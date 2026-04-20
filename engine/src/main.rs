@@ -9,10 +9,10 @@ mod deck_parser;
 mod web_server;
 mod bot;
 mod game_setup;
+mod ability_resolver;
 
 use player::Player;
 use game_state::GameState;
-use std::io::{self, BufRead};
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use serde_json;
@@ -128,6 +128,12 @@ fn main() {
             }
             "headless" => {
                 bot::headless::run_headless_game();
+            }
+            "interactive" => {
+                bot::interactive_headless::run_interactive_headless();
+            }
+            "test" => {
+                bot::test_mode::run_test_mode();
             }
             "tournament" => {
                 bot::tournament::run_tournament();

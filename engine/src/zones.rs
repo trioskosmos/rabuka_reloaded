@@ -1,7 +1,7 @@
-use crate::card::{Card, HeartColor, HeartIcon};
+use crate::card::{Card, HeartColor, HeartIcon, Keyword};
 use std::collections::VecDeque;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Orientation {
     Active,
     Wait,
@@ -89,12 +89,12 @@ impl Stage {
         }
     }
 
-    pub fn member_in_position(&self, position: crate::card::Keyword) -> bool {
+    pub fn member_in_position(&self, position: Keyword) -> bool {
         // Check if a member is in the specified position (Center, LeftSide, RightSide)
         match position {
-            crate::card::Keyword::Center => self.center.is_some(),
-            crate::card::Keyword::LeftSide => self.left_side.is_some(),
-            crate::card::Keyword::RightSide => self.right_side.is_some(),
+            Keyword::Center => self.center.is_some(),
+            Keyword::LeftSide => self.left_side.is_some(),
+            Keyword::RightSide => self.right_side.is_some(),
             _ => false,
         }
     }
@@ -293,6 +293,53 @@ impl Stage {
         }
     }
 
+    // ============== STATE CHANGE METHODS ==============
+
+    /// Set orientation of card in specific position
+    pub fn set_card_orientation(&mut self, area: MemberArea, orientation: Orientation) -> Result<(), String> {
+        let mut card_in_zone = match area {
+            MemberArea::LeftSide => self.left_side.as_mut(),
+            MemberArea::Center => self.center.as_mut(),
+            MemberArea::RightSide => self.right_side.as_mut(),
+        };
+
+        if let Some(ref mut card) = card_in_zone {
+            card.orientation = Some(orientation);
+            Ok(())
+        } else {
+            Err(format!("No card in {:?}", area))
+        }
+    }
+
+    /// Set face state of card in specific position
+    pub fn set_card_face_state(&mut self, area: MemberArea, face_state: FaceState) -> Result<(), String> {
+        let mut card_in_zone = match area {
+            MemberArea::LeftSide => self.left_side.as_mut(),
+            MemberArea::Center => self.center.as_mut(),
+            MemberArea::RightSide => self.right_side.as_mut(),
+        };
+
+        if let Some(ref mut card) = card_in_zone {
+            card.face_state = face_state;
+            Ok(())
+        } else {
+            Err(format!("No card in {:?}", area))
+        }
+    }
+
+    /// Set orientation of all stage cards
+    pub fn set_all_orientation(&mut self, orientation: Orientation) {
+        if let Some(ref mut card) = self.left_side {
+            card.orientation = Some(orientation.clone());
+        }
+        if let Some(ref mut card) = self.center {
+            card.orientation = Some(orientation.clone());
+        }
+        if let Some(ref mut card) = self.right_side {
+            card.orientation = Some(orientation.clone());
+        }
+    }
+
     fn parse_heart_color(s: &str) -> HeartColor {
         match s {
             "heart00" => HeartColor::Heart00,  // Wildcard - can substitute for heart01-heart06
@@ -425,6 +472,33 @@ impl EnergyZone {
     pub fn activate_all(&mut self) {
         for card in &mut self.cards {
             card.orientation = Some(Orientation::Active);
+        }
+    }
+
+    // ============== STATE CHANGE METHODS ==============
+
+    /// Set orientation of card at specific index
+    pub fn set_card_orientation(&mut self, index: usize, orientation: Orientation) -> Result<(), String> {
+        if index >= self.cards.len() {
+            return Err(format!("Invalid energy index: {}", index));
+        }
+        self.cards[index].orientation = Some(orientation);
+        Ok(())
+    }
+
+    /// Set face state of card at specific index
+    pub fn set_card_face_state(&mut self, index: usize, face_state: FaceState) -> Result<(), String> {
+        if index >= self.cards.len() {
+            return Err(format!("Invalid energy index: {}", index));
+        }
+        self.cards[index].face_state = face_state;
+        Ok(())
+    }
+
+    /// Set orientation of all energy cards
+    pub fn set_all_orientation(&mut self, orientation: Orientation) {
+        for card in &mut self.cards {
+            card.orientation = Some(orientation.clone());
         }
     }
 }

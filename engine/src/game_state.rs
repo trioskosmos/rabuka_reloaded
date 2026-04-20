@@ -1,6 +1,13 @@
 use crate::player::Player;
 use crate::zones::ResolutionZone;
-use std::collections::{HashMap, HashSet};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AbilityTrigger {
+    Activation,      // 起動
+    Debut,          // 登場
+    LiveStart,      // ライブ開始時
+    LiveSuccess,    // ライブ成功時
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TurnPhase {
@@ -11,6 +18,9 @@ pub enum TurnPhase {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Phase {
+    // Pre-game phases (Rule 6.2)
+    RockPaperScissors,
+    Mulligan,
     // Normal phase sub-phases (Rule 7.3.3)
     Active,
     Energy,
@@ -31,6 +41,24 @@ pub enum GameResult {
     Ongoing,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Duration {
+    LiveEnd,
+    ThisTurn,
+    ThisLive,
+    Permanent,
+}
+
+#[derive(Debug, Clone)]
+pub struct TemporaryEffect {
+    pub effect_type: String,
+    pub duration: Duration,
+    pub created_turn: u32,
+    pub created_phase: Phase,
+    pub target_player_id: String,
+    pub description: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct GameState {
     pub player1: Player,
@@ -47,6 +75,24 @@ pub struct GameState {
     // Rule 8.4.2.1: Track cheer blade heart counts for victory determination
     pub player1_cheer_blade_heart_count: u32,
     pub player2_cheer_blade_heart_count: u32,
+    // Duration tracking for temporary effects
+    pub temporary_effects: Vec<TemporaryEffect>,
+    // Game result tracking
+    pub game_result: GameResult,
+    // Automatic ability triggering - Rule 9.7
+    pub pending_auto_abilities: Vec<PendingAutoAbility>,
+    // Cheer check state - must complete before checking required hearts
+    pub cheer_check_completed: bool,
+    pub cheer_checks_required: u32,
+    pub cheer_checks_done: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingAutoAbility {
+    pub ability_id: String,
+    pub trigger_type: AbilityTrigger,
+    pub player_id: String,
+    pub source_card_id: Option<String>,
 }
 
 impl GameState {
@@ -61,10 +107,16 @@ impl GameState {
             resolution_zone: ResolutionZone::new(),
             is_first_turn,
             live_cheer_count: 0,
-            turn1_abilities_played: HashSet::new(),
-            turn2_abilities_played: HashMap::new(),
+            turn1_abilities_played: std::collections::HashSet::new(),
+            turn2_abilities_played: std::collections::HashMap::new(),
             player1_cheer_blade_heart_count: 0,
             player2_cheer_blade_heart_count: 0,
+            temporary_effects: Vec::new(),
+            game_result: GameResult::Ongoing,
+            pending_auto_abilities: Vec::new(),
+            cheer_check_completed: false,
+            cheer_checks_required: 0,
+            cheer_checks_done: 0,
         }
     }
 
@@ -173,6 +225,36 @@ impl GameState {
         *self.turn2_abilities_played.entry(ability_id).or_insert(0) += 1;
     }
 
+    pub fn can_activate_center_ability(&self, player_id: &str, card_no: &str) -> bool {
+        // Rule 11.7.2: Center ability can only activate if member is in center area
+        let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
+        if let Some(card_in_zone) = player.stage.get_area(crate::zones::MemberArea::Center) {
+            card_in_zone.card.card_no == card_no
+        } else {
+            false
+        }
+    }
+
+    pub fn can_activate_left_side_ability(&self, player_id: &str, card_no: &str) -> bool {
+        // Rule 11.8.2: LeftSide ability can only activate if member is in left side area
+        let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
+        if let Some(card_in_zone) = player.stage.get_area(crate::zones::MemberArea::LeftSide) {
+            card_in_zone.card.card_no == card_no
+        } else {
+            false
+        }
+    }
+
+    pub fn can_activate_right_side_ability(&self, player_id: &str, card_no: &str) -> bool {
+        // Rule 11.9.2: RightSide ability can only activate if member is in right side area
+        let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
+        if let Some(card_in_zone) = player.stage.get_area(crate::zones::MemberArea::RightSide) {
+            card_in_zone.card.card_no == card_no
+        } else {
+            false
+        }
+    }
+
     pub fn reset_keyword_tracking(&mut self) {
         // Reset keyword tracking at start of new turn
         self.turn1_abilities_played.clear();
@@ -180,6 +262,195 @@ impl GameState {
         // Reset cheer blade heart counts at start of new turn
         self.player1_cheer_blade_heart_count = 0;
         self.player2_cheer_blade_heart_count = 0;
+        // Reset cheer check state
+        self.cheer_check_completed = false;
+    }
+
+    pub fn perform_cheer_check(&mut self, player_id: &str, blade_count: u32) -> Result<(), String> {
+        // Rule: Execute cheer - move top cards from main deck to resolution zone
+        let player = if player_id == self.player1.id {
+            &mut self.player1
+        } else {
+            &mut self.player2
+        };
+
+        // Set required count on first call
+        if self.cheer_checks_required == 0 {
+            self.cheer_checks_required = blade_count;
+        }
+
+        for _ in 0..blade_count {
+            if let Some(card) = player.main_deck.draw() {
+                self.resolution_zone.cards.push(card);
+                self.cheer_checks_done += 1;
+            }
+        }
+
+        // Mark as completed only when all required checks are done
+        if self.cheer_checks_done >= self.cheer_checks_required {
+            self.cheer_check_completed = true;
+        }
+        Ok(())
+    }
+
+    pub fn check_required_hearts(&self) -> Result<bool, String> {
+        // Rule: Can only check required hearts after all cheer checks are completed
+        if self.cheer_checks_done < self.cheer_checks_required {
+            return Err(format!("Cannot check required hearts: {} of {} cheer checks completed", 
+                self.cheer_checks_done, self.cheer_checks_required));
+        }
+        Ok(true)
+    }
+
+    pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {
+        // Rule: In live victory determination phase, after winner places cards in success zone
+        // Remaining cards in resolution zone go to waitroom
+        let player = if player_id == self.player1.id {
+            &mut self.player1
+        } else {
+            &mut self.player2
+        };
+
+        for card in self.resolution_zone.cards.drain(..) {
+            player.waitroom.cards.push(card);
+        }
+    }
+
+    pub fn trigger_auto_ability(&mut self, ability_id: String, trigger_type: AbilityTrigger, player_id: String, source_card_id: Option<String>) {
+        // Rule 9.7.2: When automatic ability trigger condition is met, it enters waiting state
+        self.pending_auto_abilities.push(PendingAutoAbility {
+            ability_id,
+            trigger_type,
+            player_id,
+            source_card_id,
+        });
+    }
+
+    pub fn process_pending_auto_abilities(&mut self, active_player_id: &str) {
+        // Rule 9.5.1: After rule processing, play and resolve automatic abilities
+        // Rule 9.5.3.2: Active player chooses which of their waiting abilities to play first
+        // Rule 9.5.3.3: Non-active player then plays their waiting abilities
+        
+        let mut processed = Vec::new();
+        let mut abilities_to_execute = Vec::new();
+        
+        // Collect abilities to execute first (to avoid borrow checker issues)
+        for (i, pending) in self.pending_auto_abilities.iter().enumerate() {
+            if pending.player_id == active_player_id {
+                processed.push(i);
+                if let Some(ref card_no) = pending.source_card_id {
+                    abilities_to_execute.push((card_no.clone(), pending.player_id.clone()));
+                }
+            }
+        }
+        
+        // Process non-active player's abilities
+        let non_active_id = if active_player_id == self.player1.id { self.player2.id.as_str() } else { self.player1.id.as_str() };
+        for (i, pending) in self.pending_auto_abilities.iter().enumerate() {
+            if pending.player_id == non_active_id && !processed.contains(&i) {
+                processed.push(i);
+                if let Some(ref card_no) = pending.source_card_id {
+                    abilities_to_execute.push((card_no.clone(), pending.player_id.clone()));
+                }
+            }
+        }
+        
+        // Remove processed abilities (in reverse order to maintain indices)
+        processed.sort_by(|a, b| b.cmp(a));
+        for i in processed {
+            self.pending_auto_abilities.remove(i);
+        }
+        
+        // Execute collected abilities
+        for (card_no, player_id) in abilities_to_execute {
+            self.execute_card_ability(&card_no, &player_id);
+        }
+    }
+    
+    fn execute_card_ability(&mut self, card_no: &str, player_id: &str) {
+        // Find the card and its abilities, then execute them directly on game state
+        // Note: We execute effects directly to avoid cloning the game state
+        
+        let player_id_clone = player_id.to_string();
+        let player = if player_id_clone == self.player1.id {
+            &self.player1
+        } else {
+            &self.player2
+        };
+        
+        // Search for the card on stage or in other zones
+        let card = {
+            let mut found_card = None;
+            
+            // Check stage
+            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            for area in areas {
+                if let Some(card_in_zone) = player.stage.get_area(area) {
+                    if card_in_zone.card.card_no == card_no {
+                        found_card = Some(&card_in_zone.card);
+                        break;
+                    }
+                }
+            }
+            
+            // Check live card zone
+            if found_card.is_none() {
+                for card in &player.live_card_zone.cards {
+                    if card.card_no == card_no {
+                        found_card = Some(card);
+                        break;
+                    }
+                }
+            }
+            
+            found_card
+        };
+        
+        if let Some(card) = card {
+            let abilities = card.abilities.clone();
+            for ability in &abilities {
+                if let Some(ref effect) = ability.effect {
+                    // Execute effect directly on self (the actual game state)
+                    // For now, we'll implement basic effects inline
+                    self.execute_ability_effect(effect, &player_id_clone);
+                }
+            }
+        }
+    }
+    
+    fn execute_ability_effect(&mut self, effect: &crate::card::AbilityEffect, player_id: &str) {
+        // Execute ability effects directly on game state
+        match effect.action.as_str() {
+            "draw" => {
+                let count = effect.count.unwrap_or(1);
+                let player = if player_id == self.player1.id {
+                    &mut self.player1
+                } else {
+                    &mut self.player2
+                };
+                for _ in 0..count {
+                    let _ = player.draw_card();
+                }
+            }
+            "move_cards" => {
+                // TODO: Implement card movement
+                eprintln!("move_cards effect not yet implemented");
+            }
+            "gain_resource" => {
+                // TODO: Implement resource gain
+                eprintln!("gain_resource effect not yet implemented");
+            }
+            "sequential" => {
+                if let Some(ref actions) = effect.actions {
+                    for action in actions {
+                        self.execute_ability_effect(action, player_id);
+                    }
+                }
+            }
+            _ => {
+                eprintln!("Unknown ability effect: {}", effect.action);
+            }
+        }
     }
 
     pub fn check_victory(&self) -> GameResult {
@@ -187,10 +458,10 @@ impl GameState {
         // Player wins if they have 3+ success live cards AND opponent has 2 or fewer
         let p1_success = self.player1.success_live_card_zone.len();
         let p2_success = self.player2.success_live_card_zone.len();
-        
+
         let p1_wins = p1_success >= 3 && p2_success <= 2;
         let p2_wins = p2_success >= 3 && p1_success <= 2;
-        
+
         // Rule 1.2.1.2: If both have 3+ simultaneously, it's a draw
         if p1_success >= 3 && p2_success >= 3 {
             GameResult::Draw
@@ -201,5 +472,196 @@ impl GameState {
         } else {
             GameResult::Ongoing
         }
+    }
+
+    // ============== TARGET RESOLUTION ==============
+
+    /// Resolve target string to player reference(s)
+    /// Returns a vector of player references (0-2 players)
+    /// For "self" or "opponent", returns single player
+    /// For "both", returns both players
+    /// For "either", returns both players (caller must choose)
+    pub fn resolve_target<'a>(&'a self, target: &str, perspective_player: &'a Player) -> Vec<&'a Player> {
+        match target {
+            "self" | "自分" => {
+                vec![perspective_player]
+            }
+            "opponent" | "相手" => {
+                if std::ptr::eq(perspective_player, &self.player1) {
+                    vec![&self.player2]
+                } else {
+                    vec![&self.player1]
+                }
+            }
+            "both" | "両方" => {
+                vec![&self.player1, &self.player2]
+            }
+            "either" | "どちらか" => {
+                vec![&self.player1, &self.player2]
+            }
+            _ => vec![],
+        }
+    }
+
+    /// Resolve target string to mutable player reference(s)
+    pub fn resolve_target_mut(&mut self, target: &str, perspective_player_id: &str) -> Vec<&mut Player> {
+        match target {
+            "self" | "自分" => {
+                if perspective_player_id == self.player1.id {
+                    vec![&mut self.player1]
+                } else {
+                    vec![&mut self.player2]
+                }
+            }
+            "opponent" | "相手" => {
+                if perspective_player_id == self.player1.id {
+                    vec![&mut self.player2]
+                } else {
+                    vec![&mut self.player1]
+                }
+            }
+            "both" | "両方" => {
+                vec![&mut self.player1, &mut self.player2]
+            }
+            "either" | "どちらか" => {
+                vec![&mut self.player1, &mut self.player2]
+            }
+            _ => vec![],
+        }
+    }
+
+    /// Get player by ID
+    pub fn get_player(&self, player_id: &str) -> Option<&Player> {
+        if self.player1.id == player_id {
+            Some(&self.player1)
+        } else if self.player2.id == player_id {
+            Some(&self.player2)
+        } else {
+            None
+        }
+    }
+
+    /// Get mutable player by ID
+    pub fn get_player_mut(&mut self, player_id: &str) -> Option<&mut Player> {
+        if self.player1.id == player_id {
+            Some(&mut self.player1)
+        } else if self.player2.id == player_id {
+            Some(&mut self.player2)
+        } else {
+            None
+        }
+    }
+
+    // ============== TRIGGER DETECTION ==============
+
+    /// Check if debut trigger should occur (member placed on stage from non-stage zone)
+    pub fn should_trigger_debut(&self, _player: &Player, card: &crate::card::Card) -> bool {
+        // Rule 11.4: Debut - member placed on stage from non-stage zone
+        card.is_member()
+    }
+
+    /// Check if live start trigger should occur
+    pub fn should_trigger_live_start(&self, _player: &Player) -> bool {
+        // Rule 11.5: Live Start - at start of performance phase when active player
+        self.current_phase == Phase::FirstAttackerPerformance
+            || self.current_phase == Phase::SecondAttackerPerformance
+    }
+
+    /// Check if live success trigger should occur
+    pub fn should_trigger_live_success(&self, _player: &Player) -> bool {
+        // Rule 11.6: Live Success - when player's live is successful
+        // This is determined by comparing live scores during LiveVictoryDetermination phase
+        self.current_phase == Phase::LiveVictoryDetermination
+    }
+
+    /// Get all triggerable abilities for a card given current game state
+    pub fn get_triggerable_abilities<'a>(
+        &self,
+        card: &'a crate::card::Card,
+        trigger: AbilityTrigger,
+        player: &Player,
+    ) -> Vec<&'a crate::card::Ability> {
+        card.abilities.iter().filter(|ability| {
+            match trigger {
+                AbilityTrigger::Activation => {
+                    // Activation abilities can always be triggered (subject to conditions)
+                    ability.triggers.as_ref().map_or(false, |t| t == "起動")
+                }
+                AbilityTrigger::Debut => {
+                    ability.triggers.as_ref().map_or(false, |t| t == "登場")
+                        && self.should_trigger_debut(player, card)
+                }
+                AbilityTrigger::LiveStart => {
+                    ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時")
+                        && self.should_trigger_live_start(player)
+                }
+                AbilityTrigger::LiveSuccess => {
+                    ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時")
+                        && self.should_trigger_live_success(player)
+                }
+            }
+        }).collect()
+    }
+
+    // ============== DURATION MANAGEMENT ==============
+
+    /// Add a temporary effect with duration
+    pub fn add_temporary_effect(
+        &mut self,
+        effect_type: String,
+        duration: Duration,
+        target_player_id: String,
+        description: String,
+    ) {
+        self.temporary_effects.push(TemporaryEffect {
+            effect_type,
+            duration,
+            created_turn: self.turn_number,
+            created_phase: self.current_phase.clone(),
+            target_player_id,
+            description,
+        });
+    }
+
+    /// Check and remove expired effects based on current game state
+    pub fn check_expired_effects(&mut self) {
+        let mut expired_indices = Vec::new();
+
+        for (i, effect) in self.temporary_effects.iter().enumerate() {
+            let is_expired = match effect.duration {
+                Duration::LiveEnd => {
+                    // Expire when leaving Live phase
+                    self.current_turn_phase != TurnPhase::Live
+                }
+                Duration::ThisTurn => {
+                    // Expire when turn number changes
+                    self.turn_number > effect.created_turn
+                }
+                Duration::ThisLive => {
+                    // Expire when leaving Live phase
+                    self.current_turn_phase != TurnPhase::Live
+                }
+                Duration::Permanent => false,
+            };
+
+            if is_expired {
+                expired_indices.push(i);
+            }
+        }
+
+        // Remove expired effects (in reverse order to maintain indices)
+        for i in expired_indices.into_iter().rev() {
+            let _effect = self.temporary_effects.remove(i);
+            // Revert the effect (for now, just log it)
+            // TODO: Implement effect reversal logic
+        }
+    }
+
+    /// Get active temporary effects for a specific player
+    pub fn get_active_effects_for_player(&self, player_id: &str) -> Vec<&TemporaryEffect> {
+        self.temporary_effects
+            .iter()
+            .filter(|e| e.target_player_id == player_id)
+            .collect()
     }
 }

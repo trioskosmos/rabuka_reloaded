@@ -8,6 +8,7 @@ use crate::player::Player;
 
 /// AI strategy for choosing actions
 pub struct AIPlayer {
+    #[allow(dead_code)]
     name: String,
 }
 
@@ -25,17 +26,25 @@ impl AIPlayer {
             return 0;
         }
         
-        // Improved strategy: prioritize passing when no member cards can be played
+        // Improved strategy: prioritize playing member cards to build stage
         let mut rng = rand::thread_rng();
         
-        // Look for "play_member" actions first
+        // Look for "Play [card name] to [area] area" actions (member cards)
+        // These are actions that start with "Play " and end with " area"
+        let mut play_actions = Vec::new();
         for (i, action) in actions.iter().enumerate() {
-            if action.contains("Play member") {
-                return i;
+            if action.starts_with("Play ") && action.ends_with(" area") {
+                play_actions.push(i);
             }
         }
         
-        // If no member cards available, always pass
+        // If we have play actions, choose one randomly
+        if !play_actions.is_empty() {
+            return play_actions[rng.gen_range(0..play_actions.len())];
+        }
+        
+        // If no member cards available (stage full or hand empty), always pass
+        // Don't swap endlessly - swapping doesn't progress the game
         for (i, action) in actions.iter().enumerate() {
             if action.contains("Pass") {
                 return i;

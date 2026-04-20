@@ -9,62 +9,25 @@ use serde::{Serialize, Deserialize};
 pub struct Action {
     pub description: String,
     pub action_type: String,
+    pub parameters: Option<ActionParameters>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActionParameters {
+    pub card_index: Option<usize>,
+    pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
+    pub stage_area: Option<String>, // "left", "center", "right"
 }
 
 pub fn setup_game(game_state: &mut GameState) {
     // Rule 6.2: Pre-Game Procedure
-    
-    // Rule 6.2.2: Rock Paper Scissors to determine who chooses to go first
-    let rps_winner = play_rock_paper_scissors();
-    // Winner chooses to be first or second attacker
-    // For now, default: winner of RPS becomes first attacker
-    if rps_winner == 1 {
-        game_state.player1.is_first_attacker = true;
-        game_state.player2.is_first_attacker = false;
-    } else {
-        game_state.player1.is_first_attacker = false;
-        game_state.player2.is_first_attacker = true;
-    }
-    
-    // Rule 6.2.5: Initial draw - Each player draws 6 cards from main deck to hand
-    for _ in 0..6 {
-        game_state.player1.draw_card();
-        game_state.player2.draw_card();
-    }
-    
-    // Rule 6.2.6: Mulligan - Players may return cards and draw new cards
-    // Rule 6.2.1.6: Starting from first attacker, each player chooses cards to mulligan
-    perform_mulligan(game_state);
-    
-    // Rule 6.2.7: Initial energy - Each player draws 3 cards from energy deck to Energy Zone
-    // Rule 6.2.1.7: These initial energy cards start in Active state
-    for _ in 0..3 {
-        if let Some(card) = game_state.player1.energy_deck.draw() {
-            let card_in_zone = crate::zones::CardInZone {
-                card: card.clone(),
-                orientation: Some(crate::zones::Orientation::Active),
-                face_state: crate::zones::FaceState::FaceUp,
-                energy_underneath: Vec::new(),
-            };
-            let _ = game_state.player1.energy_zone.add_card(card_in_zone);
-        }
-        if let Some(card) = game_state.player2.energy_deck.draw() {
-            let card_in_zone = crate::zones::CardInZone {
-                card: card.clone(),
-                orientation: Some(crate::zones::Orientation::Active),
-                face_state: crate::zones::FaceState::FaceUp,
-                energy_underneath: Vec::new(),
-            };
-            let _ = game_state.player2.energy_zone.add_card(card_in_zone);
-        }
-    }
-    
-    // Set phase to Active to start the game
-    game_state.current_phase = crate::game_state::Phase::Active;
+    // Start at RockPaperScissors phase - player will choose RPS option
+    game_state.current_phase = crate::game_state::Phase::RockPaperScissors;
 }
 
 /// Rock-paper-scissors for determining first attacker
 /// Returns 1 if player 1 wins, 2 if player 2 wins
+#[allow(dead_code)]
 pub fn play_rock_paper_scissors() -> u8 {
     use rand::Rng;
     let mut rng = rand::thread_rng();
@@ -89,12 +52,14 @@ pub fn play_rock_paper_scissors() -> u8 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 enum RockPaperScissorsChoice {
     Rock,
     Paper,
     Scissors,
 }
 
+#[allow(dead_code)]
 fn perform_mulligan(game_state: &mut GameState) {
     // Rule 6.2.1.6: Mulligan phase
     // Starting from first attacker, each player may return cards to deck and draw new ones
@@ -113,35 +78,40 @@ fn perform_mulligan(game_state: &mut GameState) {
     perform_player_mulligan(second_player);
 }
 
+#[allow(dead_code)]
 fn perform_player_mulligan(player: &mut Player) {
     use rand::seq::SliceRandom;
     
+    // Rule 6.2.1.6: Starting from first attacker, each player chooses any number of cards from hand
     // Simple rule-based strategy: mulligan if hand has no member cards
     let has_member = player.hand.cards.iter().any(|c| !c.is_energy() && !c.is_live());
     
     if !has_member && !player.hand.cards.is_empty() {
         // Mulligan all cards
-        let cards_to_return: Vec<_> = player.hand.cards.drain(..).collect();
-        let num_to_draw = cards_to_return.len();
+        let num_to_mulligan = player.hand.cards.len();
+        let cards_to_set_aside: Vec<_> = player.hand.cards.drain(..).collect();
         
-        // Move set-aside cards to main deck
-        for card in cards_to_return {
+        // Rule 6.2.1.6: Place cards face-down to the side (waitroom temporarily)
+        // We'll hold them in a temporary vector
+        
+        // Rule 6.2.1.6: Draw the same number of cards from main deck to hand
+        for _ in 0..num_to_mulligan {
+            let _ = player.draw_card();
+        }
+        
+        // Rule 6.2.1.6: Move set-aside cards to main deck
+        for card in cards_to_set_aside {
             player.main_deck.cards.push_back(card);
         }
         
-        // Shuffle main deck
+        // Rule 6.2.1.6: Shuffle if 1+ cards were moved
         let mut deck_vec: Vec<_> = player.main_deck.cards.drain(..).collect();
         deck_vec.shuffle(&mut rand::thread_rng());
         for card in deck_vec {
             player.main_deck.cards.push_back(card);
         }
         
-        // Draw new cards
-        for _ in 0..num_to_draw {
-            let _ = player.draw_card();
-        }
-        
-        println!("Player mulliganed {} cards", num_to_draw);
+        println!("Player mulliganed {} cards", num_to_mulligan);
     } else {
         println!("Player kept their hand");
     }
@@ -152,6 +122,70 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     let active_player = game_state.active_player();
     
     match game_state.current_phase {
+        crate::game_state::Phase::RockPaperScissors => {
+            // Rule 6.2.2: Rock Paper Scissors to determine who chooses to go first
+            // Generate actions for player 1 to choose RPS option
+            actions.push(Action {
+                description: "Rock".to_string(),
+                action_type: "rps_choice".to_string(),
+                parameters: Some(ActionParameters {
+                    card_index: Some(0), // 0 = rock
+                    card_indices: None,
+                    stage_area: Some("rock".to_string()),
+                }),
+            });
+            actions.push(Action {
+                description: "Paper".to_string(),
+                action_type: "rps_choice".to_string(),
+                parameters: Some(ActionParameters {
+                    card_index: Some(1), // 1 = paper
+                    card_indices: None,
+                    stage_area: Some("paper".to_string()),
+                }),
+            });
+            actions.push(Action {
+                description: "Scissors".to_string(),
+                action_type: "rps_choice".to_string(),
+                parameters: Some(ActionParameters {
+                    card_index: Some(2), // 2 = scissors
+                    card_indices: None,
+                    stage_area: Some("scissors".to_string()),
+                }),
+            });
+        }
+        crate::game_state::Phase::Mulligan => {
+            // Rule 6.2.1.6: Mulligan - player chooses cards to mulligan
+            // Generate actions for each card in hand to select/deselect for mulligan
+            for (hand_index, card) in active_player.hand.cards.iter().enumerate() {
+                actions.push(Action {
+                    description: format!("Select {} for mulligan", card.name),
+                    action_type: "select_mulligan".to_string(),
+                    parameters: Some(ActionParameters {
+                        card_index: Some(hand_index),
+                        card_indices: None,
+                        stage_area: None,
+                    }),
+                });
+            }
+            
+            // Add action to confirm mulligan selection
+            actions.push(Action {
+                description: "Confirm mulligan (keep selected cards)".to_string(),
+                action_type: "confirm_mulligan".to_string(),
+                parameters: Some(ActionParameters {
+                    card_index: None,
+                    card_indices: Some(vec![]), // Will be populated with selected indices
+                    stage_area: None,
+                }),
+            });
+            
+            // Add action to skip mulligan
+            actions.push(Action {
+                description: "Skip mulligan (keep all cards)".to_string(),
+                action_type: "skip_mulligan".to_string(),
+                parameters: None,
+            });
+        }
         crate::game_state::Phase::Active => {
             // Rule 7.4: Active Phase - AUTOMATIC, no player actions
             // Energy activation happens automatically in advance_phase
@@ -169,101 +203,120 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             actions.push(Action {
                 description: "Pass - End Main Phase".to_string(),
                 action_type: "pass".to_string(),
+                parameters: None,
             });
             
-            // Rule 8.2: Main Phase - Can play member cards to stage
-            if active_player.can_play_member_to_stage() {
-                actions.push(Action {
-                    description: "Play member card from hand to stage".to_string(),
-                    action_type: "play_member_to_stage".to_string(),
-                });
+            // Rule 7.7.2.2: Main Phase - Can play member cards to stage
+            // Generate specific actions for each member card and each available area
+            // Only generate member cards (not live cards) - live cards are used in live phase
+            for (hand_index, card) in active_player.hand.cards.iter().enumerate() {
+                if card.is_member() && !card.is_live() {
+                    // Check which areas are available
+                    let areas = [
+                        (crate::zones::MemberArea::LeftSide, "left"),
+                        (crate::zones::MemberArea::Center, "center"),
+                        (crate::zones::MemberArea::RightSide, "right"),
+                    ];
+                    
+                    for (area, area_name) in areas {
+                        if active_player.stage.get_area(area).is_none() {
+                            // Check if player can afford this card (considering baton touch)
+                            let card_cost = card.cost.unwrap_or(0);
+                            let active_energy_count = active_player.energy_zone.cards.iter()
+                                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+                                .count() as u32;
+                            
+                            // Rule 9.6.2.3.2: Baton touch - can send member from TARGET area to waitroom to reduce cost
+                            // Check if can afford with energy OR with baton touch from target area
+                            let can_afford = if card_cost == 0 {
+                                true
+                            } else if active_energy_count >= card_cost {
+                                true
+                            } else {
+                                // Check if can use baton touch from target area
+                                // Need at least 1 energy to pay remaining cost after baton touch
+                                if active_energy_count >= 1 {
+                                    // Check if TARGET area has a member for baton touch
+                                    let has_member_in_target = match area {
+                                        crate::zones::MemberArea::LeftSide => active_player.stage.left_side.is_some(),
+                                        crate::zones::MemberArea::Center => active_player.stage.center.is_some(),
+                                        crate::zones::MemberArea::RightSide => active_player.stage.right_side.is_some(),
+                                    };
+                                    
+                                    if has_member_in_target {
+                                        // Get member cost from target area for baton touch
+                                        let member_cost = match area {
+                                            crate::zones::MemberArea::LeftSide => active_player.stage.left_side.as_ref().map(|m| m.card.cost.unwrap_or(0)),
+                                            crate::zones::MemberArea::Center => active_player.stage.center.as_ref().map(|m| m.card.cost.unwrap_or(0)),
+                                            crate::zones::MemberArea::RightSide => active_player.stage.right_side.as_ref().map(|m| m.card.cost.unwrap_or(0)),
+                                        };
+                                        let reduced_cost = card_cost.saturating_sub(member_cost.unwrap_or(0));
+                                        active_energy_count >= reduced_cost
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            };
+                            
+                            if can_afford {
+                                actions.push(Action {
+                                    description: format!("Play {} ({}) to {} area", card.name, card.card_no, area_name),
+                                    action_type: "play_member_to_stage".to_string(),
+                                    parameters: Some(ActionParameters {
+                                        card_index: Some(hand_index),
+                                        card_indices: None,
+                                        stage_area: Some(area_name.to_string()),
+                                    }),
+                                });
+                            }
+                        }
+                    }
+                }
             }
             
-            // Rule 5.5: Can shuffle deck if not empty
-            if active_player.can_shuffle_zone("deck") {
-                actions.push(Action {
-                    description: "Shuffle main deck".to_string(),
-                    action_type: "shuffle_deck".to_string(),
-                });
-            }
-            
-            // Rule 5.7: Can look at top cards
-            if active_player.can_look_at_top(1) {
-                actions.push(Action {
-                    description: "Look at top card of main deck".to_string(),
-                    action_type: "look_at_top".to_string(),
-                });
-            }
-            
-            // Rule 5.8: Can swap cards between areas
-            if active_player.can_swap_cards(
-                crate::zones::MemberArea::LeftSide,
-                crate::zones::MemberArea::Center,
-            ) {
-                actions.push(Action {
-                    description: "Swap left side and center members".to_string(),
-                    action_type: "swap_left_center".to_string(),
-                });
-            }
-            if active_player.can_swap_cards(
-                crate::zones::MemberArea::Center,
-                crate::zones::MemberArea::RightSide,
-            ) {
-                actions.push(Action {
-                    description: "Swap center and right side members".to_string(),
-                    action_type: "swap_center_right".to_string(),
-                });
-            }
-            if active_player.can_swap_cards(
-                crate::zones::MemberArea::LeftSide,
-                crate::zones::MemberArea::RightSide,
-            ) {
-                actions.push(Action {
-                    description: "Swap left side and right side members".to_string(),
-                    action_type: "swap_left_right".to_string(),
-                });
-            }
-            
-            // Rule 5.9: Can pay energy
-            if active_player.can_pay_energy(1) {
-                actions.push(Action {
-                    description: "Pay 1 energy".to_string(),
-                    action_type: "pay_energy_1".to_string(),
-                });
-            }
-            if active_player.can_pay_energy(2) {
-                actions.push(Action {
-                    description: "Pay 2 energy".to_string(),
-                    action_type: "pay_energy_2".to_string(),
-                });
-            }
-            
-            // Can place energy under members
-            if active_player.can_place_energy_under_member(crate::zones::MemberArea::LeftSide) {
-                actions.push(Action {
-                    description: "Place energy under left side member".to_string(),
-                    action_type: "place_energy_under_left".to_string(),
-                });
-            }
-            if active_player.can_place_energy_under_member(crate::zones::MemberArea::Center) {
-                actions.push(Action {
-                    description: "Place energy under center member".to_string(),
-                    action_type: "place_energy_under_center".to_string(),
-                });
-            }
-            if active_player.can_place_energy_under_member(crate::zones::MemberArea::RightSide) {
-                actions.push(Action {
-                    description: "Place energy under right side member".to_string(),
-                    action_type: "place_energy_under_right".to_string(),
-                });
-            }
+            // Basic abilityless play - only pass and play member cards
+            // Advanced actions (swap, pay energy, place energy under members) removed for basic play
         }
         crate::game_state::Phase::LiveCardSet => {
-            // Rule 9.1: Live Card Set Phase - Can place cards in live zone
-            if active_player.can_place_in_live_zone() {
+            // Rule 8.2: Live Card Set Phase - Can place up to 3 live cards face-down
+            // Generate actions for placing specific live cards
+            let live_cards: Vec<_> = active_player.hand.cards.iter()
+                .enumerate()
+                .filter(|(_, c)| c.is_live())
+                .collect();
+            
+            if !live_cards.is_empty() {
+                // Add action to place 0 cards (skip live)
                 actions.push(Action {
-                    description: "Place card in Live Card Zone".to_string(),
-                    action_type: "place_in_live_zone".to_string(),
+                    description: "Place 0 live cards (skip)".to_string(),
+                    action_type: "place_live_cards".to_string(),
+                    parameters: Some(ActionParameters {
+                        card_index: None,
+                        card_indices: Some(vec![]),
+                        stage_area: None,
+                    }),
+                });
+                
+                // Generate actions for placing 1-3 specific cards
+                // Generate all combinations of 1-3 cards from available live cards
+                let max_cards = std::cmp::min(3, live_cards.len());
+                
+                // Generate combinations using simple approach
+                for count in 1..=max_cards {
+                    generate_live_card_combinations(&live_cards, count, &mut actions);
+                }
+            } else {
+                // No live cards, must place 0
+                actions.push(Action {
+                    description: "Place 0 live cards (no live cards in hand)".to_string(),
+                    action_type: "place_live_cards".to_string(),
+                    parameters: Some(ActionParameters {
+                        card_index: None,
+                        card_indices: Some(vec![]),
+                        stage_area: None,
+                    }),
                 });
             }
         }
@@ -275,4 +328,45 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     }
     
     actions
+}
+
+fn generate_live_card_combinations(live_cards: &[(usize, &crate::card::Card)], count: usize, actions: &mut Vec<Action>) {
+    // Generate all combinations of 'count' cards from live_cards
+    // Use a simple recursive approach
+    let mut indices = Vec::new();
+    generate_combinations_recursive(live_cards, count, 0, &mut indices, actions);
+}
+
+fn generate_combinations_recursive(
+    live_cards: &[(usize, &crate::card::Card)],
+    count: usize,
+    start: usize,
+    current: &mut Vec<usize>,
+    actions: &mut Vec<Action>,
+) {
+    if current.len() == count {
+        // Generate action for this combination
+        let card_names: Vec<String> = current.iter()
+            .map(|&idx| live_cards[idx].1.name.clone())
+            .collect();
+        let description = format!("Place live card(s): {} face-down", card_names.join(", "));
+        let indices: Vec<usize> = current.iter().map(|&idx| live_cards[idx].0).collect();
+        
+        actions.push(Action {
+            description,
+            action_type: "place_live_cards".to_string(),
+            parameters: Some(ActionParameters {
+                card_index: None,
+                card_indices: Some(indices),
+                stage_area: None,
+            }),
+        });
+        return;
+    }
+    
+    for i in start..live_cards.len() {
+        current.push(i);
+        generate_combinations_recursive(live_cards, count, i + 1, current, actions);
+        current.pop();
+    }
 }

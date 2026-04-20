@@ -172,6 +172,44 @@ fn run_single_game(
         
         // Auto-advance automatic phases
         match game_state.current_phase {
+            crate::game_state::Phase::RockPaperScissors => {
+                // RPS phase - let the AI choose
+                let ai = ai::AIPlayer::new("TournamentAI".to_string());
+                let actions = crate::game_setup::generate_possible_actions(&game_state);
+                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
+                let chosen_index = ai.choose_action(&action_descriptions);
+                
+                let result = turn::TurnEngine::execute_main_phase_action(
+                    &mut game_state,
+                    &actions[chosen_index].action_type,
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                );
+                
+                if let Err(e) = result {
+                    println!("RPS action failed: {}", e);
+                }
+            }
+            crate::game_state::Phase::Mulligan => {
+                // Mulligan phase - let the AI choose
+                let ai = ai::AIPlayer::new("TournamentAI".to_string());
+                let actions = crate::game_setup::generate_possible_actions(&game_state);
+                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
+                let chosen_index = ai.choose_action(&action_descriptions);
+                
+                let result = turn::TurnEngine::execute_main_phase_action(
+                    &mut game_state,
+                    &actions[chosen_index].action_type,
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                );
+                
+                if let Err(e) = result {
+                    println!("Mulligan action failed: {}", e);
+                }
+            }
             crate::game_state::Phase::Active | 
             crate::game_state::Phase::Energy | 
             crate::game_state::Phase::Draw => {
@@ -200,12 +238,12 @@ fn run_single_game(
                         let can_afford = player.can_play_member_to_stage();
                         if !can_afford {
                             println!("Cannot afford member, passing instead");
-                            turn::TurnEngine::execute_main_phase_action(&mut game_state, "pass");
+                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, "pass", None, None, None);
                         } else {
-                            turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type);
+                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None);
                         }
                     } else {
-                        turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type);
+                        let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None);
                     }
                     
                     // Auto-advance automatic phases after action execution

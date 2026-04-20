@@ -169,6 +169,13 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
                 abilities[-1]["full_text"] += "\n" + line
                 abilities[-1]["triggerless_text"] += "\n" + line
                 continue
+            # Check if this is a fragment continuation (starts with "とき、" or similar)
+            # This handles cases where abilities are split incorrectly across newlines
+            if line.startswith('とき、') or line.startswith('なら、') or line.startswith('場合、'):
+                # Append to previous ability
+                abilities[-1]["full_text"] += line
+                abilities[-1]["triggerless_text"] += line
+                continue
         
         abilities.append({
             "card_id": card_id,

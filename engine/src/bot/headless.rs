@@ -10,6 +10,69 @@ use crate::turn;
 use crate::game_setup;
 use crate::bot::ai;
 
+fn print_game_state(game_state: &GameState) {
+    println!("--- Game State ---");
+    println!("Turn: {}, Phase: {:?}, Turn Phase: {:?}", 
+        game_state.turn_number, game_state.current_phase, game_state.current_turn_phase);
+    
+    println!("\nPlayer 1 ({}):", game_state.player1.name);
+    println!("  Hand: {} cards", game_state.player1.hand.cards.len());
+    for (i, card) in game_state.player1.hand.cards.iter().enumerate() {
+        println!("    [{}] {} ({})", i, card.name, card.card_no);
+    }
+    println!("  Energy Zone: {} cards", game_state.player1.energy_zone.cards.len());
+    println!("  Stage:");
+    if let Some(ref m) = game_state.player1.stage.left_side {
+        println!("    Left: {} ({})", m.card.name, m.card.card_no);
+    } else {
+        println!("    Left: (empty)");
+    }
+    if let Some(ref m) = game_state.player1.stage.center {
+        println!("    Center: {} ({})", m.card.name, m.card.card_no);
+    } else {
+        println!("    Center: (empty)");
+    }
+    if let Some(ref m) = game_state.player1.stage.right_side {
+        println!("    Right: {} ({})", m.card.name, m.card.card_no);
+    } else {
+        println!("    Right: (empty)");
+    }
+    println!("  Live Card Zone: {} cards", game_state.player1.live_card_zone.cards.len());
+    println!("  Success Live Card Zone: {} cards", game_state.player1.success_live_card_zone.len());
+    println!("  Waitroom: {} cards", game_state.player1.waitroom.cards.len());
+    println!("  Main Deck: {} cards", game_state.player1.main_deck.len());
+    println!("  Energy Deck: {} cards", game_state.player1.energy_deck.cards.len());
+    
+    println!("\nPlayer 2 ({}):", game_state.player2.name);
+    println!("  Hand: {} cards", game_state.player2.hand.cards.len());
+    for (i, card) in game_state.player2.hand.cards.iter().enumerate() {
+        println!("    [{}] {} ({})", i, card.name, card.card_no);
+    }
+    println!("  Energy Zone: {} cards", game_state.player2.energy_zone.cards.len());
+    println!("  Stage:");
+    if let Some(ref m) = game_state.player2.stage.left_side {
+        println!("    Left: {} ({})", m.card.name, m.card.card_no);
+    } else {
+        println!("    Left: (empty)");
+    }
+    if let Some(ref m) = game_state.player2.stage.center {
+        println!("    Center: {} ({})", m.card.name, m.card.card_no);
+    } else {
+        println!("    Center: (empty)");
+    }
+    if let Some(ref m) = game_state.player2.stage.right_side {
+        println!("    Right: {} ({})", m.card.name, m.card.card_no);
+    } else {
+        println!("    Right: (empty)");
+    }
+    println!("  Live Card Zone: {} cards", game_state.player2.live_card_zone.cards.len());
+    println!("  Success Live Card Zone: {} cards", game_state.player2.success_live_card_zone.len());
+    println!("  Waitroom: {} cards", game_state.player2.waitroom.cards.len());
+    println!("  Main Deck: {} cards", game_state.player2.main_deck.len());
+    println!("  Energy Deck: {} cards", game_state.player2.energy_deck.cards.len());
+    println!();
+}
+
 pub fn run_headless_game() {
     println!("=== Running Headless Game ===\n");
     
@@ -84,9 +147,12 @@ pub fn run_headless_game() {
     let mut game_state = GameState::new(player1, player2);
     game_setup::setup_game(&mut game_state);
     
+    // Print initial game state
+    print_game_state(&game_state);
+    
     // Run the game automatically
     let mut turn_count = 0;
-    let max_iterations = 1000;
+    let max_iterations = 100;
     let mut last_turn_number = 0;
     let mut stuck_counter = 0;
     
@@ -111,8 +177,8 @@ pub fn run_headless_game() {
             last_turn_number = game_state.turn_number;
         }
         
-        // Only print every 10 iterations to reduce output
-        if turn_count % 10 == 1 || game_state.current_phase == crate::game_state::Phase::Main {
+        // Print game state at key points
+        if game_state.current_phase == crate::game_state::Phase::Main && turn_count <= 20 {
             println!("--- Turn {} (iteration {}) ---", game_state.turn_number, turn_count);
             println!("Phase: {:?}", game_state.current_phase);
             println!("Turn Phase: {:?}", game_state.current_turn_phase);
@@ -134,11 +200,52 @@ pub fn run_headless_game() {
                 println!("\n=== Game Draw! ===");
                 return;
             }
-            crate::game_state::GameResult::Ongoing => {}
+            crate::game_state::GameResult::Ongoing => {
+                // Debug: show success live card counts
+                if turn_count % 100 == 0 {
+                    println!("P1 success cards: {}, P2 success cards: {}", 
+                        game_state.player1.success_live_card_zone.len(),
+                        game_state.player2.success_live_card_zone.len());
+                }
+            }
         }
         
         // Auto-advance automatic phases
         match game_state.current_phase {
+            crate::game_state::Phase::RockPaperScissors => {
+                // RPS phase - let the AI choose
+                let ai = ai::AIPlayer::new("HeadlessAI".to_string());
+                let actions = crate::game_setup::generate_possible_actions(&game_state);
+                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
+                let chosen_index = ai.choose_action(&action_descriptions);
+                
+                println!("RPS choice: {}", actions[chosen_index].description);
+                
+                let _ = turn::TurnEngine::execute_main_phase_action(
+                    &mut game_state,
+                    &actions[chosen_index].action_type,
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                );
+            }
+            crate::game_state::Phase::Mulligan => {
+                // Mulligan phase - let the AI choose
+                let ai = ai::AIPlayer::new("HeadlessAI".to_string());
+                let actions = crate::game_setup::generate_possible_actions(&game_state);
+                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
+                let chosen_index = ai.choose_action(&action_descriptions);
+                
+                println!("Mulligan choice: {}", actions[chosen_index].description);
+                
+                let _ = turn::TurnEngine::execute_main_phase_action(
+                    &mut game_state,
+                    &actions[chosen_index].action_type,
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                );
+            }
             crate::game_state::Phase::Active | 
             crate::game_state::Phase::Energy | 
             crate::game_state::Phase::Draw => {
@@ -164,10 +271,20 @@ pub fn run_headless_game() {
                     println!("Choosing: {}", actions[chosen_index].description);
                     
                     // Execute the chosen action
-                    turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type);
+                    let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type, actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index), actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()));
+                    
+                    // Print state after action for first few iterations
+                    if turn_count <= 20 {
+                        print_game_state(&game_state);
+                    }
                 }
             }
-            crate::game_state::Phase::LiveCardSet |
+            crate::game_state::Phase::LiveCardSet => {
+                let p1_live_count = game_state.first_attacker().hand.cards.iter().filter(|c| c.is_live()).count();
+                let p2_live_count = game_state.second_attacker().hand.cards.iter().filter(|c| c.is_live()).count();
+                println!("Auto-advancing live card set phase (P1 live cards: {}, P2 live cards: {})...", p1_live_count, p2_live_count);
+                turn::TurnEngine::advance_phase(&mut game_state);
+            }
             crate::game_state::Phase::FirstAttackerPerformance |
             crate::game_state::Phase::SecondAttackerPerformance |
             crate::game_state::Phase::LiveVictoryDetermination => {

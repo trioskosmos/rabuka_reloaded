@@ -1,298 +1,250 @@
+class MenuScene extends Phaser.Scene {
+    constructor() {
+        super('MenuScene');
+    }
+
+    create() {
+        const w = this.scale.width;
+        const h = this.scale.height;
+
+        // Title
+        this.add.text(w / 2, h * 0.2, 'Rabuka Card Game', {
+            fontSize: '48px',
+            color: '#e94560',
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        this.add.text(w / 2, h * 0.3, 'Love Live! Rabuka', {
+            fontSize: '24px',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+
+        // Deck selection
+        this.add.text(w / 2, h * 0.45, 'Select Deck:', {
+            fontSize: '20px',
+            color: '#8888aa'
+        }).setOrigin(0.5);
+
+        const decks = ['Aqours Cup', 'Muse Cup', 'Nijigaku Cup', 'Liella Cup', 'Hasunosora Cup', 'Fade Deck'];
+        this.selectedDeck = decks[0];
+
+        decks.forEach((deck, i) => {
+            const btn = this.add.text(w / 2, h * 0.52 + i * 40, deck, {
+                fontSize: '18px',
+                color: '#ffffff',
+                backgroundColor: '#0f3460',
+                padding: { x: 20, y: 10 }
+            }).setOrigin(0.5);
+
+            btn.setInteractive({ useHandCursor: true })
+               .on('pointerover', () => {
+                   btn.setStyle({ backgroundColor: '#1a1a2e', color: '#e94560' });
+               })
+               .on('pointerout', () => {
+                   btn.setStyle({ backgroundColor: '#0f3460', color: '#ffffff' });
+               })
+               .on('pointerdown', () => {
+                   this.selectedDeck = deck;
+                   // Update selection visual
+                   this.deckButtons.forEach(b => b.setStyle({ backgroundColor: '#0f3460', color: '#ffffff' }));
+                   btn.setStyle({ backgroundColor: '#e94560', color: '#ffffff' });
+               });
+
+            if (!this.deckButtons) this.deckButtons = [];
+            this.deckButtons.push(btn);
+        });
+
+        // Select first deck by default
+        this.deckButtons[0].setStyle({ backgroundColor: '#e94560', color: '#ffffff' });
+
+        // Start button
+        const startBtn = this.add.text(w / 2, h * 0.85, 'Start Game', {
+            fontSize: '24px',
+            color: '#ffffff',
+            backgroundColor: '#e94560',
+            padding: { x: 30, y: 15 },
+            fontStyle: 'bold'
+        }).setOrigin(0.5);
+
+        startBtn.setInteractive({ useHandCursor: true })
+                .on('pointerover', () => startBtn.setStyle({ backgroundColor: '#ff6b6b' }))
+                .on('pointerout', () => startBtn.setStyle({ backgroundColor: '#e94560' }))
+                .on('pointerdown', () => {
+                    this.scene.start('GameScene', { deck: this.selectedDeck });
+                });
+    }
+}
+
 class GameScene extends Phaser.Scene {
     constructor() {
         super('GameScene');
         this.gameState = null;
         this.actions = [];
-        this.draggedCard = null;
-        this.dragOffset = { x: 0, y: 0 };
         this.cardImages = new Map();
+        this.cardData = new Map();
+        this.selectedDeck = null;
     }
 
     preload() {
-        console.log('Phaser: Preload started');
-        
-        // Preload all card images
+        // Load card data first
         this.load.json('cardsData', '/cards/cards.json')
             .on('complete', () => {
                 const cardsData = this.cache.json.get('cardsData');
-                console.log('Cards data loaded, preloading images...');
+                // Store card data
+                for (const cardNo in cardsData) {
+                    this.cardData.set(cardNo, cardsData[cardNo]);
+                }
                 
                 // Preload all card images
                 for (const cardNo in cardsData) {
                     const imagePath = `/img/cards_webp/${cardNo}.webp`;
                     this.load.image(cardNo, imagePath);
                 }
-                
-                console.log('Card images preloaded');
-            })
-            .on('error', (err) => {
-                console.error('Failed to load cards data:', err);
             });
     }
 
-    create() {
-        console.log('Phaser: Create started');
+    create(data) {
+        this.selectedDeck = data.deck || 'Aqours Cup';
         
-        // Create game zones
+        this.scale.resize(window.innerWidth, window.innerHeight);
+        
+        // Create zones
         this.createZones();
         
-        // Create game info display
-        this.createGameInfo();
+        // Create UI
+        this.createUI();
         
-        // Load game state from backend
-        this.loadGameState();
+        // Show loading message
+        this.loadingText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'Initializing game...', {
+            fontSize: '24px',
+            color: '#ffffff'
+        }).setOrigin(0.5);
         
-        console.log('Phaser: Create completed');
+        // Initialize game then load state
+        this.initializeGame().then(() => {
+            if (this.loadingText) {
+                this.loadingText.destroy();
+            }
+            this.loadGameState();
+        });
+        
+        // Handle resize
+        window.addEventListener('resize', () => {
+            this.scale.resize(window.innerWidth, window.innerHeight);
+            this.createZones();
+            this.updateDisplay();
+        });
     }
 
-    async loadDeck(deckName) {
+    async initializeGame() {
         try {
-            const response = await fetch(`/decks/${deckName}.txt`);
+            // Call the init endpoint to initialize/restart the game
+            const response = await fetch('/api/init', { method: 'POST' });
             if (!response.ok) {
-                throw new Error(`Failed to load deck: ${response.statusText}`);
+                console.warn('Failed to initialize game, might already be initialized');
             }
-            const deckText = await response.text();
-            return this.parseDeck(deckText);
         } catch (error) {
-            console.error('Failed to load deck:', error);
-            console.log('Trying alternative path...');
-            // Try alternative path if first fails
-            try {
-                const altResponse = await fetch(`/decks/${deckName}.txt`);
-                if (altResponse.ok) {
-                    const deckText = await altResponse.text();
-                    return this.parseDeck(deckText);
-                }
-            } catch (e) {
-                console.error('Alternative path also failed:', e);
-            }
-            return [];
-        }
-    }
-
-    parseDeck(deckText) {
-        const cards = [];
-        const lines = deckText.split('\n');
-        
-        for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine) continue;
-            
-            const parts = trimmedLine.split(' x ');
-            if (parts.length === 2) {
-                const cardNo = parts[0].trim();
-                const quantity = parseInt(parts[1].trim());
-                
-                for (let i = 0; i < quantity; i++) {
-                    cards.push({ card_no: cardNo });
-                }
-            }
-        }
-        
-        // Shuffle the deck
-        for (let i = cards.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [cards[i], cards[j]] = [cards[j], cards[i]];
-        }
-        
-        return cards;
-    }
-
-    async loadCardData(cardNo) {
-        try {
-            const response = await fetch('/cards/cards.json');
-            if (!response.ok) {
-                throw new Error(`Failed to load cards.json: ${response.statusText}`);
-            }
-            const cardsData = await response.json();
-            return cardsData[cardNo] || null;
-        } catch (error) {
-            console.error(`Failed to load card data for ${cardNo}:`, error);
-            return null;
-        }
-    }
-
-    async loadDeckAndDisplay(deckName) {
-        const deckCards = await this.loadDeck(deckName);
-        const handZone = this['player1-hand'];
-        // Actual card aspect ratio from images: 451x630 = 0.715
-        const cardHeight = 180;
-        const cardWidth = Math.round(cardHeight * 0.715);
-        const padding = 20;
-        
-        // Display first 6 cards from deck in hand
-        const cardsToDisplay = deckCards.slice(0, 6);
-        
-        // Fallback cards if deck loading fails
-        const fallbackCards = [
-            { card_no: 'PL!S-bp2-022-L', name: 'Test Live Card', card_type: 'Live', score: 10 },
-            { card_no: 'PL!S-bp2-001-P', name: 'Test Member 1', card_type: 'Member', cost: 10, blade: 3 },
-            { card_no: 'PL!S-bp2-005-SEC', name: 'Test Member 2', card_type: 'Member', cost: 11, blade: 2 },
-            { card_no: 'PL!S-bp2-009-P', name: 'Test Member 3', card_type: 'Member', cost: 9, blade: 4 },
-            { card_no: 'PL!-sd1-001-SD', name: 'Test Energy', card_type: 'Energy' }
-        ];
-        
-        const cardsToUse = cardsToDisplay.length > 0 ? cardsToDisplay : fallbackCards.map(c => ({ card_no: c.card_no }));
-        
-        for (let i = 0; i < cardsToUse.length; i++) {
-            const deckCard = cardsToUse[i];
-            let cardData = null;
-            
-            if (cardsToDisplay.length > 0) {
-                cardData = await this.loadCardData(deckCard.card_no);
-            }
-            
-            // Use fallback data if loading failed
-            const gameCard = cardData ? {
-                card_no: deckCard.card_no,
-                name: cardData.name,
-                card_type: this.determineCardType(cardData),
-                cost: cardData.cost,
-                blade: cardData.blade,
-                score: cardData.score,
-                required_hearts: cardData.required_hearts
-            } : fallbackCards[i];
-            
-            const cardX = handZone.x + padding + i * (cardWidth + padding);
-            const cardY = handZone.y + padding + 25;
-            
-            this.createCard(cardX, cardY, cardWidth, cardHeight, gameCard, handZone, true);
-        }
-    }
-
-    determineCardType(cardData) {
-        if (cardData.score !== undefined || cardData.required_hearts !== undefined) {
-            return 'Live';
-        } else if (cardData.type === 'エネルギー' || cardData.type === 'Energy') {
-            return 'Energy';
-        }
-        return 'Member';
-    }
-
-    getCardImagePath(cardNo) {
-        // Convert card_no to image file path
-        // Format: SERIES-SET-NUMBER-RARITY.webp
-        // Example: PL!-sd1-001-SD.webp
-        if (!cardNo) return null;
-        return `/img/cards_webp/${cardNo}.webp`;
-    }
-
-    loadCardImage(cardNo) {
-        const imagePath = this.getCardImagePath(cardNo);
-        if (!imagePath) return null;
-
-        // Check if already loaded
-        if (this.cardImages.has(cardNo)) {
-            return this.cardImages.get(cardNo);
-        }
-
-        // Load the image
-        try {
-            this.load.image(cardNo, imagePath);
-            this.cardImages.set(cardNo, cardNo);
-            return cardNo;
-        } catch (error) {
-            console.error(`Failed to load image for ${cardNo}:`, error);
-            return null;
+            console.warn('Init endpoint not available, game might already be initialized:', error);
         }
     }
 
     createZones() {
-        const width = this.scale.width;
-        const height = this.scale.height;
-
-        // Player 2 zones (top - opponent)
-        this.createZone('player2-hand', 50, 20, 1000, 200, 0x4a5568, 'Opponent Hand', false);
-        this.createZone('player2-energy', 1100, 20, 300, 200, 0x2d3748, 'Opponent Energy', false);
-        this.createZone('player2-live-zone', 50, 250, 400, 200, 0x2c5282, 'Live Card Zone', false);
-        this.createZone('player2-success-live-zone', 500, 250, 250, 200, 0x2c5282, 'Success Live Zone', false);
-        this.createZone('player2-stage-left', 800, 250, 250, 200, 0x1a202c, 'Left Side', false);
-        this.createZone('player2-stage-center', 1100, 250, 250, 200, 0x1a202c, 'Center', false);
-        this.createZone('player2-stage-right', 1350, 250, 250, 200, 0x1a202c, 'Right Side', false);
-
-        // Player 1 zones (bottom - active player)
-        // Live card zone on top of stage
-        this.createZone('player1-live-zone', 50, height - 400, 400, 200, 0x2c5282, 'Live Card Zone', true);
-        this.createZone('player1-success-live-zone', 500, height - 400, 250, 200, 0x2c5282, 'Success Live Zone', true);
-        this.createZone('player1-stage-left', 800, height - 400, 250, 200, 0x1a202c, 'Left Side', true);
-        this.createZone('player1-stage-center', 1100, height - 400, 250, 200, 0x1a202c, 'Center', true);
-        this.createZone('player1-stage-right', 1350, height - 400, 250, 200, 0x1a202c, 'Right Side', true);
-        this.createZone('player1-hand', 50, height - 200, 1000, 200, 0x4a5568, 'Hand', true);
-        this.createZone('player1-energy', 1100, height - 200, 300, 200, 0x2d3748, 'Energy Zone', true);
-
-        // Decks (sides)
-        this.createZone('deck-area', 1650, height - 400, 200, 200, 0x1e3a5f, 'Deck', true);
-        this.createZone('waitroom-area', 1650, height - 200, 200, 200, 0x3d1e5f, 'Waitroom', true);
+        const w = this.scale.width;
+        const h = this.scale.height;
+        
+        // Clear existing zones
+        if (this.zoneGraphics) {
+            this.zoneGraphics.clear();
+        } else {
+            this.zoneGraphics = this.add.graphics();
+        }
+        
+        this.zones = {
+            // Player 2 (opponent - top)
+            p2Hand: { x: 50, y: 20, w: w - 100, h: 100, label: 'Opponent Hand', color: 0x2d3748 },
+            p2Stage: { x: 50, y: 140, w: w - 100, h: 160, label: 'Opponent Stage', color: 0x1a202c },
+            p2Live: { x: 50, y: 320, w: 280, h: 90, label: 'Live Zone', color: 0x2c5282 },
+            p2Success: { x: 350, y: 320, w: 180, h: 90, label: 'Success', color: 0x2c5282 },
+            p2Energy: { x: w - 230, y: 320, w: 180, h: 90, label: 'Energy', color: 0x2d3748 },
+            
+            // Player 1 (active - bottom)
+            p1Hand: { x: 50, y: h - 120, w: w - 100, h: 100, label: 'Your Hand', color: 0x4a5568 },
+            p1Stage: { x: 50, y: h - 300, w: w - 100, h: 160, label: 'Your Stage', color: 0x1a202c },
+            p1Live: { x: 50, y: h - 410, w: 280, h: 90, label: 'Live Zone', color: 0x2c5282 },
+            p1Success: { x: 350, y: h - 410, w: 180, h: 90, label: 'Success', color: 0x2c5282 },
+            p1Energy: { x: w - 230, y: h - 410, w: 180, h: 90, label: 'Energy', color: 0x2d3748 }
+        };
+        
+        // Draw zones
+        for (const [key, zone] of Object.entries(this.zones)) {
+            // Zone background with gradient effect
+            this.zoneGraphics.fillStyle(zone.color, 0.9);
+            this.zoneGraphics.fillRoundedRect(zone.x, zone.y, zone.w, zone.h, 8);
+            
+            // Zone border
+            this.zoneGraphics.lineStyle(2, 0x6666aa, 1);
+            this.zoneGraphics.strokeRoundedRect(zone.x, zone.y, zone.w, zone.h, 8);
+            
+            // Zone label
+            this.add.text(zone.x + 15, zone.y + 8, zone.label, {
+                fontSize: '12px',
+                color: '#a0aec0',
+                fontStyle: 'bold'
+            });
+        }
     }
 
-    createGameInfo() {
-        const width = this.scale.width;
-        const height = this.scale.height;
-
-        // Game info panel (moved to side to not block interactions)
-        this.infoPanel = this.add.container(width - 150, height / 2);
+    createUI() {
+        const w = this.scale.width;
+        const h = this.scale.height;
         
-        const bg = this.add.graphics();
-        bg.fillStyle(0x0f3460, 0.9);
-        bg.fillRect(-120, -100, 240, 200);
-        
-        this.turnText = this.add.text(0, -60, 'Turn: 1', {
-            fontSize: '24px',
+        // Back to menu button
+        const menuBtn = this.add.text(20, 20, '← Menu', {
+            fontSize: '16px',
             color: '#ffffff',
+            backgroundColor: '#0f3460',
+            padding: { x: 15, y: 8 }
+        }).setOrigin(0, 0);
+        
+        menuBtn.setInteractive({ useHandCursor: true })
+               .on('pointerover', () => menuBtn.setStyle({ backgroundColor: '#1a1a2e' }))
+               .on('pointerout', () => menuBtn.setStyle({ backgroundColor: '#0f3460' }))
+               .on('pointerdown', () => {
+                   this.scene.start('MenuScene');
+               });
+        
+        // Game info panel
+        this.infoBg = this.add.graphics();
+        this.infoBg.fillStyle(0x0f3460, 0.9);
+        this.infoBg.fillRoundedRect(w - 220, 20, 200, 150, 10);
+        
+        this.turnText = this.add.text(w - 120, 40, 'Turn: 1', {
+            fontSize: '20px',
+            color: '#fff',
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
-        this.phaseText = this.add.text(0, -25, 'Phase: Active', {
-            fontSize: '20px',
+        this.phaseText = this.add.text(w - 120, 70, 'Phase: Main', {
+            fontSize: '16px',
+            color: '#e94560'
+        }).setOrigin(0.5);
+        
+        // Actions panel
+        this.actionsBg = this.add.graphics();
+        this.actionsBg.fillStyle(0x16213e, 0.9);
+        this.actionsBg.fillRoundedRect(20, h / 2 - 150, 250, 300, 10);
+        
+        this.add.text(145, h / 2 - 130, 'Actions', {
+            fontSize: '18px',
             color: '#e94560',
             fontStyle: 'bold'
         }).setOrigin(0.5);
         
-        this.bladeText = this.add.text(0, 15, 'Blades: 0', {
-            fontSize: '18px',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-        
-        this.heartText = this.add.text(0, 50, 'Hearts: 0', {
-            fontSize: '18px',
-            color: '#ffffff'
-        }).setOrigin(0.5);
-
-        this.infoPanel.add([bg, this.turnText, this.phaseText, this.bladeText, this.heartText]);
-    }
-
-    createZone(name, x, y, width, height, color, label, interactive) {
-        // Create zone background
-        const graphics = this.add.graphics();
-        graphics.fillStyle(color, 1);
-        graphics.fillRect(x, y, width, height);
-        graphics.lineStyle(4, 0xe94560, 1);
-        graphics.strokeRect(x, y, width, height);
-
-        // Add zone label
-        const labelX = x + 15;
-        const labelY = y + 20;
-        this.add.text(labelX, labelY, label, {
-            fontSize: '18px',
-            color: '#ffffff',
-            fontStyle: 'bold'
-        });
-
-        // Store zone reference
-        this[name] = {
-            graphics: graphics,
-            x: x,
-            y: y,
-            width: width,
-            height: height,
-            cards: [],
-            interactive: interactive
-        };
+        this.actionButtons = [];
     }
 
     async loadGameState() {
         try {
-            console.log('Loading game state from /api/game-state');
             const response = await fetch('/api/game-state');
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -303,249 +255,135 @@ class GameScene extends Phaser.Scene {
             this.loadActions();
         } catch (error) {
             console.error('Failed to load game state:', error);
-            // Show error on screen
-            const errorText = this.add.text(this.scale.width / 2, this.scale.height / 2, 
-                `Error loading game: ${error.message}`, {
+            // Show error message on screen
+            if (this.errorText) {
+                this.errorText.destroy();
+            }
+            this.errorText = this.add.text(this.scale.width / 2, this.scale.height / 2, 
+                'Game not initialized. Please restart the server or initialize game.', {
                 fontSize: '16px',
-                color: '#ff0000'
+                color: '#ff6b6b',
+                backgroundColor: '#1a1a2e',
+                padding: { x: 20, y: 10 }
             }).setOrigin(0.5);
         }
     }
 
     updateDisplay() {
         if (!this.gameState) return;
-
-        // Update game info
+        
+        // Update info
         this.turnText.setText(`Turn: ${this.gameState.turn}`);
-        this.phaseText.setText(`Phase: ${this.gameState.phase.split(' - ')[1] || this.gameState.phase}`);
+        this.phaseText.setText(`Phase: ${this.gameState.phase}`);
         
-        // Calculate blades and hearts for active player
-        const activePlayer = this.gameState.player1;
-        const blades = activePlayer.stage.total_blades ? activePlayer.stage.total_blades() : 0;
-        this.bladeText.setText(`Blades: ${blades}`);
-        this.heartText.setText(`Hearts: 0`);
-
-        // Update zones with current game state
-        this.displayCards('player1-hand', this.gameState.player1.hand.cards);
-        this.displayCards('player1-energy', this.gameState.player1.energy.cards);
-        this.displayCards('player1-live-zone', this.gameState.player1.live_zone.cards);
-        this.displayCards('player1-success-live-zone', this.gameState.player1.success_live_card_zone.cards);
-        this.displayCards('player2-hand', this.gameState.player2.hand.cards);
-        this.displayCards('player2-energy', this.gameState.player2.energy.cards);
-        this.displayCards('player2-live-zone', this.gameState.player2.live_zone.cards);
-        this.displayCards('player2-success-live-zone', this.gameState.player2.success_live_card_zone.cards);
-        
-        // Display stage cards
-        this.displayStageCard('player1-stage-left', this.gameState.player1.stage.left_side);
-        this.displayStageCard('player1-stage-center', this.gameState.player1.stage.center);
-        this.displayStageCard('player1-stage-right', this.gameState.player1.stage.right_side);
-        this.displayStageCard('player2-stage-left', this.gameState.player2.stage.left_side);
-        this.displayStageCard('player2-stage-center', this.gameState.player2.stage.center);
-        this.displayStageCard('player2-stage-right', this.gameState.player2.stage.right_side);
-    }
-
-    displayCards(zoneName, cards) {
-        const zone = this[zoneName];
-        if (!zone) return;
-
-        // Clear existing cards in zone
-        zone.cards.forEach(card => {
-            if (card.container) card.container.destroy();
-        });
-        zone.cards = [];
-
-        // Calculate card size based on zone width and number of cards (6 cards max for hand)
-        const maxCards = 6;
-        const padding = 15;
-        const availableWidth = zone.width - (padding * 2);
-        const cardWidth = Math.floor((availableWidth - (padding * (maxCards - 1))) / maxCards);
-        const cardHeight = Math.round(cardWidth / 0.715); // Maintain aspect ratio
-        const startX = zone.x + padding;
-        const startY = zone.y + padding + 25; // +25 for label
-
-        cards.forEach((card, index) => {
-            const cardX = startX + index * (cardWidth + padding);
-            this.createCard(cardX, startY, cardWidth, cardHeight, card, zone, zone.interactive);
-        });
-    }
-
-    displayStageCard(zoneName, card) {
-        const zone = this[zoneName];
-        if (!zone) return;
-
-        // Clear existing card in zone
-        zone.cards.forEach(c => {
-            if (c.container) c.container.destroy();
-        });
-        zone.cards = [];
-
-        if (card) {
-            const padding = 20;
-            const cardWidth = zone.width - (padding * 2);
-            const cardHeight = Math.round(cardWidth / 0.715);
-            const cardX = zone.x + padding;
-            const cardY = zone.y + 25;
-            this.createCard(cardX, cardY, cardWidth, cardHeight, card, zone, zone.interactive);
+        // Clear existing cards
+        if (this.cardContainers) {
+            this.cardContainers.forEach(c => c.destroy());
         }
+        this.cardContainers = [];
+        
+        // Display cards
+        this.displayHand('p1Hand', this.gameState.player1.hand.cards, true);
+        this.displayHand('p2Hand', this.gameState.player2.hand.cards, false);
+        this.displayStage('p1Stage', this.gameState.player1.stage, true);
+        this.displayStage('p2Stage', this.gameState.player2.stage, false);
+        this.displayZone('p1Live', this.gameState.player1.live_zone.cards);
+        this.displayZone('p1Success', this.gameState.player1.success_live_card_zone.cards);
+        this.displayZone('p1Energy', this.gameState.player1.energy.cards);
     }
 
-    createCard(x, y, width, height, card, zone, interactive) {
-        const container = this.add.container(x, y);
-
-        // Determine card orientation based on card type
-        const isLandscape = card.card_type === 'Live';
+    displayHand(zoneKey, cards, interactive) {
+        const zone = this.zones[zoneKey];
+        if (!zone || cards.length === 0) return;
         
-        // Swap dimensions for landscape cards
-        const cardWidth = isLandscape ? height : width;
-        const cardHeight = isLandscape ? width : height;
-
-        // Try to load and display card image
-        const imageKey = this.loadCardImage(card.card_no);
+        const cardWidth = 80;
+        const cardHeight = 112;
+        const overlap = 30;
+        const totalWidth = cardWidth + (cards.length - 1) * overlap;
+        const startX = zone.x + (zone.w - totalWidth) / 2;
+        const startY = zone.y + (zone.h - cardHeight) / 2;
         
-        if (imageKey && this.textures.exists(imageKey)) {
-            // Display actual card image
-            const cardImage = this.add.image(cardWidth / 2, cardHeight / 2, imageKey);
-            cardImage.setDisplaySize(cardWidth, cardHeight);
-            
-            // Rotate landscape cards 90 degrees
-            if (isLandscape) {
-                cardImage.setRotation(Phaser.Math.DegToRad(90));
+        cards.forEach((card, i) => {
+            const x = startX + i * overlap;
+            this.createCard(x, startY, cardWidth, cardHeight, card, interactive);
+        });
+    }
+
+    displayStage(zoneKey, stage, interactive) {
+        const zone = this.zones[zoneKey];
+        if (!zone) return;
+        
+        const cardWidth = 120;
+        const cardHeight = 168;
+        const positions = [
+            { x: zone.x + zone.w * 0.2, y: zone.y + (zone.h - cardHeight) / 2 },
+            { x: zone.x + zone.w * 0.5 - cardWidth / 2, y: zone.y + (zone.h - cardHeight) / 2 },
+            { x: zone.x + zone.w * 0.8 - cardWidth, y: zone.y + (zone.h - cardHeight) / 2 }
+        ];
+        
+        const cards = [stage.left_side, stage.center, stage.right_side];
+        cards.forEach((card, i) => {
+            if (card && card.card_no) {
+                this.createCard(positions[i].x, positions[i].y, cardWidth, cardHeight, card, interactive);
             }
-            
+        });
+    }
+
+    displayZone(zoneKey, cards) {
+        const zone = this.zones[zoneKey];
+        if (!zone || cards.length === 0) return;
+        
+        const cardWidth = 60;
+        const cardHeight = 84;
+        const overlap = 20;
+        const totalWidth = cardWidth + (cards.length - 1) * overlap;
+        const startX = zone.x + (zone.w - totalWidth) / 2;
+        const startY = zone.y + (zone.h - cardHeight) / 2;
+        
+        cards.forEach((card, i) => {
+            const x = startX + i * overlap;
+            this.createCard(x, startY, cardWidth, cardHeight, card, false);
+        });
+    }
+
+    createCard(x, y, width, height, card, interactive) {
+        const container = this.add.container(x, y);
+        
+        // Card background
+        const bg = this.add.graphics();
+        bg.fillStyle(0x2a2a4e, 1);
+        bg.fillRoundedRect(0, 0, width, height, 5);
+        bg.lineStyle(2, 0x6666aa, 1);
+        bg.strokeRoundedRect(0, 0, width, height, 5);
+        container.add(bg);
+        
+        // Try to load card image
+        const imageKey = card.card_no;
+        if (this.textures.exists(imageKey)) {
+            const cardImage = this.add.image(width / 2, height / 2, imageKey);
+            const scale = Math.min(width / 451, height / 630);
+            cardImage.setScale(scale);
             container.add(cardImage);
         } else {
-            // Fallback to colored rectangle if image not available
-            const bg = this.add.graphics();
-            const cardColor = this.getCardColor(card);
-            bg.fillStyle(cardColor, 1);
-            bg.fillRect(0, 0, cardWidth, cardHeight);
-            bg.lineStyle(2, 0xffffff, 1);
-            bg.strokeRect(0, 0, cardWidth, cardHeight);
-            container.add(bg);
-
-            // Card name
-            const nameText = this.add.text(cardWidth / 2, 15, card.name || 'Unknown', {
+            // Fallback: show card name
+            const nameText = this.add.text(width / 2, height / 2, card.name || card.card_no || '?', {
                 fontSize: '10px',
-                color: '#ffffff',
-                fontStyle: 'bold'
+                color: '#fff',
+                align: 'center'
             }).setOrigin(0.5);
             container.add(nameText);
-
-            // Card type
-            const typeText = this.add.text(cardWidth / 2, cardHeight - 10, card.card_type || 'Card', {
-                fontSize: '8px',
-                color: '#e94560'
-            }).setOrigin(0.5);
-            container.add(typeText);
         }
-
-        // Cost if member card (overlay on image)
-        if (card.cost) {
-            const costText = this.add.text(10, cardHeight - 25, `Cost: ${card.cost}`, {
-                fontSize: '8px',
-                color: '#ffd700',
-                backgroundColor: '#000000',
-                backgroundColorAlpha: 0.7
-            });
-            container.add(costText);
-        }
-
-        // Blade icons if present (overlay on image)
-        if (card.blade > 0) {
-            const bladeText = this.add.text(cardWidth - 10, cardHeight - 25, `⚔${card.blade}`, {
-                fontSize: '10px',
-                color: '#ff6b6b',
-                backgroundColor: '#000000',
-                backgroundColorAlpha: 0.7
-            });
-            container.add(bladeText);
-        }
-
-        // Score for live cards
-        if (card.score !== undefined) {
-            const scoreText = this.add.text(cardWidth / 2, cardHeight - 25, `Score: ${card.score}`, {
-                fontSize: '8px',
-                color: '#00ff00',
-                backgroundColor: '#000000',
-                backgroundColorAlpha: 0.7
-            }).setOrigin(0.5);
-            container.add(scoreText);
-        }
-
-        container.setSize(cardWidth, cardHeight);
         
-        if (interactive) {
-            container.setInteractive({ useHandCursor: true });
-            container.on('pointerdown', (pointer) => {
-                this.draggedCard = { container, card, zone };
-                this.dragOffset.x = pointer.x - container.x;
-                this.dragOffset.y = pointer.y - container.y;
-                container.setDepth(1000);
-            });
-
-            container.on('pointerup', () => {
-                if (this.draggedCard && this.draggedCard.container === container) {
-                    this.handleCardDrop(container, card, zone);
-                }
-                container.setDepth(0);
-                this.draggedCard = null;
-            });
-        }
-
-        zone.cards.push({ container, card });
-    }
-
-    getCardColor(card) {
-        if (!card) return 0x3182ce;
-        switch (card.card_type) {
-            case 'Member': return 0x3182ce;
-            case 'Energy': return 0x38a169;
-            case 'Live': return 0x805ad5;
-            default: return 0x3182ce;
-        }
-    }
-
-    handleCardDrop(container, card, sourceZone) {
-        // Check which zone the card was dropped on
-        const dropZones = [
-            'player1-stage-left', 'player1-stage-center', 'player1-stage-right',
-            'player1-energy', 'player1-live-zone'
-        ];
-
-        for (const zoneName of dropZones) {
-            const zone = this[zoneName];
-            if (Phaser.Geom.Rectangle.Contains(zone, container.x, container.y)) {
-                this.attemptCardPlay(card, sourceZone, zoneName);
-                return;
-            }
-        }
-
-        // Return to original position if dropped outside valid zones
-        container.setPosition(sourceZone.x + 10, sourceZone.y + 25);
-    }
-
-    async attemptCardPlay(card, sourceZone, targetZone) {
-        // Find the corresponding action
-        const actionIndex = this.actions.findIndex(action => {
-            if (targetZone.includes('stage') && action.action_type === 'play_member_to_stage') {
-                return true;
-            }
-            if (targetZone.includes('energy') && action.action_type === 'play_energy_to_zone') {
-                return true;
-            }
-            if (targetZone.includes('live') && action.action_type === 'place_in_live_zone') {
-                return true;
-            }
-            return false;
-        });
-
-        if (actionIndex >= 0) {
-            await this.executeAction(actionIndex);
-        } else {
-            // Return card to hand
-            const handZone = this['player1-hand'];
-            container.setPosition(handZone.x + 10, handZone.y + 25);
-        }
+        // Card type indicator
+        const typeColor = card.card_type === 'Live' ? 0x805ad5 : 
+                         card.card_type === 'Energy' ? 0x38a169 : 0x3182ce;
+        const typeBg = this.add.graphics();
+        typeBg.fillStyle(typeColor, 1);
+        typeBg.fillRoundedRect(2, 2, 20, 12, 3);
+        container.add(typeBg);
+        
+        container.setSize(width, height);
+        this.cardContainers.push(container);
     }
 
     async loadActions() {
@@ -553,49 +391,85 @@ class GameScene extends Phaser.Scene {
             const response = await fetch('/api/actions');
             const data = await response.json();
             this.actions = data.actions;
-            this.updateActionPanel();
+            this.createActionButtons();
         } catch (error) {
             console.error('Failed to load actions:', error);
         }
     }
 
-    updateActionPanel() {
-        const actionList = document.getElementById('action-list');
-        actionList.innerHTML = '';
-
-        if (this.actions.length === 0) {
-            actionList.innerHTML = '<div style="color: #666; padding: 10px;">No legal actions available</div>';
-            return;
+    createActionButtons() {
+        // Clear existing buttons
+        this.actionButtons.forEach(btn => btn.destroy());
+        this.actionButtons = [];
+        
+        const h = this.scale.height;
+        const startY = h / 2 - 90;
+        
+        // Separate Pass action and make it prominent
+        const passAction = this.actions.find(a => a.action_type === 'pass');
+        const otherActions = this.actions.filter(a => a.action_type !== 'pass');
+        
+        let currentIndex = 0;
+        
+        // Pass button - large and prominent
+        if (passAction) {
+            const passIndex = this.actions.indexOf(passAction);
+            const passBtn = this.add.text(145, startY + currentIndex * 45, '⏭ PASS', {
+                fontSize: '20px',
+                color: '#ffffff',
+                backgroundColor: '#e94560',
+                padding: { x: 25, y: 12 },
+                fontStyle: 'bold'
+            }).setOrigin(0.5);
+            
+            passBtn.setInteractive({ useHandCursor: true })
+                   .on('pointerover', () => passBtn.setStyle({ backgroundColor: '#ff6b6b' }))
+                   .on('pointerout', () => passBtn.setStyle({ backgroundColor: '#e94560' }))
+                   .on('pointerdown', () => this.executeAction(passIndex));
+            
+            this.actionButtons.push(passBtn);
+            currentIndex++;
         }
-
-        this.actions.forEach((action, index) => {
-            const actionItem = document.createElement('div');
-            actionItem.className = 'action-item';
-            actionItem.innerHTML = `
-                <span class="action-index">[${index}]</span>
-                <span class="action-description">${action.description}</span>
-            `;
-            actionItem.onclick = () => this.executeAction(index);
-            actionList.appendChild(actionItem);
+        
+        // Other action buttons
+        otherActions.forEach((action) => {
+            const actionIndex = this.actions.indexOf(action);
+            const btn = this.add.text(145, startY + currentIndex * 35, action.description, {
+                fontSize: '13px',
+                color: '#fff',
+                backgroundColor: '#0f3460',
+                padding: { x: 15, y: 8 }
+            }).setOrigin(0.5);
+            
+            btn.setInteractive({ useHandCursor: true })
+               .on('pointerover', () => btn.setStyle({ backgroundColor: '#1a1a2e', color: '#e94560' }))
+               .on('pointerout', () => btn.setStyle({ backgroundColor: '#0f3460', color: '#fff' }))
+               .on('pointerdown', () => this.executeAction(actionIndex));
+            
+            this.actionButtons.push(btn);
+            currentIndex++;
         });
+        
+        // No actions message
+        if (this.actions.length === 0) {
+            const noActions = this.add.text(145, h / 2, 'No actions available', {
+                fontSize: '14px',
+                color: '#666688'
+            }).setOrigin(0.5);
+            this.actionButtons.push(noActions);
+        }
     }
 
     async executeAction(index) {
         try {
             const response = await fetch('/api/execute-action', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action_index: index })
             });
             
             if (response.ok) {
                 await this.loadGameState();
-            } else {
-                const error = await response.text();
-                console.error('Failed to execute action:', error);
-                alert('Action failed: ' + error);
             }
         } catch (error) {
             console.error('Failed to execute action:', error);
@@ -605,28 +479,15 @@ class GameScene extends Phaser.Scene {
 
 const config = {
     type: Phaser.AUTO,
-    width: 1920,
-    height: 1080,
-    parent: 'phaser-game',
+    width: window.innerWidth,
+    height: window.innerHeight,
+    parent: 'game-container',
     backgroundColor: '#1a1a2e',
-    scene: [GameScene],
+    scene: [MenuScene, GameScene],
     scale: {
-        mode: Phaser.Scale.FIT,
+        mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
-    },
-    render: {
-        pixelArt: false,
-        antialias: true,
-        roundPixels: false
-    },
-    physics: {
-        default: null
     }
 };
 
 const game = new Phaser.Game(config);
-
-// Expose game scene globally for HTML controls
-game.events.once('ready', () => {
-    window.gameScene = game.scene.getScene('GameScene');
-});

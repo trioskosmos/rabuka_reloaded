@@ -1,4 +1,4 @@
-use crate::card::{Card, Ability, AbilityCost, AbilityEffect, Condition};
+use crate::card::{Ability, Card};
 use serde_json;
 use std::collections::HashMap;
 use std::fs::File;
@@ -46,15 +46,18 @@ impl CardLoader {
     fn attach_abilities(mut cards: Vec<Card>, abilities_data: &serde_json::Value) -> Vec<Card> {
         // Map card numbers to their abilities
         let mut ability_map: HashMap<String, Vec<Ability>> = HashMap::new();
-        
+
         if let Some(unique_abilities) = abilities_data.get("unique_abilities").and_then(|v| v.as_array()) {
             for ability_entry in unique_abilities {
-                if let Some(card_numbers) = ability_entry.get("card_numbers").and_then(|v| v.as_array()) {
-                    if let Some(parsed) = ability_entry.get("parsed") {
-                        if let Ok(ability) = serde_json::from_value::<Ability>(parsed.clone()) {
-                            for card_no in card_numbers {
-                                if let Some(card_no_str) = card_no.as_str() {
-                                    ability_map.entry(card_no_str.to_string()).or_insert_with(Vec::new).push(ability.clone());
+                // The ability entry itself contains the ability data directly
+                if let Ok(ability) = serde_json::from_value::<Ability>(ability_entry.clone()) {
+                    if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
+                        for card_entry in card_list {
+                            if let Some(card_str) = card_entry.as_str() {
+                                // Parse card identifier like "PL!-sd1-005-SD | 星空 凛 (ab#0)"
+                                // Extract just the card number part before the space
+                                if let Some(card_no) = card_str.split(" | ").next() {
+                                    ability_map.entry(card_no.to_string()).or_insert_with(Vec::new).push(ability.clone());
                                 }
                             }
                         }
@@ -62,14 +65,14 @@ impl CardLoader {
                 }
             }
         }
-        
+
         // Attach abilities to cards
         for card in &mut cards {
             if let Some(card_abilities) = ability_map.get(&card.card_no) {
                 card.abilities = card_abilities.clone();
             }
         }
-        
+
         cards
     }
 }

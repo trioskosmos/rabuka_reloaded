@@ -7,7 +7,7 @@ use rabuka_engine::deck_parser;
 use rabuka_engine::game_state;
 use rabuka_engine::game_setup;
 use rabuka_engine::player::Player;
-use rabuka_engine::GameState;
+use rabuka_engine::game_state::GameState;
 
 #[test]
 fn test_legal_actions() {

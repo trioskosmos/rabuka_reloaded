@@ -9,6 +9,7 @@ pub struct Deck {
 }
 
 impl Deck {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Deck {
             main_deck: VecDeque::new(),

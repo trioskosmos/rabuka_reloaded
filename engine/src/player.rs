@@ -67,17 +67,31 @@ impl Player {
         // Rule 9.6.2.3: Determine cost and pay all costs
         let mut cost_to_pay = card_cost;
         
-        // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to discard instead
+        // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
+        // Note: Baton touch sends member from the TARGET area (where you're playing the new member)
         if cost_to_pay > 0 && self.energy_zone.cards.len() >= 1 {
             // Check if there's a member in the target area to baton touch
-            if let Some(existing_member) = self.stage.get_area(stage_area) {
-                // Perform baton touch: send existing member to discard
+            let member_cost = if let Some(existing_member) = self.stage.get_area(stage_area) {
+                // Clone the member card before clearing the area
                 let member_card = existing_member.card.clone();
+                let cost = existing_member.card.cost.unwrap_or(1);
+                
+                // Clear the target area since member will be sent to waitroom
+                match stage_area {
+                    crate::zones::MemberArea::LeftSide => self.stage.left_side = None,
+                    crate::zones::MemberArea::Center => self.stage.center = None,
+                    crate::zones::MemberArea::RightSide => self.stage.right_side = None,
+                }
+                
+                // Send member to waitroom
                 self.waitroom.cards.push(member_card);
-                // Rule 9.6.2.3.2: Reduce cost by member's cost
-                let member_cost = existing_member.card.cost.unwrap_or(1);
-                cost_to_pay = cost_to_pay.saturating_sub(member_cost);
-            }
+                cost
+            } else {
+                0
+            };
+            
+            // Rule 9.6.2.3.2: Reduce cost by member's cost
+            cost_to_pay = cost_to_pay.saturating_sub(member_cost);
         }
         
         // Rule 9.6.2.3.1: Pay energy equal to cost
@@ -406,6 +420,15 @@ impl Player {
             return false;
         }
         
+        // Check if there's any member with cost 0 (can play without energy)
+        let has_cost_zero_member = self.hand.cards.iter()
+            .filter(|c| c.is_member())
+            .any(|c| c.cost.unwrap_or(0) == 0);
+        
+        if has_cost_zero_member {
+            return true;
+        }
+        
         // Rule 9.6.2.3: Check if player can afford to play a member
         // Find the cheapest member card in hand
         let cheapest_cost = self.hand.cards.iter()
@@ -418,11 +441,6 @@ impl Player {
         let active_energy_count = self.energy_zone.cards.iter()
             .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
             .count() as u32;
-        
-        // Check if can afford cheapest member (or any member with cost 0)
-        if cheapest_cost == 0 {
-            return true;
-        }
         
         // Check if can use baton touch to reduce cost
         if active_energy_count >= 1 {
@@ -495,5 +513,151 @@ impl Player {
     pub fn can_place_energy_under_member(&self, target_area: crate::zones::MemberArea) -> bool {
         // Rule 5.10: Can place if energy zone has cards and target area has a member
         !self.energy_zone.cards.is_empty() && self.stage.get_area(target_area).is_some()
+    }
+
+    // ============== ABILITY QUERY METHODS ==============
+
+    /// Count cards in a specific zone
+    pub fn count_cards_in_zone(&self, zone: &str) -> usize {
+        match zone {
+            "hand" | "手札" => self.hand.cards.len(),
+            "deck" | "main_deck" | "メインデッキ" => self.main_deck.len(),
+            "energy_deck" | "エネルギーデッキ" => self.energy_deck.cards.len(),
+            "waitroom" | "discard" | "控え室" => self.waitroom.cards.len(),
+            "stage" | "ステージ" => {
+                self.stage.left_side.as_ref().map_or(0, |_| 1)
+                    + self.stage.center.as_ref().map_or(0, |_| 1)
+                    + self.stage.right_side.as_ref().map_or(0, |_| 1)
+            }
+            "energy_zone" | "エネルギー置き場" => self.energy_zone.cards.len(),
+            "live_card_zone" | "ライブカード置き場" => self.live_card_zone.len(),
+            "success_live_card_zone" | "成功ライブカード置き場" => self.success_live_card_zone.len(),
+            "exclusion_zone" | "除外領域" => self.exclusion_zone.cards.len(),
+            _ => 0,
+        }
+    }
+
+    /// Count cards of specific type in a zone
+    pub fn count_cards_by_type_in_zone(&self, zone: &str, card_type: &str) -> usize {
+        match zone {
+            "hand" | "手札" => {
+                match card_type {
+                    "member" | "member_card" | "メンバー" => self.hand.cards.iter().filter(|c| c.is_member()).count(),
+                    "live" | "live_card" | "ライブ" => self.hand.cards.iter().filter(|c| c.is_live()).count(),
+                    "energy" | "energy_card" | "エネルギー" => self.hand.cards.iter().filter(|c| c.is_energy()).count(),
+                    _ => 0,
+                }
+            }
+            "waitroom" | "discard" | "控え室" => {
+                match card_type {
+                    "member" | "member_card" | "メンバー" => self.waitroom.cards.iter().filter(|c| c.is_member()).count(),
+                    "live" | "live_card" | "ライブ" => self.waitroom.cards.iter().filter(|c| c.is_live()).count(),
+                    _ => 0,
+                }
+            }
+            "stage" | "ステージ" => {
+                match card_type {
+                    "member" | "member_card" | "メンバー" => {
+                        self.stage.left_side.as_ref().map_or(0, |_| 1)
+                            + self.stage.center.as_ref().map_or(0, |_| 1)
+                            + self.stage.right_side.as_ref().map_or(0, |_| 1)
+                    }
+                    _ => 0,
+                }
+            }
+            _ => 0,
+        }
+    }
+
+    /// Check if specific character is present on stage
+    pub fn has_character_on_stage(&self, character_name: &str) -> bool {
+        self.stage.left_side.as_ref().map_or(false, |c| c.card.name == character_name)
+            || self.stage.center.as_ref().map_or(false, |c| c.card.name == character_name)
+            || self.stage.right_side.as_ref().map_or(false, |c| c.card.name == character_name)
+    }
+
+    /// Check if any of the specified characters are present on stage
+    pub fn has_any_character_on_stage(&self, character_names: &[String]) -> bool {
+        character_names.iter().any(|name| self.has_character_on_stage(name))
+    }
+
+    /// Check if specific group is present on stage
+    pub fn has_group_on_stage(&self, group_name: &str) -> bool {
+        self.stage.left_side.as_ref().map_or(false, |c| c.card.group == group_name)
+            || self.stage.center.as_ref().map_or(false, |c| c.card.group == group_name)
+            || self.stage.right_side.as_ref().map_or(false, |c| c.card.group == group_name)
+    }
+
+    /// Check if specific unit is present on stage
+    pub fn has_unit_on_stage(&self, unit_name: &str) -> bool {
+        self.stage.left_side.as_ref().map_or(false, |c| c.card.unit.as_deref() == Some(unit_name))
+            || self.stage.center.as_ref().map_or(false, |c| c.card.unit.as_deref() == Some(unit_name))
+            || self.stage.right_side.as_ref().map_or(false, |c| c.card.unit.as_deref() == Some(unit_name))
+    }
+
+    /// Check if member is in specific position
+    pub fn has_member_in_position(&self, position: &str) -> bool {
+        match position {
+            "center" | "センターエリア" => self.stage.center.is_some(),
+            "left_side" | "左サイドエリア" => self.stage.left_side.is_some(),
+            "right_side" | "右サイドエリア" => self.stage.right_side.is_some(),
+            _ => false,
+        }
+    }
+
+    /// Check if member in specific position is in specific state (active/wait)
+    pub fn has_member_in_state_at_position(&self, position: &str, state: &str) -> bool {
+        let card_in_zone = match position {
+            "center" | "センターエリア" => self.stage.center.as_ref(),
+            "left_side" | "左サイドエリア" => self.stage.left_side.as_ref(),
+            "right_side" | "右サイドエリア" => self.stage.right_side.as_ref(),
+            _ => return false,
+        };
+
+        match state {
+            "active" | "アクティブ" => {
+                card_in_zone.map_or(false, |c| c.orientation == Some(crate::zones::Orientation::Active))
+            }
+            "wait" | "ウェイト" => {
+                card_in_zone.map_or(false, |c| c.orientation == Some(crate::zones::Orientation::Wait))
+            }
+            _ => false,
+        }
+    }
+
+    /// Count active energy cards
+    pub fn count_active_energy(&self) -> usize {
+        self.energy_zone.cards.iter()
+            .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+            .count()
+    }
+
+    /// Count wait energy cards
+    pub fn count_wait_energy(&self) -> usize {
+        self.energy_zone.cards.iter()
+            .filter(|c| c.orientation == Some(crate::zones::Orientation::Wait))
+            .count()
+    }
+
+    /// Get all cards in a zone
+    pub fn get_cards_in_zone(&self, zone: &str) -> Vec<&crate::card::Card> {
+        match zone {
+            "hand" | "手札" => self.hand.cards.iter().collect(),
+            "waitroom" | "discard" | "控え室" => self.waitroom.cards.iter().collect(),
+            "stage" | "ステージ" => {
+                let mut cards = Vec::new();
+                if let Some(ref c) = self.stage.left_side {
+                    cards.push(&c.card);
+                }
+                if let Some(ref c) = self.stage.center {
+                    cards.push(&c.card);
+                }
+                if let Some(ref c) = self.stage.right_side {
+                    cards.push(&c.card);
+                }
+                cards
+            }
+            _ => Vec::new(),
+        }
     }
 }
