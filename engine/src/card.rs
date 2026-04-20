@@ -277,6 +277,11 @@ pub struct AbilityEffect {
     pub value: Option<u32>,
     pub aggregate: Option<String>,
     pub comparison_type: Option<String>,
+    // Subvariable fields for ability effects
+    pub heart_color: Option<String>,
+    pub blade_type: Option<String>,
+    pub energy_count: Option<u32>,
+    pub target_member: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

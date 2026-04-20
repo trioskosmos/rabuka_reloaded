@@ -92,7 +92,7 @@ impl TurnEngine {
                         game_state.resolution_zone = resolution_zone;
                         result
                     };
-                    game_state.player2_cheer_blade_heart_count = blade_heart_count;
+                    game_state.player2_cheer_blade_heart_count = blade_heart_count; // This is actually total blades for cheer bonus
                     
                     // Rule 8.3.7-8.3.8: Trigger LiveStart abilities
                     // Rule 11.5: Trigger LiveStart automatic abilities
@@ -709,7 +709,7 @@ impl TurnEngine {
                 let mut temp_hearts = remaining_hearts.hearts.clone();
                 
                 for (color, needed) in &need_heart.hearts {
-                    if color == "heart0" {
+                    if color == "heart00" {
                         // Wildcard heart (rule 8.3.15.1.1) - can be any color
                         // Count total hearts available
                         let total_available: u32 = temp_hearts.values().sum();
@@ -720,7 +720,7 @@ impl TurnEngine {
                         // Consume from any colors (prefer non-wildcards first)
                         let mut consumed = 0;
                         for (c, count) in temp_hearts.iter_mut() {
-                            if *c != "heart0" {
+                            if *c != "heart00" {
                                 let to_consume = std::cmp::min(*count, *needed - consumed);
                                 *count -= to_consume;
                                 consumed += to_consume;
@@ -731,7 +731,7 @@ impl TurnEngine {
                         }
                         // If still need more, consume from wildcards
                         if consumed < *needed {
-                            if let Some(wildcard_count) = temp_hearts.get_mut("heart0") {
+                            if let Some(wildcard_count) = temp_hearts.get_mut("heart00") {
                                 let to_consume = std::cmp::min(*wildcard_count, *needed - consumed);
                                 *wildcard_count -= to_consume;
                             }

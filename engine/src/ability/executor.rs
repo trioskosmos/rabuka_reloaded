@@ -489,8 +489,9 @@ impl AbilityExecutor {
     ) -> Result<(), String> {
         let resource = effect.resource.as_deref().unwrap_or("");
         let target = effect.target.as_deref().unwrap_or("self");
+        let count = effect.count.unwrap_or(1);
 
-        if resource != "blade" && resource != "ブレード" {
+        if resource != "blade" && resource != "ブレード" && resource != "heart" && resource != "ハート" {
             return Err(format!("Unsupported resource: {}", resource));
         }
 
@@ -501,15 +502,395 @@ impl AbilityExecutor {
                 continue; // Skip for now, only implement self target
             }
 
-            // Add blades to all stage members
-            if let Some(ref mut card) = target_player.stage.left_side {
-                card.card.add_blades(1);
+            // Add resource to all stage members based on type
+            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            for area in areas {
+                if let Some(ref mut card) = target_player.stage.get_area_mut(area) {
+                    match resource {
+                        "blade" | "ブレード" => {
+                            card.card.add_blades(count);
+                        }
+                        "heart" | "ハート" => {
+                            // If heart_color is specified, add that specific color
+                            if let Some(ref heart_color) = effect.heart_color {
+                                card.card.add_heart(heart_color, count);
+                            } else {
+                                // Default to heart00 (wildcard) if no color specified
+                                card.card.add_heart("heart00", count);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
             }
-            if let Some(ref mut card) = target_player.stage.center {
-                card.card.add_blades(1);
+        }
+
+        Ok(())
+    }
+
+    /// Execute a modify_score effect
+    pub fn execute_modify_score(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let operation = effect.operation.as_deref().unwrap_or("add");
+        let value = effect.value.unwrap_or(0);
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        for target_player in target_players {
+            if target_player.id != player.id {
+                continue; // Skip for now, only implement self target
             }
-            if let Some(ref mut card) = target_player.stage.right_side {
-                card.card.add_blades(1);
+
+            // Modify score for live cards in live card zone
+            for card in &mut target_player.live_card_zone.cards {
+                match operation {
+                    "add" => card.add_score(value),
+                    "remove" => card.remove_score(value),
+                    "set" => card.set_score(value),
+                    _ => return Err(format!("Unknown operation: {}", operation)),
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute a modify_required_hearts effect
+    pub fn execute_modify_required_hearts(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let operation = effect.operation.as_deref().unwrap_or("decrease");
+        let value = effect.value.unwrap_or(0);
+        let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        for target_player in target_players {
+            if target_player.id != player.id {
+                continue; // Skip for now, only implement self target
+            }
+
+            // Modify required hearts for live cards
+            for card in &mut target_player.live_card_zone.cards {
+                if let Some(ref mut need_heart) = card.need_heart {
+                    match operation {
+                        "decrease" => {
+                            let current = need_heart.hearts.get(heart_color).copied().unwrap_or(0);
+                            if current <= value {
+                                need_heart.hearts.remove(heart_color);
+                            } else {
+                                need_heart.hearts.insert(heart_color.to_string(), current - value);
+                            }
+                        }
+                        "increase" => {
+                            *need_heart.hearts.entry(heart_color.to_string()).or_insert(0) += value;
+                        }
+                        "set" => {
+                            need_heart.hearts.insert(heart_color.to_string(), value);
+                        }
+                        _ => return Err(format!("Unknown operation: {}", operation)),
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute a set_required_hearts effect
+    pub fn execute_set_required_hearts(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let count = effect.count.unwrap_or(0);
+        let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        for target_player in target_players {
+            if target_player.id != player.id {
+                continue; // Skip for now, only implement self target
+            }
+
+            // Set required hearts for live cards
+            for card in &mut target_player.live_card_zone.cards {
+                if card.need_heart.is_none() {
+                    card.need_heart = Some(crate::card::BaseHeart {
+                        hearts: std::collections::HashMap::new(),
+                    });
+                }
+                if let Some(ref mut need_heart) = card.need_heart {
+                    need_heart.hearts.insert(heart_color.to_string(), count);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute a modify_required_hearts_global effect
+    pub fn execute_modify_required_hearts_global(
+        &mut self,
+        effect: &AbilityEffect,
+        _player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let operation = effect.operation.as_deref().unwrap_or("increase");
+        let value = effect.value.unwrap_or(1);
+        let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
+        let target = effect.target.as_deref().unwrap_or("opponent");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        for target_player in target_players {
+            // Modify required hearts for all live cards
+            for card in &mut target_player.live_card_zone.cards {
+                if let Some(ref mut need_heart) = card.need_heart {
+                    match operation {
+                        "increase" => {
+                            *need_heart.hearts.entry(heart_color.to_string()).or_insert(0) += value;
+                        }
+                        "decrease" => {
+                            let current = need_heart.hearts.get(heart_color).copied().unwrap_or(0);
+                            if current <= value {
+                                need_heart.hearts.remove(heart_color);
+                            } else {
+                                need_heart.hearts.insert(heart_color.to_string(), current - value);
+                            }
+                        }
+                        _ => return Err(format!("Unknown operation: {}", operation)),
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute a set_blade_type effect
+    pub fn execute_set_blade_type(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let blade_type = effect.blade_type.as_deref().unwrap_or("");
+        let target = effect.target.as_deref().unwrap_or("self");
+        
+        // Collect turn/phase before mutable borrow
+        let current_turn = game_state.turn_number;
+        let current_phase = game_state.current_phase.clone();
+        let effect_duration = effect.duration.clone();
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+        
+        // Collect temporary effects first to avoid borrow conflicts
+        let mut temp_effects = Vec::new();
+
+        for target_player in target_players {
+            if target_player.id != player.id {
+                continue; // Skip for now, only implement self target
+            }
+
+            // Set blade type for stage members
+            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            for area in areas {
+                if let Some(ref mut card) = target_player.stage.get_area_mut(area) {
+                    // Store blade type as a temporary effect or card attribute
+                    // For now, we'll track this in game state temporary effects
+                    let temp_effect = crate::game_state::TemporaryEffect {
+                        effect_type: format!("set_blade_type:{}", blade_type),
+                        duration: effect_duration.as_ref().map(|d| match d.as_str() {
+                            "live_end" => crate::game_state::Duration::LiveEnd,
+                            "this_turn" => crate::game_state::Duration::ThisTurn,
+                            "this_live" => crate::game_state::Duration::ThisLive,
+                            "permanent" => crate::game_state::Duration::Permanent,
+                            _ => crate::game_state::Duration::ThisLive,
+                        }).unwrap_or(crate::game_state::Duration::ThisLive),
+                        created_turn: current_turn,
+                        created_phase: current_phase.clone(),
+                        target_player_id: target_player.id.clone(),
+                        description: format!("Set blade type to {} for {}", blade_type, card.card.name),
+                    };
+                    temp_effects.push(temp_effect);
+                }
+            }
+        }
+        
+        // Push all temp effects after the loop
+        for effect in temp_effects {
+            game_state.temporary_effects.push(effect);
+        }
+
+        Ok(())
+    }
+
+    /// Execute a set_heart_type effect
+    pub fn execute_set_heart_type(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let heart_type = effect.heart_color.as_deref().unwrap_or("heart00");
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        for target_player in target_players {
+            if target_player.id != player.id {
+                continue; // Skip for now, only implement self target
+            }
+
+            // Set heart type for stage members
+            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            for area in areas {
+                if let Some(ref mut card) = target_player.stage.get_area_mut(area) {
+                    // Set heart type - replace base_heart with specified type
+                    let count = effect.count.unwrap_or(1);
+                    card.card.set_heart(heart_type, count);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute a position_change effect
+    pub fn execute_position_change(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let position = effect.position.as_ref().and_then(|p| p.position.as_deref()).unwrap_or("");
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        for target_player in target_players {
+            if target_player.id != player.id {
+                continue; // Skip for now, only implement self target
+            }
+
+            // Move member to specified position
+            let _target_area = match position {
+                "center" | "センターエリア" => crate::zones::MemberArea::Center,
+                "left_side" | "左サイドエリア" => crate::zones::MemberArea::LeftSide,
+                "right_side" | "右サイドエリア" => crate::zones::MemberArea::RightSide,
+                _ => return Err(format!("Unknown position: {}", position)),
+            };
+
+            // Find and move the member (simplified - assumes moving from current position to target)
+            // This is a complex operation that requires user choice in real gameplay
+            // For now, we'll just log the intent
+            println!("Position change requested: move member to {}", position);
+        }
+
+        Ok(())
+    }
+
+    /// Execute a place_energy_under_member effect
+    pub fn execute_place_energy_under_member(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let energy_count = effect.energy_count.unwrap_or(1);
+        let target_member = effect.target_member.as_deref().unwrap_or("this_member");
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        for target_player in target_players {
+            if target_player.id != player.id {
+                continue; // Skip for now, only implement self target
+            }
+
+            // Draw energy cards and place under member
+            for _ in 0..energy_count {
+                if let Some(energy_card) = target_player.energy_deck.draw() {
+                    // Place energy under the specified member
+                    match target_member {
+                        "this_member" => {
+                            // Place under the member that activated the ability
+                            // This requires tracking which member activated - simplified for now
+                            // Just add to energy zone for now
+                            target_player.energy_zone.cards.push(crate::zones::CardInZone {
+                                card: energy_card,
+                                orientation: Some(crate::zones::Orientation::Active),
+                                energy_underneath: Vec::new(),
+                                face_state: crate::zones::FaceState::FaceUp,
+                            });
+                        }
+                        _ => {
+                            // Place under specified member
+                            target_player.energy_zone.cards.push(crate::zones::CardInZone {
+                                card: energy_card,
+                                orientation: Some(crate::zones::Orientation::Active),
+                                energy_underneath: Vec::new(),
+                                face_state: crate::zones::FaceState::FaceUp,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Execute a modify_yell_count effect
+    pub fn execute_modify_yell_count(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        let operation = effect.operation.as_deref().unwrap_or("subtract");
+        let count = effect.count.unwrap_or(0);
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        // Check if we should apply the effect (only for self target for now)
+        let should_apply = target_players.iter().any(|p| p.id == player.id);
+
+        if should_apply {
+            // Modify yell count - this affects the cheer check count
+            match operation {
+                "add" => {
+                    game_state.cheer_checks_required += count;
+                }
+                "subtract" => {
+                    game_state.cheer_checks_required = game_state.cheer_checks_required.saturating_sub(count);
+                }
+                "set" => {
+                    game_state.cheer_checks_required = count;
+                }
+                _ => return Err(format!("Unknown operation: {}", operation)),
             }
         }
 
@@ -592,6 +973,33 @@ impl AbilityExecutor {
                 "gain_resource" => {
                     self.execute_gain_resource(sub_effect, player, game_state, perspective_player_id)?;
                 }
+                "modify_score" => {
+                    self.execute_modify_score(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "modify_required_hearts" => {
+                    self.execute_modify_required_hearts(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "set_required_hearts" => {
+                    self.execute_set_required_hearts(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "modify_required_hearts_global" => {
+                    self.execute_modify_required_hearts_global(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "set_blade_type" => {
+                    self.execute_set_blade_type(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "set_heart_type" => {
+                    self.execute_set_heart_type(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "position_change" => {
+                    self.execute_position_change(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "place_energy_under_member" => {
+                    self.execute_place_energy_under_member(sub_effect, player, game_state, perspective_player_id)?;
+                }
+                "modify_yell_count" => {
+                    self.execute_modify_yell_count(sub_effect, player, game_state, perspective_player_id)?;
+                }
                 _ => {
                     return Err(format!("Unknown action in sequence: {}", sub_effect.action));
                 }
@@ -629,6 +1037,33 @@ impl AbilityExecutor {
             }
             "sequential" => {
                 self.execute_sequential(effect, player, game_state, perspective_player_id)
+            }
+            "modify_score" => {
+                self.execute_modify_score(effect, player, game_state, perspective_player_id)
+            }
+            "modify_required_hearts" => {
+                self.execute_modify_required_hearts(effect, player, game_state, perspective_player_id)
+            }
+            "set_required_hearts" => {
+                self.execute_set_required_hearts(effect, player, game_state, perspective_player_id)
+            }
+            "modify_required_hearts_global" => {
+                self.execute_modify_required_hearts_global(effect, player, game_state, perspective_player_id)
+            }
+            "set_blade_type" => {
+                self.execute_set_blade_type(effect, player, game_state, perspective_player_id)
+            }
+            "set_heart_type" => {
+                self.execute_set_heart_type(effect, player, game_state, perspective_player_id)
+            }
+            "position_change" => {
+                self.execute_position_change(effect, player, game_state, perspective_player_id)
+            }
+            "place_energy_under_member" => {
+                self.execute_place_energy_under_member(effect, player, game_state, perspective_player_id)
+            }
+            "modify_yell_count" => {
+                self.execute_modify_yell_count(effect, player, game_state, perspective_player_id)
             }
             _ => Err(format!("Unknown effect action: {}", effect.action)),
         }

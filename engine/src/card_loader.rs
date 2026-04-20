@@ -46,8 +46,10 @@ impl CardLoader {
     fn attach_abilities(mut cards: Vec<Card>, abilities_data: &serde_json::Value) -> Vec<Card> {
         // Map card numbers to their abilities
         let mut ability_map: HashMap<String, Vec<Ability>> = HashMap::new();
+        let mut total_abilities_mapped = 0;
 
         if let Some(unique_abilities) = abilities_data.get("unique_abilities").and_then(|v| v.as_array()) {
+            println!("📚 Loading {} unique abilities from abilities.json", unique_abilities.len());
             for ability_entry in unique_abilities {
                 // The ability entry itself contains the ability data directly
                 if let Ok(ability) = serde_json::from_value::<Ability>(ability_entry.clone()) {
@@ -58,6 +60,7 @@ impl CardLoader {
                                 // Extract just the card number part before the space
                                 if let Some(card_no) = card_str.split(" | ").next() {
                                     ability_map.entry(card_no.to_string()).or_insert_with(Vec::new).push(ability.clone());
+                                    total_abilities_mapped += 1;
                                 }
                             }
                         }
@@ -66,12 +69,21 @@ impl CardLoader {
             }
         }
 
+        println!("📊 Mapped {} abilities to {} unique cards", total_abilities_mapped, ability_map.len());
+
         // Attach abilities to cards
+        let mut cards_with_abilities = 0;
         for card in &mut cards {
             if let Some(card_abilities) = ability_map.get(&card.card_no) {
                 card.abilities = card_abilities.clone();
+                cards_with_abilities += 1;
+                if card_abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == "登場")) {
+                    println!("  ✅ Card {} has {} abilities including DEBUT trigger", card.card_no, card_abilities.len());
+                }
             }
         }
+
+        println!("📋 Attached abilities to {} out of {} cards", cards_with_abilities, cards.len());
 
         cards
     }

@@ -185,27 +185,63 @@ pub fn run_test_mode() {
     let mut total_issues = initial_issues.len();
     
     for turn in 1..=max_turns {
-        println!("\n--- TURN {} ---", turn);
+        eprintln!("\n--- TURN {} ---", turn);
         
         // Auto-advance automatic phases
+        let mut phase_loop_count = 0;
         loop {
+            phase_loop_count += 1;
+            if phase_loop_count > 100 {
+                eprintln!("⚠️  Phase loop exceeded 100 iterations, breaking to prevent infinite loop");
+                eprintln!("Current phase: {:?}", game_state.current_phase);
+                break;
+            }
+            
             let current_phase = game_state.current_phase.clone();
             match current_phase {
                 crate::game_state::Phase::Active |
                 crate::game_state::Phase::Energy |
                 crate::game_state::Phase::Draw => {
-                    println!("Auto-advancing {:?}...", current_phase);
+                    eprintln!("Auto-advancing {:?}...", current_phase);
                     turn::TurnEngine::advance_phase(&mut game_state);
                 }
-                crate::game_state::Phase::LiveCardSet |
+                crate::game_state::Phase::LiveCardSet => {
+                    eprintln!("Placing cards in LiveCardSet phase...");
+                    // Per Rule 8.2.2, place up to 3 cards from hand (any cards, not just live)
+                    // Then flip face-up later and non-live cards go to waitroom (Rule 8.3.4)
+                    let player = game_state.active_player_mut();
+                    let cards_to_place = std::cmp::min(3, player.hand.cards.len());
+                    
+                    if cards_to_place > 0 {
+                        let indices: Vec<usize> = (0..cards_to_place).collect();
+                        eprintln!("  Placing {} cards at indices {:?}", cards_to_place, indices);
+                        
+                        match turn::TurnEngine::execute_main_phase_action(
+                            &mut game_state,
+                            "place_live_cards",
+                            None,
+                            Some(indices),
+                            None
+                        ) {
+                            Ok(_) => eprintln!("  Cards placed successfully"),
+                            Err(e) => {
+                                eprintln!("  Failed to place cards: {}", e);
+                                turn::TurnEngine::advance_phase(&mut game_state);
+                            }
+                        }
+                    } else {
+                        eprintln!("No cards in hand, advancing phase");
+                        turn::TurnEngine::advance_phase(&mut game_state);
+                    }
+                }
                 crate::game_state::Phase::FirstAttackerPerformance |
                 crate::game_state::Phase::SecondAttackerPerformance |
                 crate::game_state::Phase::LiveVictoryDetermination => {
-                    println!("Auto-advancing live phase...");
+                    eprintln!("Auto-advancing live phase...");
                     turn::TurnEngine::advance_phase(&mut game_state);
                 }
                 crate::game_state::Phase::RockPaperScissors => {
-                    println!("Executing RPS choice...");
+                    eprintln!("Executing RPS choice...");
                     let _ = turn::TurnEngine::execute_main_phase_action(
                         &mut game_state,
                         "rps_choice",
@@ -215,7 +251,7 @@ pub fn run_test_mode() {
                     );
                 }
                 crate::game_state::Phase::Mulligan => {
-                    println!("Skipping mulligan...");
+                    eprintln!("Skipping mulligan...");
                     let _ = turn::TurnEngine::execute_main_phase_action(
                         &mut game_state,
                         "skip_mulligan",
@@ -225,6 +261,7 @@ pub fn run_test_mode() {
                     );
                 }
                 crate::game_state::Phase::Main => {
+                    eprintln!("Reached Main phase");
                     break;
                 }
             }

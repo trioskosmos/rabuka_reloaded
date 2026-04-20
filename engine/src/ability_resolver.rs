@@ -551,6 +551,10 @@ impl AbilityResolver {
 impl Default for AbilityEffect {
     fn default() -> Self {
         AbilityEffect {
+            heart_color: None,
+            blade_type: None,
+            energy_count: None,
+            target_member: None,
             text: String::new(),
             action: String::new(),
             source: None,

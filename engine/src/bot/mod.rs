@@ -7,3 +7,4 @@ pub mod interactive_headless;
 pub mod test_mode;
 pub mod tournament;
 pub mod ai;
+pub mod ability_test;

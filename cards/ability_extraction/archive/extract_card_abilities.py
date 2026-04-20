@@ -239,7 +239,15 @@ def extract_all_abilities(cards_file: Path) -> dict:
         effect = {}
         try:
             effect = parse_effect(effect_text)
-        except:
+            # Check if effect has empty actions array
+            if 'actions' in effect and not effect['actions']:
+                print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
+                print(f"Effect dict: {effect}")
+        except Exception as e:
+            print(f"Error parsing effect: {effect_text}")
+            print(f"Exception: {e}")
+            import traceback
+            traceback.print_exc()
             effect = {"text": effect_text, "actions": []}
         
         unique_abilities.append({

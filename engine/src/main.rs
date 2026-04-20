@@ -135,6 +135,9 @@ fn main() {
             "test" => {
                 bot::test_mode::run_test_mode();
             }
+            "ability" => {
+                bot::ability_test::run_ability_test();
+            }
             "tournament" => {
                 bot::tournament::run_tournament();
             }
