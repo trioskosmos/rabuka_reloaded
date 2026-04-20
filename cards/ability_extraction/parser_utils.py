@@ -9,6 +9,7 @@ import re
 DIGIT_PATTERN = re.compile(r'(\d+)')
 COUNT_PATTERN = re.compile(r'(\d+)枚')
 PEOPLE_PATTERN = re.compile(r'(\d+)人')
+COUNTER_PATTERN = re.compile(r'(\d+)つ')  # Generic counter (e.g., "3つ")
 GROUP_PATTERN = re.compile(r"『(.+?)』")
 QUOTED_NAME_PATTERN = re.compile(r'「(.+?)」')
 COST_PATTERN = re.compile(r'コスト(\d+)')
@@ -85,11 +86,14 @@ def normalize_text(text):
 
 
 def extract_count(text):
-    """Extract count from text (e.g., '3枚' -> 3, '2人' -> 2)."""
+    """Extract count from text (e.g., '3枚' -> 3, '2人' -> 2, '3つ' -> 3)."""
     match = COUNT_PATTERN.search(text)
     if match:
         return int(match.group(1))
     match = PEOPLE_PATTERN.search(text)
+    if match:
+        return int(match.group(1))
+    match = COUNTER_PATTERN.search(text)
     if match:
         return int(match.group(1))
     return None

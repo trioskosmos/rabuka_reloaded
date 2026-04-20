@@ -28,14 +28,14 @@ impl TurnEngine {
                 Phase::Energy => {
                     // Rule 7.5: Draw energy card (automatic)
                     Self::check_timing(game_state);
-                    game_state.active_player_mut().draw_energy();
+                    let _ = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Draw;
                 }
                 Phase::Draw => {
                     // Rule 7.6: Draw card (automatic)
                     Self::check_timing(game_state);
-                    game_state.active_player_mut().draw_card();
+                    let _ = game_state.active_player_mut().draw_card();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Main;
                 }
@@ -58,18 +58,16 @@ impl TurnEngine {
             match current_phase {
                 Phase::LiveCardSet => {
                     // Rule 8.2: Both players set live cards (automatic)
-                    Self::check_timing(game_state);
                     // First attacker sets live cards
-                    Self::player_set_live_cards(game_state.first_attacker_mut());
-                    Self::check_timing(game_state);
+                    let p1_cards = crate::bot::ai::AIPlayer::choose_live_cards_to_set(game_state.first_attacker());
+                    Self::player_set_live_cards(game_state.first_attacker_mut(), p1_cards);
                     // Second attacker sets live cards
-                    Self::player_set_live_cards(game_state.second_attacker_mut());
-                    Self::check_timing(game_state);
+                    let p2_cards = crate::bot::ai::AIPlayer::choose_live_cards_to_set(game_state.second_attacker());
+                    Self::player_set_live_cards(game_state.second_attacker_mut(), p2_cards);
                     game_state.current_phase = Phase::FirstAttackerPerformance;
                 }
                 Phase::FirstAttackerPerformance => {
                     // Rule 8.3: First attacker performs (automatic)
-                    Self::check_timing(game_state);
                     let blade_heart_count = {
                         // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
@@ -80,12 +78,10 @@ impl TurnEngine {
                         result
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
-                    Self::check_timing(game_state);
                     game_state.current_phase = Phase::SecondAttackerPerformance;
                 }
                 Phase::SecondAttackerPerformance => {
                     // Rule 8.3: Second attacker performs (automatic)
-                    Self::check_timing(game_state);
                     let blade_heart_count = {
                         // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
@@ -96,12 +92,10 @@ impl TurnEngine {
                         result
                     };
                     game_state.player2_cheer_blade_heart_count = blade_heart_count;
-                    Self::check_timing(game_state);
                     game_state.current_phase = Phase::LiveVictoryDetermination;
                 }
                 Phase::LiveVictoryDetermination => {
                     // Rule 8.4: Determine live victory (automatic)
-                    Self::check_timing(game_state);
                     Self::execute_live_victory_determination(game_state);
                 }
                 _ => {}
@@ -112,6 +106,25 @@ impl TurnEngine {
     pub fn execute_main_phase_action(game_state: &mut GameState, action: &str) {
         // Execute player choice action during MAIN phase
         match action {
+            "play_member_to_stage" => {
+                // Simple implementation: play first member card to first available stage area
+                let player = game_state.active_player_mut();
+                
+                // Find first member card in hand
+                let member_index = player.hand.cards.iter()
+                    .position(|c| c.is_member());
+                
+                if let Some(idx) = member_index {
+                    // Find first available stage area
+                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                    for area in areas {
+                        if player.stage.get_area(area).is_none() {
+                            let _ = player.move_card_from_hand_to_stage(idx, area);
+                            break;
+                        }
+                    }
+                }
+            }
             "play_member_left" => {
                 // TODO: Implement playing member to left side
             }
@@ -132,7 +145,7 @@ impl TurnEngine {
         }
     }
 
-    fn execute_live_victory_determination(game_state: &mut GameState) {
+    pub fn execute_live_victory_determination(game_state: &mut GameState) {
         // Rule 8.4: Determine live victory
         // Rule 8.4.2.1: Add cheer blade heart count to score
         let player1_score = game_state.player1.live_card_zone.calculate_live_score(game_state.player1_cheer_blade_heart_count);
@@ -179,17 +192,21 @@ impl TurnEngine {
             if game_state.player1.live_card_zone.cards.len() == 2 {
                 // Player1 has 2 cards, doesn't move
             } else {
-                Self::move_live_to_success(&mut game_state.player1);
+                let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player1);
+                Self::move_live_to_success(&mut game_state.player1, card_index);
             }
             if game_state.player2.live_card_zone.cards.len() == 2 {
                 // Player2 has 2 cards, doesn't move
             } else {
-                Self::move_live_to_success(&mut game_state.player2);
+                let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player2);
+                Self::move_live_to_success(&mut game_state.player2, card_index);
             }
         } else if player1_won {
-            Self::move_live_to_success(&mut game_state.player1);
+            let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player1);
+            Self::move_live_to_success(&mut game_state.player1, card_index);
         } else if player2_won {
-            Self::move_live_to_success(&mut game_state.player2);
+            let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player2);
+            Self::move_live_to_success(&mut game_state.player2, card_index);
         }
         
         // Rule 8.4.8: Move remaining live cards and cheer cards to discard
@@ -237,10 +254,11 @@ impl TurnEngine {
         game_state.current_phase = Phase::Active;
     }
 
-    fn move_live_to_success(player: &mut crate::player::Player) {
-        // Move top card from live card zone to success live card zone
-        if let Some(top_card) = player.live_card_zone.remove_top_card() {
-            player.success_live_card_zone.cards.push(top_card);
+    fn move_live_to_success(player: &mut crate::player::Player, card_index: usize) {
+        // Move specified card from live card zone to success live card zone
+        if card_index < player.live_card_zone.cards.len() {
+            let card = player.live_card_zone.cards.remove(card_index);
+            player.success_live_card_zone.cards.push(card);
         }
     }
 
@@ -256,7 +274,7 @@ impl TurnEngine {
         }
     }
 
-    fn check_timing(game_state: &mut GameState) {
+    pub fn check_timing(game_state: &mut GameState) {
         // Rule 9.5: Check timing - process rule processing per rules 10.2-10.6
         
         // Rule 10.2: Refresh (already handled in player.refresh())
@@ -350,20 +368,19 @@ impl TurnEngine {
         // This would need to track which cards are currently being played/resolved
     }
 
-    fn player_set_live_cards(player: &mut crate::player::Player) {
+    pub fn player_set_live_cards(player: &mut crate::player::Player, num_cards_to_set: usize) {
         // Rule 8.2: Player sets live cards face-down and draws equal amount
-        // Simplified: AI chooses up to 3 live cards to set
         let live_cards: Vec<_> = player.hand.cards.iter()
             .filter(|c| c.is_live())
             .cloned()
             .collect();
         
-        if live_cards.is_empty() {
+        if live_cards.is_empty() || num_cards_to_set == 0 {
             return;
         }
         
-        // Set up to 3 cards
-        let cards_to_set = std::cmp::min(3, live_cards.len());
+        // Set specified number of cards
+        let cards_to_set = std::cmp::min(num_cards_to_set, live_cards.len());
         for i in 0..cards_to_set {
             let card = live_cards[i].clone();
             // Remove from hand
@@ -380,7 +397,7 @@ impl TurnEngine {
         }
     }
 
-    fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone) -> u32 {
+    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone) -> u32 {
         // Rule 8.3: Player performs live - check heart requirements
         // Rule 8.3.4: Reveal cards, discard non-live cards
         player.live_card_zone.cards.retain(|c| c.is_live());
@@ -435,17 +452,51 @@ impl TurnEngine {
         
         for card in &player.live_card_zone.cards {
             if let Some(ref need_heart) = card.need_heart {
-                let can_satisfy = need_heart.hearts.iter().all(|(color, needed)| {
-                    remaining_hearts.hearts.get(color).unwrap_or(&0) >= needed
-                });
+                let mut can_satisfy = true;
+                let mut temp_hearts = remaining_hearts.hearts.clone();
+                
+                for (color, needed) in &need_heart.hearts {
+                    if color == "heart0" {
+                        // Wildcard heart (rule 8.3.15.1.1) - can be any color
+                        // Count total hearts available
+                        let total_available: u32 = temp_hearts.values().sum();
+                        if total_available < *needed {
+                            can_satisfy = false;
+                            break;
+                        }
+                        // Consume from any colors (prefer non-wildcards first)
+                        let mut consumed = 0;
+                        for (c, count) in temp_hearts.iter_mut() {
+                            if *c != "heart0" {
+                                let to_consume = std::cmp::min(*count, *needed - consumed);
+                                *count -= to_consume;
+                                consumed += to_consume;
+                                if consumed >= *needed {
+                                    break;
+                                }
+                            }
+                        }
+                        // If still need more, consume from wildcards
+                        if consumed < *needed {
+                            if let Some(wildcard_count) = temp_hearts.get_mut("heart0") {
+                                let to_consume = std::cmp::min(*wildcard_count, *needed - consumed);
+                                *wildcard_count -= to_consume;
+                            }
+                        }
+                    } else {
+                        // Specific color heart
+                        let available = temp_hearts.get(color).unwrap_or(&0);
+                        if *available < *needed {
+                            can_satisfy = false;
+                            break;
+                        }
+                        *temp_hearts.get_mut(color).unwrap() -= needed;
+                    }
+                }
                 
                 if can_satisfy {
-                    // Consume hearts
-                    for (color, needed) in &need_heart.hearts {
-                        if let Some(count) = remaining_hearts.hearts.get_mut(color) {
-                            *count -= needed;
-                        }
-                    }
+                    // Update remaining hearts with the temp consumption
+                    remaining_hearts.hearts = temp_hearts;
                 } else {
                     live_cards_to_remove.push(card.clone());
                 }

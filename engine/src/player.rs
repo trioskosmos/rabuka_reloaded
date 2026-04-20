@@ -64,17 +64,44 @@ impl Player {
         // Rule 9.6.2.3.1: Cost is equal to the card's cost value in energy
         let card_cost = card.cost.unwrap_or(0);
         
+        // Rule 9.6.2.3: Determine cost and pay all costs
+        let mut cost_to_pay = card_cost;
+        
         // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to discard instead
-        let mut baton_touched = false;
-        if card_cost > 0 && self.energy_zone.cards.len() >= 1 {
+        if cost_to_pay > 0 && self.energy_zone.cards.len() >= 1 {
             // Check if there's a member in the target area to baton touch
             if let Some(existing_member) = self.stage.get_area(stage_area) {
                 // Perform baton touch: send existing member to discard
                 let member_card = existing_member.card.clone();
                 self.waitroom.cards.push(member_card);
-                baton_touched = true;
-                // Rule 9.6.2.3.2: Reduce cost by member's cost (simplified: reduce by 1 for now)
-                // TODO: Implement proper cost reduction based on member's cost
+                // Rule 9.6.2.3.2: Reduce cost by member's cost
+                let member_cost = existing_member.card.cost.unwrap_or(1);
+                cost_to_pay = cost_to_pay.saturating_sub(member_cost);
+            }
+        }
+        
+        // Rule 9.6.2.3.1: Pay energy equal to cost
+        if cost_to_pay > 0 {
+            // Check if player has enough active energy
+            let active_energy_count = self.energy_zone.cards.iter()
+                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+                .count() as u32;
+            
+            if active_energy_count < cost_to_pay {
+                self.hand.cards.insert(hand_index, card);
+                return Err(format!("Not enough energy to pay cost: need {}, have {}", cost_to_pay, active_energy_count));
+            }
+            
+            // Pay the cost by activating energy cards
+            let mut paid = 0;
+            for energy_card in self.energy_zone.cards.iter_mut() {
+                if paid >= cost_to_pay {
+                    break;
+                }
+                if energy_card.orientation == Some(crate::zones::Orientation::Active) {
+                    energy_card.orientation = Some(crate::zones::Orientation::Wait);
+                    paid += 1;
+                }
             }
         }
         
@@ -87,21 +114,21 @@ impl Player {
         
         match stage_area {
             crate::zones::MemberArea::LeftSide => {
-                if self.stage.left_side.is_some() && !baton_touched {
+                if self.stage.left_side.is_some() {
                     self.hand.cards.insert(hand_index, card_in_zone.card);
                     return Err("Left side already occupied".to_string());
                 }
                 self.stage.left_side = Some(card_in_zone);
             }
             crate::zones::MemberArea::Center => {
-                if self.stage.center.is_some() && !baton_touched {
+                if self.stage.center.is_some() {
                     self.hand.cards.insert(hand_index, card_in_zone.card);
                     return Err("Center already occupied".to_string());
                 }
                 self.stage.center = Some(card_in_zone);
             }
             crate::zones::MemberArea::RightSide => {
-                if self.stage.right_side.is_some() && !baton_touched {
+                if self.stage.right_side.is_some() {
                     self.hand.cards.insert(hand_index, card_in_zone.card);
                     return Err("Right side already occupied".to_string());
                 }
@@ -189,7 +216,7 @@ impl Player {
         self.energy_deck.draw().map(|card| {
             let card_in_zone = crate::zones::CardInZone {
                 card: card.clone(),
-                orientation: Some(crate::zones::Orientation::Active),
+                orientation: Some(crate::zones::Orientation::Wait),
                 face_state: crate::zones::FaceState::FaceUp,
                 energy_underneath: Vec::new(),
             };
@@ -217,15 +244,10 @@ impl Player {
         // If deck has fewer cards than needed to look at, refresh first
         // This would be called before look_at_top operations
         
-        // Energy deck refresh - if energy deck is empty, refresh from energy zone
-        if self.energy_deck.is_empty() && !self.energy_zone.cards.is_empty() {
-            let energy_cards: Vec<_> = self.energy_zone.cards.drain(..).collect();
-            for mut card_in_zone in energy_cards {
-                card_in_zone.orientation = Some(crate::zones::Orientation::Wait);
-                card_in_zone.face_state = crate::zones::FaceState::FaceDown;
-                self.energy_deck.cards.push_back(card_in_zone.card);
-            }
-        }
+        // Energy deck does NOT refresh like main deck
+        // Energy cards are recycled via Rule 10.5.3 (energy without member above -> energy deck)
+        // and Rule 10.5.4 (energy going to waitroom -> energy deck instead)
+        // These are handled in check_timing/check_invalid_cards in turn.rs
     }
     
     pub fn refresh_if_needed(&mut self, needed: usize) {
@@ -379,7 +401,49 @@ impl Player {
         // Rule 8.2: Main Phase - Can play if hand has member cards and stage has space
         let has_member = self.hand.cards.iter().any(|c| c.is_member());
         let has_space = self.stage.left_side.is_none() || self.stage.center.is_none() || self.stage.right_side.is_none();
-        has_member && has_space
+        
+        if !has_member || !has_space {
+            return false;
+        }
+        
+        // Rule 9.6.2.3: Check if player can afford to play a member
+        // Find the cheapest member card in hand
+        let cheapest_cost = self.hand.cards.iter()
+            .filter(|c| c.is_member())
+            .map(|c| c.cost.unwrap_or(0))
+            .min()
+            .unwrap_or(0);
+        
+        // Count active energy
+        let active_energy_count = self.energy_zone.cards.iter()
+            .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+            .count() as u32;
+        
+        // Check if can afford cheapest member (or any member with cost 0)
+        if cheapest_cost == 0 {
+            return true;
+        }
+        
+        // Check if can use baton touch to reduce cost
+        if active_energy_count >= 1 {
+            // Check if any stage area has a member for baton touch
+            if self.stage.left_side.is_some() || self.stage.center.is_some() || self.stage.right_side.is_some() {
+                // Can baton touch to reduce cost
+                let member_cost = if let Some(member) = self.stage.left_side.as_ref() {
+                    member.card.cost.unwrap_or(1)
+                } else if let Some(member) = self.stage.center.as_ref() {
+                    member.card.cost.unwrap_or(1)
+                } else if let Some(member) = self.stage.right_side.as_ref() {
+                    member.card.cost.unwrap_or(1)
+                } else {
+                    1
+                };
+                let reduced_cost = cheapest_cost.saturating_sub(member_cost);
+                return active_energy_count >= reduced_cost;
+            }
+        }
+        
+        active_energy_count >= cheapest_cost
     }
 
     /// Check if player can place a card in live zone

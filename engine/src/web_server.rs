@@ -1,7 +1,10 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
-use serde::{Deserialize, Serialize};
+use actix_files as fs;
 use std::sync::{Arc, Mutex};
+use serde::{Serialize, Deserialize};
+use serde_json;
+use std::path::PathBuf;
 
 use crate::game_state::GameState;
 
@@ -24,6 +27,7 @@ pub struct PlayerDisplay {
     pub energy: ZoneDisplay,
     pub stage: StageDisplay,
     pub live_zone: ZoneDisplay,
+    pub success_live_card_zone: ZoneDisplay,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -84,11 +88,13 @@ pub fn stage_to_display(stage: &crate::zones::Stage) -> StageDisplay {
 }
 
 pub fn player_to_display(player: &crate::player::Player) -> PlayerDisplay {
+    let energy_cards: Vec<crate::card::Card> = player.energy_zone.cards.iter().map(|c| c.card.clone()).collect();
     PlayerDisplay {
         hand: zone_to_display(&player.hand.cards),
-        energy: zone_to_display(&player.energy_zone.cards.iter().map(|c| &c.card).collect::<Vec<_>>()),
+        energy: zone_to_display(&energy_cards),
         stage: stage_to_display(&player.stage),
         live_zone: zone_to_display(&player.live_card_zone.cards),
+        success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards),
     }
 }
 
@@ -102,13 +108,41 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
 }
 
 async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
-    let game_state = data.game_state.lock().unwrap();
+    let mut game_state = data.game_state.lock().unwrap();
+    
+    // Auto-advance automatic phases (Active, Energy, Draw)
+    // These phases should execute automatically without player intervention
+    loop {
+        let current_phase = game_state.current_phase.clone();
+        match current_phase {
+            crate::game_state::Phase::Active | 
+            crate::game_state::Phase::Energy | 
+            crate::game_state::Phase::Draw => {
+                crate::turn::TurnEngine::advance_phase(&mut game_state);
+            }
+            _ => break,
+        }
+    }
+    
     let display = game_state_to_display(&game_state);
     HttpResponse::Ok().json(display)
 }
 
 async fn get_actions(data: web::Data<AppState>) -> impl Responder {
-    let game_state = data.game_state.lock().unwrap();
+    let mut game_state = data.game_state.lock().unwrap();
+    
+    // Auto-advance automatic phases (Active, Energy, Draw)
+    loop {
+        let current_phase = game_state.current_phase.clone();
+        match current_phase {
+            crate::game_state::Phase::Active | 
+            crate::game_state::Phase::Energy | 
+            crate::game_state::Phase::Draw => {
+                crate::turn::TurnEngine::advance_phase(&mut game_state);
+            }
+            _ => break,
+        }
+    }
     
     // Generate possible actions based on current game state
     let actions = generate_possible_actions(&game_state);
@@ -123,33 +157,24 @@ fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     // Filter actions based on current phase and legal action validation
     match game_state.current_phase {
         crate::game_state::Phase::Active => {
-            // Rule 7.1: Active Phase - Can activate energy cards
-            if active_player.can_activate_energy() {
-                actions.push(Action {
-                    description: "Activate all energy cards".to_string(),
-                    action_type: "activate_energy".to_string(),
-                });
-            }
+            // Rule 7.4: Active Phase - AUTOMATIC, no player actions
+            // Energy activation happens automatically in advance_phase
         }
         crate::game_state::Phase::Energy => {
-            // Rule 7.2: Energy Phase - Can play energy cards from hand
-            if active_player.can_play_energy_to_zone() {
-                actions.push(Action {
-                    description: "Play energy card from hand to energy zone".to_string(),
-                    action_type: "play_energy_to_zone".to_string(),
-                });
-            }
+            // Rule 7.5: Energy Phase - AUTOMATIC, no player actions
+            // Energy draw happens automatically in advance_phase
         }
         crate::game_state::Phase::Draw => {
-            // Rule 8.1: Draw Phase - Can draw card
-            if active_player.can_draw_card() {
-                actions.push(Action {
-                    description: "Draw card from main deck".to_string(),
-                    action_type: "draw_card".to_string(),
-                });
-            }
+            // Rule 7.6: Draw Phase - AUTOMATIC, no player actions
+            // Card draw happens automatically in advance_phase
         }
         crate::game_state::Phase::Main => {
+            // Rule 7.7: Main Phase - Add pass action to end phase
+            actions.push(Action {
+                description: "Pass - End Main Phase".to_string(),
+                action_type: "pass".to_string(),
+            });
+            
             // Rule 8.2: Main Phase - Can play member cards to stage
             if active_player.can_play_member_to_stage() {
                 actions.push(Action {
@@ -275,6 +300,10 @@ async fn execute_action(
     
     // Execute the action
     let result = match action.action_type.as_str() {
+        "pass" => {
+            crate::turn::TurnEngine::advance_phase(&mut game_state);
+            Ok(())
+        }
         "activate_energy" => {
             active_player.activate_all_energy();
             Ok(())
@@ -284,12 +313,34 @@ async fn execute_action(
             Err("Card selection not implemented".to_string())
         }
         "draw_card" => {
-            active_player.draw_card().ok_or("Deck empty".to_string())?;
-            Ok(())
+            match active_player.draw_card() {
+                Some(_) => Ok(()),
+                None => Err("Deck empty".to_string()),
+            }
         }
         "play_member_to_stage" => {
-            // TODO: Implement card selection and area selection
-            Err("Card selection not implemented".to_string())
+            // Simple implementation: play first member card to first available stage area
+            let player = game_state.active_player_mut();
+            
+            // Find first member card in hand
+            let member_index = player.hand.cards.iter()
+                .position(|c| c.is_member());
+            
+            match member_index {
+                Some(idx) => {
+                    // Find first available stage area
+                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                    let mut result = Err("No available stage areas".to_string());
+                    for area in areas {
+                        if player.stage.get_area(area).is_none() {
+                            result = player.move_card_from_hand_to_stage(idx, area);
+                            break;
+                        }
+                    }
+                    result
+                }
+                None => Err("No member cards in hand".to_string())
+            }
         }
         "shuffle_deck" => {
             active_player.shuffle_zone("deck")
@@ -324,28 +375,35 @@ async fn execute_action(
             active_player.pay_energy(2)
         }
         "place_energy_under_left" => {
-            // TODO: Implement energy card selection
-            Err("Energy selection not implemented".to_string())
+            active_player.place_energy_under_member(0, crate::zones::MemberArea::LeftSide)
         }
         "place_energy_under_center" => {
-            // TODO: Implement energy card selection
-            Err("Energy selection not implemented".to_string())
+            active_player.place_energy_under_member(0, crate::zones::MemberArea::Center)
         }
         "place_energy_under_right" => {
-            // TODO: Implement energy card selection
-            Err("Energy selection not implemented".to_string())
+            active_player.place_energy_under_member(0, crate::zones::MemberArea::RightSide)
         }
         "place_in_live_zone" => {
             // TODO: Implement card selection
             Err("Card selection not implemented".to_string())
         }
-        _ => {
-            Err("Unknown action type".to_string())
-        }
+        _ => Err("Unknown action type".to_string()),
     };
     
     match result {
         Ok(_) => {
+            // Auto-advance automatic phases after action execution
+            loop {
+                let current_phase = game_state.current_phase.clone();
+                match current_phase {
+                    crate::game_state::Phase::Active | 
+                    crate::game_state::Phase::Energy | 
+                    crate::game_state::Phase::Draw => {
+                        crate::turn::TurnEngine::advance_phase(&mut game_state);
+                    }
+                    _ => break,
+                }
+            }
             let display = game_state_to_display(&game_state);
             HttpResponse::Ok().json(display)
         }
@@ -358,15 +416,20 @@ async fn execute_action(
 pub async fn run_web_server(game_state: Arc<Mutex<GameState>>) -> std::io::Result<()> {
     let app_state = web::Data::new(AppState { game_state });
     
+    // Get the web directory path
+    let web_dir = PathBuf::from("../web");
     HttpServer::new(move || {
         let cors = Cors::permissive();
-        
+
         App::new()
             .wrap(cors)
             .app_data(app_state.clone())
             .route("/api/game-state", web::get().to(get_game_state))
             .route("/api/actions", web::get().to(get_actions))
             .route("/api/execute-action", web::post().to(execute_action))
+            .service(fs::Files::new("/decks", PathBuf::from("../game/decks")))
+            .service(fs::Files::new("/cards", PathBuf::from("../cards")))
+            .service(fs::Files::new("/", web_dir.clone()).index_file("index.html"))
     })
     .bind("127.0.0.1:8080")?
     .run()

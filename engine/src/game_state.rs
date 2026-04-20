@@ -183,15 +183,21 @@ impl GameState {
     }
 
     pub fn check_victory(&self) -> GameResult {
-        let p1_victory = self.player1.has_victory();
-        let p2_victory = self.player2.has_victory();
-
-        if p1_victory && !p2_victory {
-            GameResult::FirstAttackerWins
-        } else if p2_victory && !p1_victory {
-            GameResult::SecondAttackerWins
-        } else if p1_victory && p2_victory {
+        // Rule 1.2.1.1: Victory condition
+        // Player wins if they have 3+ success live cards AND opponent has 2 or fewer
+        let p1_success = self.player1.success_live_card_zone.len();
+        let p2_success = self.player2.success_live_card_zone.len();
+        
+        let p1_wins = p1_success >= 3 && p2_success <= 2;
+        let p2_wins = p2_success >= 3 && p1_success <= 2;
+        
+        // Rule 1.2.1.2: If both have 3+ simultaneously, it's a draw
+        if p1_success >= 3 && p2_success >= 3 {
             GameResult::Draw
+        } else if p1_wins && !p2_wins {
+            GameResult::FirstAttackerWins
+        } else if p2_wins && !p1_wins {
+            GameResult::SecondAttackerWins
         } else {
             GameResult::Ongoing
         }

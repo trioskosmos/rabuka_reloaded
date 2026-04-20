@@ -24,7 +24,7 @@
             flex: 1;
         }
         #action-panel {
-            width: 300px;
+            width: 350px;
             background: #16213e;
             border-left: 2px solid #0f3460;
             padding: 20px;
@@ -34,18 +34,21 @@
             color: #e94560;
             margin-bottom: 15px;
             font-size: 18px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
         .action-item {
             background: #0f3460;
             border: 1px solid #e94560;
-            padding: 10px;
+            padding: 12px;
             margin-bottom: 8px;
             border-radius: 4px;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.2s;
         }
         .action-item:hover {
             background: #1a1a2e;
+            transform: translateX(-2px);
         }
         .action-index {
             color: #e94560;
@@ -54,6 +57,25 @@
         }
         .action-description {
             color: #fff;
+            font-size: 13px;
+        }
+        .game-instructions {
+            background: #0f3460;
+            border: 1px solid #e94560;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .game-instructions h3 {
+            color: #e94560;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .game-instructions ul {
+            color: #fff;
+            font-size: 12px;
+            padding-left: 20px;
+            line-height: 1.6;
         }
     </style>
 </head>
@@ -62,9 +84,42 @@
         <div id="phaser-game"></div>
         <div id="action-panel">
             <h2>Possible Actions</h2>
+            <div class="game-instructions">
+                <h3>Deck Selection</h3>
+                <select id="deck-select" style="width: 100%; padding: 8px; margin: 10px 0; background: #1a1a2e; color: white; border: 1px solid #e94560; border-radius: 4px;">
+                    <option value="aqours_cup">Aqours Cup</option>
+                    <option value="muse_cup">Muse Cup</option>
+                    <option value="nijigaku_cup">Nijigaku Cup</option>
+                    <option value="liella_cup">Liella Cup</option>
+                    <option value="hasunosora_cup">Hasunosora Cup</option>
+                    <option value="fade deck">Fade Deck</option>
+                </select>
+                <button onclick="loadSelectedDeck()" style="width: 100%; padding: 8px; background: #e94560; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 10px;">Load Deck</button>
+            </div>
+            <div class="game-instructions">
+                <h3>How to Play</h3>
+                <ul>
+                    <li>Drag cards from hand to stage/energy zone</li>
+                    <li>Click actions in the panel to execute</li>
+                    <li>Game state updates automatically</li>
+                </ul>
+            </div>
             <div id="action-list"></div>
         </div>
     </div>
+    <script>
+        console.log('HTML loaded');
+        console.log('Phaser available:', typeof Phaser !== 'undefined');
+        
+        function loadSelectedDeck() {
+            const deckSelect = document.getElementById('deck-select');
+            const deckName = deckSelect.value;
+            console.log('Loading deck:', deckName);
+            if (window.gameScene) {
+                window.gameScene.loadDeckAndDisplay(deckName);
+            }
+        }
+    </script>
     <script src="game.js"></script>
 </body>
 </html>

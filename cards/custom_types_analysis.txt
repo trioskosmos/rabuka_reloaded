@@ -1,0 +1,191 @@
+--- Entry 1 ---
+Text: 控え室にあるメンバーカード2枚を好きな順番でデッキの一番下に置いてもよい：それらのカードのコストの合計が、6の場合、カードを1枚引く。合計が8の場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。...
+  Path: cost
+  Fields: ['text', 'destination', 'count', 'card_type', 'optional', 'type']
+  Full custom: {'text': '控え室にあるメンバーカード2枚を好きな順番でデッキの一番下に置いてもよい', 'destination': 'deck_bottom', 'count': 2, 'card_type': 'member_card', 'optional': True, 'type': 'custom'}
+  Path: effect.condition
+  Fields: ['text', 'aggregate', 'type']
+  Full custom: {'text': 'ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計が25の', 'aggregate': 'total', 'type': 'custom'}
+
+--- Entry 2 ---
+Text: このメンバーをウェイトにする：カードを3枚引き、手札を2枚控え室に置く。これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、このメンバーをアクティブにする。2枚ある場合、さらにライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'card_type', 'count', 'type']
+  Full custom: {'text': 'このメンバーをアクティブにする。2枚ある', 'card_type': 'member_card', 'count': 2, 'type': 'custom'}
+
+--- Entry 3 ---
+Text: カードを1枚引く。自分のステージに「米女メイ」がいる場合、さらにカードを1枚引く。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'location', 'count', 'type']
+  Full custom: {'text': 'カードを1枚引く。自分のステージに「米女メイ」がいる', 'target': 'self', 'location': 'stage', 'count': 1, 'type': 'custom'}
+
+--- Entry 4 ---
+Text: ［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、ライブ終了時まで、［緑ハート］を得る。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'card_type', 'count', 'operator', 'type']
+  Full custom: {'text': '［ターン1回］エールにより公開された自分のカードの中にライブカードが1枚以上ある', 'target': 'self', 'card_type': 'live_card', 'count': 1, 'operator': '>=', 'type': 'custom'}
+
+--- Entry 5 ---
+Text: {{icon_energy.png|E}}：このメンバーがいるエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、そのメンバーは、このメンバーがいたエリアに移動させる。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'card_type', 'count', 'movement', 'type']
+  Full custom: {'text': 'このメンバーがいるエリアとは別の自分のエリア1つを選ぶ。このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる', 'target': 'self', 'card_type': 'member_card', 'count': 1, 'movement': True, 'type': 'custom'}
+
+--- Entry 6 ---
+Text: エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'card_type', 'count', 'operator', 'type']
+  Full custom: {'text': 'エールにより公開された自分のカードの中にライブカードが1枚以上ある', 'target': 'self', 'card_type': 'live_card', 'count': 1, 'operator': '>=', 'type': 'custom'}
+
+--- Entry 7 ---
+Text: ライブの合計スコアが相手より高い場合、このカードを手札に加えてもよい。この能力は、このカードが自分のエールによって公開されている場合のみ発動する。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'location', 'destination', 'type']
+  Full custom: {'text': 'このカードを手札に加えてもよい。この能力は、このカードが自分のエールによって公開されている', 'target': 'self', 'location': 'hand', 'destination': 'hand', 'type': 'custom'}
+
+--- Entry 8 ---
+Text: エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合、カードを1枚引く。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'operator', 'type']
+  Full custom: {'text': 'エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない', 'target': 'self', 'operator': '<', 'type': 'custom'}
+
+--- Entry 9 ---
+Text: 自分のライブ中のライブカードが2枚以上あるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'card_type', 'count', 'operator', 'type']
+  Full custom: {'text': '自分のライブ中のライブカードが2枚以上あるかぎり', 'target': 'self', 'card_type': 'live_card', 'count': 2, 'operator': '>=', 'type': 'custom'}
+
+--- Entry 10 ---
+Text: 自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり、{{icon_all.p...
+  Path: effect.condition
+  Fields: ['text', 'target', 'card_type', 'operator', 'type']
+  Full custom: {'text': '自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり', 'target': 'self', 'card_type': 'live_card', 'operator': '>=', 'type': 'custom'}
+
+--- Entry 11 ---
+Text: エネルギー2枚をエネルギーデッキに置く：自分の控え室にあるライブカードを1枚手札に加える。...
+  Path: cost
+  Fields: ['text', 'count', 'type']
+  Full custom: {'text': 'エネルギー2枚をエネルギーデッキに置く', 'count': 2, 'type': 'custom'}
+
+--- Entry 12 ---
+Text: 手札のライブカードを1枚公開してもよい：自分の成功ライブカード置き場にあるカードを1枚手札に加える。そうした場合、これにより公開したカードを自分の成功ライブカード置き場に置く。...
+  Path: cost
+  Fields: ['text', 'source', 'count', 'card_type', 'optional', 'type']
+  Full custom: {'text': '手札のライブカードを1枚公開してもよい', 'source': 'hand', 'count': 1, 'card_type': 'live_card', 'optional': True, 'type': 'custom'}
+
+--- Entry 13 ---
+Text: 自分のライブ中のカードが3枚以上ある場合、このカードのスコアを＋２する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)...
+  Path: effect.condition
+  Fields: ['text', 'target', 'count', 'operator', 'type']
+  Full custom: {'text': '自分のライブ中のカードが3枚以上ある', 'target': 'self', 'count': 3, 'operator': '>=', 'type': 'custom'}
+
+--- Entry 14 ---
+Text: 自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。
+(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)...
+  Path: effect.condition
+  Fields: ['text', 'target', 'location', 'type']
+  Full custom: {'text': '自分のステージに「澁谷かのん」と「唐可可」がいる', 'target': 'self', 'location': 'stage', 'type': 'custom'}
+
+--- Entry 15 ---
+Text: エールにより公開された自分のカードの中にブレードハートを持つカードがないとき、ライブ終了時まで、{{heart_06.png|heart06}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'type']
+  Full custom: {'text': 'エールにより公開された自分のカードの中にブレードハートを持つカードがない', 'target': 'self', 'type': 'custom'}
+
+--- Entry 16 ---
+Text: エールにより公開された自分のカードの中にブレードハートを持つカードがないとき、ライブ終了時まで、{{heart_02.png|heart02}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'type']
+  Full custom: {'text': 'エールにより公開された自分のカードの中にブレードハートを持つカードがない', 'target': 'self', 'type': 'custom'}
+
+--- Entry 17 ---
+Text: エールにより公開された自分のカードの中にブレードハートを持つカードがないとき、ライブ終了時まで、{{heart_03.png|heart03}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'type']
+  Full custom: {'text': 'エールにより公開された自分のカードの中にブレードハートを持つカードがない', 'target': 'self', 'type': 'custom'}
+
+--- Entry 18 ---
+Text: 自分のステージに「徒町小鈴」が登場しており、かつ「徒町小鈴」よりコストの大きい「村野さやか」が登場している場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす。...
+  Path: effect.condition.conditions[0]
+  Fields: ['text', 'target', 'location', 'type']
+  Full custom: {'text': '自分のステージに「徒町小鈴」が登場しており、', 'target': 'self', 'location': 'stage', 'type': 'custom'}
+
+--- Entry 19 ---
+Text: ［ターン1回］エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の場合、それらのカードをすべて控え室に置いてもよい。そのエールで得たブレードハートを失い、もう一度エールを行う。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'count', 'operator', 'type']
+  Full custom: {'text': '［ターン1回］エールにより自分のカードを1枚以上公開したとき、それらのカードの中にブレードハートを持つカードが2枚以下の', 'target': 'self', 'count': 1, 'operator': '>=', 'type': 'custom'}
+
+--- Entry 20 ---
+Text: エールにより公開された自分のカードの中に{{icon_b_all.png|ALLブレード}}を持つカードが1枚以上ある場合、このカードのスコアを＋１する。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'count', 'operator', 'type']
+  Full custom: {'text': 'エールにより公開された自分のカードの中に{{icon_b_all.png|ALLブレード}}を持つカードが1枚以上ある', 'target': 'self', 'count': 1, 'operator': '>=', 'type': 'custom'}
+
+--- Entry 21 ---
+Text: 自分のメインフェイズの間、このメンバーがアクティブ状態からウェイト状態になったとき、カードを1枚引き、手札を1枚控え室に置く。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'card_type', 'type']
+  Full custom: {'text': '自分のメインフェイズの間、このメンバーがアクティブ状態からウェイト状態になった', 'target': 'self', 'card_type': 'member_card', 'type': 'custom'}
+
+--- Entry 22 ---
+Text: このゲームの1ターン目のライブフェイズの場合、このカードのスコアを＋１し、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'type']
+  Full custom: {'text': 'このゲームの1ターン目のライブフェイズの', 'type': 'custom'}
+
+--- Entry 23 ---
+Text: アクティブ状態の自分のエネルギーがある場合、このカードのスコアを＋１する。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'type']
+  Full custom: {'text': 'アクティブ状態の自分のエネルギーがある', 'target': 'self', 'type': 'custom'}
+
+--- Entry 24 ---
+Text: 自分のステージに「中須かすみ」がいる場合、自分のデッキの上からカードを4枚公開する。自分はそれらの中から「中須かすみ」のカードを1枚選ぶ。ライブ終了時まで、自分のステージにいる「中須かすみ」1人は、これにより選んだカードが持つ色のハートを1つずつ得る。公開したカードをすべて控え室に置く。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'location', 'type']
+  Full custom: {'text': '自分のステージに「中須かすみ」がいる', 'target': 'self', 'location': 'stage', 'type': 'custom'}
+
+--- Entry 25 ---
+Text: {{icon_energy.png|E}}支払ってもよい：自分のステージに『蓮ノ空』のメンバー1人を含むメンバーが2人以上おり、かつそれらのメンバーのユニット名がそれぞれ異なる場合、このカードのスコアを＋１する。...
+  Path: effect.condition.conditions[1]
+  Fields: ['text', 'card_type', 'type']
+  Full custom: {'text': 'それらのメンバーのユニット名がそれぞれ異なる', 'card_type': 'member_card', 'type': 'custom'}
+
+--- Entry 26 ---
+Text: エールにより公開されている自分のライブカードの枚数が、エールにより公開されている相手のライブカードの枚数より多い場合、このカードのスコアを＋１する。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'card_type', 'operator', 'type']
+  Full custom: {'text': 'エールにより公開されている自分のライブカードの枚数が、エールにより公開されている相手のライブカードの枚数より多い', 'target': 'both', 'card_type': 'live_card', 'operator': '>', 'type': 'custom'}
+
+--- Entry 27 ---
+Text: 自分のステージに「日野下花帆」か「徒町小鈴」か「安養寺姫芽」がいるかぎり、{{heart_04.png|heart04}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'location', 'type']
+  Full custom: {'text': '自分のステージに「日野下花帆」か「徒町小鈴」か「安養寺姫芽」がいるかぎり', 'target': 'self', 'location': 'stage', 'type': 'custom'}
+
+--- Entry 28 ---
+Text: 自分のステージに「村野さやか」か「百生吟子」か「安養寺姫芽」がいるかぎり、{{icon_blade.png|ブレード}}を得る。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'location', 'type']
+  Full custom: {'text': '自分のステージに「村野さやか」か「百生吟子」か「安養寺姫芽」がいるかぎり', 'target': 'self', 'location': 'stage', 'type': 'custom'}
+
+--- Entry 29 ---
+Text: 自分のステージに「大沢瑠璃乃」か「百生吟子」か「徒町小鈴」がいる場合、エネルギーを1枚アクティブにし、自分の控え室から『蓮ノ空』のライブカードを1枚手札に加える。...
+  Path: effect.condition
+  Fields: ['text', 'target', 'location', 'type']
+  Full custom: {'text': '自分のステージに「大沢瑠璃乃」か「百生吟子」か「徒町小鈴」がいる', 'target': 'self', 'location': 'stage', 'type': 'custom'}
+
+--- Entry 30 ---
+Text: 自分がエールしたとき、ライブ終了時まで、エールにより公開された自分のカードの中のライブカード1枚につき、{{heart_02.png|heart02}}を得る。この能力では{{heart_02.png|heart02}}は3つまでしか得られない。...
+  Path: effect.condition
+  Fields: ['text', 'type']
+  Full custom: {'text': '自分がエールした', 'type': 'custom'}
+
+--- Entry 31 ---
+Text: 手札の『Aqours』のカードを1枚公開してもよい：これにより公開したカードをデッキの一番上か一番下に置き、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。...
+  Path: cost
+  Fields: ['text', 'source', 'count', 'group', 'optional', 'type']
+  Full custom: {'text': '手札の『Aqours』のカードを1枚公開してもよい', 'source': 'hand', 'count': 1, 'group': {'name': 'Aqours', 'type': 'unit'}, 'optional': True, 'type': 'custom'}
+
