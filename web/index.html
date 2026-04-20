@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Love Live Card Game</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            overflow: hidden;
+        }
+        #game-container {
+            display: flex;
+            height: 100vh;
+        }
+        #phaser-game {
+            flex: 1;
+        }
+        #action-panel {
+            width: 300px;
+            background: #16213e;
+            border-left: 2px solid #0f3460;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        #action-panel h2 {
+            color: #e94560;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .action-item {
+            background: #0f3460;
+            border: 1px solid #e94560;
+            padding: 10px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .action-item:hover {
+            background: #1a1a2e;
+        }
+        .action-index {
+            color: #e94560;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .action-description {
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="phaser-game"></div>
+        <div id="action-panel">
+            <h2>Possible Actions</h2>
+            <div id="action-list"></div>
+        </div>
+    </div>
+    <script src="game.js"></script>
+</body>
+</html>

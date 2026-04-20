@@ -1,0 +1,620 @@
+[
+  {
+    "full_text": "{{jidou.png|自動}}{{turn1.png|ターン1回}}自分がエールしたとき、エールにより公開された自分のカードが持つブレードハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}、{{icon_all.png|ハート}}のうち、3種類以上ある場合、ライブ終了時まで、{{heart_01.png|heart01}}を得る。6種類以上ある場合、さらにライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
+    "triggerless_text": "自分がエールしたとき、エールにより公開された自分のカードが持つブレードハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}、{{icon_all.png|ハート}}のうち、3種類以上ある場合、ライブ終了時まで、{{heart_01.png|heart01}}を得る。6種類以上ある場合、さらにライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。",
+    "card_count": 4,
+    "cards": [
+      "PL!N-bp5-001-R＋ | 上原歩夢 (ab#0)",
+      "PL!N-bp5-001-P | 上原歩夢 (ab#0)",
+      "PL!N-bp5-001-AR | 上原歩夢 (ab#0)",
+      "PL!N-bp5-001-SEC | 上原歩夢 (ab#0)"
+    ],
+    "triggers": "自動",
+    "use_limit": 1,
+    "cost": null,
+    "effect": {
+      "text": "ライブ終了時まで、{{heart_01.png|heart01}}を得る。6種類以上ある場合、さらにライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋1する。」を得る",
+      "condition": {
+        "text": "自分がエールしたとき、エールにより公開された自分のカードが持つブレードハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}、{{icon_all.png|ハート}}のうち、3種類以上ある",
+        "target": "self",
+        "operator": ">=",
+        "type": "custom"
+      },
+      "quoted_text": [
+        "{{jyouji.png|常時}}ライブの合計スコアを＋1する。"
+      ],
+      "action": "gain_resource"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分のステージに『蓮ノ空』のメンバーがいる場合、このカードを成功させるための必要ハートは、{{heart_01.png|heart01}}{{heart_01.png|heart01}}{{heart_00.png|heart0}}か、{{heart_04.png|heart04}}{{heart_04.png|heart04}}{{heart_00.png|heart0}}か、{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_00.png|heart0}}のうち、選んだ1つにしてもよい。",
+    "triggerless_text": "自分のステージに『蓮ノ空』のメンバーがいる場合、このカードを成功させるための必要ハートは、{{heart_01.png|heart01}}{{heart_01.png|heart01}}{{heart_00.png|heart0}}か、{{heart_04.png|heart04}}{{heart_04.png|heart04}}{{heart_00.png|heart0}}か、{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_00.png|heart0}}のうち、選んだ1つにしてもよい。",
+    "card_count": 1,
+    "cards": [
+      "PL!HS-bp2-019-L | Bloom the smile, Bloom the dream! (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "このカードを成功させるための必要ハートは、{{heart_01.png|heart01}}{{heart_01.png|heart01}}{{heart_00.png|heart0}}か、{{heart_04.png|heart04}}{{heart_04.png|heart04}}{{heart_00.png|heart0}}か、{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_00.png|heart0}}のうち、選んだ1つにしてもよい",
+      "condition": {
+        "text": "自分のステージに『蓮ノ空』のメンバーがいる",
+        "target": "self",
+        "location": "stage",
+        "card_type": "member_card",
+        "group": {
+          "name": "蓮ノ空",
+          "type": "unit"
+        },
+        "group_names": [
+          "蓮ノ空"
+        ],
+        "type": "group_condition"
+      },
+      "optional": true,
+      "action": "custom"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+    "triggerless_text": "自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+    "card_count": 1,
+    "cards": [
+      "PL!SP-bp1-026-L | 未来予報ハレルヤ！ (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる。\n(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
+      "condition": {
+        "text": "自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる",
+        "target": "self",
+        "location": "discard",
+        "card_type": "member_card",
+        "count": 5,
+        "operator": ">=",
+        "group": {
+          "name": "Liella!",
+          "type": "unit"
+        },
+        "group_names": [
+          "Liella!"
+        ],
+        "type": "group_location_count_condition"
+      },
+      "action": "custom"
+    }
+  },
+  {
+    "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち合計5種類以上あるか、このターンに自分のステージにいるメンバーがエリアを移動している場合、このカードのスコアを＋１する。",
+    "triggerless_text": "エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち合計5種類以上あるか、このターンに自分のステージにいるメンバーがエリアを移動している場合、このカードのスコアを＋１する。",
+    "card_count": 1,
+    "cards": [
+      "LL-bp5-001-L | Live with a smile! (ab#0)"
+    ],
+    "triggers": "ライブ成功時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "このカードのスコアを＋1する",
+      "condition": {
+        "text": "エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち合計5種類以上あるか、このターンに自分のステージにいるメンバーがエリアを移動している",
+        "target": "self",
+        "location": "stage",
+        "card_type": "member_card",
+        "count": 2,
+        "operator": ">=",
+        "type": "location_count_condition"
+      },
+      "action": "modify_score",
+      "operation": "add"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
+    "triggerless_text": "自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを＋１する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
+    "card_count": 1,
+    "cards": [
+      "PL!N-bp1-027-L | Solitude Rain (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを＋1する。\n(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)",
+      "action": "sequential",
+      "actions": [
+        {
+          "text": "このカードのスコアを＋1する。\n(エールをすべて行った後",
+          "action": "modify_score",
+          "operation": "add"
+        },
+        {
+          "text": "カードを1枚引く。)",
+          "count": 1,
+          "action": "draw",
+          "source": "deck",
+          "destination": "hand"
+        }
+      ]
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分の成功ライブカード置き場かライブ中のライブカードの中に、必要ハートに含まれる{{heart_01.png|heart01}}が3の『虹ヶ咲』のライブカードがある場合、ライブ終了時まで、自分のステージにいる{{heart_06.png|heart06}}を持つ『虹ヶ咲』のメンバー1人は{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る。",
+    "triggerless_text": "自分の成功ライブカード置き場かライブ中のライブカードの中に、必要ハートに含まれる{{heart_01.png|heart01}}が3の『虹ヶ咲』のライブカードがある場合、ライブ終了時まで、自分のステージにいる{{heart_06.png|heart06}}を持つ『虹ヶ咲』のメンバー1人は{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る。",
+    "card_count": 1,
+    "cards": [
+      "PL!N-pb1-039-L | Stellar Stream (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "ライブ終了時まで、自分のステージにいる{{heart_06.png|heart06}}を持つ『虹ヶ咲』のメンバー1人は{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
+      "condition": {
+        "text": "自分の成功ライブカード置き場かライブ中のライブカードの中に、必要ハートに含まれる{{heart_01.png|heart01}}が3の『虹ヶ咲』のライブカードがある",
+        "target": "self",
+        "location": "success_live_card_zone",
+        "card_type": "live_card",
+        "group": {
+          "name": "虹ヶ咲",
+          "type": "unit"
+        },
+        "group_names": [
+          "虹ヶ咲"
+        ],
+        "type": "group_condition"
+      },
+      "count": 1,
+      "card_type": "member_card",
+      "target": "self",
+      "group": {
+        "name": "虹ヶ咲",
+        "type": "unit"
+      },
+      "group_names": [
+        "虹ヶ咲"
+      ],
+      "action": "gain_resource"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "triggerless_text": "自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "card_count": 1,
+    "cards": [
+      "PL!N-bp5-015-N | 桜坂しずく (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+      "condition": {
+        "text": "自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある",
+        "target": "self",
+        "location": "stage",
+        "card_type": "member_card",
+        "type": "location_condition"
+      },
+      "action": "gain_resource",
+      "resource": "blade"
+    }
+  },
+  {
+    "full_text": "{{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+    "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+    "card_count": 2,
+    "cards": [
+      "PL!N-bp3-007-R | 優木せつ菜 (ab#0)",
+      "PL!N-bp3-007-P | 優木せつ菜 (ab#0)"
+    ],
+    "triggers": "起動",
+    "use_limit": null,
+    "cost": {
+      "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く",
+      "source": "stage",
+      "destination": "discard",
+      "card_type": "member_card",
+      "type": "move_cards"
+    },
+    "effect": {
+      "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+      "parenthetical": [
+        "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
+      ],
+      "action": "sequential",
+      "actions": [
+        {
+          "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。",
+          "source": "hand",
+          "count": 1,
+          "card_type": "member_card",
+          "target": "self",
+          "quoted_text": [
+            "優木せつ菜"
+          ],
+          "cost_limit": 13,
+          "action": "custom"
+        },
+        {
+          "text": "自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+          "source": "stage",
+          "count": 1,
+          "card_type": "member_card",
+          "target": "self",
+          "action": "custom"
+        }
+      ]
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "card_count": 1,
+    "cards": [
+      "LL-bp3-001-R＋ | 園田海未&津島善子&天王寺璃奈 (ab#1)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": {
+      "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい",
+      "optional": true,
+      "type": "pay_energy",
+      "energy": 6
+    },
+    "effect": {
+      "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+      "action": "gain_resource",
+      "resource": "blade"
+    }
+  },
+  {
+    "full_text": "{{jyouji.png|常時}}自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり、{{icon_all.png|ハート}}を得る。",
+    "triggerless_text": "自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり、{{icon_all.png|ハート}}を得る。",
+    "card_count": 2,
+    "cards": [
+      "PL!N-pb1-007-R | 優木せつ菜 (ab#0)",
+      "PL!N-pb1-007-P＋ | 優木せつ菜 (ab#0)"
+    ],
+    "triggers": "常時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "、{{icon_all.png|ハート}}を得る",
+      "condition": {
+        "text": "自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり",
+        "target": "self",
+        "card_type": "live_card",
+        "operator": ">=",
+        "type": "custom"
+      },
+      "duration": "as_long_as",
+      "action": "gain_resource",
+      "resource": "heart"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+    "triggerless_text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+    "card_count": 4,
+    "cards": [
+      "PL!N-bp3-001-R＋ | 上原歩夢 (ab#0)",
+      "PL!N-bp3-001-P | 上原歩夢 (ab#0)",
+      "PL!N-bp3-001-P＋ | 上原歩夢 (ab#0)",
+      "PL!N-bp3-001-SEC | 上原歩夢 (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。）",
+      "parenthetical": [
+        "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
+      ],
+      "condition": {
+        "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした",
+        "target": "self",
+        "location": "energy_zone",
+        "card_type": "member_card",
+        "count": 1,
+        "type": "location_condition"
+      },
+      "source": "stage",
+      "count": 1,
+      "card_type": "member_card",
+      "target": "self",
+      "action": "gain_resource",
+      "resource": "blade"
+    }
+  },
+  {
+    "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がある場合、このカードのスコアを＋１する。",
+    "triggerless_text": "エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がある場合、このカードのスコアを＋１する。",
+    "card_count": 1,
+    "cards": [
+      "PL!N-bp4-025-L | VIVID WORLD (ab#1)"
+    ],
+    "triggers": "ライブ成功時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "このカードのスコアを＋1する",
+      "condition": {
+        "text": "エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がある",
+        "target": "self",
+        "card_type": "member_card",
+        "group": {
+          "name": "虹ヶ咲",
+          "type": "unit"
+        },
+        "group_names": [
+          "虹ヶ咲"
+        ],
+        "type": "group_condition"
+      },
+      "action": "modify_score",
+      "operation": "add"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}{{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。2枚以上ある場合、代わりに「{{jyouji.png|常時}}ライブの合計スコアを＋２する。」を得る。（この能力はセンターエリアに登場した場合のみ発動する。）",
+    "triggerless_text": "{{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。2枚以上ある場合、代わりに「{{jyouji.png|常時}}ライブの合計スコアを＋２する。」を得る。（この能力はセンターエリアに登場した場合のみ発動する。）",
+    "card_count": 2,
+    "cards": [
+      "PL!-pb1-004-R | 園田海未 (ab#0)",
+      "PL!-pb1-004-P＋ | 園田海未 (ab#0)"
+    ],
+    "triggers": "登場",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋1する。」を得る。2枚以上ある場合、代わりに「{{jyouji.png|常時}}ライブの合計スコアを＋2する。」を得る。（この能力はセンターエリアに登場した場合のみ発動する。）",
+      "parenthetical": [
+        "この能力はセンターエリアに登場した場合のみ発動する。"
+      ],
+      "condition": {
+        "text": "{{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある",
+        "target": "self",
+        "location": "success_live_card_zone",
+        "card_type": "live_card",
+        "count": 1,
+        "group": {
+          "name": "μ's",
+          "type": "unit"
+        },
+        "group_names": [
+          "μ's"
+        ],
+        "type": "group_condition"
+      },
+      "count": 2,
+      "quoted_text": [
+        "{{jyouji.png|常時}}ライブの合計スコアを＋1する。",
+        "{{jyouji.png|常時}}ライブの合計スコアを＋2する。"
+      ],
+      "action": "gain_resource"
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}以下から1つを選ぶ。\n・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。\n・自分のステージにいる『SaintSnow』のメンバー1人をポジションチェンジさせる。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
+    "triggerless_text": "以下から1つを選ぶ。\n・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。\n・自分のステージにいる『SaintSnow』のメンバー1人をポジションチェンジさせる。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
+    "card_count": 3,
+    "cards": [
+      "PL!S-bp5-004-R | 黒澤ダイヤ (ab#0)",
+      "PL!S-bp5-004-P | 黒澤ダイヤ (ab#0)",
+      "PL!S-bp5-004-AR | 黒澤ダイヤ (ab#0)"
+    ],
+    "triggers": "登場",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "以下から1つを選ぶ。\n・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。\n・自分のステージにいる『SaintSnow』のメンバー1人をポジションチェンジさせる。(このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。)",
+      "action": "choice",
+      "options": []
+    }
+  },
+  {
+    "full_text": "{{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。（この能力はセンターエリアに登場している場合のみ起動できる。）",
+    "triggerless_text": "{{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。（この能力はセンターエリアに登場している場合のみ起動できる。）",
+    "card_count": 4,
+    "cards": [
+      "PL!S-bp3-006-R＋ | 津島善子 (ab#0)",
+      "PL!S-bp3-006-P | 津島善子 (ab#0)",
+      "PL!S-bp3-006-P＋ | 津島善子 (ab#0)",
+      "PL!S-bp3-006-SEC | 津島善子 (ab#0)"
+    ],
+    "triggers": "起動",
+    "use_limit": 1,
+    "cost": {
+      "text": "{{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く",
+      "source": "hand",
+      "destination": "discard",
+      "count": 1,
+      "card_type": "member_card",
+      "type": "move_cards"
+    },
+    "effect": {
+      "text": "自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。（この能力はセンターエリアに登場している場合のみ起動できる。）",
+      "parenthetical": [
+        "この能力はセンターエリアに登場している場合のみ起動できる。"
+      ],
+      "activation_condition": "この能力はセンターエリアに登場している場合のみ起動できる。",
+      "condition": {
+        "text": "このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした",
+        "except": true,
+        "except_target": "このメンバー",
+        "target": "self",
+        "location": "discard",
+        "card_type": "member_card",
+        "count": 1,
+        "group": {
+          "name": "Aqours",
+          "type": "unit"
+        },
+        "group_names": [
+          "Aqours"
+        ],
+        "type": "group_condition"
+      },
+      "source": "discard",
+      "destination": "discard",
+      "count": 1,
+      "card_type": "member_card",
+      "target": "self",
+      "group": {
+        "name": "Aqours",
+        "type": "unit"
+      },
+      "group_names": [
+        "Aqours"
+      ],
+      "action": "move_cards"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある場合、このカードのスコアを＋１する。",
+    "triggerless_text": "自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある場合、このカードのスコアを＋１する。",
+    "card_count": 1,
+    "cards": [
+      "PL!N-bp5-026-L | TOKIMEKI Runners (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "このカードのスコアを＋1する",
+      "condition": {
+        "text": "自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある",
+        "target": "self",
+        "location": "stage",
+        "card_type": "member_card",
+        "type": "location_condition"
+      },
+      "action": "modify_score",
+      "operation": "add"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のステージにコスト9以上の『EdelNote』のメンバーがいる場合、以下から1つを選ぶ。\n・自分の控え室からコスト4以下の『EdelNote』のメンバーカードを1枚、メンバーのいないエリアに登場させる。\n・このカードの必要ハートを{{heart_06.png|heart06}}減らす。",
+    "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のステージにコスト9以上の『EdelNote』のメンバーがいる場合、以下から1つを選ぶ。\n・自分の控え室からコスト4以下の『EdelNote』のメンバーカードを1枚、メンバーのいないエリアに登場させる。\n・このカードの必要ハートを{{heart_06.png|heart06}}減らす。",
+    "card_count": 1,
+    "cards": [
+      "PL!HS-bp5-022-L | Retrofuture (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": {
+      "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい",
+      "optional": true,
+      "type": "pay_energy",
+      "energy": 2
+    },
+    "effect": {
+      "text": "自分のステージにコスト9以上の『EdelNote』のメンバーがいる場合、以下から1つを選ぶ。\n・自分の控え室からコスト4以下の『EdelNote』のメンバーカードを1枚、メンバーのいないエリアに登場させる。\n・このカードの必要ハートを{{heart_06.png|heart06}}減らす",
+      "action": "choice",
+      "options": []
+    }
+  },
+  {
+    "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+    "card_count": 2,
+    "cards": [
+      "PL!S-PR-013-PR | 高海千歌 (ab#0)",
+      "PL!S-PR-019-PR | 国木田花丸 (ab#0)"
+    ],
+    "triggers": "登場",
+    "use_limit": null,
+    "cost": {
+      "text": "手札を1枚控え室に置いてもよい",
+      "source": "hand",
+      "destination": "discard",
+      "count": 1,
+      "optional": true,
+      "type": "move_cards"
+    },
+    "effect": {
+      "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+      "action": "sequential",
+      "actions": [
+        {
+          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え",
+          "source": "deck_top",
+          "destination": "hand",
+          "count": 3,
+          "target": "self",
+          "action": "move_cards"
+        },
+        {
+          "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+          "action": "gain_resource",
+          "resource": "blade"
+        }
+      ]
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}自分のステージに{{heart_02.png|heart02}}を4つ以上持つメンバーがいる場合、このカードのスコアを＋２し、必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}になる。",
+    "triggerless_text": "自分のステージに{{heart_02.png|heart02}}を4つ以上持つメンバーがいる場合、このカードのスコアを＋２し、必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}になる。",
+    "card_count": 1,
+    "cards": [
+      "PL!N-bp5-028-L | CHASE! (ab#0)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": null,
+    "effect": {
+      "text": "このカードのスコアを＋2し、必要ハートは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}になる",
+      "condition": {
+        "text": "自分のステージに{{heart_02.png|heart02}}を4つ以上持つメンバーがいる",
+        "target": "self",
+        "location": "stage",
+        "card_type": "member_card",
+        "operator": ">=",
+        "type": "location_condition"
+      },
+      "action": "modify_score",
+      "operation": "add"
+    }
+  },
+  {
+    "full_text": "{{live_start.png|ライブ開始時}}手札の『蓮ノ空』のカードを2枚控え室に置いてもよい：{{heart_01.png|heart01}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、選んだハートを2つ得る。",
+    "triggerless_text": "手札の『蓮ノ空』のカードを2枚控え室に置いてもよい：{{heart_01.png|heart01}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、選んだハートを2つ得る。",
+    "card_count": 1,
+    "cards": [
+      "PL!HS-sd1-008-SD | 桂城 泉 (ab#1)"
+    ],
+    "triggers": "ライブ開始時",
+    "use_limit": null,
+    "cost": {
+      "text": "手札の『蓮ノ空』のカードを2枚控え室に置いてもよい",
+      "source": "hand",
+      "destination": "discard",
+      "count": 2,
+      "group": {
+        "name": "蓮ノ空",
+        "type": "unit"
+      },
+      "optional": true,
+      "type": "move_cards"
+    },
+    "effect": {
+      "text": "{{heart_01.png|heart01}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、選んだハートを2つ得る",
+      "count": 1,
+      "card_type": "member_card",
+      "target": "self",
+      "group": {
+        "name": "蓮ノ空",
+        "type": "unit"
+      },
+      "group_names": [
+        "蓮ノ空"
+      ],
+      "action": "gain_resource",
+      "resource": "heart"
+    }
+  }
+]

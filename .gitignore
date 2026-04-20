@@ -1,1 +1,6 @@
 /target/
+/target_*/
+/target_build/
+/target_new/
+__pycache__/
+*.pyc

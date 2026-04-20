@@ -66,6 +66,7 @@ impl DeckBuilder {
         }
         
         // Validate deck composition with priority on 12 live + 48 member
+        // Rule 6.1.1: Main deck must have exactly 60 cards (48 member + 12 live)
         // Be lenient if cards are missing from database
         let total_main = member_count + live_count;
         if total_main < 60 {
@@ -81,6 +82,7 @@ impl DeckBuilder {
             eprintln!("Warning: Main deck has {} member cards (expected 48)", member_count);
         }
         
+        // Rule 6.1.2: Energy deck must have exactly 12 energy cards
         // Energy deck can have any number (will add defaults if needed)
         if energy_count == 0 {
             // Will add default energy cards later
