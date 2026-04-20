@@ -856,7 +856,7 @@ impl TurnEngine {
                         if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
                             // Collect ability to trigger
                             let ability_id = format!("{}_{}", card_in_zone.card.card_no, ability.full_text);
-                            abilities_to_trigger.push((ability_id, card_in_zone.card.card_no.clone()));
+                            abilities_to_trigger.push((ability_id.clone(), card_in_zone.card.card_no.clone()));
                             eprintln!("DEBUG: Found LiveStart ability to trigger: {}", ability_id);
                         }
                     }

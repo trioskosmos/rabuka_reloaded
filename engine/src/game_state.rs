@@ -85,6 +85,10 @@ pub struct GameState {
     pub cheer_check_completed: bool,
     pub cheer_checks_required: u32,
     pub cheer_checks_done: u32,
+    // Prohibition effects tracking - e.g., "cannot play member cards"
+    pub prohibition_effects: Vec<String>,
+    // Turn-limited ability usage tracking per card instance (card_id + zone)
+    pub turn_limited_abilities_used: std::collections::HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +121,8 @@ impl GameState {
             cheer_check_completed: false,
             cheer_checks_required: 0,
             cheer_checks_done: 0,
+            prohibition_effects: Vec::new(),
+            turn_limited_abilities_used: std::collections::HashSet::new(),
         }
     }
 
@@ -301,6 +307,22 @@ impl GameState {
         }
         Ok(true)
     }
+    
+    pub fn add_prohibition_effect(&mut self, effect: String) {
+        self.prohibition_effects.push(effect);
+    }
+    
+    pub fn is_action_prohibited(&self, action: &str) -> bool {
+        self.prohibition_effects.iter().any(|e| e.contains(action))
+    }
+    
+    pub fn record_turn_limited_ability_use(&mut self, card_id: String) {
+        self.turn_limited_abilities_used.insert(card_id);
+    }
+    
+    pub fn has_turn_limited_ability_been_used(&self, card_id: &str) -> bool {
+        self.turn_limited_abilities_used.contains(card_id)
+    }
 
     pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {
         // Rule: In live victory determination phase, after winner places cards in success zone
@@ -433,12 +455,97 @@ impl GameState {
                 }
             }
             "move_cards" => {
-                // TODO: Implement card movement
-                eprintln!("move_cards effect not yet implemented");
+                let count = effect.count.unwrap_or(1);
+                let source = effect.source.as_deref().unwrap_or("");
+                let destination = effect.destination.as_deref().unwrap_or("");
+                let card_type = effect.card_type.as_deref();
+                let target = effect.target.as_deref().unwrap_or("self");
+                
+                let player = if target == "self" {
+                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
+                } else {
+                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
+                };
+                
+                // Simplified implementation - move cards from source to destination
+                match source {
+                    "deck" | "デッキ" => {
+                        for _ in 0..count {
+                            if let Some(card) = player.main_deck.draw() {
+                                match destination {
+                                    "hand" | "手札" => player.hand.add_card(card),
+                                    "discard" | "控え室" => player.waitroom.add_card(card),
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                    "hand" | "手札" => {
+                        match destination {
+                            "discard" | "控え室" => {
+                                for _ in 0..count.min(player.hand.cards.len() as u32) {
+                                    if let Some(card) = player.hand.remove_card(0) {
+                                        player.waitroom.add_card(card);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    "discard" | "控え室" => {
+                        match destination {
+                            "hand" | "手札" => {
+                                // Move from waitroom to hand, filtering by card type if specified
+                                let cards_to_move: Vec<_> = player.waitroom.cards.iter()
+                                    .filter(|c| {
+                                        if let Some(ct) = card_type {
+                                            match ct {
+                                                "live_card" | "ライブカード" => c.is_live(),
+                                                "member_card" | "メンバーカード" => c.is_member(),
+                                                _ => true
+                                            }
+                                        } else {
+                                            true
+                                        }
+                                    })
+                                    .take(count as usize)
+                                    .cloned()
+                                    .collect();
+                                
+                                for card in cards_to_move {
+                                    player.waitroom.remove_card(&card.card_no);
+                                    player.hand.add_card(card);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
             }
             "gain_resource" => {
-                // TODO: Implement resource gain
-                eprintln!("gain_resource effect not yet implemented");
+                let resource = effect.resource.as_deref().unwrap_or("");
+                let count = effect.count.unwrap_or(1);
+                let target = effect.target.as_deref().unwrap_or("self");
+                
+                let player = if target == "self" {
+                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
+                } else {
+                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
+                };
+                
+                // Add resource to members on stage
+                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                for area in areas {
+                    if let Some(card_in_zone) = player.stage.get_area_mut(area) {
+                        match resource {
+                            "blade" | "ブレード" => {
+                                card_in_zone.card.blade += count;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             }
             "sequential" => {
                 if let Some(ref actions) = effect.actions {

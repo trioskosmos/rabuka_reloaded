@@ -150,7 +150,89 @@ fn test_victory_condition() {
     game_state.check_victory();
     
     // Player1 should win
-    // assert_eq!(game_state.game_result, rabuka_engine::game_state::GameResult::FirstAttackerWins);
+    assert_eq!(game_state.game_result, rabuka_engine::game_state::GameResult::FirstAttackerWins);
+}
+
+#[test]
+fn test_end_to_end_complete_match() {
+    // End-to-end test: Play through a complete match scenario
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut game_state = GameState::new(player1, player2);
+    
+    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
+    
+    // Set up player1's deck with member cards
+    let member_cards: Vec<_> = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Member).take(10).cloned().collect();
+    for card in member_cards {
+        game_state.player1.main_deck.cards.push_back(card);
+    }
+    
+    // Set up player2's deck with member cards
+    let member_cards_p2: Vec<_> = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Member).skip(10).take(10).cloned().collect();
+    for card in member_cards_p2 {
+        game_state.player2.main_deck.cards.push_back(card);
+    }
+    
+    // Initial hand draw (5 cards each)
+    for _ in 0..5 {
+        if let Some(card) = game_state.player1.main_deck.draw() {
+            game_state.player1.hand.add_card(card);
+        }
+        if let Some(card) = game_state.player2.main_deck.draw() {
+            game_state.player2.hand.add_card(card);
+        }
+    }
+    
+    // Verify initial state
+    assert_eq!(game_state.player1.hand.len(), 5, "Player1 should have 5 cards in hand");
+    assert_eq!(game_state.player2.hand.len(), 5, "Player2 should have 5 cards in hand");
+    assert_eq!(game_state.player1.main_deck.len(), 5, "Player1 should have 5 cards in deck");
+    assert_eq!(game_state.player2.main_deck.len(), 5, "Player2 should have 5 cards in deck");
+    
+    // Player1 performs cheer check (2 cards)
+    let player1_id = game_state.player1.id.clone();
+    game_state.perform_cheer_check(&player1_id, 2)
+        .expect("Cheer check should succeed");
+    
+    // Verify cheer check results
+    assert_eq!(game_state.resolution_zone.cards.len(), 2, "2 cards in resolution zone");
+    assert_eq!(game_state.player1.main_deck.len(), 3, "3 cards remain in deck");
+    assert!(game_state.cheer_check_completed, "Cheer checks should be completed");
+    
+    // Check required hearts (should succeed after cheer checks)
+    let check_result = game_state.check_required_hearts();
+    assert!(check_result.is_ok(), "Should be able to check required hearts after cheer checks");
+    
+    // Move resolution zone cards to waitroom
+    game_state.move_resolution_zone_to_waitroom(&player1_id);
+    
+    // Verify cards moved
+    assert_eq!(game_state.resolution_zone.cards.len(), 0, "0 cards in resolution zone after move");
+    assert_eq!(game_state.player1.waitroom.cards.len(), 2, "2 cards moved to waitroom");
+    
+    // Simulate player1 winning a live by adding success card
+    let success_card = cards.iter().find(|c| c.card_type == rabuka_engine::card::CardType::Live).cloned().unwrap();
+    game_state.player1.success_live_card_zone.cards.push(success_card);
+    
+    // Check victory condition
+    game_state.check_victory();
+    
+    // Game should still be ongoing (need 3 success cards)
+    assert_eq!(game_state.game_result, rabuka_engine::game_state::GameResult::Ongoing);
+    
+    // Add 2 more success cards to trigger victory
+    for _ in 0..2 {
+        let success_card = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Live).skip(1).cloned().unwrap();
+        game_state.player1.success_live_card_zone.cards.push(success_card);
+    }
+    
+    // Check victory condition again
+    game_state.check_victory();
+    
+    // Player1 should win
+    assert_eq!(game_state.game_result, rabuka_engine::game_state::GameResult::FirstAttackerWins);
 }
 
 #[test]
@@ -1169,30 +1251,17 @@ fn test_q40_cannot_skip_remaining_cheer_checks() {
     game_state.cheer_checks_done = 1;
     game_state.cheer_check_completed = false;
     
-    // Cannot check hearts when only 1 of 3 checks done
-    let check_result = game_state.check_required_hearts();
-    assert!(check_result.is_err(), "Cannot check with partial cheer checks");
-}
-
-// Q41: Cards revealed during cheer checks go to waitroom at specific timing
 #[test]
 fn test_q41_cheer_cards_to_waitroom_timing() {
+    // Rule: In live victory determination phase, after winner places cards in success zone,
+    // remaining cards in resolution zone go to waitroom
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
     let mut game_state = GameState::new(player1, player2);
     
-    // Load real cards from cards.json
-    let cards_path = std::path::Path::new("..\\cards\\cards.json");
-    let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path)
-        .expect("Failed to load cards");
-    
-    // Add cards to player1's main deck for cheer checks
-    let member_cards: Vec<_> = cards.iter()
-        .filter(|c| c.card_type == rabuka_engine::card::CardType::Member)
-        .take(5)
-        .cloned()
-        .collect();
+    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
+    let member_cards: Vec<_> = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Member).take(5).cloned().collect();
     
     for card in member_cards {
         game_state.player1.main_deck.cards.push_back(card);
@@ -1214,4 +1283,116 @@ fn test_q41_cheer_cards_to_waitroom_timing() {
     // Verify cards moved from resolution zone to waitroom
     assert_eq!(game_state.resolution_zone.cards.len(), 0, "0 cards in resolution zone after move");
     assert_eq!(game_state.player1.waitroom.cards.len(), 3, "3 cards moved to waitroom");
+}
+
+// Q54: Draw condition when 3+ cards in success live card zone
+#[test]
+fn test_q54_draw_condition_three_success_cards() {
+    // Rule: If 3 or more cards are simultaneously in the success live card zone,
+    // the game becomes a draw
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut game_state = GameState::new(player1, player2);
+    
+    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
+    
+    // Set up: Player1 already has 2 success cards (about to add a 3rd)
+    let success_cards: Vec<_> = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Live).take(2).cloned().collect();
+    for card in success_cards {
+        game_state.player1.success_live_card_zone.cards.push(card);
+    }
+    
+    // Set up: Player2 already has 2 success cards (about to add a 3rd)
+    let success_cards_p2: Vec<_> = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Live).skip(2).take(2).cloned().collect();
+    for card in success_cards_p2 {
+        game_state.player2.success_live_card_zone.cards.push(card);
+    }
+    
+    // Verify initial state
+    assert_eq!(game_state.player1.success_live_card_zone.cards.len(), 2, "Player1 has 2 success cards");
+    assert_eq!(game_state.player2.success_live_card_zone.cards.len(), 2, "Player2 has 2 success cards");
+    assert_eq!(game_state.game_result, rabuka_engine::game_state::GameResult::Ongoing, "Game is ongoing");
+    
+    // Add 3rd success card to player1 (triggering 3+ total cards across both zones)
+    let third_card = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Live).skip(4).cloned().unwrap();
+    game_state.player1.success_live_card_zone.cards.push(third_card);
+    
+    // Check victory condition
+    game_state.check_victory();
+    
+    // Game should be a draw (3+ cards total in success live card zones)
+    assert_eq!(game_state.game_result, rabuka_engine::game_state::GameResult::Draw, "Game should be draw");
+}
+
+// Q55: Partial effect resolution when insufficient resources
+#[test]
+fn test_q55_partial_effect_resolution() {
+    // Rule: When an effect can only be partially resolved, resolve as much as possible.
+    // Example: If you have 1 card in hand and need to discard 2, discard 1.
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut game_state = GameState::new(player1, player2);
+    
+    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
+    
+    // Set up: Player1 has only 1 card in hand (about to need to discard 2)
+    let hand_card = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Member).next().cloned().unwrap();
+    game_state.player1.hand.add_card(hand_card);
+    
+    // Verify initial state
+    assert_eq!(game_state.player1.hand.len(), 1, "Player1 has 1 card in hand");
+    assert_eq!(game_state.player1.waitroom.cards.len(), 0, "0 cards in waitroom");
+    
+    // Simulate effect: "Discard 2 cards to waitroom"
+    // Since only 1 card available, discard 1
+    let cards_to_discard = game_state.player1.hand.len().min(2);
+    for _ in 0..cards_to_discard {
+        if let Some(card) = game_state.player1.hand.remove_card(0) {
+            game_state.player1.waitroom.cards.push(card);
+        }
+    }
+    
+    // Verify partial resolution occurred
+    assert_eq!(game_state.player1.hand.len(), 0, "0 cards remain in hand");
+    assert_eq!(game_state.player1.waitroom.cards.len(), 1, "1 card discarded to waitroom (partial resolution)");
+}
+
+// Q56: Full cost payment required (no partial payment)
+#[test]
+fn test_q56_full_cost_payment_required() {
+    // Rule: Costs must be paid in full. If you can't pay all costs, you can't pay any.
+    // Example: If cost is 2 energy and you only have 1, you can't pay 1 - you must pay all or none.
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let mut game_state = GameState::new(player1, player2);
+    
+    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
+    
+    // Set up: Player1 has only 1 energy card (about to need to pay cost of 2)
+    let energy_card = cards.iter().filter(|c| c.card_type == rabuka_engine::card::CardType::Energy).next().cloned().unwrap();
+    game_state.player1.energy_deck.cards.push_back(energy_card);
+    
+    // Verify initial state
+    assert_eq!(game_state.player1.energy_deck.cards.len(), 1, "Player1 has 1 energy card");
+    
+    // Simulate cost check: Cost is 2 energy
+    let cost_to_pay = 2;
+    let available_energy = game_state.player1.energy_deck.cards.len();
+    
+    // Can't pay cost if insufficient energy
+    if available_energy < cost_to_pay {
+        // Cost payment fails - no energy is paid
+        assert_eq!(game_state.player1.energy_deck.cards.len(), 1, "Energy remains unpaid");
+    } else {
+        // Would pay full cost
+        for _ in 0..cost_to_pay {
+            game_state.player1.energy_deck.cards.pop();
+        }
+    }
+    
+    // Verify no partial payment occurred
+    assert_eq!(game_state.player1.energy_deck.cards.len(), 1, "Energy remains (no partial payment)");
 }

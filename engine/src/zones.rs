@@ -624,6 +624,10 @@ impl Waitroom {
     pub fn len(&self) -> usize {
         self.cards.len()
     }
+
+    pub fn remove_card(&mut self, card_no: &str) {
+        self.cards.retain(|c| c.card_no != card_no);
+    }
 }
 
 #[derive(Debug, Clone)]

@@ -83,28 +83,59 @@ class GameScene extends Phaser.Scene {
         this.cardImages = new Map();
         this.cardData = new Map();
         this.selectedDeck = null;
+        this.loadingImages = new Set();
+        this.pendingImageUpdates = new Map(); // Map imageKey to array of containers to update
+        this.cardImageMap = new Map(); // Map card_no to image file name
     }
 
     preload() {
-        // Load card data first
+        // Load card data
         this.load.json('cardsData', '/cards/cards.json')
             .on('complete', () => {
                 const cardsData = this.cache.json.get('cardsData');
-                // Store card data
+                console.log('Loaded card data, total cards:', Object.keys(cardsData).length);
+                
+                // Create mapping from card_no to image file name
+                this.cardImageMap = new Map();
                 for (const cardNo in cardsData) {
-                    this.cardData.set(cardNo, cardsData[cardNo]);
+                    const card = cardsData[cardNo];
+                    // Extract image file name from _img field or use card_no
+                    const imgPath = card._img || card.img;
+                    const imgFileName = imgPath.split('/').pop().replace('.png', '.webp');
+                    this.cardImageMap.set(cardNo, imgFileName);
                 }
                 
-                // Preload all card images
-                for (const cardNo in cardsData) {
-                    const imagePath = `/img/cards_webp/${cardNo}.webp`;
-                    this.load.image(cardNo, imagePath);
+                // Preload card images using the mapped file names
+                const cardNos = Object.keys(cardsData);
+                const batchSize = 100;
+                let loadedCount = 0;
+                
+                for (let i = 0; i < cardNos.length; i += batchSize) {
+                    const batch = cardNos.slice(i, i + batchSize);
+                    batch.forEach(cardNo => {
+                        const imgFileName = this.cardImageMap.get(cardNo);
+                        if (imgFileName) {
+                            this.load.image(cardNo, `/img/cards_webp/${imgFileName}`);
+                            loadedCount++;
+                        }
+                    });
                 }
+                
+                console.log('Queued', loadedCount, 'card images for loading');
             });
     }
 
     create(data) {
         this.selectedDeck = data.deck || 'Aqours Cup';
+        
+        // Load card data from cache
+        const cardsData = this.cache.json.get('cardsData');
+        if (cardsData) {
+            console.log('Loaded card data, total cards:', Object.keys(cardsData).length);
+            for (const cardNo in cardsData) {
+                this.cardData.set(cardNo, cardsData[cardNo]);
+            }
+        }
         
         this.scale.resize(window.innerWidth, window.innerHeight);
         
@@ -132,7 +163,9 @@ class GameScene extends Phaser.Scene {
         window.addEventListener('resize', () => {
             this.scale.resize(window.innerWidth, window.innerHeight);
             this.createZones();
+            this.createUI();
             this.updateDisplay();
+            this.loadActions();
         });
     }
 
@@ -151,96 +184,164 @@ class GameScene extends Phaser.Scene {
     createZones() {
         const w = this.scale.width;
         const h = this.scale.height;
+        const headerHeight = this.headerHeight || 65;
+        const rightPanelWidth = 300;
         
-        // Clear existing zones
+        // Clear existing zones and labels
         if (this.zoneGraphics) {
             this.zoneGraphics.clear();
         } else {
             this.zoneGraphics = this.add.graphics();
         }
+        if (this.zoneLabels) {
+            this.zoneLabels.forEach(label => label.destroy());
+        }
+        this.zoneLabels = [];
+        
+        const playAreaWidth = w - rightPanelWidth;
+        const playAreaHeight = h - headerHeight;
+        
+        // Reduce spacing between zones to use space better
+        const zoneGap = 10;
         
         this.zones = {
             // Player 2 (opponent - top)
-            p2Hand: { x: 50, y: 20, w: w - 100, h: 100, label: 'Opponent Hand', color: 0x2d3748 },
-            p2Stage: { x: 50, y: 140, w: w - 100, h: 160, label: 'Opponent Stage', color: 0x1a202c },
-            p2Live: { x: 50, y: 320, w: 280, h: 90, label: 'Live Zone', color: 0x2c5282 },
-            p2Success: { x: 350, y: 320, w: 180, h: 90, label: 'Success', color: 0x2c5282 },
-            p2Energy: { x: w - 230, y: 320, w: 180, h: 90, label: 'Energy', color: 0x2d3748 },
+            p2Hand: { x: 20, y: headerHeight + 15, w: playAreaWidth - 40, h: 80, label: 'Opponent Hand', color: 0x4a5568 },
+            p2Stage: { x: 20, y: headerHeight + 105, w: playAreaWidth - 40, h: 120, label: 'Opponent Stage', color: 0x2d3748 },
+            p2Live: { x: 20, y: headerHeight + 235, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x553c9a },
+            p2Success: { x: 20 + playAreaWidth * 0.34, y: headerHeight + 235, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x553c9a },
+            p2Energy: { x: 20 + playAreaWidth * 0.56, y: headerHeight + 235, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x4a5568 },
             
             // Player 1 (active - bottom)
-            p1Hand: { x: 50, y: h - 120, w: w - 100, h: 100, label: 'Your Hand', color: 0x4a5568 },
-            p1Stage: { x: 50, y: h - 300, w: w - 100, h: 160, label: 'Your Stage', color: 0x1a202c },
-            p1Live: { x: 50, y: h - 410, w: 280, h: 90, label: 'Live Zone', color: 0x2c5282 },
-            p1Success: { x: 350, y: h - 410, w: 180, h: 90, label: 'Success', color: 0x2c5282 },
-            p1Energy: { x: w - 230, y: h - 410, w: 180, h: 90, label: 'Energy', color: 0x2d3748 }
+            p1Hand: { x: 20, y: h - 100, w: playAreaWidth - 40, h: 80, label: 'Your Hand', color: 0x48bb78 },
+            p1Stage: { x: 20, y: h - 230, w: playAreaWidth - 40, h: 120, label: 'Your Stage', color: 0x2d3748 },
+            p1Live: { x: 20, y: h - 310, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x553c9a },
+            p1Success: { x: 20 + playAreaWidth * 0.34, y: h - 310, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x553c9a },
+            p1Energy: { x: 20 + playAreaWidth * 0.56, y: h - 310, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x4a5568 }
         };
         
         // Draw zones
         for (const [key, zone] of Object.entries(this.zones)) {
-            // Zone background with gradient effect
-            this.zoneGraphics.fillStyle(zone.color, 0.9);
-            this.zoneGraphics.fillRoundedRect(zone.x, zone.y, zone.w, zone.h, 8);
+            // Zone background with slight transparency
+            this.zoneGraphics.fillStyle(zone.color, 0.75);
+            this.zoneGraphics.fillRoundedRect(zone.x, zone.y, zone.w, zone.h, 10);
             
             // Zone border
-            this.zoneGraphics.lineStyle(2, 0x6666aa, 1);
-            this.zoneGraphics.strokeRoundedRect(zone.x, zone.y, zone.w, zone.h, 8);
+            this.zoneGraphics.lineStyle(3, 0x718096, 1);
+            this.zoneGraphics.strokeRoundedRect(zone.x, zone.y, zone.w, zone.h, 10);
             
-            // Zone label
-            this.add.text(zone.x + 15, zone.y + 8, zone.label, {
+            // Zone label with background
+            const labelBg = this.zoneGraphics.fillStyle(0x1a202c, 0.9);
+            this.zoneGraphics.fillRoundedRect(zone.x + 5, zone.y + 5, 100, 22, 5);
+            
+            const label = this.add.text(zone.x + 12, zone.y + 16, zone.label, {
                 fontSize: '12px',
-                color: '#a0aec0',
+                color: '#e2e8f0',
                 fontStyle: 'bold'
             });
+            this.zoneLabels.push(label);
         }
+        
+        // Add counters display
+        this.deckCounters = this.add.text(25, h - 345, '', {
+            fontSize: '14px',
+            color: '#fff',
+            fontStyle: 'bold'
+        });
+        this.zoneLabels.push(this.deckCounters);
     }
 
     createUI() {
         const w = this.scale.width;
         const h = this.scale.height;
+        const headerHeight = 65;
+        const rightPanelWidth = 300;
         
-        // Back to menu button
-        const menuBtn = this.add.text(20, 20, '← Menu', {
-            fontSize: '16px',
+        // Clear existing UI elements
+        if (this.uiElements) {
+            this.uiElements.forEach(el => el.destroy());
+        }
+        this.uiElements = [];
+        
+        // Header bar at top
+        this.headerBg = this.add.graphics();
+        this.headerBg.fillStyle(0x1a202c, 1);
+        this.headerBg.fillRect(0, 0, w, headerHeight);
+        this.headerBg.lineStyle(3, 0xe94560, 1);
+        this.headerBg.lineBetween(0, headerHeight, w, headerHeight);
+        this.uiElements.push(this.headerBg);
+        
+        // Back to menu button in header
+        const menuBtn = this.add.text(20, headerHeight / 2, '← Menu', {
+            fontSize: '15px',
             color: '#ffffff',
-            backgroundColor: '#0f3460',
-            padding: { x: 15, y: 8 }
-        }).setOrigin(0, 0);
+            backgroundColor: '#4a5568',
+            padding: { x: 15, y: 10 },
+            fontStyle: 'bold',
+            borderRadius: 8
+        }).setOrigin(0, 0.5);
         
         menuBtn.setInteractive({ useHandCursor: true })
-               .on('pointerover', () => menuBtn.setStyle({ backgroundColor: '#1a1a2e' }))
-               .on('pointerout', () => menuBtn.setStyle({ backgroundColor: '#0f3460' }))
+               .on('pointerover', () => menuBtn.setStyle({ backgroundColor: '#e94560' }))
+               .on('pointerout', () => menuBtn.setStyle({ backgroundColor: '#4a5568' }))
                .on('pointerdown', () => {
                    this.scene.start('MenuScene');
                });
+        this.uiElements.push(menuBtn);
         
-        // Game info panel
-        this.infoBg = this.add.graphics();
-        this.infoBg.fillStyle(0x0f3460, 0.9);
-        this.infoBg.fillRoundedRect(w - 220, 20, 200, 150, 10);
-        
-        this.turnText = this.add.text(w - 120, 40, 'Turn: 1', {
-            fontSize: '20px',
-            color: '#fff',
-            fontStyle: 'bold'
-        }).setOrigin(0.5);
-        
-        this.phaseText = this.add.text(w - 120, 70, 'Phase: Main', {
-            fontSize: '16px',
-            color: '#e94560'
-        }).setOrigin(0.5);
-        
-        // Actions panel
-        this.actionsBg = this.add.graphics();
-        this.actionsBg.fillStyle(0x16213e, 0.9);
-        this.actionsBg.fillRoundedRect(20, h / 2 - 150, 250, 300, 10);
-        
-        this.add.text(145, h / 2 - 130, 'Actions', {
-            fontSize: '18px',
+        // Game title in header
+        this.add.text(w / 2, headerHeight / 2, 'Rabuka Card Game', {
+            fontSize: '24px',
             color: '#e94560',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            shadow: { blur: 10, color: '#e94560', fill: true }
         }).setOrigin(0.5);
         
+        // Turn and phase info in header
+        this.turnText = this.add.text(w - rightPanelWidth - 160, headerHeight / 2, 'Turn: 1', {
+            fontSize: '18px',
+            color: '#fff',
+            fontStyle: 'bold',
+            backgroundColor: '#2d3748',
+            padding: { x: 12, y: 6 },
+            borderRadius: 6
+        }).setOrigin(0.5);
+        this.uiElements.push(this.turnText);
+        
+        this.phaseText = this.add.text(w - rightPanelWidth - 50, headerHeight / 2, 'Phase: Main', {
+            fontSize: '16px',
+            color: '#48bb78',
+            backgroundColor: '#2d3748',
+            padding: { x: 12, y: 6 },
+            borderRadius: 6
+        }).setOrigin(0.5);
+        this.uiElements.push(this.phaseText);
+        
+        // Actions panel (right side, below header)
+        const actionsPanelX = w - rightPanelWidth;
+        const actionsPanelY = headerHeight;
+        const actionsPanelHeight = h - headerHeight;
+        
+        this.actionsBg = this.add.graphics();
+        this.actionsBg.fillStyle(0x1a202c, 0.95);
+        this.actionsBg.fillRect(actionsPanelX, actionsPanelY, rightPanelWidth, actionsPanelHeight);
+        this.actionsBg.lineStyle(3, 0x4a5568, 1);
+        this.actionsBg.lineBetween(actionsPanelX, actionsPanelY, actionsPanelX, actionsPanelY + actionsPanelHeight);
+        this.uiElements.push(this.actionsBg);
+        
+        this.add.text(actionsPanelX + rightPanelWidth / 2, actionsPanelY + 30, 'Actions', {
+            fontSize: '20px',
+            color: '#e94560',
+            fontStyle: 'bold',
+            shadow: { blur: 8, color: '#e94560', fill: true }
+        }).setOrigin(0.5);
+        
+        this.actionsPanelX = actionsPanelX;
+        this.actionsPanelWidth = rightPanelWidth;
+        this.actionsPanelY = actionsPanelY;
         this.actionButtons = [];
+        
+        this.headerHeight = headerHeight;
     }
 
     async loadGameState() {
@@ -272,15 +373,13 @@ class GameScene extends Phaser.Scene {
     updateDisplay() {
         if (!this.gameState) return;
         
-        // Update info
+        // Clear existing cards
+        this.cardContainers.forEach(container => container.destroy());
+        this.cardContainers = [];
+        
+        // Update turn and phase text
         this.turnText.setText(`Turn: ${this.gameState.turn}`);
         this.phaseText.setText(`Phase: ${this.gameState.phase}`);
-        
-        // Clear existing cards
-        if (this.cardContainers) {
-            this.cardContainers.forEach(c => c.destroy());
-        }
-        this.cardContainers = [];
         
         // Display cards
         this.displayHand('p1Hand', this.gameState.player1.hand.cards, true);
@@ -290,6 +389,16 @@ class GameScene extends Phaser.Scene {
         this.displayZone('p1Live', this.gameState.player1.live_zone.cards);
         this.displayZone('p1Success', this.gameState.player1.success_live_card_zone.cards);
         this.displayZone('p1Energy', this.gameState.player1.energy.cards);
+        this.displayZone('p2Live', this.gameState.player2.live_zone.cards);
+        this.displayZone('p2Success', this.gameState.player2.success_live_card_zone.cards);
+        this.displayZone('p2Energy', this.gameState.player2.energy.cards);
+        
+        // Update deck and waitroom counters
+        if (this.deckCounters) {
+            this.deckCounters.setText(
+                `Deck: ${this.gameState.player1.main_deck_count} | Energy Deck: ${this.gameState.player1.energy_deck_count} | Waitroom: ${this.gameState.player1.waitroom_count}`
+            );
+        }
     }
 
     displayHand(zoneKey, cards, interactive) {
@@ -298,7 +407,22 @@ class GameScene extends Phaser.Scene {
         
         const cardWidth = 80;
         const cardHeight = 112;
-        const overlap = 30;
+        
+        // Calculate dynamic overlap based on available space
+        const maxTotalWidth = zone.w - 20; // 10px padding on each side
+        const cardsTotalWidth = cards.length * cardWidth;
+        let overlap;
+        
+        if (cardsTotalWidth <= maxTotalWidth) {
+            // No overlap needed - cards fit with spacing
+            overlap = cardWidth + 5; // 5px gap between cards
+        } else {
+            // Calculate overlap needed to fit all cards
+            overlap = (maxTotalWidth - cardWidth) / (cards.length - 1);
+            // Ensure minimum overlap
+            overlap = Math.max(overlap, 20); // Minimum 20px overlap
+        }
+        
         const totalWidth = cardWidth + (cards.length - 1) * overlap;
         const startX = zone.x + (zone.w - totalWidth) / 2;
         const startY = zone.y + (zone.h - cardHeight) / 2;
@@ -335,7 +459,22 @@ class GameScene extends Phaser.Scene {
         
         const cardWidth = 60;
         const cardHeight = 84;
-        const overlap = 20;
+        
+        // Calculate dynamic overlap based on available space
+        const maxTotalWidth = zone.w - 20; // 10px padding on each side
+        const cardsTotalWidth = cards.length * cardWidth;
+        let overlap;
+        
+        if (cardsTotalWidth <= maxTotalWidth) {
+            // No overlap needed - cards fit with spacing
+            overlap = cardWidth + 3; // 3px gap between cards
+        } else {
+            // Calculate overlap needed to fit all cards
+            overlap = (maxTotalWidth - cardWidth) / (cards.length - 1);
+            // Ensure minimum overlap
+            overlap = Math.max(overlap, 15); // Minimum 15px overlap
+        }
+        
         const totalWidth = cardWidth + (cards.length - 1) * overlap;
         const startX = zone.x + (zone.w - totalWidth) / 2;
         const startY = zone.y + (zone.h - cardHeight) / 2;
@@ -357,19 +496,94 @@ class GameScene extends Phaser.Scene {
         bg.strokeRoundedRect(0, 0, width, height, 5);
         container.add(bg);
         
-        // Try to load card image
+        // Get image file name from mapping
         const imageKey = card.card_no;
+        const imgFileName = this.cardImageMap ? this.cardImageMap.get(imageKey) : `${imageKey}.webp`;
+        
+        // Check orientation - rotate if Wait
+        const isWait = card.orientation === 'Wait';
+        
         if (this.textures.exists(imageKey)) {
+            // Image already loaded, display it
+            const texture = this.textures.get(imageKey);
             const cardImage = this.add.image(width / 2, height / 2, imageKey);
-            const scale = Math.min(width / 451, height / 630);
+            
+            // Calculate scale to fit image within card dimensions while maintaining aspect ratio
+            const imageWidth = texture.source[0].width;
+            const imageHeight = texture.source[0].height;
+            const scaleX = width / imageWidth;
+            const scaleY = height / imageHeight;
+            const scale = Math.min(scaleX, scaleY) * 0.95; // 95% to leave small margin
+            
             cardImage.setScale(scale);
+            
+            // Rotate 90 degrees if in Wait state (tapped)
+            if (isWait) {
+                cardImage.setRotation(Math.PI / 2);
+            }
+            
             container.add(cardImage);
         } else {
-            // Fallback: show card name
+            // Load image on-demand if not already loading
+            if (!this.loadingImages.has(imageKey) && imgFileName) {
+                this.loadingImages.add(imageKey);
+                this.pendingImageUpdates.set(imageKey, []);
+                
+                this.load.image(imageKey, `/img/cards_webp/${imgFileName}`)
+                    .on('complete', () => {
+                        this.loadingImages.delete(imageKey);
+                        // Image loaded, update all pending containers
+                        const containers = this.pendingImageUpdates.get(imageKey) || [];
+                        containers.forEach(c => {
+                            // Remove the placeholder text if it exists
+                            c.each(child => {
+                                if (child.type === 'Text') {
+                                    child.destroy();
+                                }
+                            });
+                            // Add the image
+                            const texture = this.textures.get(imageKey);
+                            const cardImage = this.add.image(c.width / 2, c.height / 2, imageKey);
+                            
+                            // Calculate scale to fit image within card dimensions
+                            const imageWidth = texture.source[0].width;
+                            const imageHeight = texture.source[0].height;
+                            const scaleX = c.width / imageWidth;
+                            const scaleY = c.height / imageHeight;
+                            const scale = Math.min(scaleX, scaleY) * 0.95;
+                            
+                            cardImage.setScale(scale);
+                            
+                            // Rotate if in Wait state
+                            if (c.cardData && c.cardData.orientation === 'Wait') {
+                                cardImage.setRotation(Math.PI / 2);
+                            }
+                            
+                            c.add(cardImage);
+                        });
+                        this.pendingImageUpdates.delete(imageKey);
+                    })
+                    .on('loaderror', () => {
+                        this.loadingImages.delete(imageKey);
+                        this.pendingImageUpdates.delete(imageKey);
+                        console.error('Failed to load image:', imageKey, 'as', imgFileName);
+                    });
+                this.load.start();
+            }
+            
+            // Track this container for when the image loads
+            if (this.pendingImageUpdates.has(imageKey)) {
+                this.pendingImageUpdates.get(imageKey).push(container);
+                // Store card data for later orientation check
+                container.cardData = card;
+            }
+            
+            // Fallback: show card name while loading
             const nameText = this.add.text(width / 2, height / 2, card.name || card.card_no || '?', {
                 fontSize: '10px',
                 color: '#fff',
-                align: 'center'
+                align: 'center',
+                wordWrap: { width: width - 10 }
             }).setOrigin(0.5);
             container.add(nameText);
         }
@@ -402,11 +616,14 @@ class GameScene extends Phaser.Scene {
         this.actionButtons.forEach(btn => btn.destroy());
         this.actionButtons = [];
         
-        const h = this.scale.height;
-        const startY = h / 2 - 90;
+        const panelX = this.actionsPanelX;
+        const panelWidth = this.actionsPanelWidth;
+        const startY = this.actionsPanelY + 50;
+        const buttonWidth = panelWidth - 20;
         
         // Separate Pass action and make it prominent
         const passAction = this.actions.find(a => a.action_type === 'pass');
+        console.log('Pass action found:', passAction);
         const otherActions = this.actions.filter(a => a.action_type !== 'pass');
         
         let currentIndex = 0;
@@ -414,12 +631,14 @@ class GameScene extends Phaser.Scene {
         // Pass button - large and prominent
         if (passAction) {
             const passIndex = this.actions.indexOf(passAction);
-            const passBtn = this.add.text(145, startY + currentIndex * 45, '⏭ PASS', {
-                fontSize: '20px',
+            const passBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 55, '⏭ PASS TURN', {
+                fontSize: '18px',
                 color: '#ffffff',
                 backgroundColor: '#e94560',
-                padding: { x: 25, y: 12 },
-                fontStyle: 'bold'
+                padding: { x: 30, y: 12 },
+                fontStyle: 'bold',
+                fixedWidth: buttonWidth,
+                align: 'center'
             }).setOrigin(0.5);
             
             passBtn.setInteractive({ useHandCursor: true })
@@ -434,16 +653,19 @@ class GameScene extends Phaser.Scene {
         // Other action buttons
         otherActions.forEach((action) => {
             const actionIndex = this.actions.indexOf(action);
-            const btn = this.add.text(145, startY + currentIndex * 35, action.description, {
-                fontSize: '13px',
+            const btn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 45, action.description, {
+                fontSize: '12px',
                 color: '#fff',
-                backgroundColor: '#0f3460',
-                padding: { x: 15, y: 8 }
+                backgroundColor: '#2d3748',
+                padding: { x: 15, y: 10 },
+                fixedWidth: buttonWidth,
+                align: 'center',
+                wordWrap: { width: buttonWidth - 30 }
             }).setOrigin(0.5);
             
             btn.setInteractive({ useHandCursor: true })
-               .on('pointerover', () => btn.setStyle({ backgroundColor: '#1a1a2e', color: '#e94560' }))
-               .on('pointerout', () => btn.setStyle({ backgroundColor: '#0f3460', color: '#fff' }))
+               .on('pointerover', () => btn.setStyle({ backgroundColor: '#4a5568', color: '#e94560' }))
+               .on('pointerout', () => btn.setStyle({ backgroundColor: '#2d3748', color: '#fff' }))
                .on('pointerdown', () => this.executeAction(actionIndex));
             
             this.actionButtons.push(btn);
@@ -452,9 +674,9 @@ class GameScene extends Phaser.Scene {
         
         // No actions message
         if (this.actions.length === 0) {
-            const noActions = this.add.text(145, h / 2, 'No actions available', {
+            const noActions = this.add.text(panelX + panelWidth / 2, startY + 50, 'No actions available', {
                 fontSize: '14px',
-                color: '#666688'
+                color: '#718096'
             }).setOrigin(0.5);
             this.actionButtons.push(noActions);
         }

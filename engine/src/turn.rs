@@ -57,17 +57,9 @@ impl TurnEngine {
         else if current_turn_phase == TurnPhase::Live {
             match current_phase {
                 Phase::LiveCardSet => {
-                    // Rule 8.2: Both players set live cards (automatic)
-                    // For now, use AI to choose cards - this should be player-controlled eventually
-                    // First attacker sets live cards
-                    let p1_cards = crate::bot::ai::AIPlayer::choose_live_cards_to_set(game_state.first_attacker());
-                    println!("P1 setting {} live cards", p1_cards);
-                    Self::player_set_live_cards(game_state.first_attacker_mut(), p1_cards);
-                    // Second attacker sets live cards
-                    let p2_cards = crate::bot::ai::AIPlayer::choose_live_cards_to_set(game_state.second_attacker());
-                    println!("P2 setting {} live cards", p2_cards);
-                    Self::player_set_live_cards(game_state.second_attacker_mut(), p2_cards);
-                    game_state.current_phase = Phase::FirstAttackerPerformance;
+                    // Rule 8.2: Both players set live cards - manual phase, not auto-advanced
+                    // Players must manually choose live cards via actions
+                    return;
                 }
                 Phase::FirstAttackerPerformance => {
                     // Rule 8.3: First attacker performs (automatic)
@@ -536,7 +528,7 @@ impl TurnEngine {
         game_state.process_pending_auto_abilities(&active_player_id);
     }
 
-    fn check_victory_condition(game_state: &mut GameState) {
+    pub fn check_victory_condition(game_state: &mut GameState) {
         // Rule 10.3.1: If a player has 3+ cards in success live card zone, they win
         let p1_success_count = game_state.player1.success_live_card_zone.cards.len();
         let p2_success_count = game_state.player2.success_live_card_zone.cards.len();
@@ -848,16 +840,13 @@ impl TurnEngine {
             let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
             for area in areas {
                 if let Some(card_in_zone) = player.stage.get_area(area) {
-                    eprintln!("DEBUG: Checking card {} on stage for LiveStart abilities", card_in_zone.card.card_no);
                     // Check if card has LiveStart abilities
                     for ability in &card_in_zone.card.abilities {
-                        eprintln!("DEBUG: Ability triggers: {:?}, full_text: {}", ability.triggers, ability.full_text);
                         // Check if ability has LiveStart trigger
                         if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
                             // Collect ability to trigger
                             let ability_id = format!("{}_{}", card_in_zone.card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card_in_zone.card.card_no.clone()));
-                            eprintln!("DEBUG: Found LiveStart ability to trigger: {}", ability_id);
                         }
                     }
                 }

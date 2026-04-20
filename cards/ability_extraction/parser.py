@@ -170,7 +170,7 @@ def extract_group(text: str) -> Optional[Dict[str, Any]]:
 
 def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
     """Extract cost limit."""
-    match = re.search(r'コスト(\d+)(?:以上|以下)', text)
+    match = re.search(r'コスト(\d+)(?:以上|以下|未満|超)', text)
     if match:
         return int(match.group(1))
     return None
@@ -183,6 +183,10 @@ def extract_position(text: str) -> Dict[str, Any]:
     target = extract_target(text)
     if target:
         result['target'] = target
+    
+    # Check for both players effect (自分と相手はそれぞれ) - override target
+    if '自分と相手はそれぞれ' in text:
+        result['target'] = 'both'
     
     # Extract position
     if 'センターエリア' in text:
@@ -343,6 +347,15 @@ def parse_condition(text: str) -> Dict[str, Any]:
             condition['cost_comparison'] = 'higher'
         return condition
     
+    # Check for distinct conditions (名前が異なる) - MUST CHECK BEFORE compound conditions
+    if '名前が異なる' in text or 'ユニット名がそれぞれ異なる' in text:
+        condition['type'] = 'distinct_condition'
+        if 'ユニット名' in text:
+            condition['distinct'] = 'unit_name'
+        else:
+            condition['distinct'] = 'name'
+        # Don't return yet - continue to check for compound conditions
+    
     # Check for OR conditions (か、 = or) - MUST CHECK BEFORE movement condition
     if 'か、' in text:
         parts = [p.strip() for p in text.split('か、') if p.strip()]
@@ -389,28 +402,61 @@ def parse_condition(text: str) -> Dict[str, Any]:
         condition['type'] = 'state_condition'
         condition['state'] = 'active'
         # Check if it's about energy
-        if 'エネルギー' in text:
-            condition['resource_type'] = 'energy'
-        return condition
-    
-    # Check for temporal conditions
-    if 'このターン' in text or 'ターン目' in text:
+    # Check for "このターン、自分のステージにメンバーが3回登場したとき" type temporal count conditions
+    # Check this BEFORE appearance condition to prevent override
+    if ('このターン' in text or 'ターン目' in text) and '回' in text:
         condition['type'] = 'temporal_condition'
         condition['temporal'] = 'this_turn'
+        # Extract count if present (e.g., "3回登場した")
+        count_match = re.search(r'(\d+)回', text)
+        if count_match:
+            condition['count'] = int(count_match.group(1))
+            condition['event'] = 'appearance' if '登場' in text else 'custom'
         # Check for specific phase
         if 'ライブフェイズ' in text:
             condition['phase'] = 'live_phase'
         elif 'メインフェイズ' in text:
             condition['phase'] = 'main_phase'
+        # Continue to check for location and other fields
+        # Check for location
+        location = extract_location(text)
+        if location:
+            condition['location'] = location
+        # Check for card type
+        card_type = extract_card_type(text)
+        if card_type:
+            condition['card_type'] = card_type
+        # Check for target
+        target = extract_target(text)
+        if target:
+            condition['target'] = target
+        # Return early to prevent being overridden by appearance check
         return condition
     
-    # Check for distinct conditions
-    if '名前が異なる' in text or 'ユニット名がそれぞれ異なる' in text:
-        condition['type'] = 'distinct_condition'
-        if 'ユニット名' in text:
-            condition['distinct'] = 'unit_name'
-        else:
-            condition['distinct'] = 'name'
+    # Check for appearance conditions (登場 = appearance/appear)
+    if '登場' in text:
+        condition['type'] = 'appearance_condition'
+        condition['appearance'] = True
+        return condition
+    
+    # Check for energy state conditions (アクティブ状態のエネルギーがある)
+    if 'エネルギーがある' in text:
+        condition['type'] = 'energy_state_condition'
+        if 'アクティブ状態' in text:
+            condition['state'] = 'active'
+        return condition
+    
+    # Check for state conditions
+    if 'ウェイト状態である' in text or 'ウェイト状態にある' in text:
+        condition['type'] = 'state_condition'
+        condition['state'] = 'wait'
+        return condition
+    if 'アクティブ状態である' in text or 'アクティブ状態にある' in text or 'アクティブ状態の' in text:
+        condition['type'] = 'state_condition'
+        condition['state'] = 'active'
+        # Check if it's about energy
+        if 'エネルギー' in text:
+            condition['resource_type'] = 'energy'
         return condition
     
     # Check for position conditions
@@ -538,7 +584,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Check for comparison conditions (after extraction, if comparison fields exist)
     # This will be set after the extraction phase below
     
-    # Check for compound conditions (かつ or あり、) - MUST CHECK BEFORE distinct and other specific conditions
+    # Check for compound conditions (かつ or あり、) - MUST CHECK AFTER distinct conditions
     if COMPOUND_OPERATOR in text or COMPOUND_OPERATOR_ALT in text:
         # Use whichever operator is present
         operator = COMPOUND_OPERATOR if COMPOUND_OPERATOR in text else COMPOUND_OPERATOR_ALT
@@ -661,13 +707,16 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Extract comparison information (e.g., "相手より高い")
     comparison_targets = {
         '相手より': 'opponent',
-        '自分より': 'self'
+        '自分より': 'self',
+        'このメンバーより': 'self'
     }
     comparison_operators = {
         '高い': '>',
         '低い': '<',
         '少ない': '<',
-        '多い': '>'
+        '多い': '>',
+        '大きい': '>',
+        '小さい': '<'
     }
     for keyword, target in comparison_targets.items():
         if keyword in text:
@@ -744,12 +793,12 @@ def parse_condition(text: str) -> Dict[str, Any]:
             condition['distinct'] = distinct_type
             break
     
-    # Extract all areas flag
+    # Extract all areas flag - check this earlier before other location checks
     if 'エリアすべて' in text:
         condition['all_areas'] = True
     
     # Extract exclude_self flag (other members)
-    exclude_self_keywords = ['ほかのメンバー', 'このメンバー以外']
+    exclude_self_keywords = ['ほかのメンバー', 'このメンバー以外', 'このメンバー以外の']
     for keyword in exclude_self_keywords:
         if keyword in text:
             condition['exclude_self'] = True
@@ -859,17 +908,13 @@ def parse_action(text: str) -> Dict[str, Any]:
             'text': text,
         }
     
-    # Extract per-unit modifier (につき)
-    if PER_UNIT_MARKER in text:
-        # Try to capture the full context before "につき"
-        per_unit_match = re.search(r'([^、。につき]+)につき', text)
-        if per_unit_match:
-            action['per_unit'] = per_unit_match.group(1).strip()
-        else:
-            # Fallback to simpler pattern
-            per_unit_match = re.search(r'([^につき]+)につき', text)
-            if per_unit_match:
-                action['per_unit'] = per_unit_match.group(1).strip()
+    # Extract per-unit scaling - check for "～につき" pattern
+    per_unit_match = re.search(r'(.+?)につき', text)
+    if per_unit_match:
+        action['per_unit'] = per_unit_match.group(1).strip()
+        # Also extract location if present in per_unit context
+        if '成功ライブカード置き場にある' in text:
+            action['per_unit_location'] = 'success_live_card_zone'
     # Extract per-unit for specific actions (cost, required_hearts, etc.)
     if '枚につき' in text and ('コスト' in text or '必要ハート' in text):
         action['per_unit'] = re.search(r'([^枚]+)枚につき', text).group(1).strip() if re.search(r'([^枚]+)枚につき', text) else 'card'
@@ -877,18 +922,11 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Extract source - handle "手札を" pattern for discard
     if '手札を' in text and '控え室に置く' in text:
         action['source'] = 'hand'
-    
     # Handle source description patterns: "この[X]で控え室に置かれた[Y]"
     # Extract the description of which cards from the source are being targeted
     source_desc_match = re.search(r'この([^で]+)で控え室に置かれた', text)
     if source_desc_match:
         action['source'] = 'discard'
-        action['source_description'] = f"この{source_desc_match.group(1)}で控え室に置かれた"
-    
-    # Extract source
-    source = extract_source(text)
-    if source and 'source' not in action:
-        action['source'] = source
     # Check for under_member source (e.g., "下に置かれているエネルギーカード")
     if '下に置かれているエネルギーカード' in text:
         action['source'] = 'under_member'
@@ -901,6 +939,14 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Check for destination choice (e.g., "好きなエリアに移動させる")
     if '好きなエリア' in text:
         action['destination_choice'] = True
+    # Check for "好きな順番で" (in any order) placement
+    if '好きな順番で' in text:
+        action['placement_order'] = 'any_order'
+    
+    # Extract cost limit specifically for move_cards actions
+    cost_limit = extract_cost_limit(text)
+    if cost_limit:
+        action['cost_limit'] = cost_limit
     
     # Extract state change
     state_change = extract_state_change(text)
@@ -911,17 +957,19 @@ def parse_action(text: str) -> Dict[str, Any]:
     count = extract_count(text)
     if count:
         action['count'] = count
-    else:
-        # If no numeric count, count resource icons
-        icon_counts = {
-            '{{icon_blade.png|ブレード}}': text.count('{{icon_blade.png|ブレード}}'),
-            '{{icon_all.png|ハート}}': text.count('{{icon_all.png|ハート}}') + text.count('{{heart_'),
-            '{{icon_energy.png|E}}': text.count('{{icon_energy.png|E}}')
-        }
-        for icon, count in icon_counts.items():
-            if count > 0:
-                action['count'] = count
-                break
+    # Always count resource icons for blade/heart/energy (don't rely only on numeric count)
+    icon_counts = {
+        '{{icon_blade.png|ブレード}}': text.count('{{icon_blade.png|ブレード}}'),
+        '{{icon_all.png|ハート}}': text.count('{{icon_all.png|ハート}}') + text.count('{{heart_'),
+        '{{icon_energy.png|E}}': text.count('{{icon_energy.png|E}}')
+    }
+    for icon, icon_count in icon_counts.items():
+        if icon_count > 0:
+            action['resource_icon_count'] = icon_count
+            # Only set count if not already set by numeric extraction
+            if 'count' not in action:
+                action['count'] = icon_count
+            break
     
     # Extract card type
     card_type = extract_card_type(text)
@@ -1080,6 +1128,24 @@ def parse_action(text: str) -> Dict[str, Any]:
                     if '{{' not in q or '}}' not in q:
                         action['target_member'] = q
                         break
+    # Check for draw action
+    elif '引く' in text:
+        # Check for draw until count pattern FIRST
+        if '枚になるまで' in text:
+            action['action'] = 'draw_until_count'
+            action['source'] = 'deck'
+            action['destination'] = 'hand'
+            # Extract target count
+            count_match = re.search(r'(\d+)枚になるまで', text)
+            if count_match:
+                action['target_count'] = int(count_match.group(1))
+        else:
+            action['action'] = 'draw'
+            action['source'] = 'deck'
+            action['destination'] = 'hand'
+        # Check for source specification
+        if 'デッキの上から' in text:
+            action['source'] = 'deck_top'
     # Determine action type
     elif state_change:
         action['action'] = 'change_state'
@@ -1124,8 +1190,15 @@ def parse_action(text: str) -> Dict[str, Any]:
             action['action'] = 'move_cards'
     # Check for "置く" (place) pattern
     elif '置く' in text or '置いて' in text:
-        # Check for discard until count pattern first
-        if '枚になるまで' in text and '控え室に置く' in text:
+        # Check for draw until count pattern (check this BEFORE discard pattern)
+        if '枚になるまで' in text and '引く' in text:
+            action['action'] = 'draw_until_count'
+            # Extract target count
+            count_match = re.search(r'(\d+)枚になるまで', text)
+            if count_match:
+                action['target_count'] = int(count_match.group(1))
+        # Check for discard until count pattern
+        elif '枚になるまで' in text and '控え室に置く' in text:
             action['action'] = 'discard_until_count'
             # Extract target count
             count_match = re.search(r'(\d+)枚になるまで', text)
@@ -1193,6 +1266,9 @@ def parse_action(text: str) -> Dict[str, Any]:
         if count_match:
             action['count'] = int(count_match.group(1))
     elif '得る' in text:
+        # Check for "好きな順番で" (in any order) placement
+        if '好きな順番で' in text:
+            action['placement_order'] = 'any_order'
         # Check for character-specific resource mapping: "「X」はYを得る"
         character_mapping_match = re.search(r'「([^」]+)」は(.+)を得る', text)
         if character_mapping_match:
@@ -1367,6 +1443,24 @@ def parse_cost(text: str) -> Dict[str, Any]:
         'text': text,
     }
     
+    # Check for sequential cost (～し、～)
+    if '、' in text and 'し' in text:
+        parts = text.split('、')
+        if len(parts) >= 2 and all('し' in part for part in parts[:-1]):
+            # Parse each sequential cost part
+            cost_parts = []
+            for i, part in enumerate(parts):
+                # Add 'し' back to all but the last part for context
+                if i < len(parts) - 1:
+                    part = part + 'し'
+                cost_part = parse_cost(part.strip())
+                cost_parts.append(cost_part)
+            return {
+                'text': text,
+                'type': 'sequential_cost',
+                'costs': cost_parts
+            }
+    
     # Check for choice cost (～か、～)
     if 'か、' in text:
         parts = text.split('か、', SPLIT_LIMIT)
@@ -1438,6 +1532,10 @@ def parse_cost(text: str) -> Dict[str, Any]:
     target = extract_target(text)
     if target:
         cost['target'] = target
+    
+    # Extract exclude_self for costs (e.g., "このメンバー以外の")
+    if 'このメンバー以外' in text or 'ほかのメンバー' in text:
+        cost['exclude_self'] = True
     
     # Extract group
     group = extract_group(text)
@@ -1722,8 +1820,12 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 effect['text'] = text
                 return effect
     
+    # Check for choice marker BEFORE implicit sequential to prevent incorrect parsing
+    if CHOICE_MARKER in text:
+        # This will be handled later in the choice section
+        pass
     # Check for implicit sequential (comma-separated actions) - check AFTER "その中から" pattern
-    if '、' in text_without_parens and not any(marker in text_without_parens for marker in CONDITION_MARKERS):
+    elif '、' in text_without_parens and not any(marker in text_without_parens for marker in CONDITION_MARKERS):
         parts = text_without_parens.split('、')
         if len(parts) >= 2:
             # Check if each part looks like a separate action
@@ -2106,5 +2208,5 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         if triggerless:
             parsed = parse_ability(triggerless)
             ability['parsed'] = parsed
-    
+
     return data

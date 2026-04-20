@@ -63,15 +63,21 @@ impl Player {
         
         // Rule 9.6.2.3.1: Cost is equal to the card's cost value in energy
         let card_cost = card.cost.unwrap_or(0);
+        eprintln!("DEBUG: Playing {} ({}) - card_cost: {}", card.name, card.card_no, card_cost);
         
         // Rule 9.6.2.3: Determine cost and pay all costs
         let mut cost_to_pay = card_cost;
         
         // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
         // Note: Baton touch sends member from the TARGET area (where you're playing the new member)
-        if cost_to_pay > 0 && self.energy_zone.cards.len() >= 1 {
-            // Check if there's a member in the target area to baton touch
-            let member_cost = if let Some(existing_member) = self.stage.get_area(stage_area) {
+        // Only apply if there's actually a member in the target area AND player has active energy
+        let member_cost = if let Some(existing_member) = self.stage.get_area(stage_area) {
+            // Check if player has 1+ active energy to pay
+            let active_energy_count = self.energy_zone.cards.iter()
+                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+                .count();
+            
+            if cost_to_pay > 0 && active_energy_count >= 1 {
                 // Clone the member card before clearing the area
                 let member_card = existing_member.card.clone();
                 let cost = existing_member.card.cost.unwrap_or(1);
@@ -88,11 +94,14 @@ impl Player {
                 cost
             } else {
                 0
-            };
-            
-            // Rule 9.6.2.3.2: Reduce cost by member's cost
-            cost_to_pay = cost_to_pay.saturating_sub(member_cost);
-        }
+            }
+        } else {
+            // No member in target area, no baton touch
+            0
+        };
+        
+        // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
+        cost_to_pay = cost_to_pay.saturating_sub(member_cost);
         
         // Rule 9.6.2.3.1: Pay energy equal to cost
         if cost_to_pay > 0 {

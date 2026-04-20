@@ -51,6 +51,22 @@ app.post('/api/execute-action', async (req, res) => {
     }
 });
 
+app.post('/api/init', async (req, res) => {
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/init`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to initialize game' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Web server running on http://localhost:${PORT}`);
     console.log(`Proxying API requests to Rust backend at ${RUST_API_URL}`);

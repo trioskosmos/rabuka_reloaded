@@ -219,48 +219,37 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     ];
                     
                     for (area, area_name) in areas {
-                        if active_player.stage.get_area(area).is_none() {
-                            // Check if player can afford this card (considering baton touch)
-                            let card_cost = card.cost.unwrap_or(0);
+                        let card_cost = card.cost.unwrap_or(0);
+                        let mut cost_to_pay = card_cost;
+                        
+                        // Check if area is occupied for baton touch
+                        if let Some(existing_member) = active_player.stage.get_area(area) {
+                            // Baton touch - replace existing member
+                            let member_cost = existing_member.card.cost.unwrap_or(0);
+                            cost_to_pay = cost_to_pay.saturating_sub(member_cost);
+                            
                             let active_energy_count = active_player.energy_zone.cards.iter()
                                 .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
                                 .count() as u32;
                             
-                            // Rule 9.6.2.3.2: Baton touch - can send member from TARGET area to waitroom to reduce cost
-                            // Check if can afford with energy OR with baton touch from target area
-                            let can_afford = if card_cost == 0 {
-                                true
-                            } else if active_energy_count >= card_cost {
-                                true
-                            } else {
-                                // Check if can use baton touch from target area
-                                // Need at least 1 energy to pay remaining cost after baton touch
-                                if active_energy_count >= 1 {
-                                    // Check if TARGET area has a member for baton touch
-                                    let has_member_in_target = match area {
-                                        crate::zones::MemberArea::LeftSide => active_player.stage.left_side.is_some(),
-                                        crate::zones::MemberArea::Center => active_player.stage.center.is_some(),
-                                        crate::zones::MemberArea::RightSide => active_player.stage.right_side.is_some(),
-                                    };
-                                    
-                                    if has_member_in_target {
-                                        // Get member cost from target area for baton touch
-                                        let member_cost = match area {
-                                            crate::zones::MemberArea::LeftSide => active_player.stage.left_side.as_ref().map(|m| m.card.cost.unwrap_or(0)),
-                                            crate::zones::MemberArea::Center => active_player.stage.center.as_ref().map(|m| m.card.cost.unwrap_or(0)),
-                                            crate::zones::MemberArea::RightSide => active_player.stage.right_side.as_ref().map(|m| m.card.cost.unwrap_or(0)),
-                                        };
-                                        let reduced_cost = card_cost.saturating_sub(member_cost.unwrap_or(0));
-                                        active_energy_count >= reduced_cost
-                                    } else {
-                                        false
-                                    }
-                                } else {
-                                    false
-                                }
-                            };
+                            if active_energy_count >= cost_to_pay {
+                                actions.push(Action {
+                                    description: format!("Baton Touch: Play {} ({}) to {} (replaces {})", card.name, card.card_no, area_name, existing_member.card.name),
+                                    action_type: "play_member_to_stage".to_string(),
+                                    parameters: Some(ActionParameters {
+                                        card_index: Some(hand_index),
+                                        card_indices: None,
+                                        stage_area: Some(area_name.to_string()),
+                                    }),
+                                });
+                            }
+                        } else {
+                            // Play to empty area
+                            let active_energy_count = active_player.energy_zone.cards.iter()
+                                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+                                .count() as u32;
                             
-                            if can_afford {
+                            if active_energy_count >= cost_to_pay {
                                 actions.push(Action {
                                     description: format!("Play {} ({}) to {} area", card.name, card.card_no, area_name),
                                     action_type: "play_member_to_stage".to_string(),
