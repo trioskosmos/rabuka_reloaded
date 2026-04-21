@@ -17,4 +17,5 @@ PL!S-PR-017-PR x 4
 PL!S-PR-025-PR x 4
 PL!S-PR-026-PR x 4
 PL!S-PR-029-PR x 4
+PL!-bp3-002-R x 2
 PL!S-bp3-029-PE＋ x 12

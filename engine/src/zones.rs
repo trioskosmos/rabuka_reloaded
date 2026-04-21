@@ -26,6 +26,8 @@ pub struct CardInZone {
     pub orientation: Option<Orientation>,
     pub face_state: FaceState,
     pub energy_underneath: Vec<Card>,
+    pub played_via_ability: bool,
+    pub turn_played: u32,
 }
 
 impl CardInZone {
@@ -366,9 +368,8 @@ impl LiveCardZone {
     }
 
     pub fn can_place_card(&self, card: &Card) -> bool {
-        // Rule 9.1: During Live Card Set Phase, member and live cards can be placed in Live Card Zone
-        // Energy cards cannot be placed here
-        card.is_member() || card.is_live()
+        // Rule 8.2: During Live Card Set Phase, any card from hand can be placed in Live Card Zone
+        true
     }
 
     pub fn add_card(&mut self, card: Card, _face_down: bool) -> Result<(), String> {
@@ -673,6 +674,8 @@ impl ExclusionZone {
             orientation: None,
             face_state,
             energy_underneath: Vec::new(),
+            played_via_ability: false,
+            turn_played: 0,
         });
     }
 }

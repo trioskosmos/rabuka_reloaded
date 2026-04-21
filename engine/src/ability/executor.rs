@@ -842,6 +842,8 @@ impl AbilityExecutor {
                                 orientation: Some(crate::zones::Orientation::Active),
                                 energy_underneath: Vec::new(),
                                 face_state: crate::zones::FaceState::FaceUp,
+                                played_via_ability: false,
+                                turn_played: 0,
                             });
                         }
                         _ => {
@@ -851,6 +853,8 @@ impl AbilityExecutor {
                                 orientation: Some(crate::zones::Orientation::Active),
                                 energy_underneath: Vec::new(),
                                 face_state: crate::zones::FaceState::FaceUp,
+                                played_via_ability: false,
+                                turn_played: 0,
                             });
                         }
                     }

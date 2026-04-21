@@ -48,7 +48,7 @@ impl Player {
         self.energy_deck.cards = cards;
     }
     
-    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea) -> Result<(), String> {
+    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea) -> Result<u32, String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
         if hand_index >= self.hand.cards.len() {
             return Err("Invalid hand index".to_string());
@@ -63,7 +63,6 @@ impl Player {
         
         // Rule 9.6.2.3.1: Cost is equal to the card's cost value in energy
         let card_cost = card.cost.unwrap_or(0);
-        eprintln!("DEBUG: Playing {} ({}) - card_cost: {}", card.name, card.card_no, card_cost);
         
         // Rule 9.6.2.3: Determine cost and pay all costs
         let mut cost_to_pay = card_cost;
@@ -133,6 +132,8 @@ impl Player {
             orientation: Some(crate::zones::Orientation::Wait),
             face_state: crate::zones::FaceState::FaceUp,
             energy_underneath: Vec::new(),
+            played_via_ability: false,
+            turn_played: 0,
         };
         
         match stage_area {
@@ -162,7 +163,7 @@ impl Player {
         // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event
         // TODO: Implement baton touch event triggering
         
-        Ok(())
+        Ok(cost_to_pay)
     }
     
     pub fn move_card_from_hand_to_energy_zone(&mut self, hand_index: usize) -> Result<(), String> {
@@ -183,6 +184,8 @@ impl Player {
             orientation: Some(crate::zones::Orientation::Wait),
             face_state: crate::zones::FaceState::FaceUp,
             energy_underneath: Vec::new(),
+            played_via_ability: false,
+            turn_played: 0,
         };
         
         self.energy_zone.add_card(card_in_zone)?;
@@ -239,12 +242,14 @@ impl Player {
         self.energy_deck.draw().map(|card| {
             let card_in_zone = crate::zones::CardInZone {
                 card: card.clone(),
-                orientation: Some(crate::zones::Orientation::Wait),
+                orientation: Some(crate::zones::Orientation::Active),
                 face_state: crate::zones::FaceState::FaceUp,
                 energy_underneath: Vec::new(),
+                played_via_ability: false,
+                turn_played: 0,
             };
             if let Err(e) = self.energy_zone.add_card(card_in_zone) {
-                eprintln!("Error adding energy card: {}", e);
+                eprintln!("Failed to add energy card: {}", e);
             }
             card
         })

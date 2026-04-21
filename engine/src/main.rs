@@ -130,7 +130,7 @@ fn main() {
                 bot::headless::run_headless_game();
             }
             "interactive" => {
-                bot::interactive_headless::run_interactive_headless();
+                bot::headless::run_interactive_headless();
             }
             "test" => {
                 bot::test_mode::run_test_mode();

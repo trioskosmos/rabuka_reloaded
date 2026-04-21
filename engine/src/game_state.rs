@@ -89,6 +89,11 @@ pub struct GameState {
     pub prohibition_effects: Vec<String>,
     // Turn-limited ability usage tracking per card instance (card_id + zone)
     pub turn_limited_abilities_used: std::collections::HashSet<String>,
+    // Mulligan tracking
+    pub mulligan_player1_done: bool,
+    pub mulligan_player2_done: bool,
+    pub current_mulligan_player: String, // "player1" or "player2"
+    pub mulligan_selected_indices: Vec<usize>, // Track selected card indices for mulligan
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +128,10 @@ impl GameState {
             cheer_checks_done: 0,
             prohibition_effects: Vec::new(),
             turn_limited_abilities_used: std::collections::HashSet::new(),
+            mulligan_player1_done: false,
+            mulligan_player2_done: false,
+            current_mulligan_player: String::new(),
+            mulligan_selected_indices: Vec::new(),
         }
     }
 
@@ -353,7 +362,6 @@ impl GameState {
         // Rule 9.5.3.2: Active player chooses which of their waiting abilities to play first
         // Rule 9.5.3.3: Non-active player then plays their waiting abilities
         
-        println!("⚙️  PROCESS PENDING ABILITIES: active_player={}, pending_count={}", active_player_id, self.pending_auto_abilities.len());
         
         let mut processed = Vec::new();
         let mut abilities_to_execute = Vec::new();
@@ -363,7 +371,6 @@ impl GameState {
             if pending.player_id == active_player_id {
                 processed.push(i);
                 if let Some(ref card_no) = pending.source_card_id {
-                    println!("  📌 Found pending ability for active player: card={}, trigger={:?}", card_no, pending.trigger_type);
                     abilities_to_execute.push((card_no.clone(), pending.player_id.clone()));
                 }
             }
@@ -375,13 +382,11 @@ impl GameState {
             if pending.player_id == non_active_id && !processed.contains(&i) {
                 processed.push(i);
                 if let Some(ref card_no) = pending.source_card_id {
-                    println!("  📌 Found pending ability for non-active player: card={}, trigger={:?}", card_no, pending.trigger_type);
                     abilities_to_execute.push((card_no.clone(), pending.player_id.clone()));
                 }
             }
         }
         
-        println!("  📊 Total abilities to execute: {}", abilities_to_execute.len());
         
         // Remove processed abilities (in reverse order to maintain indices)
         processed.sort_by(|a, b| b.cmp(a));
@@ -391,7 +396,6 @@ impl GameState {
         
         // Execute collected abilities
         for (card_no, player_id) in abilities_to_execute {
-            println!("  ⚡ EXECUTING ability: card={}, player={}", card_no, player_id);
             self.execute_card_ability(&card_no, &player_id);
         }
     }
@@ -400,7 +404,6 @@ impl GameState {
         // Find the card and its abilities, then execute them directly on game state
         // Note: We execute effects directly to avoid cloning the game state
         
-        println!("    🔨 EXECUTE CARD ABILITY: card_no={}, player_id={}", card_no, player_id);
         
         let player_id_clone = player_id.to_string();
         let player = if player_id_clone == self.player1.id {
@@ -438,30 +441,24 @@ impl GameState {
         };
         
         if let Some(card) = card {
-            println!("    ✅ Found card: {} with {} abilities", card.name, card.abilities.len());
             let abilities = card.abilities.clone();
             for (i, ability) in abilities.iter().enumerate() {
-                println!("      📋 Ability {}: triggers={:?}, has_effect={}", i, ability.triggers, ability.effect.is_some());
                 if let Some(ref effect) = ability.effect {
-                    println!("        🎯 Effect action: {}", effect.action);
                     // Execute effect directly on self (the actual game state)
                     // For now, we'll implement basic effects inline
                     self.execute_ability_effect(effect, &player_id_clone);
                 }
             }
         } else {
-            println!("    ❌ Card not found: {}", card_no);
         }
     }
     
     fn execute_ability_effect(&mut self, effect: &crate::card::AbilityEffect, player_id: &str) {
         // Execute ability effects directly on game state
-        println!("        💥 EXECUTE EFFECT: action={}, count={:?}", effect.action, effect.count);
         
         match effect.action.as_str() {
             "draw" => {
                 let count = effect.count.unwrap_or(1);
-                println!("          📥 DRAW: count={}", count);
                 let player = if player_id == self.player1.id {
                     &mut self.player1
                 } else {
@@ -470,7 +467,6 @@ impl GameState {
                 for _ in 0..count {
                     let _ = player.draw_card();
                 }
-                println!("          ✅ Draw complete");
             }
             "move_cards" => {
                 let count = effect.count.unwrap_or(1);
@@ -479,7 +475,6 @@ impl GameState {
                 let card_type = effect.card_type.as_deref();
                 let target = effect.target.as_deref().unwrap_or("self");
                 
-                println!("          🔄 MOVE_CARDS: count={}, source={}, dest={}, card_type={:?}", count, source, destination, card_type);
                 
                 let player = if target == "self" {
                     if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
@@ -499,7 +494,6 @@ impl GameState {
                                 }
                             }
                         }
-                        println!("          ✅ Move from deck complete");
                     }
                     "hand" | "手札" => {
                         match destination {
@@ -512,7 +506,6 @@ impl GameState {
                             }
                             _ => {}
                         }
-                        println!("          ✅ Move from hand complete");
                     }
                     "discard" | "控え室" => {
                         match destination {
@@ -541,10 +534,8 @@ impl GameState {
                             }
                             _ => {}
                         }
-                        println!("          ✅ Move from discard complete");
                     }
                     _ => {
-                        println!("          ⚠️  Unknown source: {}", source);
                     }
                 }
             }
@@ -553,7 +544,6 @@ impl GameState {
                 let count = effect.count.unwrap_or(1);
                 let target = effect.target.as_deref().unwrap_or("self");
                 
-                println!("          💎 GAIN_RESOURCE: resource={}, count={}, target={}", resource, count, target);
                 
                 let player = if target == "self" {
                     if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
@@ -568,37 +558,28 @@ impl GameState {
                         match resource {
                             "blade" | "ブレード" => {
                                 card_in_zone.card.blade += count;
-                                println!("            Added {} blade to {}", count, card_in_zone.card.name);
                             }
                             _ => {}
                         }
                     }
                 }
-                println!("          ✅ Gain resource complete");
             }
             "sequential" => {
-                println!("          🔗 SEQUENTIAL: {} actions", effect.actions.as_ref().map_or(0, |a| a.len()));
                 if let Some(ref actions) = effect.actions {
                     for action in actions {
                         self.execute_ability_effect(action, player_id);
                     }
                 }
-                println!("          ✅ Sequential complete");
             }
             "choice" => {
-                println!("          🔀 CHOICE: (choice effect - requires player input)");
                 // Choice effects require player input - for automated testing, skip or default
-                println!("          ✅ Choice effect skipped (requires player input)");
             }
             "look_and_select" => {
-                println!("          🔍 LOOK_AND_SELECT: (look and select effect - requires player input)");
                 // Look and select effects require player input - for automated testing, skip or default
-                println!("          ✅ Look and select effect skipped (requires player input)");
             }
             "look_at" => {
                 let count = effect.count.unwrap_or(1);
                 let source = effect.source.as_deref().unwrap_or("");
-                println!("          👁️  LOOK_AT: count={}, source={}", count, source);
                 let player = if player_id == self.player1.id {
                     &mut self.player1
                 } else {
@@ -610,30 +591,24 @@ impl GameState {
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
-                        println!("          📋 Looking at top {} cards: {}", count, cards_to_look.join(", "));
                     }
                     "hand" => {
                         let cards_to_look: Vec<_> = player.hand.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
-                        println!("          📋 Looking at {} cards in hand: {}", count, cards_to_look.join(", "));
                     }
                     "discard" | "控え室" => {
                         let cards_to_look: Vec<_> = player.waitroom.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
-                        println!("          📋 Looking at {} cards in discard: {}", count, cards_to_look.join(", "));
                     }
                     _ => {
-                        println!("          ⚠️  Unknown source for look_at: {}", source);
                     }
                 }
-                println!("          ✅ Look at complete");
             }
             "reveal" => {
-                println!("          👁️  REVEAL: (reveal effect)");
                 let count = effect.count.unwrap_or(1);
                 let source = effect.source.as_deref().unwrap_or("");
                 let player = if player_id == self.player1.id {
@@ -647,26 +622,21 @@ impl GameState {
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
-                        println!("          📋 Revealed {} cards from deck: {}", count, cards_to_reveal.join(", "));
                     }
                     "hand" | "手札" => {
                         let cards_to_reveal: Vec<_> = player.hand.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
-                        println!("          📋 Revealed {} cards from hand: {}", count, cards_to_reveal.join(", "));
                     }
                     _ => {
-                        println!("          📋 Revealed {} cards from: {}", count, source);
                     }
                 }
-                println!("          ✅ Reveal complete");
             }
             "modify_score" => {
                 let operation = effect.operation.as_deref().unwrap_or("add");
                 let value = effect.value.unwrap_or(effect.count.unwrap_or(0));
                 let target = effect.target.as_deref().unwrap_or("self");
-                println!("          📊 MODIFY_SCORE: operation={}, value={}, target={}", operation, value, target);
                 
                 let player = if target == "self" {
                     if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
@@ -682,20 +652,16 @@ impl GameState {
                         _ => {}
                     }
                 }
-                println!("          ✅ Modify score complete");
             }
             "change_state" => {
                 let state_change = effect.state_change.as_deref().unwrap_or("");
-                println!("          🔄 CHANGE_STATE: state_change={}", state_change);
                 // Change card state to active/wait
-                println!("          ✅ Change state complete");
             }
             "modify_required_hearts" => {
                 let operation = effect.operation.as_deref().unwrap_or("decrease");
                 let value = effect.value.unwrap_or(0);
                 let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
                 let target = effect.target.as_deref().unwrap_or("self");
-                println!("          ❤️  MODIFY_REQUIRED_HEARTS: operation={}, value={}, heart_color={}, target={}", operation, value, heart_color, target);
                 
                 let player = if target == "self" {
                     if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
@@ -724,13 +690,11 @@ impl GameState {
                         }
                     }
                 }
-                println!("          ✅ Modify required hearts complete");
             }
             "set_required_hearts" => {
                 let count = effect.count.unwrap_or(0);
                 let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
                 let target = effect.target.as_deref().unwrap_or("self");
-                println!("          ❤️  SET_REQUIRED_HEARTS: count={}, heart_color={}, target={}", count, heart_color, target);
                 
                 let player = if target == "self" {
                     if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
@@ -748,14 +712,12 @@ impl GameState {
                         need_heart.hearts.insert(heart_color.to_string(), count);
                     }
                 }
-                println!("          ✅ Set required hearts complete");
             }
             "modify_required_hearts_global" => {
                 let operation = effect.operation.as_deref().unwrap_or("increase");
                 let value = effect.value.unwrap_or(1);
                 let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
                 let target = effect.target.as_deref().unwrap_or("opponent");
-                println!("          ❤️  MODIFY_REQUIRED_HEARTS_GLOBAL: operation={}, value={}, heart_color={}, target={}", operation, value, heart_color, target);
                 
                 let player = if target == "opponent" {
                     if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
@@ -781,12 +743,10 @@ impl GameState {
                         }
                     }
                 }
-                println!("          ✅ Modify required hearts global complete");
             }
             "set_blade_type" => {
                 let blade_type = effect.blade_type.as_deref().unwrap_or("");
                 let target = effect.target.as_deref().unwrap_or("self");
-                println!("          ⚔️  SET_BLADE_TYPE: blade_type={}, target={}", blade_type, target);
                 // Track as temporary effect
                 let temp_effect = TemporaryEffect {
                     effect_type: format!("set_blade_type:{}", blade_type),
@@ -805,13 +765,11 @@ impl GameState {
                     description: format!("Set blade type to {}", blade_type),
                 };
                 self.temporary_effects.push(temp_effect);
-                println!("          ✅ Set blade type complete");
             }
             "set_heart_type" => {
                 let heart_type = effect.heart_color.as_deref().unwrap_or("heart00");
                 let count = effect.count.unwrap_or(1);
                 let target = effect.target.as_deref().unwrap_or("self");
-                println!("          ❤️  SET_HEART_TYPE: heart_type={}, count={}, target={}", heart_type, count, target);
                 
                 let player = if target == "self" {
                     if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
@@ -825,18 +783,14 @@ impl GameState {
                         card_in_zone.card.set_heart(heart_type, count);
                     }
                 }
-                println!("          ✅ Set heart type complete");
             }
             "position_change" => {
                 let position = effect.position.as_ref().and_then(|p| p.position.as_deref()).unwrap_or("");
-                println!("          🔄 POSITION_CHANGE: position={}", position);
                 // Position change requires user choice - simplified for now
-                println!("          ✅ Position change complete");
             }
             "place_energy_under_member" => {
                 let energy_count = effect.energy_count.unwrap_or(1);
                 let target_member = effect.target_member.as_deref().unwrap_or("this_member");
-                println!("          ⚡ PLACE_ENERGY_UNDER_MEMBER: energy_count={}, target_member={}", energy_count, target_member);
                 
                 let player = if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
                 
@@ -847,15 +801,15 @@ impl GameState {
                             orientation: Some(crate::zones::Orientation::Active),
                             energy_underneath: Vec::new(),
                             face_state: crate::zones::FaceState::FaceUp,
+                            played_via_ability: false,
+                            turn_played: 0,
                         });
                     }
                 }
-                println!("          ✅ Place energy under member complete");
             }
             "modify_yell_count" => {
                 let operation = effect.operation.as_deref().unwrap_or("subtract");
                 let count = effect.count.unwrap_or(0);
-                println!("          📣 MODIFY_YELL_COUNT: operation={}, count={}", operation, count);
                 
                 match operation {
                     "add" => {
@@ -869,22 +823,16 @@ impl GameState {
                     }
                     _ => {}
                 }
-                println!("          ✅ Modify yell count complete");
             }
             "conditional_alternative" => {
-                println!("          🔀 CONDITIONAL_ALTERNATIVE: (conditional alternative effect)");
                 // Conditional alternative - requires condition evaluation
-                println!("          ✅ Conditional alternative skipped (requires condition evaluation)");
             }
             "modify_cost" => {
                 let count = effect.count.unwrap_or(1);
-                println!("          💰 MODIFY_COST: count={}", count);
                 // Modify card cost - would need to track cost modifiers
-                println!("          ✅ Modify cost complete");
             }
             "draw_until_count" => {
                 let count = effect.count.unwrap_or(5);
-                println!("          📥 DRAW_UNTIL_COUNT: count={}", count);
                 let player = if player_id == self.player1.id {
                     &mut self.player1
                 } else {
@@ -893,27 +841,19 @@ impl GameState {
                 while player.hand.cards.len() < count as usize {
                     let _ = player.draw_card();
                 }
-                println!("          ✅ Draw until count complete");
             }
             "play_baton_touch" => {
-                println!("          🎭 PLAY_BATON_TOUCH: (play baton touch effect)");
                 // Play baton touch - replace a member on stage with another from hand
                 // This is a complex effect that requires player choice
-                println!("          ✅ Play baton touch complete (requires player input)");
             }
             "activation_cost" => {
                 let count = effect.count.unwrap_or(0);
-                println!("          💰 ACTIVATION_COST: count={}", count);
                 // Activation cost is handled separately in cost payment
-                println!("          ✅ Activation cost complete");
             }
             "custom" => {
-                println!("          🎨 CUSTOM: (custom effect)");
                 // Custom effect - game-specific handling
-                println!("          ✅ Custom effect complete");
             }
             _ => {
-                println!("          ⚠️  Unknown ability effect: {}", effect.action);
             }
         }
     }

@@ -155,10 +155,31 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
         }
         crate::game_state::Phase::Mulligan => {
             // Rule 6.2.1.6: Mulligan - player chooses cards to mulligan
+            // Generate actions for the current mulligan player only
+            let mulligan_player = if game_state.current_mulligan_player == "player1" {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            
+            let player_name = if game_state.current_mulligan_player == "player1" {
+                "Player 1"
+            } else {
+                "Player 2"
+            };
+            
+            // Add header action to show whose turn it is
+            actions.push(Action {
+                description: format!("{}'s Mulligan Phase", player_name),
+                action_type: "mulligan_header".to_string(),
+                parameters: None,
+            });
+            
             // Generate actions for each card in hand to select/deselect for mulligan
-            for (hand_index, card) in active_player.hand.cards.iter().enumerate() {
+            for (hand_index, card) in mulligan_player.hand.cards.iter().enumerate() {
+                let is_selected = game_state.mulligan_selected_indices.contains(&hand_index);
                 actions.push(Action {
-                    description: format!("Select {} for mulligan", card.name),
+                    description: format!("{} {} for mulligan", if is_selected { "Deselect" } else { "Select" }, card.name),
                     action_type: "select_mulligan".to_string(),
                     parameters: Some(ActionParameters {
                         card_index: Some(hand_index),
@@ -170,18 +191,18 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             
             // Add action to confirm mulligan selection
             actions.push(Action {
-                description: "Confirm mulligan (keep selected cards)".to_string(),
+                description: format!("Confirm {}'s mulligan", player_name),
                 action_type: "confirm_mulligan".to_string(),
                 parameters: Some(ActionParameters {
                     card_index: None,
-                    card_indices: Some(vec![]), // Will be populated with selected indices
+                    card_indices: Some(vec![]), // Will use tracked indices from game state
                     stage_area: None,
                 }),
             });
             
             // Add action to skip mulligan
             actions.push(Action {
-                description: "Skip mulligan (keep all cards)".to_string(),
+                description: format!("Skip {}'s mulligan (keep all cards)", player_name),
                 action_type: "skip_mulligan".to_string(),
                 parameters: None,
             });
@@ -225,23 +246,29 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         // Check if area is occupied for baton touch
                         if let Some(existing_member) = active_player.stage.get_area(area) {
                             // Baton touch - replace existing member
-                            let member_cost = existing_member.card.cost.unwrap_or(0);
-                            cost_to_pay = cost_to_pay.saturating_sub(member_cost);
-                            
+                            // Rule 9.6.2.3.2: Baton touch requires 1+ active energy to trigger
                             let active_energy_count = active_player.energy_zone.cards.iter()
                                 .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
                                 .count() as u32;
                             
-                            if active_energy_count >= cost_to_pay {
-                                actions.push(Action {
-                                    description: format!("Baton Touch: Play {} ({}) to {} (replaces {})", card.name, card.card_no, area_name, existing_member.card.name),
-                                    action_type: "play_member_to_stage".to_string(),
-                                    parameters: Some(ActionParameters {
-                                        card_index: Some(hand_index),
-                                        card_indices: None,
-                                        stage_area: Some(area_name.to_string()),
-                                    }),
-                                });
+                            // Q206: Wait-state members don't reduce cost in baton touch
+                            let is_wait_state = existing_member.orientation != Some(crate::zones::Orientation::Active);
+                            
+                            if active_energy_count >= 1 && !is_wait_state {
+                                let member_cost = existing_member.card.cost.unwrap_or(0);
+                                cost_to_pay = cost_to_pay.saturating_sub(member_cost);
+                                
+                                if active_energy_count >= cost_to_pay {
+                                    actions.push(Action {
+                                        description: format!("Baton Touch: Play {} ({}) to {} (replaces {})", card.name, card.card_no, area_name, existing_member.card.name),
+                                        action_type: "play_member_to_stage".to_string(),
+                                        parameters: Some(ActionParameters {
+                                            card_index: Some(hand_index),
+                                            card_indices: None,
+                                            stage_area: Some(area_name.to_string()),
+                                        }),
+                                    });
+                                }
                             }
                         } else {
                             // Play to empty area
@@ -269,44 +296,39 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             // Advanced actions (swap, pay energy, place energy under members) removed for basic play
         }
         crate::game_state::Phase::LiveCardSet => {
-            // Rule 8.2: Live Card Set Phase - Can place up to 3 live cards face-down
-            // Generate actions for placing specific live cards
-            let live_cards: Vec<_> = active_player.hand.cards.iter()
+            // Rule 8.2: Live Card Set Phase - Can place up to 3 cards face-down
+            // Allow individual card selection (any card from hand, not just live cards)
+            let cards_in_hand: Vec<_> = active_player.hand.cards.iter()
                 .enumerate()
-                .filter(|(_, c)| c.is_live())
                 .collect();
             
-            if !live_cards.is_empty() {
-                // Add action to place 0 cards (skip live)
-                actions.push(Action {
-                    description: "Place 0 live cards (skip)".to_string(),
-                    action_type: "place_live_cards".to_string(),
-                    parameters: Some(ActionParameters {
-                        card_index: None,
-                        card_indices: Some(vec![]),
-                        stage_area: None,
-                    }),
-                });
-                
-                // Generate actions for placing 1-3 specific cards
-                // Generate all combinations of 1-3 cards from available live cards
-                let max_cards = std::cmp::min(3, live_cards.len());
-                
-                // Generate combinations using simple approach
-                for count in 1..=max_cards {
-                    generate_live_card_combinations(&live_cards, count, &mut actions);
+            let current_live_count = active_player.live_card_zone.cards.len();
+            let can_add_more = current_live_count < 3;
+            
+            // Always show finish action
+            actions.push(Action {
+                description: "Finish live card set".to_string(),
+                action_type: "place_live_cards".to_string(),
+                parameters: Some(ActionParameters {
+                    card_index: None,
+                    card_indices: Some(vec![]),
+                    stage_area: None,
+                }),
+            });
+            
+            if can_add_more {
+                // Generate individual card selection actions
+                for (hand_index, card) in cards_in_hand {
+                    actions.push(Action {
+                        description: format!("Place {} ({}) to live zone", card.name, card.card_no),
+                        action_type: "place_live_cards".to_string(),
+                        parameters: Some(ActionParameters {
+                            card_index: Some(hand_index),
+                            card_indices: Some(vec![hand_index]),
+                            stage_area: None,
+                        }),
+                    });
                 }
-            } else {
-                // No live cards, must place 0
-                actions.push(Action {
-                    description: "Place 0 live cards (no live cards in hand)".to_string(),
-                    action_type: "place_live_cards".to_string(),
-                    parameters: Some(ActionParameters {
-                        card_index: None,
-                        card_indices: Some(vec![]),
-                        stage_area: None,
-                    }),
-                });
             }
         }
         crate::game_state::Phase::FirstAttackerPerformance
@@ -319,43 +341,3 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     actions
 }
 
-fn generate_live_card_combinations(live_cards: &[(usize, &crate::card::Card)], count: usize, actions: &mut Vec<Action>) {
-    // Generate all combinations of 'count' cards from live_cards
-    // Use a simple recursive approach
-    let mut indices = Vec::new();
-    generate_combinations_recursive(live_cards, count, 0, &mut indices, actions);
-}
-
-fn generate_combinations_recursive(
-    live_cards: &[(usize, &crate::card::Card)],
-    count: usize,
-    start: usize,
-    current: &mut Vec<usize>,
-    actions: &mut Vec<Action>,
-) {
-    if current.len() == count {
-        // Generate action for this combination
-        let card_names: Vec<String> = current.iter()
-            .map(|&idx| live_cards[idx].1.name.clone())
-            .collect();
-        let description = format!("Place live card(s): {} face-down", card_names.join(", "));
-        let indices: Vec<usize> = current.iter().map(|&idx| live_cards[idx].0).collect();
-        
-        actions.push(Action {
-            description,
-            action_type: "place_live_cards".to_string(),
-            parameters: Some(ActionParameters {
-                card_index: None,
-                card_indices: Some(indices),
-                stage_area: None,
-            }),
-        });
-        return;
-    }
-    
-    for i in start..live_cards.len() {
-        current.push(i);
-        generate_combinations_recursive(live_cards, count, i + 1, current, actions);
-        current.pop();
-    }
-}

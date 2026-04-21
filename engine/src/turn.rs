@@ -155,24 +155,45 @@ impl TurnEngine {
                 
                 // Advance to Mulligan phase
                 game_state.current_phase = crate::game_state::Phase::Mulligan;
+                // Initialize mulligan state - first attacker goes first
+                game_state.current_mulligan_player = if game_state.player1.is_first_attacker {
+                    "player1".to_string()
+                } else {
+                    "player2".to_string()
+                };
+                game_state.mulligan_selected_indices.clear();
                 Ok(())
             }
             "select_mulligan" => {
-                // Track which cards are selected for mulligan (simplified: just advance phase)
-                // In a real implementation, this would track selected cards
-                game_state.current_phase = crate::game_state::Phase::Mulligan;
+                // Toggle card selection for mulligan
+                let idx = card_index.unwrap_or(0);
+                if let Some(pos) = game_state.mulligan_selected_indices.iter().position(|&x| x == idx) {
+                    // Already selected, deselect
+                    game_state.mulligan_selected_indices.remove(pos);
+                } else {
+                    // Not selected, select
+                    game_state.mulligan_selected_indices.push(idx);
+                }
                 Ok(())
             }
             "confirm_mulligan" => {
                 // Rule 6.2.1.6: Mulligan - player has selected cards to mulligan
-                let indices = card_indices.unwrap_or_else(|| vec![]);
+                // Use the tracked indices from game state
+                let indices = game_state.mulligan_selected_indices.clone();
                 
-                // Determine which player is mulliganing (first attacker goes first)
-                let (current_player, _other_player) = if game_state.player1.is_first_attacker {
-                    (&mut game_state.player1, &mut game_state.player2)
+                // Determine which player is mulliganing based on current_mulligan_player
+                let current_player = if game_state.current_mulligan_player == "player1" {
+                    &mut game_state.player1
                 } else {
-                    (&mut game_state.player2, &mut game_state.player1)
+                    &mut game_state.player2
                 };
+                
+                // Mark this player as done
+                if game_state.current_mulligan_player == "player1" {
+                    game_state.mulligan_player1_done = true;
+                } else {
+                    game_state.mulligan_player2_done = true;
+                }
                 
                 // Perform mulligan for selected cards
                 if !indices.is_empty() {
@@ -208,66 +229,55 @@ impl TurnEngine {
                     }
                 }
                 
+                // Clear selected indices for next player
+                game_state.mulligan_selected_indices.clear();
+                
                 // Check if both players have mulliganed
-                // For simplicity, advance to energy setup after first player mulligans
-                // In a real implementation, would track which players have mulliganed
-                
-                // Rule 6.2.7: Initial energy - Each player draws 3 cards from energy deck to Energy Zone
-                for _ in 0..3 {
-                    if let Some(card) = game_state.player1.energy_deck.draw() {
-                        let card_in_zone = crate::zones::CardInZone {
-                            card: card.clone(),
-                            orientation: Some(crate::zones::Orientation::Active),
-                            face_state: crate::zones::FaceState::FaceUp,
-                            energy_underneath: Vec::new(),
-                        };
-                        let _ = game_state.player1.energy_zone.add_card(card_in_zone);
-                    }
-                    if let Some(card) = game_state.player2.energy_deck.draw() {
-                        let card_in_zone = crate::zones::CardInZone {
-                            card: card.clone(),
-                            orientation: Some(crate::zones::Orientation::Active),
-                            face_state: crate::zones::FaceState::FaceUp,
-                            energy_underneath: Vec::new(),
-                        };
-                        let _ = game_state.player2.energy_zone.add_card(card_in_zone);
-                    }
+                if game_state.mulligan_player1_done && game_state.mulligan_player2_done {
+                    // Both done, advance to energy setup
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_phase = crate::game_state::Phase::Active;
+                } else {
+                    // Switch to other player
+                    game_state.current_mulligan_player = if game_state.current_mulligan_player == "player1" {
+                        "player2".to_string()
+                    } else {
+                        "player1".to_string()
+                    };
                 }
-                
-                // Set phase to Active to start the game
-                game_state.current_phase = crate::game_state::Phase::Active;
                 Ok(())
             }
             "skip_mulligan" => {
                 // Player chooses not to mulligan
-                
-                // Rule 6.2.7: Initial energy - Each player draws 3 cards from energy deck to Energy Zone
-                for _ in 0..3 {
-                    if let Some(card) = game_state.player1.energy_deck.draw() {
-                        let card_in_zone = crate::zones::CardInZone {
-                            card: card.clone(),
-                            orientation: Some(crate::zones::Orientation::Active),
-                            face_state: crate::zones::FaceState::FaceUp,
-                            energy_underneath: Vec::new(),
-                        };
-                        let _ = game_state.player1.energy_zone.add_card(card_in_zone);
-                    }
-                    if let Some(card) = game_state.player2.energy_deck.draw() {
-                        let card_in_zone = crate::zones::CardInZone {
-                            card: card.clone(),
-                            orientation: Some(crate::zones::Orientation::Active),
-                            face_state: crate::zones::FaceState::FaceUp,
-                            energy_underneath: Vec::new(),
-                        };
-                        let _ = game_state.player2.energy_zone.add_card(card_in_zone);
-                    }
+                // Mark this player as done
+                if game_state.current_mulligan_player == "player1" {
+                    game_state.mulligan_player1_done = true;
+                } else {
+                    game_state.mulligan_player2_done = true;
                 }
                 
-                // Set phase to Active to start the game
-                game_state.current_phase = crate::game_state::Phase::Active;
+                // Clear selected indices
+                game_state.mulligan_selected_indices.clear();
+                
+                // Check if both players have mulliganed (or skipped)
+                if game_state.mulligan_player1_done && game_state.mulligan_player2_done {
+                    // Both done, advance to energy setup
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_phase = crate::game_state::Phase::Active;
+                } else {
+                    // Switch to other player
+                    game_state.current_mulligan_player = if game_state.current_mulligan_player == "player1" {
+                        "player2".to_string()
+                    } else {
+                        "player1".to_string()
+                    };
+                }
                 Ok(())
             }
             "play_member_to_stage" => {
+                // Get turn number before any mutable borrows
+                let current_turn = game_state.turn_number;
+
                 let player = game_state.active_player_mut();
                 
                 // Use provided parameters if available, otherwise use simple fallback
@@ -300,46 +310,69 @@ impl TurnEngine {
                     }
                     (idx, area_enum)
                 };
-                
+
                 // Get card info before moving it
                 let card_no = player.hand.cards[idx].card_no.clone();
                 let player_id = player.id.clone();
-                
-                player.move_card_from_hand_to_stage(idx, area)?;
+
+                let cost_paid = player.move_card_from_hand_to_stage(idx, area)?;
+
+                // Set turn_played for the card on stage
+                if let Some(card_in_zone) = player.stage.get_area_mut(area) {
+                    card_in_zone.turn_played = current_turn;
+                }
                 
                 // Trigger 登場 abilities for the played card
-                Self::trigger_debut_abilities(game_state, &player_id, &card_no);
+                // Q197/Q198: Auto abilities don't trigger when played via baton touch with cost 10+
+                Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid);
                 
                 Ok(())
             }
             "place_live_cards" => {
-                // Rule 8.2: Live Card Set Phase - Place specific live cards face-down
-                let player = game_state.active_player_mut();
-                let indices = card_indices.unwrap_or_else(|| vec![]);
+                // Rule 8.2: Live Card Set Phase - Place individual card face-down, max 3 cards
+                let card_idx = card_index;
                 
-                // Sort indices in descending order to remove cards without shifting indices
-                let mut sorted_indices = indices.clone();
-                sorted_indices.sort_by(|a, b| b.cmp(a));
-                
-                for idx in sorted_indices {
-                    if idx < player.hand.cards.len() {
+                if let Some(idx) = card_idx {
+                    // Place a single card
+                    let player = game_state.active_player_mut();
+                    if idx < player.hand.cards.len() && player.live_card_zone.cards.len() < 3 {
                         let card = player.hand.cards.remove(idx);
-                        if card.is_live() {
-                            let _ = player.live_card_zone.add_card(card, true);
+                        let _ = player.live_card_zone.add_card(card, true);
+                        // Draw 1 card when placing 1 card (Rule 8.2)
+                        let _ = player.draw_card();
+                    }
+                    // Don't advance phase yet - allow placing more cards up to 3
+                } else {
+                    // No card selected, finish this player's live card set
+                    // Switch to other player for their live card set
+                    if game_state.current_turn_phase == crate::game_state::TurnPhase::Live {
+                        // Check if first player has finished
+                        if game_state.player1.live_card_zone.cards.len() > 0 || game_state.player2.live_card_zone.cards.len() > 0 {
+                            // At least one player has set cards, check if both have finished
+                            let p1_finished = game_state.player1.live_card_zone.cards.len() > 0;
+                            let p2_finished = game_state.player2.live_card_zone.cards.len() > 0;
+                            
+                            if p1_finished && p2_finished {
+                                // Both players have finished, advance phase
+                                Self::advance_phase(game_state);
+                            } else if p1_finished {
+                                // P1 finished, now P2's turn
+                                // Just stay in LiveCardSet phase but actions will be for P2
+                            } else if p2_finished {
+                                // P2 finished, now P1's turn
+                                // Just stay in LiveCardSet phase but actions will be for P1
+                            } else {
+                                // Neither has set any cards, advance phase
+                                Self::advance_phase(game_state);
+                            }
                         } else {
-                            // Return non-live cards to hand
-                            player.hand.cards.insert(idx, card);
+                            // Neither has set cards, advance phase
+                            Self::advance_phase(game_state);
                         }
+                    } else {
+                        Self::advance_phase(game_state);
                     }
                 }
-                
-                // Draw equal number of cards (Rule 8.2)
-                for _ in 0..indices.len() {
-                    let _ = player.draw_card();
-                }
-                
-                // Advance to next phase
-                Self::advance_phase(game_state);
                 Ok(())
             }
             "play_member_left" => {
@@ -364,6 +397,34 @@ impl TurnEngine {
                 Ok(())
             }
             _ => Err(format!("Unknown action: {}", action))
+        }
+    }
+
+    pub fn setup_initial_energy(game_state: &mut GameState) {
+        // Rule 6.2.7: Initial energy - Each player draws 3 cards from energy deck to Energy Zone
+        for _ in 0..3 {
+            if let Some(card) = game_state.player1.energy_deck.draw() {
+                let card_in_zone = crate::zones::CardInZone {
+                    card: card.clone(),
+                    orientation: Some(crate::zones::Orientation::Active),
+                    face_state: crate::zones::FaceState::FaceUp,
+                    energy_underneath: Vec::new(),
+                    played_via_ability: false,
+                    turn_played: 0,
+                };
+                let _ = game_state.player1.energy_zone.add_card(card_in_zone);
+            }
+            if let Some(card) = game_state.player2.energy_deck.draw() {
+                let card_in_zone = crate::zones::CardInZone {
+                    card: card.clone(),
+                    orientation: Some(crate::zones::Orientation::Active),
+                    face_state: crate::zones::FaceState::FaceUp,
+                    energy_underneath: Vec::new(),
+                    played_via_ability: false,
+                    turn_played: 0,
+                };
+                let _ = game_state.player2.energy_zone.add_card(card_in_zone);
+            }
         }
     }
 
@@ -498,6 +559,8 @@ impl TurnEngine {
                 orientation: Some(crate::zones::Orientation::Wait),
                 face_state: crate::zones::FaceState::FaceDown,
                 energy_underneath: Vec::new(),
+                played_via_ability: false,
+                turn_played: 0,
             });
         }
     }
@@ -605,6 +668,8 @@ impl TurnEngine {
                         orientation: None,
                         face_state: crate::zones::FaceState::FaceDown,
                         energy_underneath: Vec::new(),
+                        played_via_ability: false,
+                        turn_played: 0,
                     };
                     // Move to energy deck
                     player.energy_deck.cards.push_back(energy_card);
@@ -773,9 +838,14 @@ impl TurnEngine {
     }
 
     /// Trigger debut abilities for a player when a card is placed on stage
-    fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str) {
+    fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, cost_paid: u32) {
         // Rule 11.4: Trigger Debut (登場) automatic abilities
         // Rule 11.4.2: "【自動】 このメンバーが登場したとき、（効果）"
+        
+        // Q197/Q198: Auto abilities don't trigger when played via baton touch with cost 10+
+        if cost_paid >= 10 {
+            return;
+        }
         
         let player_id_clone = player_id.to_string();
         let card_no_clone = card_no.to_string();

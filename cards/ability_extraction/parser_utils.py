@@ -99,6 +99,42 @@ def extract_count(text):
     return None
 
 
+def extract_dynamic_count(text):
+    """Extract dynamic count references (e.g., score-based, card-based, energy-based).
+    Returns a dict with 'type' and 'details' if found, None otherwise.
+    """
+    if '数まで' in text:
+        # Pattern: "Xの数まで" - count based on X
+        count_match = re.search(r'(.+?)の数まで', text)
+        if count_match:
+            source = count_match.group(1).strip()
+            return {
+                'type': 'dynamic_count',
+                'reference': source,
+                'mode': 'max'
+            }
+    
+    if 'に等しい枚数' in text or 'に等しい数' in text:
+        # Pattern: "Xに等しい枚数" - count equals X
+        count_match = re.search(r'(.+?)に等しい(?:枚数|数)', text)
+        if count_match:
+            source = count_match.group(1).strip()
+            result = {
+                'type': 'dynamic_count',
+                'reference': source,
+                'mode': 'equals'
+            }
+            # Check for calculation pattern like "スコアに2を足した数"
+            calc_match = re.search(r'(.+?)に(\d+)を足した', source)
+            if calc_match:
+                result['base_reference'] = calc_match.group(1).strip()
+                result['calculation'] = 'add'
+                result['calculation_value'] = int(calc_match.group(2))
+            return result
+    
+    return None
+
+
 def extract_cost(text):
     """Extract cost value from text (e.g., 'コスト3' -> 3)."""
     match = COST_PATTERN.search(text)

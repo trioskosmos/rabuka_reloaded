@@ -262,7 +262,7 @@ pub struct AbilityEffect {
     pub position: Option<PositionInfo>,
     pub state_change: Option<String>,
     pub optional: Option<bool>,
-    pub max: Option<u32>,
+    pub max: Option<bool>,
     pub effect_constraint: Option<String>,
     pub shuffle_target: Option<String>,
     pub icon_count: Option<IconCount>,
@@ -282,12 +282,59 @@ pub struct AbilityEffect {
     pub blade_type: Option<String>,
     pub energy_count: Option<u32>,
     pub target_member: Option<String>,
+    // New fields from parser improvements
+    pub choice_options: Option<Vec<String>>,
+    pub group: Option<GroupInfo>,
+    pub per_unit_count: Option<u32>,
+    pub per_unit_type: Option<String>,
+    pub per_unit_reference: Option<String>,
+    pub group_matching: Option<bool>,
+    pub repeat_limit: Option<u32>,
+    pub repeat_optional: Option<bool>,
+    pub is_further: Option<bool>,
+    pub cost_result_reference: Option<bool>,
+    pub dynamic_count: Option<DynamicCount>,
+    pub resource_icon_count: Option<u32>,
+    pub placement_order: Option<String>,
+    pub cost_limit: Option<u32>,
+    pub unit: Option<String>,
+    pub distinct: Option<String>,
+    pub target_player: Option<String>,
+    pub target_location: Option<String>,
+    pub target_scope: Option<String>,
+    pub target_card_type: Option<String>,
+    pub activation_condition: Option<String>,
+    pub activation_condition_parsed: Option<Condition>,
+    pub gained_ability: Option<Box<AbilityEffect>>,
+    pub ability_text: Option<String>,
+    pub swap_action: Option<String>,
+    pub has_member_swapping: Option<bool>,
+    pub group_options: Option<Vec<String>>,
+    pub card_count: Option<u32>,
+    pub use_limit: Option<u32>,
+    pub triggers: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PositionInfo {
     pub position: Option<String>,
     pub target: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroupInfo {
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DynamicCount {
+    #[serde(rename = "type")]
+    pub count_type: String,
+    pub reference: String,
+    pub mode: String,
+    pub base_reference: Option<String>,
+    pub calculation: Option<String>,
+    pub calculation_value: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -347,6 +394,15 @@ pub struct Condition {
     pub includes: Option<bool>,
     pub appearance: Option<bool>,
     pub conditions: Option<Vec<Condition>>,
+    // New fields from parser improvements
+    pub all_areas: Option<bool>,
+    pub exclude_this_member: Option<bool>,
+    pub resource_type: Option<String>,
+    pub unit: Option<String>,
+    pub location_condition: Option<bool>,
+    pub cost_result_reference: Option<bool>,
+    pub cost_result_group_match: Option<bool>,
+    pub group_matching: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

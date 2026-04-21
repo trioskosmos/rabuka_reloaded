@@ -165,7 +165,7 @@ fn test_basic_effect_execute_draw() {
     let _initial_hand_size = player1.hand.cards.len();
     let mut game_state = GameState::new(player1, player2);
     
-    let mut resolver = AbilityResolver::new_mut(&mut game_state);
+    let mut resolver = AbilityResolver::new(&mut game_state);
     
     let effect = AbilityEffect {
         text: "Draw 2 cards".to_string(),
@@ -181,7 +181,6 @@ fn test_basic_effect_execute_draw() {
         look_action: None,
         select_action: None,
         actions: None,
-        resource: None,
         position: None,
         state_change: None,
         optional: None,
@@ -199,6 +198,40 @@ fn test_basic_effect_execute_draw() {
         value: None,
         aggregate: None,
         comparison_type: None,
+        heart_color: None,
+        blade_type: None,
+        energy_count: None,
+        target_member: None,
+        choice_options: None,
+        group: None,
+        per_unit_count: None,
+        per_unit_type: None,
+        per_unit_reference: None,
+        group_matching: None,
+        repeat_limit: None,
+        repeat_optional: None,
+        is_further: None,
+        cost_result_reference: None,
+        dynamic_count: None,
+        resource_icon_count: None,
+        placement_order: None,
+        cost_limit: None,
+        unit: None,
+        distinct: None,
+        target_player: None,
+        target_location: None,
+        target_scope: None,
+        target_card_type: None,
+        activation_condition: None,
+        activation_condition_parsed: None,
+        gained_ability: None,
+        ability_text: None,
+        swap_action: None,
+        has_member_swapping: None,
+        group_options: None,
+        card_count: None,
+        use_limit: None,
+        triggers: None,
     };
     
     let result = resolver.execute_effect(&effect);
@@ -214,7 +247,7 @@ fn test_basic_effect_execute_gain_resource() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     let mut game_state = GameState::new(player1, player2);
     
-    let mut resolver = AbilityResolver::new_mut(&mut game_state);
+    let mut resolver = AbilityResolver::new(&mut game_state);
     
     let effect = AbilityEffect {
         text: "Gain 2 blades".to_string(),
@@ -382,7 +415,7 @@ fn test_basic_ability_with_condition_and_effect() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     let mut game_state = GameState::new(player1, player2);
     
-    let mut resolver = AbilityResolver::new_mut(&mut game_state);
+    let mut resolver = AbilityResolver::new(&mut game_state);
     
     // Create an ability with a condition and effect
     let ability = Ability {

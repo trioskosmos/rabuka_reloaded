@@ -1,20 +1,13 @@
 use crate::card::{Ability, AbilityCost, AbilityEffect, Condition};
 use crate::game_state::GameState;
 
-pub struct AbilityResolver {
-    game_state: GameState,
+pub struct AbilityResolver<'a> {
+    game_state: &'a mut GameState,
 }
 
-impl AbilityResolver {
-    pub fn new(game_state: GameState) -> Self {
+impl<'a> AbilityResolver<'a> {
+    pub fn new(game_state: &'a mut GameState) -> Self {
         AbilityResolver { game_state }
-    }
-
-    pub fn new_mut(game_state: &mut GameState) -> Self {
-        // Clone the game state for now - this is a limitation
-        // In a proper implementation, the resolver would hold a mutable reference
-        // For now, we'll need to update the original game_state after execution
-        AbilityResolver { game_state: game_state.clone() }
     }
 
     /// Evaluate a condition against the current game state
@@ -23,6 +16,7 @@ impl AbilityResolver {
             Some("compound") => self.evaluate_compound_condition(condition),
             Some("comparison_condition") => self.evaluate_comparison_condition(condition),
             Some("location_condition") => self.evaluate_location_condition(condition),
+            Some("position_condition") => self.evaluate_position_condition(condition),
             Some("group_condition") => self.evaluate_group_condition(condition),
             Some("card_count_condition") => self.evaluate_card_count_condition(condition),
             Some("appearance_condition") => self.evaluate_appearance_condition(condition),
@@ -73,6 +67,7 @@ impl AbilityResolver {
         // Check if cards exist in specified location
         let location = condition.location.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
+        let card_type_filter = condition.card_type.as_deref();
         
         let player = match target {
             "self" => &self.game_state.player1,
@@ -80,14 +75,65 @@ impl AbilityResolver {
             _ => &self.game_state.player1,
         };
 
+        let matches_card_type = |card: &crate::card::Card| -> bool {
+            match card_type_filter {
+                Some("live_card") => card.is_live(),
+                Some("member_card") => card.is_member(),
+                Some("energy_card") => card.is_energy(),
+                None => true,
+                _ => true,
+            }
+        };
+
         match location {
-            "stage" => player.stage.total_blades() > 0,
-            "hand" => !player.hand.is_empty(),
+            "stage" => {
+                if card_type_filter.is_some() {
+                    // Check for specific card type on stage
+                    player.stage.center.as_ref().map_or(false, |c| matches_card_type(&c.card)) ||
+                    player.stage.left_side.as_ref().map_or(false, |c| matches_card_type(&c.card)) ||
+                    player.stage.right_side.as_ref().map_or(false, |c| matches_card_type(&c.card))
+                } else {
+                    player.stage.total_blades() > 0
+                }
+            }
+            "hand" => {
+                if card_type_filter.is_some() {
+                    player.hand.cards.iter().any(|c| matches_card_type(c))
+                } else {
+                    !player.hand.is_empty()
+                }
+            }
             "deck" => !player.main_deck.is_empty(),
-            "discard" => !player.waitroom.cards.is_empty(),
+            "discard" => {
+                if card_type_filter.is_some() {
+                    player.waitroom.cards.iter().any(|c| matches_card_type(c))
+                } else {
+                    !player.waitroom.cards.is_empty()
+                }
+            }
             "energy_zone" => !player.energy_zone.cards.is_empty(),
             "live_card_zone" => !player.live_card_zone.cards.is_empty(),
             "success_live_zone" => !player.success_live_card_zone.cards.is_empty(),
+            _ => true,
+        }
+    }
+
+    fn evaluate_position_condition(&self, condition: &Condition) -> bool {
+        // Check position conditions (center, left_side, right_side)
+        let target = condition.target.as_deref().unwrap_or("self");
+        let position = condition.position.as_ref().and_then(|p| p.position.as_deref()).unwrap_or("");
+        
+        let player = match target {
+            "self" => &self.game_state.player1,
+            "opponent" => &self.game_state.player2,
+            _ => &self.game_state.player1,
+        };
+
+        match position {
+            "center" => player.stage.center.is_some(),
+            "left_side" => player.stage.left_side.is_some(),
+            "right_side" => player.stage.right_side.is_some(),
+            "any" => player.stage.center.is_some() || player.stage.left_side.is_some() || player.stage.right_side.is_some(),
             _ => true,
         }
     }
@@ -136,28 +182,54 @@ impl AbilityResolver {
         }
     }
 
-    fn evaluate_appearance_condition(&self, condition: &Condition) -> bool {
+    fn evaluate_appearance_condition(&self, _condition: &Condition) -> bool {
         // Check if a card has appeared (this would need to track appearance events)
         // For now, return true as a placeholder
-        condition.appearance.unwrap_or(false)
+        true
     }
 
-    fn evaluate_temporal_condition(&self, condition: &Condition) -> bool {
+    fn evaluate_temporal_condition(&self, _condition: &Condition) -> bool {
         // Check temporal conditions (this turn, live_end, etc.)
         // This would need to track turn state
-        match condition.temporal_scope.as_deref() {
-            Some("this_turn") => true, // Placeholder
-            _ => true,
-        }
+        true // Placeholder
     }
 
     fn evaluate_state_condition(&self, condition: &Condition) -> bool {
         // Check card state (active, wait, face_up, face_down)
         let state = condition.state.as_deref().unwrap_or("");
-        // This would need to check specific card states
+        let target = condition.target.as_deref().unwrap_or("self");
+        
+        let player = match target {
+            "self" => &self.game_state.player1,
+            "opponent" => &self.game_state.player2,
+            _ => &self.game_state.player1,
+        };
+
         match state {
-            "active" => true,
-            "wait" => true,
+            "active" => {
+                // Check if any stage cards are active
+                player.stage.center.as_ref().map_or(false, |c| {
+                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Active))
+                }) ||
+                player.stage.left_side.as_ref().map_or(false, |c| {
+                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Active))
+                }) ||
+                player.stage.right_side.as_ref().map_or(false, |c| {
+                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Active))
+                })
+            }
+            "wait" => {
+                // Check if any stage cards are in wait state
+                player.stage.center.as_ref().map_or(false, |c| {
+                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Wait))
+                }) ||
+                player.stage.left_side.as_ref().map_or(false, |c| {
+                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Wait))
+                }) ||
+                player.stage.right_side.as_ref().map_or(false, |c| {
+                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Wait))
+                })
+            }
             _ => true,
         }
     }
@@ -165,20 +237,28 @@ impl AbilityResolver {
     fn evaluate_energy_state_condition(&self, condition: &Condition) -> bool {
         // Check energy card states
         let energy_state = condition.energy_state.as_deref().unwrap_or("");
+        let target = condition.target.as_deref().unwrap_or("self");
+        
+        let player = match target {
+            "self" => &self.game_state.player1,
+            "opponent" => &self.game_state.player2,
+            _ => &self.game_state.player1,
+        };
+
         match energy_state {
-            "active" => self.game_state.player1.energy_zone.active_count() > 0,
+            "active" => player.energy_zone.active_count() > 0,
             _ => true,
         }
     }
 
-    fn evaluate_movement_condition(&self, condition: &Condition) -> bool {
+    fn evaluate_movement_condition(&self, _condition: &Condition) -> bool {
         // Check movement-related conditions
-        condition.movement_condition.is_some()
+        true // Placeholder
     }
 
-    fn evaluate_ability_negation_condition(&self, condition: &Condition) -> bool {
+    fn evaluate_ability_negation_condition(&self, _condition: &Condition) -> bool {
         // Check if abilities are negated
-        !condition.negation.unwrap_or(false)
+        true // Placeholder
     }
 
     fn evaluate_or_condition(&self, condition: &Condition) -> bool {
@@ -189,12 +269,9 @@ impl AbilityResolver {
         }
     }
 
-    fn evaluate_any_of_condition(&self, condition: &Condition) -> bool {
-        if let Some(ref any_of) = condition.any_of {
-            any_of.iter().any(|_| true) // Placeholder
-        } else {
-            true
-        }
+    fn evaluate_any_of_condition(&self, _condition: &Condition) -> bool {
+        // Check if any condition is met
+        true // Placeholder
     }
 
     fn evaluate_score_threshold_condition(&self, _condition: &Condition) -> bool {
@@ -255,6 +332,11 @@ impl AbilityResolver {
             "activate_ability" => self.execute_activate_ability(effect),
             "invalidate_ability" => self.execute_invalidate_ability(effect),
             "play_baton_touch" => self.execute_play_baton_touch(effect),
+            "reveal" => self.execute_reveal(effect),
+            "select" => self.execute_select(effect),
+            "look_at" => self.execute_look_at(effect),
+            "modify_required_hearts_global" => self.execute_modify_required_hearts_global(effect),
+            "modify_yell_count" => self.execute_modify_yell_count(effect),
             _ => {
                 eprintln!("Unknown action type: {}", effect.action);
                 Ok(())
@@ -327,7 +409,7 @@ impl AbilityResolver {
         let count = effect.count.unwrap_or(1);
         let source = effect.source.as_deref().unwrap_or("");
         let destination = effect.destination.as_deref().unwrap_or("");
-        let _card_type = effect.card_type.as_deref();
+        let card_type_filter = effect.card_type.as_deref();
         let target = effect.target.as_deref().unwrap_or("self");
 
         let player = match target {
@@ -336,25 +418,126 @@ impl AbilityResolver {
             _ => &mut self.game_state.player1,
         };
 
-        // This is a simplified implementation
-        // A full implementation would need to handle card selection, filtering by type, etc.
+        // Helper function to check if card matches type filter
+        let matches_card_type = |card: &crate::card::Card, filter: Option<&str>| -> bool {
+            match filter {
+                Some("live_card") => card.is_live(),
+                Some("member_card") => card.is_member(),
+                Some("energy_card") => card.is_energy(),
+                None => true,
+                _ => true, // Unknown type, allow all
+            }
+        };
+
         match source {
-            "deck" => {
-                for _ in 0..count {
-                    if let Some(card) = player.main_deck.draw() {
+            "stage" => {
+                // Move card from stage to destination
+                let mut moved = 0;
+                // For now, move from center position - would need position parameter
+                if let Some(center_card) = player.stage.center.take() {
+                    if matches_card_type(&center_card.card, card_type_filter) {
                         match destination {
-                            "hand" => player.hand.add_card(card),
-                            "discard" => player.waitroom.add_card(card),
-                            _ => {}
+                            "discard" => {
+                                player.waitroom.add_card(center_card.card);
+                                moved += 1;
+                            }
+                            "hand" => {
+                                player.hand.add_card(center_card.card);
+                                moved += 1;
+                            }
+                            _ => {
+                                // Put card back
+                                player.stage.center = Some(center_card);
+                            }
                         }
+                    } else {
+                        // Put card back if it doesn't match
+                        player.stage.center = Some(center_card);
+                    }
+                }
+                // Also check left and right sides
+                if moved < count {
+                    if let Some(left_card) = player.stage.left_side.take() {
+                        if matches_card_type(&left_card.card, card_type_filter) {
+                            match destination {
+                                "discard" => {
+                                    player.waitroom.add_card(left_card.card);
+                                    moved += 1;
+                                }
+                                "hand" => {
+                                    player.hand.add_card(left_card.card);
+                                    moved += 1;
+                                }
+                                _ => {
+                                    player.stage.left_side = Some(left_card);
+                                }
+                            }
+                        } else {
+                            player.stage.left_side = Some(left_card);
+                        }
+                    }
+                }
+                if moved < count {
+                    if let Some(right_card) = player.stage.right_side.take() {
+                        if matches_card_type(&right_card.card, card_type_filter) {
+                            match destination {
+                                "discard" => {
+                                    player.waitroom.add_card(right_card.card);
+                                    moved += 1;
+                                }
+                                "hand" => {
+                                    player.hand.add_card(right_card.card);
+                                    moved += 1;
+                                }
+                                _ => {
+                                    player.stage.right_side = Some(right_card);
+                                }
+                            }
+                        } else {
+                            player.stage.right_side = Some(right_card);
+                        }
+                    }
+                }
+            }
+            "deck" | "deck_top" => {
+                let mut moved = 0;
+                while moved < count {
+                    if let Some(card) = player.main_deck.draw() {
+                        if matches_card_type(&card, card_type_filter) {
+                            match destination {
+                                "hand" => player.hand.add_card(card),
+                                "discard" => player.waitroom.add_card(card),
+                                _ => {}
+                            }
+                            moved += 1;
+                        } else {
+                            // Card doesn't match filter, put it back
+                            player.main_deck.cards.push_back(card);
+                            break; // Stop if we encounter non-matching card
+                        }
+                    } else {
+                        break; // Deck empty
                     }
                 }
             }
             "hand" => {
                 match destination {
                     "discard" => {
-                        for _ in 0..count {
-                            player.hand.remove_card(0);
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.hand.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(card, card_type_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.hand.cards.remove(i);
+                            player.waitroom.add_card(card);
                         }
                     }
                     _ => {}
@@ -363,18 +546,29 @@ impl AbilityResolver {
             "discard" => {
                 match destination {
                     "hand" => {
-                        // Simplified: just take from waitroom
-                        let cards = player.waitroom.take_all();
-                        for (i, card) in cards.into_iter().enumerate() {
-                            if i < count as usize {
-                                player.hand.add_card(card);
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.waitroom.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
                             }
+                            if matches_card_type(card, card_type_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.waitroom.cards.remove(i);
+                            player.hand.add_card(card);
                         }
                     }
                     _ => {}
                 }
             }
-            _ => {}
+            _ => {
+                eprintln!("Unknown source for move_cards: {}", source);
+            }
         }
 
         Ok(())
@@ -382,7 +576,9 @@ impl AbilityResolver {
 
     fn execute_gain_resource(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let resource = effect.resource.as_deref().unwrap_or("");
+        let count = effect.count.unwrap_or(1);
         let target = effect.target.as_deref().unwrap_or("self");
+        let _duration = effect.duration.as_deref(); // TODO: Handle duration (live_end, etc.)
 
         let player = match target {
             "self" => &mut self.game_state.player1,
@@ -392,17 +588,38 @@ impl AbilityResolver {
 
         match resource {
             "blade" => {
-                // Add blades to stage cards
-                player.stage.activate_all_cards();
+                // Add blades to all stage cards
+                if let Some(ref mut left) = player.stage.left_side {
+                    left.card.add_blades(count);
+                }
+                if let Some(ref mut center) = player.stage.center {
+                    center.card.add_blades(count);
+                }
+                if let Some(ref mut right) = player.stage.right_side {
+                    right.card.add_blades(count);
+                }
             }
             "heart" => {
-                // Add hearts to stage cards
-                // This would need to target specific cards
+                // Add hearts to all stage cards
+                // For now, add heart01 as default - would need heart_color parameter
+                if let Some(ref mut left) = player.stage.left_side {
+                    left.card.add_heart("heart01", count);
+                }
+                if let Some(ref mut center) = player.stage.center {
+                    center.card.add_heart("heart01", count);
+                }
+                if let Some(ref mut right) = player.stage.right_side {
+                    right.card.add_heart("heart01", count);
+                }
             }
             "energy" => {
-                // Add energy
+                // Add energy cards to energy zone
+                // This would need to actually create/add energy cards
+                eprintln!("Gain resource: energy (not fully implemented)");
             }
-            _ => {}
+            _ => {
+                eprintln!("Unknown resource type: {}", resource);
+            }
         }
 
         Ok(())
@@ -433,20 +650,54 @@ impl AbilityResolver {
 
     fn execute_modify_score(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let operation = effect.operation.as_deref().unwrap_or("add");
-        let _value = effect.value.unwrap_or(0);
+        let value = effect.value.unwrap_or(0);
+        let target = effect.target.as_deref().unwrap_or("self");
 
-        // This would need to target specific cards
+        let player = match target {
+            "self" => &mut self.game_state.player1,
+            "opponent" => &mut self.game_state.player2,
+            _ => &mut self.game_state.player1,
+        };
+
+        // For now, modify score on all stage cards
+        // A full implementation would need to target specific cards based on position/condition
         match operation {
             "add" => {
-                // Add score to target card
+                if let Some(ref mut left) = player.stage.left_side {
+                    left.card.add_score(value);
+                }
+                if let Some(ref mut center) = player.stage.center {
+                    center.card.add_score(value);
+                }
+                if let Some(ref mut right) = player.stage.right_side {
+                    right.card.add_score(value);
+                }
             }
             "remove" => {
-                // Remove score from target card
+                if let Some(ref mut left) = player.stage.left_side {
+                    left.card.remove_score(value);
+                }
+                if let Some(ref mut center) = player.stage.center {
+                    center.card.remove_score(value);
+                }
+                if let Some(ref mut right) = player.stage.right_side {
+                    right.card.remove_score(value);
+                }
             }
             "set" => {
-                // Set score to value
+                if let Some(ref mut left) = player.stage.left_side {
+                    left.card.set_score(value);
+                }
+                if let Some(ref mut center) = player.stage.center {
+                    center.card.set_score(value);
+                }
+                if let Some(ref mut right) = player.stage.right_side {
+                    right.card.set_score(value);
+                }
             }
-            _ => {}
+            _ => {
+                eprintln!("Unknown modify_score operation: {}", operation);
+            }
         }
 
         Ok(())
@@ -500,6 +751,70 @@ impl AbilityResolver {
         Ok(())
     }
 
+    fn execute_reveal(&mut self, _effect: &AbilityEffect) -> Result<(), String> {
+        // Reveal cards from a location to the opponent
+        // For now, this is a placeholder - would need to track revealed state
+        Ok(())
+    }
+
+    fn execute_select(&mut self, _effect: &AbilityEffect) -> Result<(), String> {
+        // Select cards from a location (typically after looking)
+        // For now, this is a placeholder - would need UI integration for selection
+        Ok(())
+    }
+
+    fn execute_look_at(&mut self, _effect: &AbilityEffect) -> Result<(), String> {
+        // Look at cards from a location without revealing
+        // For now, this is a placeholder - would need to track looked-at state
+        Ok(())
+    }
+
+    fn execute_modify_required_hearts_global(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        // Modify required hearts for all live cards in a zone
+        let operation = effect.operation.as_deref().unwrap_or("increase");
+        let _value = effect.value.unwrap_or(1);
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let player = match target {
+            "self" => &mut self.game_state.player1,
+            "opponent" => &mut self.game_state.player2,
+            _ => &mut self.game_state.player1,
+        };
+
+        // For now, just log the operation - would need target_location field
+        eprintln!("Modify required hearts globally for player: {}", operation);
+        Ok(())
+    }
+
+    fn execute_modify_yell_count(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        // Modify yell count (cheer blade/heart count)
+        let operation = effect.operation.as_deref().unwrap_or("subtract");
+        let count = effect.count.unwrap_or(0);
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let _player = match target {
+            "self" => &self.game_state.player1,
+            "opponent" => &self.game_state.player2,
+            _ => &self.game_state.player1,
+        };
+
+        // This would need to modify the cheer blade/heart count
+        // For now, just log the operation
+        match operation {
+            "add" => {
+                eprintln!("Add {} to yell count for player", count);
+            }
+            "subtract" => {
+                eprintln!("Subtract {} from yell count for player", count);
+            }
+            _ => {
+                eprintln!("Unknown modify_yell_count operation: {}", operation);
+            }
+        }
+
+        Ok(())
+    }
+
     /// Resolve a complete ability
     pub fn resolve_ability(&mut self, ability: &Ability) -> Result<(), String> {
         // First, pay the cost if there is one
@@ -516,12 +831,13 @@ impl AbilityResolver {
     }
 
     fn pay_cost(&mut self, cost: &AbilityCost) -> Result<(), String> {
-        match cost.action.as_deref() {
+        eprintln!("PAY_COST: cost_type={:?}, source={:?}, destination={:?}, card_type={:?}", cost.cost_type, cost.source, cost.destination, cost.card_type);
+        match cost.cost_type.as_deref() {
             Some("move_cards") => {
                 // Execute the move action as a cost
                 let effect = AbilityEffect {
                     text: cost.text.clone(),
-                    action: cost.action.clone().unwrap_or_default(),
+                    action: cost.cost_type.clone().unwrap_or_default(),
                     source: cost.source.clone(),
                     destination: cost.destination.clone(),
                     count: cost.count,
@@ -586,6 +902,36 @@ impl Default for AbilityEffect {
             value: None,
             aggregate: None,
             comparison_type: None,
+            choice_options: None,
+            group: None,
+            per_unit_count: None,
+            per_unit_type: None,
+            per_unit_reference: None,
+            group_matching: None,
+            repeat_limit: None,
+            repeat_optional: None,
+            is_further: None,
+            cost_result_reference: None,
+            dynamic_count: None,
+            resource_icon_count: None,
+            placement_order: None,
+            cost_limit: None,
+            unit: None,
+            distinct: None,
+            target_player: None,
+            target_location: None,
+            target_scope: None,
+            target_card_type: None,
+            activation_condition: None,
+            activation_condition_parsed: None,
+            gained_ability: None,
+            ability_text: None,
+            swap_action: None,
+            has_member_swapping: None,
+            group_options: None,
+            card_count: None,
+            use_limit: None,
+            triggers: None,
         }
     }
 }

@@ -9,6 +9,171 @@ use crate::player::Player;
 use crate::turn;
 use crate::game_setup;
 use crate::bot::ai;
+use serde::{Serialize, Deserialize};
+use serde_json;
+use std::fs::File;
+use std::io::Write;
+
+#[derive(Serialize, Deserialize, Clone)]
+struct CardDisplay {
+    card_no: String,
+    name: String,
+    card_type: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct ZoneDisplay {
+    cards: Vec<CardDisplay>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct StageDisplay {
+    left_side: Option<CardDisplay>,
+    center: Option<CardDisplay>,
+    right_side: Option<CardDisplay>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct PlayerDisplay {
+    hand: ZoneDisplay,
+    energy: ZoneDisplay,
+    stage: StageDisplay,
+    live_zone: ZoneDisplay,
+    success_live_card_zone: ZoneDisplay,
+    waitroom_count: usize,
+    main_deck_count: usize,
+    energy_deck_count: usize,
+    stage_blades: u32,
+    stage_hearts: std::collections::HashMap<String, u32>,
+    success_live_score: u32,
+}
+
+#[derive(Serialize, Deserialize)]
+struct GameStateDisplay {
+    turn: u32,
+    phase: String,
+    turn_phase: String,
+    game_result: String,
+    player1: PlayerDisplay,
+    player2: PlayerDisplay,
+    resolution_zone_count: usize,
+    p1_cheer_blade_heart_count: u32,
+    p2_cheer_blade_heart_count: u32,
+    first_attacker: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct ActionDisplay {
+    action_type: String,
+    description: String,
+    card_index: Option<usize>,
+    card_indices: Option<Vec<usize>>,
+    stage_area: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct GameResponse {
+    game_state: GameStateDisplay,
+    actions: Vec<ActionDisplay>,
+    is_finished: bool,
+}
+
+fn card_to_display(card: &crate::card::Card) -> CardDisplay {
+    CardDisplay {
+        card_no: card.card_no.clone(),
+        name: card.name.clone(),
+        card_type: format!("{:?}", card.card_type),
+    }
+}
+
+fn zone_to_display(cards: &[crate::card::Card]) -> ZoneDisplay {
+    ZoneDisplay {
+        cards: cards.iter().map(card_to_display).collect(),
+    }
+}
+
+fn stage_to_display(stage: &crate::zones::Stage) -> StageDisplay {
+    StageDisplay {
+        left_side: stage.left_side.as_ref().map(|c| card_to_display(&c.card)),
+        center: stage.center.as_ref().map(|c| card_to_display(&c.card)),
+        right_side: stage.right_side.as_ref().map(|c| card_to_display(&c.card)),
+    }
+}
+
+fn player_to_display(player: &crate::player::Player) -> PlayerDisplay {
+    let energy_cards: Vec<crate::card::Card> = player.energy_zone.cards.iter().map(|c| c.card.clone()).collect();
+    
+    let stage_blades = player.stage.total_blades();
+    
+    let mut stage_hearts = std::collections::HashMap::new();
+    if let Some(ref m) = player.stage.left_side {
+        if let Some(ref h) = m.card.base_heart {
+            for (color, count) in &h.hearts {
+                *stage_hearts.entry(color.clone()).or_insert(0) += count;
+            }
+        }
+    }
+    if let Some(ref m) = player.stage.center {
+        if let Some(ref h) = m.card.base_heart {
+            for (color, count) in &h.hearts {
+                *stage_hearts.entry(color.clone()).or_insert(0) += count;
+            }
+        }
+    }
+    if let Some(ref m) = player.stage.right_side {
+        if let Some(ref h) = m.card.base_heart {
+            for (color, count) in &h.hearts {
+                *stage_hearts.entry(color.clone()).or_insert(0) += count;
+            }
+        }
+    }
+    
+    let success_live_score: u32 = player.success_live_card_zone.cards.iter()
+        .map(|c| c.score.unwrap_or(0))
+        .sum();
+    
+    PlayerDisplay {
+        hand: zone_to_display(&player.hand.cards),
+        energy: zone_to_display(&energy_cards),
+        stage: stage_to_display(&player.stage),
+        live_zone: zone_to_display(&player.live_card_zone.cards),
+        success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards),
+        waitroom_count: player.waitroom.cards.len(),
+        main_deck_count: player.main_deck.len(),
+        energy_deck_count: player.energy_deck.cards.len(),
+        stage_blades,
+        stage_hearts,
+        success_live_score,
+    }
+}
+
+fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
+    let game_result = match game_state.check_victory() {
+        crate::game_state::GameResult::FirstAttackerWins => "FirstAttackerWins".to_string(),
+        crate::game_state::GameResult::SecondAttackerWins => "SecondAttackerWins".to_string(),
+        crate::game_state::GameResult::Draw => "Draw".to_string(),
+        crate::game_state::GameResult::Ongoing => "Ongoing".to_string(),
+    };
+    
+    let first_attacker = if game_state.player1.is_first_attacker {
+        game_state.player1.id.clone()
+    } else {
+        game_state.player2.id.clone()
+    };
+    
+    GameStateDisplay {
+        turn: game_state.turn_number,
+        phase: format!("{:?}", game_state.current_phase),
+        turn_phase: format!("{:?}", game_state.current_turn_phase),
+        game_result,
+        player1: player_to_display(&game_state.player1),
+        player2: player_to_display(&game_state.player2),
+        resolution_zone_count: game_state.resolution_zone.cards.len(),
+        p1_cheer_blade_heart_count: game_state.player1_cheer_blade_heart_count,
+        p2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
+        first_attacker,
+    }
+}
 
 fn print_game_state(game_state: &GameState) {
     println!("--- Game State ---");
@@ -297,4 +462,209 @@ pub fn run_headless_game() {
     }
     
     println!("Game stopped after {} iterations (max reached)", max_iterations);
+}
+
+pub fn run_interactive_headless() {
+    println!("=== Running Automated Headless Mode ===");
+    println!("This will play through the game automatically and log game states\n");
+    
+    // Load cards
+    let cards_path = std::path::Path::new("../cards/cards.json");
+    let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
+        Ok(cards) => {
+            let mut card_map = std::collections::HashMap::new();
+            for card in cards {
+                card_map.insert(card.card_no.clone(), card);
+            }
+            card_map
+        }
+        Err(e) => {
+            eprintln!("Failed to load cards: {}", e);
+            return;
+        }
+    };
+    
+    // Load decks
+    let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
+        Ok(decks) => decks,
+        Err(e) => {
+            eprintln!("Failed to load decks: {}", e);
+            return;
+        }
+    };
+    
+    // Use first deck for both players
+    let deck1 = &deck_lists[0];
+    let deck2 = &deck_lists[0];
+    
+    let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
+    let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
+    
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
+        Ok(mut deck) => {
+            deck.shuffle_main_deck();
+            deck.shuffle_energy_deck();
+            deck
+        }
+        Err(e) => {
+            eprintln!("Failed to build deck for Player 1: {}", e);
+            return;
+        }
+    };
+    
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
+        Ok(mut deck) => {
+            deck.shuffle_main_deck();
+            deck.shuffle_energy_deck();
+            deck
+        }
+        Err(e) => {
+            eprintln!("Failed to build deck for Player 2: {}", e);
+            return;
+        }
+    };
+    
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
+    
+    // Run multiple games for 10 seconds
+    let start_time = std::time::Instant::now();
+    let duration = std::time::Duration::from_secs(10);
+    let mut game_count = 0;
+    let mut total_turns = 0;
+    
+    while start_time.elapsed() < duration {
+        game_count += 1;
+        
+        let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+        let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+        
+        // Clone decks for each game
+        let mut p1_deck = player1_deck.clone();
+        let mut p2_deck = player2_deck.clone();
+        p1_deck.shuffle_main_deck();
+        p1_deck.shuffle_energy_deck();
+        p2_deck.shuffle_main_deck();
+        p2_deck.shuffle_energy_deck();
+        
+        player1.set_main_deck(p1_deck.main_deck);
+        player1.set_energy_deck(p1_deck.energy_deck);
+        
+        player2.set_main_deck(p2_deck.main_deck);
+        player2.set_energy_deck(p2_deck.energy_deck);
+        
+        let mut game_state = GameState::new(player1, player2);
+        game_setup::setup_game(&mut game_state);
+        
+        // Automated game loop
+        let mut turn_count = 0;
+        let mut last_turn_number = 0;
+        let mut stuck_counter = 0;
+        
+        loop {
+            turn_count += 1;
+            
+            // Check if game is finished
+            let game_result = game_state.check_victory();
+            if game_result != crate::game_state::GameResult::Ongoing {
+                break;
+            }
+            
+            // Detect stuck state
+            if game_state.turn_number == last_turn_number {
+                stuck_counter += 1;
+                if stuck_counter > 50 {
+                    break;
+                }
+            } else {
+                stuck_counter = 0;
+                last_turn_number = game_state.turn_number;
+            }
+            
+            // Auto-advance automatic phases
+            match game_state.current_phase {
+                crate::game_state::Phase::Active |
+                crate::game_state::Phase::Energy |
+                crate::game_state::Phase::Draw |
+                crate::game_state::Phase::FirstAttackerPerformance |
+                crate::game_state::Phase::SecondAttackerPerformance |
+                crate::game_state::Phase::LiveVictoryDetermination => {
+                    turn::TurnEngine::advance_phase(&mut game_state);
+                    continue;
+                }
+                _ => {}
+            }
+            
+            // Get available actions and pick random one
+            let actions = game_setup::generate_possible_actions(&game_state);
+            
+            if actions.is_empty() {
+                turn::TurnEngine::advance_phase(&mut game_state);
+                continue;
+            }
+            
+            // Pick random available action
+            let random_idx = rand::random::<usize>() % actions.len();
+            let action = &actions[random_idx];
+            execute_action_and_log(&mut game_state, action);
+        }
+        
+        total_turns += turn_count;
+    }
+    
+    let avg_turns = if game_count > 0 { total_turns as f64 / game_count as f64 } else { 0.0 };
+    println!("Games played: {}", game_count);
+    println!("Average turns per game: {:.2}", avg_turns);
+}
+
+fn execute_action_and_log(game_state: &mut GameState, action: &crate::game_setup::Action) {
+    let result = turn::TurnEngine::execute_main_phase_action(
+        game_state,
+        &action.action_type,
+        action.parameters.as_ref().and_then(|p| p.card_index),
+        action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
+        action.parameters.as_ref().and_then(|p| p.stage_area.clone()),
+    );
+    
+    match result {
+        Ok(_) => {
+            // Auto-advance automatic phases
+            auto_advance_automatic_phases(game_state);
+        }
+        Err(e) => {
+            println!("Error executing action {}: {}", action.description, e);
+        }
+    }
+}
+
+fn auto_advance_automatic_phases(game_state: &mut GameState) {
+    loop {
+        let current_phase = game_state.current_phase.clone();
+        match current_phase {
+            crate::game_state::Phase::Active |
+            crate::game_state::Phase::Energy |
+            crate::game_state::Phase::Draw |
+            crate::game_state::Phase::FirstAttackerPerformance |
+            crate::game_state::Phase::SecondAttackerPerformance |
+            crate::game_state::Phase::LiveVictoryDetermination => {
+                turn::TurnEngine::advance_phase(game_state);
+            }
+            _ => break,
+        }
+    }
+}
+
+fn output_state_and_actions(game_state: &GameState) {
+    // Only print concise summary to avoid massive output
+    println!("Turn {} | Phase: {:?} | P1 cards: {}/{}/{} | P2 cards: {}/{}/{} | Actions: {}", 
+        game_state.turn_number, 
+        game_state.current_phase,
+        game_state.player1.hand.len(),
+        game_state.player1.stage.total_blades(),
+        game_state.player1.success_live_card_zone.len(),
+        game_state.player2.hand.len(),
+        game_state.player2.stage.total_blades(),
+        game_state.player2.success_live_card_zone.len(),
+        game_setup::generate_possible_actions(game_state).len()
+    );
 }

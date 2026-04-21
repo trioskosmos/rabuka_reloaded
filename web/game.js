@@ -9,14 +9,16 @@ class MenuScene extends Phaser.Scene {
 
         // Title
         this.add.text(w / 2, h * 0.2, 'Rabuka Card Game', {
-            fontSize: '48px',
+            fontSize: '52px',
             color: '#e94560',
-            fontStyle: 'bold'
+            fontStyle: 'bold',
+            shadow: { blur: 15, color: '#e94560', fill: true }
         }).setOrigin(0.5);
 
         this.add.text(w / 2, h * 0.3, 'Love Live! Rabuka', {
-            fontSize: '24px',
-            color: '#ffffff'
+            fontSize: '28px',
+            color: '#ffffff',
+            fontStyle: 'italic'
         }).setOrigin(0.5);
 
         // Deck selection
@@ -30,24 +32,30 @@ class MenuScene extends Phaser.Scene {
 
         decks.forEach((deck, i) => {
             const btn = this.add.text(w / 2, h * 0.52 + i * 40, deck, {
-                fontSize: '18px',
+                fontSize: '20px',
                 color: '#ffffff',
-                backgroundColor: '#0f3460',
-                padding: { x: 20, y: 10 }
+                backgroundColor: '#1a1a2e',
+                padding: { x: 25, y: 12 },
+                border: '2px solid #4a5568',
+                borderRadius: 8
             }).setOrigin(0.5);
 
             btn.setInteractive({ useHandCursor: true })
                .on('pointerover', () => {
-                   btn.setStyle({ backgroundColor: '#1a1a2e', color: '#e94560' });
+                   btn.setStyle({ backgroundColor: '#2d3748', color: '#e94560', border: '2px solid #e94560' });
                })
                .on('pointerout', () => {
-                   btn.setStyle({ backgroundColor: '#0f3460', color: '#ffffff' });
+                   if (this.selectedDeck === deck) {
+                       btn.setStyle({ backgroundColor: '#e94560', color: '#ffffff', border: '2px solid #e94560' });
+                   } else {
+                       btn.setStyle({ backgroundColor: '#1a1a2e', color: '#ffffff', border: '2px solid #4a5568' });
+                   }
                })
                .on('pointerdown', () => {
                    this.selectedDeck = deck;
                    // Update selection visual
-                   this.deckButtons.forEach(b => b.setStyle({ backgroundColor: '#0f3460', color: '#ffffff' }));
-                   btn.setStyle({ backgroundColor: '#e94560', color: '#ffffff' });
+                   this.deckButtons.forEach(b => b.setStyle({ backgroundColor: '#1a1a2e', color: '#ffffff', border: '2px solid #4a5568' }));
+                   btn.setStyle({ backgroundColor: '#e94560', color: '#ffffff', border: '2px solid #e94560' });
                });
 
             if (!this.deckButtons) this.deckButtons = [];
@@ -55,20 +63,23 @@ class MenuScene extends Phaser.Scene {
         });
 
         // Select first deck by default
-        this.deckButtons[0].setStyle({ backgroundColor: '#e94560', color: '#ffffff' });
+        this.deckButtons[0].setStyle({ backgroundColor: '#e94560', color: '#ffffff', border: '2px solid #e94560' });
 
         // Start button
         const startBtn = this.add.text(w / 2, h * 0.85, 'Start Game', {
-            fontSize: '24px',
+            fontSize: '28px',
             color: '#ffffff',
             backgroundColor: '#e94560',
-            padding: { x: 30, y: 15 },
-            fontStyle: 'bold'
+            padding: { x: 40, y: 18 },
+            fontStyle: 'bold',
+            border: '3px solid #ff6b6b',
+            borderRadius: 12,
+            shadow: { blur: 10, color: '#e94560', fill: true }
         }).setOrigin(0.5);
 
         startBtn.setInteractive({ useHandCursor: true })
-                .on('pointerover', () => startBtn.setStyle({ backgroundColor: '#ff6b6b' }))
-                .on('pointerout', () => startBtn.setStyle({ backgroundColor: '#e94560' }))
+                .on('pointerover', () => startBtn.setStyle({ backgroundColor: '#ff6b6b', border: '3px solid #ff6b6b' }))
+                .on('pointerout', () => startBtn.setStyle({ backgroundColor: '#e94560', border: '3px solid #ff6b6b' }))
                 .on('pointerdown', () => {
                     this.scene.start('GameScene', { deck: this.selectedDeck });
                 });
@@ -86,10 +97,11 @@ class GameScene extends Phaser.Scene {
         this.loadingImages = new Set();
         this.pendingImageUpdates = new Map(); // Map imageKey to array of containers to update
         this.cardImageMap = new Map(); // Map card_no to image file name
+        this.cardContainers = [];
     }
 
     preload() {
-        // Load card data
+        // Load card data only - images will be loaded on-demand
         this.load.json('cardsData', '/cards/cards.json')
             .on('complete', () => {
                 const cardsData = this.cache.json.get('cardsData');
@@ -105,23 +117,7 @@ class GameScene extends Phaser.Scene {
                     this.cardImageMap.set(cardNo, imgFileName);
                 }
                 
-                // Preload card images using the mapped file names
-                const cardNos = Object.keys(cardsData);
-                const batchSize = 100;
-                let loadedCount = 0;
-                
-                for (let i = 0; i < cardNos.length; i += batchSize) {
-                    const batch = cardNos.slice(i, i + batchSize);
-                    batch.forEach(cardNo => {
-                        const imgFileName = this.cardImageMap.get(cardNo);
-                        if (imgFileName) {
-                            this.load.image(cardNo, `/img/cards_webp/${imgFileName}`);
-                            loadedCount++;
-                        }
-                    });
-                }
-                
-                console.log('Queued', loadedCount, 'card images for loading');
+                console.log('Card image mapping created, images will load on-demand');
             });
     }
 
@@ -206,29 +202,29 @@ class GameScene extends Phaser.Scene {
         
         this.zones = {
             // Player 2 (opponent - top)
-            p2Hand: { x: 20, y: headerHeight + 15, w: playAreaWidth - 40, h: 80, label: 'Opponent Hand', color: 0x4a5568 },
-            p2Stage: { x: 20, y: headerHeight + 105, w: playAreaWidth - 40, h: 120, label: 'Opponent Stage', color: 0x2d3748 },
-            p2Live: { x: 20, y: headerHeight + 235, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x553c9a },
-            p2Success: { x: 20 + playAreaWidth * 0.34, y: headerHeight + 235, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x553c9a },
-            p2Energy: { x: 20 + playAreaWidth * 0.56, y: headerHeight + 235, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x4a5568 },
+            p2Hand: { x: 20, y: headerHeight + 15, w: playAreaWidth - 40, h: 80, label: 'Opponent Hand', color: 0x2d3748, borderColor: 0x4a5568 },
+            p2Stage: { x: 20, y: headerHeight + 105, w: playAreaWidth - 40, h: 120, label: 'Opponent Stage', color: 0x1a202c, borderColor: 0x718096 },
+            p2Live: { x: 20, y: headerHeight + 235, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
+            p2Success: { x: 20 + playAreaWidth * 0.34, y: headerHeight + 235, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
+            p2Energy: { x: 20 + playAreaWidth * 0.56, y: headerHeight + 235, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 },
             
             // Player 1 (active - bottom)
-            p1Hand: { x: 20, y: h - 100, w: playAreaWidth - 40, h: 80, label: 'Your Hand', color: 0x48bb78 },
-            p1Stage: { x: 20, y: h - 230, w: playAreaWidth - 40, h: 120, label: 'Your Stage', color: 0x2d3748 },
-            p1Live: { x: 20, y: h - 310, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x553c9a },
-            p1Success: { x: 20 + playAreaWidth * 0.34, y: h - 310, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x553c9a },
-            p1Energy: { x: 20 + playAreaWidth * 0.56, y: h - 310, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x4a5568 }
+            p1Hand: { x: 20, y: h - 100, w: playAreaWidth - 40, h: 80, label: 'Your Hand', color: 0x276749, borderColor: 0x48bb78 },
+            p1Stage: { x: 20, y: h - 230, w: playAreaWidth - 40, h: 120, label: 'Your Stage', color: 0x1a202c, borderColor: 0x718096 },
+            p1Live: { x: 20, y: h - 310, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
+            p1Success: { x: 20 + playAreaWidth * 0.34, y: h - 310, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
+            p1Energy: { x: 20 + playAreaWidth * 0.56, y: h - 310, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 }
         };
         
         // Draw zones
         for (const [key, zone] of Object.entries(this.zones)) {
             // Zone background with slight transparency
-            this.zoneGraphics.fillStyle(zone.color, 0.75);
-            this.zoneGraphics.fillRoundedRect(zone.x, zone.y, zone.w, zone.h, 10);
+            this.zoneGraphics.fillStyle(zone.color, 0.85);
+            this.zoneGraphics.fillRoundedRect(zone.x, zone.y, zone.w, zone.h, 12);
             
             // Zone border
-            this.zoneGraphics.lineStyle(3, 0x718096, 1);
-            this.zoneGraphics.strokeRoundedRect(zone.x, zone.y, zone.w, zone.h, 10);
+            this.zoneGraphics.lineStyle(3, zone.borderColor, 1);
+            this.zoneGraphics.strokeRoundedRect(zone.x, zone.y, zone.w, zone.h, 12);
             
             // Zone label with background
             const labelBg = this.zoneGraphics.fillStyle(0x1a202c, 0.9);
@@ -249,6 +245,20 @@ class GameScene extends Phaser.Scene {
             fontStyle: 'bold'
         });
         this.zoneLabels.push(this.deckCounters);
+        
+        // Add zone counter text objects
+        this.zoneCounters = {};
+        for (const [key, zone] of Object.entries(this.zones)) {
+            const counter = this.add.text(zone.x + zone.w - 10, zone.y + zone.h - 10, '0', {
+                fontSize: '16px',
+                color: '#fff',
+                fontStyle: 'bold',
+                backgroundColor: '#000000',
+                padding: { x: 6, y: 3 }
+            }).setOrigin(1, 1);
+            this.zoneCounters[key] = counter;
+            this.zoneLabels.push(counter);
+        }
     }
 
     createUI() {
@@ -381,23 +391,68 @@ class GameScene extends Phaser.Scene {
         this.turnText.setText(`Turn: ${this.gameState.turn}`);
         this.phaseText.setText(`Phase: ${this.gameState.phase}`);
         
-        // Display cards
-        this.displayHand('p1Hand', this.gameState.player1.hand.cards, true);
-        this.displayHand('p2Hand', this.gameState.player2.hand.cards, false);
-        this.displayStage('p1Stage', this.gameState.player1.stage, true);
-        this.displayStage('p2Stage', this.gameState.player2.stage, false);
-        this.displayZone('p1Live', this.gameState.player1.live_zone.cards);
-        this.displayZone('p1Success', this.gameState.player1.success_live_card_zone.cards);
-        this.displayZone('p1Energy', this.gameState.player1.energy.cards);
-        this.displayZone('p2Live', this.gameState.player2.live_zone.cards);
-        this.displayZone('p2Success', this.gameState.player2.success_live_card_zone.cards);
-        this.displayZone('p2Energy', this.gameState.player2.energy.cards);
+        // Display cards with null checks
+        if (this.gameState.player1?.hand?.cards) {
+            this.displayHand('p1Hand', this.gameState.player1.hand.cards, true);
+        }
+        if (this.gameState.player2?.hand?.cards) {
+            this.displayHand('p2Hand', this.gameState.player2.hand.cards, false);
+        }
+        if (this.gameState.player1?.stage) {
+            this.displayStage('p1Stage', this.gameState.player1.stage, true);
+        }
+        if (this.gameState.player2?.stage) {
+            this.displayStage('p2Stage', this.gameState.player2.stage, false);
+        }
+        if (this.gameState.player1?.live_zone?.cards) {
+            this.displayZone('p1Live', this.gameState.player1.live_zone.cards);
+        }
+        if (this.gameState.player1?.success_live_card_zone?.cards) {
+            this.displayZone('p1Success', this.gameState.player1.success_live_card_zone.cards);
+        }
+        if (this.gameState.player1?.energy?.cards) {
+            this.displayZone('p1Energy', this.gameState.player1.energy.cards);
+        }
+        if (this.gameState.player2?.live_zone?.cards) {
+            this.displayZone('p2Live', this.gameState.player2.live_zone.cards);
+        }
+        if (this.gameState.player2?.success_live_card_zone?.cards) {
+            this.displayZone('p2Success', this.gameState.player2.success_live_card_zone.cards);
+        }
+        if (this.gameState.player2?.energy?.cards) {
+            this.displayZone('p2Energy', this.gameState.player2.energy.cards);
+        }
         
         // Update deck and waitroom counters
         if (this.deckCounters) {
             this.deckCounters.setText(
                 `Deck: ${this.gameState.player1.main_deck_count} | Energy Deck: ${this.gameState.player1.energy_deck_count} | Waitroom: ${this.gameState.player1.waitroom_count}`
             );
+        }
+        
+        // Update zone counters
+        if (this.zoneCounters) {
+            this.zoneCounters.p1Hand?.setText(this.gameState.player1?.hand?.cards?.length || 0);
+            this.zoneCounters.p2Hand?.setText(this.gameState.player2?.hand?.cards?.length || 0);
+            this.zoneCounters.p1Live?.setText(this.gameState.player1?.live_zone?.cards?.length || 0);
+            this.zoneCounters.p1Success?.setText(this.gameState.player1?.success_live_card_zone?.cards?.length || 0);
+            this.zoneCounters.p1Energy?.setText(this.gameState.player1?.energy?.cards?.length || 0);
+            this.zoneCounters.p2Live?.setText(this.gameState.player2?.live_zone?.cards?.length || 0);
+            this.zoneCounters.p2Success?.setText(this.gameState.player2?.success_live_card_zone?.cards?.length || 0);
+            this.zoneCounters.p2Energy?.setText(this.gameState.player2?.energy?.cards?.length || 0);
+            
+            // Count stage cards
+            let p1StageCount = 0;
+            if (this.gameState.player1?.stage?.left_side?.card_no) p1StageCount++;
+            if (this.gameState.player1?.stage?.center?.card_no) p1StageCount++;
+            if (this.gameState.player1?.stage?.right_side?.card_no) p1StageCount++;
+            this.zoneCounters.p1Stage?.setText(p1StageCount);
+            
+            let p2StageCount = 0;
+            if (this.gameState.player2?.stage?.left_side?.card_no) p2StageCount++;
+            if (this.gameState.player2?.stage?.center?.card_no) p2StageCount++;
+            if (this.gameState.player2?.stage?.right_side?.card_no) p2StageCount++;
+            this.zoneCounters.p2Stage?.setText(p2StageCount);
         }
     }
 
@@ -566,7 +621,17 @@ class GameScene extends Phaser.Scene {
                     .on('loaderror', () => {
                         this.loadingImages.delete(imageKey);
                         this.pendingImageUpdates.delete(imageKey);
-                        console.error('Failed to load image:', imageKey, 'as', imgFileName);
+                        console.warn('Failed to load image:', imageKey, 'as', imgFileName, '- will show placeholder');
+                        // Update failed containers to show permanent placeholder
+                        const containers = this.pendingImageUpdates.get(imageKey) || [];
+                        containers.forEach(c => {
+                            c.each(child => {
+                                if (child.type === 'Text') {
+                                    child.setText(card.name || card.card_no || '?');
+                                    child.setStyle({ color: '#ff6b6b' }); // Red color for failed loads
+                                }
+                            });
+                        });
                     });
                 this.load.start();
             }

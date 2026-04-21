@@ -105,16 +105,12 @@ pub fn run_ability_test() {
         });
     
     if let Some(debut_card) = debut_card_from_all {
-        println!("🔍 Found card with DEBUT trigger: {} ({})", debut_card.name, debut_card.card_no);
         // Add it to hand
         game_state.player1.hand.cards.push(debut_card.clone());
     } else {
-        println!("❌ No cards with DEBUT trigger found in all cards");
         return;
     }
     
-    println!("\n📋 Player 1 hand has {} cards", game_state.player1.hand.cards.len());
-    println!("⚡ Player 1 energy: {}", game_state.player1.energy_zone.cards.len());
     
     // Find a card with DEBUT trigger in hand
     let debut_card = game_state.player1.hand.cards.iter().enumerate().find(|(_, c)| {
@@ -124,7 +120,6 @@ pub fn run_ability_test() {
     
     // Try to play the first member card to stage
     if let Some((idx, card)) = debut_card {
-        println!("\n🎴 Playing card {} to stage: {} (has DEBUT ability)", idx, card.name);
         
         match turn::TurnEngine::execute_main_phase_action(
             &mut game_state,
@@ -134,19 +129,12 @@ pub fn run_ability_test() {
             Some("center".to_string())
         ) {
             Ok(_) => {
-                println!("✅ Card played successfully");
             }
             Err(e) => {
-                println!("❌ Failed to play card: {}", e);
             }
         }
     } else {
-        println!("❌ No member cards with DEBUT ability in hand");
-        println!("   Hand cards: {}", game_state.player1.hand.cards.iter()
-            .map(|c| format!("{} ({})", c.name, c.abilities.len()))
-            .collect::<Vec<_>>()
-            .join(", "));
+        // No member cards with DEBUT ability in hand
     }
     
-    println!("\n🏁 Test complete");
 }
