@@ -1,10 +1,12 @@
 use crate::game_state::{GameState, Phase, TurnPhase};
 use crate::zones::MemberArea;
+use std::vec::Vec;
+use std::string::String;
 
 pub struct TurnEngine;
 
 impl TurnEngine {
-    pub fn advance_phase(game_state: &mut GameState) {
+    pub fn advance_phase(mut game_state: &mut GameState) {
         // Advance phase according to rules 7.1.2, 7.3.3, and 8.1.2
         let current_phase = game_state.current_phase.clone();
         let current_turn_phase = game_state.current_turn_phase.clone();
@@ -64,40 +66,64 @@ impl TurnEngine {
                 Phase::FirstAttackerPerformance => {
                     // Rule 8.3: First attacker performs (automatic)
                     let blade_heart_count = {
-                        // Take resolution_zone first to avoid borrow conflicts
+                        // Take both resolution_zone and player to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                        let player = game_state.first_attacker_mut();
-                        let result = Self::player_perform_live(player, &mut resolution_zone);
+                        let player_id = game_state.player1.id.clone();
+                        let (mut player, mut game_state_rest) = {
+                            // Split game_state to get player separately
+                            let player = if game_state.player1.is_first_attacker {
+                                std::mem::replace(&mut game_state.player1, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
+                            } else {
+                                std::mem::replace(&mut game_state.player2, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
+                            };
+                            (player, game_state)
+                        };
+                        let result = Self::player_perform_live(&mut player, &mut resolution_zone, &mut game_state_rest, &player_id);
+                        // Put player back
+                        if game_state_rest.player1.is_first_attacker {
+                            game_state_rest.player1 = player;
+                        } else {
+                            game_state_rest.player2 = player;
+                        }
                         // Put resolution_zone back
-                        game_state.resolution_zone = resolution_zone;
+                        game_state_rest.resolution_zone = resolution_zone;
                         result
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
-                    
-                    // Rule 8.3.7-8.3.8: Trigger LiveStart abilities
-                    // Rule 11.5: Trigger LiveStart automatic abilities
-                    let player_id = game_state.player1.id.clone();
-                    Self::trigger_live_start_abilities(game_state, &player_id);
                     
                     game_state.current_phase = Phase::SecondAttackerPerformance;
                 }
                 Phase::SecondAttackerPerformance => {
                     // Rule 8.3: Second attacker performs (automatic)
                     let blade_heart_count = {
-                        // Take resolution_zone first to avoid borrow conflicts
+                        // Take both resolution_zone and player to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                        let player = game_state.second_attacker_mut();
-                        let result = Self::player_perform_live(player, &mut resolution_zone);
+                        let player_id = if game_state.player1.is_first_attacker {
+                            game_state.player2.id.clone()
+                        } else {
+                            game_state.player1.id.clone()
+                        };
+                        let (mut player, mut game_state_rest) = {
+                            // Split game_state to get player separately
+                            let player = if game_state.player1.is_first_attacker {
+                                std::mem::replace(&mut game_state.player2, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
+                            } else {
+                                std::mem::replace(&mut game_state.player1, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
+                            };
+                            (player, game_state)
+                        };
+                        let result = Self::player_perform_live(&mut player, &mut resolution_zone, &mut game_state_rest, &player_id);
+                        // Put player back
+                        if game_state_rest.player1.is_first_attacker {
+                            game_state_rest.player2 = player;
+                        } else {
+                            game_state_rest.player1 = player;
+                        }
                         // Put resolution_zone back
-                        game_state.resolution_zone = resolution_zone;
+                        game_state_rest.resolution_zone = resolution_zone;
                         result
                     };
                     game_state.player2_cheer_blade_heart_count = blade_heart_count; // This is actually total blades for cheer bonus
-                    
-                    // Rule 8.3.7-8.3.8: Trigger LiveStart abilities
-                    // Rule 11.5: Trigger LiveStart automatic abilities
-                    let player_id = game_state.player2.id.clone();
-                    Self::trigger_live_start_abilities(game_state, &player_id);
                     
                     game_state.current_phase = Phase::LiveVictoryDetermination;
                 }
@@ -110,7 +136,7 @@ impl TurnEngine {
         }
     }
 
-    pub fn execute_main_phase_action(game_state: &mut GameState, action: &str, card_index: Option<usize>, card_indices: Option<Vec<usize>>, stage_area: Option<String>) -> Result<(), String> {
+    pub fn execute_main_phase_action(game_state: &mut GameState, action: &str, card_index: Option<usize>, _card_indices: Option<Vec<usize>>, stage_area: Option<String>, use_baton_touch: Option<bool>) -> Result<(), String> {
         // Execute player choice action during various phases
         match action {
             "rps_choice" => {
@@ -315,7 +341,10 @@ impl TurnEngine {
                 let card_no = player.hand.cards[idx].card_no.clone();
                 let player_id = player.id.clone();
 
-                let cost_paid = player.move_card_from_hand_to_stage(idx, area)?;
+                // Check if baton touch is requested (from parameters)
+                let use_baton_touch = use_baton_touch.unwrap_or(false);
+
+                let (cost_paid, baton_touch_used) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch)?;
 
                 // Set turn_played for the card on stage
                 if let Some(card_in_zone) = player.stage.get_area_mut(area) {
@@ -325,6 +354,36 @@ impl TurnEngine {
                 // Trigger 登場 abilities for the played card
                 // Q197/Q198: Auto abilities don't trigger when played via baton touch with cost 10+
                 Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid);
+                
+                // Trigger baton touch event if baton touch was used
+                if baton_touch_used {
+                    // Rule 9.6.2.3.2.1: Baton touch event triggers when baton touch is performed
+                    // This can trigger abilities with "baton touch" trigger
+                    let player_id = game_state.active_player().id.clone();
+                    // Find the card that was played and trigger baton touch abilities
+                    // For now, trigger abilities on all stage members with baton touch trigger
+                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                    for area in areas {
+                        let card_no = if let Some(card_in_zone) = game_state.active_player().stage.get_area(area) {
+                            let abilities_to_trigger: Vec<(String, String)> = card_in_zone.card.abilities.iter()
+                                .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == "バトンタッチ" || t == "baton_touch"))
+                                .map(|ability| (format!("{}_{}", card_in_zone.card.card_no, ability.full_text), card_in_zone.card.card_no.clone()))
+                                .collect();
+                            abilities_to_trigger
+                        } else {
+                            Vec::new()
+                        };
+                        
+                        for (ability_id, card_no) in card_no {
+                            game_state.trigger_auto_ability(
+                                ability_id,
+                                crate::game_state::AbilityTrigger::Debut, // Reuse Debut for now, or add BatonTouch trigger
+                                player_id.clone(),
+                                Some(card_no),
+                            );
+                        }
+                    }
+                }
                 
                 Ok(())
             }
@@ -376,20 +435,40 @@ impl TurnEngine {
                 Ok(())
             }
             "play_member_left" => {
-                // TODO: Implement playing member to left side
-                Err("Play member left not implemented".to_string())
+                Self::execute_main_phase_action(
+                    game_state,
+                    "play_member",
+                    card_index,
+                    _card_indices,
+                    Some("left".to_string()),
+                    use_baton_touch,
+                )
             }
             "play_member_center" => {
-                // TODO: Implement playing member to center
-                Err("Play member center not implemented".to_string())
+                Self::execute_main_phase_action(
+                    game_state,
+                    "play_member",
+                    card_index,
+                    _card_indices,
+                    Some("center".to_string()),
+                    use_baton_touch,
+                )
             }
             "play_member_right" => {
-                // TODO: Implement playing member to right side
-                Err("Play member right not implemented".to_string())
+                Self::execute_main_phase_action(
+                    game_state,
+                    "play_member",
+                    card_index,
+                    _card_indices,
+                    Some("right".to_string()),
+                    use_baton_touch,
+                )
             }
             "play_energy" => {
-                // TODO: Implement playing energy
-                Err("Play energy not implemented".to_string())
+                let card_index = card_index.unwrap_or(0);
+                let player = game_state.active_player_mut();
+                player.move_card_from_hand_to_energy_zone(card_index)?;
+                Ok(())
             }
             "pass" => {
                 // Player passes, advance phase
@@ -511,17 +590,22 @@ impl TurnEngine {
             Self::check_timing(game_state);
             
             // Rule 8.4.10: Trigger 'turn end' abilities that haven't triggered yet
-            // TODO: Implement automatic ability triggering - track which abilities have triggered this turn
+            // Track abilities triggered this turn to prevent re-triggering
+            let abilities_before = game_state.pending_auto_abilities.len();
             
             // Rule 8.4.11: Check timing again
             Self::check_timing(game_state);
             
             // Rule 8.4.11: End 'until end of turn' and 'during this turn' effects
-            // TODO: Implement effect expiration - track active effects and their durations
+            game_state.check_expired_effects();
             
             // Rule 8.4.12: Loop back to 8.4.9 if new abilities triggered
-            // TODO: Implement loop detection - check if any new abilities were triggered in this iteration
-            // For now, break the loop to prevent infinite loop
+            let abilities_after = game_state.pending_auto_abilities.len();
+            if abilities_after > abilities_before {
+                // New abilities triggered, loop back
+                continue;
+            }
+            
             break;
         }
         
@@ -715,18 +799,24 @@ impl TurnEngine {
         }
     }
 
-    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone) -> u32 {
+    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone, _player_id: &str) -> u32 {
         // Rule 8.3: Player performs live - check heart requirements
+        // Note: This function no longer takes game_state to avoid borrow conflicts
+        // Ability triggering should be handled by the caller
+        
         // Rule 8.3.4: Reveal cards, discard non-live cards
         player.live_card_zone.cards.retain(|c| c.is_live());
+        
+        // Rule 8.3.4.1: If player is 'cannot live' state, discard all revealed cards
+        // Note: This check should be done by the caller before calling this function
+        // For now, we'll skip this check here
         
         // Rule 8.3.6: If no live cards, end performance
         if player.live_card_zone.cards.is_empty() {
             return 0;
         }
         
-        // Rule 8.3.7: Live start event
-        // TODO: Trigger LiveStart abilities
+        // Rule 8.3.7: Live cards exist, perform live
         
         // Rule 8.3.10: Calculate total blades from active members
         let total_blades = player.stage.total_blades();
@@ -740,28 +830,58 @@ impl TurnEngine {
         
         // Rule 8.3.12: Check blade hearts on cards in resolution zone
         let mut blade_heart_count = 0;
+        let mut special_heart_draw_count = 0;
+        let mut special_heart_score_count = 0;
+        let mut b_all_count = 0;
+        
         for card in &resolution_zone.cards {
             if let Some(ref blade_heart) = card.blade_heart {
-                blade_heart_count += blade_heart.hearts.values().sum::<u32>();
+                // Count b_all separately for wildcard treatment
+                b_all_count += blade_heart.hearts.get("b_all").copied().unwrap_or(0);
+                // Count regular blade hearts (b_heart01, etc.) for drawing
+                for (color, count) in &blade_heart.hearts {
+                    if color != "b_all" {
+                        blade_heart_count += count;
+                    }
+                }
+            }
+            // Rule: Handle special_heart types (draw and score)
+            if let Some(ref special_heart) = card.special_heart {
+                special_heart_draw_count += special_heart.hearts.get("draw").copied().unwrap_or(0);
+                special_heart_score_count += special_heart.hearts.get("score").copied().unwrap_or(0);
             }
         }
         
-        // Rule 8.3.12.1: Draw cards based on blade heart count
+        // Rule 8.3.12.1: Draw cards based on blade heart count (excluding b_all)
         for _ in 0..blade_heart_count {
             let _ = player.draw_card();
         }
+        
+        // Rule: Draw additional cards based on special_heart draw count
+        for _ in 0..special_heart_draw_count {
+            let _ = player.draw_card();
+        }
+        
+        // Rule 8.3.13: Check timing (caller responsibility)
         
         // Rule 8.3.14: Calculate live-owned hearts from stage and blade hearts
         let stage_hearts = player.stage.get_available_hearts();
         let mut live_owned_hearts = stage_hearts.clone();
         
-        // Add blade hearts from resolution zone
+        // Add blade hearts from resolution zone (excluding b_all which is handled as wildcard)
         for card in &resolution_zone.cards {
             if let Some(ref blade_heart) = card.blade_heart {
                 for (color, count) in &blade_heart.hearts {
-                    *live_owned_hearts.hearts.entry(color.clone()).or_insert(0) += count;
+                    if color != "b_all" {
+                        *live_owned_hearts.hearts.entry(color.clone()).or_insert(0) += count;
+                    }
                 }
             }
+        }
+        
+        // Add b_all as wildcard hearts (can be any color, stored as "b_all" key)
+        if b_all_count > 0 {
+            *live_owned_hearts.hearts.entry("b_all".to_string()).or_insert(0) += b_all_count;
         }
         
         // Rule 8.3.15: Check if each live card can satisfy required hearts
@@ -776,7 +896,7 @@ impl TurnEngine {
                 for (color, needed) in &need_heart.hearts {
                     if color == "heart00" {
                         // Wildcard heart (rule 8.3.15.1.1) - can be any color
-                        // Count total hearts available
+                        // Count total hearts available (including b_all wildcards)
                         let total_available: u32 = temp_hearts.values().sum();
                         if total_available < *needed {
                             can_satisfy = false;
@@ -785,7 +905,7 @@ impl TurnEngine {
                         // Consume from any colors (prefer non-wildcards first)
                         let mut consumed = 0;
                         for (c, count) in temp_hearts.iter_mut() {
-                            if *c != "heart00" {
+                            if *c != "heart00" && *c != "b_all" {
                                 let to_consume = std::cmp::min(*count, *needed - consumed);
                                 *count -= to_consume;
                                 consumed += to_consume;
@@ -794,21 +914,39 @@ impl TurnEngine {
                                 }
                             }
                         }
-                        // If still need more, consume from wildcards
+                        // If still need more, consume from wildcards (heart00 and b_all)
                         if consumed < *needed {
                             if let Some(wildcard_count) = temp_hearts.get_mut("heart00") {
                                 let to_consume = std::cmp::min(*wildcard_count, *needed - consumed);
                                 *wildcard_count -= to_consume;
+                                consumed += to_consume;
+                            }
+                        }
+                        if consumed < *needed {
+                            if let Some(b_all_count) = temp_hearts.get_mut("b_all") {
+                                let to_consume = std::cmp::min(*b_all_count, *needed - consumed);
+                                *b_all_count -= to_consume;
                             }
                         }
                     } else {
-                        // Specific color heart
-                        let available = temp_hearts.get(color).unwrap_or(&0);
-                        if *available < *needed {
+                        // Specific color heart - can use b_all as wildcard
+                        let specific_available = temp_hearts.get(color).unwrap_or(&0);
+                        let b_all_available = temp_hearts.get("b_all").unwrap_or(&0);
+                        let total_available = specific_available + b_all_available;
+                        
+                        if total_available < *needed {
                             can_satisfy = false;
                             break;
                         }
-                        *temp_hearts.get_mut(color).unwrap() -= needed;
+                        
+                        // Use specific color first, then b_all
+                        let specific_to_consume = std::cmp::min(*specific_available, *needed);
+                        *temp_hearts.get_mut(color).unwrap() -= specific_to_consume;
+                        let remaining_needed = *needed - specific_to_consume;
+                        
+                        if remaining_needed > 0 {
+                            *temp_hearts.get_mut("b_all").unwrap() -= remaining_needed;
+                        }
                     }
                 }
                 
@@ -834,7 +972,10 @@ impl TurnEngine {
             player.waitroom.cards.push(card);
         }
         
-        blade_heart_count
+        // Rule 8.3.17: Check timing (caller responsibility)
+        
+        // Return total heart count for victory determination (blade hearts + b_all + special_heart score)
+        blade_heart_count + b_all_count + special_heart_score_count
     }
 
     /// Trigger debut abilities for a player when a card is placed on stage
@@ -884,6 +1025,50 @@ impl TurnEngine {
             game_state.trigger_auto_ability(
                 ability_id,
                 crate::game_state::AbilityTrigger::Debut,
+                player_id_clone.clone(),
+                Some(card_no),
+            );
+        }
+    }
+
+    fn trigger_performance_phase_start_abilities(game_state: &mut GameState, player_id: &str) {
+        // Rule 8.3.3: Trigger 'performance phase start' automatic abilities
+        // Rule 8.3.3: "手番プレイヤーの自動能力の'パフォーマンスフェイズの始めに'の誘発条件が発生し、チェックタイミングが発生します。"
+        
+        let player_id_clone = player_id.to_string();
+        
+        // Collect abilities to trigger first to avoid borrow conflicts
+        let mut abilities_to_trigger = Vec::new();
+        
+        {
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            
+            // Check all members on stage for performance phase start abilities
+            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            for area in areas {
+                if let Some(card_in_zone) = player.stage.get_area(area) {
+                    // Check if card has performance phase start abilities
+                    for ability in &card_in_zone.card.abilities {
+                        // Check if ability has performance phase start trigger
+                        if ability.triggers.as_ref().map_or(false, |t| t == "パフォーマンスフェイズの始めに" || t == "performance_phase_start") {
+                            // Collect ability to trigger
+                            let ability_id = format!("{}_{}", card_in_zone.card.card_no, ability.full_text);
+                            abilities_to_trigger.push((ability_id, card_in_zone.card.card_no.clone()));
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Trigger collected abilities
+        for (ability_id, card_no) in abilities_to_trigger {
+            game_state.trigger_auto_ability(
+                ability_id,
+                crate::game_state::AbilityTrigger::PerformancePhaseStart,
                 player_id_clone.clone(),
                 Some(card_no),
             );

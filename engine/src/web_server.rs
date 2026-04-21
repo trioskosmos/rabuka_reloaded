@@ -57,6 +57,13 @@ pub struct ActionParameters {
     pub card_index: Option<usize>,
     pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
     pub stage_area: Option<String>,
+    pub use_baton_touch: Option<bool>, // Whether to use baton touch cost reduction
+    // Card grouping information for improved UI
+    pub card_name: Option<String>,
+    pub card_no: Option<String>,
+    pub base_cost: Option<u32>,
+    pub final_cost: Option<u32>,
+    pub available_areas: Option<Vec<crate::game_setup::AreaInfo>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -74,6 +81,7 @@ pub struct ActionsResponse {
 #[derive(Deserialize)]
 pub struct ExecuteActionRequest {
     pub action_index: usize,
+    pub stage_area: Option<String>,
 }
 
 pub struct AppState {
@@ -205,6 +213,12 @@ fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             card_index: p.card_index,
             card_indices: p.card_indices,
             stage_area: p.stage_area,
+            use_baton_touch: p.use_baton_touch,
+            card_name: p.card_name,
+            card_no: p.card_no,
+            base_cost: p.base_cost,
+            final_cost: p.final_cost,
+            available_areas: p.available_areas,
         }),
     }).collect()
 }
@@ -214,6 +228,7 @@ async fn execute_action(
     req: web::Json<ExecuteActionRequest>,
 ) -> impl Responder {
     let action_index = req.action_index;
+    let requested_stage_area = req.stage_area.clone();
     let mut game_state = data.game_state.lock().unwrap();
     
     // Get possible actions
@@ -225,13 +240,20 @@ async fn execute_action(
     
     let action = &actions[action_index];
     
+    // Use stage_area from request if provided, otherwise use from action parameters
+    let stage_area = requested_stage_area.or_else(|| action.parameters.as_ref().and_then(|p| p.stage_area.clone()));
+    
+    // Get use_baton_touch from parameters
+    let use_baton_touch = action.parameters.as_ref().and_then(|p| p.use_baton_touch);
+    
     // Execute the action using turn engine
     let result = crate::turn::TurnEngine::execute_main_phase_action(
         &mut game_state,
         &action.action_type,
         action.parameters.as_ref().and_then(|p| p.card_index),
         action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
-        action.parameters.as_ref().and_then(|p| p.stage_area.clone()),
+        stage_area,
+        use_baton_touch,
     );
     
     match result {

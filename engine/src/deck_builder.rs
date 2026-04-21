@@ -1,6 +1,7 @@
 use crate::card::Card;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::vec::Vec;
 
 #[derive(Debug, Clone)]
 pub struct Deck {

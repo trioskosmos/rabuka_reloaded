@@ -83,20 +83,48 @@ fn test_gain_resource_persists() {
         value: None,
         aggregate: None,
         comparison_type: None,
+        heart_color: None,
+        blade_type: None,
+        energy_count: None,
+        target_member: None,
+        choice_options: None,
+        group: None,
+        per_unit_count: None,
+        per_unit_type: None,
+        per_unit_reference: None,
+        group_matching: None,
+        repeat_limit: None,
+        repeat_optional: None,
+        is_further: None,
+        cost_result_reference: None,
+        dynamic_count: None,
+        resource_icon_count: None,
+        placement_order: None,
+        cost_limit: None,
+        unit: None,
+        distinct: None,
+        target_player: None,
+        target_location: None,
+        target_scope: None,
+        target_card_type: None,
+        activation_condition: None,
+        activation_condition_parsed: None,
+        gained_ability: None,
+        ability_text: None,
+        swap_action: None,
+        has_member_swapping: None,
+        group_options: None,
+        card_count: None,
+        use_limit: None,
+        triggers: None,
     };
 
     let result = resolver.execute_effect(&effect);
     assert!(result.is_ok(), "Gain resource effect should execute successfully");
 
-    // Get the modified game state back
-    let modified_state = resolver.into_game_state();
-
-    // Verify the blade count increased
-    let new_blade_count = modified_state.player1.stage.left_side.as_ref().unwrap().card.blade;
+    // Verify the blade count increased (changes are direct since resolver uses mutable reference)
+    let new_blade_count = game_state.player1.stage.left_side.as_ref().unwrap().card.blade;
     assert_eq!(new_blade_count, initial_blade_count + 2, "Blade count should have increased by 2");
-
-    // Update the original game state with the modified one
-    game_state = modified_state;
 
     // Verify the change persisted
     let final_blade_count = game_state.player1.stage.left_side.as_ref().unwrap().card.blade;
@@ -180,15 +208,46 @@ fn test_modify_score_persists() {
         count: None,
         aggregate: None,
         comparison_type: None,
+        heart_color: None,
+        blade_type: None,
+        energy_count: None,
+        target_member: None,
+        choice_options: None,
+        group: None,
+        per_unit_count: None,
+        per_unit_type: None,
+        per_unit_reference: None,
+        group_matching: None,
+        repeat_limit: None,
+        repeat_optional: None,
+        is_further: None,
+        cost_result_reference: None,
+        dynamic_count: None,
+        resource_icon_count: None,
+        placement_order: None,
+        cost_limit: None,
+        unit: None,
+        distinct: None,
+        target_player: None,
+        target_location: None,
+        target_scope: None,
+        target_card_type: None,
+        activation_condition: None,
+        activation_condition_parsed: None,
+        gained_ability: None,
+        ability_text: None,
+        swap_action: None,
+        has_member_swapping: None,
+        group_options: None,
+        card_count: None,
+        use_limit: None,
+        triggers: None,
     };
 
     let result = resolver.execute_effect(&effect);
     assert!(result.is_ok(), "Modify score effect should execute successfully");
 
-    // Get the modified game state back
-    let modified_state = resolver.into_game_state();
-
-    // Verify the score increased
-    let new_score = modified_state.player1.stage.center.as_ref().unwrap().card.score.unwrap_or(0);
+    // Verify the score increased (changes are direct since resolver uses mutable reference)
+    let new_score = game_state.player1.stage.center.as_ref().unwrap().card.score.unwrap_or(0);
     assert_eq!(new_score, initial_score + 50, "Score should have increased by 50");
 }

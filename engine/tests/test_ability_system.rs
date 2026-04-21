@@ -320,12 +320,16 @@ fn test_q58_turn_limited_abilities_per_card_instance() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     let card_in_zone_left = rabuka_engine::zones::CardInZone {
         card: hanayo_card,
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone_center);
@@ -370,6 +374,8 @@ fn test_q59_card_movement_resets_turn_limit() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -398,6 +404,8 @@ fn test_q59_card_movement_resets_turn_limit() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     game_state.player1.stage.center = Some(card_in_zone_new);
     
@@ -428,6 +436,8 @@ fn test_q60_mandatory_auto_abilities() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -474,6 +484,8 @@ fn test_q61_optional_turn_limited_auto_abilities() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -571,6 +583,8 @@ fn test_q63_ability_placement_no_cost() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     game_state.player1.stage.center = Some(card_in_zone);
     
@@ -728,6 +742,8 @@ fn test_q67_all_heart_timing() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -897,6 +913,8 @@ fn test_position_restrictions() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -950,6 +968,8 @@ fn test_position_restrictions() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -1243,6 +1263,8 @@ fn test_q15_energy_deck_placement() {
         orientation: Some(rabuka_engine::zones::Orientation::Active),
         face_state: rabuka_engine::zones::FaceState::FaceUp, // Energy zone cards face up
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.energy_zone.cards.push(energy_in_zone);
@@ -1300,6 +1322,8 @@ fn test_q29_baton_touch_same_turn_restriction() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -1346,6 +1370,8 @@ fn test_q30_multiple_same_cards_on_stage() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     let card_in_zone2 = rabuka_engine::zones::CardInZone {
@@ -1353,6 +1379,8 @@ fn test_q30_multiple_same_cards_on_stage() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone1);
@@ -1504,6 +1532,8 @@ fn test_q23_member_card_placement_procedure() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(card_in_zone);
@@ -1544,6 +1574,8 @@ fn test_q24_baton_touch_procedure() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     });
     
     // Add new card to hand
@@ -1561,6 +1593,8 @@ fn test_q24_baton_touch_procedure() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(new_card_in_zone);
@@ -1597,6 +1631,8 @@ fn test_q25_baton_touch_same_or_lower_cost() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     });
     
     // Baton touch with same cost: energy_to_pay = card_cost - card_cost = 0
@@ -1650,6 +1686,8 @@ fn test_q28_place_member_without_baton_touch() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     });
     
     // Find another member card for new placement
@@ -1674,6 +1712,8 @@ fn test_q28_place_member_without_baton_touch() {
         orientation: None,
         face_state: rabuka_engine::zones::FaceState::FaceUp,
         energy_underneath: Vec::new(),
+        played_via_ability: false,
+        turn_played: 1,
     };
     
     game_state.player1.stage.center = Some(new_card_in_zone);

@@ -177,16 +177,30 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
                 abilities[-1]["triggerless_text"] += line
                 continue
         
-        abilities.append({
-            "card_id": card_id,
-            "full_text": line,
-            "triggerless_text": effect,
-            "use_limit": use_limit,
-            "once_per_turn": use_limit == 1 if use_limit else False,
-            "triggers": triggers,
-            "trigger_count": len(triggers),
-            "ability_index": i,
-        })
+        # If this line has no trigger at all, treat it as a note (is_null: True)
+        # Only parse as regular ability if it has trigger brackets
+        if not triggers:
+            abilities.append({
+                "card_id": card_id,
+                "full_text": line,
+                "triggerless_text": "",
+                "use_limit": None,
+                "triggers": [],
+                "trigger_count": 0,
+                "ability_index": i,
+                "is_null": True,
+            })
+        else:
+            abilities.append({
+                "card_id": card_id,
+                "full_text": line,
+                "triggerless_text": effect,
+                "use_limit": use_limit,
+                "once_per_turn": use_limit == 1 if use_limit else False,
+                "triggers": triggers,
+                "trigger_count": len(triggers),
+                "ability_index": i,
+            })
     
     return abilities
 
@@ -220,6 +234,21 @@ def extract_all_abilities(cards_file: Path) -> dict:
         # Parse semantic effect and cost
         effect_text = sample["triggerless_text"]
         
+        # Skip parsing for is_null abilities (notes without triggers)
+        if sample.get("is_null", False):
+            unique_abilities.append({
+                "full_text": full_text,
+                "triggerless_text": sample["triggerless_text"],
+                "card_count": len(card_examples),
+                "cards": card_examples,
+                "triggers": ', '.join(sample["triggers"]) if sample["triggers"] else None,
+                "use_limit": sample["use_limit"],
+                "is_null": True,
+                "cost": None,
+                "effect": None,
+            })
+            continue
+        
         # Split cost and effect
         cost_text = None
         if "：" in effect_text:
@@ -243,6 +272,91 @@ def extract_all_abilities(cards_file: Path) -> dict:
             if 'actions' in effect and not effect['actions']:
                 print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
                 print(f"Effect dict: {effect}")
+            # Post-processing: fix per_unit effects missing action field
+            if effect.get('per_unit') and 'action' not in effect:
+                text = effect.get('text', '')
+                # Check for blade gain (with or without icon tag)
+                if 'ブレードを得る' in text or '選んだブレード' in text or '{{icon_blade.png|ブレード}}を得る' in text:
+                    effect['action'] = 'gain_resource'
+                    effect['resource'] = 'blade'
+                    # Extract resource icon count and use as count
+                    icon_count = text.count('{{icon_blade.png|ブレード}}')
+                    if icon_count > 0:
+                        effect['count'] = icon_count
+                # Check for heart gain (with or without icon tag)
+                elif 'ハートを得る' in text or '選んだハート' in text or ('{{heart' in text and 'を得る' in text):
+                    effect['action'] = 'gain_resource'
+                    effect['resource'] = 'heart'
+                    # Extract heart icon count and use as count
+                    icon_count = len(re.findall(r'{{heart_\d+\.png|heart\d+}}', text))
+                    if icon_count > 0:
+                        effect['count'] = icon_count
+                elif '引く' in text:
+                    effect['action'] = 'draw_card'
+            
+            # Post-processing: fix 'action': 'draw' to 'draw_card' in effect and nested structures
+            def fix_draw_action(obj):
+                if isinstance(obj, dict):
+                    if obj.get('action') == 'draw':
+                        obj['action'] = 'draw_card'
+                    for key, value in obj.items():
+                        fix_draw_action(value)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        fix_draw_action(item)
+            
+            fix_draw_action(effect)
+            
+            # Post-processing: ensure gain_resource effects have count and resource fields in nested structures
+            def fix_gain_resource(obj):
+                if isinstance(obj, dict):
+                    if obj.get('action') == 'gain_resource':
+                        text = obj.get('text', '')
+                        # Check if this is actually a 'gain ability' pattern
+                        quoted_text_match = re.search(r'「([^」]+)」を得る', text)
+                        if quoted_text_match:
+                            quoted_content = quoted_text_match.group(1)
+                            # If the quoted text contains ability keywords, convert to gain_ability
+                            if 'ライブ' in quoted_content or 'スコア' in quoted_content:
+                                obj['action'] = 'gain_ability'
+                                obj['ability'] = [quoted_content]
+                                # Remove resource and count fields if they were added incorrectly
+                                if 'resource' in obj:
+                                    del obj['resource']
+                                if 'count' in obj:
+                                    del obj['count']
+                                return
+                        # Ensure resource field is set
+                        if 'resource' not in obj:
+                            if 'ブレード' in text:
+                                obj['resource'] = 'blade'
+                            elif 'ハート' in text:
+                                obj['resource'] = 'heart'
+                        # Ensure count field is set
+                        if 'count' not in obj:
+                            # Try to extract from numeric text
+                            count_match = re.search(r'(\d+)つ', text)
+                            if count_match:
+                                obj['count'] = int(count_match.group(1))
+                            else:
+                                # Try to extract from icon counts
+                                blade_count = text.count('{{icon_blade.png|ブレード}}')
+                                heart_count = len(re.findall(r'{{heart_\d+\.png|heart\d+}}', text))
+                                if blade_count > 0:
+                                    obj['count'] = blade_count
+                                elif heart_count > 0:
+                                    obj['count'] = heart_count
+                                else:
+                                    # Default to 1 if not specified
+                                    obj['count'] = 1
+                    for key, value in obj.items():
+                        fix_gain_resource(value)
+                elif isinstance(obj, list):
+                    for item in obj:
+                        fix_gain_resource(item)
+            
+            fix_gain_resource(effect)
+            
         except Exception as e:
             print(f"Error parsing effect: {effect_text}")
             print(f"Exception: {e}")
@@ -295,8 +409,8 @@ def test_parsing():
 def main():
     test_parsing()
     
-    cards_file = Path(__file__).parent.parent.parent / "cards.json"
-    output_file = Path(__file__).parent.parent.parent / "abilities.json"
+    cards_file = Path(__file__).parent.parent / "cards.json"
+    output_file = Path(__file__).parent.parent / "abilities.json"
     
     print(f"Extracting abilities from {cards_file}...")
     result = extract_all_abilities(cards_file)

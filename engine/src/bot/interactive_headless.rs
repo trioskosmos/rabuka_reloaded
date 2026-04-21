@@ -1,13 +1,13 @@
 // Interactive headless game mode for manual gameplay
 // This provides a CLI interface to play the game without the web UI
+#![allow(dead_code)]
 
 use crate::card_loader;
-use crate::deck_builder;
 use crate::deck_parser;
 use crate::game_state::GameState;
-use crate::player::Player;
-use crate::turn;
 use crate::game_setup;
+use crate::turn;
+use crate::turn::TurnEngine;
 use std::io::{self, Write};
 
 fn print_game_state(game_state: &GameState) {
@@ -351,6 +351,7 @@ pub fn run_interactive_headless() {
                     action.parameters.as_ref().and_then(|p| p.card_index),
                     action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
                     action.parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    action.parameters.as_ref().and_then(|p| p.use_baton_touch),
                 ) {
                     Ok(_) => {
                         println!("✓ Action executed successfully");

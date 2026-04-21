@@ -20,6 +20,9 @@ pub struct Player {
     pub waitroom: Waitroom,
     pub success_live_card_zone: SuccessLiveCardZone,
     pub exclusion_zone: ExclusionZone,
+    // Rule 9.6.2.1.2.1: Track areas where cards moved from non-stage to stage this turn
+    // These areas cannot be targeted for baton touch
+    pub areas_locked_this_turn: std::collections::HashSet<crate::zones::MemberArea>,
 }
 
 impl Player {
@@ -37,6 +40,7 @@ impl Player {
             waitroom: Waitroom::new(),
             success_live_card_zone: SuccessLiveCardZone::new(),
             exclusion_zone: ExclusionZone::new(),
+            areas_locked_this_turn: std::collections::HashSet::new(),
         }
     }
 
@@ -48,7 +52,7 @@ impl Player {
         self.energy_deck.cards = cards;
     }
     
-    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea) -> Result<u32, String> {
+    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea, use_baton_touch: bool) -> Result<(u32, bool), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
         if hand_index >= self.hand.cards.len() {
             return Err("Invalid hand index".to_string());
@@ -69,38 +73,46 @@ impl Player {
         
         // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
         // Note: Baton touch sends member from the TARGET area (where you're playing the new member)
-        // Only apply if there's actually a member in the target area AND player has active energy
-        let member_cost = if let Some(existing_member) = self.stage.get_area(stage_area) {
-            // Check if player has 1+ active energy to pay
-            let active_energy_count = self.energy_zone.cards.iter()
-                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-                .count();
-            
-            if cost_to_pay > 0 && active_energy_count >= 1 {
-                // Clone the member card before clearing the area
-                let member_card = existing_member.card.clone();
-                let cost = existing_member.card.cost.unwrap_or(1);
-                
-                // Clear the target area since member will be sent to waitroom
-                match stage_area {
-                    crate::zones::MemberArea::LeftSide => self.stage.left_side = None,
-                    crate::zones::MemberArea::Center => self.stage.center = None,
-                    crate::zones::MemberArea::RightSide => self.stage.right_side = None,
+        let baton_touch_used = if use_baton_touch {
+            if let Some(existing_member) = self.stage.get_area(stage_area) {
+                // Rule 9.6.2.1.2.1: Cannot baton touch to an area that had a card moved from non-stage to stage this turn
+                if self.areas_locked_this_turn.contains(&stage_area) {
+                    false
+                } else {
+                    // Check if player has 1+ active energy to pay
+                    let active_energy_count = self.energy_zone.cards.iter()
+                        .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+                        .count();
+                    
+                    if cost_to_pay > 0 && active_energy_count >= 1 {
+                        // Clone the member card before clearing the area
+                        let member_card = existing_member.card.clone();
+                        let cost = existing_member.card.cost.unwrap_or(1);
+                        
+                        // Clear the target area since member will be sent to waitroom
+                        match stage_area {
+                            crate::zones::MemberArea::LeftSide => self.stage.left_side = None,
+                            crate::zones::MemberArea::Center => self.stage.center = None,
+                            crate::zones::MemberArea::RightSide => self.stage.right_side = None,
+                        }
+                        
+                        // Send member to waitroom
+                        self.waitroom.cards.push(member_card);
+                        
+                        // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
+                        cost_to_pay = cost_to_pay.saturating_sub(cost);
+                        true
+                    } else {
+                        false
+                    }
                 }
-                
-                // Send member to waitroom
-                self.waitroom.cards.push(member_card);
-                cost
             } else {
-                0
+                // No member in target area, can't baton touch
+                false
             }
         } else {
-            // No member in target area, no baton touch
-            0
+            false
         };
-        
-        // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
-        cost_to_pay = cost_to_pay.saturating_sub(member_cost);
         
         // Rule 9.6.2.3.1: Pay energy equal to cost
         if cost_to_pay > 0 {
@@ -129,7 +141,7 @@ impl Player {
         
         let card_in_zone = crate::zones::CardInZone {
             card: card,
-            orientation: Some(crate::zones::Orientation::Wait),
+            orientation: Some(crate::zones::Orientation::Active),
             face_state: crate::zones::FaceState::FaceUp,
             energy_underneath: Vec::new(),
             played_via_ability: false,
@@ -143,6 +155,8 @@ impl Player {
                     return Err("Left side already occupied".to_string());
                 }
                 self.stage.left_side = Some(card_in_zone);
+                // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
+                self.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
             }
             crate::zones::MemberArea::Center => {
                 if self.stage.center.is_some() {
@@ -150,6 +164,8 @@ impl Player {
                     return Err("Center already occupied".to_string());
                 }
                 self.stage.center = Some(card_in_zone);
+                // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
+                self.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
             }
             crate::zones::MemberArea::RightSide => {
                 if self.stage.right_side.is_some() {
@@ -157,13 +173,15 @@ impl Player {
                     return Err("Right side already occupied".to_string());
                 }
                 self.stage.right_side = Some(card_in_zone);
+                // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
+                self.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
             }
         }
         
         // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event
-        // TODO: Implement baton touch event triggering
+        // This is handled in turn.rs after the card is played to stage
         
-        Ok(cost_to_pay)
+        Ok((cost_to_pay, baton_touch_used))
     }
     
     pub fn move_card_from_hand_to_energy_zone(&mut self, hand_index: usize) -> Result<(), String> {

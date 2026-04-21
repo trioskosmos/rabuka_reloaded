@@ -119,18 +119,19 @@ pub fn run_ability_test() {
     });
     
     // Try to play the first member card to stage
-    if let Some((idx, card)) = debut_card {
+    if let Some((idx, _card)) = debut_card {
         
         match turn::TurnEngine::execute_main_phase_action(
             &mut game_state,
             "play_member_to_stage",
             Some(idx),
             None,
-            Some("center".to_string())
+            Some("center".to_string()),
+            None,
         ) {
             Ok(_) => {
             }
-            Err(e) => {
+            Err(_e) => {
             }
         }
     } else {

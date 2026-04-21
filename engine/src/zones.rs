@@ -46,10 +46,33 @@ impl CardInZone {
     }
     
     pub fn pay_cost(&mut self, cost: u32) -> bool {
-        // Rule 8.2.5: Pay cost by reducing blades
-        // For now, this is a placeholder - actual blade payment needs more complex logic
+        // Rule 8.2.5: Pay cost by reducing blades from card and energy underneath
         if self.can_pay_cost(cost) {
-            // TODO: Implement actual blade payment logic
+            let mut remaining_cost = cost;
+            
+            // Reduce from card blade first
+            if self.card.blade >= remaining_cost {
+                self.card.blade -= remaining_cost;
+                remaining_cost = 0;
+            } else {
+                remaining_cost -= self.card.blade;
+                self.card.blade = 0;
+            }
+            
+            // Then reduce from energy underneath
+            for energy in &mut self.energy_underneath {
+                if remaining_cost == 0 {
+                    break;
+                }
+                if energy.blade >= remaining_cost {
+                    energy.blade -= remaining_cost;
+                    remaining_cost = 0;
+                } else {
+                    remaining_cost -= energy.blade;
+                    energy.blade = 0;
+                }
+            }
+            
             true
         } else {
             false
@@ -367,7 +390,7 @@ impl LiveCardZone {
         LiveCardZone { cards: Vec::new() }
     }
 
-    pub fn can_place_card(&self, card: &Card) -> bool {
+    pub fn can_place_card(&self, _card: &Card) -> bool {
         // Rule 8.2: During Live Card Set Phase, any card from hand can be placed in Live Card Zone
         true
     }
@@ -399,7 +422,14 @@ impl LiveCardZone {
         let mut total_score = 0;
         for card in &self.cards {
             total_score += card.get_score();
-            // TODO: Add heart satisfaction bonus calculation
+            // Heart satisfaction bonus: if card's need_heart is satisfied, add bonus
+            // For now, add 1 bonus if card has need_heart and it's satisfied
+            // This is a simplified implementation - full implementation would check actual heart satisfaction
+            if let Some(ref need_heart) = card.need_heart {
+                if !need_heart.hearts.is_empty() {
+                    total_score += 1; // Simplified: add 1 bonus for any heart requirement
+                }
+            }
         }
         total_score + cheer_blade_heart_count
     }

@@ -66,6 +66,9 @@ impl AbilityExecutor {
             Some("move_cards") => self.calculate_move_cards_cost(cost, player, game_state),
             Some("pay_energy") => self.calculate_pay_energy_cost(cost, player, game_state),
             Some("change_state") => self.calculate_change_state_cost(cost, player, game_state),
+            Some("choice_condition") => self.calculate_choice_condition_cost(cost, player, game_state),
+            Some("energy_condition") => self.calculate_energy_condition_cost(cost, player, game_state),
+            Some("reveal") => self.calculate_reveal_cost(cost, player, game_state),
             _ => CostCalculation {
                 payable: false,
                 reason: Some(format!("Unknown cost type: {:?}", cost.cost_type)),
@@ -83,26 +86,49 @@ impl AbilityExecutor {
         // Check if source zone has the required card
         let source = cost.source.as_deref().unwrap_or("");
         let card_type = cost.card_type.as_deref().unwrap_or("");
+        let count_needed = cost.count.unwrap_or(1) as usize;
 
         let has_card = match source {
             "stage" | "ステージ" => {
                 // Check if player has a member on stage
                 if card_type == "member_card" || card_type == "メンバー" {
-                    player.stage.left_side.is_some()
-                        || player.stage.center.is_some()
-                        || player.stage.right_side.is_some()
+                    let count = player.stage.left_side.as_ref().map_or(0, |_| 1) +
+                               player.stage.center.as_ref().map_or(0, |_| 1) +
+                               player.stage.right_side.as_ref().map_or(0, |_| 1);
+                    count >= count_needed
                 } else {
                     false
                 }
             }
             "hand" | "手札" => {
                 if card_type == "member_card" || card_type == "メンバー" {
-                    player.hand.cards.iter().any(|c| c.is_member())
+                    player.hand.cards.iter().filter(|c| c.is_member()).count() >= count_needed
                 } else if card_type == "live_card" || card_type == "ライブ" {
-                    player.hand.cards.iter().any(|c| c.is_live())
+                    player.hand.cards.iter().filter(|c| c.is_live()).count() >= count_needed
                 } else {
-                    !player.hand.is_empty()
+                    player.hand.cards.len() >= count_needed
                 }
+            }
+            "discard" | "控え室" => {
+                if card_type == "member_card" || card_type == "メンバー" {
+                    player.waitroom.cards.iter().filter(|c| c.is_member()).count() >= count_needed
+                } else if card_type == "live_card" || card_type == "ライブ" {
+                    player.waitroom.cards.iter().filter(|c| c.is_live()).count() >= count_needed
+                } else {
+                    player.waitroom.cards.len() >= count_needed
+                }
+            }
+            "deck" | "デッキ" => {
+                player.main_deck.cards.len() >= count_needed
+            }
+            "success_live_zone" => {
+                player.success_live_card_zone.cards.len() >= count_needed
+            }
+            "live_card_zone" => {
+                player.live_card_zone.cards.len() >= count_needed
+            }
+            "energy_zone" => {
+                player.energy_zone.cards.len() >= count_needed
             }
             _ => false,
         };
@@ -117,9 +143,22 @@ impl AbilityExecutor {
             CostCalculation {
                 payable: false,
                 reason: Some(format!(
-                    "No {} card in {}",
+                    "Not enough {} cards in {} (need {}, have {})",
                     card_type,
-                    source
+                    source,
+                    count_needed,
+                    match source {
+                        "stage" => player.stage.left_side.as_ref().map_or(0, |_| 1) +
+                                   player.stage.center.as_ref().map_or(0, |_| 1) +
+                                   player.stage.right_side.as_ref().map_or(0, |_| 1),
+                        "hand" => player.hand.cards.len(),
+                        "discard" => player.waitroom.cards.len(),
+                        "deck" => player.main_deck.cards.len(),
+                        "success_live_zone" => player.success_live_card_zone.cards.len(),
+                        "live_card_zone" => player.live_card_zone.cards.len(),
+                        "energy_zone" => player.energy_zone.cards.len(),
+                        _ => 0,
+                    }
                 )),
                 cost_description: cost.text.clone(),
             }
@@ -191,6 +230,103 @@ impl AbilityExecutor {
                 reason: Some(format!("Unknown state: {}", state)),
                 cost_description: cost.text.clone(),
             },
+        }
+    }
+
+    fn calculate_choice_condition_cost(
+        &self,
+        cost: &AbilityCost,
+        player: &Player,
+        _game_state: &GameState,
+    ) -> CostCalculation {
+        // Choice condition cost - check if the choice can be made
+        // This typically involves checking if the required cards exist
+        let source = cost.source.as_deref().unwrap_or("");
+        let count = cost.count.unwrap_or(1) as usize;
+
+        let has_options = match source {
+            "hand" => player.hand.cards.len() >= count,
+            "deck" => player.main_deck.cards.len() >= count,
+            "discard" => player.waitroom.cards.len() >= count,
+            "stage" => {
+                player.stage.left_side.is_some() as usize +
+                player.stage.center.is_some() as usize +
+                player.stage.right_side.is_some() as usize >= count
+            }
+            _ => true, // For now, assume payable for unknown sources
+        };
+
+        if has_options {
+            CostCalculation {
+                payable: true,
+                reason: None,
+                cost_description: cost.text.clone(),
+            }
+        } else {
+            CostCalculation {
+                payable: false,
+                reason: Some(format!("Not enough options in {} to make a choice", source)),
+                cost_description: cost.text.clone(),
+            }
+        }
+    }
+
+    fn calculate_energy_condition_cost(
+        &self,
+        cost: &AbilityCost,
+        player: &Player,
+        _game_state: &GameState,
+    ) -> CostCalculation {
+        // Energy condition cost - check if energy state meets requirements
+        let energy_needed = cost.energy.unwrap_or(1) as usize;
+        let active_energy = player.count_active_energy();
+
+        if active_energy >= energy_needed {
+            CostCalculation {
+                payable: true,
+                reason: None,
+                cost_description: cost.text.clone(),
+            }
+        } else {
+            CostCalculation {
+                payable: false,
+                reason: Some(format!(
+                    "Energy condition not met: need {}, have {}",
+                    energy_needed, active_energy
+                )),
+                cost_description: cost.text.clone(),
+            }
+        }
+    }
+
+    fn calculate_reveal_cost(
+        &self,
+        cost: &AbilityCost,
+        player: &Player,
+        _game_state: &GameState,
+    ) -> CostCalculation {
+        // Reveal cost - check if cards can be revealed from source
+        let source = cost.source.as_deref().unwrap_or("");
+        let count = cost.count.unwrap_or(1) as usize;
+
+        let has_cards = match source {
+            "hand" => player.hand.cards.len() >= count,
+            "deck" => player.main_deck.cards.len() >= count,
+            _ => true, // For now, assume payable for unknown sources
+        };
+
+        if has_cards {
+            CostCalculation {
+                payable: true,
+                reason: None,
+                cost_description: cost.text.clone(),
+            }
+        } else {
+            CostCalculation {
+                payable: false,
+                reason: Some(format!("Not enough cards in {} to reveal", source)),
+                cost_description: cost.text.clone(),
+            }
         }
     }
 

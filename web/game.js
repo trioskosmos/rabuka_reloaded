@@ -101,6 +101,13 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
+        // Load texticon images for hearts and blades
+        this.load.image('icon_blade', '/img/texticon/icon_blade.png');
+        for (let i = 0; i <= 6; i++) {
+            const fileName = i.toString().padStart(2, '0');
+            this.load.image(`heart_${fileName}`, `/img/texticon/heart_${fileName}.png`);
+        }
+        
         // Load card data only - images will be loaded on-demand
         this.load.json('cardsData', '/cards/cards.json')
             .on('complete', () => {
@@ -155,13 +162,16 @@ class GameScene extends Phaser.Scene {
             this.loadGameState();
         });
         
-        // Handle resize
+        // Handle resize with debounce to prevent multiple rapid calls
+        this.resizeTimeout = null;
         window.addEventListener('resize', () => {
-            this.scale.resize(window.innerWidth, window.innerHeight);
-            this.createZones();
-            this.createUI();
-            this.updateDisplay();
-            this.loadActions();
+            if (this.resizeTimeout) {
+                clearTimeout(this.resizeTimeout);
+            }
+            this.resizeTimeout = setTimeout(() => {
+                this.scale.resize(window.innerWidth, window.innerHeight);
+                this.handleResize();
+            }, 100);
         });
     }
 
@@ -177,21 +187,82 @@ class GameScene extends Phaser.Scene {
         }
     }
 
+    handleResize() {
+        // Clear all UI elements before recreation
+        this.clearAllUI();
+        this.createZones();
+        this.createUI();
+        this.updateDisplay();
+        this.loadActions();
+    }
+
+    clearAllUI() {
+        // Clear action buttons
+        if (this.actionButtons) {
+            this.actionButtons.forEach(btn => btn.destroy());
+            this.actionButtons = [];
+        }
+        
+        // Clear zone labels
+        if (this.zoneLabels) {
+            this.zoneLabels.forEach(label => label.destroy());
+            this.zoneLabels = [];
+        }
+        
+        // Clear UI elements
+        if (this.uiElements) {
+            this.uiElements.forEach(el => el.destroy());
+            this.uiElements = [];
+        }
+        
+        // Clear card containers
+        if (this.cardContainers) {
+            this.cardContainers.forEach(container => container.destroy());
+            this.cardContainers = [];
+        }
+        
+        // Clear stats containers
+        if (this.p1StatsContainer) {
+            this.p1StatsContainer.destroy();
+            this.p1StatsContainer = null;
+        }
+        if (this.p2StatsContainer) {
+            this.p2StatsContainer.destroy();
+            this.p2StatsContainer = null;
+        }
+        
+        // Clear zone graphics
+        if (this.zoneGraphics) {
+            this.zoneGraphics.clear();
+            this.zoneGraphics.destroy();
+            this.zoneGraphics = null;
+        }
+        
+        // Clear actions panel graphics
+        if (this.actionsBg) {
+            this.actionsBg.clear();
+            this.actionsBg.destroy();
+            this.actionsBg = null;
+        }
+        
+        // Clear header graphics
+        if (this.headerBg) {
+            this.headerBg.clear();
+            this.headerBg.destroy();
+            this.headerBg = null;
+        }
+    }
+
     createZones() {
         const w = this.scale.width;
         const h = this.scale.height;
-        const headerHeight = this.headerHeight || 65;
+        const headerHeight = 65;
         const rightPanelWidth = 300;
         
-        // Clear existing zones and labels
-        if (this.zoneGraphics) {
-            this.zoneGraphics.clear();
-        } else {
-            this.zoneGraphics = this.add.graphics();
-        }
-        if (this.zoneLabels) {
-            this.zoneLabels.forEach(label => label.destroy());
-        }
+        this.headerHeight = headerHeight;
+        
+        // Create zone graphics
+        this.zoneGraphics = this.add.graphics();
         this.zoneLabels = [];
         
         const playAreaWidth = w - rightPanelWidth;
@@ -202,18 +273,18 @@ class GameScene extends Phaser.Scene {
         
         this.zones = {
             // Player 2 (opponent - top)
-            p2Hand: { x: 20, y: headerHeight + 15, w: playAreaWidth - 40, h: 80, label: 'Opponent Hand', color: 0x2d3748, borderColor: 0x4a5568 },
-            p2Stage: { x: 20, y: headerHeight + 105, w: playAreaWidth - 40, h: 120, label: 'Opponent Stage', color: 0x1a202c, borderColor: 0x718096 },
-            p2Live: { x: 20, y: headerHeight + 235, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
-            p2Success: { x: 20 + playAreaWidth * 0.34, y: headerHeight + 235, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
-            p2Energy: { x: 20 + playAreaWidth * 0.56, y: headerHeight + 235, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 },
+            p2Hand: { x: 20, y: headerHeight + 15, w: playAreaWidth - 40, h: 100, label: 'Opponent Hand', color: 0x2d3748, borderColor: 0x4a5568 },
+            p2Stage: { x: 20, y: headerHeight + 125, w: playAreaWidth - 40, h: 150, label: 'Opponent Stage', color: 0x1a202c, borderColor: 0x718096 },
+            p2Live: { x: 20, y: headerHeight + 285, w: playAreaWidth * 0.32, h: 90, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
+            p2Success: { x: 20 + playAreaWidth * 0.34, y: headerHeight + 285, w: playAreaWidth * 0.20, h: 90, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
+            p2Energy: { x: 20 + playAreaWidth * 0.56, y: headerHeight + 285, w: playAreaWidth * 0.22, h: 90, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 },
             
             // Player 1 (active - bottom)
-            p1Hand: { x: 20, y: h - 100, w: playAreaWidth - 40, h: 80, label: 'Your Hand', color: 0x276749, borderColor: 0x48bb78 },
-            p1Stage: { x: 20, y: h - 230, w: playAreaWidth - 40, h: 120, label: 'Your Stage', color: 0x1a202c, borderColor: 0x718096 },
-            p1Live: { x: 20, y: h - 310, w: playAreaWidth * 0.32, h: 70, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
-            p1Success: { x: 20 + playAreaWidth * 0.34, y: h - 310, w: playAreaWidth * 0.20, h: 70, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
-            p1Energy: { x: 20 + playAreaWidth * 0.56, y: h - 310, w: playAreaWidth * 0.22, h: 70, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 }
+            p1Hand: { x: 20, y: h - 120, w: playAreaWidth - 40, h: 100, label: 'Your Hand', color: 0x276749, borderColor: 0x48bb78 },
+            p1Stage: { x: 20, y: h - 275, w: playAreaWidth - 40, h: 150, label: 'Your Stage', color: 0x1a202c, borderColor: 0x718096 },
+            p1Live: { x: 20, y: h - 375, w: playAreaWidth * 0.32, h: 90, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
+            p1Success: { x: 20 + playAreaWidth * 0.34, y: h - 375, w: playAreaWidth * 0.20, h: 90, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
+            p1Energy: { x: 20 + playAreaWidth * 0.56, y: h - 375, w: playAreaWidth * 0.22, h: 90, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 }
         };
         
         // Draw zones
@@ -238,13 +309,24 @@ class GameScene extends Phaser.Scene {
             this.zoneLabels.push(label);
         }
         
-        // Add counters display
-        this.deckCounters = this.add.text(25, h - 345, '', {
-            fontSize: '14px',
-            color: '#fff',
-            fontStyle: 'bold'
+        // Add counters display for both players
+        this.p1DeckCounters = this.add.text(25, h - 410, '', {
+            fontSize: '13px',
+            color: '#48bb78',
+            fontStyle: 'bold',
+            backgroundColor: '#1a202c',
+            padding: { x: 8, y: 4 }
         });
-        this.zoneLabels.push(this.deckCounters);
+        this.zoneLabels.push(this.p1DeckCounters);
+        
+        this.p2DeckCounters = this.add.text(25, headerHeight + 390, '', {
+            fontSize: '13px',
+            color: '#718096',
+            fontStyle: 'bold',
+            backgroundColor: '#1a202c',
+            padding: { x: 8, y: 4 }
+        });
+        this.zoneLabels.push(this.p2DeckCounters);
         
         // Add zone counter text objects
         this.zoneCounters = {};
@@ -254,7 +336,7 @@ class GameScene extends Phaser.Scene {
                 color: '#fff',
                 fontStyle: 'bold',
                 backgroundColor: '#000000',
-                padding: { x: 6, y: 3 }
+                padding: { x: 8, y: 4 }
             }).setOrigin(1, 1);
             this.zoneCounters[key] = counter;
             this.zoneLabels.push(counter);
@@ -282,11 +364,11 @@ class GameScene extends Phaser.Scene {
         this.uiElements.push(this.headerBg);
         
         // Back to menu button in header
-        const menuBtn = this.add.text(20, headerHeight / 2, '← Menu', {
+        const menuBtn = this.add.text(20, headerHeight / 2, 'Menu', {
             fontSize: '15px',
             color: '#ffffff',
             backgroundColor: '#4a5568',
-            padding: { x: 15, y: 10 },
+            padding: { x: 12, y: 6 },
             fontStyle: 'bold',
             borderRadius: 8
         }).setOrigin(0, 0.5);
@@ -306,6 +388,43 @@ class GameScene extends Phaser.Scene {
             fontStyle: 'bold',
             shadow: { blur: 10, color: '#e94560', fill: true }
         }).setOrigin(0.5);
+        
+        // Player stats in header (heart vector and blade count) - using images
+        this.p1StatsContainer = this.add.container(120, headerHeight / 2);
+        this.p1StatsLabel = this.add.text(0, 0, 'You: ', {
+            fontSize: '13px',
+            color: '#48bb78',
+            fontStyle: 'bold'
+        }).setOrigin(0, 0.5);
+        // Heart icons will be created dynamically
+        this.p1HeartIcons = [];
+        this.p1HeartCounts = [];
+        this.p1BladeIcon = this.add.image(110, 0, 'icon_blade').setScale(0.5).setOrigin(0, 0.5);
+        this.p1BladeCount = this.add.text(125, 0, '0', {
+            fontSize: '13px',
+            color: '#48bb78',
+            fontStyle: 'bold'
+        }).setOrigin(0, 0.5);
+        this.p1StatsContainer.add([this.p1StatsLabel, this.p1BladeIcon, this.p1BladeCount]);
+        this.uiElements.push(this.p1StatsContainer);
+        
+        this.p2StatsContainer = this.add.container(380, headerHeight / 2);
+        this.p2StatsLabel = this.add.text(0, 0, 'Opponent: ', {
+            fontSize: '13px',
+            color: '#718096',
+            fontStyle: 'bold'
+        }).setOrigin(0, 0.5);
+        // Heart icons will be created dynamically
+        this.p2HeartIcons = [];
+        this.p2HeartCounts = [];
+        this.p2BladeIcon = this.add.image(150, 0, 'icon_blade').setScale(0.5).setOrigin(0, 0.5);
+        this.p2BladeCount = this.add.text(165, 0, '0', {
+            fontSize: '13px',
+            color: '#718096',
+            fontStyle: 'bold'
+        }).setOrigin(0, 0.5);
+        this.p2StatsContainer.add([this.p2StatsLabel, this.p2BladeIcon, this.p2BladeCount]);
+        this.uiElements.push(this.p2StatsContainer);
         
         // Turn and phase info in header
         this.turnText = this.add.text(w - rightPanelWidth - 160, headerHeight / 2, 'Turn: 1', {
@@ -375,9 +494,50 @@ class GameScene extends Phaser.Scene {
                 fontSize: '16px',
                 color: '#ff6b6b',
                 backgroundColor: '#1a1a2e',
-                padding: { x: 20, y: 10 }
+                padding: { x: 12, y: 6 }
             }).setOrigin(0.5);
         }
+    }
+
+    calculateHeartVector(stage) {
+        if (!stage) return {};
+        const hearts = {};
+        const members = [stage.left_side, stage.center, stage.right_side];
+        members.forEach(member => {
+            if (member && member.card_no) {
+                // Look up card data to get heart information
+                const cardData = this.cardData.get(member.card_no);
+                if (cardData && cardData.base_heart) {
+                    // heart is an object like { heart01: 1, heart03: 2, heart06: 1 }
+                    // Handle all heart types dynamically, but exclude blade hearts (b_heart)
+                    // Blade hearts only exist on cards revealed by エール, not on stage members
+                    for (const [heartType, count] of Object.entries(cardData.base_heart)) {
+                        // Skip blade hearts (b_heart) - they are not on stage members
+                        if (count && !heartType.startsWith('b_heart')) {
+                            hearts[heartType] = (hearts[heartType] || 0) + count;
+                        }
+                    }
+                }
+            }
+        });
+        return hearts;
+    }
+
+    calculateBladeCount(stage) {
+        if (!stage) return '0';
+        let totalBlades = 0;
+        const members = [stage.left_side, stage.center, stage.right_side];
+        members.forEach(member => {
+            if (member && member.card_no) {
+                // Look up card data to get blade information
+                const cardData = this.cardData.get(member.card_no);
+                if (cardData && cardData.blade) {
+                    // blade is a number
+                    totalBlades += cardData.blade || 0;
+                }
+            }
+        });
+        return totalBlades.toString();
     }
 
     updateDisplay() {
@@ -390,6 +550,80 @@ class GameScene extends Phaser.Scene {
         // Update turn and phase text
         this.turnText.setText(`Turn: ${this.gameState.turn}`);
         this.phaseText.setText(`Phase: ${this.gameState.phase}`);
+        
+        // Update player stats (heart vector and blade count)
+        // Calculate heart vector from stage members
+        const p1Hearts = this.calculateHeartVector(this.gameState.player1?.stage);
+        const p1Blades = this.calculateBladeCount(this.gameState.player1?.stage);
+        const p2Hearts = this.calculateHeartVector(this.gameState.player2?.stage);
+        const p2Blades = this.calculateBladeCount(this.gameState.player2?.stage);
+        
+        // Clear old heart icons and counts
+        this.p1HeartIcons.forEach(icon => icon.destroy());
+        this.p1HeartCounts.forEach(count => count.destroy());
+        this.p1HeartIcons = [];
+        this.p1HeartCounts = [];
+        
+        this.p2HeartIcons.forEach(icon => icon.destroy());
+        this.p2HeartCounts.forEach(count => count.destroy());
+        this.p2HeartIcons = [];
+        this.p2HeartCounts = [];
+        
+        // Create dynamic heart icons for player 1
+        let xOffset = 35;
+        for (const [heartType, count] of Object.entries(p1Hearts).sort()) {
+            if (count > 0) {
+                // Extract the number from heartType (e.g., "heart01" -> "01")
+                const heartNum = heartType.replace('heart', '').replace('b_heart', 'b_');
+                const iconKey = `heart_${heartNum}`;
+                const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(0.5).setOrigin(0, 0.5);
+                const heartCount = this.add.text(xOffset + 13, 0, count.toString(), {
+                    fontSize: '11px',
+                    color: '#48bb78',
+                    fontStyle: 'bold'
+                }).setOrigin(0, 0.5);
+                
+                this.p1HeartIcons.push(heartIcon);
+                this.p1HeartCounts.push(heartCount);
+                this.p1StatsContainer.add([heartIcon, heartCount]);
+                xOffset += 25;
+            }
+        }
+        
+        // Reposition blade icon and count based on heart icons
+        this.p1BladeIcon.setX(xOffset);
+        this.p1BladeCount.setX(xOffset + 15);
+        
+        // Create dynamic heart icons for player 2
+        xOffset = 75;
+        for (const [heartType, count] of Object.entries(p2Hearts).sort()) {
+            if (count > 0) {
+                const heartNum = heartType.replace('heart', '').replace('b_heart', 'b_');
+                const iconKey = `heart_${heartNum}`;
+                const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(0.5).setOrigin(0, 0.5);
+                const heartCount = this.add.text(xOffset + 13, 0, count.toString(), {
+                    fontSize: '11px',
+                    color: '#718096',
+                    fontStyle: 'bold'
+                }).setOrigin(0, 0.5);
+                
+                this.p2HeartIcons.push(heartIcon);
+                this.p2HeartCounts.push(heartCount);
+                this.p2StatsContainer.add([heartIcon, heartCount]);
+                xOffset += 25;
+            }
+        }
+        
+        // Reposition blade icon and count based on heart icons
+        this.p2BladeIcon.setX(xOffset);
+        this.p2BladeCount.setX(xOffset + 15);
+        
+        if (this.p1BladeCount) {
+            this.p1BladeCount.setText(p1Blades);
+        }
+        if (this.p2BladeCount) {
+            this.p2BladeCount.setText(p2Blades);
+        }
         
         // Display cards with null checks
         if (this.gameState.player1?.hand?.cards) {
@@ -423,10 +657,15 @@ class GameScene extends Phaser.Scene {
             this.displayZone('p2Energy', this.gameState.player2.energy.cards);
         }
         
-        // Update deck and waitroom counters
-        if (this.deckCounters) {
-            this.deckCounters.setText(
-                `Deck: ${this.gameState.player1.main_deck_count} | Energy Deck: ${this.gameState.player1.energy_deck_count} | Waitroom: ${this.gameState.player1.waitroom_count}`
+        // Update deck and waitroom counters for both players
+        if (this.p1DeckCounters) {
+            this.p1DeckCounters.setText(
+                `You: Deck ${this.gameState.player1.main_deck_count} | Energy ${this.gameState.player1.energy_deck_count} | Waitroom ${this.gameState.player1.waitroom_count}`
+            );
+        }
+        if (this.p2DeckCounters) {
+            this.p2DeckCounters.setText(
+                `Opponent: Deck ${this.gameState.player2.main_deck_count} | Energy ${this.gameState.player2.energy_deck_count} | Waitroom ${this.gameState.player2.waitroom_count}`
             );
         }
         
@@ -558,6 +797,11 @@ class GameScene extends Phaser.Scene {
         // Check orientation - rotate if Wait
         const isWait = card.orientation === 'Wait';
         
+        // Rotate entire container if in Wait state
+        if (isWait) {
+            container.setRotation(Math.PI / 2);
+        }
+        
         if (this.textures.exists(imageKey)) {
             // Image already loaded, display it
             const texture = this.textures.get(imageKey);
@@ -572,10 +816,12 @@ class GameScene extends Phaser.Scene {
             
             cardImage.setScale(scale);
             
-            // Rotate 90 degrees if in Wait state (tapped)
-            if (isWait) {
-                cardImage.setRotation(Math.PI / 2);
-            }
+            // Remove background when image is loaded
+            container.each(child => {
+                if (child.type === 'Graphics') {
+                    child.destroy();
+                }
+            });
             
             container.add(cardImage);
         } else {
@@ -590,9 +836,9 @@ class GameScene extends Phaser.Scene {
                         // Image loaded, update all pending containers
                         const containers = this.pendingImageUpdates.get(imageKey) || [];
                         containers.forEach(c => {
-                            // Remove the placeholder text if it exists
+                            // Remove the placeholder text and background if they exist
                             c.each(child => {
-                                if (child.type === 'Text') {
+                                if (child.type === 'Text' || child.type === 'Graphics') {
                                     child.destroy();
                                 }
                             });
@@ -608,11 +854,6 @@ class GameScene extends Phaser.Scene {
                             const scale = Math.min(scaleX, scaleY) * 0.95;
                             
                             cardImage.setScale(scale);
-                            
-                            // Rotate if in Wait state
-                            if (c.cardData && c.cardData.orientation === 'Wait') {
-                                cardImage.setRotation(Math.PI / 2);
-                            }
                             
                             c.add(cardImage);
                         });
@@ -653,14 +894,6 @@ class GameScene extends Phaser.Scene {
             container.add(nameText);
         }
         
-        // Card type indicator
-        const typeColor = card.card_type === 'Live' ? 0x805ad5 : 
-                         card.card_type === 'Energy' ? 0x38a169 : 0x3182ce;
-        const typeBg = this.add.graphics();
-        typeBg.fillStyle(typeColor, 1);
-        typeBg.fillRoundedRect(2, 2, 20, 12, 3);
-        container.add(typeBg);
-        
         container.setSize(width, height);
         this.cardContainers.push(container);
     }
@@ -683,12 +916,11 @@ class GameScene extends Phaser.Scene {
         
         const panelX = this.actionsPanelX;
         const panelWidth = this.actionsPanelWidth;
-        const startY = this.actionsPanelY + 50;
+        const startY = this.actionsPanelY + 70;
         const buttonWidth = panelWidth - 20;
         
         // Separate Pass action and make it prominent
         const passAction = this.actions.find(a => a.action_type === 'pass');
-        console.log('Pass action found:', passAction);
         const otherActions = this.actions.filter(a => a.action_type !== 'pass');
         
         let currentIndex = 0;
@@ -696,11 +928,11 @@ class GameScene extends Phaser.Scene {
         // Pass button - large and prominent
         if (passAction) {
             const passIndex = this.actions.indexOf(passAction);
-            const passBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 55, '⏭ PASS TURN', {
+            const passBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 55, 'PASS TURN', {
                 fontSize: '18px',
                 color: '#ffffff',
                 backgroundColor: '#e94560',
-                padding: { x: 30, y: 12 },
+                padding: { x: 20, y: 10 },
                 fontStyle: 'bold',
                 fixedWidth: buttonWidth,
                 align: 'center'
@@ -715,26 +947,73 @@ class GameScene extends Phaser.Scene {
             currentIndex++;
         }
         
-        // Other action buttons
+        // Other action buttons - check if they have available_areas for grouping
         otherActions.forEach((action) => {
             const actionIndex = this.actions.indexOf(action);
-            const btn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 45, action.description, {
-                fontSize: '12px',
-                color: '#fff',
-                backgroundColor: '#2d3748',
-                padding: { x: 15, y: 10 },
-                fixedWidth: buttonWidth,
-                align: 'center',
-                wordWrap: { width: buttonWidth - 30 }
-            }).setOrigin(0.5);
+            const params = action.parameters;
             
-            btn.setInteractive({ useHandCursor: true })
-               .on('pointerover', () => btn.setStyle({ backgroundColor: '#4a5568', color: '#e94560' }))
-               .on('pointerout', () => btn.setStyle({ backgroundColor: '#2d3748', color: '#fff' }))
-               .on('pointerdown', () => this.executeAction(actionIndex));
-            
-            this.actionButtons.push(btn);
-            currentIndex++;
+            // Check if this is a grouped card action with available_areas
+            if (params && params.available_areas && params.available_areas.length > 0) {
+                // Card title with base cost
+                const titleText = this.add.text(panelX + 10, startY + currentIndex * 80, action.description, {
+                    fontSize: '14px',
+                    color: '#e94560',
+                    fontStyle: 'bold',
+                    backgroundColor: '#1a202c',
+                    padding: { x: 8, y: 4 }
+                }).setOrigin(0, 0.5);
+                this.actionButtons.push(titleText);
+                
+                // Area buttons for left, center, right
+                const areas = params.available_areas;
+                const buttonWidthSmall = (buttonWidth - 20) / 3;
+                
+                areas.forEach((areaInfo, i) => {
+                    if (areaInfo.available) {
+                        const label = areaInfo.area.charAt(0).toUpperCase() + areaInfo.area.slice(1);
+                        const costText = areaInfo.is_baton_touch ? 
+                            `${label} (${areaInfo.cost} - Baton)` : 
+                            `${label} (${areaInfo.cost})`;
+                        
+                        const btn = this.add.text(panelX + 10 + i * buttonWidthSmall, startY + currentIndex * 80 + 25, costText, {
+                            fontSize: '11px',
+                            color: '#fff',
+                            backgroundColor: areaInfo.is_baton_touch ? '#48bb78' : '#2d3748',
+                            padding: { x: 8, y: 4 },
+                            fixedWidth: buttonWidthSmall - 5,
+                            align: 'center'
+                        }).setOrigin(0, 0.5);
+                        
+                        btn.setInteractive({ useHandCursor: true })
+                           .on('pointerover', () => btn.setStyle({ backgroundColor: areaInfo.is_baton_touch ? '#68d391' : '#4a5568', color: '#e94560' }))
+                           .on('pointerout', () => btn.setStyle({ backgroundColor: areaInfo.is_baton_touch ? '#48bb78' : '#2d3748', color: '#fff' }))
+                           .on('pointerdown', () => this.executeActionWithArea(actionIndex, areaInfo.area));
+                        
+                        this.actionButtons.push(btn);
+                    }
+                });
+                
+                currentIndex++;
+            } else {
+                // Regular action button (not grouped)
+                const btn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 45, action.description, {
+                    fontSize: '12px',
+                    color: '#fff',
+                    backgroundColor: '#2d3748',
+                    padding: { x: 12, y: 6 },
+                    fixedWidth: buttonWidth,
+                    align: 'center',
+                    wordWrap: { width: buttonWidth - 30 }
+                }).setOrigin(0.5);
+                
+                btn.setInteractive({ useHandCursor: true })
+                   .on('pointerover', () => btn.setStyle({ backgroundColor: '#4a5568', color: '#e94560' }))
+                   .on('pointerout', () => btn.setStyle({ backgroundColor: '#2d3748', color: '#fff' }))
+                   .on('pointerdown', () => this.executeAction(actionIndex));
+                
+                this.actionButtons.push(btn);
+                currentIndex++;
+            }
         });
         
         // No actions message
@@ -744,6 +1023,29 @@ class GameScene extends Phaser.Scene {
                 color: '#718096'
             }).setOrigin(0.5);
             this.actionButtons.push(noActions);
+        }
+    }
+
+    async executeActionWithArea(actionIndex, stageArea) {
+        try {
+            const action = this.actions[actionIndex];
+            // Create a modified action with the selected stage_area
+            const modifiedAction = {
+                action_index: actionIndex,
+                stage_area: stageArea
+            };
+            
+            const response = await fetch('/api/execute-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(modifiedAction)
+            });
+            
+            if (response.ok) {
+                await this.loadGameState();
+            }
+        } catch (error) {
+            console.error('Failed to execute action:', error);
         }
     }
 

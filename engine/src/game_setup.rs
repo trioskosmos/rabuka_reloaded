@@ -4,6 +4,7 @@
 use crate::game_state::GameState;
 use crate::player::Player;
 use serde::{Serialize, Deserialize};
+use std::vec::Vec;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Action {
@@ -17,6 +18,22 @@ pub struct ActionParameters {
     pub card_index: Option<usize>,
     pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
     pub stage_area: Option<String>, // "left", "center", "right"
+    pub use_baton_touch: Option<bool>, // Whether to use baton touch cost reduction
+    // Card grouping information for improved UI
+    pub card_name: Option<String>,
+    pub card_no: Option<String>,
+    pub base_cost: Option<u32>,
+    pub final_cost: Option<u32>,
+    pub available_areas: Option<Vec<AreaInfo>>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AreaInfo {
+    pub area: String, // "left", "center", "right"
+    pub available: bool,
+    pub cost: u32,
+    pub is_baton_touch: bool,
+    pub existing_member_name: Option<String>,
 }
 
 pub fn setup_game(game_state: &mut GameState) {
@@ -132,6 +149,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     card_index: Some(0), // 0 = rock
                     card_indices: None,
                     stage_area: Some("rock".to_string()),
+                    use_baton_touch: None,
+                    card_name: None,
+                    card_no: None,
+                    base_cost: None,
+                    final_cost: None,
+                    available_areas: None,
                 }),
             });
             actions.push(Action {
@@ -141,6 +164,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     card_index: Some(1), // 1 = paper
                     card_indices: None,
                     stage_area: Some("paper".to_string()),
+                    use_baton_touch: None,
+                    card_name: None,
+                    card_no: None,
+                    base_cost: None,
+                    final_cost: None,
+                    available_areas: None,
                 }),
             });
             actions.push(Action {
@@ -150,6 +179,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     card_index: Some(2), // 2 = scissors
                     card_indices: None,
                     stage_area: Some("scissors".to_string()),
+                    use_baton_touch: None,
+                    card_name: None,
+                    card_no: None,
+                    base_cost: None,
+                    final_cost: None,
+                    available_areas: None,
                 }),
             });
         }
@@ -185,6 +220,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         card_index: Some(hand_index),
                         card_indices: None,
                         stage_area: None,
+                        use_baton_touch: None,
+                        card_name: None,
+                        card_no: None,
+                        base_cost: None,
+                        final_cost: None,
+                        available_areas: None,
                     }),
                 });
             }
@@ -197,6 +238,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     card_index: None,
                     card_indices: Some(vec![]), // Will use tracked indices from game state
                     stage_area: None,
+                    use_baton_touch: None,
+                    card_name: None,
+                    card_no: None,
+                    base_cost: None,
+                    final_cost: None,
+                    available_areas: None,
                 }),
             });
             
@@ -228,10 +275,15 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             });
             
             // Rule 7.7.2.2: Main Phase - Can play member cards to stage
-            // Generate specific actions for each member card and each available area
+            // Group actions by card with area information for improved UI
             // Only generate member cards (not live cards) - live cards are used in live phase
             for (hand_index, card) in active_player.hand.cards.iter().enumerate() {
                 if card.is_member() && !card.is_live() {
+                    let card_cost = card.cost.unwrap_or(0);
+                    let active_energy_count = active_player.energy_zone.cards.iter()
+                        .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
+                        .count() as u32;
+                    
                     // Check which areas are available
                     let areas = [
                         (crate::zones::MemberArea::LeftSide, "left"),
@@ -239,61 +291,118 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         (crate::zones::MemberArea::RightSide, "right"),
                     ];
                     
+                    let mut available_areas = Vec::new();
+                    let mut has_any_available = false;
+                    
                     for (area, area_name) in areas {
-                        let card_cost = card.cost.unwrap_or(0);
-                        let mut cost_to_pay = card_cost;
+                        let mut area_info = AreaInfo {
+                            area: area_name.to_string(),
+                            available: false,
+                            cost: card_cost,
+                            is_baton_touch: false,
+                            existing_member_name: None,
+                        };
                         
                         // Check if area is occupied for baton touch
                         if let Some(existing_member) = active_player.stage.get_area(area) {
-                            // Baton touch - replace existing member
-                            // Rule 9.6.2.3.2: Baton touch requires 1+ active energy to trigger
-                            let active_energy_count = active_player.energy_zone.cards.iter()
-                                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-                                .count() as u32;
-                            
-                            // Q206: Wait-state members don't reduce cost in baton touch
-                            let is_wait_state = existing_member.orientation != Some(crate::zones::Orientation::Active);
-                            
-                            if active_energy_count >= 1 && !is_wait_state {
-                                let member_cost = existing_member.card.cost.unwrap_or(0);
-                                cost_to_pay = cost_to_pay.saturating_sub(member_cost);
+                            // Rule 9.6.2.1.2.1: Cannot baton touch to an area that had a card moved from non-stage to stage this turn
+                            if active_player.areas_locked_this_turn.contains(&area) {
+                                // Area locked, not available
+                            } else {
+                                // Baton touch - replace existing member
+                                // Rule 9.6.2.3.2: Baton touch requires 1+ active energy to trigger
+                                let is_wait_state = existing_member.orientation != Some(crate::zones::Orientation::Active);
                                 
-                                if active_energy_count >= cost_to_pay {
-                                    actions.push(Action {
-                                        description: format!("Baton Touch: Play {} ({}) to {} (replaces {})", card.name, card.card_no, area_name, existing_member.card.name),
-                                        action_type: "play_member_to_stage".to_string(),
-                                        parameters: Some(ActionParameters {
-                                            card_index: Some(hand_index),
-                                            card_indices: None,
-                                            stage_area: Some(area_name.to_string()),
-                                        }),
-                                    });
+                                if active_energy_count >= 1 && !is_wait_state {
+                                    let member_cost = existing_member.card.cost.unwrap_or(0);
+                                    let cost_to_pay = card_cost.saturating_sub(member_cost);
+                                    
+                                    if active_energy_count >= cost_to_pay {
+                                        area_info.available = true;
+                                        area_info.cost = cost_to_pay;
+                                        area_info.is_baton_touch = true;
+                                        area_info.existing_member_name = Some(existing_member.card.name.clone());
+                                        has_any_available = true;
+                                    }
                                 }
                             }
                         } else {
                             // Play to empty area
-                            let active_energy_count = active_player.energy_zone.cards.iter()
-                                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-                                .count() as u32;
-                            
-                            if active_energy_count >= cost_to_pay {
-                                actions.push(Action {
-                                    description: format!("Play {} ({}) to {} area", card.name, card.card_no, area_name),
-                                    action_type: "play_member_to_stage".to_string(),
-                                    parameters: Some(ActionParameters {
-                                        card_index: Some(hand_index),
-                                        card_indices: None,
-                                        stage_area: Some(area_name.to_string()),
-                                    }),
-                                });
+                            if active_energy_count >= card_cost {
+                                area_info.available = true;
+                                area_info.cost = card_cost;
+                                has_any_available = true;
                             }
                         }
+                        
+                        available_areas.push(area_info);
+                    }
+                    
+                    // Only add card action if at least one area is available
+                    if has_any_available {
+                        actions.push(Action {
+                            description: format!("{} ({}) - Cost: {}", card.name, card.card_no, card_cost),
+                            action_type: "play_member_to_stage".to_string(),
+                            parameters: Some(ActionParameters {
+                                card_index: Some(hand_index),
+                                card_indices: None,
+                                stage_area: None, // Will be selected from available_areas
+                                use_baton_touch: None, // Web app will set based on selected area's is_baton_touch
+                                card_name: Some(card.name.clone()),
+                                card_no: Some(card.card_no.clone()),
+                                base_cost: Some(card_cost),
+                                final_cost: None, // Will be determined by area selection
+                                available_areas: Some(available_areas),
+                            }),
+                        });
                     }
                 }
             }
             
-            // Basic abilityless play - only pass and play member cards
-            // Advanced actions (swap, pay energy, place energy under members) removed for basic play
+            // Check stage cards for abilities that can be activated
+            let stage_positions = [
+                (&active_player.stage.center, crate::zones::MemberArea::Center, "center"),
+                (&active_player.stage.left_side, crate::zones::MemberArea::LeftSide, "left"),
+                (&active_player.stage.right_side, crate::zones::MemberArea::RightSide, "right"),
+            ];
+            
+            for (card_in_zone_opt, _area, area_name) in stage_positions {
+                if let Some(card_in_zone) = card_in_zone_opt {
+                    let card = &card_in_zone.card;
+                    for (_ability_index, ability) in card.abilities.iter().enumerate() {
+                        // Check if ability can be activated (has main phase trigger)
+                        // triggers is a String field, check if it contains "main"
+                        let can_activate = ability.triggers.as_ref().map_or(false, |t| {
+                            t.contains("main") || t.contains("メイン")
+                        });
+                        
+                        if can_activate {
+                            let _ability_name = if ability.full_text.len() > 30 {
+                                format!("{}...", &ability.full_text[..30])
+                            } else {
+                                ability.full_text.clone()
+                            };
+                            let ability_cost = ability.cost.as_ref().and_then(|c| c.energy).unwrap_or(0);
+                            
+                            actions.push(Action {
+                                description: format!("Use ability on {} ({})", card.name, area_name),
+                                action_type: "use_ability".to_string(),
+                                parameters: Some(ActionParameters {
+                                    card_index: None,
+                                    card_indices: None,
+                                    stage_area: Some(area_name.to_string()),
+                                    use_baton_touch: None,
+                                    card_name: Some(card.name.clone()),
+                                    card_no: Some(card.card_no.clone()),
+                                    base_cost: Some(ability_cost),
+                                    final_cost: Some(ability_cost),
+                                    available_areas: None,
+                                }),
+                            });
+                        }
+                    }
+                }
+            }
         }
         crate::game_state::Phase::LiveCardSet => {
             // Rule 8.2: Live Card Set Phase - Can place up to 3 cards face-down
@@ -311,8 +420,14 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 action_type: "place_live_cards".to_string(),
                 parameters: Some(ActionParameters {
                     card_index: None,
-                    card_indices: Some(vec![]),
+                    card_indices: None,
                     stage_area: None,
+                    use_baton_touch: None,
+                    card_name: None,
+                    card_no: None,
+                    base_cost: None,
+                    final_cost: None,
+                    available_areas: None,
                 }),
             });
             
@@ -326,6 +441,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                             card_index: Some(hand_index),
                             card_indices: Some(vec![hand_index]),
                             stage_area: None,
+                            use_baton_touch: None,
+                            card_name: None,
+                            card_no: None,
+                            base_cost: None,
+                            final_cost: None,
+                            available_areas: None,
                         }),
                     });
                 }

@@ -4,6 +4,7 @@
 //
 // DO NOT SIMPLIFY THE GAME FOR THE AI. FOLLOW RULES.TXT. MAKE SURE ALL GAME MECHANICS ARE PRESENT.
 
+use std::vec::Vec;
 use crate::player::Player;
 
 /// AI strategy for choosing actions

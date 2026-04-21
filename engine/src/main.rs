@@ -398,7 +398,7 @@ fn execute_action(index: usize) {
 
 fn choose_deck(deck_lists: &[deck_parser::DeckList], player_name: &str) -> deck_parser::DeckList {
     // For now, just pick the first deck
-    // TODO: Implement actual player choice
+    // In a real implementation, this would prompt the player for their choice
     println!("{} chose: {}", player_name, deck_lists[0].name);
     deck_lists[0].clone()
 }

@@ -1,5 +1,6 @@
 // Headless game mode for automated testing
 // This is separated from core game logic to keep the engine clean
+#![allow(dead_code)]
 
 use crate::card_loader;
 use crate::deck_builder;
@@ -10,9 +11,6 @@ use crate::turn;
 use crate::game_setup;
 use crate::bot::ai;
 use serde::{Serialize, Deserialize};
-use serde_json;
-use std::fs::File;
-use std::io::Write;
 
 #[derive(Serialize, Deserialize, Clone)]
 struct CardDisplay {
@@ -392,6 +390,7 @@ pub fn run_headless_game() {
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
             crate::game_state::Phase::Mulligan => {
@@ -409,6 +408,7 @@ pub fn run_headless_game() {
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
             crate::game_state::Phase::Active | 
@@ -436,7 +436,7 @@ pub fn run_headless_game() {
                     println!("Choosing: {}", actions[chosen_index].description);
                     
                     // Execute the chosen action
-                    let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type, actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index), actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()));
+                    let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type, actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index), actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch));
                     
                     // Print state after action for first few iterations
                     if turn_count <= 20 {
@@ -624,6 +624,7 @@ fn execute_action_and_log(game_state: &mut GameState, action: &crate::game_setup
         action.parameters.as_ref().and_then(|p| p.card_index),
         action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
         action.parameters.as_ref().and_then(|p| p.stage_area.clone()),
+        action.parameters.as_ref().and_then(|p| p.use_baton_touch),
     );
     
     match result {

@@ -8,6 +8,7 @@ use crate::game_state::GameState;
 use crate::player::Player;
 use crate::turn;
 use crate::game_setup;
+use std::vec::Vec;
 
 fn validate_game_state(game_state: &GameState) -> Vec<String> {
     let mut issues = Vec::new();
@@ -221,7 +222,8 @@ pub fn run_test_mode() {
                             "place_live_cards",
                             None,
                             Some(indices),
-                            None
+                            None,
+                            None,
                         ) {
                             Ok(_) => eprintln!("  Cards placed successfully"),
                             Err(e) => {
@@ -247,7 +249,8 @@ pub fn run_test_mode() {
                         "rps_choice",
                         None,
                         None,
-                        Some("rock".to_string())
+                        Some("rock".to_string()),
+                        None,
                     );
                 }
                 crate::game_state::Phase::Mulligan => {
@@ -257,7 +260,8 @@ pub fn run_test_mode() {
                         "skip_mulligan",
                         None,
                         None,
-                        None
+                        None,
+                        None,
                     );
                 }
                 crate::game_state::Phase::Main => {
@@ -287,6 +291,7 @@ pub fn run_test_mode() {
                     action.parameters.as_ref().and_then(|p| p.card_index),
                     action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
                     action.parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    action.parameters.as_ref().and_then(|p| p.use_baton_touch),
                 ) {
                     Ok(_) => {
                         println!("✓ Action executed");

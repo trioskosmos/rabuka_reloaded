@@ -3,10 +3,11 @@ use crate::zones::ResolutionZone;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbilityTrigger {
-    Activation,      // 起動
-    Debut,          // 登場
-    LiveStart,      // ライブ開始時
-    LiveSuccess,    // ライブ成功時
+    Activation,           // 起動
+    Debut,               // 登場
+    LiveStart,           // ライブ開始時
+    LiveSuccess,         // ライブ成功時
+    PerformancePhaseStart, // パフォーマンスフェイズの始めに (8.3.3)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,6 +95,13 @@ pub struct GameState {
     pub mulligan_player2_done: bool,
     pub current_mulligan_player: String, // "player1" or "player2"
     pub mulligan_selected_indices: Vec<usize>, // Track selected card indices for mulligan
+    // Live card set tracking
+    pub live_card_set_player1_done: bool,
+    pub live_card_set_player2_done: bool,
+    // Undo/redo history
+    pub history: Vec<GameState>,
+    pub future: Vec<GameState>,
+    pub max_history_size: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +140,11 @@ impl GameState {
             mulligan_player2_done: false,
             current_mulligan_player: String::new(),
             mulligan_selected_indices: Vec::new(),
+            live_card_set_player1_done: false,
+            live_card_set_player2_done: false,
+            history: Vec::new(),
+            future: Vec::new(),
+            max_history_size: 100,
         }
     }
 
@@ -401,9 +414,7 @@ impl GameState {
     }
     
     fn execute_card_ability(&mut self, card_no: &str, player_id: &str) {
-        // Find the card and its abilities, then execute them directly on game state
-        // Note: We execute effects directly to avoid cloning the game state
-        
+        // Find the card and its abilities, then execute them using AbilityResolver
         
         let player_id_clone = player_id.to_string();
         let player = if player_id_clone == self.player1.id {
@@ -442,14 +453,15 @@ impl GameState {
         
         if let Some(card) = card {
             let abilities = card.abilities.clone();
-            for (i, ability) in abilities.iter().enumerate() {
-                if let Some(ref effect) = ability.effect {
-                    // Execute effect directly on self (the actual game state)
-                    // For now, we'll implement basic effects inline
-                    self.execute_ability_effect(effect, &player_id_clone);
+            for ability in abilities.iter() {
+                // Use AbilityResolver to evaluate conditions and execute effects
+                let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+                if let Err(e) = resolver.resolve_ability(ability) {
+                    eprintln!("Failed to resolve ability: {}", e);
                 }
             }
         } else {
+            eprintln!("Card not found: {}", card_no);
         }
     }
     
@@ -587,19 +599,19 @@ impl GameState {
                 };
                 match source {
                     "deck_top" => {
-                        let cards_to_look: Vec<_> = player.main_deck.cards.iter()
+                        let _cards_to_look: Vec<_> = player.main_deck.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
                     }
                     "hand" => {
-                        let cards_to_look: Vec<_> = player.hand.cards.iter()
+                        let _cards_to_look: Vec<_> = player.hand.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
                     }
                     "discard" | "控え室" => {
-                        let cards_to_look: Vec<_> = player.waitroom.cards.iter()
+                        let _cards_to_look: Vec<_> = player.waitroom.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
@@ -618,13 +630,13 @@ impl GameState {
                 };
                 match source {
                     "deck" | "デッキ" => {
-                        let cards_to_reveal: Vec<_> = player.main_deck.cards.iter()
+                        let _cards_to_reveal: Vec<_> = player.main_deck.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
                     }
                     "hand" | "手札" => {
-                        let cards_to_reveal: Vec<_> = player.hand.cards.iter()
+                        let _cards_to_reveal: Vec<_> = player.hand.cards.iter()
                             .take(count as usize)
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
@@ -654,7 +666,7 @@ impl GameState {
                 }
             }
             "change_state" => {
-                let state_change = effect.state_change.as_deref().unwrap_or("");
+                let _state_change = effect.state_change.as_deref().unwrap_or("");
                 // Change card state to active/wait
             }
             "modify_required_hearts" => {
@@ -785,12 +797,12 @@ impl GameState {
                 }
             }
             "position_change" => {
-                let position = effect.position.as_ref().and_then(|p| p.position.as_deref()).unwrap_or("");
+                let _position = effect.position.as_ref().and_then(|p| p.position.as_deref()).unwrap_or("");
                 // Position change requires user choice - simplified for now
             }
             "place_energy_under_member" => {
                 let energy_count = effect.energy_count.unwrap_or(1);
-                let target_member = effect.target_member.as_deref().unwrap_or("this_member");
+                let _target_member = effect.target_member.as_deref().unwrap_or("this_member");
                 
                 let player = if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
                 
@@ -828,7 +840,7 @@ impl GameState {
                 // Conditional alternative - requires condition evaluation
             }
             "modify_cost" => {
-                let count = effect.count.unwrap_or(1);
+                let _count = effect.count.unwrap_or(1);
                 // Modify card cost - would need to track cost modifiers
             }
             "draw_until_count" => {
@@ -847,7 +859,7 @@ impl GameState {
                 // This is a complex effect that requires player choice
             }
             "activation_cost" => {
-                let count = effect.count.unwrap_or(0);
+                let _count = effect.count.unwrap_or(0);
                 // Activation cost is handled separately in cost payment
             }
             "custom" => {
@@ -1004,6 +1016,9 @@ impl GameState {
                     ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時")
                         && self.should_trigger_live_success(player)
                 }
+                AbilityTrigger::PerformancePhaseStart => {
+                    ability.triggers.as_ref().map_or(false, |t| t == "パフォーマンスフェイズの始めに")
+                }
             }
         }).collect()
     }
@@ -1056,9 +1071,24 @@ impl GameState {
 
         // Remove expired effects (in reverse order to maintain indices)
         for i in expired_indices.into_iter().rev() {
-            let _effect = self.temporary_effects.remove(i);
-            // Revert the effect (for now, just log it)
-            // TODO: Implement effect reversal logic
+            let effect = self.temporary_effects.remove(i);
+            // Revert the effect based on effect type
+            // For now, this is a simplified implementation
+            // Full implementation would track and revert specific effect changes
+            match effect.effect_type.as_str() {
+                "activation_cost_increase" => {
+                    // Remove cost increase from prohibition effects
+                    self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
+                }
+                "activation_cost_decrease" => {
+                    // Remove cost decrease from prohibition effects
+                    self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
+                }
+                _ => {
+                    // Log other effect expirations
+                    eprintln!("Expired effect: {}", effect.description);
+                }
+            }
         }
     }
 
@@ -1068,5 +1098,61 @@ impl GameState {
             .iter()
             .filter(|e| e.target_player_id == player_id)
             .collect()
+    }
+
+    /// Save current state to history before making a change
+    pub fn save_state(&mut self) {
+        // Clear future when making a new change
+        self.future.clear();
+        
+        // Add current state to history
+        self.history.push(self.clone());
+        
+        // Limit history size
+        if self.history.len() > self.max_history_size {
+            self.history.remove(0);
+        }
+    }
+
+    /// Undo to previous state
+    pub fn undo(&mut self) -> Result<(), String> {
+        if self.history.is_empty() {
+            return Err("No history to undo".to_string());
+        }
+        
+        // Save current state to future
+        self.future.push(self.clone());
+        
+        // Restore previous state
+        let previous = self.history.pop().unwrap();
+        *self = previous;
+        
+        Ok(())
+    }
+
+    /// Redo to next state
+    pub fn redo(&mut self) -> Result<(), String> {
+        if self.future.is_empty() {
+            return Err("No future to redo".to_string());
+        }
+        
+        // Save current state to history
+        self.history.push(self.clone());
+        
+        // Restore next state
+        let next = self.future.pop().unwrap();
+        *self = next;
+        
+        Ok(())
+    }
+
+    /// Check if undo is available
+    pub fn can_undo(&self) -> bool {
+        !self.history.is_empty()
+    }
+
+    /// Check if redo is available
+    pub fn can_redo(&self) -> bool {
+        !self.future.is_empty()
     }
 }

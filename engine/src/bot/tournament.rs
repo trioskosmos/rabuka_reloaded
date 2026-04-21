@@ -9,6 +9,8 @@ use crate::player::Player;
 use crate::turn;
 use crate::game_setup;
 use crate::bot::ai;
+use std::vec::Vec;
+use std::string::String;
 
 pub fn run_tournament() {
     println!("=== Deck Tournament ===\n");
@@ -185,6 +187,7 @@ fn run_single_game(
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
                 
                 if let Err(e) = result {
@@ -204,6 +207,7 @@ fn run_single_game(
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
                 
                 if let Err(e) = result {
@@ -238,12 +242,12 @@ fn run_single_game(
                         let can_afford = player.can_play_member_to_stage();
                         if !can_afford {
                             println!("Cannot afford member, passing instead");
-                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, "pass", None, None, None);
+                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, "pass", None, None, None, None);
                         } else {
-                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None);
+                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None, None);
                         }
                     } else {
-                        let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None);
+                        let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None, None);
                     }
                     
                     // Auto-advance automatic phases after action execution
@@ -274,10 +278,13 @@ fn run_single_game(
                 // Rule 8.3: First attacker performs (automatic)
                 let blade_heart_count = {
                     let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
+                    let player_id = if game_state.player1.is_first_attacker {
+                        game_state.player1.id.clone()
+                    } else {
+                        game_state.player2.id.clone()
+                    };
                     let player = game_state.first_attacker_mut();
-                    let result = turn::TurnEngine::player_perform_live(player, &mut resolution_zone);
-                    game_state.resolution_zone = resolution_zone;
-                    result
+                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id)
                 };
                 game_state.player1_cheer_blade_heart_count = blade_heart_count;
                 game_state.current_phase = crate::game_state::Phase::SecondAttackerPerformance;
@@ -286,10 +293,13 @@ fn run_single_game(
                 // Rule 8.3: Second attacker performs (automatic)
                 let blade_heart_count = {
                     let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
+                    let player_id = if game_state.player1.is_first_attacker {
+                        game_state.player2.id.clone()
+                    } else {
+                        game_state.player1.id.clone()
+                    };
                     let player = game_state.second_attacker_mut();
-                    let result = turn::TurnEngine::player_perform_live(player, &mut resolution_zone);
-                    game_state.resolution_zone = resolution_zone;
-                    result
+                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id)
                 };
                 game_state.player2_cheer_blade_heart_count = blade_heart_count;
                 game_state.current_phase = crate::game_state::Phase::LiveVictoryDetermination;

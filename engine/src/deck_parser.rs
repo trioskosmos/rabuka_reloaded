@@ -1,5 +1,7 @@
 use std::fs;
 use std::path::Path;
+use std::vec::Vec;
+use std::string::String;
 
 #[derive(Debug, Clone)]
 pub struct DeckEntry {

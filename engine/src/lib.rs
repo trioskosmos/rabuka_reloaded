@@ -1,3 +1,5 @@
+#![recursion_limit = "512"]
+
 pub mod card;
 pub mod zones;
 pub mod player;

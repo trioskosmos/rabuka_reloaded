@@ -218,17 +218,26 @@ pub struct SpecialHeart {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ability {
+    #[serde(default = "default_empty_string")]
     pub full_text: String,
+    #[serde(default = "default_empty_string")]
     pub triggerless_text: String,
     pub triggers: Option<String>,
     pub use_limit: Option<u32>,
+    #[serde(default)]
     pub is_null: bool,
     pub cost: Option<AbilityCost>,
     pub effect: Option<AbilityEffect>,
+    pub keywords: Option<Vec<Keyword>>,
+}
+
+fn default_empty_string() -> String {
+    String::new()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbilityCost {
+    #[serde(default = "default_empty_string")]
     pub text: String,
     #[serde(rename = "type")]
     pub cost_type: Option<String>,
@@ -246,7 +255,9 @@ pub struct AbilityCost {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AbilityEffect {
+    #[serde(default = "default_empty_string")]
     pub text: String,
+    #[serde(default = "default_empty_string")]
     pub action: String,
     pub source: Option<String>,
     pub destination: Option<String>,
@@ -266,6 +277,7 @@ pub struct AbilityEffect {
     pub effect_constraint: Option<String>,
     pub shuffle_target: Option<String>,
     pub icon_count: Option<IconCount>,
+    pub resource_icon_count: Option<u32>,
     pub ability_gain: Option<String>,
     pub quoted_text: Option<QuotedText>,
     pub per_unit: Option<bool>,
@@ -294,7 +306,6 @@ pub struct AbilityEffect {
     pub is_further: Option<bool>,
     pub cost_result_reference: Option<bool>,
     pub dynamic_count: Option<DynamicCount>,
-    pub resource_icon_count: Option<u32>,
     pub placement_order: Option<String>,
     pub cost_limit: Option<u32>,
     pub unit: Option<String>,
