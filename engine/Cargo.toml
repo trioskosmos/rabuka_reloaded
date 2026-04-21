@@ -11,3 +11,15 @@ actix-web = "4.4"
 actix-cors = "0.6"
 actix-files = "0.6"
 tokio = { version = "1.35", features = ["full"] }
+smallvec = "1.11"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "performance"
+harness = false
+
+[[bin]]
+name = "run_qa_tests"
+path = "src/run_qa_tests.rs"

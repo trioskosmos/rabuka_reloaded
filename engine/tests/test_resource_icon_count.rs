@@ -1,10 +1,10 @@
-// Test resource_icon_count functionality
-// This tests that the resource_icon_count field from abilities.json is properly used
+// Comprehensive QA tests for resource_icon_count functionality
+// These tests use real cards from cards.json and test edge cases
+// to ensure the engine correctly handles resource icon counting
 
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::ability_resolver::AbilityResolver;
 use rabuka_engine::player::Player;
-use rabuka_engine::zones::{CardInZone, Orientation, FaceState};
 use rabuka_engine::card::{Ability, AbilityEffect};
 use rabuka_engine::game_state::{GameState, TurnPhase, Phase, GameResult};
 use rabuka_engine::zones::ResolutionZone;
@@ -20,9 +20,15 @@ fn load_cards() -> Vec<Card> {
 
 /// Create a standard test GameState with default values
 fn create_test_game_state(player1: Player, player2: Player) -> GameState {
+    use rabuka_engine::card::CardDatabase;
+    use std::sync::Arc;
+    
+    let card_database = Arc::new(CardDatabase::load_or_create(vec![]));
+    
     GameState {
         player1,
         player2,
+        card_database,
         current_turn_phase: TurnPhase::FirstAttackerNormal,
         current_phase: Phase::Active,
         turn_number: 1,
@@ -50,29 +56,16 @@ fn create_test_game_state(player1: Player, player2: Player) -> GameState {
         history: Vec::new(),
         future: Vec::new(),
         max_history_size: 100,
-    }
-}
-
-/// Create a CardInZone for placing a card on stage
-fn create_card_in_zone(card: &Card) -> CardInZone {
-    CardInZone {
-        card: card.clone(),
-        orientation: Some(Orientation::Active),
-        face_state: FaceState::FaceUp,
-        energy_underneath: Vec::new(),
-        played_via_ability: false,
-        turn_played: 1,
+        blade_modifiers: std::collections::HashMap::new(),
+        heart_modifiers: std::collections::HashMap::new(),
+        need_heart_modifiers: std::collections::HashMap::new(),
+        score_modifiers: std::collections::HashMap::new(),
     }
 }
 
 /// Place a card on stage in a specific area
-fn place_card_on_stage(player: &mut Player, card: &Card, area: MemberArea) {
-    let card_in_zone = create_card_in_zone(card);
-    match area {
-        MemberArea::Center => player.stage.center = Some(card_in_zone),
-        MemberArea::LeftSide => player.stage.left_side = Some(card_in_zone),
-        MemberArea::RightSide => player.stage.right_side = Some(card_in_zone),
-    }
+fn place_card_on_stage(player: &mut Player, card_id: i16, area: MemberArea) {
+    player.stage.set_area(area, card_id);
 }
 
 /// Execute an ability and return the result
@@ -141,25 +134,284 @@ fn test_gain_resource_with_resource_icon_count() {
     
     // Create a simple test card and place it on stage
     let test_card = cards.first().unwrap();
-    place_card_on_stage(&mut player1, test_card, MemberArea::Center);
-    
-    let initial_blade_count = player1.stage.center.as_ref().map(|c| c.card.blade).unwrap_or(0);
-    println!("Initial blade count: {}", initial_blade_count);
+    let card_id = test_card.card_no.parse::<i16>().unwrap_or(0);
+    place_card_on_stage(&mut player1, card_id, MemberArea::Center);
     
     let mut game_state = create_test_game_state(player1, player2);
+    
+    let initial_blade_count = if game_state.player1.stage.stage[1] != -1 {
+        let card_id = game_state.player1.stage.stage[1];
+        let cards = load_cards();
+        let card = cards.iter().find(|c| c.card_no.parse::<i16>().unwrap_or(0) == card_id);
+        card.map(|c| c.blade).unwrap_or(0)
+    } else {
+        0
+    };
+    println!("Initial blade count: {}", initial_blade_count);
     let result = execute_ability(&mut game_state, &test_ability);
     
     println!("Ability execution result: {:?}", result);
     assert!(result.is_ok(), "Ability should resolve successfully");
     
     // Verify that resource_icon_count (2) was used, not count (1)
-    let final_blade_count = game_state.player1.stage.center.as_ref().map(|c| c.card.blade).unwrap_or(0);
+    let final_blade_count = if game_state.player1.stage.stage[1] != -1 {
+        let card_id = game_state.player1.stage.stage[1];
+        let cards = load_cards();
+        let card = cards.iter().find(|c| c.card_no.parse::<i16>().unwrap_or(0) == card_id);
+        card.map(|c| c.blade).unwrap_or(0) as i32
+    } else {
+        0
+    };
     println!("Final blade count: {}", final_blade_count);
     
     // Should have gained 2 blades (from resource_icon_count), not 1 (from count)
-    assert_eq!(final_blade_count - initial_blade_count, 2, "Should have gained 2 blades from resource_icon_count");
+    assert_eq!(final_blade_count - initial_blade_count as i32, 2, "Should have gained 2 blades from resource_icon_count");
     
     println!("✓ resource_icon_count works correctly");
+}
+
+/// Test: Edge case - resource_icon_count of 0
+/// Edge case: Zero resource icon count should not change state
+#[test]
+fn test_resource_icon_count_zero_edge_case() {
+    let cards = load_cards();
+    
+    let test_ability = Ability {
+        full_text: "Test: Gain 0 blades".to_string(),
+        triggerless_text: "Test: Gain 0 blades".to_string(),
+        triggers: None,
+        use_limit: None,
+        is_null: false,
+        cost: None,
+        effect: Some(AbilityEffect {
+            text: "Gain 0 blades".to_string(),
+            action: "gain_resource".to_string(),
+            resource: Some("blade".to_string()),
+            resource_icon_count: Some(0),
+            ..Default::default()
+        }),
+        keywords: None,
+    };
+    
+    let (mut player1, player2) = create_test_players();
+    let test_card = cards.first().unwrap();
+    let card_id = test_card.card_no.parse::<i16>().unwrap_or(0);
+    place_card_on_stage(&mut player1, card_id, MemberArea::Center);
+    
+    let initial_blade_count = if player1.stage.stage[1] != -1 {
+        test_card.blade
+    } else {
+        0
+    };
+    
+    let mut game_state = create_test_game_state(player1, player2);
+    let result = execute_ability(&mut game_state, &test_ability);
+    
+    assert!(result.is_ok(), "Ability should resolve even with 0 count");
+    
+    let final_blade_count = if game_state.player1.stage.stage[1] != -1 {
+        let card_id = game_state.player1.stage.stage[1];
+        let cards = load_cards();
+        let card = cards.iter().find(|c| c.card_no.parse::<i16>().unwrap_or(0) == card_id);
+        card.map(|c| c.blade).unwrap_or(0) as i32
+    } else {
+        0
+    };
+    assert_eq!(final_blade_count, initial_blade_count as i32, "Blade count should not change with 0 resource_icon_count");
+}
+
+/// Test: Edge case - Large resource_icon_count
+/// Edge case: Very large resource icon count to test overflow handling
+#[test]
+fn test_resource_icon_count_large_value_edge_case() {
+    let cards = load_cards();
+    
+    // Use a very large value to test if engine handles it correctly
+    let large_count = 100u32;
+    
+    let test_ability = Ability {
+        full_text: format!("Test: Gain {} blades", large_count),
+        triggerless_text: format!("Test: Gain {} blades", large_count),
+        triggers: None,
+        use_limit: None,
+        is_null: false,
+        cost: None,
+        effect: Some(AbilityEffect {
+            text: format!("Gain {} blades", large_count),
+            action: "gain_resource".to_string(),
+            resource: Some("blade".to_string()),
+            resource_icon_count: Some(large_count),
+            ..Default::default()
+        }),
+        keywords: None,
+    };
+    
+    let (mut player1, player2) = create_test_players();
+    let test_card = cards.first().unwrap();
+    let card_id = test_card.card_no.parse::<i16>().unwrap_or(0);
+    place_card_on_stage(&mut player1, card_id, MemberArea::Center);
+    
+    let initial_blade_count = if player1.stage.stage[1] != -1 {
+        test_card.blade
+    } else {
+        0
+    };
+    
+    let mut game_state = create_test_game_state(player1, player2);
+    let result = execute_ability(&mut game_state, &test_ability);
+    
+    assert!(result.is_ok(), "Ability should resolve with large count");
+    
+    let final_blade_count = if game_state.player1.stage.stage[1] != -1 {
+        let card_id = game_state.player1.stage.stage[1];
+        let cards = load_cards();
+        let card = cards.iter().find(|c| c.card_no.parse::<i16>().unwrap_or(0) == card_id);
+        card.map(|c| c.blade).unwrap_or(0) as i32
+    } else {
+        0
+    };
+    let expected = initial_blade_count as i32 + large_count as i32;
+    assert_eq!(final_blade_count, expected, "Should gain exactly {} blades", large_count);
+    
+    // Verify no unintended side effects
+    assert_eq!(game_state.player1.hand.cards.len(), 0, "Hand should be unchanged");
+    assert_eq!(game_state.player2.stage.stage[1], -1, "Opponent stage should be unchanged");
+}
+
+/// Test: Edge case - Multiple resource gains in sequence
+/// Edge case: Multiple resource_icon_count effects should accumulate correctly
+#[test]
+fn test_multiple_resource_icon_count_gains() {
+    let cards = load_cards();
+    
+    let test_ability1 = Ability {
+        full_text: "Test: Gain 1 blade".to_string(),
+        triggerless_text: "Test: Gain 1 blade".to_string(),
+        triggers: None,
+        use_limit: None,
+        is_null: false,
+        cost: None,
+        effect: Some(AbilityEffect {
+            text: "Gain 1 blade".to_string(),
+            action: "gain_resource".to_string(),
+            resource: Some("blade".to_string()),
+            resource_icon_count: Some(1),
+            ..Default::default()
+        }),
+        keywords: None,
+    };
+    
+    let test_ability2 = Ability {
+        full_text: "Test: Gain 2 blades".to_string(),
+        triggerless_text: "Test: Gain 2 blades".to_string(),
+        triggers: None,
+        use_limit: None,
+        is_null: false,
+        cost: None,
+        effect: Some(AbilityEffect {
+            text: "Gain 2 blades".to_string(),
+            action: "gain_resource".to_string(),
+            resource: Some("blade".to_string()),
+            resource_icon_count: Some(2),
+            ..Default::default()
+        }),
+        keywords: None,
+    };
+    
+    let (mut player1, player2) = create_test_players();
+    let test_card = cards.first().unwrap();
+    let card_id = test_card.card_no.parse::<i16>().unwrap_or(0);
+    place_card_on_stage(&mut player1, card_id, MemberArea::Center);
+    
+    let initial_blade_count = if player1.stage.stage[1] != -1 {
+        test_card.blade
+    } else {
+        0
+    };
+    
+    let mut game_state = create_test_game_state(player1, player2);
+    
+    // Execute first ability
+    let result1 = execute_ability(&mut game_state, &test_ability1);
+    assert!(result1.is_ok(), "First ability should resolve");
+    
+    let after_first = if game_state.player1.stage.stage[1] != -1 {
+        let card_id = game_state.player1.stage.stage[1];
+        let cards = load_cards();
+        let card = cards.iter().find(|c| c.card_no.parse::<i16>().unwrap_or(0) == card_id);
+        card.map(|c| c.blade).unwrap_or(0) as i32
+    } else {
+        0
+    };
+    assert_eq!(after_first - initial_blade_count as i32, 1, "Should gain 1 blade from first ability");
+    
+    // Execute second ability
+    let result2 = execute_ability(&mut game_state, &test_ability2);
+    assert!(result2.is_ok(), "Second ability should resolve");
+    
+    let final_blade_count = if game_state.player1.stage.stage[1] != -1 {
+        let card_id = game_state.player1.stage.stage[1];
+        let cards = load_cards();
+        let card = cards.iter().find(|c| c.card_no.parse::<i16>().unwrap_or(0) == card_id);
+        card.map(|c| c.blade).unwrap_or(0) as i32
+    } else {
+        0
+    };
+    assert_eq!(final_blade_count - initial_blade_count as i32, 3, "Should gain total of 3 blades (1 + 2)");
+}
+
+/// Test: Edge case - resource_icon_count vs count priority
+/// Edge case: resource_icon_count should take priority over count field
+#[test]
+fn test_resource_icon_count_priority_over_count() {
+    let cards = load_cards();
+    
+    // Create ability with both resource_icon_count and count set to different values
+    let test_ability = Ability {
+        full_text: "Test: Gain blades".to_string(),
+        triggerless_text: "Test: Gain blades".to_string(),
+        triggers: None,
+        use_limit: None,
+        is_null: false,
+        cost: None,
+        effect: Some(AbilityEffect {
+            text: "Gain blades".to_string(),
+            action: "gain_resource".to_string(),
+            resource: Some("blade".to_string()),
+            resource_icon_count: Some(5),  // Should use this
+            count: Some(1),  // Should ignore this
+            ..Default::default()
+        }),
+        keywords: None,
+    };
+    
+    let (mut player1, player2) = create_test_players();
+    let test_card = cards.first().unwrap();
+    let card_id = test_card.card_no.parse::<i16>().unwrap_or(0);
+    place_card_on_stage(&mut player1, card_id, MemberArea::Center);
+    
+    let initial_blade_count = if player1.stage.stage[1] != -1 {
+        test_card.blade
+    } else {
+        0
+    };
+    
+    let mut game_state = create_test_game_state(player1, player2);
+    let result = execute_ability(&mut game_state, &test_ability);
+    
+    assert!(result.is_ok(), "Ability should resolve");
+    
+    let final_blade_count = if game_state.player1.stage.stage[1] != -1 {
+        let card_id = game_state.player1.stage.stage[1];
+        let cards = load_cards();
+        let card = cards.iter().find(|c| c.card_no.parse::<i16>().unwrap_or(0) == card_id);
+        card.map(|c| c.blade).unwrap_or(0) as i32
+    } else {
+        0
+    };
+    
+    // Should use resource_icon_count (5), not count (1)
+    assert_eq!(final_blade_count - initial_blade_count as i32, 5, "Should use resource_icon_count (5), not count (1)");
 }
 
 fn create_test_players() -> (Player, Player) {

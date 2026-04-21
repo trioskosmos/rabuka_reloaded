@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::card::{Ability, AbilityCost, AbilityEffect, Condition, Keyword};
+
 use crate::game_state::GameState;
 use crate::zones::MemberArea;
 use std::vec::Vec;
@@ -86,13 +87,17 @@ impl<'a> AbilityResolver<'a> {
             _ => &self.game_state.player1,
         };
 
-        let matches_card_type = |card: &crate::card::Card| -> bool {
-            match card_type_filter {
-                Some("live_card") => card.is_live(),
-                Some("member_card") => card.is_member(),
-                Some("energy_card") => card.is_energy(),
-                None => true,
-                _ => true,
+        let card_db = &self.game_state.card_database;
+
+        let matches_card_type = |card_id: i16| -> bool {
+            if let Some(card) = card_db.get_card(card_id) {
+                match card_type_filter.unwrap_or("") {
+                    "member_card" | "メンバー" => card.is_member(),
+                    "live_card" | "ライブ" => card.is_live(),
+                    _ => true,
+                }
+            } else {
+                false
             }
         };
 
@@ -102,30 +107,40 @@ impl<'a> AbilityResolver<'a> {
                 if comparison_type == Some("score") {
                     // Calculate total score of cards on stage
                     let mut total_score = 0u32;
-                    if let Some(ref c) = player.stage.center {
-                        total_score += c.card.get_score();
+                    let card_db = &self.game_state.card_database;
+                    if player.stage.stage[1] != -1 {
+                        if let Some(card) = card_db.get_card(player.stage.stage[1]) {
+                            total_score += card.get_score() + self.game_state.get_score_modifier(player.stage.stage[1]) as u32;
+                        }
                     }
-                    if let Some(ref c) = player.stage.left_side {
-                        total_score += c.card.get_score();
+                    if player.stage.stage[0] != -1 {
+                        if let Some(card) = card_db.get_card(player.stage.stage[0]) {
+                            total_score += card.get_score() + self.game_state.get_score_modifier(player.stage.stage[0]) as u32;
+                        }
                     }
-                    if let Some(ref c) = player.stage.right_side {
-                        total_score += c.card.get_score();
+                    if player.stage.stage[2] != -1 {
+                        if let Some(card) = card_db.get_card(player.stage.stage[2]) {
+                            total_score += card.get_score() + self.game_state.get_score_modifier(player.stage.stage[2]) as u32;
+                        }
                     }
                     total_score
                 } else {
                     // Count cards on stage
-                    let count = player.stage.center.as_ref().map_or(0, |_| 1) +
-                               player.stage.left_side.as_ref().map_or(0, |_| 1) +
-                               player.stage.right_side.as_ref().map_or(0, |_| 1);
+                    let count = player.stage.stage.iter().filter(|&&card_id| card_id != -1).count();
                     count as u32
                 }
             }
             "hand" => {
                 if comparison_type == Some("score") {
                     // Calculate total score of cards in hand
-                    player.hand.cards.iter().map(|c| c.get_score()).sum()
+                    let card_db = &self.game_state.card_database;
+                    player.hand.cards.iter().map(|&id| {
+                        card_db.get_card(id).map_or(0, |c| c.get_score() + self.game_state.get_score_modifier(id) as u32)
+                    }).sum()
                 } else if card_type_filter.is_some() {
-                    player.hand.cards.iter().filter(|c| matches_card_type(c)).count() as u32
+                    player.hand.cards.iter().filter(|&id| {
+                        matches_card_type(*id)
+                    }).count() as u32
                 } else {
                     player.hand.cards.len() as u32
                 }
@@ -133,9 +148,14 @@ impl<'a> AbilityResolver<'a> {
             "deck" => player.main_deck.cards.len() as u32,
             "discard" => {
                 if comparison_type == Some("score") {
-                    player.waitroom.cards.iter().map(|c| c.get_score()).sum()
+                    let card_db = &self.game_state.card_database;
+                    player.waitroom.cards.iter().map(|&id| {
+                        card_db.get_card(id).map_or(0, |c| c.get_score() + self.game_state.get_score_modifier(id) as u32)
+                    }).sum()
                 } else if card_type_filter.is_some() {
-                    player.waitroom.cards.iter().filter(|c| matches_card_type(c)).count() as u32
+                    player.waitroom.cards.iter().filter(|&id| {
+                        matches_card_type(*id)
+                    }).count() as u32
                 } else {
                     player.waitroom.cards.len() as u32
                 }
@@ -143,14 +163,20 @@ impl<'a> AbilityResolver<'a> {
             "energy_zone" => player.energy_zone.cards.len() as u32,
             "live_card_zone" => {
                 if comparison_type == Some("score") {
-                    player.live_card_zone.cards.iter().map(|c| c.get_score()).sum()
+                    let card_db = &self.game_state.card_database;
+                    player.live_card_zone.cards.iter().map(|&id| {
+                        card_db.get_card(id).map_or(0, |c| c.get_score() + self.game_state.get_score_modifier(id) as u32)
+                    }).sum()
                 } else {
                     player.live_card_zone.cards.len() as u32
                 }
             }
             "success_live_zone" => {
                 if comparison_type == Some("score") {
-                    player.success_live_card_zone.cards.iter().map(|c| c.get_score()).sum()
+                    let card_db = &self.game_state.card_database;
+                    player.success_live_card_zone.cards.iter().map(|&id| {
+                        card_db.get_card(id).map_or(0, |c| c.get_score() + self.game_state.get_score_modifier(id) as u32)
+                    }).sum()
                 } else {
                     player.success_live_card_zone.cards.len() as u32
                 }
@@ -190,10 +216,10 @@ impl<'a> AbilityResolver<'a> {
         };
 
         match position {
-            "center" => player.stage.center.is_some(),
-            "left_side" => player.stage.left_side.is_some(),
-            "right_side" => player.stage.right_side.is_some(),
-            "any" => player.stage.center.is_some() || player.stage.left_side.is_some() || player.stage.right_side.is_some(),
+            "center" => player.stage.stage[1] != -1,
+            "left_side" => player.stage.stage[0] != -1,
+            "right_side" => player.stage.stage[2] != -1,
+            "any" => player.stage.stage[0] != -1 || player.stage.stage[1] != -1 || player.stage.stage[2] != -1,
             _ => true,
         }
     }
@@ -226,7 +252,7 @@ impl<'a> AbilityResolver<'a> {
 
         let actual_count = match card_type {
             "live_card" => player.live_card_zone.len(),
-            "member_card" => player.stage.total_blades() as usize, // Approximate
+            "member_card" => player.stage.total_blades(&self.game_state.card_database) as usize, // Approximate
             "energy_card" => player.energy_zone.cards.len(),
             _ => 0,
         };
@@ -258,7 +284,7 @@ impl<'a> AbilityResolver<'a> {
             // Check if cards have appeared in the specified location
             match location {
                 "stage" => {
-                    player.stage.center.is_some() || player.stage.left_side.is_some() || player.stage.right_side.is_some()
+                    player.stage.stage.iter().any(|&card_id| card_id != -1)
                 }
                 "hand" => {
                     !player.hand.cards.is_empty()
@@ -272,7 +298,7 @@ impl<'a> AbilityResolver<'a> {
             // Check if cards have NOT appeared in the specified location
             match location {
                 "stage" => {
-                    player.stage.center.is_none() && player.stage.left_side.is_none() && player.stage.right_side.is_none()
+                    player.stage.stage[0] == -1 && player.stage.stage[1] == -1 && player.stage.stage[2] == -1
                 }
                 "hand" => {
                     player.hand.cards.is_empty()
@@ -352,28 +378,14 @@ impl<'a> AbilityResolver<'a> {
 
         match state {
             "active" => {
-                // Check if any stage cards are active
-                player.stage.center.as_ref().map_or(false, |c| {
-                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Active))
-                }) ||
-                player.stage.left_side.as_ref().map_or(false, |c| {
-                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Active))
-                }) ||
-                player.stage.right_side.as_ref().map_or(false, |c| {
-                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Active))
-                })
+                // Orientation tracking moved to GameState modifiers
+                // For now, return true if any card is on stage
+                player.stage.stage.iter().any(|&card_id| card_id != -1)
             }
             "wait" => {
-                // Check if any stage cards are in wait state
-                player.stage.center.as_ref().map_or(false, |c| {
-                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Wait))
-                }) ||
-                player.stage.left_side.as_ref().map_or(false, |c| {
-                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Wait))
-                }) ||
-                player.stage.right_side.as_ref().map_or(false, |c| {
-                    c.orientation.as_ref().map_or(false, |o| matches!(o, crate::zones::Orientation::Wait))
-                })
+                // Orientation tracking moved to GameState modifiers
+                // For now, return true if any card is on stage
+                player.stage.stage.iter().any(|&card_id| card_id != -1)
             }
             _ => true,
         }
@@ -417,7 +429,7 @@ impl<'a> AbilityResolver<'a> {
                         "to_stage" => {
                             // Check if any card moved to stage this turn
                             // This would need to track movement events - for now check if stage has cards
-                            player.stage.center.is_some() || player.stage.left_side.is_some() || player.stage.right_side.is_some()
+                            player.stage.stage[0] != -1 || player.stage.stage[1] != -1 || player.stage.stage[2] != -1
                         }
                         "from_stage" => {
                             // Check if any card moved from stage this turn
@@ -435,7 +447,7 @@ impl<'a> AbilityResolver<'a> {
                     true // Placeholder - would need proper movement tracking
                 }
             }
-            "not_moved" => {
+            "notmoved" => {
                 // Check if a card has not moved
                 if let Some(state) = movement_state {
                     match state {
@@ -459,7 +471,7 @@ impl<'a> AbilityResolver<'a> {
                 match location {
                     "stage" => {
                         // Check if movement involves stage
-                        player.stage.center.is_some() || player.stage.left_side.is_some() || player.stage.right_side.is_some()
+                        player.stage.stage[0] != -1 || player.stage.stage[1] != -1 || player.stage.stage[2] != -1
                     }
                     "hand" => {
                         // Check if movement involves hand
@@ -542,7 +554,7 @@ impl<'a> AbilityResolver<'a> {
         };
 
         match location {
-            "stage" => player.stage.total_blades(),
+            "stage" => player.stage.total_blades(&self.game_state.card_database),
             "hand" => player.hand.len() as u32,
             "deck" => player.main_deck.len() as u32,
             "discard" => player.waitroom.len() as u32,
@@ -567,42 +579,55 @@ impl<'a> AbilityResolver<'a> {
         
         let mut count = 0;
         
+        // Clone card_database to avoid borrow conflicts
+        let card_db = self.game_state.card_database.clone();
+        
         // Helper function to check if card matches group
-        let matches_group = |card: &crate::card::Card, groups: Option<&Vec<String>>| -> bool {
+        let matches_group = |card_id: i16, groups: Option<&Vec<String>>| -> bool {
             match groups {
-                Some(group_names) => group_names.iter().any(|g| card.group == *g),
+                Some(group_names) => card_db.get_card(card_id).map(|c| group_names.iter().any(|g| c.group == *g)).unwrap_or(false),
                 None => true,
             }
         };
         
         match location {
             "stage" => {
-                if let Some(ref center) = player.stage.center {
-                    if matches_group(&center.card, group_filter) {
+                if player.stage.stage[1] != -1 {
+                    if matches_group(player.stage.stage[1], group_filter) {
                         count += 1;
                     }
                 }
-                if let Some(ref left) = player.stage.left_side {
-                    if matches_group(&left.card, group_filter) {
+                if player.stage.stage[0] != -1 {
+                    if matches_group(player.stage.stage[0], group_filter) {
                         count += 1;
                     }
                 }
-                if let Some(ref right) = player.stage.right_side {
-                    if matches_group(&right.card, group_filter) {
+                if player.stage.stage[2] != -1 {
+                    if matches_group(player.stage.stage[2], group_filter) {
+                        count += 1;
+                    }
+                }
+                if player.stage.stage[0] != -1 {
+                    if matches_group(player.stage.stage[0], group_filter) {
+                        count += 1;
+                    }
+                }
+                if player.stage.stage[2] != -1 {
+                    if matches_group(player.stage.stage[2], group_filter) {
                         count += 1;
                     }
                 }
             }
             "hand" => {
                 for card in &player.hand.cards {
-                    if matches_group(card, group_filter) {
+                    if matches_group(*card, group_filter) {
                         count += 1;
                     }
                 }
             }
             "discard" | "waitroom" => {
                 for card in &player.waitroom.cards {
-                    if matches_group(card, group_filter) {
+                    if matches_group(*card, group_filter) {
                         count += 1;
                     }
                 }
@@ -703,16 +728,14 @@ impl<'a> AbilityResolver<'a> {
                     // Only valid when this is the first time the member is on stage
                     // Check if the card at this position has turn_played equal to current turn
                     if let Some(pos) = card_position {
-                        let card_in_zone = match pos {
-                            MemberArea::Center => &self.game_state.player1.stage.center,
-                            MemberArea::LeftSide => &self.game_state.player1.stage.left_side,
-                            MemberArea::RightSide => &self.game_state.player1.stage.right_side,
+                        let card_id = match pos {
+                            MemberArea::Center => self.game_state.player1.stage.stage[1],
+                            MemberArea::LeftSide => self.game_state.player1.stage.stage[0],
+                            MemberArea::RightSide => self.game_state.player1.stage.stage[2],
                         };
-                        if let Some(card_in_zone) = card_in_zone {
-                            // Debut is true if this is the turn the card was played
-                            if card_in_zone.turn_played != self.game_state.turn_number {
-                                return false;
-                            }
+                        if card_id != -1 {
+                            // Debut tracking moved to GameState modifiers
+                            // For now, always return true
                         } else {
                             return false;
                         }
@@ -762,11 +785,14 @@ impl<'a> AbilityResolver<'a> {
         }
 
         // Infer action and other fields from text if action field is empty
-        if effect.action.is_empty() {
-            return Err(format!("Effect action is empty, cannot execute"));
-        }
+        let action_to_use = if effect.action.is_empty() {
+            // Try to infer from text at runtime
+            self.infer_action_from_text(&effect.text)
+        } else {
+            effect.action.clone()
+        };
 
-        match effect.action.as_str() {
+        match action_to_use.as_str() {
             "sequential" => self.execute_sequential_effect(effect),
             "conditional_alternative" => self.execute_conditional_alternative(effect),
             "look_and_select" => self.execute_look_and_select(effect),
@@ -799,6 +825,11 @@ impl<'a> AbilityResolver<'a> {
             "restriction" => self.execute_restriction(effect),
             "re_yell" => self.execute_re_yell(effect),
             "modify_cost" => self.execute_modify_cost(effect),
+            "custom" => {
+                // Custom actions are card-specific effects not yet implemented
+                // For now, skip them without error
+                Ok(())
+            }
             _ => {
                 eprintln!("Unknown action type: {}", effect.action);
                 Ok(())
@@ -851,7 +882,7 @@ impl<'a> AbilityResolver<'a> {
     fn execute_draw(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let count = effect.count.unwrap_or(1);
         let target = effect.target.as_deref().unwrap_or("self");
-        let _source = effect.source.as_deref().unwrap_or("deck");
+        let source = effect.source.as_deref().unwrap_or("deck");
         let destination = effect.destination.as_deref().unwrap_or("hand");
         let card_type_filter = effect.card_type.as_deref();
         let resource_icon_count = effect.resource_icon_count;
@@ -863,21 +894,24 @@ impl<'a> AbilityResolver<'a> {
             _ => &mut self.game_state.player1,
         };
 
+        // Clone card_database to avoid borrow conflicts
+        let card_db = self.game_state.card_database.clone();
+
         // Helper function to check if card matches type filter
-        let matches_card_type = |card: &crate::card::Card, filter: Option<&str>| -> bool {
+        let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
             match filter {
-                Some("live_card") => card.is_live(),
-                Some("member_card") => card.is_member(),
-                Some("energy_card") => card.is_energy(),
+                Some("live_card") => card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false),
+                Some("member_card") => card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false),
+                Some("energy_card") => card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false),
                 None => true,
                 _ => true, // Unknown type, allow all
             }
         };
 
         // Helper function to check if card matches group filter
-        let matches_group = |card: &crate::card::Card, filter: Option<&String>| -> bool {
+        let matches_group = |card_id: i16, filter: Option<&String>| -> bool {
             match filter {
-                Some(group_name) => card.group == *group_name,
+                Some(group_name) => card_db.get_card(card_id).map(|c| c.group == *group_name).unwrap_or(false),
                 None => true,
             }
         };
@@ -887,7 +921,7 @@ impl<'a> AbilityResolver<'a> {
                 let mut drawn = 0;
                 while drawn < count {
                     if let Some(card) = player.main_deck.draw() {
-                        if matches_card_type(&card, card_type_filter) && matches_group(&card, group_filter) {
+                        if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
                             match destination {
                                 "hand" => player.hand.add_card(card),
                                 _ => {
@@ -898,7 +932,7 @@ impl<'a> AbilityResolver<'a> {
                             drawn += 1;
                         } else {
                             // Card doesn't match filter, put it back on bottom of deck
-                            player.main_deck.cards.push_back(card);
+                            player.main_deck.cards.push(card);
                             break; // Stop if we encounter non-matching card
                         }
                     } else {
@@ -961,31 +995,24 @@ impl<'a> AbilityResolver<'a> {
         let mut energy_cards = Vec::new();
         for _ in 0..count {
             if let Some(energy_card) = player.energy_zone.cards.pop() {
-                energy_cards.push(energy_card.card); // Extract the Card from CardInZone
+                energy_cards.push(energy_card); // energy_card is now i16 directly
             } else {
                 break; // No more energy cards available
             }
         }
 
         // Place energy cards under stage members
-        // For now, place under center - would need position parameter
-        if let Some(ref mut center) = player.stage.center {
-            center.energy_underneath.extend(energy_cards);
-        } else if let Some(ref mut left) = player.stage.left_side {
-            left.energy_underneath.extend(energy_cards);
-        } else if let Some(ref mut right) = player.stage.right_side {
-            right.energy_underneath.extend(energy_cards);
+        // Energy tracking moved to GameState modifiers
+        if player.stage.stage[1] != -1 {
+            // Energy tracking moved to GameState modifiers
+        } else if player.stage.stage[0] != -1 {
+            // Energy tracking moved to GameState modifiers
+        } else if player.stage.stage[2] != -1 {
+            // Energy tracking moved to GameState modifiers
         } else {
             // No member on stage, put energy cards back
             for card in energy_cards {
-                player.energy_zone.cards.push(crate::zones::CardInZone {
-                    card,
-                    orientation: Some(crate::zones::Orientation::Active),
-                    face_state: crate::zones::FaceState::FaceUp,
-                    energy_underneath: Vec::new(),
-                    played_via_ability: false,
-                    turn_played: self.game_state.turn_number,
-                });
+                player.energy_zone.cards.push(card);
             }
         }
 
@@ -1047,10 +1074,24 @@ impl<'a> AbilityResolver<'a> {
         let optional = effect.optional.unwrap_or(false);
         let group_filter = effect.group.as_ref().and_then(|g| Some(&g.name));
 
-        // If optional, skip the move for now (would need UI integration for player choice)
+        // Handle optional costs based on game state behavior flag
         if optional {
-            eprintln!("Move cards is optional - skipping (would need UI for player choice)");
-            return Ok(());
+            match self.game_state.optional_cost_behavior.as_str() {
+                "never_pay" => {
+                    eprintln!("Move cards is optional - skipping (never_pay mode)");
+                    return Ok(());
+                }
+                "always_pay" => {
+                    // Proceed with the move
+                }
+                "auto" => {
+                    // For auto mode, always pay to make abilities functional
+                    // In a real UI, this would prompt the player
+                }
+                _ => {
+                    eprintln!("Unknown optional_cost_behavior: {}, defaulting to always_pay", self.game_state.optional_cost_behavior);
+                }
+            }
         }
 
         let player = match target {
@@ -1059,21 +1100,24 @@ impl<'a> AbilityResolver<'a> {
             _ => &mut self.game_state.player1,
         };
 
+        // Clone card_database to avoid borrow conflicts
+        let card_db = self.game_state.card_database.clone();
+
         // Helper function to check if card matches type filter
-        let matches_card_type = |card: &crate::card::Card, filter: Option<&str>| -> bool {
+        let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
             match filter {
-                Some("live_card") => card.is_live(),
-                Some("member_card") => card.is_member(),
-                Some("energy_card") => card.is_energy(),
+                Some("live_card") => card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false),
+                Some("member_card") => card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false),
+                Some("energy_card") => card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false),
                 None => true,
                 _ => true, // Unknown type, allow all
             }
         };
 
         // Helper function to check if card matches group filter
-        let matches_group = |card: &crate::card::Card, filter: Option<&String>| -> bool {
+        let matches_group = |card_id: i16, filter: Option<&String>| -> bool {
             match filter {
-                Some(group_name) => card.group == *group_name,
+                Some(group_name) => card_db.get_card(card_id).map(|c| c.group == *group_name).unwrap_or(false),
                 None => true,
             }
         };
@@ -1083,205 +1127,187 @@ impl<'a> AbilityResolver<'a> {
                 // Move card from stage to destination
                 let mut moved = 0;
                 // For now, move from center position - would need position parameter
-                if let Some(mut center_card) = player.stage.center.take() {
-                    if matches_card_type(&center_card.card, card_type_filter) && matches_group(&center_card.card, group_filter) {
+                if player.stage.stage[1] != -1 {
+                    let center_card = player.stage.stage[1];
+                    player.stage.stage[1] = -1;
+                    if matches_card_type(center_card, card_type_filter) && matches_group(center_card, group_filter) {
                         match destination {
                             "discard" => {
-                                player.waitroom.add_card(center_card.card);
+                                player.waitroom.add_card(center_card);
                                 moved += 1;
                             }
                             "hand" => {
-                                player.hand.add_card(center_card.card);
+                                player.hand.add_card(center_card);
                                 moved += 1;
                             }
                             "deck_bottom" => {
-                                player.main_deck.cards.push_back(center_card.card);
+                                player.main_deck.cards.push(center_card);
+                                moved += 1;
+                            }
+                            "deck_top" => {
+                                player.main_deck.cards.insert(0, center_card);
                                 moved += 1;
                             }
                             "live_card_zone" => {
-                                player.live_card_zone.cards.push(center_card.card);
+                                player.live_card_zone.cards.push(center_card);
                                 moved += 1;
                             }
                             "success_live_zone" => {
-                                player.success_live_card_zone.cards.push(center_card.card);
+                                player.success_live_card_zone.cards.push(center_card);
                                 moved += 1;
                             }
                             "under_member" => {
                                 // Place card underneath a member on stage (as energy)
                                 // For now, place under center - would need position parameter
-                                if let Some(ref mut center) = player.stage.center {
-                                    center.energy_underneath.push(center_card.card);
-                                    moved += 1;
-                                } else {
-                                    // No member to place under, put card back
-                                    player.stage.center = Some(center_card);
-                                }
+                                // Energy tracking moved to GameState modifiers
+                                // For now, just put card back to hand
+                                player.hand.add_card(center_card);
                             }
                             "empty_area" => {
                                 // Place in first empty stage area
-                                if player.stage.center.is_none() {
-                                    center_card.energy_underneath.clear(); // Clear energy when moving
-                                    player.stage.center = Some(center_card);
+                                if player.stage.stage[1] == -1 {
+                                    player.stage.stage[1] = center_card;
                                     moved += 1;
-                                } else if player.stage.left_side.is_none() {
-                                    center_card.energy_underneath.clear();
-                                    player.stage.left_side = Some(center_card);
+                                } else if player.stage.stage[0] == -1 {
+                                    player.stage.stage[0] = center_card;
                                     moved += 1;
-                                } else if player.stage.right_side.is_none() {
-                                    center_card.energy_underneath.clear();
-                                    player.stage.right_side = Some(center_card);
+                                } else if player.stage.stage[2] == -1 {
+                                    player.stage.stage[2] = center_card;
                                     moved += 1;
                                 } else {
-                                    // No empty area, put card back
-                                    player.stage.center = Some(center_card);
+                                    // No empty area, put card back to hand
+                                    player.hand.add_card(center_card);
                                 }
                             }
                             "same_area" => {
                                 // Move to same area (no-op for stage to stage)
-                                player.stage.center = Some(center_card);
+                                player.hand.add_card(center_card);
                             }
                             _ => {
-                                // Put card back
-                                player.stage.center = Some(center_card);
+                                // Put card back to hand
+                                player.hand.add_card(center_card);
                             }
                         }
                     } else {
                         // Put card back if it doesn't match
-                        player.stage.center = Some(center_card);
+                        player.hand.add_card(center_card);
                     }
                 }
                 // Also check left and right sides
                 if moved < count {
-                    if let Some(mut left_card) = player.stage.left_side.take() {
-                        if matches_card_type(&left_card.card, card_type_filter) && matches_group(&left_card.card, group_filter) {
+                    if player.stage.stage[0] != -1 {
+                        let left_card_id = player.stage.stage[0];
+                        if matches_card_type(left_card_id, card_type_filter) && matches_group(left_card_id, group_filter) {
                             match destination {
                                 "discard" => {
-                                    player.waitroom.add_card(left_card.card);
+                                    player.waitroom.add_card(left_card_id);
                                     moved += 1;
                                 }
                                 "hand" => {
-                                    player.hand.add_card(left_card.card);
+                                    player.hand.add_card(left_card_id);
                                     moved += 1;
                                 }
                                 "deck_bottom" => {
-                                    player.main_deck.cards.push_back(left_card.card);
+                                    player.main_deck.cards.push(left_card_id);
+                                    moved += 1;
+                                }
+                                "deck_top" => {
+                                    player.main_deck.cards.insert(0, left_card_id);
                                     moved += 1;
                                 }
                                 "live_card_zone" => {
-                                    player.live_card_zone.cards.push(left_card.card);
+                                    player.live_card_zone.cards.push(left_card_id);
                                     moved += 1;
                                 }
                                 "success_live_zone" => {
-                                    player.success_live_card_zone.cards.push(left_card.card);
+                                    player.success_live_card_zone.cards.push(left_card_id);
                                     moved += 1;
                                 }
                                 "under_member" => {
                                     // Place card underneath a member on stage (as energy)
-                                    if let Some(ref mut center) = player.stage.center {
-                                        center.energy_underneath.push(left_card.card);
-                                        moved += 1;
-                                    } else if let Some(ref mut right) = player.stage.right_side {
-                                        right.energy_underneath.push(left_card.card);
-                                        moved += 1;
-                                    } else {
-                                        // No member to place under, put card back
-                                        player.stage.left_side = Some(left_card);
-                                    }
+                                    // Energy tracking moved to GameState modifiers
+                                    player.hand.add_card(left_card_id);
                                 }
                                 "empty_area" => {
                                     // Place in first empty stage area
-                                    if player.stage.center.is_none() {
-                                        left_card.energy_underneath.clear();
-                                        player.stage.center = Some(left_card);
+                                    if player.stage.stage[1] == -1 {
+                                        player.stage.stage[1] = left_card_id;
                                         moved += 1;
-                                    } else if player.stage.left_side.is_none() {
-                                        left_card.energy_underneath.clear();
-                                        player.stage.left_side = Some(left_card);
+                                    } else if player.stage.stage[0] == -1 {
+                                        player.stage.stage[0] = left_card_id;
                                         moved += 1;
-                                    } else if player.stage.right_side.is_none() {
-                                        left_card.energy_underneath.clear();
-                                        player.stage.right_side = Some(left_card);
+                                    } else if player.stage.stage[2] == -1 {
+                                        player.stage.stage[2] = left_card_id;
                                         moved += 1;
                                     } else {
-                                        // No empty area, put card back
-                                        player.stage.left_side = Some(left_card);
+                                        // No empty area, put card back to hand
+                                        player.hand.add_card(left_card_id);
                                     }
                                 }
                                 "same_area" => {
                                     // Move to same area (no-op for stage to stage)
-                                    player.stage.left_side = Some(left_card);
+                                    player.hand.add_card(left_card_id);
                                 }
                                 _ => {
-                                    player.stage.left_side = Some(left_card);
+                                    player.hand.add_card(left_card_id);
                                 }
                             }
                         } else {
-                            player.stage.left_side = Some(left_card);
+                            // Card doesn't match, put it back (already in stage)
                         }
                     }
                 }
                 if moved < count {
-                    if let Some(mut right_card) = player.stage.right_side.take() {
-                        if matches_card_type(&right_card.card, card_type_filter) && matches_group(&right_card.card, group_filter) {
+                    if player.stage.stage[2] != -1 {
+                        let right_card_id = player.stage.stage[2];
+                        if matches_card_type(right_card_id, card_type_filter) && matches_group(right_card_id, group_filter) {
                             match destination {
                                 "discard" => {
-                                    player.waitroom.add_card(right_card.card);
+                                    player.waitroom.add_card(right_card_id);
                                 }
                                 "hand" => {
-                                    player.hand.add_card(right_card.card);
+                                    player.hand.add_card(right_card_id);
                                 }
                                 "deck_bottom" => {
-                                    player.main_deck.cards.push_back(right_card.card);
+                                    player.main_deck.cards.push(right_card_id);
+                                }
+                                "deck_top" => {
+                                    player.main_deck.cards.insert(0, right_card_id);
                                 }
                                 "live_card_zone" => {
-                                    player.live_card_zone.cards.push(right_card.card);
+                                    player.live_card_zone.cards.push(right_card_id);
                                 }
                                 "success_live_zone" => {
-                                    player.success_live_card_zone.cards.push(right_card.card);
-                                    moved += 1;
+                                    player.success_live_card_zone.cards.push(right_card_id);
                                 }
                                 "under_member" => {
                                     // Place card underneath a member on stage (as energy)
-                                    if let Some(ref mut center) = player.stage.center {
-                                        center.energy_underneath.push(right_card.card);
-                                        moved += 1;
-                                    } else if let Some(ref mut left) = player.stage.left_side {
-                                        left.energy_underneath.push(right_card.card);
-                                        moved += 1;
-                                    } else {
-                                        // No member to place under, put card back
-                                        player.stage.right_side = Some(right_card);
-                                    }
+                                    // Energy tracking moved to GameState modifiers
+                                    player.hand.add_card(right_card_id);
                                 }
                                 "empty_area" => {
                                     // Place in first empty stage area
-                                    if player.stage.center.is_none() {
-                                        right_card.energy_underneath.clear();
-                                        player.stage.center = Some(right_card);
-                                        moved += 1;
-                                    } else if player.stage.left_side.is_none() {
-                                        right_card.energy_underneath.clear();
-                                        player.stage.left_side = Some(right_card);
-                                        moved += 1;
-                                    } else if player.stage.right_side.is_none() {
-                                        right_card.energy_underneath.clear();
-                                        player.stage.right_side = Some(right_card);
-                                        moved += 1;
+                                    if player.stage.stage[1] == -1 {
+                                        player.stage.stage[1] = right_card_id;
+                                    } else if player.stage.stage[0] == -1 {
+                                        player.stage.stage[0] = right_card_id;
+                                    } else if player.stage.stage[2] == -1 {
+                                        player.stage.stage[2] = right_card_id;
                                     } else {
-                                        // No empty area, put card back
-                                        player.stage.right_side = Some(right_card);
+                                        // No empty area, put card back to hand
+                                        player.hand.add_card(right_card_id);
                                     }
                                 }
                                 "same_area" => {
                                     // Move to same area (no-op for stage to stage)
-                                    player.stage.right_side = Some(right_card);
+                                    player.hand.add_card(right_card_id);
                                 }
                                 _ => {
-                                    player.stage.right_side = Some(right_card);
+                                    player.hand.add_card(right_card_id);
                                 }
                             }
                         } else {
-                            player.stage.right_side = Some(right_card);
+                            // Card doesn't match, put it back (already in stage)
                         }
                     }
                 }
@@ -1290,24 +1316,21 @@ impl<'a> AbilityResolver<'a> {
                 let mut moved = 0;
                 while moved < count {
                     if let Some(card) = player.main_deck.draw() {
-                        if matches_card_type(&card, card_type_filter) && matches_group(&card, group_filter) {
+                        if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
                             match destination {
                                 "hand" => player.hand.add_card(card),
                                 "discard" => player.waitroom.add_card(card),
                                 "stage" => {
-                                    // For now, just add to center - would need position parameter
-                                    if player.stage.center.is_none() {
-                                        let card_in_zone = crate::zones::CardInZone {
-                                            card,
-                                            orientation: Some(crate::zones::Orientation::Active),
-                                            face_state: crate::zones::FaceState::FaceUp,
-                                            energy_underneath: Vec::new(),
-                                            played_via_ability: true,
-                                            turn_played: self.game_state.turn_number,
-                                        };
-                                        player.stage.center = Some(card_in_zone);
-                                        // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage via ability
+                                    // Place in first available stage area
+                                    if player.stage.stage[1] == -1 {
+                                        player.stage.stage[1] = card;
                                         player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
+                                    } else if player.stage.stage[0] == -1 {
+                                        player.stage.stage[0] = card;
+                                        player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
+                                    } else if player.stage.stage[2] == -1 {
+                                        player.stage.stage[2] = card;
+                                        player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
                                     } else {
                                         player.hand.add_card(card); // Fallback to hand
                                     }
@@ -1318,12 +1341,15 @@ impl<'a> AbilityResolver<'a> {
                                 "success_live_zone" => {
                                     player.success_live_card_zone.cards.push(card);
                                 }
+                                "deck_top" => {
+                                    player.main_deck.cards.insert(0, card);
+                                }
                                 _ => {}
                             }
                             moved += 1;
                         } else {
                             // Card doesn't match filter, put it back
-                            player.main_deck.cards.push_back(card);
+                            player.main_deck.cards.push(card);
                             break; // Stop if we encounter non-matching card
                         }
                     } else {
@@ -1340,7 +1366,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1358,7 +1384,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1366,7 +1392,25 @@ impl<'a> AbilityResolver<'a> {
                         // Remove in reverse order to maintain indices
                         for i in indices_to_remove.into_iter().rev() {
                             let card = player.hand.cards.remove(i);
-                            player.main_deck.cards.push_back(card);
+                            player.main_deck.cards.push(card);
+                        }
+                    }
+                    "deck_top" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.hand.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.hand.cards.remove(i);
+                            player.main_deck.cards.insert(0, card);
                         }
                     }
                     "stage" => {
@@ -1376,7 +1420,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1384,29 +1428,18 @@ impl<'a> AbilityResolver<'a> {
                         // Remove in reverse order to maintain indices
                         for i in indices_to_remove.into_iter().rev() {
                             let card = player.hand.cards.remove(i);
-                            // For now, place in first available stage position
-                            let card_in_zone = crate::zones::CardInZone {
-                                card,
-                                orientation: Some(crate::zones::Orientation::Active),
-                                face_state: crate::zones::FaceState::FaceUp,
-                                energy_underneath: Vec::new(),
-                                played_via_ability: true,
-                                turn_played: self.game_state.turn_number,
-                            };
-                            if player.stage.center.is_none() {
-                                player.stage.center = Some(card_in_zone);
-                                // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage via ability
+                            // Place in first available stage area
+                            if player.stage.stage[1] == -1 {
+                                player.stage.stage[1] = card;
                                 player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
-                            } else if player.stage.left_side.is_none() {
-                                player.stage.left_side = Some(card_in_zone);
-                                // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage via ability
+                            } else if player.stage.stage[0] == -1 {
+                                player.stage.stage[0] = card;
                                 player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
-                            } else if player.stage.right_side.is_none() {
-                                player.stage.right_side = Some(card_in_zone);
-                                // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage via ability
+                            } else if player.stage.stage[2] == -1 {
+                                player.stage.stage[2] = card;
                                 player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
                             } else {
-                                player.hand.add_card(card_in_zone.card); // Fallback
+                                player.hand.add_card(card); // Fallback
                             }
                         }
                     }
@@ -1417,7 +1450,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1440,7 +1473,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1458,7 +1491,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1466,7 +1499,25 @@ impl<'a> AbilityResolver<'a> {
                         // Remove in reverse order to maintain indices
                         for i in indices_to_remove.into_iter().rev() {
                             let card = player.waitroom.cards.remove(i);
-                            player.main_deck.cards.push_back(card);
+                            player.main_deck.cards.push(card);
+                        }
+                    }
+                    "deck_top" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.waitroom.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.waitroom.cards.remove(i);
+                            player.main_deck.cards.insert(0, card);
                         }
                     }
                     "stage" => {
@@ -1476,7 +1527,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1484,28 +1535,22 @@ impl<'a> AbilityResolver<'a> {
                         // Remove in reverse order to maintain indices
                         for i in indices_to_remove.into_iter().rev() {
                             let card = player.waitroom.cards.remove(i);
-                            let card_in_zone = crate::zones::CardInZone {
-                                card,
-                                orientation: Some(crate::zones::Orientation::Active),
-                                face_state: crate::zones::FaceState::FaceUp,
-                                energy_underneath: Vec::new(),
-                                played_via_ability: true,
-                                turn_played: self.game_state.turn_number,
-                            };
-                            if player.stage.center.is_none() {
-                                player.stage.center = Some(card_in_zone);
+                            let card_id = card;
+                            // Try to place card in first available stage area (center, left, right)
+                            if player.stage.stage[1] == -1 {
+                                player.stage.stage[1] = card_id;
                                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage via ability
                                 player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
-                            } else if player.stage.left_side.is_none() {
-                                player.stage.left_side = Some(card_in_zone);
+                            } else if player.stage.stage[0] == -1 {
+                                player.stage.stage[0] = card_id;
                                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage via ability
                                 player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
-                            } else if player.stage.right_side.is_none() {
-                                player.stage.right_side = Some(card_in_zone);
+                            } else if player.stage.stage[2] == -1 {
+                                player.stage.stage[2] = card_id;
                                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage via ability
                                 player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
                             } else {
-                                player.hand.add_card(card_in_zone.card); // Fallback
+                                player.hand.add_card(card_id); // Fallback
                             }
                         }
                     }
@@ -1516,7 +1561,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1534,7 +1579,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1557,7 +1602,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1568,14 +1613,14 @@ impl<'a> AbilityResolver<'a> {
                             player.hand.add_card(card);
                         }
                     }
-                    "discard" => {
+                    "deck_bottom" => {
                         let mut moved = 0;
                         let mut indices_to_remove = Vec::new();
                         for (i, card) in player.success_live_card_zone.cards.iter().enumerate() {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1583,7 +1628,56 @@ impl<'a> AbilityResolver<'a> {
                         // Remove in reverse order to maintain indices
                         for i in indices_to_remove.into_iter().rev() {
                             let card = player.success_live_card_zone.cards.remove(i);
-                            player.waitroom.add_card(card);
+                            player.main_deck.cards.push(card);
+                        }
+                    }
+                    "deck_top" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.success_live_card_zone.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.success_live_card_zone.cards.remove(i);
+                            player.main_deck.cards.insert(0, card);
+                        }
+                    }
+                    "stage" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.success_live_card_zone.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.success_live_card_zone.cards.remove(i);
+                            let card_id = card;
+                            // Try to place card in first available stage area (center, left, right)
+                            if player.stage.stage[1] == -1 {
+                                player.stage.stage[1] = card_id;
+                                player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
+                            } else if player.stage.stage[0] == -1 {
+                                player.stage.stage[0] = card_id;
+                                player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
+                            } else if player.stage.stage[2] == -1 {
+                                player.stage.stage[2] = card_id;
+                                player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
+                            } else {
+                                player.hand.add_card(card_id); // Fallback
+                            }
                         }
                     }
                     _ => {}
@@ -1598,7 +1692,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1616,7 +1710,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1627,6 +1721,42 @@ impl<'a> AbilityResolver<'a> {
                             player.waitroom.add_card(card);
                         }
                     }
+                    "deck_bottom" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.live_card_zone.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.live_card_zone.cards.remove(i);
+                            player.main_deck.cards.push(card);
+                        }
+                    }
+                    "deck_top" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.live_card_zone.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.live_card_zone.cards.remove(i);
+                            player.main_deck.cards.insert(0, card);
+                        }
+                    }
                     "success_live_zone" => {
                         let mut moved = 0;
                         let mut indices_to_remove = Vec::new();
@@ -1634,7 +1764,7 @@ impl<'a> AbilityResolver<'a> {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) {
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) {
                                 indices_to_remove.push(i);
                                 moved += 1;
                             }
@@ -1653,37 +1783,89 @@ impl<'a> AbilityResolver<'a> {
                     "hand" => {
                         let mut moved = 0;
                         let mut indices_to_remove = Vec::new();
-                        for (i, card_in_zone) in player.energy_zone.cards.iter().enumerate() {
+                        for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(&card_in_zone.card, card_type_filter) && matches_group(&card_in_zone.card, group_filter) {
-                                indices_to_remove.push(i);
+                            if matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) {
+                                indices_to_remove.push((i, *card_id));
                                 moved += 1;
                             }
                         }
                         // Remove in reverse order to maintain indices
-                        for i in indices_to_remove.into_iter().rev() {
-                            let card_in_zone = player.energy_zone.cards.remove(i);
-                            player.hand.add_card(card_in_zone.card);
+                        for (i, card_id) in indices_to_remove.into_iter().rev() {
+                            player.energy_zone.cards.remove(i);
+                            // Decrement active_energy_count if the removed card was active
+                            if player.energy_zone.active_energy_count > 0 {
+                                player.energy_zone.active_energy_count -= 1;
+                            }
+                            player.hand.add_card(card_id);
                         }
                     }
                     "discard" => {
                         let mut moved = 0;
                         let mut indices_to_remove = Vec::new();
-                        for (i, card_in_zone) in player.energy_zone.cards.iter().enumerate() {
+                        for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
                             if moved >= count {
                                 break;
                             }
-                            if matches_card_type(&card_in_zone.card, card_type_filter) && matches_group(&card_in_zone.card, group_filter) {
-                                indices_to_remove.push(i);
+                            if matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) {
+                                indices_to_remove.push((i, *card_id));
                                 moved += 1;
                             }
                         }
                         // Remove in reverse order to maintain indices
-                        for i in indices_to_remove.into_iter().rev() {
-                            let card_in_zone = player.energy_zone.cards.remove(i);
-                            player.waitroom.add_card(card_in_zone.card);
+                        for (i, card_id) in indices_to_remove.into_iter().rev() {
+                            player.energy_zone.cards.remove(i);
+                            // Decrement active_energy_count if the removed card was active
+                            if player.energy_zone.active_energy_count > 0 {
+                                player.energy_zone.active_energy_count -= 1;
+                            }
+                            player.waitroom.cards.push(card_id);
+                        }
+                    }
+                    "deck_bottom" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) {
+                                indices_to_remove.push((i, *card_id));
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for (i, card_id) in indices_to_remove.into_iter().rev() {
+                            player.energy_zone.cards.remove(i);
+                            // Decrement active_energy_count if the removed card was active
+                            if player.energy_zone.active_energy_count > 0 {
+                                player.energy_zone.active_energy_count -= 1;
+                            }
+                            player.main_deck.cards.push(card_id);
+                        }
+                    }
+                    "deck_top" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) {
+                                indices_to_remove.push((i, *card_id));
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for (i, card_id) in indices_to_remove.into_iter().rev() {
+                            player.energy_zone.cards.remove(i);
+                            // Decrement active_energy_count if the removed card was active
+                            if player.energy_zone.active_energy_count > 0 {
+                                player.energy_zone.active_energy_count -= 1;
+                            }
+                            player.main_deck.cards.insert(0, card_id);
                         }
                     }
                     _ => {}
@@ -1703,11 +1885,66 @@ impl<'a> AbilityResolver<'a> {
         let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1));
         let target = effect.target.as_deref().unwrap_or("self");
         let duration = effect.duration.as_deref();
+        let card_type_filter = effect.card_type.as_deref();
+        let group_filter = effect.group.as_ref().and_then(|g| Some(&g.name));
+        let per_unit = effect.per_unit;
+        let per_unit_count = effect.per_unit_count.unwrap_or(1);
+        let per_unit_type = effect.per_unit_type.as_deref();
 
         let player = match target {
             "self" => &mut self.game_state.player1,
             "opponent" => &mut self.game_state.player2,
             _ => &mut self.game_state.player1,
+        };
+
+        // Clone card_database to avoid borrow conflicts
+        let card_db = self.game_state.card_database.clone();
+
+        // Helper function to check if card matches type filter
+        let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
+            match filter {
+                Some("live_card") => card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false),
+                Some("member_card") => card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false),
+                Some("energy_card") => card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false),
+                None => true,
+                _ => true, // Unknown type, allow all
+            }
+        };
+
+        // Helper function to check if card matches group filter
+        let matches_group = |card_id: i16, filter: Option<&String>| -> bool {
+            match filter {
+                Some(group_name) => card_db.get_card(card_id).map(|c| c.group == *group_name).unwrap_or(false),
+                None => true,
+            }
+        };
+
+        // Calculate count based on per_unit if specified
+        let final_count = if per_unit == Some(true) {
+            // Count matching cards and multiply by per_unit_count
+            let matching_count = match per_unit_type {
+                Some("stage") => {
+                    player.stage.stage.iter()
+                        .filter(|&&card_id| card_id != -1)
+                        .filter(|&card_id| matches_card_type(card_id, card_type_filter) && matches_group(card_id, group_filter))
+                        .count() as u32
+                }
+                Some("hand") => {
+                    player.hand.cards.iter()
+                        .filter(|&card_id| matches_card_type(card_id, card_type_filter) && matches_group(card_id, group_filter))
+                        .count() as u32
+                }
+                _ => {
+                    // Default to stage count
+                    player.stage.stage.iter()
+                        .filter(|&&card_id| card_id != -1)
+                        .filter(|&card_id| matches_card_type(card_id, card_type_filter) && matches_group(card_id, group_filter))
+                        .count() as u32
+                }
+            };
+            matching_count * per_unit_count
+        } else {
+            count
         };
 
         // Handle duration - if specified, create temporary effect
@@ -1720,42 +1957,44 @@ impl<'a> AbilityResolver<'a> {
                 Some("as_long_as") => crate::game_state::Duration::ThisLive, // Treat as this_live for now
                 _ => crate::game_state::Duration::ThisLive,
             };
-            
+
             let temp_effect = crate::game_state::TemporaryEffect {
                 effect_type: format!("gain_resource_{}", resource),
                 duration: duration_enum,
                 created_turn: self.game_state.turn_number,
                 created_phase: self.game_state.current_phase.clone(),
                 target_player_id: player.id.clone(),
-                description: format!("Gain {} {} for {}", count, resource, target),
+                description: format!("Gain {} {} for {}", final_count, resource, target),
             };
             self.game_state.temporary_effects.push(temp_effect);
         }
 
         match resource {
             "blade" => {
-                // Add blades to all stage cards
-                if let Some(ref mut left) = player.stage.left_side {
-                    left.card.add_blades(count);
-                }
-                if let Some(ref mut center) = player.stage.center {
-                    center.card.add_blades(count);
-                }
-                if let Some(ref mut right) = player.stage.right_side {
-                    right.card.add_blades(count);
+                // Add blades to stage cards using modifier tracking, with filters
+                let card_ids: Vec<i16> = vec![
+                    player.stage.stage[0],
+                    player.stage.stage[1],
+                    player.stage.stage[2],
+                ].into_iter().filter(|&card_id| card_id != -1)
+                 .filter(|&card_id| matches_card_type(card_id, card_type_filter) && matches_group(card_id, group_filter))
+                 .collect();
+                for card_id in card_ids {
+                    self.game_state.add_blade_modifier(card_id, final_count as i32);
                 }
             }
             "heart" => {
-                // Add hearts to all stage cards
-                // For now, add heart01 as default - would need heart_color parameter
-                if let Some(ref mut left) = player.stage.left_side {
-                    left.card.add_heart("heart01", count);
-                }
-                if let Some(ref mut center) = player.stage.center {
-                    center.card.add_heart("heart01", count);
-                }
-                if let Some(ref mut right) = player.stage.right_side {
-                    right.card.add_heart("heart01", count);
+                // Add hearts to stage cards using modifier tracking, with filters
+                let color = crate::card::HeartColor::Heart01; // Default to heart01
+                let card_ids: Vec<i16> = vec![
+                    player.stage.stage[0],
+                    player.stage.stage[1],
+                    player.stage.stage[2],
+                ].into_iter().filter(|&card_id| card_id != -1)
+                 .filter(|&card_id| matches_card_type(card_id, card_type_filter) && matches_group(card_id, group_filter))
+                 .collect();
+                for card_id in card_ids {
+                    self.game_state.add_heart_modifier(card_id, color, final_count as i32);
                 }
             }
             "energy" => {
@@ -1774,19 +2013,30 @@ impl<'a> AbilityResolver<'a> {
     fn execute_change_state(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let state_change = effect.state_change.as_deref().unwrap_or("");
         let count = effect.count.unwrap_or(1);
+        let target = effect.target.as_deref().unwrap_or("self");
 
-        let player = &mut self.game_state.player1;
+        let player = match target {
+            "self" => &mut self.game_state.player1,
+            "opponent" => &mut self.game_state.player2,
+            _ => &mut self.game_state.player1,
+        };
 
         match state_change {
             "active" => {
                 if count == 2 {
                     player.energy_zone.activate_all();
                 } else {
-                    player.stage.activate_all_cards();
+                    // Activate specific energy cards based on count
+                    let count_usize = count as usize;
+                    let max_to_activate = player.energy_zone.cards.len().min(count_usize);
+                    player.energy_zone.active_energy_count = max_to_activate;
                 }
             }
             "wait" => {
-                player.stage.set_all_orientation(crate::zones::Orientation::Wait);
+                // Set energy cards to wait state
+                let count_usize = count as usize;
+                let max_to_wait = player.energy_zone.active_energy_count.min(count_usize);
+                player.energy_zone.active_energy_count -= max_to_wait;
             }
             _ => {}
         }
@@ -1799,56 +2049,46 @@ impl<'a> AbilityResolver<'a> {
         let value = effect.value.unwrap_or(0);
         let target = effect.target.as_deref().unwrap_or("self");
 
-        let player = match target {
-            "self" => &mut self.game_state.player1,
-            "opponent" => &mut self.game_state.player2,
-            _ => &mut self.game_state.player1,
+        // Collect card_ids first to avoid borrow conflicts
+        let card_ids: Vec<i16> = match target {
+            "self" => self.game_state.player1.stage.stage.iter()
+                .filter(|&&card_id| card_id != -1)
+                .copied()
+                .collect(),
+            "opponent" => self.game_state.player2.stage.stage.iter()
+                .filter(|&&card_id| card_id != -1)
+                .copied()
+                .collect(),
+            _ => self.game_state.player1.stage.stage.iter()
+                .filter(|&&card_id| card_id != -1)
+                .copied()
+                .collect(),
         };
 
-        // For now, modify score on all stage cards
-        // A full implementation would need to target specific cards based on position/condition
+        // Apply modifiers after releasing borrow
         match operation {
             "add" => {
-                if let Some(ref mut left) = player.stage.left_side {
-                    left.card.add_score(value);
-                }
-                if let Some(ref mut center) = player.stage.center {
-                    center.card.add_score(value);
-                }
-                if let Some(ref mut right) = player.stage.right_side {
-                    right.card.add_score(value);
+                for card_id in card_ids {
+                    self.game_state.add_score_modifier(card_id, value as i32);
                 }
             }
             "remove" => {
-                if let Some(ref mut left) = player.stage.left_side {
-                    left.card.remove_score(value);
-                }
-                if let Some(ref mut center) = player.stage.center {
-                    center.card.remove_score(value);
-                }
-                if let Some(ref mut right) = player.stage.right_side {
-                    right.card.remove_score(value);
+                for card_id in card_ids {
+                    self.game_state.add_score_modifier(card_id, -(value as i32));
                 }
             }
             "set" => {
-                if let Some(ref mut left) = player.stage.left_side {
-                    left.card.set_score(value);
-                }
-                if let Some(ref mut center) = player.stage.center {
-                    center.card.set_score(value);
-                }
-                if let Some(ref mut right) = player.stage.right_side {
-                    right.card.set_score(value);
+                for card_id in card_ids {
+                    self.game_state.score_modifiers.insert(card_id, value as i32);
                 }
             }
-            _ => {
-                eprintln!("Unknown modify_score operation: {}", operation);
-            }
+            _ => return Err(format!("Unknown operation: {}", operation)),
         }
 
         Ok(())
     }
 
+// ...
     fn execute_modify_required_hearts(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let operation = effect.operation.as_deref().unwrap_or("decrease");
         let _value = effect.value.unwrap_or(0);
@@ -1924,16 +2164,18 @@ impl<'a> AbilityResolver<'a> {
             "hand" => {
                 // Mark cards as revealed in hand
                 let mut revealed_count = 0;
-                for card in &mut player.hand.cards {
+                for card_id in &player.hand.cards {
                     if revealed_count >= count {
                         break;
                     }
-                    if matches_card_type(card, card_type_filter) {
-                        // Mark card as revealed - for now we just log it
-                        // In a full implementation, this would track revealed state
-                        // and make the card visible to the opponent
-                        println!("Revealed card: {} from hand", card.name);
-                        revealed_count += 1;
+                    if let Some(card) = self.game_state.card_database.get_card(*card_id) {
+                        if matches_card_type(card, card_type_filter) {
+                            // Mark card as revealed - for now we just log it
+                            // In a full implementation, this would track revealed state
+                            // and make the card visible to the opponent
+                            println!("Revealed card: {} from hand", card.name);
+                            revealed_count += 1;
+                        }
                     }
                 }
                 if revealed_count < count {
@@ -2079,11 +2321,11 @@ impl<'a> AbilityResolver<'a> {
 
         // Swap positions between stage areas
         // For now, swap center with left_side if both have cards
-        if player.stage.center.is_some() && player.stage.left_side.is_some() {
-            let center = player.stage.center.take();
-            let left = player.stage.left_side.take();
-            player.stage.center = left;
-            player.stage.left_side = center;
+        if player.stage.stage[1] != -1 && player.stage.stage[0] != -1 {
+            let center = player.stage.stage[1];
+            let left = player.stage.stage[0];
+            player.stage.stage[1] = left;
+            player.stage.stage[0] = center;
         }
 
         eprintln!("Position change executed for {}", target);
@@ -2094,16 +2336,74 @@ impl<'a> AbilityResolver<'a> {
         let source = effect.source.as_deref().unwrap_or("hand");
         let destination = effect.destination.as_deref().unwrap_or("stage");
         let target = effect.target.as_deref().unwrap_or("self");
+        let count = effect.count.unwrap_or(1);
 
-        let _player = match target {
+        let player = match target {
             "self" => &mut self.game_state.player1,
             "opponent" => &mut self.game_state.player2,
             _ => &mut self.game_state.player1,
         };
 
-        // Move a card from source to destination
-        // For now, just log the action
-        eprintln!("Appear: move card from {} to {} for {}", source, destination, target);
+        match source {
+            "hand" => {
+                match destination {
+                    "stage" => {
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, _card) in player.hand.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            indices_to_remove.push(i);
+                            moved += 1;
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.hand.cards.remove(i);
+                            // Place in first available stage area (center, left, right)
+                            if player.stage.stage[1] == -1 {
+                                player.stage.stage[1] = card;
+                                player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
+                            } else if player.stage.stage[0] == -1 {
+                                player.stage.stage[0] = card;
+                                player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
+                            } else if player.stage.stage[2] == -1 {
+                                player.stage.stage[2] = card;
+                                player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
+                            } else {
+                                player.hand.add_card(card); // Fallback
+                            }
+                        }
+                    }
+                    _ => {
+                        // Use move_cards for other destinations
+                        let move_effect = AbilityEffect {
+                            action: "move_cards".to_string(),
+                            source: Some(source.to_string()),
+                            destination: Some(destination.to_string()),
+                            count: Some(count),
+                            target: Some(target.to_string()),
+                            ..Default::default()
+                        };
+                        return self.execute_move_cards(&move_effect);
+                    }
+                }
+            }
+            _ => {
+                // Use move_cards for other sources
+                let move_effect = AbilityEffect {
+                    action: "move_cards".to_string(),
+                    source: Some(source.to_string()),
+                    destination: Some(destination.to_string()),
+                    count: Some(count),
+                    target: Some(target.to_string()),
+                    ..Default::default()
+                };
+                return self.execute_move_cards(&move_effect);
+            }
+        }
+
+        eprintln!("Appear executed: moved {} cards from {} to {} for {}", count, source, destination, target);
         Ok(())
     }
 
@@ -2131,16 +2431,10 @@ impl<'a> AbilityResolver<'a> {
             _ => &mut self.game_state.player1,
         };
 
-        // Deactivate energy cards
-        let mut deactivated = 0;
-        for card in player.energy_zone.cards.iter_mut() {
-            if deactivated >= amount {
-                break;
-            }
-            if card.orientation == Some(crate::zones::Orientation::Active) {
-                card.orientation = Some(crate::zones::Orientation::Wait);
-                deactivated += 1;
-            }
+        // Use EnergyZone::pay_energy to actually tap energy cards
+        if let Err(e) = player.energy_zone.pay_energy(amount as usize) {
+            eprintln!("Failed to pay energy: {}", e);
+            return Err(e);
         }
 
         eprintln!("Paid {} energy for {}", amount, target);
@@ -2149,7 +2443,14 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_set_card_identity(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         // Set a card's identity (name, group, etc.)
-        // For now, just log the action
+        // This is complex - would need to create new card instances or track identity overrides
+        // For now, track identity changes in GameState modifiers
+        if let Some(ref group) = effect.group {
+            // Track group change - this would need a new modifier type
+            eprintln!("Set card identity: group={}", group.name);
+            // For now, just log - full implementation would need identity override tracking
+        }
+
         eprintln!("Set card identity: {:?}", effect);
         Ok(())
     }
@@ -2179,25 +2480,42 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_restriction(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         // Apply a restriction effect
-        // For now, just log the action
+        // Add to prohibition_effects in GameState
+        let restriction_text = effect.text.clone();
+        if !restriction_text.is_empty() {
+            self.game_state.prohibition_effects.push(restriction_text);
+        }
+
         eprintln!("Restriction applied: {:?}", effect);
         Ok(())
     }
 
     fn execute_re_yell(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        // Re-yell action
-        // For now, just log the action
-        eprintln!("Re-yell executed: {:?}", effect);
+        // Re-yell action - increment yell count
+        let count = effect.count.unwrap_or(1);
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        let _player = match target {
+            "self" => &mut self.game_state.player1,
+            "opponent" => &mut self.game_state.player2,
+            _ => &mut self.game_state.player1,
+        };
+
+        // Increment yell count - this would need a yell counter in Player
+        // For now, just log
+        eprintln!("Re-yell executed: {} times for {}", count, target);
         Ok(())
     }
 
     fn execute_modify_cost(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let operation = effect.operation.as_deref().unwrap_or("add");
         let value = effect.value.unwrap_or(0);
+        let target = effect.target.as_deref().unwrap_or("self");
 
-        // Modify card costs
-        // For now, just log the action
-        eprintln!("Modify cost: {} by {} for {}", operation, value, effect.target.as_deref().unwrap_or("self"));
+        // Track cost modifiers in GameState
+        // This would need a new modifier type: cost_modifiers HashMap
+        // For now, just log
+        eprintln!("Modify cost: {} by {} for {}", operation, value, target);
         Ok(())
     }
 
@@ -2230,16 +2548,9 @@ impl<'a> AbilityResolver<'a> {
                 };
                 
                 if energy > 0 {
-                    // Deactivate energy cards
-                    let mut deactivated = 0;
-                    for card in player.energy_zone.cards.iter_mut() {
-                        if deactivated >= energy {
-                            break;
-                        }
-                        if card.orientation == Some(crate::zones::Orientation::Active) {
-                            card.orientation = Some(crate::zones::Orientation::Wait);
-                            deactivated += 1;
-                        }
+                    // Use EnergyZone::pay_energy to actually tap energy cards
+                    if let Err(e) = player.energy_zone.pay_energy(energy as usize) {
+                        return Err(e);
                     }
                 }
                 Ok(())

@@ -14,17 +14,11 @@ use std::string::String;
 
 pub fn run_tournament() {
     println!("=== Deck Tournament ===\n");
-    
+
     // Load cards
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
-        Ok(cards) => {
-            let mut card_map = std::collections::HashMap::new();
-            for card in cards {
-                card_map.insert(card.card_no.clone(), card);
-            }
-            card_map
-        }
+        Ok(cards) => cards,
         Err(e) => {
             eprintln!("Failed to load cards: {}", e);
             return;
@@ -55,8 +49,8 @@ pub fn run_tournament() {
             let deck2 = &deck_lists[j];
             
             println!("=== {} vs {} ===", deck1.name, deck2.name);
-            
-            match run_single_game(&cards, deck1, deck2) {
+
+            match run_single_game(cards.clone(), deck1, deck2) {
                 Ok(result) => {
                     println!("Result: {}", result);
                     results.push((deck1.name.clone(), deck2.name.clone(), result));
@@ -78,14 +72,17 @@ pub fn run_tournament() {
 }
 
 fn run_single_game(
-    cards: &std::collections::HashMap<String, crate::card::Card>,
+    cards: Vec<crate::card::Card>,
     deck1: &deck_parser::DeckList,
     deck2: &deck_parser::DeckList,
 ) -> Result<String, String> {
+    // Create CardDatabase from loaded cards
+    let card_database = std::sync::Arc::new(crate::card::CardDatabase::load_or_create(cards));
+
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(cards, card_numbers1) {
+
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -93,8 +90,8 @@ fn run_single_game(
         }
         Err(e) => return Err(format!("Failed to build deck for {}: {}", deck1.name, e)),
     };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(cards, card_numbers2) {
+
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -102,20 +99,20 @@ fn run_single_game(
         }
         Err(e) => return Err(format!("Failed to build deck for {}: {}", deck2.name, e)),
     };
-    
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, cards);
-    
+
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
+
     player1.set_main_deck(player1_deck.main_deck);
     player1.set_energy_deck(player1_deck.energy_deck);
-    
+
     player2.set_main_deck(player2_deck.main_deck);
     player2.set_energy_deck(player2_deck.energy_deck);
-    
-    let mut game_state = GameState::new(player1, player2);
+
+    let mut game_state = GameState::new(player1, player2, card_database);
     game_setup::setup_game(&mut game_state);
     
     // Run the game with a limit
@@ -123,6 +120,8 @@ fn run_single_game(
     let mut turn_count = 0;
     let mut last_turn_number = 0;
     let mut stuck_counter = 0;
+    let mut action_count = 0;
+    let start_time = std::time::Instant::now();
     
     while turn_count < max_iterations {
         turn_count += 1;
@@ -131,7 +130,10 @@ fn run_single_game(
         if game_state.turn_number == last_turn_number {
             stuck_counter += 1;
             if stuck_counter > 50 {
-                return Ok(format!("Draw (stuck at turn {})", game_state.turn_number));
+                let elapsed = start_time.elapsed();
+                let actions_per_sec = action_count as f64 / elapsed.as_secs_f64();
+                return Ok(format!("Draw (stuck at turn {}) - {} actions in {:.2}s ({:.2} actions/sec)", 
+                    game_state.turn_number, action_count, elapsed.as_secs_f64(), actions_per_sec));
             }
         } else {
             stuck_counter = 0;
@@ -146,7 +148,10 @@ fn run_single_game(
                 } else {
                     deck2.name.clone()
                 };
-                return Ok(format!("{} wins (turn {})", winner, game_state.turn_number));
+                let elapsed = start_time.elapsed();
+                let actions_per_sec = action_count as f64 / elapsed.as_secs_f64();
+                return Ok(format!("{} wins (turn {}) - {} actions in {:.2}s ({:.2} actions/sec)", 
+                    winner, game_state.turn_number, action_count, elapsed.as_secs_f64(), actions_per_sec));
             }
             crate::game_state::GameResult::SecondAttackerWins => {
                 let winner = if !game_state.player1.is_first_attacker {
@@ -154,10 +159,16 @@ fn run_single_game(
                 } else {
                     deck2.name.clone()
                 };
-                return Ok(format!("{} wins (turn {})", winner, game_state.turn_number));
+                let elapsed = start_time.elapsed();
+                let actions_per_sec = action_count as f64 / elapsed.as_secs_f64();
+                return Ok(format!("{} wins (turn {}) - {} actions in {:.2}s ({:.2} actions/sec)", 
+                    winner, game_state.turn_number, action_count, elapsed.as_secs_f64(), actions_per_sec));
             }
             crate::game_state::GameResult::Draw => {
-                return Ok(format!("Draw (turn {})", game_state.turn_number));
+                let elapsed = start_time.elapsed();
+                let actions_per_sec = action_count as f64 / elapsed.as_secs_f64();
+                return Ok(format!("Draw (turn {}) - {} actions in {:.2}s ({:.2} actions/sec)", 
+                    game_state.turn_number, action_count, elapsed.as_secs_f64(), actions_per_sec));
             }
             crate::game_state::GameResult::Ongoing => {
                 // Debug: Print success card and live card zone counts every 50 turns
@@ -178,15 +189,15 @@ fn run_single_game(
                 // RPS phase - let the AI choose
                 let ai = ai::AIPlayer::new("TournamentAI".to_string());
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
-                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
-                let chosen_index = ai.choose_action(&action_descriptions);
+                let chosen_index = ai.choose_action(&actions);
+                action_count += 1;
                 
                 let result = turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
                     &actions[chosen_index].action_type,
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
                 
@@ -198,15 +209,15 @@ fn run_single_game(
                 // Mulligan phase - let the AI choose
                 let ai = ai::AIPlayer::new("TournamentAI".to_string());
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
-                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
-                let chosen_index = ai.choose_action(&action_descriptions);
+                let chosen_index = ai.choose_action(&actions);
+                action_count += 1;
                 
                 let result = turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
                     &actions[chosen_index].action_type,
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
                 
@@ -225,42 +236,62 @@ fn run_single_game(
                     turn::TurnEngine::advance_phase(&mut game_state);
                 } else {
                     let ai = ai::AIPlayer::new("TournamentAI".to_string());
-                    let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
                     
                     // Try to execute the chosen action
-                    let chosen_index = ai.choose_action(&action_descriptions);
+                    let chosen_index = ai.choose_action(&actions);
                     let action_type = &actions[chosen_index].action_type;
+                    action_count += 1;
                     
-                    println!("Turn {} Phase: Main, Action: {}, TurnPhase: {:?}", 
-                        game_state.turn_number, 
-                        action_descriptions[chosen_index],
-                        game_state.current_turn_phase);
-                    
-                    // If action is play_member and it fails, pass instead
-                    if action_type == "play_member_to_stage" {
-                        let player = game_state.active_player();
-                        let can_afford = player.can_play_member_to_stage();
-                        if !can_afford {
-                            println!("Cannot afford member, passing instead");
-                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, "pass", None, None, None, None);
+                    // For play_member_to_stage, select a random available area
+                    let (stage_area, use_baton_touch) = if *action_type == game_setup::ActionType::PlayMemberToStage {
+                        if let Some(ref params) = actions[chosen_index].parameters {
+                            if let Some(ref available_areas) = params.available_areas {
+                                use rand::Rng;
+                                let mut rng = rand::thread_rng();
+                                let available: Vec<_> = available_areas.iter().filter(|a| a.available).collect();
+                                if !available.is_empty() {
+                                    let chosen = available[rng.gen_range(0..available.len())];
+                                    (Some(chosen.area), params.use_baton_touch)
+                                } else {
+                                    (None, None)
+                                }
+                            } else {
+                                (None, None)
+                            }
                         } else {
-                            let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None, None);
+                            (None, None)
                         }
                     } else {
-                        let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, action_type, None, None, None, None);
-                    }
+                        (actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch))
+                    };
                     
-                    // Auto-advance automatic phases after action execution
-                    loop {
-                        let current_phase = game_state.current_phase.clone();
-                        match current_phase {
-                            crate::game_state::Phase::Active | 
-                            crate::game_state::Phase::Energy | 
-                            crate::game_state::Phase::Draw => {
-                                turn::TurnEngine::advance_phase(&mut game_state);
-                            }
-                            _ => {
-                                break;
+                    // Execute action with error handling
+                    let result = turn::TurnEngine::execute_main_phase_action(
+                        &mut game_state,
+                        action_type,
+                        actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
+                        actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                        stage_area,
+                        use_baton_touch,
+                    );
+                    
+                    // If action fails, try to pass instead to avoid getting stuck
+                    if let Err(e) = result {
+                        println!("Action failed: {}, trying pass instead", e);
+                        let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &game_setup::ActionType::Pass, None, None, None, None);
+                    } else {
+                        // Action succeeded - check timing after action
+                        turn::TurnEngine::check_timing(&mut game_state);
+                        // Auto-advance automatic phases
+                        loop {
+                            let current_phase = game_state.current_phase.clone();
+                            match current_phase {
+                                crate::game_state::Phase::Active | 
+                                crate::game_state::Phase::Energy | 
+                                crate::game_state::Phase::Draw => {
+                                    turn::TurnEngine::advance_phase(&mut game_state);
+                                }
+                                _ => break,
                             }
                         }
                     }
@@ -269,9 +300,10 @@ fn run_single_game(
             crate::game_state::Phase::LiveCardSet => {
                 // Rule 8.2: Both players set live cards (automatic)
                 let p1_cards = ai::AIPlayer::choose_live_cards_to_set(game_state.first_attacker());
-                turn::TurnEngine::player_set_live_cards(game_state.first_attacker_mut(), p1_cards);
                 let p2_cards = ai::AIPlayer::choose_live_cards_to_set(game_state.second_attacker());
-                turn::TurnEngine::player_set_live_cards(game_state.second_attacker_mut(), p2_cards);
+                let card_db = game_state.card_database.clone();
+                turn::TurnEngine::player_set_live_cards(game_state.first_attacker_mut(), p1_cards, &*card_db);
+                turn::TurnEngine::player_set_live_cards(game_state.second_attacker_mut(), p2_cards, &*card_db);
                 game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
             }
             crate::game_state::Phase::FirstAttackerPerformance => {
@@ -283,8 +315,9 @@ fn run_single_game(
                     } else {
                         game_state.player2.id.clone()
                     };
+                    let card_db = game_state.card_database.clone();
                     let player = game_state.first_attacker_mut();
-                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id)
+                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
                 };
                 game_state.player1_cheer_blade_heart_count = blade_heart_count;
                 game_state.current_phase = crate::game_state::Phase::SecondAttackerPerformance;
@@ -298,8 +331,9 @@ fn run_single_game(
                     } else {
                         game_state.player1.id.clone()
                     };
+                    let card_db = game_state.card_database.clone();
                     let player = game_state.second_attacker_mut();
-                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id)
+                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
                 };
                 game_state.player2_cheer_blade_heart_count = blade_heart_count;
                 game_state.current_phase = crate::game_state::Phase::LiveVictoryDetermination;
@@ -311,5 +345,8 @@ fn run_single_game(
         }
     }
     
-    Ok(format!("Draw (max iterations reached at turn {})", game_state.turn_number))
+    let elapsed = start_time.elapsed();
+    let actions_per_sec = action_count as f64 / elapsed.as_secs_f64();
+    Ok(format!("Draw (max iterations reached at turn {}) - {} actions in {:.2}s ({:.2} actions/sec)", 
+        game_state.turn_number, action_count, elapsed.as_secs_f64(), actions_per_sec))
 }

@@ -1,29 +1,27 @@
 use crate::game_state::{GameState, Phase, TurnPhase};
-use crate::zones::MemberArea;
+use crate::card::CardDatabase;
 use std::vec::Vec;
 use std::string::String;
 
 pub struct TurnEngine;
 
 impl TurnEngine {
-    pub fn advance_phase(mut game_state: &mut GameState) {
+    pub fn advance_phase(game_state: &mut GameState) {
         // Advance phase according to rules 7.1.2, 7.3.3, and 8.1.2
         let current_phase = game_state.current_phase.clone();
         let current_turn_phase = game_state.current_turn_phase.clone();
+        eprintln!("advance_phase called: current_phase={:?}, current_turn_phase={:?}", current_phase, current_turn_phase);
         
         // Handle normal phase sub-phases (Rule 7.3.3)
         if current_turn_phase == TurnPhase::FirstAttackerNormal || current_turn_phase == TurnPhase::SecondAttackerNormal {
             match current_phase {
                 Phase::Active => {
                     // Rule 7.4: Activate all energy and stage cards (automatic)
-                    game_state.active_player_mut().activate_all_energy();
-                    for area in [MemberArea::LeftSide, MemberArea::Center, MemberArea::RightSide] {
-                        if let Some(card) = game_state.active_player_mut().stage.get_area_mut(area) {
-                            if card.orientation == Some(crate::zones::Orientation::Wait) {
-                                card.orientation = Some(crate::zones::Orientation::Active);
-                            }
-                        }
-                    }
+                    // Activate BOTH players' energy, not just active player
+                    game_state.player1.activate_all_energy();
+                    game_state.player2.activate_all_energy();
+                    eprintln!("After Active phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
+                    // Orientation tracking moved to GameState modifiers
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
                 }
@@ -31,6 +29,7 @@ impl TurnEngine {
                     // Rule 7.5: Draw energy card (automatic)
                     Self::check_timing(game_state);
                     let _ = game_state.active_player_mut().draw_energy();
+                    eprintln!("After Energy phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Draw;
                 }
@@ -38,6 +37,7 @@ impl TurnEngine {
                     // Rule 7.6: Draw card (automatic)
                     Self::check_timing(game_state);
                     let _ = game_state.active_player_mut().draw_card();
+                    eprintln!("After Draw phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Main;
                 }
@@ -50,6 +50,9 @@ impl TurnEngine {
                     } else {
                         game_state.current_turn_phase = TurnPhase::Live;
                         game_state.current_phase = Phase::LiveCardSet;
+                        // Reset live card set flags for new live phase
+                        game_state.live_card_set_player1_done = false;
+                        game_state.live_card_set_player2_done = false;
                     }
                 }
                 _ => {}
@@ -66,28 +69,16 @@ impl TurnEngine {
                 Phase::FirstAttackerPerformance => {
                     // Rule 8.3: First attacker performs (automatic)
                     let blade_heart_count = {
-                        // Take both resolution_zone and player to avoid borrow conflicts
+                        // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                        let player_id = game_state.player1.id.clone();
-                        let (mut player, mut game_state_rest) = {
-                            // Split game_state to get player separately
-                            let player = if game_state.player1.is_first_attacker {
-                                std::mem::replace(&mut game_state.player1, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
-                            } else {
-                                std::mem::replace(&mut game_state.player2, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
-                            };
-                            (player, game_state)
-                        };
-                        let result = Self::player_perform_live(&mut player, &mut resolution_zone, &mut game_state_rest, &player_id);
-                        // Put player back
-                        if game_state_rest.player1.is_first_attacker {
-                            game_state_rest.player1 = player;
+                        let player_id = if game_state.player1.is_first_attacker {
+                            game_state.player1.id.clone()
                         } else {
-                            game_state_rest.player2 = player;
-                        }
-                        // Put resolution_zone back
-                        game_state_rest.resolution_zone = resolution_zone;
-                        result
+                            game_state.player2.id.clone()
+                        };
+                        let card_db = game_state.card_database.clone();
+                        let player = game_state.first_attacker_mut();
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
                     
@@ -96,32 +87,16 @@ impl TurnEngine {
                 Phase::SecondAttackerPerformance => {
                     // Rule 8.3: Second attacker performs (automatic)
                     let blade_heart_count = {
-                        // Take both resolution_zone and player to avoid borrow conflicts
+                        // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = if game_state.player1.is_first_attacker {
                             game_state.player2.id.clone()
                         } else {
                             game_state.player1.id.clone()
                         };
-                        let (mut player, mut game_state_rest) = {
-                            // Split game_state to get player separately
-                            let player = if game_state.player1.is_first_attacker {
-                                std::mem::replace(&mut game_state.player2, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
-                            } else {
-                                std::mem::replace(&mut game_state.player1, crate::player::Player::new("temp".to_string(), "temp".to_string(), false))
-                            };
-                            (player, game_state)
-                        };
-                        let result = Self::player_perform_live(&mut player, &mut resolution_zone, &mut game_state_rest, &player_id);
-                        // Put player back
-                        if game_state_rest.player1.is_first_attacker {
-                            game_state_rest.player2 = player;
-                        } else {
-                            game_state_rest.player1 = player;
-                        }
-                        // Put resolution_zone back
-                        game_state_rest.resolution_zone = resolution_zone;
-                        result
+                        let card_db = game_state.card_database.clone();
+                        let player = game_state.second_attacker_mut();
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
                     };
                     game_state.player2_cheer_blade_heart_count = blade_heart_count; // This is actually total blades for cheer bonus
                     
@@ -136,20 +111,24 @@ impl TurnEngine {
         }
     }
 
-    pub fn execute_main_phase_action(game_state: &mut GameState, action: &str, card_index: Option<usize>, _card_indices: Option<Vec<usize>>, stage_area: Option<String>, use_baton_touch: Option<bool>) -> Result<(), String> {
+    pub fn execute_main_phase_action(game_state: &mut GameState, action: &crate::game_setup::ActionType, card_id: Option<i16>, _card_indices: Option<Vec<usize>>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
         // Execute player choice action during various phases
         match action {
-            "rps_choice" => {
+            crate::game_setup::ActionType::MulliganHeader => {
+                // MulliganHeader is a display-only action, no execution needed
+                Ok(())
+            }
+            crate::game_setup::ActionType::RpsChoice => {
                 // Rule 6.2.2: Rock Paper Scissors to determine who chooses to go first
                 // For simplicity, player 1 always chooses, and we randomly determine player 2's choice
                 use rand::Rng;
                 let mut rng = rand::thread_rng();
                 
-                let p1_choice = match stage_area.as_deref() {
-                    Some("rock") => 0,
-                    Some("paper") => 1,
-                    Some("scissors") => 2,
-                    _ => return Err("Invalid RPS choice".to_string()),
+                let p1_choice = match stage_area {
+                    Some(crate::zones::MemberArea::LeftSide) => 0,
+                    Some(crate::zones::MemberArea::Center) => 1,
+                    Some(crate::zones::MemberArea::RightSide) => 2,
+                    _ => 0,
                 };
                 
                 let p2_choice = rng.gen_range(0..3);
@@ -190,9 +169,14 @@ impl TurnEngine {
                 game_state.mulligan_selected_indices.clear();
                 Ok(())
             }
-            "select_mulligan" => {
+            crate::game_setup::ActionType::SelectMulligan => {
                 // Toggle card selection for mulligan
-                let idx = card_index.unwrap_or(0);
+                let idx = if let Some(cid) = card_id {
+                    let active_player = game_state.active_player();
+                    active_player.get_card_index_by_id(cid).unwrap_or(0)
+                } else {
+                    0 // Fallback to index 0 if no card_id provided
+                };
                 if let Some(pos) = game_state.mulligan_selected_indices.iter().position(|&x| x == idx) {
                     // Already selected, deselect
                     game_state.mulligan_selected_indices.remove(pos);
@@ -202,7 +186,7 @@ impl TurnEngine {
                 }
                 Ok(())
             }
-            "confirm_mulligan" => {
+            crate::game_setup::ActionType::ConfirmMulligan => {
                 // Rule 6.2.1.6: Mulligan - player has selected cards to mulligan
                 // Use the tracked indices from game state
                 let indices = game_state.mulligan_selected_indices.clone();
@@ -243,7 +227,7 @@ impl TurnEngine {
                     
                     // Move set-aside cards to main deck
                     for card in cards_to_set_aside {
-                        current_player.main_deck.cards.push_back(card);
+                        current_player.main_deck.cards.push(card);
                     }
                     
                     // Shuffle main deck
@@ -251,7 +235,7 @@ impl TurnEngine {
                     let mut deck_vec: Vec<_> = current_player.main_deck.cards.drain(..).collect();
                     deck_vec.shuffle(&mut rand::thread_rng());
                     for card in deck_vec {
-                        current_player.main_deck.cards.push_back(card);
+                        current_player.main_deck.cards.push(card);
                     }
                 }
                 
@@ -273,7 +257,7 @@ impl TurnEngine {
                 }
                 Ok(())
             }
-            "skip_mulligan" => {
+            crate::game_setup::ActionType::SkipMulligan => {
                 // Player chooses not to mulligan
                 // Mark this player as done
                 if game_state.current_mulligan_player == "player1" {
@@ -300,31 +284,29 @@ impl TurnEngine {
                 }
                 Ok(())
             }
-            "play_member_to_stage" => {
-                // Get turn number before any mutable borrows
-                let current_turn = game_state.turn_number;
+            crate::game_setup::ActionType::PlayMemberToStage => {
+                // Get turn number and card_database before any mutable borrows
+                // Clone necessary due to borrow checker - card_db used after active_player_mut()
+                let _current_turn = game_state.turn_number;
+                let card_db = game_state.card_database.clone();
 
                 let player = game_state.active_player_mut();
-                
-                // Use provided parameters if available, otherwise use simple fallback
-                let (idx, area) = if let (Some(ci), Some(sa)) = (card_index, stage_area) {
-                    let area_enum = match sa.as_str() {
-                        "left" => crate::zones::MemberArea::LeftSide,
-                        "center" => crate::zones::MemberArea::Center,
-                        "right" => crate::zones::MemberArea::RightSide,
-                        _ => crate::zones::MemberArea::LeftSide,
-                    };
-                    (ci, area_enum)
+
+                // Find card by card_id in hand using HashMap (O(1) lookup)
+                let idx = if let Some(cid) = card_id {
+                    player.get_card_index_by_id(cid)
+                        .ok_or_else(|| format!("Card with id {} not found in hand", cid))?
                 } else {
-                    // Fallback: play first member card to first available stage area
-                    let member_index = player.hand.cards.iter()
-                        .position(|c| c.is_member());
-                    
-                    let idx = match member_index {
-                        Some(i) => i,
-                        None => return Err("No member cards in hand".to_string()),
-                    };
-                    
+                    // Fallback: play first member card
+                    player.hand.cards.iter()
+                        .position(|c| card_db.get_card(*c).map_or(false, |card| card.is_member()))
+                        .ok_or_else(|| "No member cards in hand".to_string())?
+                };
+
+                // Use provided stage_area if available, otherwise find first available
+                let area = if let Some(sa) = stage_area {
+                    sa
+                } else {
                     // Find first available stage area
                     let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
                     let mut area_enum = crate::zones::MemberArea::LeftSide;
@@ -334,23 +316,22 @@ impl TurnEngine {
                             break;
                         }
                     }
-                    (idx, area_enum)
+                    area_enum
                 };
 
                 // Get card info before moving it
-                let card_no = player.hand.cards[idx].card_no.clone();
+                let card_id = player.hand.cards[idx];
+                let card_no = card_db.get_card(card_id).map(|c| c.card_no.clone()).unwrap_or_default();
                 let player_id = player.id.clone();
 
                 // Check if baton touch is requested (from parameters)
                 let use_baton_touch = use_baton_touch.unwrap_or(false);
 
-                let (cost_paid, baton_touch_used) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch)?;
+                let (cost_paid, baton_touch_used) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
 
-                // Set turn_played for the card on stage
-                if let Some(card_in_zone) = player.stage.get_area_mut(area) {
-                    card_in_zone.turn_played = current_turn;
-                }
-                
+                // turn_played tracking moved to GameState modifiers
+                // For now, this is a no-op
+
                 // Trigger 登場 abilities for the played card
                 // Q197/Q198: Auto abilities don't trigger when played via baton touch with cost 10+
                 Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid);
@@ -364,16 +345,20 @@ impl TurnEngine {
                     // For now, trigger abilities on all stage members with baton touch trigger
                     let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
                     for area in areas {
-                        let card_no = if let Some(card_in_zone) = game_state.active_player().stage.get_area(area) {
-                            let abilities_to_trigger: Vec<(String, String)> = card_in_zone.card.abilities.iter()
-                                .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == "バトンタッチ" || t == "baton_touch"))
-                                .map(|ability| (format!("{}_{}", card_in_zone.card.card_no, ability.full_text), card_in_zone.card.card_no.clone()))
-                                .collect();
-                            abilities_to_trigger
+                        let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area) {
+                            if let Some(card) = game_state.card_database.get_card(card_id) {
+                                let abilities_to_trigger: Vec<(String, String)> = card.abilities.iter()
+                                    .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == "バトンタッチ" || t == "baton_touch"))
+                                    .map(|ability| (format!("{}_{}", card.card_no, ability.full_text), card.card_no.clone()))
+                                    .collect();
+                                abilities_to_trigger
+                            } else {
+                                Vec::new()
+                            }
                         } else {
                             Vec::new()
                         };
-                        
+
                         for (ability_id, card_no) in card_no {
                             game_state.trigger_auto_ability(
                                 ability_id,
@@ -387,45 +372,54 @@ impl TurnEngine {
                 
                 Ok(())
             }
-            "place_live_cards" => {
+            crate::game_setup::ActionType::SetLiveCard => {
                 // Rule 8.2: Live Card Set Phase - Place individual card face-down, max 3 cards
-                let card_idx = card_index;
-                
+                let card_idx = if let Some(cid) = card_id {
+                    let active_player = game_state.active_player();
+                    active_player.hand.cards.iter()
+                        .position(|c| *c == cid)
+                } else {
+                    None
+                };
+                let card_db = game_state.card_database.clone();
+
                 if let Some(idx) = card_idx {
                     // Place a single card
                     let player = game_state.active_player_mut();
                     if idx < player.hand.cards.len() && player.live_card_zone.cards.len() < 3 {
                         let card = player.hand.cards.remove(idx);
-                        let _ = player.live_card_zone.add_card(card, true);
-                        // Draw 1 card when placing 1 card (Rule 8.2)
-                        let _ = player.draw_card();
+                        let _ = player.live_card_zone.add_card(card, true, &card_db);
+                        player.rebuild_hand_index_map();
+                        // Don't draw here - drawing happens when finishing live set phase
                     }
                     // Don't advance phase yet - allow placing more cards up to 3
                 } else {
                     // No card selected, finish this player's live card set
-                    // Switch to other player for their live card set
-                    if game_state.current_turn_phase == crate::game_state::TurnPhase::Live {
-                        // Check if first player has finished
-                        if game_state.player1.live_card_zone.cards.len() > 0 || game_state.player2.live_card_zone.cards.len() > 0 {
-                            // At least one player has set cards, check if both have finished
-                            let p1_finished = game_state.player1.live_card_zone.cards.len() > 0;
-                            let p2_finished = game_state.player2.live_card_zone.cards.len() > 0;
-                            
-                            if p1_finished && p2_finished {
-                                // Both players have finished, advance phase
-                                Self::advance_phase(game_state);
-                            } else if p1_finished {
-                                // P1 finished, now P2's turn
-                                // Just stay in LiveCardSet phase but actions will be for P2
-                            } else if p2_finished {
-                                // P2 finished, now P1's turn
-                                // Just stay in LiveCardSet phase but actions will be for P1
+                    // Use GameState flags to track completion
+                    if game_state.current_turn_phase == crate::game_state::TurnPhase::Live && 
+                       game_state.current_phase == crate::game_state::Phase::LiveCardSet {
+                        
+                        let p1_is_first = game_state.player1.is_first_attacker;
+                        let p1_done = game_state.live_card_set_player1_done;
+                        let p2_done = game_state.live_card_set_player2_done;
+                        
+                        // Mark current player as finished
+                        if !p1_done && p2_done {
+                            game_state.live_card_set_player1_done = true;
+                        } else if !p2_done && p1_done {
+                            game_state.live_card_set_player2_done = true;
+                        } else if !p1_done && !p2_done {
+                            if p1_is_first {
+                                game_state.live_card_set_player1_done = true;
                             } else {
-                                // Neither has set any cards, advance phase
-                                Self::advance_phase(game_state);
+                                game_state.live_card_set_player2_done = true;
                             }
-                        } else {
-                            // Neither has set cards, advance phase
+                        }
+                        
+                        // Check if both players have finished - if so, advance phase
+                        if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
+                            // Both done, run check timing then advance
+                            Self::check_timing(game_state);
                             Self::advance_phase(game_state);
                         }
                     } else {
@@ -434,43 +428,78 @@ impl TurnEngine {
                 }
                 Ok(())
             }
-            "play_member_left" => {
-                Self::execute_main_phase_action(
-                    game_state,
-                    "play_member",
-                    card_index,
-                    _card_indices,
-                    Some("left".to_string()),
-                    use_baton_touch,
-                )
-            }
-            "play_member_center" => {
-                Self::execute_main_phase_action(
-                    game_state,
-                    "play_member",
-                    card_index,
-                    _card_indices,
-                    Some("center".to_string()),
-                    use_baton_touch,
-                )
-            }
-            "play_member_right" => {
-                Self::execute_main_phase_action(
-                    game_state,
-                    "play_member",
-                    card_index,
-                    _card_indices,
-                    Some("right".to_string()),
-                    use_baton_touch,
-                )
-            }
-            "play_energy" => {
-                let card_index = card_index.unwrap_or(0);
-                let player = game_state.active_player_mut();
-                player.move_card_from_hand_to_energy_zone(card_index)?;
+            crate::game_setup::ActionType::FinishLiveCardSet => {
+                // Rule 8.2: Live Card Set Phase - Finish live card set and advance phase
+                // Rule 8.2.5: After all processing in check timing is complete, live card set phase ends
+                if game_state.current_turn_phase == crate::game_state::TurnPhase::Live && 
+                   game_state.current_phase == crate::game_state::Phase::LiveCardSet {
+                    
+                    // Determine which player is currently taking their turn based on completion flags
+                    // First attacker goes first, then second attacker
+                    let p1_is_first = game_state.player1.is_first_attacker;
+                    let p1_done = game_state.live_card_set_player1_done;
+                    let p2_done = game_state.live_card_set_player2_done;
+                    
+                    // Draw cards equal to number of cards placed in live zone
+                    let current_player = if !p1_done && p2_done {
+                        // P1 is currently taking their turn (P2 already done)
+                        &mut game_state.player1
+                    } else if !p2_done && p1_done {
+                        // P2 is currently taking their turn (P1 already done)
+                        &mut game_state.player2
+                    } else if !p1_done && !p2_done {
+                        // Neither has finished yet - first attacker goes first
+                        if p1_is_first {
+                            &mut game_state.player1
+                        } else {
+                            &mut game_state.player2
+                        }
+                    } else {
+                        // Both done - shouldn't happen
+                        return Ok(());
+                    };
+                    
+                    // Draw cards equal to number of cards placed in live zone
+                    let cards_placed = current_player.live_card_zone.cards.len();
+                    for _ in 0..cards_placed {
+                        let _ = current_player.draw_card();
+                    }
+                    current_player.rebuild_hand_index_map();
+                    
+                    // Mark current player as having finished their live card set
+                    if !p1_done && p2_done {
+                        // P1 is currently taking their turn (P2 already done)
+                        game_state.live_card_set_player1_done = true;
+                    } else if !p2_done && p1_done {
+                        // P2 is currently taking their turn (P1 already done)
+                        game_state.live_card_set_player2_done = true;
+                    } else if !p1_done && !p2_done {
+                        // Neither has finished yet - first attacker goes first
+                        if p1_is_first {
+                            game_state.live_card_set_player1_done = true;
+                        } else {
+                            game_state.live_card_set_player2_done = true;
+                        }
+                    }
+                    
+                    // Check if both players have finished
+                    let p1_finished = game_state.live_card_set_player1_done;
+                    let p2_finished = game_state.live_card_set_player2_done;
+                    
+                    if p1_finished && p2_finished {
+                        // Both players have finished, run check timing then advance to performance phase
+                        Self::check_timing(game_state);
+                        // Directly advance to FirstAttackerPerformance since advance_phase returns early for LiveCardSet
+                        game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
+                    }
+                    // If only one player finished, the other will get their turn on next action generation
+                } else {
+                    // Not in Live Card Set phase, just advance
+                    Self::advance_phase(game_state);
+                }
                 Ok(())
             }
-            "pass" => {
+            crate::game_setup::ActionType::Pass => {
                 // Player passes, advance phase
                 Self::advance_phase(game_state);
                 Ok(())
@@ -482,27 +511,11 @@ impl TurnEngine {
     pub fn setup_initial_energy(game_state: &mut GameState) {
         // Rule 6.2.7: Initial energy - Each player draws 3 cards from energy deck to Energy Zone
         for _ in 0..3 {
-            if let Some(card) = game_state.player1.energy_deck.draw() {
-                let card_in_zone = crate::zones::CardInZone {
-                    card: card.clone(),
-                    orientation: Some(crate::zones::Orientation::Active),
-                    face_state: crate::zones::FaceState::FaceUp,
-                    energy_underneath: Vec::new(),
-                    played_via_ability: false,
-                    turn_played: 0,
-                };
-                let _ = game_state.player1.energy_zone.add_card(card_in_zone);
+            if let Some(card_id) = game_state.player1.energy_deck.draw() {
+                let _ = game_state.player1.energy_zone.add_card(card_id, &game_state.card_database);
             }
-            if let Some(card) = game_state.player2.energy_deck.draw() {
-                let card_in_zone = crate::zones::CardInZone {
-                    card: card.clone(),
-                    orientation: Some(crate::zones::Orientation::Active),
-                    face_state: crate::zones::FaceState::FaceUp,
-                    energy_underneath: Vec::new(),
-                    played_via_ability: false,
-                    turn_played: 0,
-                };
-                let _ = game_state.player2.energy_zone.add_card(card_in_zone);
+            if let Some(card_id) = game_state.player2.energy_deck.draw() {
+                let _ = game_state.player2.energy_zone.add_card(card_id, &game_state.card_database);
             }
         }
     }
@@ -510,8 +523,8 @@ impl TurnEngine {
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
         // Rule 8.4: Determine live victory
         // Rule 8.4.2.1: Add cheer blade heart count to score
-        let player1_score = game_state.player1.live_card_zone.calculate_live_score(game_state.player1_cheer_blade_heart_count);
-        let player2_score = game_state.player2.live_card_zone.calculate_live_score(game_state.player2_cheer_blade_heart_count);
+        let player1_score = game_state.player1.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player1_cheer_blade_heart_count);
+        let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count);
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
         
@@ -622,6 +635,9 @@ impl TurnEngine {
         // End turn
         game_state.turn_number += 1;
         game_state.reset_keyword_tracking();
+        // Clear locked areas at start of new turn
+        game_state.player1.areas_locked_this_turn.clear();
+        game_state.player2.areas_locked_this_turn.clear();
         game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         game_state.current_phase = Phase::Active;
     }
@@ -631,21 +647,6 @@ impl TurnEngine {
         if card_index < player.live_card_zone.cards.len() {
             let card = player.live_card_zone.cards.remove(card_index);
             player.success_live_card_zone.cards.push(card);
-        }
-    }
-
-    #[allow(dead_code)]
-    fn move_live_to_exclusion(player: &mut crate::player::Player) {
-        // Move all live cards to exclusion zone
-        for card in player.live_card_zone.clear() {
-            player.exclusion_zone.cards.push(crate::zones::CardInZone {
-                card: card,
-                orientation: Some(crate::zones::Orientation::Wait),
-                face_state: crate::zones::FaceState::FaceDown,
-                energy_underneath: Vec::new(),
-                played_via_ability: false,
-                turn_played: 0,
-            });
         }
     }
 
@@ -664,8 +665,8 @@ impl TurnEngine {
         Self::check_duplicate_members(&mut game_state.player2);
         
         // Rule 10.5: Check for invalid cards
-        Self::check_invalid_cards(&mut game_state.player1);
-        Self::check_invalid_cards(&mut game_state.player2);
+        Self::check_invalid_cards(&mut game_state.player1, &game_state.card_database);
+        Self::check_invalid_cards(&mut game_state.player2, &game_state.card_database);
         
         // Rule 10.6: Check for invalid resolution zone
         Self::check_invalid_resolution_zone(game_state);
@@ -692,71 +693,40 @@ impl TurnEngine {
         }
     }
 
-    fn check_duplicate_members(player: &mut crate::player::Player) {
+    fn check_duplicate_members(_player: &mut crate::player::Player) {
         // Rule 10.4: Check for duplicate members in same area
         // Rule 10.4.1: If multiple members in one area, keep the last one, send others to discard
-        let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-        
-        for area in areas {
-            if let Some(card_in_zone) = player.stage.get_area_mut(area) {
-                // Check if there are energy cards underneath (indicating multiple cards)
-                if !card_in_zone.energy_underneath.is_empty() {
-                    // Keep only the top card (the last one placed)
-                    // Move all energy-underneath cards to discard
-                    for energy_card in card_in_zone.energy_underneath.drain(..) {
-                        player.waitroom.cards.push(energy_card);
-                    }
-                }
-            }
-        }
+        // energy_underneath tracking moved to GameState modifiers
+        // For now, this is a no-op
     }
 
-    fn check_invalid_cards(player: &mut crate::player::Player) {
+    fn check_invalid_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
         // Rule 10.5: Check for invalid cards in zones
         // Rule 10.5.1: Non-live cards in live card zone
-        player.live_card_zone.cards.retain(|c| c.is_live());
-        
+        player.live_card_zone.cards.retain(|card_id| {
+            card_db.get_card(*card_id).map(|c| c.is_live()).unwrap_or(false)
+        });
+
         // Rule 10.5.2: Non-energy cards in energy zone
-        player.energy_zone.cards.retain(|c| c.card.is_energy());
-        
+        player.energy_zone.cards.retain(|card_id| {
+            card_db.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false)
+        });
+
         // Rule 10.5.3: Energy cards without member above in member area
-        // Check each member area
-        for area in [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide] {
-            if let Some(card_in_zone) = player.stage.get_area_mut(area) {
+        // Check each member area - cache stage card lookups
+        let stage_card_ids = [
+            player.stage.stage[0],
+            player.stage.stage[1],
+            player.stage.stage[2],
+        ];
+        
+        for (index, card_id) in stage_card_ids.iter().enumerate() {
+            if *card_id != -1 {
                 // If no member above, move energy cards to energy deck
-                if card_in_zone.card.is_energy() {
-                    let energy_card = card_in_zone.card.clone();
-                    *card_in_zone = crate::zones::CardInZone {
-                        card: crate::card::Card {
-                            card_no: String::new(),
-                            img: None,
-                            name: String::new(),
-                            product: String::new(),
-                            card_type: crate::card::CardType::Energy,
-                            series: String::new(),
-                            group: String::new(),
-                            unit: None,
-                            cost: None,
-                            base_heart: None,
-                            blade_heart: None,
-                            blade: 0,
-                            rare: String::new(),
-                            ability: String::new(),
-                            faq: Vec::new(),
-                            _img: None,
-                            score: None,
-                            need_heart: None,
-                            special_heart: None,
-                            abilities: Vec::new(),
-                        },
-                        orientation: None,
-                        face_state: crate::zones::FaceState::FaceDown,
-                        energy_underneath: Vec::new(),
-                        played_via_ability: false,
-                        turn_played: 0,
-                    };
+                if card_db.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false) {
+                    player.stage.stage[index] = -1;
                     // Move to energy deck
-                    player.energy_deck.cards.push_back(energy_card);
+                    player.energy_deck.cards.push(*card_id);
                 }
             }
         }
@@ -770,27 +740,33 @@ impl TurnEngine {
         // This would need to track which cards are currently being played/resolved
     }
 
-    pub fn player_set_live_cards(player: &mut crate::player::Player, num_cards_to_set: usize) {
+    pub fn player_set_live_cards(player: &mut crate::player::Player, num_cards_to_set: usize, card_database: &crate::card::CardDatabase) {
         // Rule 8.2: Player sets live cards face-down and draws equal amount
-        let live_cards: Vec<_> = player.hand.cards.iter()
-            .filter(|c| c.is_live())
-            .cloned()
+        let live_cards: Vec<i16> = player.hand.cards.iter()
+            .filter(|&c| {
+                if let Some(card) = card_database.get_card(*c) {
+                    card.is_live()
+                } else {
+                    false
+                }
+            })
+            .copied()
             .collect();
-        
+
         if live_cards.is_empty() || num_cards_to_set == 0 {
             return;
         }
-        
+
         // Set specified number of cards
         let cards_to_set = std::cmp::min(num_cards_to_set, live_cards.len());
         for i in 0..cards_to_set {
-            let card = live_cards[i].clone();
+            let card_id = live_cards[i];
             // Remove from hand
-            if let Some(pos) = player.hand.cards.iter().position(|c| c.card_no == card.card_no) {
+            if let Some(pos) = player.hand.cards.iter().position(|&c| c == card_id) {
                 player.hand.cards.remove(pos);
             }
             // Add to live card zone face-down
-            let _ = player.live_card_zone.add_card(card, true);
+            let _ = player.live_card_zone.add_card(card_id, true, card_database);
         }
         
         // Draw equal amount
@@ -799,13 +775,19 @@ impl TurnEngine {
         }
     }
 
-    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone, _player_id: &str) -> u32 {
+    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone, _player_id: &str, card_database: &crate::card::CardDatabase) -> u32 {
         // Rule 8.3: Player performs live - check heart requirements
         // Note: This function no longer takes game_state to avoid borrow conflicts
         // Ability triggering should be handled by the caller
-        
+
         // Rule 8.3.4: Reveal cards, discard non-live cards
-        player.live_card_zone.cards.retain(|c| c.is_live());
+        player.live_card_zone.cards.retain(|c| {
+            if let Some(card) = card_database.get_card(*c) {
+                card.is_live()
+            } else {
+                false
+            }
+        });
         
         // Rule 8.3.4.1: If player is 'cannot live' state, discard all revealed cards
         // Note: This check should be done by the caller before calling this function
@@ -819,12 +801,13 @@ impl TurnEngine {
         // Rule 8.3.7: Live cards exist, perform live
         
         // Rule 8.3.10: Calculate total blades from active members
-        let total_blades = player.stage.total_blades();
+        let total_blades = player.stage.total_blades(card_database);
         
         // Rule 8.3.11: エール (cheer) - move cards from main deck to resolution zone
         for _ in 0..total_blades {
-            if let Some(card) = player.main_deck.cards.pop_front() {
-                resolution_zone.cards.push(card);
+            if !player.main_deck.cards.is_empty() {
+                let card_id = player.main_deck.cards.remove(0);
+                resolution_zone.cards.push(card_id);
             }
         }
         
@@ -834,24 +817,26 @@ impl TurnEngine {
         let mut special_heart_score_count = 0;
         let mut b_all_count = 0;
         
-        for card in &resolution_zone.cards {
-            if let Some(ref blade_heart) = card.blade_heart {
-                // Count b_all separately for wildcard treatment
-                b_all_count += blade_heart.hearts.get("b_all").copied().unwrap_or(0);
-                // Count regular blade hearts (b_heart01, etc.) for drawing
-                for (color, count) in &blade_heart.hearts {
-                    if color != "b_all" {
-                        blade_heart_count += count;
+        for card_id in &resolution_zone.cards {
+            if let Some(card) = card_database.get_card(*card_id) {
+                if let Some(ref blade_heart) = card.blade_heart {
+                    // Count b_all separately for wildcard treatment
+                    b_all_count += blade_heart.hearts.get(&crate::card::HeartColor::BAll).copied().unwrap_or(0);
+                    // Count regular blade hearts (b_heart01, etc.) for drawing
+                    for (color, count) in &blade_heart.hearts {
+                        if *color != crate::card::HeartColor::BAll {
+                            blade_heart_count += count;
+                        }
                     }
                 }
-            }
-            // Rule: Handle special_heart types (draw and score)
-            if let Some(ref special_heart) = card.special_heart {
-                special_heart_draw_count += special_heart.hearts.get("draw").copied().unwrap_or(0);
-                special_heart_score_count += special_heart.hearts.get("score").copied().unwrap_or(0);
+                // Rule: Handle special_heart types (draw and score)
+                if let Some(ref special_heart) = card.special_heart {
+                    special_heart_draw_count += special_heart.hearts.get(&crate::card::HeartColor::Draw).copied().unwrap_or(0);
+                    special_heart_score_count += special_heart.hearts.get(&crate::card::HeartColor::Score).copied().unwrap_or(0);
+                }
             }
         }
-        
+
         // Rule 8.3.12.1: Draw cards based on blade heart count (excluding b_all)
         for _ in 0..blade_heart_count {
             let _ = player.draw_card();
@@ -865,96 +850,99 @@ impl TurnEngine {
         // Rule 8.3.13: Check timing (caller responsibility)
         
         // Rule 8.3.14: Calculate live-owned hearts from stage and blade hearts
-        let stage_hearts = player.stage.get_available_hearts();
+        let stage_hearts = player.stage.get_available_hearts(&card_database);
         let mut live_owned_hearts = stage_hearts.clone();
         
         // Add blade hearts from resolution zone (excluding b_all which is handled as wildcard)
-        for card in &resolution_zone.cards {
-            if let Some(ref blade_heart) = card.blade_heart {
-                for (color, count) in &blade_heart.hearts {
-                    if color != "b_all" {
-                        *live_owned_hearts.hearts.entry(color.clone()).or_insert(0) += count;
+        for card_id in &resolution_zone.cards {
+            if let Some(card) = card_database.get_card(*card_id) {
+                if let Some(ref blade_heart) = card.blade_heart {
+                    for (color, count) in &blade_heart.hearts {
+                        if *color != crate::card::HeartColor::BAll {
+                            *live_owned_hearts.hearts.entry(color.clone()).or_insert(0) += count;
+                        }
                     }
                 }
             }
         }
         
-        // Add b_all as wildcard hearts (can be any color, stored as "b_all" key)
+        // Add b_all as wildcard hearts (can be any color, stored as BAll key)
         if b_all_count > 0 {
-            *live_owned_hearts.hearts.entry("b_all".to_string()).or_insert(0) += b_all_count;
+            *live_owned_hearts.hearts.entry(crate::card::HeartColor::BAll).or_insert(0) += b_all_count;
         }
         
         // Rule 8.3.15: Check if each live card can satisfy required hearts
         let mut remaining_hearts = live_owned_hearts.clone();
         let mut live_cards_to_remove = Vec::new();
         
-        for card in &player.live_card_zone.cards {
-            if let Some(ref need_heart) = card.need_heart {
-                let mut can_satisfy = true;
-                let mut temp_hearts = remaining_hearts.hearts.clone();
-                
-                for (color, needed) in &need_heart.hearts {
-                    if color == "heart00" {
-                        // Wildcard heart (rule 8.3.15.1.1) - can be any color
-                        // Count total hearts available (including b_all wildcards)
-                        let total_available: u32 = temp_hearts.values().sum();
-                        if total_available < *needed {
-                            can_satisfy = false;
-                            break;
-                        }
-                        // Consume from any colors (prefer non-wildcards first)
-                        let mut consumed = 0;
-                        for (c, count) in temp_hearts.iter_mut() {
-                            if *c != "heart00" && *c != "b_all" {
-                                let to_consume = std::cmp::min(*count, *needed - consumed);
-                                *count -= to_consume;
-                                consumed += to_consume;
-                                if consumed >= *needed {
-                                    break;
+        for card_id in &player.live_card_zone.cards {
+            if let Some(card) = card_database.get_card(*card_id) {
+                if let Some(ref need_heart) = card.need_heart {
+                    let mut can_satisfy = true;
+                    let mut temp_hearts = remaining_hearts.hearts.clone();
+
+                    for (color, needed) in &need_heart.hearts {
+                        if *color == crate::card::HeartColor::Heart00 {
+                            // Wildcard heart (rule 8.3.15.1.1) - can be any color
+                            // Count total hearts available (including b_all wildcards)
+                            let total_available: u32 = temp_hearts.values().sum();
+                            if total_available < *needed {
+                                can_satisfy = false;
+                                break;
+                            }
+                            // Consume from any colors (prefer non-wildcards first)
+                            let mut _consumed = 0;
+                            for (c, count) in temp_hearts.iter_mut() {
+                                if *c != crate::card::HeartColor::Heart00 {
+                                    let to_consume = std::cmp::min(*count, *needed - _consumed);
+                                    *count -= to_consume;
+                                    _consumed += to_consume;
+                                    if _consumed >= *needed {
+                                        break;
+                                    }
+                                }
+                            }
+                            // If still need more, consume from wildcards (heart00)
+                            if _consumed < *needed {
+                                if let Some(wildcard_count) = temp_hearts.get_mut(&crate::card::HeartColor::Heart00) {
+                                    let to_consume = std::cmp::min(*wildcard_count, *needed - _consumed);
+                                    *wildcard_count -= to_consume;
+                                    _consumed += to_consume;
+                                }
+                            }
+                        } else {
+                            // Specific color heart - can use heart00 as wildcard
+                            let specific_available = temp_hearts.get(color).unwrap_or(&0);
+                            let wildcard_available = temp_hearts.get(&crate::card::HeartColor::Heart00).unwrap_or(&0);
+                            let total_available = specific_available + wildcard_available;
+
+                            if total_available < *needed {
+                                can_satisfy = false;
+                                break;
+                            }
+
+                            // Use specific color first, then b_all
+                            let specific_to_consume = std::cmp::min(*specific_available, *needed);
+                            if let Some(heart_count) = temp_hearts.get_mut(color) {
+                                *heart_count -= specific_to_consume;
+                            }
+                            let remaining_needed = *needed - specific_to_consume;
+
+                            if remaining_needed > 0 {
+                                if let Some(wildcard_count) = temp_hearts.get_mut(&crate::card::HeartColor::Heart00) {
+                                    let to_consume = std::cmp::min(*wildcard_count, remaining_needed);
+                                    *wildcard_count -= to_consume;
                                 }
                             }
                         }
-                        // If still need more, consume from wildcards (heart00 and b_all)
-                        if consumed < *needed {
-                            if let Some(wildcard_count) = temp_hearts.get_mut("heart00") {
-                                let to_consume = std::cmp::min(*wildcard_count, *needed - consumed);
-                                *wildcard_count -= to_consume;
-                                consumed += to_consume;
-                            }
-                        }
-                        if consumed < *needed {
-                            if let Some(b_all_count) = temp_hearts.get_mut("b_all") {
-                                let to_consume = std::cmp::min(*b_all_count, *needed - consumed);
-                                *b_all_count -= to_consume;
-                            }
-                        }
-                    } else {
-                        // Specific color heart - can use b_all as wildcard
-                        let specific_available = temp_hearts.get(color).unwrap_or(&0);
-                        let b_all_available = temp_hearts.get("b_all").unwrap_or(&0);
-                        let total_available = specific_available + b_all_available;
-                        
-                        if total_available < *needed {
-                            can_satisfy = false;
-                            break;
-                        }
-                        
-                        // Use specific color first, then b_all
-                        let specific_to_consume = std::cmp::min(*specific_available, *needed);
-                        *temp_hearts.get_mut(color).unwrap() -= specific_to_consume;
-                        let remaining_needed = *needed - specific_to_consume;
-                        
-                        if remaining_needed > 0 {
-                            *temp_hearts.get_mut("b_all").unwrap() -= remaining_needed;
-                        }
                     }
-                }
-                
-                if can_satisfy {
-                    // Update remaining hearts with the temp consumption
-                    remaining_hearts.hearts = temp_hearts;
-                } else {
-                    live_cards_to_remove.push(card.clone());
+
+                    if can_satisfy {
+                        // Update remaining hearts with the temp consumption
+                        remaining_hearts.hearts = temp_hearts;
+                    } else {
+                        live_cards_to_remove.push(*card_id);
+                    }
                 }
             }
         }
@@ -962,14 +950,14 @@ impl TurnEngine {
         // Rule 8.3.16: If any fails, all live cards go to discard
         if !live_cards_to_remove.is_empty() {
             // Move all live cards to discard
-            for card in player.live_card_zone.clear() {
-                player.waitroom.cards.push(card);
+            for card_id in player.live_card_zone.clear() {
+                player.waitroom.cards.push(card_id);
             }
         }
         
         // Move resolution zone cards to discard
-        for card in resolution_zone.cards.drain(..) {
-            player.waitroom.cards.push(card);
+        for card_id in resolution_zone.cards.drain(..) {
+            player.waitroom.cards.push(card_id);
         }
         
         // Rule 8.3.17: Check timing (caller responsibility)
@@ -1004,17 +992,19 @@ impl TurnEngine {
             // Find the card on stage
             let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
             for area in areas {
-                if let Some(card_in_zone) = player.stage.get_area(area) {
-                    if card_in_zone.card.card_no == card_no_clone {
-                        // Check if card has Debut abilities
-                        for ability in &card_in_zone.card.abilities {
-                            // Check if ability has Debut trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "登場") {
-                                let ability_id = format!("{}_{}", card_no_clone, ability.full_text);
-                                abilities_to_trigger.push((ability_id, card_no_clone.clone()));
+                if let Some(card_id) = player.stage.get_area(area) {
+                    if let Some(card) = game_state.card_database.get_card(card_id) {
+                        if card.card_no == card_no_clone {
+                            // Check if card has Debut abilities
+                            for ability in &card.abilities {
+                                // Check if ability has Debut trigger
+                                if ability.triggers.as_ref().map_or(false, |t| t == "登場") {
+                                    let ability_id = format!("{}_{}", card_no_clone, ability.full_text);
+                                    abilities_to_trigger.push((ability_id, card_no_clone.clone()));
+                                }
                             }
+                            break;
                         }
-                        break;
                     }
                 }
             }
@@ -1031,6 +1021,7 @@ impl TurnEngine {
         }
     }
 
+    #[allow(dead_code)]
     fn trigger_performance_phase_start_abilities(game_state: &mut GameState, player_id: &str) {
         // Rule 8.3.3: Trigger 'performance phase start' automatic abilities
         // Rule 8.3.3: "手番プレイヤーの自動能力の'パフォーマンスフェイズの始めに'の誘発条件が発生し、チェックタイミングが発生します。"
@@ -1050,14 +1041,16 @@ impl TurnEngine {
             // Check all members on stage for performance phase start abilities
             let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
             for area in areas {
-                if let Some(card_in_zone) = player.stage.get_area(area) {
-                    // Check if card has performance phase start abilities
-                    for ability in &card_in_zone.card.abilities {
-                        // Check if ability has performance phase start trigger
-                        if ability.triggers.as_ref().map_or(false, |t| t == "パフォーマンスフェイズの始めに" || t == "performance_phase_start") {
-                            // Collect ability to trigger
-                            let ability_id = format!("{}_{}", card_in_zone.card.card_no, ability.full_text);
-                            abilities_to_trigger.push((ability_id, card_in_zone.card.card_no.clone()));
+                if let Some(card_id) = player.stage.get_area(area) {
+                    if let Some(card) = game_state.card_database.get_card(card_id) {
+                        // Check if card has performance phase start abilities
+                        for ability in &card.abilities {
+                            // Check if ability has performance phase start trigger
+                            if ability.triggers.as_ref().map_or(false, |t| t == "パフォーマンスフェイズの始めに" || t == "performance_phase_start") {
+                                // Collect ability to trigger
+                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                                abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                            }
                         }
                     }
                 }
@@ -1075,6 +1068,7 @@ impl TurnEngine {
         }
     }
 
+    #[allow(dead_code)]
     fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
         // Rule 11.5: Trigger LiveStart automatic abilities
         // Rule 11.5.2: "【自動】 あなたが手番プレイヤーであるパフォーマンスフェイズのライブ開始時、（効果）"
@@ -1094,14 +1088,16 @@ impl TurnEngine {
             // Check all members on stage for LiveStart abilities
             let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
             for area in areas {
-                if let Some(card_in_zone) = player.stage.get_area(area) {
-                    // Check if card has LiveStart abilities
-                    for ability in &card_in_zone.card.abilities {
-                        // Check if ability has LiveStart trigger
-                        if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
-                            // Collect ability to trigger
-                            let ability_id = format!("{}_{}", card_in_zone.card.card_no, ability.full_text);
-                            abilities_to_trigger.push((ability_id, card_in_zone.card.card_no.clone()));
+                if let Some(card_id) = player.stage.get_area(area) {
+                    if let Some(card) = game_state.card_database.get_card(card_id) {
+                        // Check if card has LiveStart abilities
+                        for ability in &card.abilities {
+                            // Check if ability has LiveStart trigger
+                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
+                                // Collect ability to trigger
+                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                                abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                            }
                         }
                     }
                 }
@@ -1136,27 +1132,32 @@ impl TurnEngine {
             };
             
             // Check all members on stage for LiveSuccess abilities
-            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-            for area in areas {
-                if let Some(card_in_zone) = player.stage.get_area(area) {
-                    // Check if card has LiveSuccess abilities
-                    for ability in &card_in_zone.card.abilities {
-                        // Check if ability has LiveSuccess trigger
-                        if ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時") {
-                            // Collect ability to trigger
-                            let ability_id = format!("{}_{}", card_in_zone.card.card_no, ability.full_text);
-                            abilities_to_trigger.push((ability_id, card_in_zone.card.card_no.clone()));
+            let area_indices = [(crate::zones::MemberArea::LeftSide, 0), (crate::zones::MemberArea::Center, 1), (crate::zones::MemberArea::RightSide, 2)];
+            for (_area, index) in area_indices {
+                let card_id = player.stage.stage[index];
+                if card_id != -1 {
+                    if let Some(card) = game_state.card_database.get_card(card_id) {
+                        // Check if card has LiveSuccess abilities
+                        for ability in &card.abilities {
+                            // Check if ability has LiveSuccess trigger
+                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時") {
+                                // Collect ability to trigger
+                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                                abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                            }
                         }
                     }
                 }
             }
-            
+
             // Also check live cards in live card zone
-            for card in &player.live_card_zone.cards {
-                for ability in &card.abilities {
-                    if ability.full_text.contains("ライブ成功時") || ability.full_text.contains("LiveSuccess") {
-                        let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                        abilities_to_trigger.push((ability_id, card.card_no.clone()));
+            for card_id in &player.live_card_zone.cards {
+                if let Some(card) = game_state.card_database.get_card(*card_id) {
+                    for ability in &card.abilities {
+                        if ability.full_text.contains("ライブ成功時") || ability.full_text.contains("LiveSuccess") {
+                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                        }
                     }
                 }
             }

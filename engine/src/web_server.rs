@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
 
+use crate::game_setup::AreaInfo;
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::card_loader;
@@ -54,7 +55,8 @@ pub struct GameStateDisplay {
 
 #[derive(Serialize, Deserialize)]
 pub struct ActionParameters {
-    pub card_index: Option<usize>,
+    pub card_id: Option<i16>, // Database card ID - reliable identifier
+    pub card_index: Option<usize>, // Array position - kept for backward compatibility
     pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
     pub stage_area: Option<String>,
     pub use_baton_touch: Option<bool>, // Whether to use baton touch cost reduction
@@ -81,49 +83,53 @@ pub struct ActionsResponse {
 #[derive(Deserialize)]
 pub struct ExecuteActionRequest {
     pub action_index: usize,
-    pub stage_area: Option<String>,
+    pub stage_area: Option<crate::zones::MemberArea>,
+    pub action_type: Option<String>,
+    pub card_id: Option<i16>, // Database card ID - reliable identifier
+    pub card_index: Option<usize>, // Array position - kept for backward compatibility
+    pub card_indices: Option<Vec<usize>>,
+    pub card_no: Option<String>,
+    pub use_baton_touch: Option<bool>,
 }
 
 pub struct AppState {
     pub game_state: Arc<Mutex<GameState>>,
 }
 
-pub fn card_to_display(card: &crate::card::Card, orientation: Option<crate::zones::Orientation>) -> CardDisplay {
-    CardDisplay {
-        card_no: card.card_no.clone(),
-        name: card.name.clone(),
-        card_type: format!("{:?}", card.card_type),
-        orientation: orientation.map(|o| format!("{:?}", o)),
+pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>) -> Option<CardDisplay> {
+    if let Some(card) = card_db.get_card(card_id) {
+        Some(CardDisplay {
+            card_no: card.card_no.clone(),
+            name: card.name.clone(),
+            card_type: format!("{:?}", card.card_type),
+            orientation: orientation.map(|o| format!("{:?}", o)),
+        })
+    } else {
+        None
     }
 }
 
-pub fn zone_to_display_from_cardinzone(cards: &[crate::zones::CardInZone]) -> ZoneDisplay {
+pub fn zone_to_display_from_card_ids(cards: &[i16], card_db: &crate::card::CardDatabase) -> ZoneDisplay {
     ZoneDisplay {
-        cards: cards.iter().map(|c| card_to_display(&c.card, c.orientation)).collect(),
+        cards: cards.iter().filter_map(|&card_id| card_to_display(card_id, card_db, None)).collect(),
     }
 }
 
-pub fn zone_to_display_from_card(cards: &[crate::card::Card]) -> ZoneDisplay {
-    ZoneDisplay {
-        cards: cards.iter().map(|c| card_to_display(c, None)).collect(),
-    }
-}
-
-pub fn stage_to_display(stage: &crate::zones::Stage) -> StageDisplay {
+pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardDatabase) -> StageDisplay {
     StageDisplay {
-        left_side: stage.left_side.as_ref().map(|c| card_to_display(&c.card, c.orientation)),
-        center: stage.center.as_ref().map(|c| card_to_display(&c.card, c.orientation)),
-        right_side: stage.right_side.as_ref().map(|c| card_to_display(&c.card, c.orientation)),
+        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, None) } else { None },
+        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, None) } else { None },
+        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, None) } else { None },
     }
 }
 
-pub fn player_to_display(player: &crate::player::Player) -> PlayerDisplay {
+pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase) -> PlayerDisplay {
     PlayerDisplay {
-        hand: zone_to_display_from_card(&player.hand.cards),
-        energy: zone_to_display_from_cardinzone(&player.energy_zone.cards),
-        stage: stage_to_display(&player.stage),
-        live_zone: zone_to_display_from_card(&player.live_card_zone.cards),
-        success_live_card_zone: zone_to_display_from_card(&player.success_live_card_zone.cards),
+        hand: zone_to_display_from_card_ids(&player.hand.cards, card_db),
+        energy: zone_to_display_from_card_ids(&player.energy_zone.cards, card_db),
+        stage: stage_to_display(&player.stage, card_db),
+        live_zone: zone_to_display_from_card_ids(&player.live_card_zone.cards, card_db),
+        success_live_card_zone: zone_to_display_from_card_ids(&player.success_live_card_zone.cards, card_db),
         main_deck_count: player.main_deck.cards.len(),
         energy_deck_count: player.energy_deck.cards.len(),
         waitroom_count: player.waitroom.cards.len(),
@@ -134,33 +140,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1),
-        player2: player_to_display(&game_state.player2),
+        player1: player_to_display(&game_state.player1, &game_state.card_database),
+        player2: player_to_display(&game_state.player2, &game_state.card_database),
     }
 }
 
 async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
-    let mut game_state = data.game_state.lock().unwrap();
-    
-    // Auto-advance automatic phases
-    loop {
-        let current_phase = game_state.current_phase.clone();
-        match current_phase {
-            // Live phase phases - LiveCardSet is manual, others are automatic
-            crate::game_state::Phase::FirstAttackerPerformance |
-            crate::game_state::Phase::SecondAttackerPerformance |
-            crate::game_state::Phase::LiveVictoryDetermination => {
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            // Early game automatic phases
-            crate::game_state::Phase::Active |
-            crate::game_state::Phase::Energy |
-            crate::game_state::Phase::Draw => {
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            _ => break,
-        }
-    }
+    let game_state = data.game_state.lock().unwrap();
     
     let display = game_state_to_display(&game_state);
     HttpResponse::Ok().json(display)
@@ -169,17 +155,10 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
 async fn get_actions(data: web::Data<AppState>) -> impl Responder {
     let mut game_state = data.game_state.lock().unwrap();
     
-    // Auto-advance automatic phases
+    // Auto-advance automatic phases (Active, Energy, Draw) to ensure energy is activated
     loop {
         let current_phase = game_state.current_phase.clone();
         match current_phase {
-            // Live phase phases - LiveCardSet is manual, others are automatic
-            crate::game_state::Phase::FirstAttackerPerformance |
-            crate::game_state::Phase::SecondAttackerPerformance |
-            crate::game_state::Phase::LiveVictoryDetermination => {
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            // Early game automatic phases
             crate::game_state::Phase::Active |
             crate::game_state::Phase::Energy |
             crate::game_state::Phase::Draw => {
@@ -208,17 +187,24 @@ fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     // Convert game_setup Action to web_server Action
     setup_actions.into_iter().map(|sa| Action {
         description: sa.description,
-        action_type: sa.action_type,
+        action_type: sa.action_type.to_string(),
         parameters: sa.parameters.map(|p| ActionParameters {
+            card_id: p.card_id,
             card_index: p.card_index,
             card_indices: p.card_indices,
-            stage_area: p.stage_area,
+            stage_area: p.stage_area.map(|a| a.to_string()),
             use_baton_touch: p.use_baton_touch,
             card_name: p.card_name,
             card_no: p.card_no,
             base_cost: p.base_cost,
             final_cost: p.final_cost,
-            available_areas: p.available_areas,
+            available_areas: p.available_areas.map(|areas| areas.into_iter().map(|ai| AreaInfo {
+                area: ai.area,
+                available: ai.available,
+                cost: ai.cost,
+                is_baton_touch: ai.is_baton_touch,
+                existing_member_name: ai.existing_member_name,
+            }).collect()),
         }),
     }).collect()
 }
@@ -227,33 +213,28 @@ async fn execute_action(
     data: web::Data<AppState>,
     req: web::Json<ExecuteActionRequest>,
 ) -> impl Responder {
-    let action_index = req.action_index;
+    let _action_index = req.action_index;
     let requested_stage_area = req.stage_area.clone();
+    let _requested_action_type = req.action_type.clone();
+    let requested_card_id = req.card_id;
+    let _requested_card_index = req.card_index;
+    let _requested_card_no = req.card_no.clone();
     let mut game_state = data.game_state.lock().unwrap();
     
-    // Get possible actions
-    let actions = generate_possible_actions(&game_state);
+    // Parse action type from request
+    let action_type = req.action_type.as_ref()
+        .and_then(|t| t.parse::<crate::game_setup::ActionType>().ok())
+        .unwrap_or_else(|| crate::game_setup::ActionType::Pass);
     
-    if action_index >= actions.len() {
-        return HttpResponse::BadRequest().json("Invalid action index");
-    }
-    
-    let action = &actions[action_index];
-    
-    // Use stage_area from request if provided, otherwise use from action parameters
-    let stage_area = requested_stage_area.or_else(|| action.parameters.as_ref().and_then(|p| p.stage_area.clone()));
-    
-    // Get use_baton_touch from parameters
-    let use_baton_touch = action.parameters.as_ref().and_then(|p| p.use_baton_touch);
-    
-    // Execute the action using turn engine
+    // Execute the action using turn engine with card_id directly
+    // Turn engine handles card_id to card_index lookup internally
     let result = crate::turn::TurnEngine::execute_main_phase_action(
         &mut game_state,
-        &action.action_type,
-        action.parameters.as_ref().and_then(|p| p.card_index),
-        action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
-        stage_area,
-        use_baton_touch,
+        &action_type,
+        requested_card_id,
+        req.card_indices.clone(),
+        requested_stage_area,
+        req.use_baton_touch,
     );
     
     match result {
@@ -281,6 +262,7 @@ async fn execute_action(
             HttpResponse::Ok().json(display)
         }
         Err(e) => {
+            eprintln!("Action execution error: {}", e);
             HttpResponse::BadRequest().json(e)
         }
     }
@@ -302,7 +284,7 @@ async fn init_game(data: web::Data<AppState>) -> impl Responder {
             return HttpResponse::InternalServerError().json("Failed to load cards");
         }
     };
-    
+
     // Load deck lists
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(decks) => decks,
@@ -311,15 +293,19 @@ async fn init_game(data: web::Data<AppState>) -> impl Responder {
             return HttpResponse::InternalServerError().json("Failed to load decks");
         }
     };
-    
+
     // Use first deck for both players (can be enhanced later to allow deck selection)
     let deck1 = &deck_lists[0];
     let deck2 = &deck_lists[0];
-    
+
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
+
+    // Create CardDatabase from loaded cards - convert HashMap values to Vec
+    let card_vec: Vec<crate::card::Card> = cards.into_values().collect();
+    let card_database = Arc::new(crate::card::CardDatabase::load_or_create(card_vec));
+
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -330,8 +316,8 @@ async fn init_game(data: web::Data<AppState>) -> impl Responder {
             return HttpResponse::InternalServerError().json("Failed to build deck for Player 1");
         }
     };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
+
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -342,22 +328,22 @@ async fn init_game(data: web::Data<AppState>) -> impl Responder {
             return HttpResponse::InternalServerError().json("Failed to build deck for Player 2");
         }
     };
-    
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
-    
+
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+
     // Create fresh players
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
+
     player1.set_main_deck(player1_deck.main_deck);
     player1.set_energy_deck(player1_deck.energy_deck);
-    
+
     player2.set_main_deck(player2_deck.main_deck);
     player2.set_energy_deck(player2_deck.energy_deck);
-    
-    // Create fresh game state
-    let mut game_state = GameState::new(player1, player2);
+
+    // Create fresh game state with CardDatabase
+    let mut game_state = GameState::new(player1, player2, card_database);
     
     // Setup game (Rule 6.2)
     crate::game_setup::setup_game(&mut game_state);

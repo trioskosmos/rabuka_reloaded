@@ -76,66 +76,96 @@ struct GameResponse {
     is_finished: bool,
 }
 
-fn card_to_display(card: &crate::card::Card) -> CardDisplay {
-    CardDisplay {
-        card_no: card.card_no.clone(),
-        name: card.name.clone(),
-        card_type: format!("{:?}", card.card_type),
+fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase) -> CardDisplay {
+    if let Some(card) = card_db.get_card(card_id) {
+        CardDisplay {
+            card_no: card.card_no.clone(),
+            name: card.name.clone(),
+            card_type: format!("{:?}", card.card_type),
+        }
+    } else {
+        CardDisplay {
+            card_no: format!("unknown:{}", card_id),
+            name: format!("Unknown Card {}", card_id),
+            card_type: "Unknown".to_string(),
+        }
     }
 }
 
-fn zone_to_display(cards: &[crate::card::Card]) -> ZoneDisplay {
+fn zone_to_display(card_ids: &[i16], card_db: &crate::card::CardDatabase) -> ZoneDisplay {
     ZoneDisplay {
-        cards: cards.iter().map(card_to_display).collect(),
+        cards: card_ids.iter().map(|&id| card_to_display(id, card_db)).collect(),
     }
 }
 
-fn stage_to_display(stage: &crate::zones::Stage) -> StageDisplay {
+fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardDatabase) -> StageDisplay {
     StageDisplay {
-        left_side: stage.left_side.as_ref().map(|c| card_to_display(&c.card)),
-        center: stage.center.as_ref().map(|c| card_to_display(&c.card)),
-        right_side: stage.right_side.as_ref().map(|c| card_to_display(&c.card)),
+        left_side: if stage.stage[0] != -1 { Some(card_to_display(stage.stage[0], card_db)) } else { None },
+        center: if stage.stage[1] != -1 { Some(card_to_display(stage.stage[1], card_db)) } else { None },
+        right_side: if stage.stage[2] != -1 { Some(card_to_display(stage.stage[2], card_db)) } else { None },
     }
 }
 
-fn player_to_display(player: &crate::player::Player) -> PlayerDisplay {
-    let energy_cards: Vec<crate::card::Card> = player.energy_zone.cards.iter().map(|c| c.card.clone()).collect();
+fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase) -> PlayerDisplay {
+    let energy_cards: Vec<(i16, Option<crate::zones::Orientation>)> = player.energy_zone.cards.iter()
+        .enumerate()
+        .map(|(i, &card_id)| {
+            // Simplified: first active_energy_count cards are active, rest are wait
+            let orientation = if i < player.energy_zone.active_energy_count {
+                Some(crate::zones::Orientation::Active)
+            } else {
+                Some(crate::zones::Orientation::Wait)
+            };
+            (card_id, orientation)
+        })
+        .collect();
     
-    let stage_blades = player.stage.total_blades();
+    let energy_display = ZoneDisplay {
+        cards: energy_cards.iter()
+            .filter_map(|(card_id, _)| {
+                Some(card_to_display(*card_id, card_db))
+            })
+            .collect(),
+    };
+    
+    let stage_blades = player.stage.total_blades(card_db);
     
     let mut stage_hearts = std::collections::HashMap::new();
-    if let Some(ref m) = player.stage.left_side {
-        if let Some(ref h) = m.card.base_heart {
-            for (color, count) in &h.hearts {
-                *stage_hearts.entry(color.clone()).or_insert(0) += count;
-            }
-        }
-    }
-    if let Some(ref m) = player.stage.center {
-        if let Some(ref h) = m.card.base_heart {
-            for (color, count) in &h.hearts {
-                *stage_hearts.entry(color.clone()).or_insert(0) += count;
-            }
-        }
-    }
-    if let Some(ref m) = player.stage.right_side {
-        if let Some(ref h) = m.card.base_heart {
-            for (color, count) in &h.hearts {
-                *stage_hearts.entry(color.clone()).or_insert(0) += count;
+    for &card_id in &player.stage.stage[..] {
+        if card_id != -1 {
+            if let Some(card) = card_db.get_card(card_id) {
+                if let Some(ref h) = card.base_heart {
+                    for (color, count) in &h.hearts {
+                        let color_str = match color {
+                            crate::card::HeartColor::Heart00 => "heart00",
+                            crate::card::HeartColor::Heart01 => "heart01",
+                            crate::card::HeartColor::Heart02 => "heart02",
+                            crate::card::HeartColor::Heart03 => "heart03",
+                            crate::card::HeartColor::Heart04 => "heart04",
+                            crate::card::HeartColor::Heart05 => "heart05",
+                            crate::card::HeartColor::Heart06 => "heart06",
+                            crate::card::HeartColor::BAll => "b_all",
+                            crate::card::HeartColor::Draw => "draw",
+                            crate::card::HeartColor::Score => "score",
+                        };
+                        *stage_hearts.entry(color_str.to_string()).or_insert(0) += count;
+                    }
+                }
             }
         }
     }
     
     let success_live_score: u32 = player.success_live_card_zone.cards.iter()
+        .filter_map(|&id| card_db.get_card(id))
         .map(|c| c.score.unwrap_or(0))
         .sum();
     
     PlayerDisplay {
-        hand: zone_to_display(&player.hand.cards),
-        energy: zone_to_display(&energy_cards),
-        stage: stage_to_display(&player.stage),
-        live_zone: zone_to_display(&player.live_card_zone.cards),
-        success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards),
+        hand: zone_to_display(&player.hand.cards, card_db),
+        energy: energy_display,
+        stage: stage_to_display(&player.stage, card_db),
+        live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
+        success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards, card_db),
         waitroom_count: player.waitroom.cards.len(),
         main_deck_count: player.main_deck.len(),
         energy_deck_count: player.energy_deck.cards.len(),
@@ -164,8 +194,8 @@ fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         phase: format!("{:?}", game_state.current_phase),
         turn_phase: format!("{:?}", game_state.current_turn_phase),
         game_result,
-        player1: player_to_display(&game_state.player1),
-        player2: player_to_display(&game_state.player2),
+        player1: player_to_display(&game_state.player1, &game_state.card_database),
+        player2: player_to_display(&game_state.player2, &game_state.card_database),
         resolution_zone_count: game_state.resolution_zone.cards.len(),
         p1_cheer_blade_heart_count: game_state.player1_cheer_blade_heart_count,
         p2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
@@ -178,25 +208,43 @@ fn print_game_state(game_state: &GameState) {
     println!("Turn: {}, Phase: {:?}, Turn Phase: {:?}", 
         game_state.turn_number, game_state.current_phase, game_state.current_turn_phase);
     
+    let card_db = &game_state.card_database;
+    
     println!("\nPlayer 1 ({}):", game_state.player1.name);
     println!("  Hand: {} cards", game_state.player1.hand.cards.len());
-    for (i, card) in game_state.player1.hand.cards.iter().enumerate() {
-        println!("    [{}] {} ({})", i, card.name, card.card_no);
+    for (i, card_id) in game_state.player1.hand.cards.iter().enumerate() {
+        if let Some(card) = card_db.get_card(*card_id) {
+            println!("    [{}] {} ({})", i, card.name, card.card_no);
+        } else {
+            println!("    [{}] Unknown card {}", i, card_id);
+        }
     }
     println!("  Energy Zone: {} cards", game_state.player1.energy_zone.cards.len());
     println!("  Stage:");
-    if let Some(ref m) = game_state.player1.stage.left_side {
-        println!("    Left: {} ({})", m.card.name, m.card.card_no);
+    if game_state.player1.stage.stage[0] != -1 {
+        if let Some(card) = card_db.get_card(game_state.player1.stage.stage[0]) {
+            println!("    Left: {} ({})", card.name, card.card_no);
+        } else {
+            println!("    Left: Unknown card {}", game_state.player1.stage.stage[0]);
+        }
     } else {
         println!("    Left: (empty)");
     }
-    if let Some(ref m) = game_state.player1.stage.center {
-        println!("    Center: {} ({})", m.card.name, m.card.card_no);
+    if game_state.player1.stage.stage[1] != -1 {
+        if let Some(card) = card_db.get_card(game_state.player1.stage.stage[1]) {
+            println!("    Center: {} ({})", card.name, card.card_no);
+        } else {
+            println!("    Center: Unknown card {}", game_state.player1.stage.stage[1]);
+        }
     } else {
         println!("    Center: (empty)");
     }
-    if let Some(ref m) = game_state.player1.stage.right_side {
-        println!("    Right: {} ({})", m.card.name, m.card.card_no);
+    if game_state.player1.stage.stage[2] != -1 {
+        if let Some(card) = card_db.get_card(game_state.player1.stage.stage[2]) {
+            println!("    Right: {} ({})", card.name, card.card_no);
+        } else {
+            println!("    Right: Unknown card {}", game_state.player1.stage.stage[2]);
+        }
     } else {
         println!("    Right: (empty)");
     }
@@ -208,23 +256,39 @@ fn print_game_state(game_state: &GameState) {
     
     println!("\nPlayer 2 ({}):", game_state.player2.name);
     println!("  Hand: {} cards", game_state.player2.hand.cards.len());
-    for (i, card) in game_state.player2.hand.cards.iter().enumerate() {
-        println!("    [{}] {} ({})", i, card.name, card.card_no);
+    for (i, card_id) in game_state.player2.hand.cards.iter().enumerate() {
+        if let Some(card) = card_db.get_card(*card_id) {
+            println!("    [{}] {} ({})", i, card.name, card.card_no);
+        } else {
+            println!("    [{}] Unknown card {}", i, card_id);
+        }
     }
     println!("  Energy Zone: {} cards", game_state.player2.energy_zone.cards.len());
     println!("  Stage:");
-    if let Some(ref m) = game_state.player2.stage.left_side {
-        println!("    Left: {} ({})", m.card.name, m.card.card_no);
+    if game_state.player2.stage.stage[0] != -1 {
+        if let Some(card) = card_db.get_card(game_state.player2.stage.stage[0]) {
+            println!("    Left: {} ({})", card.name, card.card_no);
+        } else {
+            println!("    Left: Unknown card {}", game_state.player2.stage.stage[0]);
+        }
     } else {
         println!("    Left: (empty)");
     }
-    if let Some(ref m) = game_state.player2.stage.center {
-        println!("    Center: {} ({})", m.card.name, m.card.card_no);
+    if game_state.player2.stage.stage[1] != -1 {
+        if let Some(card) = card_db.get_card(game_state.player2.stage.stage[1]) {
+            println!("    Center: {} ({})", card.name, card.card_no);
+        } else {
+            println!("    Center: Unknown card {}", game_state.player2.stage.stage[1]);
+        }
     } else {
         println!("    Center: (empty)");
     }
-    if let Some(ref m) = game_state.player2.stage.right_side {
-        println!("    Right: {} ({})", m.card.name, m.card.card_no);
+    if game_state.player2.stage.stage[2] != -1 {
+        if let Some(card) = card_db.get_card(game_state.player2.stage.stage[2]) {
+            println!("    Right: {} ({})", card.name, card.card_no);
+        } else {
+            println!("    Right: Unknown card {}", game_state.player2.stage.stage[2]);
+        }
     } else {
         println!("    Right: (empty)");
     }
@@ -238,23 +302,20 @@ fn print_game_state(game_state: &GameState) {
 
 pub fn run_headless_game() {
     println!("=== Running Headless Game ===\n");
-    
+
     // Load cards
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
-        Ok(cards) => {
-            let mut card_map = std::collections::HashMap::new();
-            for card in cards {
-                card_map.insert(card.card_no.clone(), card);
-            }
-            card_map
-        }
+        Ok(cards) => cards,
         Err(e) => {
             eprintln!("Failed to load cards: {}", e);
             return;
         }
     };
-    
+
+    // Create CardDatabase from loaded cards
+    let card_database = std::sync::Arc::new(crate::card::CardDatabase::load_or_create(cards.clone()));
+
     // Load decks
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(decks) => decks,
@@ -263,15 +324,15 @@ pub fn run_headless_game() {
             return;
         }
     };
-    
+
     // Use first deck for both players
     let deck1 = &deck_lists[0];
     let deck2 = &deck_lists[0];
-    
+
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
+
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -282,8 +343,8 @@ pub fn run_headless_game() {
             return;
         }
     };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
+
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -294,20 +355,20 @@ pub fn run_headless_game() {
             return;
         }
     };
-    
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
-    
+
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
+
     player1.set_main_deck(player1_deck.main_deck);
     player1.set_energy_deck(player1_deck.energy_deck);
-    
+
     player2.set_main_deck(player2_deck.main_deck);
     player2.set_energy_deck(player2_deck.energy_deck);
-    
-    let mut game_state = GameState::new(player1, player2);
+
+    let mut game_state = GameState::new(player1, player2, card_database);
     game_setup::setup_game(&mut game_state);
     
     // Print initial game state
@@ -379,17 +440,16 @@ pub fn run_headless_game() {
                 // RPS phase - let the AI choose
                 let ai = ai::AIPlayer::new("HeadlessAI".to_string());
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
-                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
-                let chosen_index = ai.choose_action(&action_descriptions);
-                
+                let chosen_index = ai.choose_action(&actions);
+
                 println!("RPS choice: {}", actions[chosen_index].description);
                 
                 let _ = turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
                     &actions[chosen_index].action_type,
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
@@ -397,17 +457,16 @@ pub fn run_headless_game() {
                 // Mulligan phase - let the AI choose
                 let ai = ai::AIPlayer::new("HeadlessAI".to_string());
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
-                let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
-                let chosen_index = ai.choose_action(&action_descriptions);
+                let chosen_index = ai.choose_action(&actions);
                 
                 println!("Mulligan choice: {}", actions[chosen_index].description);
                 
                 let _ = turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
                     &actions[chosen_index].action_type,
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
@@ -426,8 +485,7 @@ pub fn run_headless_game() {
                 } else {
                     // Use AI module to choose action
                     let ai = ai::AIPlayer::new("HeadlessAI".to_string());
-                    let action_descriptions: Vec<String> = actions.iter().map(|a| a.description.clone()).collect();
-                    let chosen_index = ai.choose_action(&action_descriptions);
+                    let chosen_index = ai.choose_action(&actions);
                     
                     println!("Actions available: {}", actions.len());
                     for (i, action) in actions.iter().enumerate() {
@@ -436,7 +494,7 @@ pub fn run_headless_game() {
                     println!("Choosing: {}", actions[chosen_index].description);
                     
                     // Execute the chosen action
-                    let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type, actions[chosen_index].parameters.as_ref().and_then(|p| p.card_index), actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch));
+                    let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type, actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id), actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch));
                     
                     // Print state after action for first few iterations
                     if turn_count <= 20 {
@@ -445,8 +503,12 @@ pub fn run_headless_game() {
                 }
             }
             crate::game_state::Phase::LiveCardSet => {
-                let p1_live_count = game_state.first_attacker().hand.cards.iter().filter(|c| c.is_live()).count();
-                let p2_live_count = game_state.second_attacker().hand.cards.iter().filter(|c| c.is_live()).count();
+                let p1_live_count = game_state.first_attacker().hand.cards.iter().filter(|c| {
+                    game_state.card_database.get_card(**c).map_or(false, |card| card.is_live())
+                }).count();
+                let p2_live_count = game_state.second_attacker().hand.cards.iter().filter(|c| {
+                    game_state.card_database.get_card(**c).map_or(false, |card| card.is_live())
+                }).count();
                 println!("Auto-advancing live card set phase (P1 live cards: {}, P2 live cards: {})...", p1_live_count, p2_live_count);
                 turn::TurnEngine::advance_phase(&mut game_state);
             }
@@ -467,23 +529,20 @@ pub fn run_headless_game() {
 pub fn run_interactive_headless() {
     println!("=== Running Automated Headless Mode ===");
     println!("This will play through the game automatically and log game states\n");
-    
+
     // Load cards
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
-        Ok(cards) => {
-            let mut card_map = std::collections::HashMap::new();
-            for card in cards {
-                card_map.insert(card.card_no.clone(), card);
-            }
-            card_map
-        }
+        Ok(cards) => cards,
         Err(e) => {
             eprintln!("Failed to load cards: {}", e);
             return;
         }
     };
-    
+
+    // Create CardDatabase from loaded cards
+    let card_database = std::sync::Arc::new(crate::card::CardDatabase::load_or_create(cards.clone()));
+
     // Load decks
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(decks) => decks,
@@ -492,15 +551,15 @@ pub fn run_interactive_headless() {
             return;
         }
     };
-    
+
     // Use first deck for both players
     let deck1 = &deck_lists[0];
     let deck2 = &deck_lists[0];
-    
+
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
+
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -511,8 +570,8 @@ pub fn run_interactive_headless() {
             return;
         }
     };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
+
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -523,22 +582,22 @@ pub fn run_interactive_headless() {
             return;
         }
     };
-    
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
-    
+
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+
     // Run multiple games for 10 seconds
     let start_time = std::time::Instant::now();
     let duration = std::time::Duration::from_secs(10);
     let mut game_count = 0;
     let mut total_turns = 0;
-    
+
     while start_time.elapsed() < duration {
         game_count += 1;
-        
+
         let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
         let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-        
+
         // Clone decks for each game
         let mut p1_deck = player1_deck.clone();
         let mut p2_deck = player2_deck.clone();
@@ -546,14 +605,14 @@ pub fn run_interactive_headless() {
         p1_deck.shuffle_energy_deck();
         p2_deck.shuffle_main_deck();
         p2_deck.shuffle_energy_deck();
-        
+
         player1.set_main_deck(p1_deck.main_deck);
         player1.set_energy_deck(p1_deck.energy_deck);
-        
+
         player2.set_main_deck(p2_deck.main_deck);
         player2.set_energy_deck(p2_deck.energy_deck);
-        
-        let mut game_state = GameState::new(player1, player2);
+
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_setup::setup_game(&mut game_state);
         
         // Automated game loop
@@ -621,9 +680,9 @@ fn execute_action_and_log(game_state: &mut GameState, action: &crate::game_setup
     let result = turn::TurnEngine::execute_main_phase_action(
         game_state,
         &action.action_type,
-        action.parameters.as_ref().and_then(|p| p.card_index),
+        action.parameters.as_ref().and_then(|p| p.card_id),
         action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
-        action.parameters.as_ref().and_then(|p| p.stage_area.clone()),
+        action.parameters.as_ref().and_then(|p| p.stage_area),
         action.parameters.as_ref().and_then(|p| p.use_baton_touch),
     );
     
@@ -658,13 +717,13 @@ fn auto_advance_automatic_phases(game_state: &mut GameState) {
 fn output_state_and_actions(game_state: &GameState) {
     // Only print concise summary to avoid massive output
     println!("Turn {} | Phase: {:?} | P1 cards: {}/{}/{} | P2 cards: {}/{}/{} | Actions: {}", 
-        game_state.turn_number, 
+        game_state.turn_number,
         game_state.current_phase,
         game_state.player1.hand.len(),
-        game_state.player1.stage.total_blades(),
+        game_state.player1.stage.total_blades(&game_state.card_database),
         game_state.player1.success_live_card_zone.len(),
         game_state.player2.hand.len(),
-        game_state.player2.stage.total_blades(),
+        game_state.player2.stage.total_blades(&game_state.card_database),
         game_state.player2.success_live_card_zone.len(),
         game_setup::generate_possible_actions(game_state).len()
     );

@@ -1730,7 +1730,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         elif '右サイドエリア' in text or '右サイド' in text:
             action['destination_area'] = 'right_side'
     # Check for gain_ability via quoted text (even without explicit "能力" keyword) - check this BEFORE generic 'を得る' check
-    if quoted_text and any('ライブ' in q or 'スコア' in q for q in quoted_text):
+    elif quoted_text and any('ライブ' in q or 'スコア' in q or 'ブレード' in q or 'ハート' in q for q in quoted_text):
         action['action'] = 'gain_ability'
         action['ability'] = quoted_text
     elif 'を得る' in text and '能力' in text:

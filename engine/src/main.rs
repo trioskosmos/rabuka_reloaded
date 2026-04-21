@@ -13,6 +13,7 @@ mod ability_resolver;
 
 use player::Player;
 use game_state::GameState;
+use card::CardDatabase;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use serde_json;
@@ -28,6 +29,7 @@ pub struct CardDisplay {
     pub name: String,
     #[serde(rename = "type")]
     pub card_type: String,
+    pub orientation: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -58,35 +60,60 @@ pub struct GameStateDisplay {
     pub player2: PlayerDisplay,
 }
 
-pub fn card_to_display(card: &crate::card::Card) -> CardDisplay {
-    CardDisplay {
-        card_no: card.card_no.clone(),
-        name: card.name.clone(),
-        card_type: format!("{:?}", card.card_type),
+pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>) -> Option<CardDisplay> {
+    if let Some(card) = card_db.get_card(card_id) {
+        Some(CardDisplay {
+            card_no: card.card_no.clone(),
+            name: card.name.clone(),
+            card_type: format!("{:?}", card.card_type),
+            orientation: orientation.map(|o| format!("{:?}", o)),
+        })
+    } else {
+        None
     }
 }
 
-pub fn zone_to_display(cards: &[crate::card::Card]) -> ZoneDisplay {
+pub fn zone_to_display(card_ids: &[i16], card_db: &crate::card::CardDatabase) -> ZoneDisplay {
     ZoneDisplay {
-        cards: cards.iter().map(card_to_display).collect(),
+        cards: card_ids.iter().filter_map(|&id| card_to_display(id, card_db, None)).collect(),
     }
 }
 
-pub fn stage_to_display(stage: &crate::zones::Stage) -> StageDisplay {
+pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardDatabase) -> StageDisplay {
     StageDisplay {
-        left_side: stage.left_side.as_ref().map(|c| card_to_display(&c.card)),
-        center: stage.center.as_ref().map(|c| card_to_display(&c.card)),
-        right_side: stage.right_side.as_ref().map(|c| card_to_display(&c.card)),
+        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, None) } else { None },
+        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, None) } else { None },
+        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, None) } else { None },
     }
 }
 
-pub fn player_to_display(player: &crate::player::Player) -> PlayerDisplay {
-    let energy_cards: Vec<crate::card::Card> = player.energy_zone.cards.iter().map(|c| c.card.clone()).collect();
+pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase) -> PlayerDisplay {
+    let energy_cards: Vec<(i16, Option<crate::zones::Orientation>)> = player.energy_zone.cards.iter()
+        .enumerate()
+        .map(|(i, &card_id)| {
+            // Simplified: first active_energy_count cards are active, rest are wait
+            let orientation = if i < player.energy_zone.active_energy_count {
+                Some(crate::zones::Orientation::Active)
+            } else {
+                Some(crate::zones::Orientation::Wait)
+            };
+            (card_id, orientation)
+        })
+        .collect();
+    
+    let energy_display = ZoneDisplay {
+        cards: energy_cards.iter()
+            .filter_map(|(card_id, orientation)| {
+                card_to_display(*card_id, card_db, *orientation)
+            })
+            .collect(),
+    };
+    
     PlayerDisplay {
-        hand: zone_to_display(&player.hand.cards),
-        energy: zone_to_display(&energy_cards),
-        stage: stage_to_display(&player.stage),
-        live_zone: zone_to_display(&player.live_card_zone.cards),
+        energy: energy_display,
+        hand: zone_to_display(&player.hand.cards, card_db),
+        stage: stage_to_display(&player.stage, card_db),
+        live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
     }
 }
 
@@ -94,8 +121,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?} - {:?}", game_state.current_turn_phase, game_state.current_phase),
-        player1: player_to_display(&game_state.player1),
-        player2: player_to_display(&game_state.player2),
+        player1: player_to_display(&game_state.player1, &game_state.card_database),
+        player2: player_to_display(&game_state.player2, &game_state.card_database),
     }
 }
 
@@ -242,7 +269,10 @@ fn run_game() {
     player2.set_energy_deck(player2_deck.energy_deck);
     
     // Initialize game state
-    let mut game_state = GameState::new(player1, player2);
+    let card_database = Arc::new(CardDatabase::load_or_create(
+        cards.values().cloned().collect()
+    ));
+    let mut game_state = GameState::new(player1, player2, card_database);
     
     println!("Game initialized");
     println!("Turn: {}", game_state.turn_number);
@@ -272,20 +302,16 @@ fn initialize_game() {
     // Load cards from cards.json
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
-        Ok(cards) => {
-            // Convert Vec<Card> to HashMap<String, Card>
-            let mut card_map = std::collections::HashMap::new();
-            for card in cards {
-                card_map.insert(card.card_no.clone(), card);
-            }
-            card_map
-        }
+        Ok(cards) => cards,
         Err(e) => {
             eprintln!("Failed to load cards: {}", e);
             return;
         }
     };
-    
+
+    // Create CardDatabase from loaded cards
+    let card_database = Arc::new(CardDatabase::load_or_create(cards));
+
     // Load sample decks from game/decks
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(decks) => decks,
@@ -294,16 +320,16 @@ fn initialize_game() {
             return;
         }
     };
-    
+
     // Let players choose decks
     let deck1 = choose_deck(&deck_lists, "Player 1");
     let deck2 = choose_deck(&deck_lists, "Player 2");
-    
-    // Build decks from chosen deck lists
+
+    // Build decks from chosen deck lists using card IDs
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
+
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -314,8 +340,8 @@ fn initialize_game() {
             return;
         }
     };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
+
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -326,30 +352,30 @@ fn initialize_game() {
             return;
         }
     };
-    
+
     // Add default energy cards if needed
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
-    
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+
     // Initialize players with decks
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
+
     player1.set_main_deck(player1_deck.main_deck);
     player1.set_energy_deck(player1_deck.energy_deck);
-    
+
     player2.set_main_deck(player2_deck.main_deck);
     player2.set_energy_deck(player2_deck.energy_deck);
-    
-    // Initialize game state
-    let mut game_state = GameState::new(player1, player2);
-    
+
+    // Initialize game state with CardDatabase
+    let mut game_state = GameState::new(player1, player2, card_database);
+
     // Game setup (Rule 6.2)
     game_setup::setup_game(&mut game_state);
-    
+
     // Store in global state
     *GAME_STATE.lock().unwrap() = Some(game_state);
-    
+
     println!("Game initialized successfully");
 }
 
@@ -378,7 +404,7 @@ fn execute_action(index: usize) {
         println!("Executing action: {}", action.description);
         
         // Execute the action (simplified - in real implementation would call execute_action from web_server)
-        match action.action_type.as_str() {
+        match action.action_type.to_string().as_str() {
             "activate_energy" => {
                 state.player1.activate_all_energy();
             }
@@ -432,11 +458,12 @@ fn run_web_server() {
     
     let deck1 = &deck_lists[0];
     let deck2 = &deck_lists[0];
-    
+
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
+
+    // Build decks before consuming cards
+    let player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -447,8 +474,8 @@ fn run_web_server() {
             return;
         }
     };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
+
+    let player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -459,20 +486,21 @@ fn run_web_server() {
             return;
         }
     };
-    
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
+
+    // Create CardDatabase from loaded cards - convert HashMap values to Vec
+    let card_vec: Vec<crate::card::Card> = cards.into_values().collect();
+    let card_database = std::sync::Arc::new(crate::card::CardDatabase::load_or_create(card_vec));
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
+
     player1.set_main_deck(player1_deck.main_deck);
     player1.set_energy_deck(player1_deck.energy_deck);
-    
+
     player2.set_main_deck(player2_deck.main_deck);
     player2.set_energy_deck(player2_deck.energy_deck);
-    
-    let mut game_state = GameState::new(player1, player2);
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_setup::setup_game(&mut game_state);
     
     // Start web server with game state

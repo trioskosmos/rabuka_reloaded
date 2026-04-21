@@ -73,8 +73,21 @@ impl CardLoader {
                                 }
                                 // If still empty, try to infer from text
                                 else if !text.is_empty() {
-                                    // Check for common action keywords
-                                    if text.contains("手札に加える") || text.contains("手札に加え") {
+                                    // Check for common action keywords in order of specificity
+                                    
+                                    // Draw cards
+                                    if text.contains("カードを1枚引く") || text.contains("カードを2枚引く") || text.contains("カードを3枚引く") {
+                                        effect.action = "draw".to_string();
+                                        if text.contains("2枚") {
+                                            effect.count = Some(2);
+                                        } else if text.contains("3枚") {
+                                            effect.count = Some(3);
+                                        } else {
+                                            effect.count = Some(1);
+                                        }
+                                    }
+                                    // Add to hand from specific source
+                                    else if text.contains("手札に加える") || text.contains("手札に加え") {
                                         effect.action = "move_cards".to_string();
                                         if effect.source.is_none() {
                                             // Try to infer source from text
@@ -82,15 +95,77 @@ impl CardLoader {
                                                 effect.source = Some("discard".to_string());
                                             } else if text.contains("デッキから") {
                                                 effect.source = Some("deck".to_string());
+                                            } else if text.contains("ライブカードゾーンから") {
+                                                effect.source = Some("live_card_zone".to_string());
                                             }
                                         }
                                         if effect.destination.is_none() {
                                             effect.destination = Some("hand".to_string());
                                         }
-                                    } else if text.contains("ドロー") {
-                                        effect.action = "draw".to_string();
-                                    } else if text.contains("ライブ") {
-                                        effect.action = "live".to_string();
+                                        // Infer count
+                                        if text.contains("1枚") {
+                                            effect.count = Some(1);
+                                        } else if text.contains("2枚") {
+                                            effect.count = Some(2);
+                                        } else if text.contains("3枚") {
+                                            effect.count = Some(3);
+                                        }
+                                        // Infer card type
+                                        if text.contains("メンバーカード") {
+                                            effect.card_type = Some("member_card".to_string());
+                                        } else if text.contains("ライブカード") {
+                                            effect.card_type = Some("live_card".to_string());
+                                        }
+                                    }
+                                    // Send to discard/waitroom
+                                    else if text.contains("控え室に置く") || text.contains("控え室に送る") {
+                                        effect.action = "move_cards".to_string();
+                                        if effect.source.is_none() {
+                                            effect.source = Some("hand".to_string());
+                                        }
+                                        if effect.destination.is_none() {
+                                            effect.destination = Some("discard".to_string());
+                                        }
+                                    }
+                                    // Add blades/cheer
+                                    else if text.contains("ブレード") || text.contains("cheer") {
+                                        effect.action = "gain_resource".to_string();
+                                        effect.resource = Some("blade".to_string());
+                                        if text.contains("1つ") || text.contains("1個") {
+                                            effect.count = Some(1);
+                                        } else if text.contains("2つ") || text.contains("2個") {
+                                            effect.count = Some(2);
+                                        }
+                                    }
+                                    // Add score
+                                    else if text.contains("スコア") {
+                                        effect.action = "modify_score".to_string();
+                                        if text.contains("+") {
+                                            // Extract number after +
+                                            if let Some(pos) = text.find('+') {
+                                                let num_str = &text[pos+1..].chars().take_while(|c| c.is_numeric()).collect::<String>();
+                                                if let Ok(num) = num_str.parse::<u32>() {
+                                                    effect.count = Some(num);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    // Change state (active/wait)
+                                    else if text.contains("アクティブ") || text.contains("ウェイト") {
+                                        effect.action = "change_state".to_string();
+                                        if text.contains("アクティブ") {
+                                            effect.state_change = Some("active".to_string());
+                                        } else if text.contains("ウェイト") {
+                                            effect.state_change = Some("wait".to_string());
+                                        }
+                                    }
+                                    // Look at cards
+                                    else if text.contains("見る") {
+                                        effect.action = "look_at".to_string();
+                                    }
+                                    // Default to custom if we can't determine
+                                    else {
+                                        effect.action = "custom".to_string();
                                     }
                                 }
                             }

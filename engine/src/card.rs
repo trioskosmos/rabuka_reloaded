@@ -15,7 +15,7 @@ pub enum CardType {
     Energy,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum HeartColor {
     #[serde(rename = "heart00")]
     Heart00,  // Index 0 - wildcard, can be treated as any heart01-heart06
@@ -31,6 +31,12 @@ pub enum HeartColor {
     Heart05,
     #[serde(rename = "heart06")]
     Heart06,
+    #[serde(rename = "b_all")]
+    BAll,  // Blade heart wildcard
+    #[serde(rename = "draw")]
+    Draw,  // Special heart type for drawing cards
+    #[serde(rename = "score")]
+    Score,  // Special heart type for score bonus
 }
 
 // Rule 9.1: Ability Types
@@ -79,16 +85,80 @@ pub struct RequiredHeart {
     pub count: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BladeHeart {
-    #[serde(flatten)]
-    pub hearts: HashMap<String, u32>,
+    pub hearts: HashMap<HeartColor, u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+impl<'de> Deserialize<'de> for BladeHeart {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawBladeHeart {
+            #[serde(flatten)]
+            hearts: HashMap<String, u32>,
+        }
+        
+        let raw = RawBladeHeart::deserialize(deserializer)?;
+        let hearts = raw.hearts.into_iter().map(|(k, v)| {
+            let color = match k.as_str() {
+                "heart00" => HeartColor::Heart00,
+                "heart01" => HeartColor::Heart01,
+                "heart02" => HeartColor::Heart02,
+                "heart03" => HeartColor::Heart03,
+                "heart04" => HeartColor::Heart04,
+                "heart05" => HeartColor::Heart05,
+                "heart06" => HeartColor::Heart06,
+                "b_all" => HeartColor::BAll,
+                "draw" => HeartColor::Draw,
+                "score" => HeartColor::Score,
+                _ => HeartColor::Heart00,
+            };
+            (color, v)
+        }).collect();
+        
+        Ok(BladeHeart { hearts })
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct BaseHeart {
-    #[serde(flatten)]
-    pub hearts: HashMap<String, u32>,
+    pub hearts: HashMap<HeartColor, u32>,
+}
+
+impl<'de> Deserialize<'de> for BaseHeart {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawBaseHeart {
+            #[serde(flatten)]
+            hearts: HashMap<String, u32>,
+        }
+        
+        let raw = RawBaseHeart::deserialize(deserializer)?;
+        let hearts = raw.hearts.into_iter().map(|(k, v)| {
+            let color = match k.as_str() {
+                "heart00" => HeartColor::Heart00,
+                "heart01" => HeartColor::Heart01,
+                "heart02" => HeartColor::Heart02,
+                "heart03" => HeartColor::Heart03,
+                "heart04" => HeartColor::Heart04,
+                "heart05" => HeartColor::Heart05,
+                "heart06" => HeartColor::Heart06,
+                "b_all" => HeartColor::BAll,
+                "draw" => HeartColor::Draw,
+                "score" => HeartColor::Score,
+                _ => HeartColor::Heart00,
+            };
+            (color, v)
+        }).collect();
+        
+        Ok(BaseHeart { hearts })
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -125,6 +195,74 @@ pub struct Card {
     // Parsed abilities from abilities.json
     #[serde(skip)]
     pub abilities: Vec<Ability>,
+    #[serde(skip)]
+    pub card_id: i16,  // Database ID for optimization
+}
+
+#[derive(Debug, Clone)]
+pub struct CardDatabase {
+    pub cards: HashMap<i16, Card>,
+    pub card_no_to_id: HashMap<String, i16>,
+    pub next_id: i16,
+}
+
+impl CardDatabase {
+    pub fn new() -> Self {
+        Self {
+            cards: HashMap::new(),
+            card_no_to_id: HashMap::new(),
+            next_id: 0,
+        }
+    }
+
+    pub fn load_or_create(cards: Vec<Card>) -> Self {
+        let mut db = Self::new();
+        
+        // Try to load existing mapping
+        if let Ok(mapping) = std::fs::read_to_string("card_id_mapping.json") {
+            if let Ok(loaded_mapping) = serde_json::from_str::<HashMap<String, i16>>(&mapping) {
+                db.card_no_to_id = loaded_mapping;
+                db.next_id = db.card_no_to_id.values().max().copied().unwrap_or(0) + 1;
+            }
+        }
+        
+        // Add cards, assigning IDs if not already mapped
+        for card in cards {
+            if !db.card_no_to_id.contains_key(&card.card_no) {
+                db.card_no_to_id.insert(card.card_no.clone(), db.next_id);
+                db.next_id += 1;
+            }
+            let card_id = db.card_no_to_id[&card.card_no];
+            db.cards.insert(card_id, card);
+        }
+        
+        // Save mapping
+        db.save_mapping();
+        
+        db
+    }
+
+    pub fn save_mapping(&self) {
+        if let Ok(mapping) = serde_json::to_string_pretty(&self.card_no_to_id) {
+            let _ = std::fs::write("card_id_mapping.json", mapping);
+        }
+    }
+
+    pub fn get_card(&self, card_id: i16) -> Option<&Card> {
+        self.cards.get(&card_id)
+    }
+
+    pub fn get_card_by_no(&self, card_no: &str) -> Option<&Card> {
+        if let Some(&card_id) = self.card_no_to_id.get(card_no) {
+            self.cards.get(&card_id)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_card_id(&self, card_no: &str) -> Option<i16> {
+        self.card_no_to_id.get(card_no).copied()
+    }
 }
 
 #[allow(dead_code)]
@@ -191,6 +329,7 @@ impl<'de> Deserialize<'de> for Card {
             need_heart: helper.need_heart,
             special_heart: helper.special_heart,
             abilities: Vec::new(),
+            card_id: 0,
         })
     }
 }
@@ -210,10 +349,42 @@ fn default_blade() -> u32 {
     0
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SpecialHeart {
-    #[serde(flatten)]
-    pub hearts: HashMap<String, u32>,
+    pub hearts: HashMap<HeartColor, u32>,
+}
+
+impl<'de> Deserialize<'de> for SpecialHeart {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct RawSpecialHeart {
+            #[serde(flatten)]
+            hearts: HashMap<String, u32>,
+        }
+        
+        let raw = RawSpecialHeart::deserialize(deserializer)?;
+        let hearts = raw.hearts.into_iter().map(|(k, v)| {
+            let color = match k.as_str() {
+                "heart00" => HeartColor::Heart00,
+                "heart01" => HeartColor::Heart01,
+                "heart02" => HeartColor::Heart02,
+                "heart03" => HeartColor::Heart03,
+                "heart04" => HeartColor::Heart04,
+                "heart05" => HeartColor::Heart05,
+                "heart06" => HeartColor::Heart06,
+                "b_all" => HeartColor::BAll,
+                "draw" => HeartColor::Draw,
+                "score" => HeartColor::Score,
+                _ => HeartColor::Heart00,
+            };
+            (color, v)
+        }).collect();
+        
+        Ok(SpecialHeart { hearts })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -457,7 +628,7 @@ impl Card {
         // Rule 8.2.8: Check if provided hearts satisfy card's need_heart requirement
         // Heart00 (index 0) is wildcard and can substitute for any heart01-heart06
         if let Some(ref need_heart) = self.need_heart {
-            let wildcard_count = *provided_hearts.hearts.get("heart00").unwrap_or(&0);
+            let wildcard_count = *provided_hearts.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
             
             for (color, needed_amount) in &need_heart.hearts {
                 if let Some(&provided_amount) = provided_hearts.hearts.get(color) {
@@ -523,37 +694,30 @@ impl Card {
 
     /// Add hearts of specific color
     pub fn add_heart(&mut self, heart_color: &str, amount: u32) {
-        if self.base_heart.is_none() {
-            self.base_heart = Some(BaseHeart {
-                hearts: std::collections::HashMap::new(),
-            });
-        }
         if let Some(ref mut base_heart) = self.base_heart {
-            *base_heart.hearts.entry(heart_color.to_string()).or_insert(0) += amount;
+            let color = crate::zones::parse_heart_color(heart_color);
+            *base_heart.hearts.entry(color).or_insert(0) += amount;
         }
     }
 
     /// Remove hearts of specific color (minimum 0)
     pub fn remove_heart(&mut self, heart_color: &str, amount: u32) {
         if let Some(ref mut base_heart) = self.base_heart {
-            let current = base_heart.hearts.get(heart_color).copied().unwrap_or(0);
+            let color = crate::zones::parse_heart_color(heart_color);
+            let current = base_heart.hearts.get(&color).copied().unwrap_or(0);
             if current <= amount {
-                base_heart.hearts.remove(heart_color);
+                base_heart.hearts.remove(&color);
             } else {
-                base_heart.hearts.insert(heart_color.to_string(), current - amount);
+                base_heart.hearts.insert(color, current - amount);
             }
         }
     }
 
     /// Set hearts to specific value
     pub fn set_heart(&mut self, heart_color: &str, amount: u32) {
-        if self.base_heart.is_none() {
-            self.base_heart = Some(BaseHeart {
-                hearts: std::collections::HashMap::new(),
-            });
-        }
         if let Some(ref mut base_heart) = self.base_heart {
-            base_heart.hearts.insert(heart_color.to_string(), amount);
+            let color = crate::zones::parse_heart_color(heart_color);
+            base_heart.hearts.insert(color, amount);
         }
     }
 

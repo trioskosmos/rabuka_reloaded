@@ -80,7 +80,10 @@ fn test_legal_actions() {
     player2.set_main_deck(player2_deck.main_deck);
     player2.set_energy_deck(player2_deck.energy_deck);
     
-    let mut game_state = GameState::new(player1, player2);
+    use rabuka_engine::card::CardDatabase;
+    use std::sync::Arc;
+    let card_database = Arc::new(CardDatabase::load_or_create(vec![]));
+    let mut game_state = GameState::new(player1, player2, card_database);
     game_setup::setup_game(&mut game_state);
     
     // Test legal actions in different phases

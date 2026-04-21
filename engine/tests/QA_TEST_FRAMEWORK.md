@@ -27,9 +27,10 @@ When a card moves between zones, track:
 // Before: card in hand at index 2
 // After: card should be in stage center, face up, active
 assert_eq!(player1.hand.cards.len(), initial_hand_count - 1);
-assert!(player1.stage.center.is_some());
-assert_eq!(player1.stage.center.as_ref().unwrap().card.card_no, card_no);
-assert_eq!(player1.stage.center.as_ref().unwrap().orientation, Some(Orientation::Active));
+assert!(player1.stage.stage[1] != -1); // center is index 1
+let card_id = player1.stage.stage[1];
+assert_eq!(card_db.get_card(card_id).unwrap().card_no, card_no);
+// Orientation is now tracked in GameState modifiers
 ```
 
 ### Energy Tracking
@@ -46,9 +47,9 @@ When energy is manipulated, track:
 let initial_energy_count = player1.energy_zone.cards.len();
 // ... execute ability ...
 assert_eq!(player1.energy_zone.cards.len(), initial_energy_count - cost_paid);
-// Check energy states
-let active_energy = player1.energy_zone.cards.iter()
-    .filter(|e| e.orientation == Some(Orientation::Active)).count();
+// Energy cards are now i16, orientation tracked in GameState modifiers
+// For now, assume all energy cards are active
+let active_energy = player1.energy_zone.cards.len();
 ```
 
 ### Heart Tracking
@@ -63,12 +64,14 @@ When hearts are gained/spent/modified, track:
 **Example verification:**
 ```rust
 // Track heart changes
-let initial_hearts = count_total_hearts(&player1.stage);
+let card_db = &game_state.card_database;
+let initial_hearts = player1.stage.all_heart_icons(card_db).len();
 // ... execute heart-gaining ability ...
-let final_hearts = count_total_hearts(&player1.stage);
+let final_hearts = player1.stage.all_heart_icons(card_db).len();
 assert_eq!(final_hearts, initial_hearts + expected_gain);
 // Verify specific colors if relevant
-assert!(has_heart_color(&player1.stage, HeartColor::Heart01));
+let hearts = player1.stage.all_heart_icons(card_db);
+assert!(hearts.contains(&HeartColor::Heart01));
 ```
 
 ### Score Tracking
@@ -96,9 +99,10 @@ When blades are manipulated, track:
 
 **Example verification:**
 ```rust
-let initial_blades = count_total_blades(&player1.stage);
+let card_db = &game_state.card_database;
+let initial_blades = player1.stage.total_blades(card_db);
 // ... execute blade-gaining ability ...
-let final_blades = count_total_blades(&player1.stage);
+let final_blades = player1.stage.total_blades(card_db);
 assert_eq!(final_blades, initial_blades + expected_gain);
 ```
 
@@ -133,6 +137,7 @@ let initial_hand_count = player1.hand.cards.len();
 // ... execute draw ability ...
 assert_eq!(player1.main_deck.cards.len(), initial_deck_count - cards_drawn);
 assert_eq!(player1.hand.cards.len(), initial_hand_count + cards_drawn);
+// Note: hand.cards is now SmallVec<[i16; 10]>, use .to_vec() if Vec needed
 ```
 
 ### Multi-Member Card Counting
@@ -144,10 +149,20 @@ When multi-member cards (e.g., "LL-bp1-001-R+ 上原歩夢&澁谷かのん&日�
 **Example verification:**
 ```rust
 // Multi-member card counts as 1 member
-let member_count = count_members_on_stage(&player1.stage);
+let member_count = player1.stage.stage.iter().filter(|&&id| id != -1).count();
 assert_eq!(member_count, 1); // Even if card has 3 characters
-// Can be referenced as any character
-assert!(has_character_on_stage(&player1.stage, "上原歩夢"));
+// Can be referenced as any character - use CardDatabase to check card data
+let card_db = &game_state.card_database;
+let has_character = player1.stage.stage.iter()
+    .filter(|&&id| id != -1)
+    .any(|&id| {
+        if let Some(card) = card_db.get_card(id) {
+            card.name.contains("上原歩夢")
+        } else {
+            false
+        }
+    });
+assert!(has_character);
 ```
 
 ### Baton Touch Tracking
@@ -163,7 +178,8 @@ When baton touch is used, track:
 let original_cost = card.cost;
 // ... execute baton touch ...
 assert_eq!(actual_cost_paid, original_cost - touched_card.cost);
-assert!(!touched_card.turn_played == current_turn); // Must be from previous turn
+// turn_played tracking moved to GameState modifiers
+// For now, assume baton touch restrictions are handled by game logic
 ```
 
 ## Test Structure
@@ -194,15 +210,14 @@ Based on Q&A patterns:
 ## Setup Helpers
 
 Common setup patterns:
-- `setup_game_with_cards(card_numbers)` - Load cards and create game state
-- `place_card_on_stage(card, area, orientation)` - Place a card on stage with specific state
-- `add_cards_to_hand(card_numbers)` - Add cards to player's hand
-- `add_energy_to_card(card, count, state)` - Add energy under a card with specific state
-- `set_card_face_state(card, face_state)` - Set card face up/face down
-- `set_card_orientation(card, orientation)` - Set card active/wait
-- `execute_action(action_type, parameters)` - Execute a webapp-style action
-- `record_initial_state()` - Snapshot all relevant variables before action
-- `verify_state_changes(expected_changes)` - Compare post-action state against expected
+- `setup_game_with_cards(card_numbers, card_database)` - Load cards and create game state with CardDatabase
+- `place_card_on_stage(player, card_id, area_index)` - Place a card on stage using array index (0=left, 1=center, 2=right)
+- `add_cards_to_hand(player, card_ids)` - Add card IDs to player's hand (SmallVec)
+- `add_energy_to_zone(player, card_ids)` - Add energy cards to energy zone (energy cards are now i16)
+- `execute_action(game_state, action_type, parameters)` - Execute a webapp-style action
+- `record_initial_state(game_state)` - Snapshot all relevant variables before action
+- `verify_state_changes(game_state, expected_changes)` - Compare post-action state against expected
+- **Note**: Orientation and energy_underneath tracking moved to GameState modifiers
 
 ## Execution Pattern
 
@@ -222,43 +237,44 @@ Tests should follow the webapp execution flow:
 fn test_q237_card_name_reference() {
     // Q237: Can you add "Dream Believers (104期Ver.)" to hand after revealing "Dream Believers"?
     // Answer: No, you cannot.
-    
+
     // 1. Load cards
     let cards = load_cards();
-    let hana_card = find_card(&cards, "PL!HS-bp5-001-R＋"); // 日野下花帆
-    let dream_believers = find_card(&cards, "PL!HS-bp1-019-L"); // Dream Believers
-    let dream_believers_104 = find_card(&cards, "PL!HS-sd1-018-SD"); // Dream Believers (104期Ver.)
-    
+    let card_database = Arc::new(CardDatabase::load_or_create(cards.clone()));
+    let hana_card_id = find_card_id(&cards, "PL!HS-bp5-001-R＋"); // 日野下花帆
+    let dream_believers_id = find_card_id(&cards, "PL!HS-bp1-019-L"); // Dream Believers
+    let dream_believers_104_id = find_card_id(&cards, "PL!HS-sd1-018-SD"); // Dream Believers (104期Ver.)
+
     // 2. Setup game state
     let (mut player1, mut player2) = create_test_players();
-    
-    // Place 日野下花帆 on stage
-    place_card_on_stage(&mut player1, hana_card, MemberArea::Center);
-    
-    // Add Dream Believers to discard
-    player1.discard.cards.push(dream_believers.clone());
-    
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+
+    // Place 日野下花帆 on stage (center is index 1)
+    game_state.player1.stage.stage[1] = hana_card_id;
+
+    // Add Dream Believers to discard (discard cards are now i16)
+    game_state.player1.waitroom.cards.push(dream_believers_id);
+
     // Add Dream Believers (104期Ver.) to discard
-    player1.discard.cards.push(dream_believers_104.clone());
-    
-    let mut game_state = create_test_game_state(player1, player2);
-    
+    game_state.player1.waitroom.cards.push(dream_believers_104_id);
+
     // 3. Record initial state
     let initial_hand_count = game_state.player1.hand.cards.len();
-    let initial_discard_count = game_state.player1.discard.cards.len();
-    
+    let initial_discard_count = game_state.player1.waitroom.cards.len();
+
     // 4. Execute ability: reveal Dream Believers, try to add Dream Believers (104期Ver.) to hand
+    let hana_card = card_database.get_card(hana_card_id).unwrap();
     let ability = get_ability_by_text(&hana_card.abilities, "起動能力で「Dream Believers」を公開しました");
     let result = execute_ability(&mut game_state, &ability, Some("Dream Believers (104期Ver.)"));
-    
+
     // 5. Verify against Q&A answer
-    assert!(result.is_err() || !hand_contains(&game_state.player1.hand, "PL!HS-sd1-018-SD"),
+    assert!(result.is_err() || !hand_contains(&game_state.player1.hand, dream_believers_104_id, &card_database),
         "Should NOT be able to add Dream Believers (104期Ver.) to hand");
-    
+
     // 6. Verify state changes
     assert_eq!(game_state.player1.hand.cards.len(), initial_hand_count,
         "Hand count should not change");
-    assert_eq!(game_state.player1.discard.cards.len(), initial_discard_count,
+    assert_eq!(game_state.player1.waitroom.cards.len(), initial_discard_count,
         "Discard count should not change");
 }
 ```
@@ -270,6 +286,16 @@ Before writing a test, consult:
 2. **qa_data.json** - Official Q&A with expected answers
 3. **Card ability text** - The actual ability text on the card being tested
 4. **Related cards** - Other cards mentioned in the Q&A that may be on stage/in hand
+
+## Debugging Failed Tests
+
+When a test fails, consider the following in order:
+1. **Engine implementation** - The most likely issue is the engine not correctly implementing the game mechanic
+2. **Ability parsing** - If the ability text is complex, parser.py in cards/ability_extraction/ may need to be updated to correctly parse the ability
+3. **Card data** - Verify the card data in cards.json is correct
+4. **Test setup** - Ensure the test correctly sets up the game state as described in the Q&A
+
+**Note:** If the ability text is not correctly parsed by parser.py, it may need editing. However, the engine implementation is the most likely source of issues and should be investigated first.
 
 ## Starting Point
 

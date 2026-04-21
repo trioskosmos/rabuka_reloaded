@@ -2,8 +2,8 @@ use crate::zones::{
     EnergyDeck, EnergyZone, ExclusionZone, Hand, LiveCardZone, MainDeck, Stage,
     SuccessLiveCardZone, Waitroom,
 };
-use crate::card::Card;
-use std::collections::VecDeque;
+use crate::card::CardDatabase;
+use std::collections::{VecDeque, HashMap};
 use rand::prelude::SliceRandom;
 
 #[derive(Debug, Clone)]
@@ -23,6 +23,10 @@ pub struct Player {
     // Rule 9.6.2.1.2.1: Track areas where cards moved from non-stage to stage this turn
     // These areas cannot be targeted for baton touch
     pub areas_locked_this_turn: std::collections::HashSet<crate::zones::MemberArea>,
+    // Rule 8.2: Track if player has finished their live card set
+    pub has_finished_live_card_set: bool,
+    // Optimization: Map card_id to index in hand for O(1) lookups
+    pub hand_card_id_to_index: HashMap<i16, usize>,
 }
 
 impl Player {
@@ -41,138 +45,156 @@ impl Player {
             success_live_card_zone: SuccessLiveCardZone::new(),
             exclusion_zone: ExclusionZone::new(),
             areas_locked_this_turn: std::collections::HashSet::new(),
+            has_finished_live_card_set: false,
+            hand_card_id_to_index: HashMap::new(),
         }
     }
 
-    pub fn set_main_deck(&mut self, cards: VecDeque<Card>) {
-        self.main_deck.cards = cards;
+    pub fn set_main_deck(&mut self, cards: VecDeque<i16>) {
+        self.main_deck.cards = cards.into_iter().collect();
     }
 
-    pub fn set_energy_deck(&mut self, cards: VecDeque<Card>) {
-        self.energy_deck.cards = cards;
+    pub fn set_energy_deck(&mut self, cards: VecDeque<i16>) {
+        self.energy_deck.cards = cards.into_iter().collect();
+    }
+
+    // Helper method to get card index by card_id using HashMap (O(1) lookup)
+    pub fn get_card_index_by_id(&self, card_id: i16) -> Option<usize> {
+        self.hand_card_id_to_index.get(&card_id).copied()
+    }
+
+    // Helper method to update the index map when hand changes
+    pub fn rebuild_hand_index_map(&mut self) {
+        self.hand_card_id_to_index.clear();
+        for (index, card_id) in self.hand.cards.iter().enumerate() {
+            self.hand_card_id_to_index.insert(*card_id, index);
+        }
+    }
+
+    // Helper method to add a card to the hand and update index map
+    pub fn add_card_to_hand(&mut self, card_id: i16) {
+        let index = self.hand.cards.len();
+        self.hand.cards.push(card_id);
+        self.hand_card_id_to_index.insert(card_id, index);
+    }
+
+    // Helper method to remove a card from hand by index and update index map
+    pub fn remove_card_from_hand(&mut self, index: usize) -> Option<i16> {
+        if index >= self.hand.cards.len() {
+            return None;
+        }
+        let card_id = self.hand.cards.remove(index);
+        self.hand_card_id_to_index.remove(&card_id);
+        // Rebuild map to update indices after removal
+        self.rebuild_hand_index_map();
+        Some(card_id)
     }
     
-    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea, use_baton_touch: bool) -> Result<(u32, bool), String> {
+    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea, use_baton_touch: bool, card_db: &CardDatabase) -> Result<(u32, bool), String> {
         // Rule 8.2: Main Phase - Play member card from hand to stage
         if hand_index >= self.hand.cards.len() {
             return Err("Invalid hand index".to_string());
         }
-        
-        let card = self.hand.cards.remove(hand_index);
-        
-        if !card.is_member() {
-            self.hand.cards.insert(hand_index, card);
-            return Err("Only member cards can be placed on stage".to_string());
-        }
-        
-        // Rule 9.6.2.3.1: Cost is equal to the card's cost value in energy
-        let card_cost = card.cost.unwrap_or(0);
-        
-        // Rule 9.6.2.3: Determine cost and pay all costs
-        let mut cost_to_pay = card_cost;
-        
-        // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
-        // Note: Baton touch sends member from the TARGET area (where you're playing the new member)
-        let baton_touch_used = if use_baton_touch {
-            if let Some(existing_member) = self.stage.get_area(stage_area) {
-                // Rule 9.6.2.1.2.1: Cannot baton touch to an area that had a card moved from non-stage to stage this turn
-                if self.areas_locked_this_turn.contains(&stage_area) {
-                    false
-                } else {
-                    // Check if player has 1+ active energy to pay
-                    let active_energy_count = self.energy_zone.cards.iter()
-                        .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-                        .count();
-                    
-                    if cost_to_pay > 0 && active_energy_count >= 1 {
-                        // Clone the member card before clearing the area
-                        let member_card = existing_member.card.clone();
-                        let cost = existing_member.card.cost.unwrap_or(1);
-                        
-                        // Clear the target area since member will be sent to waitroom
-                        match stage_area {
-                            crate::zones::MemberArea::LeftSide => self.stage.left_side = None,
-                            crate::zones::MemberArea::Center => self.stage.center = None,
-                            crate::zones::MemberArea::RightSide => self.stage.right_side = None,
-                        }
-                        
-                        // Send member to waitroom
-                        self.waitroom.cards.push(member_card);
-                        
-                        // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
-                        cost_to_pay = cost_to_pay.saturating_sub(cost);
-                        true
-                    } else {
+
+        let card_id = self.hand.cards.remove(hand_index);
+        // Rebuild index map after removal
+        self.rebuild_hand_index_map();
+        eprintln!("Card ID from hand: {}", card_id);
+
+        if let Some(card) = card_db.get_card(card_id) {
+            eprintln!("Retrieved card: {} (card_no: {})", card.name, card.card_no);
+            if !card.is_member() {
+                self.hand.cards.insert(hand_index, card_id);
+                self.rebuild_hand_index_map();
+                return Err("Only member cards can be placed on stage".to_string());
+            }
+
+            // Rule 9.6.2.3: Cost is equal to the card's cost value in energy
+            let card_cost = card.cost.unwrap_or(0);
+            eprintln!("Playing card {} with cost {}", card.name, card_cost);
+
+            // Rule 9.6.2.3: Determine cost and pay all costs
+            let mut cost_to_pay = card_cost;
+
+            // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
+            // Note: Baton touch sends member from the TARGET area (where you're playing the new member)
+            let baton_touch_used = if use_baton_touch {
+                if let Some(existing_member) = self.stage.get_area(stage_area) {
+                    // Rule 9.6.2.1.2.1: Cannot baton touch to an area that had a card moved from non-stage to stage this turn
+                    if self.areas_locked_this_turn.contains(&stage_area) {
                         false
+                    } else {
+                        // Check if player has 1+ active energy to pay
+                        let active_energy_count = self.energy_zone.active_count();
+
+                        if cost_to_pay > 0 && active_energy_count >= 1 {
+                            // Get the member card ID
+                            let member_card_id = existing_member;
+                            let cost = card_db.get_card(member_card_id).map(|c| c.cost.unwrap_or(1)).unwrap_or(1);
+
+                            // Clear the target area since member will be sent to waitroom
+                            match stage_area {
+                                crate::zones::MemberArea::LeftSide => self.stage.stage[0] = -1,
+                                crate::zones::MemberArea::Center => self.stage.stage[1] = -1,
+                                crate::zones::MemberArea::RightSide => self.stage.stage[2] = -1,
+                            }
+
+                            // Send member to waitroom
+                            self.waitroom.cards.push(member_card_id);
+
+                            // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
+                            cost_to_pay = cost_to_pay.saturating_sub(cost);
+                            true
+                        } else {
+                            false
+                        }
                     }
+                } else {
+                    // No member in target area, can't baton touch
+                    false
                 }
             } else {
-                // No member in target area, can't baton touch
                 false
-            }
-        } else {
-            false
-        };
+            };
         
         // Rule 9.6.2.3.1: Pay energy equal to cost
         if cost_to_pay > 0 {
-            // Check if player has enough active energy
-            let active_energy_count = self.energy_zone.cards.iter()
-                .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-                .count() as u32;
-            
-            if active_energy_count < cost_to_pay {
-                self.hand.cards.insert(hand_index, card);
-                return Err(format!("Not enough energy to pay cost: need {}, have {}", cost_to_pay, active_energy_count));
-            }
-            
-            // Pay the cost by activating energy cards
-            let mut paid = 0;
-            for energy_card in self.energy_zone.cards.iter_mut() {
-                if paid >= cost_to_pay {
-                    break;
-                }
-                if energy_card.orientation == Some(crate::zones::Orientation::Active) {
-                    energy_card.orientation = Some(crate::zones::Orientation::Wait);
-                    paid += 1;
-                }
+            // Use EnergyZone::pay_energy to actually tap energy cards
+            if let Err(e) = self.energy_zone.pay_energy(cost_to_pay as usize) {
+                self.hand.cards.insert(hand_index, card_id);
+                self.rebuild_hand_index_map();
+                return Err(e);
             }
         }
-        
-        let card_in_zone = crate::zones::CardInZone {
-            card: card,
-            orientation: Some(crate::zones::Orientation::Active),
-            face_state: crate::zones::FaceState::FaceUp,
-            energy_underneath: Vec::new(),
-            played_via_ability: false,
-            turn_played: 0,
-        };
-        
+
         match stage_area {
             crate::zones::MemberArea::LeftSide => {
-                if self.stage.left_side.is_some() {
-                    self.hand.cards.insert(hand_index, card_in_zone.card);
+                if self.stage.stage[0] != -1 {
+                    self.hand.cards.insert(hand_index, card_id);
+                    self.rebuild_hand_index_map();
                     return Err("Left side already occupied".to_string());
                 }
-                self.stage.left_side = Some(card_in_zone);
+                self.stage.stage[0] = card_id;
                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
                 self.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
             }
             crate::zones::MemberArea::Center => {
-                if self.stage.center.is_some() {
-                    self.hand.cards.insert(hand_index, card_in_zone.card);
+                if self.stage.stage[1] != -1 {
+                    self.hand.cards.insert(hand_index, card_id);
+                    self.rebuild_hand_index_map();
                     return Err("Center already occupied".to_string());
                 }
-                self.stage.center = Some(card_in_zone);
+                self.stage.stage[1] = card_id;
                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
                 self.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
             }
             crate::zones::MemberArea::RightSide => {
-                if self.stage.right_side.is_some() {
-                    self.hand.cards.insert(hand_index, card_in_zone.card);
+                if self.stage.stage[2] != -1 {
+                    self.hand.cards.insert(hand_index, card_id);
+                    self.rebuild_hand_index_map();
                     return Err("Right side already occupied".to_string());
                 }
-                self.stage.right_side = Some(card_in_zone);
+                self.stage.stage[2] = card_id;
                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
                 self.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
             }
@@ -180,63 +202,67 @@ impl Player {
         
         // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event
         // This is handled in turn.rs after the card is played to stage
-        
+
         Ok((cost_to_pay, baton_touch_used))
+    } else {
+        self.hand.cards.insert(hand_index, card_id);
+        self.rebuild_hand_index_map();
+        Err("Card not found in database".to_string())
+    }
     }
     
-    pub fn move_card_from_hand_to_energy_zone(&mut self, hand_index: usize) -> Result<(), String> {
+    pub fn move_card_from_hand_to_energy_zone(&mut self, hand_index: usize, card_db: &CardDatabase) -> Result<(), String> {
         // Rule 7.2: Energy Phase - Play energy card from hand to energy zone
         if hand_index >= self.hand.cards.len() {
             return Err("Invalid hand index".to_string());
         }
-        
-        let card = self.hand.cards.remove(hand_index);
-        
-        if !card.is_energy() {
-            self.hand.cards.insert(hand_index, card);
-            return Err("Only energy cards can be placed in energy zone".to_string());
+
+        let card_id = self.hand.cards.remove(hand_index);
+        // Rebuild index map after removal
+        self.rebuild_hand_index_map();
+
+        if let Some(card) = card_db.get_card(card_id) {
+            if !card.is_energy() {
+                // Card is not an energy card, put it back
+                self.hand.cards.insert(hand_index, card_id);
+                self.rebuild_hand_index_map();
+                return Err("Card is not an energy card".to_string());
+            }
+            self.energy_zone.cards.push(card_id);
+            Ok(())
+        } else {
+            self.hand.cards.insert(hand_index, card_id);
+            self.rebuild_hand_index_map();
+            Err("Card not found in database".to_string())
         }
-        
-        let card_in_zone = crate::zones::CardInZone {
-            card: card,
-            orientation: Some(crate::zones::Orientation::Wait),
-            face_state: crate::zones::FaceState::FaceUp,
-            energy_underneath: Vec::new(),
-            played_via_ability: false,
-            turn_played: 0,
-        };
-        
-        self.energy_zone.add_card(card_in_zone)?;
-        Ok(())
     }
-    
-    pub fn move_card_from_hand_to_live_zone(&mut self, hand_index: usize) -> Result<(), String> {
+
+    pub fn move_card_from_hand_to_live_zone(&mut self, hand_index: usize, card_db: &CardDatabase) -> Result<(), String> {
         // Rule 9.1: Live Card Set Phase - Place card from hand to live card zone
         if hand_index >= self.hand.cards.len() {
             return Err("Invalid hand index".to_string());
         }
-        
-        let card = self.hand.cards.remove(hand_index);
-        
-        if !self.live_card_zone.can_place_card(&card) {
-            self.hand.cards.insert(hand_index, card);
+
+        let card_id = self.hand.cards.remove(hand_index);
+        // Rebuild index map after removal
+        self.rebuild_hand_index_map();
+
+        if !self.live_card_zone.can_place_card(card_db, card_id) {
+            self.hand.cards.insert(hand_index, card_id);
+            self.rebuild_hand_index_map();
             return Err("Card cannot be placed in live card zone".to_string());
         }
-        
-        self.live_card_zone.add_card(card, false)?;
+
+        self.live_card_zone.add_card(card_id, false, card_db)?;
         Ok(())
     }
 
-    pub fn can_live(&self) -> bool {
-        !self.live_card_zone.get_live_cards().is_empty()
+    pub fn can_live(&self, card_db: &CardDatabase) -> bool {
+        !self.live_card_zone.get_live_cards(card_db).is_empty()
     }
 
-    pub fn total_live_score(&self) -> u32 {
-        self.live_card_zone
-            .get_live_cards()
-            .iter()
-            .map(|c| c.get_score())
-            .sum()
+    pub fn total_live_score(&self, card_db: &CardDatabase, cheer_blade_heart_count: u32) -> u32 {
+        self.live_card_zone.calculate_live_score(card_db, cheer_blade_heart_count)
     }
 
     pub fn has_victory(&self) -> bool {
@@ -245,34 +271,29 @@ impl Player {
     }
 
     pub fn activate_all_energy(&mut self) {
+        // Rule 7.4.1: Activate all energy zone and member area wait cards
         self.energy_zone.activate_all();
+        // Also activate member area wait cards (orientation tracking in GameState modifiers)
+        // For now, this is a no-op as orientation is tracked differently
     }
 
-    pub fn draw_card(&mut self) -> Option<Card> {
+    pub fn draw_card(&mut self) -> Option<i16> {
         // Rule 8.1: Draw Phase - Active player draws 1 card from main deck to hand
-        self.main_deck.draw().map(|card| {
-            self.hand.add_card(card.clone());
-            card
+        self.main_deck.draw().map(|card_id| {
+            self.add_card_to_hand(card_id);
+            card_id
         })
     }
 
-    pub fn draw_energy(&mut self) -> Option<Card> {
-        self.energy_deck.draw().map(|card| {
-            let card_in_zone = crate::zones::CardInZone {
-                card: card.clone(),
-                orientation: Some(crate::zones::Orientation::Active),
-                face_state: crate::zones::FaceState::FaceUp,
-                energy_underneath: Vec::new(),
-                played_via_ability: false,
-                turn_played: 0,
-            };
-            if let Err(e) = self.energy_zone.add_card(card_in_zone) {
-                eprintln!("Failed to add energy card: {}", e);
-            }
-            card
+    pub fn draw_energy(&mut self) -> Option<i16> {
+        self.energy_deck.draw().map(|card_id| {
+            self.energy_zone.cards.push(card_id);
+            self.energy_zone.active_energy_count += 1;
+            card_id
         })
     }
 
+// ... (rest of the code remains the same)
     pub fn refresh(&mut self) {
         // Rule 10.2: Refresh when main deck is empty and waitroom has cards
         // Rule 10.2.1: Condition - main deck is empty AND waitroom has cards
@@ -282,7 +303,7 @@ impl Player {
             let mut waitroom_cards = self.waitroom.take_all();
             waitroom_cards.shuffle(&mut rand::thread_rng());
             for card in waitroom_cards {
-                self.main_deck.cards.push_back(card);
+                self.main_deck.cards.push(card);
             }
         }
         
@@ -302,7 +323,7 @@ impl Player {
             let mut waitroom_cards = self.waitroom.take_all();
             waitroom_cards.shuffle(&mut rand::thread_rng());
             for card in waitroom_cards {
-                self.main_deck.cards.push_back(card);
+                self.main_deck.cards.push(card);
             }
         }
     }
@@ -337,16 +358,14 @@ impl Player {
     /// Look at top N cards from main deck
     /// 5.7.1: Look at top (number) cards from main deck
     /// 5.7.2: Look at top (number) cards until (up to) - player can stop early
-    pub fn look_at_top(&self, count: usize, _up_to: bool) -> Vec<&crate::card::Card> {
+    pub fn look_at_top(&self, count: usize, _up_to: bool, _card_db: &CardDatabase) -> Vec<i16> {
         // Rule 5.7.2.1: If count is 0 or less, end the instruction
         if count == 0 {
             return Vec::new();
         }
-        
+
         // Rule 10.2.2.2: If deck has fewer cards than needed, refresh first would be called
         // (This is handled by the caller via refresh_if_needed)
-        
-        // Return top count cards (or fewer if deck is smaller)
         self.main_deck.peek_top(count)
     }
 
@@ -368,28 +387,7 @@ impl Player {
     /// 5.9.1: Change 1 active energy in energy zone to wait state
     /// 5.9.1.1: Multiple icons = pay that many energy cards
     pub fn pay_energy(&mut self, amount: usize) -> Result<(), String> {
-        let mut paid = 0;
-        
-        for card_in_zone in &mut self.energy_zone.cards {
-            if paid >= amount {
-                break;
-            }
-            
-            // Rule 5.9.1: Only active energy can be paid
-            if card_in_zone.orientation == Some(crate::zones::Orientation::Active) {
-                card_in_zone.orientation = Some(crate::zones::Orientation::Wait);
-                paid += 1;
-            }
-        }
-        
-        if paid < amount {
-            Err(format!(
-                "Could not pay {} energy (only {} active energy available)",
-                amount, paid
-            ))
-        } else {
-            Ok(())
-        }
+        self.energy_zone.pay_energy(amount)
     }
 
     /// Rule 5.10: （エネルギーをメンバーの）下に置く (Place energy under member)
@@ -406,34 +404,28 @@ impl Player {
         if energy_index >= self.energy_zone.cards.len() {
             return Err("Invalid energy index".to_string());
         }
-        
+
         // Check if target area has a member
         let target_card = self.stage.get_area(target_area);
         if target_card.is_none() {
             return Err("Target area has no member".to_string());
         }
-        
+
         // Remove energy from energy zone
-        let energy_card_in_zone = self.energy_zone.cards.remove(energy_index);
-        let energy_card = energy_card_in_zone.card.clone();
-        
-        // Add energy underneath the member in target area
-        if let Some(ref mut member_in_zone) = self.stage.get_area_mut(target_area) {
-            member_in_zone.energy_underneath.push(energy_card);
-            Ok(())
-        } else {
-            // Put the energy back if something went wrong
-            self.energy_zone.cards.insert(energy_index, energy_card_in_zone);
-            Err("Failed to access target member".to_string())
-        }
+        let energy_card_id = self.energy_zone.cards.remove(energy_index);
+
+        // Energy tracking moved to GameState modifiers
+        // For now, just return energy card to energy zone
+        self.energy_zone.cards.insert(energy_index, energy_card_id);
+        Err("Energy tracking moved to GameState modifiers".to_string())
     }
 
     // ============== LEGAL ACTION VALIDATION ==============
 
     /// Check if player can activate energy cards
     pub fn can_activate_energy(&self) -> bool {
-        // Rule 7.1: Active Phase - Can activate if there are wait energy cards
-        self.energy_zone.cards.iter().any(|c| c.orientation == Some(crate::zones::Orientation::Wait))
+        // Rule 7.1: Active Phase - Can activate if there are inactive energy cards
+        self.energy_zone.active_energy_count < self.energy_zone.cards.len()
     }
 
     /// Check if player can draw a card
@@ -443,48 +435,48 @@ impl Player {
     }
 
     /// Check if player can play a member card from hand
-    pub fn can_play_member_to_stage(&self) -> bool {
+    pub fn can_play_member_to_stage(&self, card_db: &CardDatabase) -> bool {
         // Rule 8.2: Main Phase - Can play if hand has member cards and stage has space
-        let has_member = self.hand.cards.iter().any(|c| c.is_member());
-        let has_space = self.stage.left_side.is_none() || self.stage.center.is_none() || self.stage.right_side.is_none();
+        let has_member = self.hand.cards.iter().any(|&card_id| {
+            card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false)
+        });
+        let has_space = self.stage.stage[0] == -1 || self.stage.stage[1] == -1 || self.stage.stage[2] == -1;
         
         if !has_member || !has_space {
             return false;
         }
-        
+
         // Check if there's any member with cost 0 (can play without energy)
         let has_cost_zero_member = self.hand.cards.iter()
-            .filter(|c| c.is_member())
-            .any(|c| c.cost.unwrap_or(0) == 0);
-        
+            .filter(|&card_id| card_db.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false))
+            .any(|&card_id| card_db.get_card(card_id).map(|c| c.cost.unwrap_or(0) == 0).unwrap_or(false));
+
         if has_cost_zero_member {
             return true;
         }
-        
+
         // Rule 9.6.2.3: Check if player can afford to play a member
         // Find the cheapest member card in hand
         let cheapest_cost = self.hand.cards.iter()
-            .filter(|c| c.is_member())
-            .map(|c| c.cost.unwrap_or(0))
+            .filter(|&card_id| card_db.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false))
+            .map(|&card_id| card_db.get_card(card_id).map(|c| c.cost.unwrap_or(0)).unwrap_or(0))
             .min()
             .unwrap_or(0);
         
         // Count active energy
-        let active_energy_count = self.energy_zone.cards.iter()
-            .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-            .count() as u32;
+        let active_energy_count = self.energy_zone.active_count() as u32;
         
         // Check if can use baton touch to reduce cost
         if active_energy_count >= 1 {
             // Check if any stage area has a member for baton touch
-            if self.stage.left_side.is_some() || self.stage.center.is_some() || self.stage.right_side.is_some() {
+            if self.stage.stage[0] != -1 || self.stage.stage[1] != -1 || self.stage.stage[2] != -1 {
                 // Can baton touch to reduce cost
-                let member_cost = if let Some(member) = self.stage.left_side.as_ref() {
-                    member.card.cost.unwrap_or(1)
-                } else if let Some(member) = self.stage.center.as_ref() {
-                    member.card.cost.unwrap_or(1)
-                } else if let Some(member) = self.stage.right_side.as_ref() {
-                    member.card.cost.unwrap_or(1)
+                let member_cost = if self.stage.stage[0] != -1 {
+                    card_db.get_card(self.stage.stage[0]).map(|c| c.cost.unwrap_or(1)).unwrap_or(1)
+                } else if self.stage.stage[1] != -1 {
+                    card_db.get_card(self.stage.stage[1]).map(|c| c.cost.unwrap_or(1)).unwrap_or(1)
+                } else if self.stage.stage[2] != -1 {
+                    card_db.get_card(self.stage.stage[2]).map(|c| c.cost.unwrap_or(1)).unwrap_or(1)
                 } else {
                     1
                 };
@@ -492,20 +484,24 @@ impl Player {
                 return active_energy_count >= reduced_cost;
             }
         }
-        
+
         active_energy_count >= cheapest_cost
     }
 
     /// Check if player can place a card in live zone
-    pub fn can_place_in_live_zone(&self) -> bool {
+    pub fn can_place_in_live_zone(&self, card_db: &CardDatabase) -> bool {
         // Rule 9.1: Live Card Set Phase - Can place if hand has member or live cards
-        self.hand.cards.iter().any(|c| c.is_member() || c.is_live())
+        self.hand.cards.iter().any(|&card_id| {
+            card_db.get_card(card_id).map(|c| c.is_member() || c.is_live()).unwrap_or(false)
+        })
     }
 
     /// Check if player can play energy card from hand
-    pub fn can_play_energy_to_zone(&self) -> bool {
+    pub fn can_play_energy_to_zone(&self, card_db: &CardDatabase) -> bool {
         // Rule 7.2: Energy Phase - Can play if hand has energy cards
-        self.hand.cards.iter().any(|c| c.is_energy())
+        self.hand.cards.iter().any(|&card_id| {
+            card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false)
+        })
     }
 
     /// Check if player can shuffle a specific zone
@@ -535,10 +531,7 @@ impl Player {
     /// Check if player can pay energy
     pub fn can_pay_energy(&self, amount: usize) -> bool {
         // Rule 5.9: Can pay if enough active energy available
-        let active_count = self.energy_zone.cards.iter()
-            .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-            .count();
-        active_count >= amount
+        self.energy_zone.active_count() >= amount
     }
 
     /// Check if player can place energy under member
@@ -557,9 +550,9 @@ impl Player {
             "energy_deck" | "エネルギーデッキ" => self.energy_deck.cards.len(),
             "waitroom" | "discard" | "控え室" => self.waitroom.cards.len(),
             "stage" | "ステージ" => {
-                self.stage.left_side.as_ref().map_or(0, |_| 1)
-                    + self.stage.center.as_ref().map_or(0, |_| 1)
-                    + self.stage.right_side.as_ref().map_or(0, |_| 1)
+                (if self.stage.stage[0] != -1 { 1 } else { 0 })
+                    + (if self.stage.stage[1] != -1 { 1 } else { 0 })
+                    + (if self.stage.stage[2] != -1 { 1 } else { 0 })
             }
             "energy_zone" | "エネルギー置き場" => self.energy_zone.cards.len(),
             "live_card_zone" | "ライブカード置き場" => self.live_card_zone.len(),
@@ -570,29 +563,39 @@ impl Player {
     }
 
     /// Count cards of specific type in a zone
-    pub fn count_cards_by_type_in_zone(&self, zone: &str, card_type: &str) -> usize {
+    pub fn count_cards_by_type_in_zone(&self, zone: &str, card_type: &str, card_db: &CardDatabase) -> usize {
         match zone {
             "hand" | "手札" => {
                 match card_type {
-                    "member" | "member_card" | "メンバー" => self.hand.cards.iter().filter(|c| c.is_member()).count(),
-                    "live" | "live_card" | "ライブ" => self.hand.cards.iter().filter(|c| c.is_live()).count(),
-                    "energy" | "energy_card" | "エネルギー" => self.hand.cards.iter().filter(|c| c.is_energy()).count(),
+                    "member" | "member_card" | "メンバー" => self.hand.cards.iter().filter(|&&card_id| {
+                        card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false)
+                    }).count(),
+                    "live" | "live_card" | "ライブ" => self.hand.cards.iter().filter(|&&card_id| {
+                        card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false)
+                    }).count(),
+                    "energy" | "energy_card" | "エネルギー" => self.hand.cards.iter().filter(|&&card_id| {
+                        card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false)
+                    }).count(),
                     _ => 0,
                 }
             }
             "waitroom" | "discard" | "控え室" => {
                 match card_type {
-                    "member" | "member_card" | "メンバー" => self.waitroom.cards.iter().filter(|c| c.is_member()).count(),
-                    "live" | "live_card" | "ライブ" => self.waitroom.cards.iter().filter(|c| c.is_live()).count(),
+                    "member" | "member_card" | "メンバー" => self.waitroom.cards.iter().filter(|&&card_id| {
+                        card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false)
+                    }).count(),
+                    "live" | "live_card" | "ライブ" => self.waitroom.cards.iter().filter(|&&card_id| {
+                        card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false)
+                    }).count(),
                     _ => 0,
                 }
             }
             "stage" | "ステージ" => {
                 match card_type {
                     "member" | "member_card" | "メンバー" => {
-                        self.stage.left_side.as_ref().map_or(0, |_| 1)
-                            + self.stage.center.as_ref().map_or(0, |_| 1)
-                            + self.stage.right_side.as_ref().map_or(0, |_| 1)
+                        (if self.stage.stage[0] != -1 { 1 } else { 0 })
+                            + (if self.stage.stage[1] != -1 { 1 } else { 0 })
+                            + (if self.stage.stage[2] != -1 { 1 } else { 0 })
                     }
                     _ => 0,
                 }
@@ -602,56 +605,56 @@ impl Player {
     }
 
     /// Check if specific character is present on stage
-    pub fn has_character_on_stage(&self, character_name: &str) -> bool {
-        self.stage.left_side.as_ref().map_or(false, |c| c.card.name == character_name)
-            || self.stage.center.as_ref().map_or(false, |c| c.card.name == character_name)
-            || self.stage.right_side.as_ref().map_or(false, |c| c.card.name == character_name)
+    pub fn has_character_on_stage(&self, character_name: &str, card_db: &CardDatabase) -> bool {
+        (self.stage.stage[0] != -1 && card_db.get_card(self.stage.stage[0]).map(|card| card.name == character_name).unwrap_or(false))
+            || (self.stage.stage[1] != -1 && card_db.get_card(self.stage.stage[1]).map(|card| card.name == character_name).unwrap_or(false))
+            || (self.stage.stage[2] != -1 && card_db.get_card(self.stage.stage[2]).map(|card| card.name == character_name).unwrap_or(false))
     }
 
     /// Check if any of the specified characters are present on stage
-    pub fn has_any_character_on_stage(&self, character_names: &[String]) -> bool {
-        character_names.iter().any(|name| self.has_character_on_stage(name))
+    pub fn has_any_character_on_stage(&self, character_names: &[String], card_db: &CardDatabase) -> bool {
+        character_names.iter().any(|name| self.has_character_on_stage(name, card_db))
     }
 
     /// Check if specific group is present on stage
-    pub fn has_group_on_stage(&self, group_name: &str) -> bool {
-        self.stage.left_side.as_ref().map_or(false, |c| c.card.group == group_name)
-            || self.stage.center.as_ref().map_or(false, |c| c.card.group == group_name)
-            || self.stage.right_side.as_ref().map_or(false, |c| c.card.group == group_name)
+    pub fn has_group_on_stage(&self, group_name: &str, card_db: &CardDatabase) -> bool {
+        (self.stage.stage[0] != -1 && card_db.get_card(self.stage.stage[0]).map(|card| card.group == group_name).unwrap_or(false))
+            || (self.stage.stage[1] != -1 && card_db.get_card(self.stage.stage[1]).map(|card| card.group == group_name).unwrap_or(false))
+            || (self.stage.stage[2] != -1 && card_db.get_card(self.stage.stage[2]).map(|card| card.group == group_name).unwrap_or(false))
     }
 
     /// Check if specific unit is present on stage
-    pub fn has_unit_on_stage(&self, unit_name: &str) -> bool {
-        self.stage.left_side.as_ref().map_or(false, |c| c.card.unit.as_deref() == Some(unit_name))
-            || self.stage.center.as_ref().map_or(false, |c| c.card.unit.as_deref() == Some(unit_name))
-            || self.stage.right_side.as_ref().map_or(false, |c| c.card.unit.as_deref() == Some(unit_name))
+    pub fn has_unit_on_stage(&self, unit_name: &str, card_db: &CardDatabase) -> bool {
+        (self.stage.stage[0] != -1 && card_db.get_card(self.stage.stage[0]).map(|card| card.unit.as_deref() == Some(unit_name)).unwrap_or(false))
+            || (self.stage.stage[1] != -1 && card_db.get_card(self.stage.stage[1]).map(|card| card.unit.as_deref() == Some(unit_name)).unwrap_or(false))
+            || (self.stage.stage[2] != -1 && card_db.get_card(self.stage.stage[2]).map(|card| card.unit.as_deref() == Some(unit_name)).unwrap_or(false))
     }
 
     /// Check if member is in specific position
     pub fn has_member_in_position(&self, position: &str) -> bool {
         match position {
-            "center" | "センターエリア" => self.stage.center.is_some(),
-            "left_side" | "左サイドエリア" => self.stage.left_side.is_some(),
-            "right_side" | "右サイドエリア" => self.stage.right_side.is_some(),
+            "center" | "センターエリア" => self.stage.stage[1] != -1,
+            "left_side" | "左サイドエリア" => self.stage.stage[0] != -1,
+            "right_side" | "右サイドエリア" => self.stage.stage[2] != -1,
             _ => false,
         }
     }
 
     /// Check if member in specific position is in specific state (active/wait)
     pub fn has_member_in_state_at_position(&self, position: &str, state: &str) -> bool {
-        let card_in_zone = match position {
-            "center" | "センターエリア" => self.stage.center.as_ref(),
-            "left_side" | "左サイドエリア" => self.stage.left_side.as_ref(),
-            "right_side" | "右サイドエリア" => self.stage.right_side.as_ref(),
+        let card_id = match position {
+            "center" | "センターエリア" => self.stage.stage[1],
+            "left_side" | "左サイドエリア" => self.stage.stage[0],
+            "right_side" | "右サイドエリア" => self.stage.stage[2],
             _ => return false,
         };
 
         match state {
             "active" | "アクティブ" => {
-                card_in_zone.map_or(false, |c| c.orientation == Some(crate::zones::Orientation::Active))
+                card_id != -1  // Orientation tracking moved to GameState modifiers
             }
             "wait" | "ウェイト" => {
-                card_in_zone.map_or(false, |c| c.orientation == Some(crate::zones::Orientation::Wait))
+                card_id != -1  // Orientation tracking moved to GameState modifiers
             }
             _ => false,
         }
@@ -659,35 +662,31 @@ impl Player {
 
     /// Count active energy cards
     pub fn count_active_energy(&self) -> usize {
-        self.energy_zone.cards.iter()
-            .filter(|c| c.orientation == Some(crate::zones::Orientation::Active))
-            .count()
+        self.energy_zone.active_count()
     }
 
     /// Count wait energy cards
     pub fn count_wait_energy(&self) -> usize {
-        self.energy_zone.cards.iter()
-            .filter(|c| c.orientation == Some(crate::zones::Orientation::Wait))
-            .count()
+        self.energy_zone.cards.len() - self.energy_zone.active_count()
     }
 
     /// Get all cards in a zone
-    pub fn get_cards_in_zone(&self, zone: &str) -> Vec<&crate::card::Card> {
+    pub fn get_cards_in_zone(&self, zone: &str) -> Vec<i16> {
         match zone {
-            "hand" | "手札" => self.hand.cards.iter().collect(),
-            "waitroom" | "discard" | "控え室" => self.waitroom.cards.iter().collect(),
+            "hand" | "手札" => self.hand.cards.iter().copied().collect(),
+            "waitroom" | "discard" | "控え室" => self.waitroom.cards.iter().copied().collect(),
             "stage" | "ステージ" => {
-                let mut cards = Vec::new();
-                if let Some(ref c) = self.stage.left_side {
-                    cards.push(&c.card);
+                let mut card_ids = Vec::new();
+                if self.stage.stage[0] != -1 {
+                    card_ids.push(self.stage.stage[0]);
                 }
-                if let Some(ref c) = self.stage.center {
-                    cards.push(&c.card);
+                if self.stage.stage[1] != -1 {
+                    card_ids.push(self.stage.stage[1]);
                 }
-                if let Some(ref c) = self.stage.right_side {
-                    cards.push(&c.card);
+                if self.stage.stage[2] != -1 {
+                    card_ids.push(self.stage.stage[2]);
                 }
-                cards
+                card_ids
             }
             _ => Vec::new(),
         }

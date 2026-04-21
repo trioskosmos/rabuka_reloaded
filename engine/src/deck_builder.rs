@@ -1,12 +1,13 @@
-use crate::card::Card;
+use crate::card::{Card, CardDatabase};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::vec::Vec;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Deck {
-    pub main_deck: VecDeque<Card>,
-    pub energy_deck: VecDeque<Card>,
+    pub main_deck: VecDeque<i16>,  // Card IDs
+    pub energy_deck: VecDeque<i16>,  // Card IDs
 }
 
 impl Deck {
@@ -20,14 +21,14 @@ impl Deck {
 
     pub fn shuffle_main_deck(&mut self) {
         use rand::seq::SliceRandom;
-        let mut cards: Vec<Card> = self.main_deck.drain(..).collect();
+        let mut cards: Vec<i16> = self.main_deck.drain(..).collect();
         cards.shuffle(&mut rand::thread_rng());
         self.main_deck = cards.into();
     }
 
     pub fn shuffle_energy_deck(&mut self) {
         use rand::seq::SliceRandom;
-        let mut cards: Vec<Card> = self.energy_deck.drain(..).collect();
+        let mut cards: Vec<i16> = self.energy_deck.drain(..).collect();
         cards.shuffle(&mut rand::thread_rng());
         self.energy_deck = cards.into();
     }
@@ -36,37 +37,41 @@ impl Deck {
 pub struct DeckBuilder;
 
 impl DeckBuilder {
-    pub fn build_deck_from_cards(cards: Vec<Card>) -> Result<Deck, String> {
-        let mut main_deck: VecDeque<Card> = VecDeque::new();
-        let mut energy_deck: VecDeque<Card> = VecDeque::new();
-        
+    pub fn build_deck_from_database(card_db: &Arc<CardDatabase>, card_numbers: Vec<String>) -> Result<Deck, String> {
+        let mut main_deck: VecDeque<i16> = VecDeque::new();
+        let mut energy_deck: VecDeque<i16> = VecDeque::new();
+
         let mut member_count = 0;
         let mut live_count = 0;
         let mut energy_count = 0;
-        
+
         let mut card_number_counts: HashMap<String, u32> = HashMap::new();
-        
-        for card in cards {
+
+        for card_no in card_numbers {
             // Card number limit check removed for testing purposes
-            let count = card_number_counts.entry(card.card_no.clone()).or_insert(0);
+            let count = card_number_counts.entry(card_no.clone()).or_insert(0);
             *count += 1;
-            
-            match card.card_type {
-                crate::card::CardType::Member => {
-                    main_deck.push_back(card);
-                    member_count += 1;
-                }
-                crate::card::CardType::Live => {
-                    main_deck.push_back(card);
-                    live_count += 1;
-                }
-                crate::card::CardType::Energy => {
-                    energy_deck.push_back(card);
-                    energy_count += 1;
+
+            if let Some(card_id) = card_db.get_card_id(&card_no) {
+                if let Some(card) = card_db.get_card(card_id) {
+                    match card.card_type {
+                        crate::card::CardType::Member => {
+                            main_deck.push_back(card_id);
+                            member_count += 1;
+                        }
+                        crate::card::CardType::Live => {
+                            main_deck.push_back(card_id);
+                            live_count += 1;
+                        }
+                        crate::card::CardType::Energy => {
+                            energy_deck.push_back(card_id);
+                            energy_count += 1;
+                        }
+                    }
                 }
             }
         }
-        
+
         // Validate deck composition with priority on 12 live + 48 member
         // Rule 6.1.1: Main deck must have exactly 60 cards (48 member + 12 live)
         // Be lenient if cards are missing from database
@@ -75,29 +80,58 @@ impl DeckBuilder {
             eprintln!("Warning: Main deck has {} cards (expected 60): {} member + {} live", total_main, member_count, live_count);
             // Allow decks with fewer cards due to missing cards in database
         }
-        
+
         if live_count < 12 {
             eprintln!("Warning: Main deck has {} live cards (expected 12)", live_count);
         }
-        
+
         if member_count < 48 {
             eprintln!("Warning: Main deck has {} member cards (expected 48)", member_count);
         }
-        
-        // Rule 6.1.2: Energy deck must have exactly 12 energy cards
-        // Energy deck can have any number (will add defaults if needed)
-        if energy_count == 0 {
-            // Will add default energy cards later
-        } else if energy_count != 12 {
-            return Err(format!("Energy deck should have 12 energy cards, found {}", energy_count));
+
+        // Rule 6.1.1.3: Energy deck must have exactly 12 energy cards
+        if energy_count != 12 {
+            eprintln!("Warning: Energy deck has {} energy cards (expected 12)", energy_count);
         }
-        
+
         Ok(Deck {
             main_deck,
             energy_deck,
         })
     }
+
+    pub fn build_deck_from_cards(cards: Vec<Card>) -> Result<Deck, String> {
+        // This method is deprecated in favor of build_deck_from_database
+        // For backward compatibility, convert cards to card IDs
+        let card_db = Arc::new(CardDatabase::load_or_create(cards.clone()));
+        let card_numbers: Vec<String> = cards.iter().map(|c| c.card_no.clone()).collect();
+        Self::build_deck_from_database(&card_db, card_numbers)
+    }
     
+    pub fn add_default_energy_cards_from_database(deck: &mut Deck, card_db: &Arc<CardDatabase>) -> Result<(), String> {
+        if deck.energy_deck.is_empty() {
+            // Add default energy cards
+            let mut energy_card_ids: Vec<i16> = Vec::new();
+            for (card_id, card) in card_db.cards.iter() {
+                if card.is_energy() {
+                    energy_card_ids.push(*card_id);
+                    if energy_card_ids.len() >= 12 {
+                        break;
+                    }
+                }
+            }
+
+            if energy_card_ids.len() < 12 {
+                return Err(format!("Not enough energy cards available: found {}", energy_card_ids.len()));
+            }
+
+            for card_id in energy_card_ids {
+                deck.energy_deck.push_back(card_id);
+            }
+        }
+        Ok(())
+    }
+
     pub fn add_default_energy_cards(deck: &mut Deck, all_cards: &HashMap<String, Card>) -> Result<(), String> {
         if deck.energy_deck.is_empty() {
             // Add default energy cards
@@ -105,13 +139,16 @@ impl DeckBuilder {
                 .filter(|c| c.is_energy())
                 .take(12)
                 .collect();
-            
+
             if energy_cards.len() < 12 {
                 return Err(format!("Not enough energy cards available: found {}", energy_cards.len()));
             }
-            
-            for card in energy_cards {
-                deck.energy_deck.push_back(card.clone());
+
+            for _card in energy_cards {
+                // This is deprecated - use add_default_energy_cards_from_database instead
+                // For now, we'll need to map card to card_id, but we don't have a mapping here
+                // This function should not be used anymore
+                return Err("add_default_energy_cards is deprecated, use add_default_energy_cards_from_database".to_string());
             }
         }
         Ok(())

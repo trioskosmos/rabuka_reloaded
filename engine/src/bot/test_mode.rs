@@ -10,7 +10,7 @@ use crate::turn;
 use crate::game_setup;
 use std::vec::Vec;
 
-fn validate_game_state(game_state: &GameState) -> Vec<String> {
+fn validate_game_state(game_state: &GameState, card_database: &std::sync::Arc<crate::card::CardDatabase>) -> Vec<String> {
     let mut issues = Vec::new();
     
     // Rule 1.2.1.1: Victory condition
@@ -66,12 +66,16 @@ fn validate_game_state(game_state: &GameState) -> Vec<String> {
     // So we don't validate for duplicates in hand
     
     // Check energy cards should be in energy zone
-    let p1_hand_energy = game_state.player1.hand.cards.iter().filter(|c| c.is_energy()).count();
+    let p1_hand_energy = game_state.player1.hand.cards.iter().filter(|&c| {
+        card_database.get_card(*c).map_or(false, |card| card.is_energy())
+    }).count();
     if p1_hand_energy > 0 {
         issues.push(format!("P1 has {} energy cards in hand (should be in energy zone)", p1_hand_energy));
     }
     
-    let p2_hand_energy = game_state.player2.hand.cards.iter().filter(|c| c.is_energy()).count();
+    let p2_hand_energy = game_state.player2.hand.cards.iter().filter(|&c| {
+        card_database.get_card(*c).map_or(false, |card| card.is_energy())
+    }).count();
     if p2_hand_energy > 0 {
         issues.push(format!("P2 has {} energy cards in hand (should be in energy zone)", p2_hand_energy));
     }
@@ -81,33 +85,32 @@ fn validate_game_state(game_state: &GameState) -> Vec<String> {
 
 fn count_stage_members(stage: &crate::zones::Stage) -> usize {
     let mut count = 0;
-    if stage.left_side.is_some() { count += 1; }
-    if stage.center.is_some() { count += 1; }
-    if stage.right_side.is_some() { count += 1; }
+    if stage.stage[0] != -1 { count += 1; }
+    if stage.stage[1] != -1 { count += 1; }
+    if stage.stage[2] != -1 { count += 1; }
     count
 }
 
 pub fn run_test_mode() {
     println!("=== AUTOMATED TEST MODE ===\n");
-    
+
     // Load cards
     println!("Loading cards...");
     let cards_path = std::path::Path::new("../cards/cards.json");
     let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
         Ok(cards) => {
-            let mut card_map = std::collections::HashMap::new();
-            for card in cards {
-                card_map.insert(card.card_no.clone(), card);
-            }
-            println!("Loaded {} cards", card_map.len());
-            card_map
+            println!("Loaded {} cards", cards.len());
+            cards
         }
         Err(e) => {
             eprintln!("Failed to load cards: {}", e);
             return;
         }
     };
-    
+
+    // Create CardDatabase from loaded cards
+    let card_database = std::sync::Arc::new(crate::card::CardDatabase::load_or_create(cards.clone()));
+
     // Load decks
     println!("Loading decks...");
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
@@ -120,15 +123,15 @@ pub fn run_test_mode() {
             return;
         }
     };
-    
+
     // Use first deck for both players
     let deck1 = &deck_lists[0];
     let deck2 = &deck_lists[0];
-    
+
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
+
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -139,8 +142,8 @@ pub fn run_test_mode() {
             return;
         }
     };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
+
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -151,27 +154,27 @@ pub fn run_test_mode() {
             return;
         }
     };
-    
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
-    
+
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
+
     player1.set_main_deck(player1_deck.main_deck);
     player1.set_energy_deck(player1_deck.energy_deck);
-    
+
     player2.set_main_deck(player2_deck.main_deck);
     player2.set_energy_deck(player2_deck.energy_deck);
-    
-    let mut game_state = GameState::new(player1, player2);
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_setup::setup_game(&mut game_state);
     
     println!("\nGame initialized with deck: {}", deck1.name);
     println!("\n--- INITIAL STATE ---");
     print_game_state_summary(&game_state);
     
-    let initial_issues = validate_game_state(&game_state);
+    let initial_issues = validate_game_state(&game_state, &card_database);
     if !initial_issues.is_empty() {
         println!("\n⚠️  INITIAL VALIDATION ISSUES:");
         for issue in &initial_issues {
@@ -219,7 +222,7 @@ pub fn run_test_mode() {
                         
                         match turn::TurnEngine::execute_main_phase_action(
                             &mut game_state,
-                            "place_live_cards",
+                            &crate::game_setup::ActionType::SetLiveCard,
                             None,
                             Some(indices),
                             None,
@@ -246,10 +249,10 @@ pub fn run_test_mode() {
                     eprintln!("Executing RPS choice...");
                     let _ = turn::TurnEngine::execute_main_phase_action(
                         &mut game_state,
-                        "rps_choice",
+                        &crate::game_setup::ActionType::RpsChoice,
                         None,
                         None,
-                        Some("rock".to_string()),
+                        Some(crate::zones::MemberArea::LeftSide),
                         None,
                     );
                 }
@@ -257,7 +260,7 @@ pub fn run_test_mode() {
                     eprintln!("Skipping mulligan...");
                     let _ = turn::TurnEngine::execute_main_phase_action(
                         &mut game_state,
-                        "skip_mulligan",
+                        &crate::game_setup::ActionType::SkipMulligan,
                         None,
                         None,
                         None,
@@ -288,9 +291,9 @@ pub fn run_test_mode() {
                 match turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
                     &action.action_type,
-                    action.parameters.as_ref().and_then(|p| p.card_index),
+                    action.parameters.as_ref().and_then(|p| p.card_id),
                     action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    action.parameters.as_ref().and_then(|p| p.stage_area.clone()),
+                    action.parameters.as_ref().and_then(|p| p.stage_area),
                     action.parameters.as_ref().and_then(|p| p.use_baton_touch),
                 ) {
                     Ok(_) => {
@@ -314,7 +317,7 @@ pub fn run_test_mode() {
         }
         
         // Validate after action
-        let issues = validate_game_state(&game_state);
+        let issues = validate_game_state(&game_state, &card_database);
         if !issues.is_empty() {
             println!("⚠️  Validation issues:");
             for issue in &issues {

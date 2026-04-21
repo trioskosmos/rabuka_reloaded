@@ -919,16 +919,27 @@ class GameScene extends Phaser.Scene {
         const startY = this.actionsPanelY + 70;
         const buttonWidth = panelWidth - 20;
         
-        // Separate Pass action and make it prominent
-        const passAction = this.actions.find(a => a.action_type === 'pass');
-        const otherActions = this.actions.filter(a => a.action_type !== 'pass');
-        
+        // Separate Pass/Skip/Finish actions and make them prominent
+        let skipActions = [];
         let currentIndex = 0;
         
-        // Pass button - large and prominent
-        if (passAction) {
-            const passIndex = this.actions.indexOf(passAction);
-            const passBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 55, 'PASS TURN', {
+        // Find skip/finish/pass actions
+        this.actions.forEach((action) => {
+            if (action.action_type === 'pass' || action.action_type === 'skip_mulligan' || action.action_type === 'finish_live_card_set') {
+                skipActions.push(action);
+            }
+        });
+        
+        // Skip/Finish/Pass buttons - large and prominent at the top
+        skipActions.forEach((skipAction) => {
+            let buttonText = 'PASS TURN';
+            if (skipAction.action_type === 'skip_mulligan') {
+                buttonText = 'SKIP MULLIGAN';
+            } else if (skipAction.action_type === 'finish_live_card_set') {
+                buttonText = 'FINISH LIVE SET';
+            }
+            
+            const skipBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 55, buttonText, {
                 fontSize: '18px',
                 color: '#ffffff',
                 backgroundColor: '#e94560',
@@ -938,18 +949,22 @@ class GameScene extends Phaser.Scene {
                 align: 'center'
             }).setOrigin(0.5);
             
-            passBtn.setInteractive({ useHandCursor: true })
-                   .on('pointerover', () => passBtn.setStyle({ backgroundColor: '#ff6b6b' }))
-                   .on('pointerout', () => passBtn.setStyle({ backgroundColor: '#e94560' }))
-                   .on('pointerdown', () => this.executeAction(passIndex));
+            // Capture skip action in closure
+            const capturedSkipAction = skipAction;
+            skipBtn.setInteractive({ useHandCursor: true })
+                   .on('pointerover', () => skipBtn.setStyle({ backgroundColor: '#ff6b6b' }))
+                   .on('pointerout', () => skipBtn.setStyle({ backgroundColor: '#e94560' }))
+                   .on('pointerdown', () => this.executeActionDirect(capturedSkipAction));
             
-            this.actionButtons.push(passBtn);
+            this.actionButtons.push(skipBtn);
             currentIndex++;
-        }
+        });
         
         // Other action buttons - check if they have available_areas for grouping
-        otherActions.forEach((action) => {
-            const actionIndex = this.actions.indexOf(action);
+        this.actions.forEach((action, originalIndex) => {
+            // Skip skip/finish/pass actions as they're already handled
+            if (action.action_type === 'pass' || action.action_type === 'skip_mulligan' || action.action_type === 'finish_live_card_set') return;
+            
             const params = action.parameters;
             
             // Check if this is a grouped card action with available_areas
@@ -984,10 +999,13 @@ class GameScene extends Phaser.Scene {
                             align: 'center'
                         }).setOrigin(0, 0.5);
                         
+                        // Capture action and areaInfo in closure
+                        const capturedAction = action;
+                        const capturedAreaInfo = areaInfo;
                         btn.setInteractive({ useHandCursor: true })
-                           .on('pointerover', () => btn.setStyle({ backgroundColor: areaInfo.is_baton_touch ? '#68d391' : '#4a5568', color: '#e94560' }))
-                           .on('pointerout', () => btn.setStyle({ backgroundColor: areaInfo.is_baton_touch ? '#48bb78' : '#2d3748', color: '#fff' }))
-                           .on('pointerdown', () => this.executeActionWithArea(actionIndex, areaInfo.area));
+                           .on('pointerover', () => btn.setStyle({ backgroundColor: capturedAreaInfo.is_baton_touch ? '#68d391' : '#4a5568', color: '#e94560' }))
+                           .on('pointerout', () => btn.setStyle({ backgroundColor: capturedAreaInfo.is_baton_touch ? '#48bb78' : '#2d3748', color: '#fff' }))
+                           .on('pointerdown', () => this.executeActionWithAreaDirect(capturedAction, capturedAreaInfo.area));
                         
                         this.actionButtons.push(btn);
                     }
@@ -1006,10 +1024,12 @@ class GameScene extends Phaser.Scene {
                     wordWrap: { width: buttonWidth - 30 }
                 }).setOrigin(0.5);
                 
+                // Capture action in closure
+                const capturedAction = action;
                 btn.setInteractive({ useHandCursor: true })
                    .on('pointerover', () => btn.setStyle({ backgroundColor: '#4a5568', color: '#e94560' }))
                    .on('pointerout', () => btn.setStyle({ backgroundColor: '#2d3748', color: '#fff' }))
-                   .on('pointerdown', () => this.executeAction(actionIndex));
+                   .on('pointerdown', () => this.executeActionDirect(capturedAction));
                 
                 this.actionButtons.push(btn);
                 currentIndex++;
@@ -1026,13 +1046,20 @@ class GameScene extends Phaser.Scene {
         }
     }
 
-    async executeActionWithArea(actionIndex, stageArea) {
+    async executeActionWithAreaDirect(action, stageArea) {
         try {
-            const action = this.actions[actionIndex];
-            // Create a modified action with the selected stage_area
+            // Find the selected area info to get use_baton_touch
+            const areaInfo = action.parameters?.available_areas?.find(a => a.area === stageArea);
+            
             const modifiedAction = {
-                action_index: actionIndex,
-                stage_area: stageArea
+                action_index: 0, // Not used by backend anymore
+                stage_area: stageArea,
+                action_type: action.action_type,
+                card_id: action.parameters?.card_id,
+                card_index: action.parameters?.card_index, // Keep for backward compatibility
+                card_indices: action.parameters?.card_indices,
+                card_no: action.parameters?.card_no,
+                use_baton_touch: areaInfo?.is_baton_touch
             };
             
             const response = await fetch('/api/execute-action', {
@@ -1043,6 +1070,36 @@ class GameScene extends Phaser.Scene {
             
             if (response.ok) {
                 await this.loadGameState();
+            } else {
+                const errorText = await response.text();
+                console.error('Action execution failed:', response.status, errorText);
+            }
+        } catch (error) {
+            console.error('Failed to execute action:', error);
+        }
+    }
+
+    async executeActionDirect(action) {
+        try {
+            const response = await fetch('/api/execute-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action_index: 0, // Not used by backend anymore
+                    action_type: action.action_type,
+                    card_id: action.parameters?.card_id,
+                    card_index: action.parameters?.card_index, // Keep for backward compatibility
+                    card_indices: action.parameters?.card_indices,
+                    card_no: action.parameters?.card_no,
+                    use_baton_touch: action.parameters?.use_baton_touch
+                })
+            });
+            
+            if (response.ok) {
+                await this.loadGameState();
+            } else {
+                const errorText = await response.text();
+                console.error('Action execution failed:', response.status, errorText);
             }
         } catch (error) {
             console.error('Failed to execute action:', error);
@@ -1051,14 +1108,25 @@ class GameScene extends Phaser.Scene {
 
     async executeAction(index) {
         try {
+            const action = this.actions[index];
             const response = await fetch('/api/execute-action', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action_index: index })
+                body: JSON.stringify({ 
+                    action_index: index,
+                    action_type: action.action_type,
+                    card_index: action.parameters?.card_index,
+                    card_indices: action.parameters?.card_indices,
+                    card_no: action.parameters?.card_no,
+                    use_baton_touch: action.parameters?.use_baton_touch
+                })
             });
             
             if (response.ok) {
                 await this.loadGameState();
+            } else {
+                const errorText = await response.text();
+                console.error('Action execution failed:', response.status, errorText);
             }
         } catch (error) {
             console.error('Failed to execute action:', error);
