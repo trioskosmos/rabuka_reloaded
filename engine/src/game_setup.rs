@@ -511,7 +511,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
 
                             // Check use_limit (e.g., once per turn)
                             let ability_key = format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
-                            let can_use = if let Some(use_limit) = ability.use_limit {
+                            let can_use = if let Some(_use_limit) = ability.use_limit {
                                 // Check if this ability has already been used this turn
                                 !game_state.turn_limited_abilities_used.contains(&ability_key)
                             } else {

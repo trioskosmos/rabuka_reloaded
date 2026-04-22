@@ -357,6 +357,9 @@ impl<'a> AbilityResolver<'a> {
         let comparison_type = condition.comparison_type.as_deref(); // e.g., "score"
         let operator = condition.operator.as_deref(); // e.g., ">=", "=="
         let count_threshold = condition.count.unwrap_or(0);
+        let distinct = condition.distinct.unwrap_or(false); // Check for distinct names
+        let all_areas = condition.all_areas.unwrap_or(false); // Check all areas (e.g., all stage areas)
+        let no_excess_heart = condition.no_excess_heart.unwrap_or(false); // Check opponent has no excess hearts
         
         let player = match target {
             "self" => &self.game_state.player1,
@@ -376,6 +379,26 @@ impl<'a> AbilityResolver<'a> {
             } else {
                 false
             }
+        };
+
+        // Helper function to check if cards have distinct names
+        let check_distinct_names = |card_ids: &[i16]| -> bool {
+            let mut names = std::collections::HashSet::new();
+            for &card_id in card_ids {
+                if card_id == -1 {
+                    continue;
+                }
+                if card_db.get_card(card_id).is_some() {
+                    // For multi-name cards (e.g., "A&B&C"), check all names
+                    let card_names = card_db.get_card_names(card_id);
+                    for name in card_names {
+                        if !names.insert(name) {
+                            return false; // Duplicate name found
+                        }
+                    }
+                }
+            }
+            true
         };
 
         // Calculate the value based on location and comparison type
@@ -404,6 +427,12 @@ impl<'a> AbilityResolver<'a> {
                 } else {
                     // Count cards on stage
                     let count = player.stage.stage.iter().filter(|&&card_id| card_id != -1).count();
+                    
+                    // Apply all_areas check: if all_areas is true, all stage areas must be occupied
+                    if all_areas && count != 3 {
+                        return false;
+                    }
+                    
                     count as u32
                 }
             }
@@ -460,6 +489,63 @@ impl<'a> AbilityResolver<'a> {
             }
             _ => 0,
         };
+
+        // Apply distinct check: if distinct is true, verify cards have distinct names
+        if distinct {
+            let card_ids: Vec<i16> = match location {
+                "stage" => player.stage.stage.to_vec(),
+                "hand" => player.hand.cards.to_vec(),
+                "discard" => player.waitroom.cards.to_vec(),
+                "energy_zone" => player.energy_zone.cards.to_vec(),
+                "live_card_zone" => player.live_card_zone.cards.to_vec(),
+                "success_live_zone" => player.success_live_card_zone.cards.to_vec(),
+                _ => Vec::new(),
+            };
+            
+            if !check_distinct_names(&card_ids) {
+                return false;
+            }
+        }
+
+        // Apply no_excess_heart check: if true, verify opponent has no excess hearts
+        // This is used in conditions like "相手が余剰のハートを持たずにライブを成功させていた"
+        if no_excess_heart {
+            // Check if opponent (target) has excess hearts
+            // Excess hearts are hearts beyond what's needed for live cards
+            let opponent = if target == "self" {
+                &self.game_state.player2
+            } else {
+                &self.game_state.player1
+            };
+            
+            // Calculate opponent's excess hearts
+            let total_hearts: u32 = opponent.stage.stage.iter()
+                .filter(|&&card_id| card_id != -1)
+                .map(|&card_id| {
+                    if let Some(card) = card_db.get_card(card_id) {
+                        card.total_hearts()
+                    } else {
+                        0
+                    }
+                })
+                .sum();
+            
+            // Calculate hearts needed for live cards
+            let needed_hearts: u32 = opponent.live_card_zone.cards.iter()
+                .map(|&card_id| {
+                    if let Some(card) = card_db.get_card(card_id) {
+                        card.total_hearts()
+                    } else {
+                        0
+                    }
+                })
+                .sum();
+            
+            // If total hearts > needed hearts, opponent has excess hearts
+            if total_hearts > needed_hearts {
+                return false;
+            }
+        }
 
         // Apply aggregate if specified (e.g., "total" for sum)
         let final_value = match aggregate {
@@ -1231,7 +1317,7 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_draw(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let count = effect.count.unwrap_or(1);
-        let max = effect.max.unwrap_or(false);
+        let _max = effect.max.unwrap_or(false);
         let target = effect.target.as_deref().unwrap_or("self");
         let source = effect.source.as_deref().unwrap_or("deck");
         let destination = effect.destination.as_deref().unwrap_or("hand");
@@ -1472,7 +1558,7 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let count = effect.count.unwrap_or(1);
-        let max = effect.max.unwrap_or(false);
+        let _max = effect.max.unwrap_or(false);
         let source = effect.source.as_deref().unwrap_or("");
         let destination = effect.destination.as_deref().unwrap_or("");
         let card_type_filter = effect.card_type.as_deref();
@@ -1480,7 +1566,7 @@ impl<'a> AbilityResolver<'a> {
         let optional = effect.optional.unwrap_or(false);
         let group_filter = effect.group.as_ref().and_then(|g| Some(&g.name));
         let cost_limit = effect.cost_limit;
-        let placement_order = effect.placement_order.as_deref();
+        let _placement_order = effect.placement_order.as_deref();
 
         let player = match target {
             "self" => &mut self.game_state.player1,
@@ -1849,7 +1935,6 @@ impl<'a> AbilityResolver<'a> {
                                     // Move to same area - track original position (right side)
                                     // For stage to stage, this is a no-op, card stays in place
                                     eprintln!("same_area: keeping card in right position");
-                                    moved += 1;
                                 }
                                 _ => {
                                     player.hand.add_card(right_card_id);
@@ -2563,13 +2648,13 @@ impl<'a> AbilityResolver<'a> {
     fn execute_change_state(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let state_change = effect.state_change.as_deref().unwrap_or("");
         let count = effect.count.unwrap_or(1);
-        let max = effect.max.unwrap_or(false);
+        let _max = effect.max.unwrap_or(false);
         let target = effect.target.as_deref().unwrap_or("self");
         let card_type_filter = effect.card_type.as_deref();
         let group_filter = effect.group.as_ref().and_then(|g| Some(&g.name));
         let cost_limit = effect.cost_limit;
         let optional = effect.optional.unwrap_or(false);
-        let destination = effect.destination.as_deref();
+        let _destination = effect.destination.as_deref();
         let source = effect.source.as_deref().unwrap_or("");
 
         // Handle optional costs - only for AUTO abilities, not ACTIVATION abilities
@@ -3809,7 +3894,7 @@ impl<'a> AbilityResolver<'a> {
         let target = effect.target.as_deref().unwrap_or("self");
         let card_type = effect.card_type.as_deref();
 
-        let player = match target {
+        let _player = match target {
             "self" => &mut self.game_state.player1,
             "opponent" => &mut self.game_state.player2,
             _ => &mut self.game_state.player1,

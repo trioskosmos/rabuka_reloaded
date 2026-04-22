@@ -48,7 +48,7 @@ impl CardLoader {
     fn attach_abilities(mut cards: Vec<Card>, abilities_data: &serde_json::Value) -> Vec<Card> {
         // Map card numbers to their abilities
         let mut ability_map: HashMap<String, Vec<Ability>> = HashMap::new();
-        let mut total_abilities_mapped = 0;
+        let mut _total_abilities_mapped = 0;
 
         if let Some(unique_abilities) = abilities_data.get("unique_abilities").and_then(|v| v.as_array()) {
             // println!("Loading {} unique abilities from abilities.json", unique_abilities.len());
@@ -178,7 +178,7 @@ impl CardLoader {
                                 // Extract just the card number part before the space
                                 if let Some(card_no) = card_str.split(" | ").next() {
                                     ability_map.entry(card_no.to_string()).or_insert_with(Vec::new).push(ability.clone());
-                                    total_abilities_mapped += 1;
+                                    _total_abilities_mapped += 1;
                                 }
                             }
                         }
@@ -195,11 +195,10 @@ impl CardLoader {
         }
 
         // Attach abilities to cards
-        let mut cards_with_abilities = 0;
+        let _cards_with_abilities = 0;
         for card in &mut cards {
             if let Some(card_abilities) = ability_map.get(&card.card_no) {
                 card.abilities = card_abilities.clone();
-                cards_with_abilities += 1;
             }
         }
         // println!("Attached abilities to {} cards", cards_with_abilities);

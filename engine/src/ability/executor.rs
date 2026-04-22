@@ -589,7 +589,7 @@ impl AbilityExecutor {
         Ok(())
     }
 
-    fn move_from_stage_to_discard(&self, player: &mut Player, is_self_cost: bool, exclude_self: bool, game_state: &GameState) -> Result<(), String> {
+    fn move_from_stage_to_discard(&mut self, player: &mut Player, is_self_cost: bool, exclude_self: bool, game_state: &GameState) -> Result<(), String> {
         // This is a cost - move member(s) from stage to discard
         if is_self_cost {
             // Self-cost: the card itself is the cost
@@ -627,9 +627,6 @@ impl AbilityExecutor {
             }
         } else {
             // Non-self-cost: need user selection (or use exclude_self to filter)
-            // For now, simplified: if exclude_self, exclude activating card, otherwise prompt for selection
-            // TODO: Implement proper pending choice mechanism for user selection
-            
             let activating_card_id = game_state.activating_card;
             let mut cards_to_discard = Vec::new();
             
@@ -649,8 +646,24 @@ impl AbilityExecutor {
                 return Err("No cards on stage to discard (after exclude_self filter)".to_string());
             }
             
-            // For now, discard all non-excluded cards (simplified)
-            // TODO: Add pending choice for user to select which cards
+            // If multiple cards available, require user selection
+            if cards_to_discard.len() > 1 {
+                // Create pending choice for user to select which card to discard
+                let description = format!("Select 1 card from stage to discard ({} valid options)", cards_to_discard.len());
+                
+                self.pending_choice = Some(Choice::SelectCard {
+                    zone: "stage".to_string(),
+                    card_type: Some("member_card".to_string()),
+                    count: 1,
+                    description,
+                });
+                
+                // Store the valid card indices for later selection
+                // Note: This requires the caller to handle the pending choice
+                return Err("Pending choice required: select card to discard from stage".to_string());
+            }
+            
+            // Only one card available, discard it
             for (i, card_id) in cards_to_discard {
                 player.stage.stage[i] = -1;
                 player.waitroom.add_card(card_id);
@@ -660,9 +673,23 @@ impl AbilityExecutor {
         Ok(())
     }
 
-    fn move_from_hand_to_discard(&self, player: &mut Player, count: usize) -> Result<(), String> {
-        // This requires user choice - for now, discard first count cards
-        // TODO: Implement proper pending choice mechanism for user selection
+    fn move_from_hand_to_discard(&mut self, player: &mut Player, count: usize) -> Result<(), String> {
+        // This requires user choice - if multiple cards available, prompt for selection
+        if player.hand.cards.len() > count {
+            // Create pending choice for user to select which cards to discard
+            let description = format!("Select {} card(s) from hand to discard ({} available)", count, player.hand.cards.len());
+            
+            self.pending_choice = Some(Choice::SelectCard {
+                zone: "hand".to_string(),
+                card_type: None,
+                count,
+                description,
+            });
+            
+            return Err("Pending choice required: select cards to discard from hand".to_string());
+        }
+        
+        // If count equals or exceeds hand size, discard all cards
         let cards_to_remove: Vec<_> = player.hand.cards.iter().take(count).copied().collect();
         for card_id in cards_to_remove {
             player.waitroom.add_card(card_id);
@@ -1002,10 +1029,14 @@ impl AbilityExecutor {
         game_state: &mut GameState,
         perspective_player_id: &str,
     ) -> Result<(), String> {
-        let _heart_type = effect.heart_color.as_deref().unwrap_or("heart00");
+        let heart_type = effect.heart_color.as_deref().unwrap_or("heart00");
         let target = effect.target.as_deref().unwrap_or("self");
+        let count = effect.count.unwrap_or(1) as i32;
 
         let target_players = game_state.resolve_target_mut(target, perspective_player_id);
+
+        // Collect card_ids to modify, then apply modifiers after releasing the borrow
+        let mut card_ids_to_modify: Vec<i16> = Vec::new();
 
         for target_player in target_players {
             if target_player.id != player.id {
@@ -1017,12 +1048,16 @@ impl AbilityExecutor {
             for index in areas {
                 let card_id = target_player.stage.stage[index];
                 if card_id != -1 {
-                    // TODO: Track heart modifiers per card_id in GameState/PlayerState
-                    // For now, this is a no-op - need to implement modifier system
-                    let _count = effect.count.unwrap_or(1);
-                    // game_state.add_heart_modifier(card_in_zone.card_id, heart_type, count, area);
+                    card_ids_to_modify.push(card_id);
                 }
             }
+        }
+
+        // Apply heart modifiers after releasing the mutable borrow
+        let color = crate::zones::parse_heart_color(heart_type);
+        for card_id in card_ids_to_modify {
+            game_state.add_heart_modifier(card_id, color, count);
+            eprintln!("Added heart modifier: card_id={}, color={:?}, count={}", card_id, color, count);
         }
 
         Ok(())

@@ -827,7 +827,7 @@ impl GameState {
         self.draw_state
     }
 
-    pub fn check_success_zone_draw_condition(&self, player_id: &str) -> bool {
+    pub fn check_success_zone_draw_condition(&self, _player_id: &str) -> bool {
         // Q54: Draw condition when 3+ success cards (2+ in half deck)
         // This is a simplified check - actual implementation would depend on deck type
         // Note: Player doesn't have a success_zone field, so this is a placeholder
@@ -1121,7 +1121,7 @@ impl GameState {
                     }
                     // Check if there's a pending choice after execution
                     eprintln!("After resolve_ability, pending_choice: {:?}", resolver.get_pending_choice());
-                    if let Some(choice) = resolver.get_pending_choice() {
+                    if let Some(_choice) = resolver.get_pending_choice() {
                         // Store pending ability state with the choice
                         if let Some(ref effect) = ability.effect {
                             self.pending_ability = Some(PendingAbilityExecution {

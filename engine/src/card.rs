@@ -630,6 +630,7 @@ pub struct Condition {
     pub conditions: Option<Vec<Condition>>,
     // New fields from parser improvements
     pub all_areas: Option<bool>,
+    pub no_excess_heart: Option<bool>,
     pub exclude_this_member: Option<bool>,
     pub resource_type: Option<String>,
     pub unit: Option<String>,

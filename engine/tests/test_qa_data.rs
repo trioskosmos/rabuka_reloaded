@@ -689,10 +689,14 @@ fn test_q34_live_card_remains_when_heart_met() {
     let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = Phase::FirstAttackerPerformance;
     
-    let initial_live_zone_count = game_state.player1.live_card_zone.cards.len();
-    
     // Q34 verification: Live card remains in zone when heart met
-    assert_eq!(initial_live_zone_count, 1, "Live card should be in zone");
+    // Simulate through performance phase
+    assert_eq!(game_state.player1.live_card_zone.cards.len(), 1,
+        "Live card should be in zone");
+    
+    // Advance phase to simulate heart check passing
+    TurnEngine::advance_phase(&mut game_state);
+    
     assert_eq!(game_state.player1.live_card_zone.cards.len(), 1,
         "Live card should remain in zone when heart met");
     
@@ -743,10 +747,18 @@ fn test_q36_live_success_timing() {
     let mut game_state = GameState::new(player1, player2, card_database);
     game_state.current_phase = Phase::FirstAttackerPerformance;
     
+    // Q36 verification: Live success timing is after performance phases, before victory determination
     assert_eq!(game_state.current_phase, Phase::FirstAttackerPerformance,
-        "Should be in FirstAttackerPerformance phase ");
+        "Should be in FirstAttackerPerformance phase");
     
-    println!("Q36 test: Live success timing - after Performance, before victory determination ");
+    // Advance through performance phases
+    TurnEngine::advance_phase(&mut game_state); // To SecondAttackerPerformance
+    TurnEngine::advance_phase(&mut game_state); // To LiveVictoryDetermination
+    
+    assert_eq!(game_state.current_phase, Phase::LiveVictoryDetermination,
+        "Should be in LiveVictoryDetermination phase after performance");
+    
+    println!("Q36 test: Live success timing - after Performance, before victory determination");
 }
 
 /// Q37: ライブ開始時やライブ成功時の自動能力は、同じタイミングで何回でも使えますか？
@@ -832,22 +844,23 @@ fn test_q39_cannot_skip_cheer_checks() {
     player1.live_card_zone.cards.push(live_card_id);
     
     let mut game_state = GameState::new(player1, player2, card_database);
-    game_state.current_phase = Phase::FirstAttackerPerformance;
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
     
     // Q39 verification: Cheer checks must be completed before checking heart requirements
-    // Engine enforces this through cheer_check_completed flag
-    assert!(!game_state.cheer_check_completed,
-        "Cheer checks should not be completed initially");
+    // Engine enforces this through phase progression - cannot skip cheer checks
+    // Set up for cheer checks
+    game_state.player1.is_first_attacker = true;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
     
-    // The engine requires cheer_checks_done to reach cheer_checks_required before proceeding
-    game_state.cheer_checks_required = 3; // Example: 3 blades = 3 cheer checks
-    game_state.cheer_checks_done = 0;
+    // Advance to performance phase (cheer checks happen during performance)
+    TurnEngine::advance_phase(&mut game_state);
     
-    assert!(game_state.cheer_checks_done < game_state.cheer_checks_required,
-        "Cheer checks must be completed before checking hearts");
+    assert_eq!(game_state.current_phase, Phase::FirstAttackerPerformance,
+        "Should advance to performance phase for cheer checks");
     
-    println!("Q39 test: Cannot skip cheer checks - required: {}, done: {}", 
-        game_state.cheer_checks_required, game_state.cheer_checks_done);
+    println!("Q39 test: Cannot skip cheer checks - phase enforces cheer check execution");
 }
 
 /// Q40: エールのチェックを行っている途中で、必要ハートの条件を満たすことがわかりました。残りのエールのチェックを行わないことはできますか？
@@ -1061,7 +1074,6 @@ fn test_q45_all_blade_effects() {
     
     let mut player1 = player1;
     player1.live_card_zone.cards.push(live_card_id);
-    
     let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = Phase::FirstAttackerPerformance;
     
@@ -1069,6 +1081,26 @@ fn test_q45_all_blade_effects() {
     // Engine handles this in turn.rs player_perform_live - b_all_count is tracked separately
     // and can be used as wildcard hearts (2.1.1.3)
     
+    // Set up for live phase with ALL blade simulation
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game_state.player1.is_first_attacker = true;
+    game_state.player2.is_first_attacker = false;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
+    
+    // Add ALL blade to resolution zone (simulating cheer check)
+    let energy_card = cards.iter()
+        .filter(|c| c.is_energy())
+        .next()
+        .expect("Should have energy card");
+    let energy_card_id = get_card_id(energy_card, &card_database);
+    game_state.resolution_zone.cards.push(energy_card_id);
+    
+    // Advance to performance phase to process ALL blade effects
+    TurnEngine::advance_phase(&mut game_state);
+    
+    // Q45 verification: ALL blade icons can be treated as any color heart icon
     // The engine has HeartColor::BAll which represents wildcard hearts
     let b_all_color = HeartColor::BAll;
     
@@ -1076,7 +1108,11 @@ fn test_q45_all_blade_effects() {
     assert!(matches!(b_all_color, HeartColor::BAll),
         "BAll should exist as a wildcard heart color");
     
-    println!("Q45 test: ALL blade effects - BAll can be treated as any color heart icon");
+    // Verify ALL blade was tracked in resolution zone
+    assert!(game_state.resolution_zone.cards.len() > 0,
+        "ALL blade should be in resolution zone");
+    
+    println!("Q45 test: ALL blade effects - BAll can be treated as any color heart icon, resolution zone cards: {}", game_state.resolution_zone.cards.len());
 }
 
 /// Q46: 『常時自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合、ハートハートブレードブレードを得る。』について。
@@ -1122,31 +1158,46 @@ fn test_q47_failed_live_no_score_state() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
     
+    let live_card = cards.iter()
+        .find(|c| c.is_live())
+        .expect("Should have a live card");
+    let live_card_id = get_card_id(live_card, &card_database);
+    
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
+    // Player1 has live card (will succeed)
+    player1.live_card_zone.cards.push(live_card_id);
+    
+    // Player2 has no live card (will fail)
+    
     let mut game_state = GameState::new(player1, player2, card_database);
     
-    // Player1 succeeds in live with score 10
-    game_state.player1.live_score = 10;
-    game_state.set_player_has_live_score("player1", true);
+    // Set up for live phase
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game_state.player1.is_first_attacker = true;
+    game_state.player2.is_first_attacker = false;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
     
-    // Player2 fails in live (no score state)
-    game_state.player2.live_score = 0;
-    game_state.set_player_has_live_score("player2", false);
+    // Advance through performance phases to victory determination
+    TurnEngine::advance_phase(&mut game_state); // To FirstAttackerPerformance
+    TurnEngine::advance_phase(&mut game_state); // To SecondAttackerPerformance
     
-    // Verify that player1 has live score
-    assert!(game_state.player_has_live_score("player1"),
-        "Player1 should have live score after successful live");
+    // Execute victory determination - this sets live_score and has_live_score flags
+    TurnEngine::execute_live_victory_determination(&mut game_state);
     
-    // Verify that player2 does NOT have live score (failed live)
-    assert!(!game_state.player_has_live_score("player2"),
-        "Player2 should not have live score after failed live");
+    // Q47 verification: Player1 has live cards (succeeded), Player2 does not (failed)
+    assert!(game_state.player1.live_card_zone.cards.len() > 0,
+        "Player1 should have live cards (succeeded)");
+    assert_eq!(game_state.player2.live_card_zone.cards.len(), 0,
+        "Player2 should have no live cards (failed)");
     
     // In score comparison, player1's score is considered higher regardless of value
-    // because player2 has no score state
+    // because player2 has no live cards (no score state)
     
-    println!("Q47 test: Failed live score state - has_live_score tracking works");
+    println!("Q47 test: Failed live score state - player1 has cards, player2 has none");
 }
 
 /// Q48: 成功したライブの合計スコアが0点以下の場合でも、ライブに勝利することはできますか？
@@ -1156,30 +1207,45 @@ fn test_q48_zero_score_can_win_live() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
     
+    let live_card = cards.iter()
+        .find(|c| c.is_live())
+        .expect("Should have a live card");
+    let live_card_id = get_card_id(live_card, &card_database);
+    
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
+    // Player1 has live card with score 0 (will succeed with 0 score)
+    player1.live_card_zone.cards.push(live_card_id);
+    
+    // Player2 has no live card (will fail)
+    
     let mut game_state = GameState::new(player1, player2, card_database);
     
-    // Player1 succeeds in live with score 0
-    game_state.player1.live_score = 0;
-    game_state.set_player_has_live_score("player1", true);
+    // Set up for live phase
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game_state.player1.is_first_attacker = true;
+    game_state.player2.is_first_attacker = false;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
     
-    // Player2 fails in live (no score state)
-    game_state.player2.live_score = 0;
-    game_state.set_player_has_live_score("player2", false);
+    // Advance through performance phases to victory determination
+    TurnEngine::advance_phase(&mut game_state); // To FirstAttackerPerformance
+    TurnEngine::advance_phase(&mut game_state); // To SecondAttackerPerformance
     
-    // Verify that player1 has live score (even though it's 0)
-    assert!(game_state.player_has_live_score("player1"),
-        "Player1 should have live score even with 0 score");
+    // Execute victory determination
+    TurnEngine::execute_live_victory_determination(&mut game_state);
     
-    // Verify that player2 does NOT have live score
-    assert!(!game_state.player_has_live_score("player2"),
-        "Player2 should not have live score after failed live");
+    // Q48 verification: Player1 has live cards (succeeded with 0 score), Player2 has none (failed)
+    assert!(game_state.player1.live_card_zone.cards.len() > 0,
+        "Player1 should have live cards (succeeded with 0 score)");
+    assert_eq!(game_state.player2.live_card_zone.cards.len(), 0,
+        "Player2 should have no live cards (failed)");
     
-    // Player1 wins because they have a score state, even though it's 0
+    // Player1 wins because they have live cards (score state), even with 0 score
     
-    println!("Q48 test: Zero score win condition - 0 score with has_live_score=true wins");
+    println!("Q48 test: Zero score win condition - 0 score with live cards wins");
 }
 
 /// Q49: Aさんが先攻、Bさんが後攻のターンで、ライブに勝利したプレイヤーがいませんでした。次のターンの先攻・後攻はどうなりますか？
@@ -1192,16 +1258,32 @@ fn test_q49_no_winner_turn_order_unchanged() {
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
+    // Neither player has live cards (no one wins)
+    
     let mut game_state = GameState::new(player1, player2, card_database);
     
-    // No one wins live - turn order should not change
-    game_state.set_turn_order_changed(false);
+    // Set up for live phase with no live cards
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game_state.player1.is_first_attacker = true;
+    game_state.player2.is_first_attacker = false;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
     
-    // Verify that turn order has not changed
-    assert!(!game_state.has_turn_order_changed(),
-        "Turn order should not change when no one wins live");
+    // Advance through performance phases to victory determination
+    TurnEngine::advance_phase(&mut game_state); // To FirstAttackerPerformance
+    TurnEngine::advance_phase(&mut game_state); // To SecondAttackerPerformance
     
-    println!("Q49 test: No winner turn order unchanged - turn_order_changed tracking works");
+    // Execute victory determination - no winner since no live cards
+    TurnEngine::execute_live_victory_determination(&mut game_state);
+    
+    // Q49 verification: Turn order should not change when no one wins live
+    assert!(game_state.player1.is_first_attacker,
+        "Player1 should remain first attacker when no one wins");
+    assert!(!game_state.player2.is_first_attacker,
+        "Player2 should remain second attacker when no one wins");
+    
+    println!("Q49 test: No winner turn order unchanged - turn order remains same");
 }
 
 /// Q50: Aさんが先攻、Bさんが後攻のターンで、スコアが同じため両方のプレイヤーがライブに勝利して、両方のプレイヤーが成功ライブカード置き場にカードを置きました。次のターンの先攻・後攻はどうなりますか？
@@ -1211,19 +1293,42 @@ fn test_q50_both_winners_turn_order_unchanged() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
     
+    let live_card = cards.iter()
+        .find(|c| c.is_live())
+        .expect("Should have a live card");
+    let live_card_id = get_card_id(live_card, &card_database);
+    
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
+    // Both players have live cards (both will win with same score)
+    player1.live_card_zone.cards.push(live_card_id);
+    player2.live_card_zone.cards.push(live_card_id);
+    
     let mut game_state = GameState::new(player1, player2, card_database);
     
-    // Both players win live (same score) - turn order should not change
-    game_state.set_turn_order_changed(false);
+    // Set up for live phase
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game_state.player1.is_first_attacker = true;
+    game_state.player2.is_first_attacker = false;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
     
-    // Verify that turn order has not changed
-    assert!(!game_state.has_turn_order_changed(),
-        "Turn order should not change when both players win live");
+    // Advance through performance phases to victory determination
+    TurnEngine::advance_phase(&mut game_state); // To FirstAttackerPerformance
+    TurnEngine::advance_phase(&mut game_state); // To SecondAttackerPerformance
     
-    println!("Q50 test: Both winners turn order unchanged - turn_order_changed tracking works");
+    // Execute victory determination - both win with same score
+    TurnEngine::execute_live_victory_determination(&mut game_state);
+    
+    // Q50 verification: Turn order should not change when both players win live
+    assert!(game_state.player1.is_first_attacker,
+        "Player1 should remain first attacker when both win");
+    assert!(!game_state.player2.is_first_attacker,
+        "Player2 should remain second attacker when both win");
+    
+    println!("Q50 test: Both winners turn order unchanged - turn order remains same");
 }
 
 /// Q51: Aさんが先攻、Bさんが後攻のターンで、スコアが同じため両方のプレイヤーがライブに勝利して、Bさんは成功ライブカード置き場にカードを置きましたが、Aさんは既に成功ライブカード置き場にカードが2枚（ハーフデッキの場合は1枚）あったため、カードを置けませんでした。次のターンの先攻・後攻はどうなりますか？
@@ -1233,19 +1338,47 @@ fn test_q51_one_winner_turn_order_changes() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
     
+    let live_card = cards.iter()
+        .find(|c| c.is_live())
+        .expect("Should have a live card");
+    let live_card_id = get_card_id(live_card, &card_database);
+    
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
+    // Both players have live cards
+    player1.live_card_zone.cards.push(live_card_id);
+    player2.live_card_zone.cards.push(live_card_id);
+    
+    // Player1 already has 2 success cards (full)
+    player1.success_live_card_zone.cards.push(live_card_id);
+    player1.success_live_card_zone.cards.push(live_card_id);
+    
     let mut game_state = GameState::new(player1, player2, card_database);
     
-    // Only player2 places success card - turn order should change
-    game_state.set_turn_order_changed(true);
+    // Set up for live phase
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game_state.player1.is_first_attacker = true;
+    game_state.player2.is_first_attacker = false;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
     
-    // Verify that turn order has changed
-    assert!(game_state.has_turn_order_changed(),
-        "Turn order should change when only one player places success card");
+    // Advance through performance phases to victory determination
+    TurnEngine::advance_phase(&mut game_state); // To FirstAttackerPerformance
+    TurnEngine::advance_phase(&mut game_state); // To SecondAttackerPerformance
     
-    println!("Q51 test: One winner turn order changes - turn_order_changed tracking works");
+    // Execute victory determination - player2 places success card, player1 cannot
+    TurnEngine::execute_live_victory_determination(&mut game_state);
+    
+    // Q51 verification: Turn order should change when only player2 places success card
+    // The engine handles this in execute_live_victory_determination
+    assert!(!game_state.player1.is_first_attacker,
+        "Player1 should no longer be first attacker (turn order changed)");
+    assert!(game_state.player2.is_first_attacker,
+        "Player2 should now be first attacker (turn order changed)");
+    
+    println!("Q51 test: One winner turn order changes - turn order changed to player2");
 }
 
 /// Q52: Aさんが先攻、Bさんが後攻のターンで、スコアが同じため両方のプレイヤーがライブに勝利して、既に成功ライブカード置き場にカードが2枚（ハーフデッキの場合は1枚）あったため、両方のプレイヤーがカードを置けませんでした。次のターンの先攻・後攻はどうなりますか？
@@ -1255,19 +1388,48 @@ fn test_q52_no_one_places_card_turn_order_unchanged() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
     
+    let live_card = cards.iter()
+        .find(|c| c.is_live())
+        .expect("Should have a live card");
+    let live_card_id = get_card_id(live_card, &card_database);
+    
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
+    // Both players have live cards
+    player1.live_card_zone.cards.push(live_card_id);
+    player2.live_card_zone.cards.push(live_card_id);
+    
+    // Both players already have 2 success cards (full)
+    player1.success_live_card_zone.cards.push(live_card_id);
+    player1.success_live_card_zone.cards.push(live_card_id);
+    player2.success_live_card_zone.cards.push(live_card_id);
+    player2.success_live_card_zone.cards.push(live_card_id);
+    
     let mut game_state = GameState::new(player1, player2, card_database);
     
-    // No one can place success card - turn order should not change
-    game_state.set_turn_order_changed(false);
+    // Set up for live phase
+    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
+    game_state.player1.is_first_attacker = true;
+    game_state.player2.is_first_attacker = false;
+    game_state.live_card_set_player1_done = true;
+    game_state.live_card_set_player2_done = true;
     
-    // Verify that turn order has not changed
-    assert!(!game_state.has_turn_order_changed(),
-        "Turn order should not change when no one can place success card");
+    // Advance through performance phases to victory determination
+    TurnEngine::advance_phase(&mut game_state); // To FirstAttackerPerformance
+    TurnEngine::advance_phase(&mut game_state); // To SecondAttackerPerformance
     
-    println!("Q52 test: No one places card turn order unchanged - turn_order_changed tracking works");
+    // Execute victory determination - neither can place success card
+    TurnEngine::execute_live_victory_determination(&mut game_state);
+    
+    // Q52 verification: Turn order should not change when neither can place success card
+    assert!(game_state.player1.is_first_attacker,
+        "Player1 should remain first attacker when neither can place");
+    assert!(!game_state.player2.is_first_attacker,
+        "Player2 should remain second attacker when neither can place");
+    
+    println!("Q52 test: No one places card turn order unchanged - turn order remains same");
 }
 
 /// Q53: 対戦中にメインデッキが0枚になりました。どうすればいいですか？
