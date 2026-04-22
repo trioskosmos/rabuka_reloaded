@@ -246,13 +246,25 @@ pub fn run_test_mode() {
                     turn::TurnEngine::advance_phase(&mut game_state);
                 }
                 crate::game_state::Phase::RockPaperScissors => {
-                    eprintln!("Executing RPS choice...");
+                    eprintln!("Playing RPS...");
                     let _ = turn::TurnEngine::execute_main_phase_action(
                         &mut game_state,
-                        &crate::game_setup::ActionType::RpsChoice,
+                        &crate::game_setup::ActionType::RockChoice,
                         None,
                         None,
-                        Some(crate::zones::MemberArea::LeftSide),
+                        None,
+                        None,
+                    );
+                }
+                crate::game_state::Phase::ChooseFirstAttacker => {
+                    eprintln!("RPS winner choosing turn order...");
+                    // Q16: RPS winner chooses to go first (simplified for test mode)
+                    let _ = turn::TurnEngine::execute_main_phase_action(
+                        &mut game_state,
+                        &crate::game_setup::ActionType::ChooseFirstAttacker,
+                        None,
+                        None,
+                        None,
                         None,
                     );
                 }

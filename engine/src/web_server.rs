@@ -92,6 +92,11 @@ pub struct ExecuteActionRequest {
     pub use_baton_touch: Option<bool>,
 }
 
+#[derive(Deserialize)]
+pub struct InitGameRequest {
+    pub deck: Option<String>,
+}
+
 pub struct AppState {
     pub game_state: Arc<Mutex<GameState>>,
 }
@@ -162,6 +167,22 @@ async fn get_actions(data: web::Data<AppState>) -> impl Responder {
             crate::game_state::Phase::Active |
             crate::game_state::Phase::Energy |
             crate::game_state::Phase::Draw => {
+                crate::turn::TurnEngine::advance_phase(&mut game_state);
+            }
+            // LiveCardSet - auto-advance if both players are done
+            crate::game_state::Phase::LiveCardSet => {
+                if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
+                    // Both players finished, directly advance since advance_phase returns early for LiveCardSet
+                    crate::turn::TurnEngine::check_timing(&mut game_state);
+                    game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
+                } else {
+                    break;
+                }
+            }
+            // Live phase automatic phases - auto-advance to prevent softlock
+            crate::game_state::Phase::FirstAttackerPerformance |
+            crate::game_state::Phase::SecondAttackerPerformance |
+            crate::game_state::Phase::LiveVictoryDetermination => {
                 crate::turn::TurnEngine::advance_phase(&mut game_state);
             }
             _ => break,
@@ -255,6 +276,7 @@ async fn execute_action(
                     crate::game_state::Phase::Draw => {
                         crate::turn::TurnEngine::advance_phase(&mut game_state);
                     }
+                    // LiveCardSet is manual - only advance when both players explicitly finish
                     _ => break,
                 }
             }
@@ -268,7 +290,7 @@ async fn execute_action(
     }
 }
 
-async fn init_game(data: web::Data<AppState>) -> impl Responder {
+async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -> impl Responder {
     // Load cards from cards.json
     let cards_path = PathBuf::from("../cards/cards.json");
     let cards = match card_loader::CardLoader::load_cards_from_file(&cards_path) {
@@ -294,9 +316,34 @@ async fn init_game(data: web::Data<AppState>) -> impl Responder {
         }
     };
 
-    // Use first deck for both players (can be enhanced later to allow deck selection)
-    let deck1 = &deck_lists[0];
-    let deck2 = &deck_lists[0];
+    // Map frontend deck names to deck file names
+    let deck_name_mapping = std::collections::HashMap::from([
+        ("Aqours Cup", "aqours_cup"),
+        ("Muse Cup", "muse_cup"),
+        ("Nijigaku Cup", "nijigaku_cup"),
+        ("Liella Cup", "liella_cup"),
+        ("Hasunosora Cup", "hasunosora_cup"),
+        ("Fade Deck", "fade deck"),
+    ]);
+
+    // Select deck based on request, default to first deck if not specified or not found
+    let selected_deck_name = req.deck.as_deref();
+    let deck_index = if let Some(name) = selected_deck_name {
+        if let Some(file_name) = deck_name_mapping.get(name) {
+            deck_lists.iter().position(|d| d.name == *file_name)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let deck1 = if let Some(idx) = deck_index {
+        &deck_lists[idx]
+    } else {
+        &deck_lists[0]
+    };
+    let deck2 = deck1; // Use same deck for both players
 
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);

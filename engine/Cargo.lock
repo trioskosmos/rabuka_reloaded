@@ -1292,6 +1292,8 @@ dependencies = [
  "actix-web",
  "criterion",
  "rand 0.8.6",
+ "rand_chacha",
+ "rayon",
  "serde",
  "serde_json",
  "smallvec",

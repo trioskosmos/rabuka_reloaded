@@ -1378,6 +1378,26 @@ def parse_action(text: str) -> Dict[str, Any]:
     elif 'バトンタッチで控え室に置けない' in text:
         action['action'] = 'restriction'
         action['restriction_type'] = 'cannot_baton_touch'
+    # Check for general "できない" (cannot) restriction patterns
+    # Must check BEFORE destination-based move_cards to avoid false positives
+    elif '置くことができない' in text:
+        action['action'] = 'restriction'
+        action['restriction_type'] = 'cannot_place'
+        # Extract destination if present for context
+        if 'destination' in action:
+            action['restricted_destination'] = action['destination']
+    elif '置けない' in text:
+        action['action'] = 'restriction'
+        action['restriction_type'] = 'cannot_place'
+        # Extract destination if present for context
+        if 'destination' in action:
+            action['restricted_destination'] = action['destination']
+    elif '登場できない' in text:
+        action['action'] = 'restriction'
+        action['restriction_type'] = 'cannot_appear'
+    elif '移動できない' in text:
+        action['action'] = 'restriction'
+        action['restriction_type'] = 'cannot_move'
     elif 'source' in action and 'destination' in action and action['source'] and action['destination']:
         action['action'] = 'move_cards'
     # Check for "加える" (add to) pattern - common for adding cards to hand

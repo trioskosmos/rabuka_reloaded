@@ -118,38 +118,60 @@ impl TurnEngine {
                 // MulliganHeader is a display-only action, no execution needed
                 Ok(())
             }
-            crate::game_setup::ActionType::RpsChoice => {
-                // Rule 6.2.2: Rock Paper Scissors to determine who chooses to go first
-                // For simplicity, player 1 always chooses, and we randomly determine player 2's choice
-                use rand::Rng;
-                let mut rng = rand::thread_rng();
+            crate::game_setup::ActionType::RockChoice => {
+                Self::handle_rps_choice(game_state, 0)
+            }
+            crate::game_setup::ActionType::PaperChoice => {
+                Self::handle_rps_choice(game_state, 1)
+            }
+            crate::game_setup::ActionType::ScissorsChoice => {
+                Self::handle_rps_choice(game_state, 2)
+            }
+            crate::game_setup::ActionType::ChooseFirstAttacker => {
+                // Q16: RPS winner chooses to be first attacker
+                let rps_winner = game_state.rps_winner.unwrap_or(1);
                 
-                let p1_choice = match stage_area {
-                    Some(crate::zones::MemberArea::LeftSide) => 0,
-                    Some(crate::zones::MemberArea::Center) => 1,
-                    Some(crate::zones::MemberArea::RightSide) => 2,
-                    _ => 0,
-                };
-                
-                let p2_choice = rng.gen_range(0..3);
-                
-                // Determine winner
-                let rps_winner = match (p1_choice, p2_choice) {
-                    (0, 2) | (1, 0) | (2, 1) => 1, // Player 1 wins
-                    (2, 0) | (0, 1) | (1, 2) => 2, // Player 2 wins
-                    _ => {
-                        // Tie - play again (simplified: player 1 wins on tie)
-                        1
-                    }
-                };
-                
-                // Set first attacker
+                // Set first attacker based on RPS winner's choice
                 if rps_winner == 1 {
+                    // Player 1 won RPS and chose to go first
                     game_state.player1.is_first_attacker = true;
                     game_state.player2.is_first_attacker = false;
                 } else {
+                    // Player 2 won RPS and chose to go first
                     game_state.player1.is_first_attacker = false;
                     game_state.player2.is_first_attacker = true;
+                }
+                
+                // Rule 6.2.5: Initial draw - Each player draws 6 cards from main deck to hand
+                for _ in 0..6 {
+                    game_state.player1.draw_card();
+                    game_state.player2.draw_card();
+                }
+                
+                // Advance to Mulligan phase
+                game_state.current_phase = crate::game_state::Phase::Mulligan;
+                // Initialize mulligan state - first attacker goes first
+                game_state.current_mulligan_player = if game_state.player1.is_first_attacker {
+                    "player1".to_string()
+                } else {
+                    "player2".to_string()
+                };
+                game_state.mulligan_selected_indices.clear();
+                Ok(())
+            }
+            crate::game_setup::ActionType::ChooseSecondAttacker => {
+                // Q16: RPS winner chooses to be second attacker
+                let rps_winner = game_state.rps_winner.unwrap_or(1);
+                
+                // Set first attacker as the OPPOSITE of RPS winner
+                if rps_winner == 1 {
+                    // Player 1 won RPS but chose to go second
+                    game_state.player1.is_first_attacker = false;
+                    game_state.player2.is_first_attacker = true;
+                } else {
+                    // Player 2 won RPS but chose to go second
+                    game_state.player1.is_first_attacker = true;
+                    game_state.player2.is_first_attacker = false;
                 }
                 
                 // Rule 6.2.5: Initial draw - Each player draws 6 cards from main deck to hand
@@ -248,12 +270,13 @@ impl TurnEngine {
                     Self::setup_initial_energy(game_state);
                     game_state.current_phase = crate::game_state::Phase::Active;
                 } else {
-                    // Switch to other player
+                    // Switch to other player and clear their selections
                     game_state.current_mulligan_player = if game_state.current_mulligan_player == "player1" {
                         "player2".to_string()
                     } else {
                         "player1".to_string()
                     };
+                    game_state.mulligan_selected_indices.clear();
                 }
                 Ok(())
             }
@@ -491,6 +514,15 @@ impl TurnEngine {
                         Self::check_timing(game_state);
                         // Directly advance to FirstAttackerPerformance since advance_phase returns early for LiveCardSet
                         game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
+                        // Trigger live start abilities for first attacker
+                        let first_attacker_id = if game_state.player1.is_first_attacker {
+                            game_state.player1.id.clone()
+                        } else {
+                            game_state.player2.id.clone()
+                        };
+                        Self::trigger_live_start_abilities(game_state, &first_attacker_id);
+                        // Trigger performance phase start abilities for first attacker
+                        Self::trigger_performance_phase_start_abilities(game_state, &first_attacker_id);
                     }
                     // If only one player finished, the other will get their turn on next action generation
                 } else {
@@ -502,6 +534,49 @@ impl TurnEngine {
             crate::game_setup::ActionType::Pass => {
                 // Player passes, advance phase
                 Self::advance_phase(game_state);
+                Ok(())
+            }
+            crate::game_setup::ActionType::UseAbility => {
+                // Manual activation of kidou (起動) abilities
+                // card_id specifies which card to activate ability from
+                if let Some(card_id) = card_id {
+                    let card_db = game_state.card_database.clone();
+                    let player = game_state.active_player_mut();
+                    
+                    // Find the card on stage
+                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                    let mut found_card = None;
+                    for area in areas {
+                        if let Some(stage_card_id) = player.stage.get_area(area) {
+                            if stage_card_id == card_id {
+                                found_card = Some((area, stage_card_id));
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if let Some((_area, stage_card_id)) = found_card {
+                        if let Some(card) = card_db.get_card(stage_card_id) {
+                            // Find kidou (起動) abilities on this card
+                            let player_id = player.id.clone();
+                            for ability in &card.abilities {
+                                if ability.triggers.as_ref().map_or(false, |t| t == "起動") {
+                                    let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                                    game_state.trigger_auto_ability(
+                                        ability_id,
+                                        crate::game_state::AbilityTrigger::Activation,
+                                        player_id.clone(),
+                                        Some(card.card_no.clone()),
+                                    );
+                                }
+                            }
+                        }
+                    } else {
+                        return Err("Card not found on stage".to_string());
+                    }
+                } else {
+                    return Err("No card specified for ability activation".to_string());
+                }
                 Ok(())
             }
             _ => Err(format!("Unknown action: {}", action))
@@ -518,6 +593,33 @@ impl TurnEngine {
                 let _ = game_state.player2.energy_zone.add_card(card_id, &game_state.card_database);
             }
         }
+    }
+
+    fn handle_rps_choice(game_state: &mut GameState, p1_choice: i32) -> Result<(), String> {
+        // Q16 from qa_data.json: Game preparation first/second attacker is determined by RPS
+        // "じゃんけんで勝ったプレイヤーが先攻か後攻を決めます"
+        // Winner of RPS chooses whether to be first or second attacker
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        
+        let p2_choice = rng.gen_range(0..3);
+        
+        // Determine RPS winner: 0=Rock, 1=Paper, 2=Scissors
+        let rps_winner = match (p1_choice, p2_choice) {
+            (0, 2) | (1, 0) | (2, 1) => 1, // Player 1 wins
+            (2, 0) | (0, 1) | (1, 2) => 2, // Player 2 wins
+            _ => {
+                // Tie - play again (simplified: player 1 wins on tie)
+                1
+            }
+        };
+        
+        // Store RPS winner in game state for the next phase (choosing turn order)
+        game_state.rps_winner = Some(rps_winner);
+        
+        // Advance to ChooseFirstAttacker phase where winner decides turn order
+        game_state.current_phase = crate::game_state::Phase::ChooseFirstAttacker;
+        Ok(())
     }
 
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
@@ -567,6 +669,55 @@ impl TurnEngine {
         }
         
         // Rule 8.4.7: Move winning live card to success zone
+        // First, send cards with "cannot_place" restriction straight to discard
+        let card_db = game_state.card_database.clone();
+        Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);
+        Self::move_restricted_cards_to_discard(&mut game_state.player2, &card_db);
+        
+        Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
+    }
+
+    fn move_restricted_cards_to_discard(player: &mut crate::player::Player, card_db: &CardDatabase) {
+        // Check each card in live_card_zone for "cannot_place" restriction
+        let mut cards_to_remove = Vec::new();
+        
+        for (index, card_id) in player.live_card_zone.cards.iter().enumerate() {
+            // Check if this specific card has the restriction by looking at its abilities
+            if let Some(card) = card_db.get_card(*card_id) {
+                let has_restriction = card.abilities.iter().any(|ability| {
+                    if let Some(ref effect) = ability.effect {
+                        effect.action == "restriction" 
+                            && effect.restriction_type.as_deref() == Some("cannot_place")
+                            && effect.restricted_destination.as_deref() == Some("success_live_zone")
+                    } else {
+                        false
+                    }
+                });
+                
+                if has_restriction {
+                    cards_to_remove.push(index);
+                    eprintln!("Card {} ({}) has cannot_place restriction for success_live_zone - will send to discard", 
+                        card_id, card.card_no);
+                }
+            }
+        }
+        
+        // Remove restricted cards in reverse order to maintain indices
+        for index in cards_to_remove.into_iter().rev() {
+            let card = player.live_card_zone.cards.remove(index);
+            player.waitroom.cards.push(card);
+        }
+    }
+
+    fn move_live_to_success(player: &mut crate::player::Player, card_index: usize) {
+        // Move specified card from live card zone to success live card zone
+        if card_index < player.live_card_zone.cards.len() {
+            let card = player.live_card_zone.cards.remove(card_index);
+            player.success_live_card_zone.cards.push(card);
+        }
+    }
+
+    fn move_live_to_success_and_handle_wins(game_state: &mut GameState, player1_won: bool, player2_won: bool) {
         if player1_won && player2_won {
             // Both won - check if either has 2 cards
             if game_state.player1.live_card_zone.cards.len() == 2 {
@@ -630,24 +781,11 @@ impl TurnEngine {
             game_state.player1.is_first_attacker = false;
             game_state.player2.is_first_attacker = true;
         }
-        // If both won or no one won, keep current first attacker
         
-        // End turn
-        game_state.turn_number += 1;
-        game_state.reset_keyword_tracking();
-        // Clear locked areas at start of new turn
         game_state.player1.areas_locked_this_turn.clear();
         game_state.player2.areas_locked_this_turn.clear();
         game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         game_state.current_phase = Phase::Active;
-    }
-
-    fn move_live_to_success(player: &mut crate::player::Player, card_index: usize) {
-        // Move specified card from live card zone to success live card zone
-        if card_index < player.live_card_zone.cards.len() {
-            let card = player.live_card_zone.cards.remove(card_index);
-            player.success_live_card_zone.cards.push(card);
-        }
     }
 
     pub fn check_timing(game_state: &mut GameState) {

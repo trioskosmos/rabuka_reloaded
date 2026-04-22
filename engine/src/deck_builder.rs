@@ -26,10 +26,24 @@ impl Deck {
         self.main_deck = cards.into();
     }
 
+    pub fn shuffle_main_deck_with_rng<R: rand::Rng>(&mut self, rng: &mut R) {
+        use rand::seq::SliceRandom;
+        let mut cards: Vec<i16> = self.main_deck.drain(..).collect();
+        cards.shuffle(rng);
+        self.main_deck = cards.into();
+    }
+
     pub fn shuffle_energy_deck(&mut self) {
         use rand::seq::SliceRandom;
         let mut cards: Vec<i16> = self.energy_deck.drain(..).collect();
         cards.shuffle(&mut rand::thread_rng());
+        self.energy_deck = cards.into();
+    }
+
+    pub fn shuffle_energy_deck_with_rng<R: rand::Rng>(&mut self, rng: &mut R) {
+        use rand::seq::SliceRandom;
+        let mut cards: Vec<i16> = self.energy_deck.drain(..).collect();
+        cards.shuffle(rng);
         self.energy_deck = cards.into();
     }
 }

@@ -437,20 +437,33 @@ pub fn run_headless_game() {
         // Auto-advance automatic phases
         match game_state.current_phase {
             crate::game_state::Phase::RockPaperScissors => {
-                // RPS phase - let the AI choose
-                let ai = ai::AIPlayer::new("HeadlessAI".to_string());
+                // Q16: Play RPS to determine turn order
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
-                let chosen_index = ai.choose_action(&actions);
 
-                println!("RPS choice: {}", actions[chosen_index].description);
+                println!("Playing RPS...");
                 
                 let _ = turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
-                    &actions[chosen_index].action_type,
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
+                    &actions[0].action_type,
+                    actions[0].parameters.as_ref().and_then(|p| p.card_id),
+                    actions[0].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    None,
+                    actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
+                );
+            }
+            crate::game_state::Phase::ChooseFirstAttacker => {
+                // Q16: RPS winner chooses turn order (simplified: always choose first)
+                let actions = crate::game_setup::generate_possible_actions(&game_state);
+
+                println!("RPS winner choosing turn order...");
+                
+                let _ = turn::TurnEngine::execute_main_phase_action(
+                    &mut game_state,
+                    &actions[0].action_type,
+                    actions[0].parameters.as_ref().and_then(|p| p.card_id),
+                    actions[0].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[0].parameters.as_ref().and_then(|p| p.stage_area),
+                    actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
             crate::game_state::Phase::Mulligan => {

@@ -39,6 +39,24 @@ pub enum HeartColor {
     Score,  // Special heart type for score bonus
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum BladeColor {
+    #[serde(rename = "桃")]
+    Peach,
+    #[serde(rename = "赤")]
+    Red,
+    #[serde(rename = "黄")]
+    Yellow,
+    #[serde(rename = "緑")]
+    Green,
+    #[serde(rename = "青")]
+    Blue,
+    #[serde(rename = "紫")]
+    Purple,
+    #[serde(rename = "all")]
+    All,  // All blade types
+}
+
 // Rule 9.1: Ability Types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -475,6 +493,8 @@ pub struct AbilityEffect {
     pub repeat_limit: Option<u32>,
     pub repeat_optional: Option<bool>,
     pub is_further: Option<bool>,
+    pub restriction_type: Option<String>,
+    pub restricted_destination: Option<String>,
     pub cost_result_reference: Option<bool>,
     pub dynamic_count: Option<DynamicCount>,
     pub placement_order: Option<String>,

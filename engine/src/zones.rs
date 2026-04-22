@@ -235,6 +235,19 @@ pub fn parse_heart_color(s: &str) -> HeartColor {
     }
 }
 
+pub fn parse_blade_color(s: &str) -> crate::card::BladeColor {
+    match s {
+        "桃" => crate::card::BladeColor::Peach,
+        "赤" => crate::card::BladeColor::Red,
+        "黄" => crate::card::BladeColor::Yellow,
+        "緑" => crate::card::BladeColor::Green,
+        "青" => crate::card::BladeColor::Blue,
+        "紫" => crate::card::BladeColor::Purple,
+        "all" | "ALL" => crate::card::BladeColor::All,
+        _ => crate::card::BladeColor::All,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct LiveCardZone {
     // Rule 5.2: Live Card Zone - Where member and live cards are placed during Live Card Set Phase

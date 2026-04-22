@@ -7,55 +7,94 @@ class MenuScene extends Phaser.Scene {
         const w = this.scale.width;
         const h = this.scale.height;
 
-        // Title
-        this.add.text(w / 2, h * 0.2, 'Rabuka Card Game', {
-            fontSize: '52px',
+        // Calculate responsive sizes based on screen dimensions
+        const minDim = Math.min(w, h);
+        const titleSize = Math.max(32, Math.floor(minDim * 0.05));
+        const subtitleSize = Math.max(18, Math.floor(minDim * 0.028));
+        const labelSize = Math.max(14, Math.floor(minDim * 0.022));
+        const buttonSize = Math.max(16, Math.floor(minDim * 0.025));
+        const startButtonSize = Math.max(22, Math.floor(minDim * 0.035));
+        const buttonSpacing = Math.max(30, Math.floor(h * 0.04));
+        const buttonPaddingX = Math.max(20, Math.floor(w * 0.03));
+        const buttonPaddingY = Math.max(10, Math.floor(h * 0.015));
+
+        // Title with enhanced glow effect
+        this.add.text(w / 2, h * 0.18, 'Rabuka Card Game', {
+            fontSize: `${titleSize}px`,
             color: '#e94560',
             fontStyle: 'bold',
-            shadow: { blur: 15, color: '#e94560', fill: true }
+            shadow: { blur: 20, color: '#e94560', fill: true, offsetX: 0, offsetY: 0 }
         }).setOrigin(0.5);
 
-        this.add.text(w / 2, h * 0.3, 'Love Live! Rabuka', {
-            fontSize: '28px',
+        this.add.text(w / 2, h * 0.26, 'Love Live! Rabuka', {
+            fontSize: `${subtitleSize}px`,
             color: '#ffffff',
-            fontStyle: 'italic'
+            fontStyle: 'italic',
+            shadow: { blur: 8, color: '#ffffff', fill: true }
         }).setOrigin(0.5);
 
-        // Deck selection
-        this.add.text(w / 2, h * 0.45, 'Select Deck:', {
-            fontSize: '20px',
-            color: '#8888aa'
+        // Deck selection label
+        this.add.text(w / 2, h * 0.38, 'Select Deck:', {
+            fontSize: `${labelSize}px`,
+            color: '#a0aec0',
+            fontStyle: 'bold'
         }).setOrigin(0.5);
 
         const decks = ['Aqours Cup', 'Muse Cup', 'Nijigaku Cup', 'Liella Cup', 'Hasunosora Cup', 'Fade Deck'];
         this.selectedDeck = decks[0];
 
         decks.forEach((deck, i) => {
-            const btn = this.add.text(w / 2, h * 0.52 + i * 40, deck, {
-                fontSize: '20px',
+            const startY = h * 0.43;
+            const btn = this.add.text(w / 2, startY + i * buttonSpacing, deck, {
+                fontSize: `${buttonSize}px`,
                 color: '#ffffff',
-                backgroundColor: '#1a1a2e',
-                padding: { x: 25, y: 12 },
+                backgroundColor: '#1a202c',
+                padding: { x: buttonPaddingX, y: buttonPaddingY },
                 border: '2px solid #4a5568',
-                borderRadius: 8
+                borderRadius: 10,
+                shadow: { blur: 5, color: '#000000', fill: true }
             }).setOrigin(0.5);
 
             btn.setInteractive({ useHandCursor: true })
                .on('pointerover', () => {
-                   btn.setStyle({ backgroundColor: '#2d3748', color: '#e94560', border: '2px solid #e94560' });
+                   btn.setStyle({ 
+                       backgroundColor: '#2d3748', 
+                       color: '#e94560', 
+                       border: '2px solid #e94560',
+                       shadow: { blur: 8, color: '#e94560', fill: true }
+                   });
                })
                .on('pointerout', () => {
                    if (this.selectedDeck === deck) {
-                       btn.setStyle({ backgroundColor: '#e94560', color: '#ffffff', border: '2px solid #e94560' });
+                       btn.setStyle({ 
+                           backgroundColor: '#e94560', 
+                           color: '#ffffff', 
+                           border: '2px solid #e94560',
+                           shadow: { blur: 8, color: '#e94560', fill: true }
+                       });
                    } else {
-                       btn.setStyle({ backgroundColor: '#1a1a2e', color: '#ffffff', border: '2px solid #4a5568' });
+                       btn.setStyle({ 
+                           backgroundColor: '#1a202c', 
+                           color: '#ffffff', 
+                           border: '2px solid #4a5568',
+                           shadow: { blur: 5, color: '#000000', fill: true }
+                       });
                    }
                })
                .on('pointerdown', () => {
                    this.selectedDeck = deck;
-                   // Update selection visual
-                   this.deckButtons.forEach(b => b.setStyle({ backgroundColor: '#1a1a2e', color: '#ffffff', border: '2px solid #4a5568' }));
-                   btn.setStyle({ backgroundColor: '#e94560', color: '#ffffff', border: '2px solid #e94560' });
+                   this.deckButtons.forEach(b => b.setStyle({ 
+                       backgroundColor: '#1a202c', 
+                       color: '#ffffff', 
+                       border: '2px solid #4a5568',
+                       shadow: { blur: 5, color: '#000000', fill: true }
+                   }));
+                   btn.setStyle({ 
+                       backgroundColor: '#e94560', 
+                       color: '#ffffff', 
+                       border: '2px solid #e94560',
+                       shadow: { blur: 8, color: '#e94560', fill: true }
+                   });
                });
 
             if (!this.deckButtons) this.deckButtons = [];
@@ -63,23 +102,36 @@ class MenuScene extends Phaser.Scene {
         });
 
         // Select first deck by default
-        this.deckButtons[0].setStyle({ backgroundColor: '#e94560', color: '#ffffff', border: '2px solid #e94560' });
+        this.deckButtons[0].setStyle({ 
+            backgroundColor: '#e94560', 
+            color: '#ffffff', 
+            border: '2px solid #e94560',
+            shadow: { blur: 8, color: '#e94560', fill: true }
+        });
 
-        // Start button
-        const startBtn = this.add.text(w / 2, h * 0.85, 'Start Game', {
-            fontSize: '28px',
+        // Start button with enhanced styling
+        const startBtn = this.add.text(w / 2, h * 0.82, 'Start Game', {
+            fontSize: `${startButtonSize}px`,
             color: '#ffffff',
             backgroundColor: '#e94560',
-            padding: { x: 40, y: 18 },
+            padding: { x: buttonPaddingX * 1.5, y: buttonPaddingY * 1.5 },
             fontStyle: 'bold',
             border: '3px solid #ff6b6b',
-            borderRadius: 12,
-            shadow: { blur: 10, color: '#e94560', fill: true }
+            borderRadius: 15,
+            shadow: { blur: 15, color: '#e94560', fill: true, offsetX: 0, offsetY: 0 }
         }).setOrigin(0.5);
 
         startBtn.setInteractive({ useHandCursor: true })
-                .on('pointerover', () => startBtn.setStyle({ backgroundColor: '#ff6b6b', border: '3px solid #ff6b6b' }))
-                .on('pointerout', () => startBtn.setStyle({ backgroundColor: '#e94560', border: '3px solid #ff6b6b' }))
+                .on('pointerover', () => startBtn.setStyle({ 
+                    backgroundColor: '#ff6b6b', 
+                    border: '3px solid #ff8787',
+                    shadow: { blur: 20, color: '#ff6b6b', fill: true }
+                }))
+                .on('pointerout', () => startBtn.setStyle({ 
+                    backgroundColor: '#e94560', 
+                    border: '3px solid #ff6b6b',
+                    shadow: { blur: 15, color: '#e94560', fill: true }
+                }))
                 .on('pointerdown', () => {
                     this.scene.start('GameScene', { deck: this.selectedDeck });
                 });
@@ -120,7 +172,18 @@ class GameScene extends Phaser.Scene {
                     const card = cardsData[cardNo];
                     // Extract image file name from _img field or use card_no
                     const imgPath = card._img || card.img;
-                    const imgFileName = imgPath.split('/').pop().replace('.png', '.webp');
+                    let imgFileName = `${cardNo}.webp`; // Default fallback
+                    if (imgPath) {
+                        // Extract filename from path, handling various formats
+                        const parts = imgPath.split('/');
+                        const filename = parts[parts.length - 1] || imgPath;
+                        // Replace common image extensions with .webp
+                        imgFileName = filename.replace(/\.(png|jpg|jpeg|gif)$/i, '.webp');
+                        // If no extension, add .webp
+                        if (!imgFileName.includes('.')) {
+                            imgFileName += '.webp';
+                        }
+                    }
                     this.cardImageMap.set(cardNo, imgFileName);
                 }
                 
@@ -148,10 +211,14 @@ class GameScene extends Phaser.Scene {
         // Create UI
         this.createUI();
         
-        // Show loading message
+        // Show loading message with responsive sizing
+        const h = this.scale.height;
+        const loadingSize = Math.max(20, Math.floor(h * 0.028));
         this.loadingText = this.add.text(this.scale.width / 2, this.scale.height / 2, 'Initializing game...', {
-            fontSize: '24px',
-            color: '#ffffff'
+            fontSize: `${loadingSize}px`,
+            color: '#ffffff',
+            fontStyle: 'bold',
+            shadow: { blur: 8, color: '#e94560', fill: true }
         }).setOrigin(0.5);
         
         // Initialize game then load state
@@ -177,8 +244,12 @@ class GameScene extends Phaser.Scene {
 
     async initializeGame() {
         try {
-            // Call the init endpoint to initialize/restart the game
-            const response = await fetch('/api/init', { method: 'POST' });
+            // Call the init endpoint to initialize/restart the game with selected deck
+            const response = await fetch('/api/init', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ deck: this.selectedDeck })
+            });
             if (!response.ok) {
                 console.warn('Failed to initialize game, might already be initialized');
             }
@@ -256,8 +327,12 @@ class GameScene extends Phaser.Scene {
     createZones() {
         const w = this.scale.width;
         const h = this.scale.height;
-        const headerHeight = 65;
-        const rightPanelWidth = 300;
+        
+        // Calculate responsive sizes based on screen dimensions
+        const headerHeight = Math.max(60, Math.floor(h * 0.08));
+        const rightPanelWidth = Math.max(280, Math.floor(w * 0.25));
+        const zoneGap = Math.max(8, Math.floor(h * 0.01));
+        const zonePadding = Math.max(15, Math.floor(w * 0.015));
         
         this.headerHeight = headerHeight;
         
@@ -268,75 +343,103 @@ class GameScene extends Phaser.Scene {
         const playAreaWidth = w - rightPanelWidth;
         const playAreaHeight = h - headerHeight;
         
-        // Reduce spacing between zones to use space better
-        const zoneGap = 10;
+        // Calculate zone heights proportionally
+        const handHeight = Math.max(90, Math.floor(playAreaHeight * 0.14));
+        const stageHeight = Math.max(130, Math.floor(playAreaHeight * 0.22));
+        const supportHeight = Math.max(80, Math.floor(playAreaHeight * 0.12));
+        
+        // Calculate vertical positions
+        const p2HandY = headerHeight + zoneGap;
+        const p2StageY = p2HandY + handHeight + zoneGap;
+        const p2SupportY = p2StageY + stageHeight + zoneGap;
+        
+        const p1HandY = h - handHeight - zoneGap;
+        const p1StageY = p1HandY - stageHeight - zoneGap;
+        const p1SupportY = p1StageY - supportHeight - zoneGap;
         
         this.zones = {
             // Player 2 (opponent - top)
-            p2Hand: { x: 20, y: headerHeight + 15, w: playAreaWidth - 40, h: 100, label: 'Opponent Hand', color: 0x2d3748, borderColor: 0x4a5568 },
-            p2Stage: { x: 20, y: headerHeight + 125, w: playAreaWidth - 40, h: 150, label: 'Opponent Stage', color: 0x1a202c, borderColor: 0x718096 },
-            p2Live: { x: 20, y: headerHeight + 285, w: playAreaWidth * 0.32, h: 90, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
-            p2Success: { x: 20 + playAreaWidth * 0.34, y: headerHeight + 285, w: playAreaWidth * 0.20, h: 90, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
-            p2Energy: { x: 20 + playAreaWidth * 0.56, y: headerHeight + 285, w: playAreaWidth * 0.22, h: 90, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 },
+            p2Hand: { x: zonePadding, y: p2HandY, w: playAreaWidth - zonePadding * 2, h: handHeight, label: 'Opponent Hand', color: 0x2d3748, borderColor: 0x4a5568 },
+            p2Stage: { x: zonePadding, y: p2StageY, w: playAreaWidth - zonePadding * 2, h: stageHeight, label: 'Opponent Stage', color: 0x1a202c, borderColor: 0x718096 },
+            p2Live: { x: zonePadding, y: p2SupportY, w: playAreaWidth * 0.32, h: supportHeight, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
+            p2Success: { x: zonePadding + playAreaWidth * 0.34, y: p2SupportY, w: playAreaWidth * 0.20, h: supportHeight, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
+            p2Energy: { x: zonePadding + playAreaWidth * 0.56, y: p2SupportY, w: playAreaWidth * 0.22, h: supportHeight, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 },
             
             // Player 1 (active - bottom)
-            p1Hand: { x: 20, y: h - 120, w: playAreaWidth - 40, h: 100, label: 'Your Hand', color: 0x276749, borderColor: 0x48bb78 },
-            p1Stage: { x: 20, y: h - 275, w: playAreaWidth - 40, h: 150, label: 'Your Stage', color: 0x1a202c, borderColor: 0x718096 },
-            p1Live: { x: 20, y: h - 375, w: playAreaWidth * 0.32, h: 90, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
-            p1Success: { x: 20 + playAreaWidth * 0.34, y: h - 375, w: playAreaWidth * 0.20, h: 90, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
-            p1Energy: { x: 20 + playAreaWidth * 0.56, y: h - 375, w: playAreaWidth * 0.22, h: 90, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 }
+            p1Hand: { x: zonePadding, y: p1HandY, w: playAreaWidth - zonePadding * 2, h: handHeight, label: 'Your Hand', color: 0x276749, borderColor: 0x48bb78 },
+            p1Stage: { x: zonePadding, y: p1StageY, w: playAreaWidth - zonePadding * 2, h: stageHeight, label: 'Your Stage', color: 0x1a202c, borderColor: 0x718096 },
+            p1Live: { x: zonePadding, y: p1SupportY, w: playAreaWidth * 0.32, h: supportHeight, label: 'Live Zone', color: 0x44337a, borderColor: 0x805ad5 },
+            p1Success: { x: zonePadding + playAreaWidth * 0.34, y: p1SupportY, w: playAreaWidth * 0.20, h: supportHeight, label: 'Success', color: 0x44337a, borderColor: 0x805ad5 },
+            p1Energy: { x: zonePadding + playAreaWidth * 0.56, y: p1SupportY, w: playAreaWidth * 0.22, h: supportHeight, label: 'Energy', color: 0x276749, borderColor: 0x48bb78 }
         };
         
-        // Draw zones
+        // Calculate responsive font sizes
+        const labelFontSize = Math.max(11, Math.floor(h * 0.015));
+        const counterFontSize = Math.max(14, Math.floor(h * 0.018));
+        const deckCounterFontSize = Math.max(12, Math.floor(h * 0.016));
+        
+        // Draw zones with enhanced styling
         for (const [key, zone] of Object.entries(this.zones)) {
-            // Zone background with slight transparency
-            this.zoneGraphics.fillStyle(zone.color, 0.85);
-            this.zoneGraphics.fillRoundedRect(zone.x, zone.y, zone.w, zone.h, 12);
+            // Zone background with gradient-like effect (multiple layers)
+            this.zoneGraphics.fillStyle(zone.color, 0.9);
+            this.zoneGraphics.fillRoundedRect(zone.x, zone.y, zone.w, zone.h, 14);
             
-            // Zone border
-            this.zoneGraphics.lineStyle(3, zone.borderColor, 1);
-            this.zoneGraphics.strokeRoundedRect(zone.x, zone.y, zone.w, zone.h, 12);
+            // Zone border with glow effect
+            this.zoneGraphics.lineStyle(2, zone.borderColor, 1);
+            this.zoneGraphics.strokeRoundedRect(zone.x, zone.y, zone.w, zone.h, 14);
             
-            // Zone label with background
-            const labelBg = this.zoneGraphics.fillStyle(0x1a202c, 0.9);
-            this.zoneGraphics.fillRoundedRect(zone.x + 5, zone.y + 5, 100, 22, 5);
+            // Inner glow effect
+            this.zoneGraphics.lineStyle(1, zone.borderColor, 0.3);
+            this.zoneGraphics.strokeRoundedRect(zone.x + 2, zone.y + 2, zone.w - 4, zone.h - 4, 12);
             
-            const label = this.add.text(zone.x + 12, zone.y + 16, zone.label, {
-                fontSize: '12px',
+            // Zone label with enhanced background
+            const labelBgWidth = Math.max(100, Math.floor(zone.w * 0.25));
+            const labelBgHeight = Math.max(20, Math.floor(h * 0.025));
+            this.zoneGraphics.fillStyle(0x1a202c, 0.95);
+            this.zoneGraphics.fillRoundedRect(zone.x + 6, zone.y + 6, labelBgWidth, labelBgHeight, 6);
+            
+            const label = this.add.text(zone.x + 14, zone.y + 6 + labelBgHeight / 2, zone.label, {
+                fontSize: `${labelFontSize}px`,
                 color: '#e2e8f0',
                 fontStyle: 'bold'
-            });
+            }).setOrigin(0, 0.5);
             this.zoneLabels.push(label);
         }
         
-        // Add counters display for both players
-        this.p1DeckCounters = this.add.text(25, h - 410, '', {
-            fontSize: '13px',
+        // Add counters display for both players with responsive positioning
+        const p1CounterY = p1SupportY - supportHeight - zoneGap - 20;
+        const p2CounterY = p2SupportY + supportHeight + zoneGap + 10;
+        
+        this.p1DeckCounters = this.add.text(zonePadding, p1CounterY, '', {
+            fontSize: `${deckCounterFontSize}px`,
             color: '#48bb78',
             fontStyle: 'bold',
             backgroundColor: '#1a202c',
-            padding: { x: 8, y: 4 }
+            padding: { x: 10, y: 5 },
+            borderRadius: 6
         });
         this.zoneLabels.push(this.p1DeckCounters);
         
-        this.p2DeckCounters = this.add.text(25, headerHeight + 390, '', {
-            fontSize: '13px',
+        this.p2DeckCounters = this.add.text(zonePadding, p2CounterY, '', {
+            fontSize: `${deckCounterFontSize}px`,
             color: '#718096',
             fontStyle: 'bold',
             backgroundColor: '#1a202c',
-            padding: { x: 8, y: 4 }
+            padding: { x: 10, y: 5 },
+            borderRadius: 6
         });
         this.zoneLabels.push(this.p2DeckCounters);
         
-        // Add zone counter text objects
+        // Add zone counter text objects with responsive sizing
         this.zoneCounters = {};
         for (const [key, zone] of Object.entries(this.zones)) {
-            const counter = this.add.text(zone.x + zone.w - 10, zone.y + zone.h - 10, '0', {
-                fontSize: '16px',
+            const counter = this.add.text(zone.x + zone.w - 12, zone.y + zone.h - 12, '0', {
+                fontSize: `${counterFontSize}px`,
                 color: '#fff',
                 fontStyle: 'bold',
                 backgroundColor: '#000000',
-                padding: { x: 8, y: 4 }
+                padding: { x: 8, y: 4 },
+                borderRadius: 4
             }).setOrigin(1, 1);
             this.zoneCounters[key] = counter;
             this.zoneLabels.push(counter);
@@ -346,8 +449,18 @@ class GameScene extends Phaser.Scene {
     createUI() {
         const w = this.scale.width;
         const h = this.scale.height;
-        const headerHeight = 65;
-        const rightPanelWidth = 300;
+        
+        // Calculate responsive sizes based on screen dimensions
+        const headerHeight = this.headerHeight || Math.max(60, Math.floor(h * 0.08));
+        const rightPanelWidth = Math.max(280, Math.floor(w * 0.25));
+        
+        // Calculate responsive font sizes
+        const menuBtnSize = Math.max(14, Math.floor(h * 0.018));
+        const titleSize = Math.max(20, Math.floor(h * 0.028));
+        const statsSize = Math.max(12, Math.floor(h * 0.016));
+        const turnSize = Math.max(16, Math.floor(h * 0.022));
+        const phaseSize = Math.max(14, Math.floor(h * 0.02));
+        const actionsTitleSize = Math.max(18, Math.floor(h * 0.025));
         
         // Clear existing UI elements
         if (this.uiElements) {
@@ -355,94 +468,112 @@ class GameScene extends Phaser.Scene {
         }
         this.uiElements = [];
         
-        // Header bar at top
+        // Header bar at top with gradient effect
         this.headerBg = this.add.graphics();
+        // Main header background
         this.headerBg.fillStyle(0x1a202c, 1);
         this.headerBg.fillRect(0, 0, w, headerHeight);
-        this.headerBg.lineStyle(3, 0xe94560, 1);
-        this.headerBg.lineBetween(0, headerHeight, w, headerHeight);
+        // Bottom border with glow
+        this.headerBg.lineStyle(2, 0xe94560, 1);
+        this.headerBg.lineBetween(0, headerHeight - 1, w, headerHeight - 1);
+        // Subtle top highlight
+        this.headerBg.lineStyle(1, 0x4a5568, 0.5);
+        this.headerBg.lineBetween(0, 1, w, 1);
         this.uiElements.push(this.headerBg);
         
         // Back to menu button in header
-        const menuBtn = this.add.text(20, headerHeight / 2, 'Menu', {
-            fontSize: '15px',
+        const menuBtnPadding = Math.max(10, Math.floor(w * 0.012));
+        const menuBtn = this.add.text(menuBtnPadding, headerHeight / 2, 'Menu', {
+            fontSize: `${menuBtnSize}px`,
             color: '#ffffff',
-            backgroundColor: '#4a5568',
-            padding: { x: 12, y: 6 },
+            backgroundColor: '#2d3748',
+            padding: { x: menuBtnPadding, y: menuBtnPadding * 0.6 },
             fontStyle: 'bold',
-            borderRadius: 8
+            borderRadius: 8,
+            shadow: { blur: 4, color: '#000000', fill: true }
         }).setOrigin(0, 0.5);
         
         menuBtn.setInteractive({ useHandCursor: true })
-               .on('pointerover', () => menuBtn.setStyle({ backgroundColor: '#e94560' }))
-               .on('pointerout', () => menuBtn.setStyle({ backgroundColor: '#4a5568' }))
+               .on('pointerover', () => menuBtn.setStyle({ 
+                   backgroundColor: '#e94560',
+                   shadow: { blur: 6, color: '#e94560', fill: true }
+               }))
+               .on('pointerout', () => menuBtn.setStyle({ 
+                   backgroundColor: '#2d3748',
+                   shadow: { blur: 4, color: '#000000', fill: true }
+               }))
                .on('pointerdown', () => {
                    this.scene.start('MenuScene');
                });
         this.uiElements.push(menuBtn);
         
-        // Game title in header
+        // Game title in header with enhanced glow
         this.add.text(w / 2, headerHeight / 2, 'Rabuka Card Game', {
-            fontSize: '24px',
+            fontSize: `${titleSize}px`,
             color: '#e94560',
             fontStyle: 'bold',
-            shadow: { blur: 10, color: '#e94560', fill: true }
+            shadow: { blur: 12, color: '#e94560', fill: true }
         }).setOrigin(0.5);
         
         // Player stats in header (heart vector and blade count) - using images
-        this.p1StatsContainer = this.add.container(120, headerHeight / 2);
+        const p1StatsX = menuBtnPadding * 4 + 60;
+        this.p1StatsContainer = this.add.container(p1StatsX, headerHeight / 2);
         this.p1StatsLabel = this.add.text(0, 0, 'You: ', {
-            fontSize: '13px',
+            fontSize: `${statsSize}px`,
             color: '#48bb78',
             fontStyle: 'bold'
         }).setOrigin(0, 0.5);
-        // Heart icons will be created dynamically
         this.p1HeartIcons = [];
         this.p1HeartCounts = [];
-        this.p1BladeIcon = this.add.image(110, 0, 'icon_blade').setScale(0.5).setOrigin(0, 0.5);
-        this.p1BladeCount = this.add.text(125, 0, '0', {
-            fontSize: '13px',
+        const iconScale = Math.max(0.4, Math.min(0.6, h * 0.0008));
+        this.p1BladeIcon = this.add.image(50, 0, 'icon_blade').setScale(iconScale).setOrigin(0, 0.5);
+        this.p1BladeCount = this.add.text(50 + iconScale * 20, 0, '0', {
+            fontSize: `${statsSize}px`,
             color: '#48bb78',
             fontStyle: 'bold'
         }).setOrigin(0, 0.5);
         this.p1StatsContainer.add([this.p1StatsLabel, this.p1BladeIcon, this.p1BladeCount]);
         this.uiElements.push(this.p1StatsContainer);
         
-        this.p2StatsContainer = this.add.container(380, headerHeight / 2);
+        const p2StatsX = p1StatsX + 180;
+        this.p2StatsContainer = this.add.container(p2StatsX, headerHeight / 2);
         this.p2StatsLabel = this.add.text(0, 0, 'Opponent: ', {
-            fontSize: '13px',
+            fontSize: `${statsSize}px`,
             color: '#718096',
             fontStyle: 'bold'
         }).setOrigin(0, 0.5);
-        // Heart icons will be created dynamically
         this.p2HeartIcons = [];
         this.p2HeartCounts = [];
-        this.p2BladeIcon = this.add.image(150, 0, 'icon_blade').setScale(0.5).setOrigin(0, 0.5);
-        this.p2BladeCount = this.add.text(165, 0, '0', {
-            fontSize: '13px',
+        this.p2BladeIcon = this.add.image(70, 0, 'icon_blade').setScale(iconScale).setOrigin(0, 0.5);
+        this.p2BladeCount = this.add.text(70 + iconScale * 20, 0, '0', {
+            fontSize: `${statsSize}px`,
             color: '#718096',
             fontStyle: 'bold'
         }).setOrigin(0, 0.5);
         this.p2StatsContainer.add([this.p2StatsLabel, this.p2BladeIcon, this.p2BladeCount]);
         this.uiElements.push(this.p2StatsContainer);
         
-        // Turn and phase info in header
-        this.turnText = this.add.text(w - rightPanelWidth - 160, headerHeight / 2, 'Turn: 1', {
-            fontSize: '18px',
+        // Turn and phase info in header with enhanced styling
+        const phasePadding = Math.max(8, Math.floor(w * 0.01));
+        this.turnText = this.add.text(w - rightPanelWidth - 140, headerHeight / 2, 'Turn: 1', {
+            fontSize: `${turnSize}px`,
             color: '#fff',
             fontStyle: 'bold',
             backgroundColor: '#2d3748',
-            padding: { x: 12, y: 6 },
-            borderRadius: 6
+            padding: { x: phasePadding, y: phasePadding * 0.7 },
+            borderRadius: 8,
+            shadow: { blur: 4, color: '#000000', fill: true }
         }).setOrigin(0.5);
         this.uiElements.push(this.turnText);
         
-        this.phaseText = this.add.text(w - rightPanelWidth - 50, headerHeight / 2, 'Phase: Main', {
-            fontSize: '16px',
+        this.phaseText = this.add.text(w - rightPanelWidth - 40, headerHeight / 2, 'Phase: Main', {
+            fontSize: `${phaseSize}px`,
             color: '#48bb78',
+            fontStyle: 'bold',
             backgroundColor: '#2d3748',
-            padding: { x: 12, y: 6 },
-            borderRadius: 6
+            padding: { x: phasePadding, y: phasePadding * 0.7 },
+            borderRadius: 8,
+            shadow: { blur: 4, color: '#000000', fill: true }
         }).setOrigin(0.5);
         this.uiElements.push(this.phaseText);
         
@@ -454,15 +585,19 @@ class GameScene extends Phaser.Scene {
         this.actionsBg = this.add.graphics();
         this.actionsBg.fillStyle(0x1a202c, 0.95);
         this.actionsBg.fillRect(actionsPanelX, actionsPanelY, rightPanelWidth, actionsPanelHeight);
-        this.actionsBg.lineStyle(3, 0x4a5568, 1);
+        // Left border with glow effect
+        this.actionsBg.lineStyle(2, 0x4a5568, 1);
         this.actionsBg.lineBetween(actionsPanelX, actionsPanelY, actionsPanelX, actionsPanelY + actionsPanelHeight);
+        // Inner border for depth
+        this.actionsBg.lineStyle(1, 0x718096, 0.3);
+        this.actionsBg.lineBetween(actionsPanelX + 2, actionsPanelY, actionsPanelX + 2, actionsPanelY + actionsPanelHeight);
         this.uiElements.push(this.actionsBg);
         
-        this.add.text(actionsPanelX + rightPanelWidth / 2, actionsPanelY + 30, 'Actions', {
-            fontSize: '20px',
+        this.add.text(actionsPanelX + rightPanelWidth / 2, actionsPanelY + 35, 'Actions', {
+            fontSize: `${actionsTitleSize}px`,
             color: '#e94560',
             fontStyle: 'bold',
-            shadow: { blur: 8, color: '#e94560', fill: true }
+            shadow: { blur: 10, color: '#e94560', fill: true }
         }).setOrigin(0.5);
         
         this.actionsPanelX = actionsPanelX;
@@ -485,16 +620,22 @@ class GameScene extends Phaser.Scene {
             this.loadActions();
         } catch (error) {
             console.error('Failed to load game state:', error);
-            // Show error message on screen
+            // Show error message on screen with responsive sizing
             if (this.errorText) {
                 this.errorText.destroy();
             }
+            const h = this.scale.height;
+            const errorSize = Math.max(14, Math.floor(h * 0.02));
+            const errorPadding = Math.max(10, Math.floor(h * 0.015));
             this.errorText = this.add.text(this.scale.width / 2, this.scale.height / 2, 
                 'Game not initialized. Please restart the server or initialize game.', {
-                fontSize: '16px',
+                fontSize: `${errorSize}px`,
                 color: '#ff6b6b',
-                backgroundColor: '#1a1a2e',
-                padding: { x: 12, y: 6 }
+                backgroundColor: '#1a202c',
+                padding: { x: errorPadding, y: errorPadding * 0.6 },
+                borderRadius: 8,
+                fontStyle: 'bold',
+                shadow: { blur: 6, color: '#ff6b6b', fill: true }
             }).setOrigin(0.5);
         }
     }
@@ -557,6 +698,9 @@ class GameScene extends Phaser.Scene {
         const p1Blades = this.calculateBladeCount(this.gameState.player1?.stage);
         const p2Hearts = this.calculateHeartVector(this.gameState.player2?.stage);
         const p2Blades = this.calculateBladeCount(this.gameState.player2?.stage);
+
+        console.log('P1 Hearts:', p1Hearts, 'P1 Blades:', p1Blades);
+        console.log('P2 Hearts:', p2Hearts, 'P2 Blades:', p2Blades);
         
         // Clear old heart icons and counts
         this.p1HeartIcons.forEach(icon => icon.destroy());
@@ -569,54 +713,83 @@ class GameScene extends Phaser.Scene {
         this.p2HeartIcons = [];
         this.p2HeartCounts = [];
         
-        // Create dynamic heart icons for player 1
-        let xOffset = 35;
+        // Create dynamic heart icons for player 1 with responsive sizing
+        const h = this.scale.height;
+        const iconScale = Math.max(0.35, Math.min(0.55, h * 0.0007));
+        const heartIconSize = Math.max(10, Math.floor(iconScale * 30));
+        const heartCountSize = Math.max(10, Math.floor(h * 0.014));
+        const heartSpacing = Math.max(20, Math.floor(h * 0.025));
+        
+        let xOffset = 40;
         for (const [heartType, count] of Object.entries(p1Hearts).sort()) {
             if (count > 0) {
-                // Extract the number from heartType (e.g., "heart01" -> "01")
-                const heartNum = heartType.replace('heart', '').replace('b_heart', 'b_');
+                // Extract the number from heartType (e.g., "heart01" -> "01", "b_heart01" -> "b_01")
+                let heartNum = heartType;
+                if (heartType.startsWith('heart')) {
+                    heartNum = heartType.replace('heart', '');
+                } else if (heartType.startsWith('b_heart')) {
+                    heartNum = 'b_' + heartType.replace('b_heart', '');
+                }
+                // Ensure heartNum is 2 digits for icon key (e.g., "01", "b_01")
+                if (!heartNum.startsWith('b_')) {
+                    heartNum = heartNum.padStart(2, '0');
+                }
                 const iconKey = `heart_${heartNum}`;
-                const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(0.5).setOrigin(0, 0.5);
-                const heartCount = this.add.text(xOffset + 13, 0, count.toString(), {
-                    fontSize: '11px',
+                const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(iconScale).setOrigin(0, 0.5);
+                const heartCount = this.add.text(xOffset + heartIconSize, 0, count.toString(), {
+                    fontSize: `${heartCountSize}px`,
                     color: '#48bb78',
                     fontStyle: 'bold'
                 }).setOrigin(0, 0.5);
-                
+
                 this.p1HeartIcons.push(heartIcon);
                 this.p1HeartCounts.push(heartCount);
                 this.p1StatsContainer.add([heartIcon, heartCount]);
-                xOffset += 25;
+                xOffset += heartSpacing;
             }
         }
         
         // Reposition blade icon and count based on heart icons
+        this.p1BladeIcon.setScale(iconScale);
         this.p1BladeIcon.setX(xOffset);
-        this.p1BladeCount.setX(xOffset + 15);
+        this.p1BladeCount.setX(xOffset + heartIconSize);
+        this.p1BladeCount.setFontSize(`${heartCountSize}px`);
         
-        // Create dynamic heart icons for player 2
-        xOffset = 75;
+        // Create dynamic heart icons for player 2 with responsive sizing
+        xOffset = 80;
         for (const [heartType, count] of Object.entries(p2Hearts).sort()) {
             if (count > 0) {
-                const heartNum = heartType.replace('heart', '').replace('b_heart', 'b_');
+                // Extract the number from heartType (e.g., "heart01" -> "01", "b_heart01" -> "b_01")
+                let heartNum = heartType;
+                if (heartType.startsWith('heart')) {
+                    heartNum = heartType.replace('heart', '');
+                } else if (heartType.startsWith('b_heart')) {
+                    heartNum = 'b_' + heartType.replace('b_heart', '');
+                }
+                // Ensure heartNum is 2 digits for icon key (e.g., "01", "b_01")
+                if (!heartNum.startsWith('b_')) {
+                    heartNum = heartNum.padStart(2, '0');
+                }
                 const iconKey = `heart_${heartNum}`;
-                const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(0.5).setOrigin(0, 0.5);
-                const heartCount = this.add.text(xOffset + 13, 0, count.toString(), {
-                    fontSize: '11px',
+                const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(iconScale).setOrigin(0, 0.5);
+                const heartCount = this.add.text(xOffset + heartIconSize, 0, count.toString(), {
+                    fontSize: `${heartCountSize}px`,
                     color: '#718096',
                     fontStyle: 'bold'
                 }).setOrigin(0, 0.5);
-                
+
                 this.p2HeartIcons.push(heartIcon);
                 this.p2HeartCounts.push(heartCount);
                 this.p2StatsContainer.add([heartIcon, heartCount]);
-                xOffset += 25;
+                xOffset += heartSpacing;
             }
         }
         
         // Reposition blade icon and count based on heart icons
+        this.p2BladeIcon.setScale(iconScale);
         this.p2BladeIcon.setX(xOffset);
-        this.p2BladeCount.setX(xOffset + 15);
+        this.p2BladeCount.setX(xOffset + heartIconSize);
+        this.p2BladeCount.setFontSize(`${heartCountSize}px`);
         
         if (this.p1BladeCount) {
             this.p1BladeCount.setText(p1Blades);
@@ -699,22 +872,27 @@ class GameScene extends Phaser.Scene {
         const zone = this.zones[zoneKey];
         if (!zone || cards.length === 0) return;
         
-        const cardWidth = 80;
-        const cardHeight = 112;
+        // Calculate responsive card sizes based on zone dimensions
+        const cardHeight = Math.max(70, Math.floor(zone.h * 0.7));
+        const cardWidth = Math.max(50, Math.floor(cardHeight * 0.72));
         
         // Calculate dynamic overlap based on available space
-        const maxTotalWidth = zone.w - 20; // 10px padding on each side
+        const padding = Math.max(10, Math.floor(zone.w * 0.02));
+        const maxTotalWidth = zone.w - padding * 2;
         const cardsTotalWidth = cards.length * cardWidth;
         let overlap;
         
         if (cardsTotalWidth <= maxTotalWidth) {
             // No overlap needed - cards fit with spacing
-            overlap = cardWidth + 5; // 5px gap between cards
-        } else {
+            overlap = cardWidth + Math.max(4, Math.floor(cardWidth * 0.06));
+        } else if (cards.length > 1) {
             // Calculate overlap needed to fit all cards
             overlap = (maxTotalWidth - cardWidth) / (cards.length - 1);
             // Ensure minimum overlap
-            overlap = Math.max(overlap, 20); // Minimum 20px overlap
+            overlap = Math.max(overlap, Math.max(15, Math.floor(cardWidth * 0.2)));
+        } else {
+            // Single card, no overlap needed
+            overlap = cardWidth;
         }
         
         const totalWidth = cardWidth + (cards.length - 1) * overlap;
@@ -731,12 +909,19 @@ class GameScene extends Phaser.Scene {
         const zone = this.zones[zoneKey];
         if (!zone) return;
         
-        const cardWidth = 120;
-        const cardHeight = 168;
+        // Calculate responsive card sizes based on zone dimensions
+        const cardHeight = Math.max(100, Math.floor(zone.h * 0.65));
+        const cardWidth = Math.max(70, Math.floor(cardHeight * 0.72));
+        
+        // Calculate positions with spacing
+        const spacing = Math.max(10, Math.floor(zone.w * 0.05));
+        const totalCardsWidth = cardWidth * 3 + spacing * 2;
+        const startX = zone.x + (zone.w - totalCardsWidth) / 2;
+        
         const positions = [
-            { x: zone.x + zone.w * 0.2, y: zone.y + (zone.h - cardHeight) / 2 },
-            { x: zone.x + zone.w * 0.5 - cardWidth / 2, y: zone.y + (zone.h - cardHeight) / 2 },
-            { x: zone.x + zone.w * 0.8 - cardWidth, y: zone.y + (zone.h - cardHeight) / 2 }
+            { x: startX, y: zone.y + (zone.h - cardHeight) / 2 },
+            { x: startX + cardWidth + spacing, y: zone.y + (zone.h - cardHeight) / 2 },
+            { x: startX + (cardWidth + spacing) * 2, y: zone.y + (zone.h - cardHeight) / 2 }
         ];
         
         const cards = [stage.left_side, stage.center, stage.right_side];
@@ -751,22 +936,27 @@ class GameScene extends Phaser.Scene {
         const zone = this.zones[zoneKey];
         if (!zone || cards.length === 0) return;
         
-        const cardWidth = 60;
-        const cardHeight = 84;
+        // Calculate responsive card sizes based on zone dimensions
+        const cardHeight = Math.max(50, Math.floor(zone.h * 0.6));
+        const cardWidth = Math.max(35, Math.floor(cardHeight * 0.72));
         
         // Calculate dynamic overlap based on available space
-        const maxTotalWidth = zone.w - 20; // 10px padding on each side
+        const padding = Math.max(8, Math.floor(zone.w * 0.02));
+        const maxTotalWidth = zone.w - padding * 2;
         const cardsTotalWidth = cards.length * cardWidth;
         let overlap;
         
         if (cardsTotalWidth <= maxTotalWidth) {
             // No overlap needed - cards fit with spacing
-            overlap = cardWidth + 3; // 3px gap between cards
-        } else {
+            overlap = cardWidth + Math.max(2, Math.floor(cardWidth * 0.05));
+        } else if (cards.length > 1) {
             // Calculate overlap needed to fit all cards
             overlap = (maxTotalWidth - cardWidth) / (cards.length - 1);
             // Ensure minimum overlap
-            overlap = Math.max(overlap, 15); // Minimum 15px overlap
+            overlap = Math.max(overlap, Math.max(10, Math.floor(cardWidth * 0.2)));
+        } else {
+            // Single card, no overlap needed
+            overlap = cardWidth;
         }
         
         const totalWidth = cardWidth + (cards.length - 1) * overlap;
@@ -782,21 +972,29 @@ class GameScene extends Phaser.Scene {
     createCard(x, y, width, height, card, interactive) {
         const container = this.add.container(x, y);
         
-        // Card background
+        // Card background with enhanced styling
         const bg = this.add.graphics();
+        // Main background with gradient-like effect
         bg.fillStyle(0x2a2a4e, 1);
-        bg.fillRoundedRect(0, 0, width, height, 5);
+        bg.fillRoundedRect(0, 0, width, height, Math.max(4, Math.floor(width * 0.06)));
+        // Outer border with glow
         bg.lineStyle(2, 0x6666aa, 1);
-        bg.strokeRoundedRect(0, 0, width, height, 5);
+        bg.strokeRoundedRect(0, 0, width, height, Math.max(4, Math.floor(width * 0.06)));
+        // Inner highlight for depth
+        bg.lineStyle(1, 0x8888cc, 0.5);
+        bg.strokeRoundedRect(2, 2, width - 4, height - 4, Math.max(3, Math.floor(width * 0.05)));
         container.add(bg);
         
         // Get image file name from mapping
         const imageKey = card.card_no;
         const imgFileName = this.cardImageMap ? this.cardImageMap.get(imageKey) : `${imageKey}.webp`;
-        
+
+        // Set container size before rotation for correct hit detection
+        container.setSize(width, height);
+
         // Check orientation - rotate if Wait
         const isWait = card.orientation === 'Wait';
-        
+
         // Rotate entire container if in Wait state
         if (isWait) {
             container.setRotation(Math.PI / 2);
@@ -806,10 +1004,14 @@ class GameScene extends Phaser.Scene {
             // Image already loaded, display it
             const texture = this.textures.get(imageKey);
             const cardImage = this.add.image(width / 2, height / 2, imageKey);
-            
-            // Calculate scale to fit image within card dimensions while maintaining aspect ratio
-            const imageWidth = texture.source[0].width;
-            const imageHeight = texture.source[0].height;
+
+            // Calculate scale to fit image within card dimensions with validation
+            let imageWidth = 100;
+            let imageHeight = 140;
+            if (texture && texture.source && texture.source[0]) {
+                imageWidth = texture.source[0].width || 100;
+                imageHeight = texture.source[0].height || 140;
+            }
             const scaleX = width / imageWidth;
             const scaleY = height / imageHeight;
             const scale = Math.min(scaleX, scaleY) * 0.95; // 95% to leave small margin
@@ -836,6 +1038,12 @@ class GameScene extends Phaser.Scene {
                         // Image loaded, update all pending containers
                         const containers = this.pendingImageUpdates.get(imageKey) || [];
                         containers.forEach(c => {
+                            // Check orientation from stored cardData and apply rotation if needed
+                            const isWait = c.cardData && c.cardData.orientation === 'Wait';
+                            if (isWait) {
+                                c.setRotation(Math.PI / 2);
+                            }
+
                             // Remove the placeholder text and background if they exist
                             c.each(child => {
                                 if (child.type === 'Text' || child.type === 'Graphics') {
@@ -845,16 +1053,20 @@ class GameScene extends Phaser.Scene {
                             // Add the image
                             const texture = this.textures.get(imageKey);
                             const cardImage = this.add.image(c.width / 2, c.height / 2, imageKey);
-                            
-                            // Calculate scale to fit image within card dimensions
-                            const imageWidth = texture.source[0].width;
-                            const imageHeight = texture.source[0].height;
+
+                            // Calculate scale to fit image within card dimensions with validation
+                            let imageWidth = 100;
+                            let imageHeight = 140;
+                            if (texture && texture.source && texture.source[0]) {
+                                imageWidth = texture.source[0].width || 100;
+                                imageHeight = texture.source[0].height || 140;
+                            }
                             const scaleX = c.width / imageWidth;
                             const scaleY = c.height / imageHeight;
                             const scale = Math.min(scaleX, scaleY) * 0.95;
-                            
+
                             cardImage.setScale(scale);
-                            
+
                             c.add(cardImage);
                         });
                         this.pendingImageUpdates.delete(imageKey);
@@ -884,17 +1096,17 @@ class GameScene extends Phaser.Scene {
                 container.cardData = card;
             }
             
-            // Fallback: show card name while loading
+            // Fallback: show card name while loading with responsive font size
+            const placeholderSize = Math.max(8, Math.floor(width * 0.12));
             const nameText = this.add.text(width / 2, height / 2, card.name || card.card_no || '?', {
-                fontSize: '10px',
+                fontSize: `${placeholderSize}px`,
                 color: '#fff',
                 align: 'center',
-                wordWrap: { width: width - 10 }
+                wordWrap: { width: width - Math.max(6, Math.floor(width * 0.1)) }
             }).setOrigin(0.5);
             container.add(nameText);
         }
-        
-        container.setSize(width, height);
+
         this.cardContainers.push(container);
     }
 
@@ -916,8 +1128,29 @@ class GameScene extends Phaser.Scene {
         
         const panelX = this.actionsPanelX;
         const panelWidth = this.actionsPanelWidth;
-        const startY = this.actionsPanelY + 70;
-        const buttonWidth = panelWidth - 20;
+        const h = this.scale.height;
+        
+        // Calculate responsive sizes
+        const startY = this.actionsPanelY + Math.max(40, Math.floor(h * 0.05));
+        const buttonWidth = panelWidth - Math.max(20, Math.floor(panelWidth * 0.08));
+        
+        // Calculate responsive font sizes
+        const skipBtnSize = Math.max(16, Math.floor(h * 0.022));
+        const titleSize = Math.max(12, Math.floor(h * 0.017));
+        const smallBtnSize = Math.max(10, Math.floor(h * 0.014));
+        const regularBtnSize = Math.max(11, Math.floor(h * 0.016));
+        const noActionsSize = Math.max(13, Math.floor(h * 0.018));
+        
+        // Calculate responsive spacing
+        const skipBtnSpacing = Math.max(50, Math.floor(h * 0.06));
+        const groupedSpacing = Math.max(75, Math.floor(h * 0.09));
+        const regularSpacing = Math.max(42, Math.floor(h * 0.05));
+        
+        // Calculate responsive padding
+        const skipBtnPadding = { x: Math.max(15, Math.floor(buttonWidth * 0.05)), y: Math.max(8, Math.floor(h * 0.012)) };
+        const titlePadding = { x: Math.max(6, Math.floor(buttonWidth * 0.02)), y: Math.max(3, Math.floor(h * 0.005)) };
+        const smallBtnPadding = { x: Math.max(5, Math.floor(buttonWidth * 0.015)), y: Math.max(3, Math.floor(h * 0.005)) };
+        const regularBtnPadding = { x: Math.max(8, Math.floor(buttonWidth * 0.025)), y: Math.max(4, Math.floor(h * 0.006)) };
         
         // Separate Pass/Skip/Finish actions and make them prominent
         let skipActions = [];
@@ -939,21 +1172,29 @@ class GameScene extends Phaser.Scene {
                 buttonText = 'FINISH LIVE SET';
             }
             
-            const skipBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 55, buttonText, {
-                fontSize: '18px',
+            const skipBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * skipBtnSpacing, buttonText, {
+                fontSize: `${skipBtnSize}px`,
                 color: '#ffffff',
                 backgroundColor: '#e94560',
-                padding: { x: 20, y: 10 },
+                padding: skipBtnPadding,
                 fontStyle: 'bold',
                 fixedWidth: buttonWidth,
-                align: 'center'
+                align: 'center',
+                borderRadius: 10,
+                shadow: { blur: 8, color: '#e94560', fill: true }
             }).setOrigin(0.5);
             
             // Capture skip action in closure
             const capturedSkipAction = skipAction;
             skipBtn.setInteractive({ useHandCursor: true })
-                   .on('pointerover', () => skipBtn.setStyle({ backgroundColor: '#ff6b6b' }))
-                   .on('pointerout', () => skipBtn.setStyle({ backgroundColor: '#e94560' }))
+                   .on('pointerover', () => skipBtn.setStyle({ 
+                       backgroundColor: '#ff6b6b',
+                       shadow: { blur: 12, color: '#ff6b6b', fill: true }
+                   }))
+                   .on('pointerout', () => skipBtn.setStyle({ 
+                       backgroundColor: '#e94560',
+                       shadow: { blur: 8, color: '#e94560', fill: true }
+                   }))
                    .on('pointerdown', () => this.executeActionDirect(capturedSkipAction));
             
             this.actionButtons.push(skipBtn);
@@ -970,18 +1211,20 @@ class GameScene extends Phaser.Scene {
             // Check if this is a grouped card action with available_areas
             if (params && params.available_areas && params.available_areas.length > 0) {
                 // Card title with base cost
-                const titleText = this.add.text(panelX + 10, startY + currentIndex * 80, action.description, {
-                    fontSize: '14px',
+                const titleText = this.add.text(panelX + Math.max(10, Math.floor(panelWidth * 0.04)), startY + currentIndex * groupedSpacing, action.description, {
+                    fontSize: `${titleSize}px`,
                     color: '#e94560',
                     fontStyle: 'bold',
                     backgroundColor: '#1a202c',
-                    padding: { x: 8, y: 4 }
+                    padding: titlePadding,
+                    borderRadius: 6
                 }).setOrigin(0, 0.5);
                 this.actionButtons.push(titleText);
                 
                 // Area buttons for left, center, right
                 const areas = params.available_areas;
-                const buttonWidthSmall = (buttonWidth - 20) / 3;
+                const buttonWidthSmall = (buttonWidth - Math.max(15, Math.floor(buttonWidth * 0.05))) / 3;
+                const smallBtnX = panelX + Math.max(10, Math.floor(panelWidth * 0.04));
                 
                 areas.forEach((areaInfo, i) => {
                     if (areaInfo.available) {
@@ -990,21 +1233,31 @@ class GameScene extends Phaser.Scene {
                             `${label} (${areaInfo.cost} - Baton)` : 
                             `${label} (${areaInfo.cost})`;
                         
-                        const btn = this.add.text(panelX + 10 + i * buttonWidthSmall, startY + currentIndex * 80 + 25, costText, {
-                            fontSize: '11px',
+                        const btn = this.add.text(smallBtnX + i * buttonWidthSmall, startY + currentIndex * groupedSpacing + Math.max(22, Math.floor(h * 0.03)), costText, {
+                            fontSize: `${smallBtnSize}px`,
                             color: '#fff',
                             backgroundColor: areaInfo.is_baton_touch ? '#48bb78' : '#2d3748',
-                            padding: { x: 8, y: 4 },
-                            fixedWidth: buttonWidthSmall - 5,
-                            align: 'center'
+                            padding: smallBtnPadding,
+                            fixedWidth: buttonWidthSmall - Math.max(3, Math.floor(buttonWidth * 0.01)),
+                            align: 'center',
+                            borderRadius: 6,
+                            shadow: { blur: 4, color: '#000000', fill: true }
                         }).setOrigin(0, 0.5);
                         
                         // Capture action and areaInfo in closure
                         const capturedAction = action;
                         const capturedAreaInfo = areaInfo;
                         btn.setInteractive({ useHandCursor: true })
-                           .on('pointerover', () => btn.setStyle({ backgroundColor: capturedAreaInfo.is_baton_touch ? '#68d391' : '#4a5568', color: '#e94560' }))
-                           .on('pointerout', () => btn.setStyle({ backgroundColor: capturedAreaInfo.is_baton_touch ? '#48bb78' : '#2d3748', color: '#fff' }))
+                           .on('pointerover', () => btn.setStyle({ 
+                               backgroundColor: capturedAreaInfo.is_baton_touch ? '#68d391' : '#4a5568', 
+                               color: '#e94560',
+                               shadow: { blur: 6, color: '#e94560', fill: true }
+                           }))
+                           .on('pointerout', () => btn.setStyle({ 
+                               backgroundColor: capturedAreaInfo.is_baton_touch ? '#48bb78' : '#2d3748', 
+                               color: '#fff',
+                               shadow: { blur: 4, color: '#000000', fill: true }
+                           }))
                            .on('pointerdown', () => this.executeActionWithAreaDirect(capturedAction, capturedAreaInfo.area));
                         
                         this.actionButtons.push(btn);
@@ -1014,21 +1267,31 @@ class GameScene extends Phaser.Scene {
                 currentIndex++;
             } else {
                 // Regular action button (not grouped)
-                const btn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * 45, action.description, {
-                    fontSize: '12px',
+                const btn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * regularSpacing, action.description, {
+                    fontSize: `${regularBtnSize}px`,
                     color: '#fff',
                     backgroundColor: '#2d3748',
-                    padding: { x: 12, y: 6 },
+                    padding: regularBtnPadding,
                     fixedWidth: buttonWidth,
                     align: 'center',
-                    wordWrap: { width: buttonWidth - 30 }
+                    wordWrap: { width: buttonWidth - Math.max(25, Math.floor(buttonWidth * 0.08)) },
+                    borderRadius: 8,
+                    shadow: { blur: 4, color: '#000000', fill: true }
                 }).setOrigin(0.5);
                 
                 // Capture action in closure
                 const capturedAction = action;
                 btn.setInteractive({ useHandCursor: true })
-                   .on('pointerover', () => btn.setStyle({ backgroundColor: '#4a5568', color: '#e94560' }))
-                   .on('pointerout', () => btn.setStyle({ backgroundColor: '#2d3748', color: '#fff' }))
+                   .on('pointerover', () => btn.setStyle({ 
+                       backgroundColor: '#4a5568', 
+                       color: '#e94560',
+                       shadow: { blur: 6, color: '#e94560', fill: true }
+                   }))
+                   .on('pointerout', () => btn.setStyle({ 
+                       backgroundColor: '#2d3748', 
+                       color: '#fff',
+                       shadow: { blur: 4, color: '#000000', fill: true }
+                   }))
                    .on('pointerdown', () => this.executeActionDirect(capturedAction));
                 
                 this.actionButtons.push(btn);
@@ -1038,9 +1301,10 @@ class GameScene extends Phaser.Scene {
         
         // No actions message
         if (this.actions.length === 0) {
-            const noActions = this.add.text(panelX + panelWidth / 2, startY + 50, 'No actions available', {
-                fontSize: '14px',
-                color: '#718096'
+            const noActions = this.add.text(panelX + panelWidth / 2, startY + Math.max(50, Math.floor(h * 0.06)), 'No actions available', {
+                fontSize: `${noActionsSize}px`,
+                color: '#718096',
+                fontStyle: 'italic'
             }).setOrigin(0.5);
             this.actionButtons.push(noActions);
         }
@@ -1115,6 +1379,7 @@ class GameScene extends Phaser.Scene {
                 body: JSON.stringify({ 
                     action_index: index,
                     action_type: action.action_type,
+                    card_id: action.parameters?.card_id,
                     card_index: action.parameters?.card_index,
                     card_indices: action.parameters?.card_indices,
                     card_no: action.parameters?.card_no,

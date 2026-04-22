@@ -9,7 +9,11 @@ use std::vec::Vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionType {
-    RpsChoice,
+    RockChoice,        // Q16: RPS - choose Rock
+    PaperChoice,       // Q16: RPS - choose Paper
+    ScissorsChoice,    // Q16: RPS - choose Scissors
+    ChooseFirstAttacker,  // Q16: RPS winner chooses to go first
+    ChooseSecondAttacker, // Q16: RPS winner chooses to go second
     MulliganHeader,
     SelectMulligan,
     ConfirmMulligan,
@@ -24,7 +28,11 @@ pub enum ActionType {
 impl std::fmt::Display for ActionType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ActionType::RpsChoice => write!(f, "rps_choice"),
+            ActionType::RockChoice => write!(f, "rock_choice"),
+            ActionType::PaperChoice => write!(f, "paper_choice"),
+            ActionType::ScissorsChoice => write!(f, "scissors_choice"),
+            ActionType::ChooseFirstAttacker => write!(f, "choose_first_attacker"),
+            ActionType::ChooseSecondAttacker => write!(f, "choose_second_attacker"),
             ActionType::MulliganHeader => write!(f, "mulligan_header"),
             ActionType::SelectMulligan => write!(f, "select_mulligan"),
             ActionType::ConfirmMulligan => write!(f, "confirm_mulligan"),
@@ -43,7 +51,11 @@ impl std::str::FromStr for ActionType {
     
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "rps_choice" => Ok(ActionType::RpsChoice),
+            "rock_choice" => Ok(ActionType::RockChoice),
+            "paper_choice" => Ok(ActionType::PaperChoice),
+            "scissors_choice" => Ok(ActionType::ScissorsChoice),
+            "choose_first_attacker" => Ok(ActionType::ChooseFirstAttacker),
+            "choose_second_attacker" => Ok(ActionType::ChooseSecondAttacker),
             "mulligan_header" => Ok(ActionType::MulliganHeader),
             "select_mulligan" => Ok(ActionType::SelectMulligan),
             "confirm_mulligan" => Ok(ActionType::ConfirmMulligan),
@@ -200,32 +212,37 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     
     match game_state.current_phase {
         crate::game_state::Phase::RockPaperScissors => {
-            // Rule 6.2.2: Rock Paper Scissors to determine who chooses to go first
+            // Q16 from qa_data.json: "じゃんけんで勝ったプレイヤーが先攻か後攻を決めます"
             // Generate actions for player 1 to choose RPS option
             actions.push(Action {
                 description: "Rock".to_string(),
-                action_type: ActionType::RpsChoice,
-                parameters: Some(ActionParameters {
-                    card_id: None,
-                    card_index: Some(0), // 0 = rock
-                    card_indices: None,
-                    stage_area: Some(MemberArea::LeftSide), // Placeholder for RPS
-                    use_baton_touch: None,
-                    card_name: None,
-                    card_no: None,
-                    base_cost: None,
-                    final_cost: None,
-                    available_areas: None,
-                }),
+                action_type: ActionType::RockChoice,
+                parameters: None,
             });
             actions.push(Action {
                 description: "Paper".to_string(),
-                action_type: ActionType::RpsChoice,
+                action_type: ActionType::PaperChoice,
+                parameters: None,
+            });
+            actions.push(Action {
+                description: "Scissors".to_string(),
+                action_type: ActionType::ScissorsChoice,
+                parameters: None,
+            });
+        }
+        crate::game_state::Phase::ChooseFirstAttacker => {
+            // Q16: RPS winner chooses whether to go first or second
+            let rps_winner = game_state.rps_winner.unwrap_or(1);
+            let winner_name = if rps_winner == 1 { "Player 1" } else { "Player 2" };
+            
+            actions.push(Action {
+                description: format!("{} goes first", winner_name),
+                action_type: ActionType::ChooseFirstAttacker,
                 parameters: Some(ActionParameters {
                     card_id: None,
-                    card_index: Some(1), // 1 = paper
+                    card_index: None,
                     card_indices: None,
-                    stage_area: Some(MemberArea::Center), // Placeholder for RPS
+                    stage_area: None,
                     use_baton_touch: None,
                     card_name: None,
                     card_no: None,
@@ -235,13 +252,13 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 }),
             });
             actions.push(Action {
-                description: "Scissors".to_string(),
-                action_type: ActionType::RpsChoice,
+                description: format!("{} goes second", winner_name),
+                action_type: ActionType::ChooseSecondAttacker,
                 parameters: Some(ActionParameters {
                     card_id: None,
-                    card_index: Some(2), // 2 = scissors
+                    card_index: None,
                     card_indices: None,
-                    stage_area: Some(MemberArea::RightSide), // Placeholder for RPS
+                    stage_area: None,
                     use_baton_touch: None,
                     card_name: None,
                     card_no: None,

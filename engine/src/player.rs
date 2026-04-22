@@ -25,6 +25,8 @@ pub struct Player {
     pub areas_locked_this_turn: std::collections::HashSet<crate::zones::MemberArea>,
     // Rule 8.2: Track if player has finished their live card set
     pub has_finished_live_card_set: bool,
+    // Track live score for the current live
+    pub live_score: i32,
     // Optimization: Map card_id to index in hand for O(1) lookups
     pub hand_card_id_to_index: HashMap<i16, usize>,
 }
@@ -46,6 +48,7 @@ impl Player {
             exclusion_zone: ExclusionZone::new(),
             areas_locked_this_turn: std::collections::HashSet::new(),
             has_finished_live_card_set: false,
+            live_score: 0,
             hand_card_id_to_index: HashMap::new(),
         }
     }

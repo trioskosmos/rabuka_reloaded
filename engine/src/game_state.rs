@@ -10,6 +10,8 @@ pub enum AbilityTrigger {
     LiveStart,           // ライブ開始時
     LiveSuccess,         // ライブ成功時
     PerformancePhaseStart, // パフォーマンスフェイズの始めに (8.3.3)
+    Constant,            // 常時
+    Auto,                // 自動 (generic auto ability)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +25,7 @@ pub enum TurnPhase {
 pub enum Phase {
     // Pre-game phases (Rule 6.2)
     RockPaperScissors,
+    ChooseFirstAttacker,  // Q16: RPS winner chooses turn order
     Mulligan,
     // Normal phase sub-phases (Rule 7.3.3)
     Active,
@@ -97,6 +100,8 @@ pub struct GameState {
     pub mulligan_player2_done: bool,
     pub current_mulligan_player: String, // "player1" or "player2"
     pub mulligan_selected_indices: Vec<usize>, // Track selected card indices for mulligan
+    // RPS tracking - Q16: "じゃんけんで勝ったプレイヤーが先攻か後攻を決めます"
+    pub rps_winner: Option<u8>, // 1 = player1, 2 = player2
     // Live card set tracking
     pub live_card_set_player1_done: bool,
     pub live_card_set_player2_done: bool,
@@ -108,12 +113,25 @@ pub struct GameState {
     pub card_database: Arc<CardDatabase>,
     // Card modifier tracking - tracks blade/heart/score changes instead of mutating Card objects
     pub blade_modifiers: std::collections::HashMap<i16, i32>, // card_id -> blade delta
+    pub blade_type_modifiers: std::collections::HashMap<i16, crate::card::BladeColor>, // card_id -> blade type override
     pub heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> heart delta
     pub score_modifiers: std::collections::HashMap<i16, i32>, // card_id -> score delta
     pub need_heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> need_heart delta
     pub orientation_modifiers: std::collections::HashMap<i16, String>, // card_id -> "active" or "wait"
+    pub cost_modifiers: std::collections::HashMap<i16, i32>, // card_id -> cost delta
     // Optional cost behavior: "always_pay", "never_pay", "auto" (pay if beneficial)
     pub optional_cost_behavior: String,
+    // Pending ability execution state for user interaction
+    pub pending_ability: Option<PendingAbilityExecution>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PendingAbilityExecution {
+    pub card_no: String,
+    pub player_id: String,
+    pub action_index: usize,
+    pub effect: crate::card::AbilityEffect,
+    pub conditional_choice: Option<String>, // Track choice for conditional_alternative
 }
 
 #[derive(Debug, Clone)]
@@ -152,6 +170,7 @@ impl GameState {
             mulligan_player2_done: false,
             current_mulligan_player: String::new(),
             mulligan_selected_indices: Vec::new(),
+            rps_winner: None,  // Q16: RPS winner chooses turn order
             live_card_set_player1_done: false,
             live_card_set_player2_done: false,
             history: Vec::new(),
@@ -159,11 +178,14 @@ impl GameState {
             max_history_size: 50,
             card_database,
             blade_modifiers: std::collections::HashMap::new(),
+            blade_type_modifiers: std::collections::HashMap::new(),
             heart_modifiers: std::collections::HashMap::new(),
             score_modifiers: std::collections::HashMap::new(),
             need_heart_modifiers: std::collections::HashMap::new(),
             orientation_modifiers: std::collections::HashMap::new(),
+            cost_modifiers: std::collections::HashMap::new(),
             optional_cost_behavior: "always_pay".to_string(), // Default to always pay for bot/test mode
+            pending_ability: None,
         }
     }
 
@@ -173,8 +195,33 @@ impl GameState {
             TurnPhase::FirstAttackerNormal => self.first_attacker(),
             TurnPhase::SecondAttackerNormal => self.second_attacker(),
             TurnPhase::Live => {
-                // Rule 7.2.1.2: In phases without specified turn player, first attacker is active
-                self.first_attacker()
+                // During live card set phase, determine which player is currently setting cards
+                // based on completion flags
+                let p1_is_first = self.player1.is_first_attacker;
+                let p1_done = self.live_card_set_player1_done;
+                let p2_done = self.live_card_set_player2_done;
+
+                if !p1_done && p2_done {
+                    // P1 is currently taking their turn (P2 already done)
+                    &self.player1
+                } else if !p2_done && p1_done {
+                    // P2 is currently taking their turn (P1 already done)
+                    &self.player2
+                } else if !p1_done && !p2_done {
+                    // Neither has finished yet - first attacker goes first
+                    if p1_is_first {
+                        &self.player1
+                    } else {
+                        &self.player2
+                    }
+                } else {
+                    // Both done - shouldn't happen during live card set
+                    if p1_is_first {
+                        &self.player1
+                    } else {
+                        &self.player2
+                    }
+                }
             }
         }
     }
@@ -196,10 +243,32 @@ impl GameState {
                 }
             }
             TurnPhase::Live => {
-                if self.player1.is_first_attacker {
+                // During live card set phase, determine which player is currently setting cards
+                // based on completion flags
+                let p1_is_first = self.player1.is_first_attacker;
+                let p1_done = self.live_card_set_player1_done;
+                let p2_done = self.live_card_set_player2_done;
+
+                if !p1_done && p2_done {
+                    // P1 is currently taking their turn (P2 already done)
                     &mut self.player1
-                } else {
+                } else if !p2_done && p1_done {
+                    // P2 is currently taking their turn (P1 already done)
                     &mut self.player2
+                } else if !p1_done && !p2_done {
+                    // Neither has finished yet - first attacker goes first
+                    if p1_is_first {
+                        &mut self.player1
+                    } else {
+                        &mut self.player2
+                    }
+                } else {
+                    // Both done - shouldn't happen during live card set
+                    if p1_is_first {
+                        &mut self.player1
+                    } else {
+                        &mut self.player2
+                    }
                 }
             }
         }
@@ -272,10 +341,10 @@ impl GameState {
         *self.turn2_abilities_played.entry(ability_id).or_insert(0) += 1;
     }
 
-    pub fn can_activate_center_ability(&self, player_id: &str, card_no: &str) -> bool {
-        // Rule 11.7.2: Center ability can only activate if member is in center area
+    pub fn can_activate_area_ability(&self, player_id: &str, card_no: &str, area: crate::zones::MemberArea) -> bool {
+        // Rule 11.7.2, 11.8.2, 11.9.2: Area-specific ability can only activate if member is in that area
         let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
-        if let Some(card_in_zone) = player.stage.get_area(crate::zones::MemberArea::Center) {
+        if let Some(card_in_zone) = player.stage.get_area(area) {
             if let Some(card) = self.card_database.get_card(card_in_zone) {
                 card.card_no == card_no
             } else {
@@ -284,34 +353,19 @@ impl GameState {
         } else {
             false
         }
+    }
+
+    // Convenience wrappers for backward compatibility
+    pub fn can_activate_center_ability(&self, player_id: &str, card_no: &str) -> bool {
+        self.can_activate_area_ability(player_id, card_no, crate::zones::MemberArea::Center)
     }
 
     pub fn can_activate_left_side_ability(&self, player_id: &str, card_no: &str) -> bool {
-        // Rule 11.8.2: LeftSide ability can only activate if member is in left side area
-        let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
-        if let Some(card_in_zone) = player.stage.get_area(crate::zones::MemberArea::LeftSide) {
-            if let Some(card) = self.card_database.get_card(card_in_zone) {
-                card.card_no == card_no
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+        self.can_activate_area_ability(player_id, card_no, crate::zones::MemberArea::LeftSide)
     }
 
     pub fn can_activate_right_side_ability(&self, player_id: &str, card_no: &str) -> bool {
-        // Rule 11.9.2: RightSide ability can only activate if member is in right side area
-        let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
-        if let Some(card_in_zone) = player.stage.get_area(crate::zones::MemberArea::RightSide) {
-            if let Some(card) = self.card_database.get_card(card_in_zone) {
-                card.card_no == card_no
-            } else {
-                false
-            }
-        } else {
-            false
-        }
+        self.can_activate_area_ability(player_id, card_no, crate::zones::MemberArea::RightSide)
     }
 
     pub fn reset_keyword_tracking(&mut self) {
@@ -386,6 +440,18 @@ impl GameState {
         *self.blade_modifiers.get(&card_id).unwrap_or(&0)
     }
 
+    pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: crate::card::BladeColor) {
+        self.blade_type_modifiers.insert(card_id, blade_color);
+    }
+
+    pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<crate::card::BladeColor> {
+        self.blade_type_modifiers.get(&card_id).copied()
+    }
+
+    pub fn clear_blade_type_modifier(&mut self, card_id: i16) {
+        self.blade_type_modifiers.remove(&card_id);
+    }
+
     pub fn add_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
         let colors = self.heart_modifiers.entry(card_id).or_insert_with(std::collections::HashMap::new);
         *colors.entry(color).or_insert(0) += delta;
@@ -432,6 +498,18 @@ impl GameState {
         self.orientation_modifiers.insert(card_id, orientation.to_string());
     }
 
+    pub fn add_cost_modifier(&mut self, card_id: i16, delta: i32) {
+        *self.cost_modifiers.entry(card_id).or_insert(0) += delta;
+    }
+
+    pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
+        self.cost_modifiers.insert(card_id, value);
+    }
+
+    pub fn get_cost_modifier(&self, card_id: i16) -> i32 {
+        *self.cost_modifiers.get(&card_id).unwrap_or(&0)
+    }
+
     pub fn get_orientation_modifier(&self, card_id: i16) -> Option<&String> {
         self.orientation_modifiers.get(&card_id)
     }
@@ -442,6 +520,7 @@ impl GameState {
         self.score_modifiers.remove(&card_id);
         self.need_heart_modifiers.remove(&card_id);
         self.orientation_modifiers.remove(&card_id);
+        self.cost_modifiers.remove(&card_id);
     }
 
     pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {
@@ -503,40 +582,36 @@ impl GameState {
         }
     }
     
-    fn execute_card_ability(&mut self, card_no: &str, player_id: &str) {
-        // Find the card and its abilities, then execute them using AbilityResolver
-        
-        let player_id_clone = player_id.to_string();
-        let player = if player_id_clone == self.player1.id {
-            &self.player1
-        } else {
-            &self.player2
-        };
-        
-        // Search for the card on stage or in other zones
+    pub fn execute_card_ability(&mut self, card_no: &str, player_id: &str) {
+        // Find the card by card_no
         let card = {
+            let player = if player_id == self.player1.id {
+                &self.player1
+            } else {
+                &self.player2
+            };
+            
             let mut found_card = None;
             
-            // Check stage
-            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-            for area in areas {
-                if let Some(card_in_zone) = player.stage.get_area(area) {
-                    if let Some(card) = self.card_database.get_card(card_in_zone) {
-                        if card.card_no == card_no {
-                            found_card = Some(card);
-                            break;
-                        }
+            // Check hand
+            for card_id in &player.hand.cards {
+                if let Some(card) = self.card_database.get_card(*card_id) {
+                    if card.card_no == card_no {
+                        found_card = Some(card);
+                        break;
                     }
                 }
             }
             
-            // Check live card zone
+            // Check stage
             if found_card.is_none() {
-                for card_id in &player.live_card_zone.cards {
-                    if let Some(card) = self.card_database.get_card(*card_id) {
-                        if card.card_no == card_no {
-                            found_card = Some(card);
-                            break;
+                for stage_card_id in &player.stage.stage {
+                    if *stage_card_id != -1 {
+                        if let Some(card) = self.card_database.get_card(*stage_card_id) {
+                            if card.card_no == card_no {
+                                found_card = Some(card);
+                                break;
+                            }
                         }
                     }
                 }
@@ -548,15 +623,85 @@ impl GameState {
         if let Some(card) = card {
             let abilities = card.abilities.clone();
             for ability in abilities.iter() {
-                // Use AbilityResolver to evaluate conditions and execute effects
-                let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-                if let Err(e) = resolver.resolve_ability(ability) {
-                    eprintln!("Failed to resolve ability: {}", e);
+                // Check if there's a pending ability execution
+                let pending = self.pending_ability.clone();
+                if let Some(ref pending) = pending {
+                    // Resume from pending execution
+                    if pending.card_no == card_no && pending.player_id == player_id {
+                        if let Some(ref effect) = ability.effect {
+                            let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+
+                            // Handle conditional_alternative choice
+                            if effect.action == "conditional_alternative" {
+                                if let Some(ref choice) = pending.conditional_choice {
+                                    if choice == "alternative" {
+                                        if let Some(ref alt_effect) = effect.alternative_effect {
+                                            if let Err(e) = resolver.execute_effect(alt_effect) {
+                                                eprintln!("Failed to execute alternative effect: {}", e);
+                                            }
+                                        }
+                                    } else {
+                                        if let Err(e) = resolver.execute_effect(effect) {
+                                            eprintln!("Failed to execute primary effect: {}", e);
+                                        }
+                                    }
+                                }
+                            } else {
+                                if let Err(e) = resolver.execute_effect(effect) {
+                                    eprintln!("Failed to execute effect: {}", e);
+                                }
+                            }
+
+                            // Clear pending ability after execution
+                            self.pending_ability = None;
+                        }
+                    }
+                } else {
+                    // Start new ability execution
+                    let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+                    if let Err(e) = resolver.resolve_ability(ability) {
+                        eprintln!("Failed to resolve ability: {}", e);
+                    }
+                    // Check if there's a pending choice after execution
+                    if let Some(_choice) = resolver.get_pending_choice() {
+                        // Store pending ability state
+                        if let Some(ref effect) = ability.effect {
+                            self.pending_ability = Some(PendingAbilityExecution {
+                                card_no: card_no.to_string(),
+                                player_id: player_id.to_string(),
+                                action_index: 0,
+                                effect: effect.clone(),
+                                conditional_choice: None,
+                            });
+                        }
+                    }
                 }
             }
         } else {
             eprintln!("Card not found: {}", card_no);
         }
+    }
+
+    pub fn provide_ability_choice_result(&mut self, result: crate::ability_resolver::ChoiceResult) -> Result<(), String> {
+        // Check if this is a conditional_alternative choice
+        if let Some(ref mut pending) = self.pending_ability {
+            if let crate::ability_resolver::ChoiceResult::TargetSelected { target } = &result {
+                if target == "primary" || target == "alternative" {
+                    pending.conditional_choice = Some(target.clone());
+                }
+            }
+        }
+        
+        // Execute the choice result using the resolver
+        let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+        resolver.provide_choice_result(result)?;
+        
+        // Resume ability execution after choice
+        if let Some(pending) = self.pending_ability.clone() {
+            self.execute_card_ability(&pending.card_no, &pending.player_id);
+        }
+        
+        Ok(())
     }
     
     #[allow(dead_code)]
@@ -1125,6 +1270,14 @@ impl GameState {
                 }
                 AbilityTrigger::PerformancePhaseStart => {
                     ability.triggers.as_ref().map_or(false, |t| t == "パフォーマンスフェイズの始めに")
+                }
+                AbilityTrigger::Constant => {
+                    // Constant abilities are always active, but need to be evaluated continuously
+                    ability.triggers.as_ref().map_or(false, |t| t == "常時")
+                }
+                AbilityTrigger::Auto => {
+                    // Generic auto abilities (not tied to specific timing)
+                    ability.triggers.as_ref().map_or(false, |t| t == "自動")
                 }
             }
         }).collect()

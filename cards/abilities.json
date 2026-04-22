@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-04-22T06:37:47.907407",
+  "generated_at": "2026-04-22T19:48:06.135871",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7838,7 +7838,8 @@
           "temporal": "this_turn"
         },
         "card_type": "live_card",
-        "action": "move_cards",
+        "action": "restriction",
+        "restriction_type": "cannot_place",
         "duration": "live_end"
       }
     },
@@ -12971,7 +12972,9 @@
         "text": "このカードは成功ライブカード置き場に置くことができない",
         "destination": "success_live_card_zone",
         "card_type": "live_card",
-        "action": "move_cards"
+        "action": "restriction",
+        "restriction_type": "cannot_place",
+        "restricted_destination": "success_live_card_zone"
       }
     },
     {
