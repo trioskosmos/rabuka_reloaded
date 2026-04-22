@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-04-22T19:48:06.135871",
+  "generated_at": "2026-04-23T02:33:49.270127",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -51,6 +51,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -94,6 +95,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -355,6 +357,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -410,6 +413,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -1779,7 +1783,8 @@
         "text": "このメンバーをウェイトにする",
         "state_change": "wait",
         "type": "change_state",
-        "card_type": "member_card"
+        "card_type": "member_card",
+        "self_cost": true
       },
       "effect": {
         "text": "自分の控え室から『μ's』のライブカードを1枚手札に加える",
@@ -1876,7 +1881,8 @@
         "text": "このメンバーをウェイトにする",
         "state_change": "wait",
         "type": "change_state",
-        "card_type": "member_card"
+        "card_type": "member_card",
+        "self_cost": true
       },
       "effect": {
         "text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、選んだハートを1つ得る",
@@ -2014,7 +2020,8 @@
             "text": "{{center.png|センター}}このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -3504,7 +3511,8 @@
             "text": "このメンバーをウェイトにする",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -3539,7 +3547,8 @@
         "text": "このメンバーをウェイトにする",
         "state_change": "wait",
         "type": "change_state",
-        "card_type": "member_card"
+        "card_type": "member_card",
+        "self_cost": true
       },
       "effect": {
         "text": "さらにライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4016,7 +4025,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -4410,7 +4420,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置いてもよい",
@@ -4705,7 +4716,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置いてもよい",
@@ -4973,6 +4985,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -5084,7 +5097,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置いてもよい",
@@ -5319,7 +5333,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置いてもよい",
@@ -5657,7 +5672,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置いてもよい",
@@ -6454,6 +6470,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -7858,7 +7875,8 @@
         "text": "このメンバーをウェイトにする",
         "state_change": "wait",
         "type": "change_state",
-        "card_type": "member_card"
+        "card_type": "member_card",
+        "self_cost": true
       },
       "effect": {
         "text": "カードを1枚引き、手札を1枚控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）",
@@ -7944,6 +7962,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -8216,6 +8235,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -8391,7 +8411,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -8455,6 +8476,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -8619,7 +8641,8 @@
             "text": "{{center.png|センター}}このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置く",
@@ -8672,6 +8695,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -8730,6 +8754,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -9215,6 +9240,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -9755,6 +9781,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -9951,7 +9978,8 @@
         "text": "{{icon_energy.png|E}}このメンバーをウェイトにする",
         "state_change": "wait",
         "type": "change_state",
-        "card_type": "member_card"
+        "card_type": "member_card",
+        "self_cost": true
       },
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
@@ -10225,7 +10253,8 @@
         "text": "このメンバーをウェイトにする",
         "state_change": "wait",
         "type": "change_state",
-        "card_type": "member_card"
+        "card_type": "member_card",
+        "self_cost": true
       },
       "effect": {
         "text": "エネルギーを1枚アクティブにする",
@@ -11043,7 +11072,8 @@
             "text": "このメンバーをウェイトにし",
             "state_change": "wait",
             "type": "change_state",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "self_cost": true
           },
           {
             "text": "手札を1枚控え室に置いてもよい",
@@ -11089,6 +11119,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -11646,6 +11677,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -14749,6 +14781,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -14835,6 +14868,7 @@
         "state_change": "wait",
         "type": "change_state",
         "card_type": "member_card",
+        "self_cost": true,
         "optional": true
       },
       "effect": {
@@ -15633,6 +15667,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -17159,6 +17194,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {
@@ -17296,6 +17332,7 @@
         "source": "stage",
         "destination": "discard",
         "card_type": "member_card",
+        "self_cost": true,
         "type": "move_cards"
       },
       "effect": {

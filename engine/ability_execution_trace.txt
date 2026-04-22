@@ -1,0 +1,9 @@
+Ability Execution Trace:
+Card: PL!SP-bp5-001-R＋
+Cost option selected: 0
+Cost paid: member set to wait state (still on stage)
+Stage count: 1 -> 1
+Waitroom size: 0 -> 0
+Card orientation: Some("wait")
+Active energy count: 6
+Total energy cards: 10

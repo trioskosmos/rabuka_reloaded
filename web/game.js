@@ -1143,8 +1143,9 @@ class GameScene extends Phaser.Scene {
         
         // Calculate responsive spacing
         const skipBtnSpacing = Math.max(50, Math.floor(h * 0.06));
-        const groupedSpacing = Math.max(75, Math.floor(h * 0.09));
         const regularSpacing = Math.max(42, Math.floor(h * 0.05));
+        const afterGroupedSpacing = Math.max(25, Math.floor(h * 0.035));
+        const afterRegularSpacing = Math.max(15, Math.floor(h * 0.022));
         
         // Calculate responsive padding
         const skipBtnPadding = { x: Math.max(15, Math.floor(buttonWidth * 0.05)), y: Math.max(8, Math.floor(h * 0.012)) };
@@ -1152,9 +1153,11 @@ class GameScene extends Phaser.Scene {
         const smallBtnPadding = { x: Math.max(5, Math.floor(buttonWidth * 0.015)), y: Math.max(3, Math.floor(h * 0.005)) };
         const regularBtnPadding = { x: Math.max(8, Math.floor(buttonWidth * 0.025)), y: Math.max(4, Math.floor(h * 0.006)) };
         
+        // Track actual Y position instead of using index
+        let currentY = startY;
+        
         // Separate Pass/Skip/Finish actions and make them prominent
         let skipActions = [];
-        let currentIndex = 0;
         
         // Find skip/finish/pass actions
         this.actions.forEach((action) => {
@@ -1172,7 +1175,7 @@ class GameScene extends Phaser.Scene {
                 buttonText = 'FINISH LIVE SET';
             }
             
-            const skipBtn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * skipBtnSpacing, buttonText, {
+            const skipBtn = this.add.text(panelX + panelWidth / 2, currentY, buttonText, {
                 fontSize: `${skipBtnSize}px`,
                 color: '#ffffff',
                 backgroundColor: '#e94560',
@@ -1198,7 +1201,7 @@ class GameScene extends Phaser.Scene {
                    .on('pointerdown', () => this.executeActionDirect(capturedSkipAction));
             
             this.actionButtons.push(skipBtn);
-            currentIndex++;
+            currentY += skipBtnSpacing;
         });
         
         // Other action buttons - check if they have available_areas for grouping
@@ -1211,7 +1214,7 @@ class GameScene extends Phaser.Scene {
             // Check if this is a grouped card action with available_areas
             if (params && params.available_areas && params.available_areas.length > 0) {
                 // Card title with base cost
-                const titleText = this.add.text(panelX + Math.max(10, Math.floor(panelWidth * 0.04)), startY + currentIndex * groupedSpacing, action.description, {
+                const titleText = this.add.text(panelX + Math.max(10, Math.floor(panelWidth * 0.04)), currentY, action.description, {
                     fontSize: `${titleSize}px`,
                     color: '#e94560',
                     fontStyle: 'bold',
@@ -1225,6 +1228,7 @@ class GameScene extends Phaser.Scene {
                 const areas = params.available_areas;
                 const buttonWidthSmall = (buttonWidth - Math.max(15, Math.floor(buttonWidth * 0.05))) / 3;
                 const smallBtnX = panelX + Math.max(10, Math.floor(panelWidth * 0.04));
+                const areaButtonOffset = Math.max(22, Math.floor(h * 0.03));
                 
                 areas.forEach((areaInfo, i) => {
                     if (areaInfo.available) {
@@ -1233,7 +1237,7 @@ class GameScene extends Phaser.Scene {
                             `${label} (${areaInfo.cost} - Baton)` : 
                             `${label} (${areaInfo.cost})`;
                         
-                        const btn = this.add.text(smallBtnX + i * buttonWidthSmall, startY + currentIndex * groupedSpacing + Math.max(22, Math.floor(h * 0.03)), costText, {
+                        const btn = this.add.text(smallBtnX + i * buttonWidthSmall, currentY + areaButtonOffset, costText, {
                             fontSize: `${smallBtnSize}px`,
                             color: '#fff',
                             backgroundColor: areaInfo.is_baton_touch ? '#48bb78' : '#2d3748',
@@ -1264,10 +1268,11 @@ class GameScene extends Phaser.Scene {
                     }
                 });
                 
-                currentIndex++;
+                // Move Y position to account for title + area buttons
+                currentY += areaButtonOffset + afterGroupedSpacing;
             } else {
                 // Regular action button (not grouped)
-                const btn = this.add.text(panelX + panelWidth / 2, startY + currentIndex * regularSpacing, action.description, {
+                const btn = this.add.text(panelX + panelWidth / 2, currentY, action.description, {
                     fontSize: `${regularBtnSize}px`,
                     color: '#fff',
                     backgroundColor: '#2d3748',
@@ -1295,7 +1300,7 @@ class GameScene extends Phaser.Scene {
                    .on('pointerdown', () => this.executeActionDirect(capturedAction));
                 
                 this.actionButtons.push(btn);
-                currentIndex++;
+                currentY += regularSpacing + afterRegularSpacing;
             }
         });
         

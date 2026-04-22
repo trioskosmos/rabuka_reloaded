@@ -51,7 +51,7 @@ impl CardLoader {
         let mut total_abilities_mapped = 0;
 
         if let Some(unique_abilities) = abilities_data.get("unique_abilities").and_then(|v| v.as_array()) {
-            println!("Loading {} unique abilities from abilities.json", unique_abilities.len());
+            // println!("Loading {} unique abilities from abilities.json", unique_abilities.len());
             for ability_entry in unique_abilities {
                 // Try to deserialize the ability directly - #[serde(default)] will handle missing fields
                 if let Ok(mut ability) = serde_json::from_value::<Ability>(ability_entry.clone()) {
@@ -191,7 +191,7 @@ impl CardLoader {
                     }
                 }
             }
-            println!("Mapped {} total abilities to cards", total_abilities_mapped);
+            // println!("Mapped {} total abilities to cards", total_abilities_mapped);
         }
 
         // Attach abilities to cards
@@ -202,7 +202,7 @@ impl CardLoader {
                 cards_with_abilities += 1;
             }
         }
-        println!("Attached abilities to {} cards", cards_with_abilities);
+        // println!("Attached abilities to {} cards", cards_with_abilities);
 
         cards
     }

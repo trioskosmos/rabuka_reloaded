@@ -27,6 +27,8 @@ pub struct Player {
     pub has_finished_live_card_set: bool,
     // Track live score for the current live
     pub live_score: i32,
+    // Track whether player has a valid live score (Q47, Q48)
+    pub has_live_score: bool,
     // Optimization: Map card_id to index in hand for O(1) lookups
     pub hand_card_id_to_index: HashMap<i16, usize>,
 }
@@ -49,6 +51,7 @@ impl Player {
             areas_locked_this_turn: std::collections::HashSet::new(),
             has_finished_live_card_set: false,
             live_score: 0,
+            has_live_score: false,
             hand_card_id_to_index: HashMap::new(),
         }
     }
@@ -102,10 +105,10 @@ impl Player {
         let card_id = self.hand.cards.remove(hand_index);
         // Rebuild index map after removal
         self.rebuild_hand_index_map();
-        eprintln!("Card ID from hand: {}", card_id);
+        // eprintln!("Card ID from hand: {}", card_id);
 
         if let Some(card) = card_db.get_card(card_id) {
-            eprintln!("Retrieved card: {} (card_no: {})", card.name, card.card_no);
+            // eprintln!("Retrieved card: {} (card_no: {})", card.name, card.card_no);
             if !card.is_member() {
                 self.hand.cards.insert(hand_index, card_id);
                 self.rebuild_hand_index_map();
@@ -114,7 +117,7 @@ impl Player {
 
             // Rule 9.6.2.3: Cost is equal to the card's cost value in energy
             let card_cost = card.cost.unwrap_or(0);
-            eprintln!("Playing card {} with cost {}", card.name, card_cost);
+            // eprintln!("Playing card {} with cost {}", card.name, card_cost);
 
             // Rule 9.6.2.3: Determine cost and pay all costs
             let mut cost_to_pay = card_cost;
@@ -127,10 +130,11 @@ impl Player {
                     if self.areas_locked_this_turn.contains(&stage_area) {
                         false
                     } else {
-                        // Check if player has 1+ active energy to pay
+                        // Check if player has 1+ active energy to pay (or if cost is 0 for equal/lower cost baton touch)
                         let active_energy_count = self.energy_zone.active_count();
 
-                        if cost_to_pay > 0 && active_energy_count >= 1 {
+                        // Allow baton touch if cost_to_pay is 0 (equal/lower cost) OR if there's energy to pay
+                        if cost_to_pay == 0 || (cost_to_pay > 0 && active_energy_count >= 1) {
                             // Get the member card ID
                             let member_card_id = existing_member;
                             let cost = card_db.get_card(member_card_id).map(|c| c.cost.unwrap_or(1)).unwrap_or(1);
@@ -172,34 +176,43 @@ impl Player {
 
         match stage_area {
             crate::zones::MemberArea::LeftSide => {
-                if self.stage.stage[0] != -1 {
+                // Only check occupation if not using baton touch (baton touch replaces the card)
+                if !baton_touch_used && self.stage.stage[0] != -1 {
                     self.hand.cards.insert(hand_index, card_id);
                     self.rebuild_hand_index_map();
                     return Err("Left side already occupied".to_string());
                 }
                 self.stage.stage[0] = card_id;
                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
-                self.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
+                if !baton_touch_used {
+                    self.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide);
+                }
             }
             crate::zones::MemberArea::Center => {
-                if self.stage.stage[1] != -1 {
+                // Only check occupation if not using baton touch (baton touch replaces the card)
+                if !baton_touch_used && self.stage.stage[1] != -1 {
                     self.hand.cards.insert(hand_index, card_id);
                     self.rebuild_hand_index_map();
                     return Err("Center already occupied".to_string());
                 }
                 self.stage.stage[1] = card_id;
                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
-                self.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
+                if !baton_touch_used {
+                    self.areas_locked_this_turn.insert(crate::zones::MemberArea::Center);
+                }
             }
             crate::zones::MemberArea::RightSide => {
-                if self.stage.stage[2] != -1 {
+                // Only check occupation if not using baton touch (baton touch replaces the card)
+                if !baton_touch_used && self.stage.stage[2] != -1 {
                     self.hand.cards.insert(hand_index, card_id);
                     self.rebuild_hand_index_map();
                     return Err("Right side already occupied".to_string());
                 }
                 self.stage.stage[2] = card_id;
                 // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
-                self.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
+                if !baton_touch_used {
+                    self.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
+                }
             }
         }
         

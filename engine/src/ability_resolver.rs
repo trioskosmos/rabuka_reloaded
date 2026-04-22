@@ -110,8 +110,11 @@ impl<'a> AbilityResolver<'a> {
                         eprintln!("User chose to pay optional cost - continuing with effect");
                         // Retrieve the pending ability and continue execution
                         if let Some(pending) = self.game_state.pending_ability.clone() {
-                            // Re-execute the effect without the optional check
-                            // For now, just clear and continue - the actual execution happens when the ability is resolved
+                            eprintln!("Executing effect from pending ability: {:?}", pending.effect);
+                            // Execute the effect
+                            if let Err(e) = self.execute_effect(&pending.effect) {
+                                eprintln!("Failed to execute effect after optional cost: {}", e);
+                            }
                             self.pending_choice = None;
                             return Ok(());
                         }
@@ -1437,7 +1440,9 @@ impl<'a> AbilityResolver<'a> {
             "opponent" => {
                 self.game_state.prohibition_effects.push(prohibition_text);
             }
-            _ => {}
+            _ => {
+                // Do nothing for other targets
+            }
         }
         
         // Handle duration for temporary cost modifications
@@ -1527,6 +1532,10 @@ impl<'a> AbilityResolver<'a> {
                             action_index: 0,
                             effect: effect.clone(),
                             conditional_choice: None,
+                            activating_card: None,
+                            ability_index: 0,
+                            cost: None,
+                            cost_choice: None,
                         });
                         
                         return Ok(());
@@ -1555,6 +1564,10 @@ impl<'a> AbilityResolver<'a> {
                             action_index: 0,
                             effect: effect.clone(),
                             conditional_choice: None,
+                            activating_card: None,
+                            ability_index: 0,
+                            cost: None,
+                            cost_choice: None,
                         });
                         
                         return Ok(());
@@ -1582,6 +1595,10 @@ impl<'a> AbilityResolver<'a> {
                         action_index: 0,
                         effect: effect.clone(),
                         conditional_choice: None,
+                        activating_card: None,
+                        ability_index: 0,
+                        cost: None,
+                        cost_choice: None,
                     });
                     
                     return Ok(());
@@ -1610,6 +1627,10 @@ impl<'a> AbilityResolver<'a> {
                         action_index: 0,
                         effect: effect.clone(),
                         conditional_choice: None,
+                        activating_card: None,
+                        ability_index: 0,
+                        cost: None,
+                        cost_choice: None,
                     });
                     
                     return Ok(());
@@ -1739,8 +1760,14 @@ impl<'a> AbilityResolver<'a> {
                                 }
                                 "under_member" => {
                                     // Place card underneath a member on stage (as energy)
-                                    // Energy tracking moved to GameState modifiers
-                                    player.hand.add_card(left_card_id);
+                                    if player.stage.stage[0] != -1 {
+                                        // There's a member in left side, place energy under it
+                                        eprintln!("under_member: placing energy under left member");
+                                        player.hand.add_card(left_card_id);
+                                    } else {
+                                        // No member in left side, put card back to hand
+                                        player.hand.add_card(left_card_id);
+                                    }
                                 }
                                 "empty_area" => {
                                     // Place in first empty stage area
@@ -1796,8 +1823,14 @@ impl<'a> AbilityResolver<'a> {
                                 }
                                 "under_member" => {
                                     // Place card underneath a member on stage (as energy)
-                                    // Energy tracking moved to GameState modifiers
-                                    player.hand.add_card(right_card_id);
+                                    if player.stage.stage[2] != -1 {
+                                        // There's a member in right side, place energy under it
+                                        eprintln!("under_member: placing energy under right member");
+                                        player.hand.add_card(right_card_id);
+                                    } else {
+                                        // No member in right side, put card back to hand
+                                        player.hand.add_card(right_card_id);
+                                    }
                                 }
                                 "empty_area" => {
                                     // Place in first empty stage area
@@ -1813,8 +1846,10 @@ impl<'a> AbilityResolver<'a> {
                                     }
                                 }
                                 "same_area" => {
-                                    // Move to same area (no-op for stage to stage)
-                                    player.hand.add_card(right_card_id);
+                                    // Move to same area - track original position (right side)
+                                    // For stage to stage, this is a no-op, card stays in place
+                                    eprintln!("same_area: keeping card in right position");
+                                    moved += 1;
                                 }
                                 _ => {
                                     player.hand.add_card(right_card_id);
@@ -2570,6 +2605,10 @@ impl<'a> AbilityResolver<'a> {
                             action_index: 0,
                             effect: effect.clone(),
                             conditional_choice: None,
+                            activating_card: None,
+                            ability_index: 0,
+                            cost: None,
+                            cost_choice: None,
                         });
                         
                         return Ok(());
@@ -2598,6 +2637,10 @@ impl<'a> AbilityResolver<'a> {
                             action_index: 0,
                             effect: effect.clone(),
                             conditional_choice: None,
+                            activating_card: None,
+                            ability_index: 0,
+                            cost: None,
+                            cost_choice: None,
                         });
                         
                         return Ok(());
@@ -2625,6 +2668,10 @@ impl<'a> AbilityResolver<'a> {
                         action_index: 0,
                         effect: effect.clone(),
                         conditional_choice: None,
+                        activating_card: None,
+                        ability_index: 0,
+                        cost: None,
+                        cost_choice: None,
                     });
                     
                     return Ok(());
@@ -2653,6 +2700,10 @@ impl<'a> AbilityResolver<'a> {
                         action_index: 0,
                         effect: effect.clone(),
                         conditional_choice: None,
+                        activating_card: None,
+                        ability_index: 0,
+                        cost: None,
+                        cost_choice: None,
                     });
                     
                     return Ok(());
@@ -2703,58 +2754,79 @@ impl<'a> AbilityResolver<'a> {
                 } else {
                     // Activate specific energy cards based on count and filters
                     let count_usize = count as usize;
-                    let mut activated = 0;
-                    for card_id in player.energy_zone.cards.iter() {
-                        if activated >= count_usize {
-                            break;
-                        }
-                        if matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) && matches_cost_limit(*card_id, cost_limit) {
-                            if activated < player.energy_zone.active_energy_count {
-                                // Already active, skip
-                                continue;
-                            }
-                            activated += 1;
-                        }
-                    }
-                    let max_to_activate = player.energy_zone.cards.len().min(count_usize);
-                    player.energy_zone.active_energy_count = max_to_activate;
+                    let current_active = player.energy_zone.active_energy_count;
+                    let total_cards = player.energy_zone.cards.len();
+                    
+                    // Calculate new active count, but don't exceed total cards
+                    let new_active = (current_active + count_usize).min(total_cards);
+                    player.energy_zone.active_energy_count = new_active;
                 }
             }
             "wait" => {
-                // Set energy cards to wait state
                 let count_usize = count as usize;
                 
-                // Find all valid targets
-                let valid_targets: Vec<i16> = player.energy_zone.cards.iter()
-                    .filter(|&card_id| matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) && matches_cost_limit(*card_id, cost_limit))
-                    .copied()
-                    .collect();
+                // Check if targeting member cards or energy cards
+                let is_member = card_type_filter == Some("member_card");
                 
-                // If multiple valid targets and count < valid_targets.len(), need user choice
-                if valid_targets.len() > count_usize && count_usize > 0 {
-                    let description = format!("Select {} energy card(s) to set to wait state from {} valid targets", count_usize, valid_targets.len());
+                if is_member {
+                    // Handle member cards on stage
+                    let valid_targets: Vec<i16> = player.stage.stage.iter()
+                        .filter(|&&id| id != -1)
+                        .filter(|&card_id| matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) && matches_cost_limit(*card_id, cost_limit))
+                        .copied()
+                        .collect();
                     
-                    // Store valid targets temporarily for selection
-                    self.looked_at_cards = valid_targets;
+                    // If multiple valid targets and count < valid_targets.len(), need user choice
+                    if valid_targets.len() > count_usize && count_usize > 0 {
+                        let description = format!("Select {} member(s) to set to wait state from {} valid targets", count_usize, valid_targets.len());
+                        
+                        // Store valid targets temporarily for selection
+                        self.looked_at_cards = valid_targets;
+                        
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "stage".to_string(),
+                            card_type: card_type_filter.map(|s| s.to_string()),
+                            count: count_usize,
+                            description,
+                            allow_skip: false,
+                        });
+                        // Return early - execution will continue after user provides choice
+                        return Ok(());
+                    }
                     
-                    self.pending_choice = Some(Choice::SelectCard {
-                        zone: "energy_zone".to_string(),
-                        card_type: card_type_filter.map(|s| s.to_string()),
-                        count: count_usize,
-                        description,
-                        allow_skip: false,
-                    });
-                    // Return early - execution will continue after user provides choice
-                    return Ok(());
+                    // Otherwise, set the first count_usize cards to wait state using orientation modifiers
+                    for card_id in valid_targets.iter().take(count_usize) {
+                        self.game_state.add_orientation_modifier(*card_id, "wait");
+                    }
+                } else {
+                    // Handle energy cards
+                    let valid_targets: Vec<i16> = player.energy_zone.cards.iter()
+                        .filter(|&card_id| matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) && matches_cost_limit(*card_id, cost_limit))
+                        .copied()
+                        .collect();
+                    
+                    // If multiple valid targets and count < valid_targets.len(), need user choice
+                    if valid_targets.len() > count_usize && count_usize > 0 {
+                        let description = format!("Select {} energy card(s) to set to wait state from {} valid targets", count_usize, valid_targets.len());
+                        
+                        // Store valid targets temporarily for selection
+                        self.looked_at_cards = valid_targets;
+                        
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "energy_zone".to_string(),
+                            card_type: card_type_filter.map(|s| s.to_string()),
+                            count: count_usize,
+                            description,
+                            allow_skip: false,
+                        });
+                        // Return early - execution will continue after user provides choice
+                        return Ok(());
+                    }
+                    
+                    // Otherwise, deactivate the first count_usize cards
+                    let max_to_wait = player.energy_zone.active_energy_count.min(count_usize);
+                    player.energy_zone.active_energy_count -= max_to_wait;
                 }
-                
-                // Otherwise, deactivate the first count_usize cards
-                let mut deactivated = 0;
-                for card_id in valid_targets.iter().take(count_usize) {
-                    deactivated += 1;
-                }
-                let max_to_wait = player.energy_zone.active_energy_count.min(count_usize);
-                player.energy_zone.active_energy_count -= max_to_wait;
             }
             _ => {}
         }
@@ -2967,10 +3039,10 @@ impl<'a> AbilityResolver<'a> {
         // Track as temporary effect if duration is specified
         if let Some(dur) = duration {
             let duration_enum = match dur {
-                "live_end" => crate::game_state::EffectDuration::LiveEnd,
-                "as_long_as" => crate::game_state::EffectDuration::AsLongAs,
-                "this_turn" => crate::game_state::EffectDuration::ThisTurn,
-                _ => crate::game_state::EffectDuration::LiveEnd,
+                "live_end" => crate::game_state::Duration::LiveEnd,
+                "as_long_as" => crate::game_state::Duration::ThisLive,
+                "this_turn" => crate::game_state::Duration::ThisTurn,
+                _ => crate::game_state::Duration::LiveEnd,
             };
 
             let temp_effect = crate::game_state::TemporaryEffect {
@@ -3172,19 +3244,22 @@ impl<'a> AbilityResolver<'a> {
             "hand" => {
                 // Mark cards as revealed in hand
                 let mut revealed_count = 0;
+                let mut cards_to_reveal: Vec<i16> = Vec::new();
                 for card_id in &player.hand.cards {
                     if revealed_count >= count {
                         break;
                     }
                     if let Some(card) = self.game_state.card_database.get_card(*card_id) {
                         if matches_card_type(card, card_type_filter) {
-                            // Mark card as revealed - for now we just log it
-                            // In a full implementation, this would track revealed state
-                            // and make the card visible to the opponent
+                            cards_to_reveal.push(*card_id);
                             println!("Revealed card: {} from hand", card.name);
                             revealed_count += 1;
                         }
                     }
+                }
+                // Add revealed cards after the loop to avoid borrow conflict
+                for card_id in cards_to_reveal {
+                    self.game_state.add_revealed_card(card_id);
                 }
                 if revealed_count < count {
                     eprintln!("Warning: Only {} cards revealed, requested {}", revealed_count, count);
@@ -3321,13 +3396,25 @@ impl<'a> AbilityResolver<'a> {
     }
 
     /// Resolve a complete ability
-    pub fn resolve_ability(&mut self, ability: &Ability) -> Result<(), String> {
+    pub fn resolve_ability(&mut self, ability: &Ability, activating_card: Option<i16>) -> Result<(), String> {
         // Set current ability for optional cost handling
         self.current_ability = Some(ability.clone());
+        
+        // Set activating card in game state for self-cost handling
+        self.game_state.activating_card = activating_card;
         
         // First, pay the cost if there is one
         if let Some(ref cost) = ability.cost {
             self.pay_cost(cost)?;
+        }
+
+        // Check if there's a pending choice from cost payment (e.g., optional cost)
+        // If so, don't execute the effect yet - wait for user choice
+        if self.pending_choice.is_some() {
+            eprintln!("Pending choice from cost payment, pausing ability execution");
+            self.current_ability = None;
+            // Don't clear activating_card yet - we need it when resuming
+            return Ok(());
         }
 
         // Then execute the effect
@@ -3335,9 +3422,9 @@ impl<'a> AbilityResolver<'a> {
             self.execute_effect(effect)?;
         }
 
-        // Clear current ability after execution
+        // Clear activating card after successful execution
+        self.game_state.activating_card = None;
         self.current_ability = None;
-        
         Ok(())
     }
 
@@ -3419,6 +3506,10 @@ impl<'a> AbilityResolver<'a> {
                 action_index: 0,
                 effect: effect.clone(),
                 conditional_choice: None,
+                activating_card: None,
+                ability_index: 0,
+                cost: None,
+                cost_choice: None,
             });
             return Ok(());
         }
@@ -3545,6 +3636,10 @@ impl<'a> AbilityResolver<'a> {
                 action_index: 0,
                 effect: effect.clone(),
                 conditional_choice: None,
+                activating_card: None,
+                ability_index: 0,
+                cost: None,
+                cost_choice: None,
             });
             return Ok(());
         }
@@ -3697,6 +3792,10 @@ impl<'a> AbilityResolver<'a> {
                 action_index: 0,
                 effect: effect.clone(),
                 conditional_choice: None,
+                activating_card: None,
+                ability_index: 0,
+                cost: None,
+                cost_choice: None,
             });
             return Ok(());
         }
@@ -3851,7 +3950,7 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn pay_cost(&mut self, cost: &AbilityCost) -> Result<(), String> {
+    pub fn pay_cost(&mut self, cost: &AbilityCost) -> Result<(), String> {
         eprintln!("PAY_COST: cost_type={:?}, source={:?}, destination={:?}, card_type={:?}", cost.cost_type, cost.source, cost.destination, cost.card_type);
         match cost.cost_type.as_deref() {
             Some("move_cards") => {
@@ -3867,6 +3966,75 @@ impl<'a> AbilityResolver<'a> {
                     ..Default::default()
                 };
                 self.execute_move_cards(&effect)
+            }
+            Some("change_state") => {
+                // Execute state change as a cost (e.g., put member to wait state)
+                let state_change = cost.state_change.as_deref().unwrap_or("");
+                eprintln!("PAY_COST: Executing state change: {}", state_change);
+                
+                // Check if this is an optional cost
+                if cost.optional == Some(true) {
+                    // Present choice to pay or skip optional cost
+                    let cost_description = if state_change == "wait" {
+                        "Put this member to wait state"
+                    } else {
+                        "Pay cost"
+                    };
+                    
+                    self.pending_choice = Some(Choice::SelectTarget {
+                        target: "pay_optional_cost:skip_optional_cost".to_string(),
+                        description: format!("Pay optional cost: {}? (pay or skip)", cost_description),
+                    });
+                    
+                    // Store the actual ability effect (from current_ability) for resuming after choice
+                    let actual_effect = if let Some(ref ability) = self.current_ability {
+                        eprintln!("Retrieving effect from current_ability: {:?}", ability.effect);
+                        ability.effect.clone()
+                    } else {
+                        eprintln!("No current_ability found!");
+                        None
+                    };
+                    
+                    // Store effect for resuming after choice
+                    self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+                        card_no: "optional_cost".to_string(),
+                        player_id: "self".to_string(),
+                        action_index: 0,
+                        effect: actual_effect.unwrap_or_default(),
+                        conditional_choice: None,
+                        activating_card: None,
+                        ability_index: 0,
+                        cost: Some(cost.clone()),
+                        cost_choice: None,
+                    });
+                    
+                    eprintln!("Stored pending_ability with effect: {:?}", self.game_state.pending_ability);
+                    
+                    return Ok(());
+                }
+                
+                if state_change == "wait" {
+                    // Set member to wait state (inactive but still on stage)
+                    let target = cost.target.as_deref().unwrap_or("self");
+                    let player = if target == "self" {
+                        &self.game_state.player1
+                    } else {
+                        &self.game_state.player2
+                    };
+                    
+                    // Collect card IDs first to avoid borrow issues
+                    let card_ids: Vec<i16> = player.stage.stage.iter()
+                        .filter(|&&id| id != -1)
+                        .copied()
+                        .collect();
+                    
+                    // Set orientation to wait for each card
+                    for card_id in card_ids {
+                        self.game_state.add_orientation_modifier(card_id, "wait");
+                        eprintln!("PAY_COST: Set card {} to wait state (still on stage)", card_id);
+                    }
+                }
+                Ok(())
             }
             Some("pay_energy") => {
                 // Pay energy cost

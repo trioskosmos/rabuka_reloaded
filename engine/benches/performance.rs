@@ -108,7 +108,7 @@ enum GameEndReason {
 }
 
 fn run_single_game_to_completion(mut game_state: GameState) -> (GameState, u64, GameEndReason) {
-    let max_iterations = 10000; // High limit to allow long games
+    let max_iterations = 1000; // Reduced for faster benchmarking
     let mut iteration_count = 0;
     let mut action_count = 0;
     let mut end_reason = GameEndReason::Stuck;
@@ -128,7 +128,7 @@ fn run_single_game_to_completion(mut game_state: GameState) -> (GameState, u64, 
         // Detect stuck state (very lenient)
         if game_state.turn_number == last_turn_number {
             stuck_counter += 1;
-            if stuck_counter > 5000 { // Very high threshold
+            if stuck_counter > 500 { // Reduced threshold
                 end_reason = GameEndReason::Stuck;
                 break;
             }
@@ -254,19 +254,16 @@ fn benchmark_full_game(c: &mut Criterion) {
         // Run a quick test to get approximate actions per second for throughput
         let (test_actions, test_victories, test_games) = run_games_for_duration(card_database.clone(), player1_deck_template.clone(), player2_deck_template.clone(), 1);
         
-        println!("Deck {}: {} actions, {} victories in {} games (1 second test)", deck_name, test_actions, test_victories, test_games);
-        
-        let mut group = c.benchmark_group("full_game_10sec");
-        group.throughput(Throughput::Elements(test_actions * 10)); // Scale to 10 seconds
+        let mut group = c.benchmark_group("full_game_2sec");
+        group.throughput(Throughput::Elements(test_actions * 2)); // Scale to 2 seconds
         group.bench_with_input(BenchmarkId::from_parameter(deck_name), deck_name, |b, &_deck_name| {
             b.iter(|| {
                 let (actions, victories, games) = run_games_for_duration(
                     card_database.clone(),
                     player1_deck_template.clone(),
                     player2_deck_template.clone(),
-                    10
+                    2
                 );
-                println!("  Run: {} actions, {} victories in {} games", actions, victories, games);
                 actions
             });
         });
@@ -314,15 +311,13 @@ fn benchmark_full_game_parallel(c: &mut Criterion) {
         // Run a quick test to get approximate actions per second for throughput
         let (test_actions, test_victories, test_games) = run_games_for_duration(Arc::clone(card_database), player1_deck_template.clone(), player2_deck_template.clone(), 1);
         
-        println!("Deck {}: {} actions, {} victories in {} games (1 second test)", deck_name, test_actions, test_victories, test_games);
-        
         let num_threads = rayon::current_num_threads();
         
-        let mut group = c.benchmark_group("full_game_parallel_10sec");
-        group.throughput(Throughput::Elements(test_actions * 10)); // Scale to 10 seconds
+        let mut group = c.benchmark_group("full_game_parallel_2sec");
+        group.throughput(Throughput::Elements(test_actions * 2)); // Scale to 2 seconds
         group.bench_with_input(BenchmarkId::from_parameter(deck_name), deck_name, |b, &_deck_name| {
             b.iter(|| {
-                // Run games in parallel using rayon for 10 seconds total
+                // Run games in parallel using rayon for 2 seconds total
                 let total_actions: u64 = (0..num_threads)
                     .into_par_iter()
                     .map(|_| {
@@ -330,7 +325,7 @@ fn benchmark_full_game_parallel(c: &mut Criterion) {
                             Arc::clone(card_database),
                             player1_deck_template.clone(),
                             player2_deck_template.clone(),
-                            10 / num_threads as u64 // Divide time among threads
+                            2 / num_threads as u64 // Divide time among threads
                         ).0
                     })
                     .sum();

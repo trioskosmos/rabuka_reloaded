@@ -10,7 +10,7 @@ impl TurnEngine {
         // Advance phase according to rules 7.1.2, 7.3.3, and 8.1.2
         let current_phase = game_state.current_phase.clone();
         let current_turn_phase = game_state.current_turn_phase.clone();
-        eprintln!("advance_phase called: current_phase={:?}, current_turn_phase={:?}", current_phase, current_turn_phase);
+        // eprintln!("advance_phase called: current_phase={:?}, current_turn_phase={:?}", current_phase, current_turn_phase);
         
         // Handle normal phase sub-phases (Rule 7.3.3)
         if current_turn_phase == TurnPhase::FirstAttackerNormal || current_turn_phase == TurnPhase::SecondAttackerNormal {
@@ -20,7 +20,7 @@ impl TurnEngine {
                     // Activate BOTH players' energy, not just active player
                     game_state.player1.activate_all_energy();
                     game_state.player2.activate_all_energy();
-                    eprintln!("After Active phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
+                    // eprintln!("After Active phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
                     // Orientation tracking moved to GameState modifiers
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
@@ -29,7 +29,7 @@ impl TurnEngine {
                     // Rule 7.5: Draw energy card (automatic)
                     Self::check_timing(game_state);
                     let _ = game_state.active_player_mut().draw_energy();
-                    eprintln!("After Energy phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
+                    // eprintln!("After Energy phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Draw;
                 }
@@ -37,7 +37,7 @@ impl TurnEngine {
                     // Rule 7.6: Draw card (automatic)
                     Self::check_timing(game_state);
                     let _ = game_state.active_player_mut().draw_card();
-                    eprintln!("After Draw phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
+                    // eprintln!("After Draw phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Main;
                 }
@@ -194,8 +194,13 @@ impl TurnEngine {
             crate::game_setup::ActionType::SelectMulligan => {
                 // Toggle card selection for mulligan
                 let idx = if let Some(cid) = card_id {
-                    let active_player = game_state.active_player();
-                    active_player.get_card_index_by_id(cid).unwrap_or(0)
+                    // Use current_mulligan_player instead of active_player
+                    let mulligan_player = if game_state.current_mulligan_player == "player1" {
+                        &game_state.player1
+                    } else {
+                        &game_state.player2
+                    };
+                    mulligan_player.get_card_index_by_id(cid).unwrap_or(0)
                 } else {
                     0 // Fallback to index 0 if no card_id provided
                 };
@@ -559,15 +564,88 @@ impl TurnEngine {
                         if let Some(card) = card_db.get_card(stage_card_id) {
                             // Find kidou (起動) abilities on this card
                             let player_id = player.id.clone();
-                            for ability in &card.abilities {
+                            for (ability_index, ability) in card.abilities.iter().enumerate() {
                                 if ability.triggers.as_ref().map_or(false, |t| t == "起動") {
-                                    let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                    game_state.trigger_auto_ability(
-                                        ability_id,
-                                        crate::game_state::AbilityTrigger::Activation,
-                                        player_id.clone(),
-                                        Some(card.card_no.clone()),
-                                    );
+                                    // Mark ability as used if it has a use_limit
+                                    if ability.use_limit.is_some() {
+                                        let ability_key = format!("{}_{}_{}", stage_card_id, ability_index, game_state.turn_number);
+                                        game_state.turn_limited_abilities_used.insert(ability_key);
+                                    }
+                                    
+                                    // Check if ability has a cost
+                                    let mut should_trigger_effect = true;
+                                    if let Some(ref cost) = ability.cost {
+                                        // Check if cost requires user choice (choice_condition or OR conditions)
+                                        if cost.cost_type.as_deref() == Some("choice_condition") {
+                                            // Present cost payment options to the player
+                                            let cost_text = cost.text.clone();
+                                            
+                                            // Extract the actual cost options
+                                            if let Some(ref cost_options) = cost.options {
+                                                let option_texts: Vec<String> = cost_options.iter()
+                                                    .map(|opt| opt.text.clone())
+                                                    .collect();
+                                                
+                                                // Create option indices for selection
+                                                let option_indices: Vec<String> = cost_options.iter()
+                                                    .enumerate()
+                                                    .map(|(i, _)| i.to_string())
+                                                    .collect();
+                                                
+                                                // Show options in a readable format
+                                                let options_display = option_texts.iter()
+                                                    .enumerate()
+                                                    .map(|(i, text)| format!("{}. {}", i + 1, text))
+                                                    .collect::<Vec<_>>()
+                                                    .join("\n");
+                                                
+                                                // Create a pending choice for cost selection
+                                                let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+                                                resolver.pending_choice = Some(crate::ability_resolver::Choice::SelectTarget {
+                                                    target: option_indices.join("|"),
+                                                    description: format!("Pay cost to activate ability:\n{}\n{}\nSelect option:", cost_text, options_display),
+                                                });
+                                                
+                                                // Store pending ability with cost information
+                                                game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+                                                    card_no: card.card_no.clone(),
+                                                    player_id: player_id.clone(),
+                                                    action_index: ability_index,
+                                                    effect: ability.effect.clone().unwrap_or_default(),
+                                                    conditional_choice: None,
+                                                    activating_card: None,
+                                                    ability_index: ability_index,
+                                                    cost: Some(cost.clone()),
+                                                    cost_choice: None,
+                                                });
+                                                
+                                                eprintln!("Ability has cost requiring user choice: {}", cost_text);
+                                                should_trigger_effect = false; // Don't trigger effect yet, wait for cost selection
+                                            } else {
+                                                eprintln!("Choice condition cost has no options, treating as simple cost");
+                                                // Fall through to simple cost handling
+                                            }
+                                        }
+                                        
+                                        // Simple cost without choice - pay it directly
+                                        if should_trigger_effect {
+                                            let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+                                            if let Err(e) = resolver.pay_cost(cost) {
+                                                return Err(format!("Failed to pay cost: {}", e));
+                                            }
+                                        }
+                                    }
+                                    
+                                    // Trigger the ability effect (after cost is paid, if any)
+                                    if should_trigger_effect {
+                                        let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                                        game_state.trigger_auto_ability(
+                                            ability_id,
+                                            crate::game_state::AbilityTrigger::Activation,
+                                            player_id.clone(),
+                                            Some(card.card_no.clone()),
+                                        );
+                                    }
                                 }
                             }
                         }
@@ -784,6 +862,7 @@ impl TurnEngine {
         
         game_state.player1.areas_locked_this_turn.clear();
         game_state.player2.areas_locked_this_turn.clear();
+        game_state.turn_limited_abilities_used.clear();
         game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         game_state.current_phase = Phase::Active;
     }

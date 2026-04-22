@@ -502,16 +502,25 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             for (card_id, area_name) in stage_positions {
                 if card_id != -1 {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for (_ability_index, ability) in card.abilities.iter().enumerate() {
-                            // Check if ability can be activated (has main phase trigger)
-                            // triggers is a String field, check if it contains "main"
+                        for (ability_index, ability) in card.abilities.iter().enumerate() {
+                            // Check if ability can be activated (has activation trigger or main phase trigger)
+                            // triggers is a String field, check if it contains "main", "メイン", or "起動" (activation)
                             let can_activate = ability.triggers.as_ref().map_or(false, |t| {
-                                t.contains("main") || t.contains("メイン")
+                                t.contains("main") || t.contains("メイン") || t.contains("起動")
                             });
 
-                            if can_activate {
-                                let ability_name = if ability.full_text.len() > 30 {
-                                    format!("{}...", &ability.full_text[..30])
+                            // Check use_limit (e.g., once per turn)
+                            let ability_key = format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
+                            let can_use = if let Some(use_limit) = ability.use_limit {
+                                // Check if this ability has already been used this turn
+                                !game_state.turn_limited_abilities_used.contains(&ability_key)
+                            } else {
+                                true
+                            };
+
+                            if can_activate && can_use {
+                                let ability_name = if ability.full_text.chars().count() > 30 {
+                                    format!("{}...", ability.full_text.chars().take(30).collect::<String>())
                                 } else {
                                     ability.full_text.clone()
                                 };

@@ -1913,6 +1913,14 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if 'このメンバー以外' in text or 'ほかのメンバー' in text:
         cost['exclude_self'] = True
     
+    # Extract self_cost for costs (e.g., "このメンバーを" - the card itself is the cost)
+    # This is distinct from exclude_self - here the card itself is being acted upon
+    if 'このメンバー' in text and 'このメンバー以外' not in text and 'ほかのメンバー' not in text:
+        # Check if it's the subject/object of the action (marked by を or が)
+        # Common patterns: "このメンバーをステージから控え室に置く", "このメンバーをウェイトにする"
+        if re.search(r'このメンバー[をが]', text):
+            cost['self_cost'] = True
+    
     # Extract group
     group = extract_group(text)
     if group:

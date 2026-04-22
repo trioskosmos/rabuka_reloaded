@@ -173,13 +173,52 @@ When baton touch is used, track:
 - **Area selection** - Can choose any area the touched members occupied (Q193)
 - **Ability triggering** - Baton touch triggers "登場" (appearance) abilities
 
+**Critical Testing Requirements for Baton Touch:**
+
+Baton touch tests MUST follow these conditions to properly simulate gameplay:
+
+1. **Two-Turn Requirement**: Baton touch must be done across two turns. You cannot play multiple cards in the same zone in the same turn normally. The area lock prevents this.
+
+2. **Area Lock Mechanics**: When a card is played to a stage area, that area is locked for the rest of the turn (`areas_locked_this_turn`). This prevents playing another card in the same area in the same turn.
+
+3. **Proper Test Setup**:
+   - Turn 1: Play first member card to stage (e.g., Center)
+   - Advance to turn 2: `game_state.turn_number = 2`
+   - Clear area locks: `game_state.player1.areas_locked_this_turn.clear()`
+   - Turn 2: Baton touch with second card to the SAME area (e.g., Center)
+
+4. **Same Area Requirement**: Baton touch only works when replacing a card in the SAME stage area. Playing to a different area (e.g., Center then RightSide) will not trigger baton touch replacement.
+
 **Example verification:**
 ```rust
+// Turn 1: Play first card to stage
+TurnEngine::execute_main_phase_action(
+    &mut game_state,
+    &ActionType::PlayMemberToStage,
+    Some(first_card_id),
+    None,
+    Some(MemberArea::Center),
+    Some(false), // not baton touch
+).expect("Should play card to stage");
+
+// Advance to turn 2 for baton touch
+game_state.turn_number = 2;
+// Clear locked areas to simulate end of turn logic
+game_state.player1.areas_locked_this_turn.clear();
+
+// Turn 2: Baton touch with second card to SAME area
+TurnEngine::execute_main_phase_action(
+    &mut game_state,
+    &ActionType::PlayMemberToStage,
+    Some(second_card_id),
+    None,
+    Some(MemberArea::Center), // SAME area to trigger replacement
+    Some(true), // use baton touch
+).expect("Should baton touch");
+
 let original_cost = card.cost;
-// ... execute baton touch ...
+// ... verify cost reduction ...
 assert_eq!(actual_cost_paid, original_cost - touched_card.cost);
-// turn_played tracking moved to GameState modifiers
-// For now, assume baton touch restrictions are handled by game logic
 ```
 
 ## Test Structure

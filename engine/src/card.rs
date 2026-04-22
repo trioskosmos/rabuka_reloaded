@@ -281,6 +281,32 @@ impl CardDatabase {
     pub fn get_card_id(&self, card_no: &str) -> Option<i16> {
         self.card_no_to_id.get(card_no).copied()
     }
+
+    /// Check if a card's name contains the given name fragment
+    /// Used for cost payment and ability targeting (Q90, Q81, Q74)
+    pub fn card_name_contains(&self, card_id: i16, name_fragment: &str) -> bool {
+        if let Some(card) = self.cards.get(&card_id) {
+            card.name.contains(name_fragment)
+        } else {
+            false
+        }
+    }
+
+    /// Get all names from a multi-name card (e.g., "A&B&C" -> ["A", "B", "C"])
+    /// Used for multi-name card handling (Q65, Q69, Q81)
+    pub fn get_card_names(&self, card_id: i16) -> Vec<String> {
+        if let Some(card) = self.cards.get(&card_id) {
+            card.name.split('＆').map(|s| s.to_string()).collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Check if card has any of the given names (for multi-name cards)
+    pub fn card_has_any_name(&self, card_id: i16, names: &[&str]) -> bool {
+        let card_names = self.get_card_names(card_id);
+        names.iter().any(|&name| card_names.iter().any(|cn| cn.contains(name)))
+    }
 }
 
 #[allow(dead_code)]
@@ -440,6 +466,12 @@ pub struct AbilityCost {
     pub energy: Option<u32>,
     pub state_change: Option<String>,
     pub position: Option<PositionInfo>,
+    #[serde(default)]
+    pub options: Option<Vec<AbilityCost>>, // For choice_condition costs with multiple options
+    #[serde(default)]
+    pub self_cost: Option<bool>, // True if the card itself is the cost (e.g., "このメンバーを")
+    #[serde(default)]
+    pub exclude_self: Option<bool>, // True if the cost excludes the activating card (e.g., "このメンバー以外")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

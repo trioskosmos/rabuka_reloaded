@@ -403,14 +403,14 @@ impl EnergyZone {
     
     pub fn pay_energy(&mut self, amount: usize) -> Result<(), String> {
         // Rule 5.9: Pay energy by decrementing active count
-        eprintln!("pay_energy called: amount={}, active_energy_count={}", amount, self.active_energy_count);
+        // eprintln!("pay_energy called: amount={}, active_energy_count={}", amount, self.active_energy_count);
         
         if self.active_energy_count >= amount {
             self.active_energy_count -= amount;
-            eprintln!("pay_energy result: success, remaining active_energy_count={}", self.active_energy_count);
+            // eprintln!("pay_energy result: success, remaining active_energy_count={}", self.active_energy_count);
             Ok(())
         } else {
-            eprintln!("pay_energy result: failed, active_energy_count={}", self.active_energy_count);
+            // eprintln!("pay_energy result: failed, active_energy_count={}", self.active_energy_count);
             Err(format!("Could not pay {} energy (only {} active energy available, {} total energy cards)", amount, self.active_energy_count, self.cards.len()))
         }
     }
@@ -418,7 +418,7 @@ impl EnergyZone {
     pub fn activate_all(&mut self) {
         // Set all energy cards to active state
         self.active_energy_count = self.cards.len();
-        eprintln!("Activated {} energy cards (active_energy_count={})", self.cards.len(), self.active_energy_count);
+        // eprintln!("Activated {} energy cards (active_energy_count={})", self.cards.len(), self.active_energy_count);
     }
 }
 

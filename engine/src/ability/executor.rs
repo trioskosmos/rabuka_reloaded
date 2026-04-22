@@ -521,7 +521,7 @@ impl AbilityExecutor {
                     self.move_from_discard_to_hand(player, count_usize, card_type, game_state)?;
                 }
                 ("stage" | "ステージ", "discard" | "控え室") => {
-                    self.move_from_stage_to_discard(player)?;
+                    self.move_from_stage_to_discard(player, false, false, game_state)?;
                 }
                 ("hand" | "手札", "discard" | "控え室") => {
                     self.move_from_hand_to_discard(player, count_usize)?;
@@ -589,29 +589,80 @@ impl AbilityExecutor {
         Ok(())
     }
 
-    fn move_from_stage_to_discard(&self, player: &mut Player) -> Result<(), String> {
-        // This is a cost - move the activating member to discard
-        // For now, just remove all members (simplified)
-        if player.stage.stage[0] != -1 {
-            let card_id = player.stage.stage[0];
-            player.stage.stage[0] = -1;
-            player.waitroom.add_card(card_id);
-        }
-        if player.stage.stage[1] != -1 {
-            let card_id = player.stage.stage[1];
-            player.stage.stage[1] = -1;
-            player.waitroom.add_card(card_id);
-        }
-        if player.stage.stage[2] != -1 {
-            let card_id = player.stage.stage[2];
-            player.stage.stage[2] = -1;
-            player.waitroom.add_card(card_id);
+    fn move_from_stage_to_discard(&self, player: &mut Player, is_self_cost: bool, exclude_self: bool, game_state: &GameState) -> Result<(), String> {
+        // This is a cost - move member(s) from stage to discard
+        if is_self_cost {
+            // Self-cost: the card itself is the cost
+            if let Some(activating_card_id) = game_state.activating_card {
+                // Find and discard the activating card from stage
+                let mut found = false;
+                for i in 0..3 {
+                    if player.stage.stage[i] == activating_card_id {
+                        player.stage.stage[i] = -1;
+                        player.waitroom.add_card(activating_card_id);
+                        eprintln!("Self-cost: discarded activating card {} from stage position {}", activating_card_id, i);
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    return Err(format!("Activating card {} not found on stage", activating_card_id));
+                }
+            } else {
+                // Fallback: no activating card tracked, prompt user (shouldn't happen in normal flow)
+                let stage_count = player.stage.stage.iter().filter(|&&c| c != -1).count();
+                if stage_count == 0 {
+                    return Err("No cards on stage to discard".to_string());
+                }
+                eprintln!("Self-cost: no activating card tracked, removing first card");
+                for i in 0..3 {
+                    if player.stage.stage[i] != -1 {
+                        let card_id = player.stage.stage[i];
+                        player.stage.stage[i] = -1;
+                        player.waitroom.add_card(card_id);
+                        eprintln!("Discarded card at position {}", i);
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Non-self-cost: need user selection (or use exclude_self to filter)
+            // For now, simplified: if exclude_self, exclude activating card, otherwise prompt for selection
+            // TODO: Implement proper pending choice mechanism for user selection
+            
+            let activating_card_id = game_state.activating_card;
+            let mut cards_to_discard = Vec::new();
+            
+            for i in 0..3 {
+                if player.stage.stage[i] != -1 {
+                    let card_id = player.stage.stage[i];
+                    // Skip if exclude_self and this is the activating card
+                    if exclude_self && activating_card_id == Some(card_id) {
+                        eprintln!("Excluding activating card {} from discard", card_id);
+                        continue;
+                    }
+                    cards_to_discard.push((i, card_id));
+                }
+            }
+            
+            if cards_to_discard.is_empty() {
+                return Err("No cards on stage to discard (after exclude_self filter)".to_string());
+            }
+            
+            // For now, discard all non-excluded cards (simplified)
+            // TODO: Add pending choice for user to select which cards
+            for (i, card_id) in cards_to_discard {
+                player.stage.stage[i] = -1;
+                player.waitroom.add_card(card_id);
+                eprintln!("Discarded card {} from stage position {}", card_id, i);
+            }
         }
         Ok(())
     }
 
     fn move_from_hand_to_discard(&self, player: &mut Player, count: usize) -> Result<(), String> {
         // This requires user choice - for now, discard first count cards
+        // TODO: Implement proper pending choice mechanism for user selection
         let cards_to_remove: Vec<_> = player.hand.cards.iter().take(count).copied().collect();
         for card_id in cards_to_remove {
             player.waitroom.add_card(card_id);
@@ -1267,7 +1318,7 @@ impl AbilityExecutor {
         &mut self,
         cost: &AbilityCost,
         player: &mut Player,
-        _game_state: &mut GameState,
+        game_state: &mut GameState,
         _perspective_player_id: &str,
     ) -> Result<(), String> {
         match cost.cost_type.as_deref() {
@@ -1277,7 +1328,9 @@ impl AbilityExecutor {
 
                 match (source, destination) {
                     ("stage" | "ステージ", "discard" | "控え室") => {
-                        self.move_from_stage_to_discard(player)?;
+                        let is_self_cost = cost.self_cost.unwrap_or(false);
+                        let exclude_self = cost.exclude_self.unwrap_or(false);
+                        self.move_from_stage_to_discard(player, is_self_cost, exclude_self, game_state)?;
                     }
                     ("hand" | "手札", "discard" | "控え室") => {
                         let count = cost.count.unwrap_or(1);
@@ -1342,7 +1395,11 @@ impl AbilityExecutor {
         player: &mut Player,
         game_state: &mut GameState,
         perspective_player_id: &str,
+        activating_card: Option<i16>,
     ) -> Result<(), String> {
+        // Store activating card in game state for self-cost handling
+        game_state.activating_card = activating_card;
+        
         // Pay cost if exists
         if let Some(ref cost) = ability.cost {
             // Check if cost is optional
@@ -1358,6 +1415,9 @@ impl AbilityExecutor {
         if let Some(ref effect) = ability.effect {
             self.execute_effect(effect, player, game_state, perspective_player_id)?;
         }
+
+        // Clear activating card after execution
+        game_state.activating_card = None;
 
         Ok(())
     }

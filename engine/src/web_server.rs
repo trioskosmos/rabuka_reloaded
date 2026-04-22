@@ -129,9 +129,31 @@ pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::Card
 }
 
 pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase) -> PlayerDisplay {
+    // Calculate orientation for energy cards based on active_energy_count
+    let energy_cards: Vec<(i16, Option<crate::zones::Orientation>)> = player.energy_zone.cards.iter()
+        .enumerate()
+        .map(|(i, &card_id)| {
+            // First active_energy_count cards are active, rest are wait
+            let orientation = if i < player.energy_zone.active_energy_count {
+                Some(crate::zones::Orientation::Active)
+            } else {
+                Some(crate::zones::Orientation::Wait)
+            };
+            (card_id, orientation)
+        })
+        .collect();
+
+    let energy_display = ZoneDisplay {
+        cards: energy_cards.iter()
+            .filter_map(|(card_id, orientation)| {
+                card_to_display(*card_id, card_db, *orientation)
+            })
+            .collect(),
+    };
+
     PlayerDisplay {
         hand: zone_to_display_from_card_ids(&player.hand.cards, card_db),
-        energy: zone_to_display_from_card_ids(&player.energy_zone.cards, card_db),
+        energy: energy_display,
         stage: stage_to_display(&player.stage, card_db),
         live_zone: zone_to_display_from_card_ids(&player.live_card_zone.cards, card_db),
         success_live_card_zone: zone_to_display_from_card_ids(&player.success_live_card_zone.cards, card_db),
