@@ -447,7 +447,7 @@ pub fn run_headless_game() {
                     &actions[0].action_type,
                     actions[0].parameters.as_ref().and_then(|p| p.card_id),
                     actions[0].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    None,
+                    actions[0].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }

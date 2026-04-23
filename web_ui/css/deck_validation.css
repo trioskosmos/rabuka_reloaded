@@ -1,0 +1,136 @@
+.deck-validation-summary {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 12px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.deck-validation-summary .stat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.deck-validation-summary .stat.valid {
+    color: #2ecc71;
+    font-weight: bold;
+}
+
+.deck-validation-summary .stat.warning {
+    color: #f1c40f;
+}
+
+.deck-validation-errors {
+    margin-bottom: 12px;
+    padding: 10px;
+    background: rgba(231, 76, 60, 0.1);
+    border: 1px solid rgba(231, 76, 60, 0.3);
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+
+.error-list {
+    margin-top: 4px;
+    color: #e74c3c;
+    word-break: break-all;
+}
+
+.preview-section-title {
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: #888;
+    text-transform: uppercase;
+    margin: 15px 0 8px 5px;
+    letter-spacing: 0.05em;
+}
+
+.deck-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Scrollbar */
+.deck-preview-grid::-webkit-scrollbar {
+    width: 6px;
+}
+
+.deck-preview-grid::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.deck-preview-grid::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+}
+
+.preview-item {
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 4px;
+    text-align: center;
+    transition: transform 0.15s;
+    cursor: default;
+}
+
+.preview-item:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.07);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.preview-item.invalid {
+    border-color: rgba(231, 76, 60, 0.5);
+    background: rgba(231, 76, 60, 0.05);
+}
+
+.preview-card-img {
+    width: 100%;
+    aspect-ratio: 219/306;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    background: #111;
+}
+
+.preview-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #ff6b9d;
+    font-size: 0.65rem;
+    font-weight: bold;
+    padding: 1px 4px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 107, 157, 0.3);
+}
+
+.preview-code {
+    font-size: 0.5rem;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.1;
+}
+
+.format-hint {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-size: 0.85rem;
+    font-style: italic;
+}

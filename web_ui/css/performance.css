@@ -1,0 +1,340 @@
+/* --- Performance Results UI --- */
+
+.perf-overview-shell {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+}
+
+.perf-comparison-banner {
+    padding: var(--space-md);
+    background: linear-gradient(135deg, rgba(241, 186, 76, 0.1), transparent);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+.perf-player-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
+}
+
+.perf-panel {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--glass-border);
+    padding: var(--space-md);
+    border-left: 4px solid #666;
+}
+
+/* Hover effect removed to stabilize layout and save space */
+
+.perf-panel.success { border-left-color: var(--accent-green); }
+.perf-panel.failure { border-left-color: var(--accent-pink); }
+
+.perf-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-xs);
+}
+
+.perf-metric-card {
+    padding: var(--space-xs) var(--space-sm);
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+}
+
+.perf-metric-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: var(--accent-gold);
+}
+
+/* Heart Progress */
+.heart-progress-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.heart-pip {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.heart-pip.filled { background: white; border-color: white; }
+.heart-pip.color-0.filled { background: var(--accent-pink); }
+.heart-pip.color-1.filled { background: var(--accent-red); }
+.heart-pip.color-2.filled { background: var(--accent-gold); }
+.heart-pip.color-3.filled { background: var(--accent-green); }
+.heart-pip.color-4.filled { background: var(--accent-blue); }
+
+.heart-mini-icon {
+    width: 16px;
+    height: 16px;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
+.perf-inline-icon {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
+.perf-live-art, .perf-contrib-art {
+    width: 36px;
+    height: 36px;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+}
+
+.perf-yell-card-modern img {
+    width: 100%;
+    height: auto;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+}
+
+.heart-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    background: rgba(0,0,0,0.3);
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+}
+
+/* History List */
+.turn-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.turn-event-item {
+    background: rgba(255, 255, 255, 0.03);
+    border-left: 3px solid #666;
+    padding: 4px 10px;
+}
+
+.turn-event-item.play { border-left-color: var(--accent-blue); background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), transparent); }
+.turn-event-item.activate { border-left-color: var(--accent-pink); background: linear-gradient(90deg, rgba(255, 85, 170, 0.1), transparent); }
+.turn-event-item.generic { border-left-color: #666; }
+
+.perf-hearts-grid {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    background: rgba(0,0,0,0.1);
+    padding: 4px 8px;
+    border-radius: 6px;
+    min-height: 24px;
+}
+
+.heart-grid-cell {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.heart-grid-cell .count-value {
+    color: #fff;
+}
+
+/* Yell Card Refinement */
+.perf-yell-gallery {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.perf-yell-card-modern {
+    width: 80px;
+    flex-shrink: 0;
+    background: var(--perf-surface-strong);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.perf-yell-card-art-wrap {
+    aspect-ratio: 1/1;
+    overflow: hidden;
+    border-radius: 4px;
+}
+
+.perf-yell-card-modern img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.perf-yell-icons {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 0.65rem;
+}
+
+.perf-badge {
+    padding: 1px 4px;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.perf-badge.note { background: #55c2b2; color: #000; }
+.perf-badge.draw { background: #3b82f6; color: #fff; }
+
+.perf-eyebrow {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+}
+
+/* Math Sum Layout */
+.perf-math-sum {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 4px 0;
+    padding: 8px;
+    background: rgba(0,0,0,0.2);
+    border-radius: 8px;
+}
+
+.perf-math-operand {
+    text-align: center;
+}
+
+.perf-math-value {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.perf-math-operator {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: var(--text-dim);
+    margin-top: 12px;
+}
+
+.perf-math-result .perf-math-value {
+    color: var(--accent-gold);
+}
+
+.success .perf-math-result .perf-math-value { color: var(--accent-green); }
+.failure .perf-math-result .perf-math-value { color: var(--accent-pink); }
+
+.perf-match-footnote {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: center;
+    margin-top: 4px;
+}
+
+.perf-match-summary {
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 8px;
+    margin-top: 8px;
+}
+.perf-panel-body-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: var(--space-md);
+    align-items: start;
+}
+
+.perf-body-column-left, .perf-body-column-right {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.perf-body-column-left > *, .perf-body-column-right > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+@media (max-width: 1200px) {
+    .perf-panel-body-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.perf-metric-card.highlight {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.perf-metric-card.highlight .perf-metric-value {
+    color: var(--accent-gold);
+    text-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+.total-count-dim {
+    font-size: 0.8rem;
+    opacity: 0.5;
+    margin-left: 4px;
+    font-weight: normal;
+}
+
+.hearts-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+
+.perf-panel-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: var(--space-md);
+}
+
+.perf-panel-header h2 {
+    margin: 4px 0;
+    font-size: 1.4rem;
+}
+
+.perf-panel-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+}
+
+.perf-status-pill {
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-weight: 800;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+
+.perf-status-pill.success { background: var(--accent-green); color: #fff; }
+.perf-status-pill.failure { background: var(--accent-pink); color: #fff; }
+
+.perf-outcome-pill {
+    margin-top: 4px;
+    font-size: 0.7rem;
+    text-align: right;
+    color: var(--text-muted);
+}

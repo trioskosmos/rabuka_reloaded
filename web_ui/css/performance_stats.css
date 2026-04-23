@@ -1,0 +1,106 @@
+.perf-overview-shell {
+    --perf-rose: #e86966;
+    --perf-amber: #f1ba4c;
+    --perf-sea: #55c2b2;
+    --perf-ink: #0d1521;
+    --perf-surface: rgba(13, 21, 33, 0.82);
+    --perf-surface-strong: rgba(9, 14, 24, 0.9);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 4px;
+}
+
+.perf-comparison-banner,
+.perf-engine-flow,
+.perf-panel,
+.perf-section-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        radial-gradient(circle at top right, rgba(241, 186, 76, 0.14), transparent 35%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+        var(--perf-surface);
+    border-radius: 18px;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.perf-metric-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.perf-metric-card {
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.perf-metric-value {
+    margin-top: 8px;
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #fff8ee;
+}
+
+.perf-member-contribution {
+    display: flex;
+    gap: 10px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.heart-pip {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.heart-pip.filled {
+    border-color: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3);
+}
+
+.heart-pip.color-0.filled { background: #ff55aa; }
+.heart-pip.color-1.filled { background: #ff4444; }
+.heart-pip.color-2.filled { background: #f59e0b; }
+.heart-pip.color-3.filled { background: #2ecc71; }
+.heart-pip.color-4.filled { background: #3b82f6; }
+.heart-pip.color-5.filled { background: #8b5cf6; }
+.heart-pip.color-6.filled { background: #ffffff; }
+
+@media (max-width: 1100px) {
+    .perf-player-grid,
+    .perf-route-grid,
+    .perf-contrib-grid,
+    .perf-effects-grid,
+    .perf-flow-grid,
+    .perf-source-lists {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Tooltips */
+.perf-bonus-source-tooltip {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(15, 15, 25, 0.98);
+    border: 1px solid var(--accent-gold);
+    padding: 12px;
+    border-radius: 12px;
+    z-index: var(--z-tooltip);
+    width: 320px;
+    visibility: hidden;
+    opacity: 0;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(12px);
+    transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
+    pointer-events: none;
+}

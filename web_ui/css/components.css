@@ -1,0 +1,444 @@
+/* 
+   loveca - components.css
+   Unified styling for UI components (buttons, selects, inputs).
+   Matches the premium, glassmorphic theme of the application.
+*/
+
+/* --- Base Button Styles --- */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    user-select: none;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.4));
+    color: var(--text);
+    backdrop-filter: blur(4px);
+    position: relative;
+    overflow: hidden;
+    gap: var(--space-xs);
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--accent-blue);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Actions should override general hover blue */
+.btn.hover-highlight {
+    border-color: transparent; 
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: none;
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* --- Button Sizes --- */
+.btn-sm {
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    height: 24px;
+}
+
+.btn-lg {
+    padding: var(--space-md) var(--space-xl);
+    font-size: 1rem;
+}
+
+/* --- Button Variants --- */
+.btn-primary {
+    background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-dark));
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: var(--glow-blue);
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, var(--accent-blue-dark), var(--accent-blue));
+    box-shadow: 0 0 20px rgba(74, 158, 255, 0.6);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--border);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-accent {
+    background: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-dark));
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-accent:hover {
+    box-shadow: var(--glow-gold);
+}
+
+.btn-accent-pink {
+    background: rgba(255, 85, 170, 0.1);
+    border-color: var(--accent-pink);
+    color: var(--accent-pink);
+}
+
+.btn-accent-pink:hover {
+    background: var(--accent-pink);
+    color: white;
+    box-shadow: var(--glow-pink);
+}
+
+/* --- Action Button Interaction System --- */
+.action-btn:hover,
+.action-btn.hover-highlight,
+.action-btn.selected {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(245, 158, 11, 0.1));
+    border-color: var(--accent-gold) !important;
+    border-width: 2px !important;
+    box-shadow: var(--glow-gold-strong), inset 0 0 10px rgba(245, 158, 11, 0.15) !important;
+    z-index: 10;
+}
+
+.action-btn:hover {
+    animation: action-btn-pulse 1.5s infinite ease-in-out;
+}
+
+.action-btn.hover-highlight {
+    animation: action-btn-pulse 1.5s infinite ease-in-out;
+}
+
+.action-btn .action-title,
+.action-btn .action-cost,
+.action-btn .inline-icon {
+    pointer-events: none;
+}
+
+@keyframes action-btn-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.02); opacity: 0.95; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+.btn-accent-green {
+    background: rgba(46, 204, 113, 0.1);
+    border-color: var(--accent-green);
+    color: var(--accent-green);
+}
+
+.btn-accent-green:hover {
+    background: var(--accent-green);
+    color: white;
+    box-shadow: var(--glow-green);
+}
+
+.btn-accent-purple {
+    background: rgba(155, 89, 182, 0.1);
+    border-color: var(--accent-purple);
+    color: var(--accent-purple);
+}
+
+.btn-accent-purple:hover {
+    background: var(--accent-purple);
+    color: white;
+    box-shadow: var(--glow-purple);
+}
+
+.btn-accent-red {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--accent-red);
+    color: var(--accent-red);
+}
+
+.btn-accent-red:hover {
+    background: var(--accent-red);
+    color: white;
+    box-shadow: var(--glow-red);
+}
+
+.btn-accent-gray {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--text-dim);
+    color: var(--text-dim);
+}
+
+.btn-accent-gray:hover {
+    background: var(--text-dim);
+    color: var(--bg-primary);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+}
+
+.btn-outline:hover {
+    border-color: white;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+/* --- Form Controls (Select, Input) --- */
+.form-select,
+.form-input,
+.report-textarea {
+    appearance: none;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    padding: var(--space-sm) var(--space-md);
+    font-size: 0.85rem;
+    font-family: inherit;
+    outline: none;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.form-select:hover,
+.form-input:hover,
+.report-textarea:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: var(--bg-tertiary);
+}
+
+.form-select:focus,
+.form-input:focus,
+.report-textarea:focus {
+    border-color: var(--accent-blue);
+    box-shadow: var(--glow-blue), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    background: var(--bg-tertiary);
+}
+
+/* Custom Select Arrow */
+.form-select {
+    padding-right: var(--space-xl);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23a0aec0' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right var(--space-md) center;
+}
+
+/* --- Toggle Buttons --- */
+.btn-toggle {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-weight: 700;
+    padding: var(--space-sm) var(--space-lg);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.btn-toggle.active {
+    background: var(--bg-tertiary);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    box-shadow: var(--glow-blue);
+}
+
+/* --- Specialized Components --- */
+.debug-badge {
+    background: rgba(74, 158, 255, 0.15);
+    border: 1px solid var(--accent-blue);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: var(--accent-blue);
+    font-weight: 700;
+}
+
+.report-textarea {
+    width: 100%;
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+/* Tooltip (Glass) */
+.floating-tooltip {
+    position: fixed;
+    z-index: var(--z-tooltip);
+    background: rgba(15, 20, 30, 0.9);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--accent-blue);
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+    color: white;
+    font-size: 0.8rem;
+    pointer-events: none;
+    box-shadow: var(--shadow-lg);
+    max-width: 300px;
+}
+
+/* Debug Modal Unification */
+.debug-scalar-cell {
+    padding: 7px 8px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.04);
+    font-size: 10px;
+    line-height: 1.35;
+    min-width: 0;
+}
+
+.debug-scalar-label {
+    opacity: 0.6;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.debug-scalar-value {
+    font-family: var(--font-mono);
+    word-break: break-word;
+}
+
+.debug-status-banner {
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.debug-status-error {
+    border-left: 3px solid var(--accent-red);
+    background: rgba(239, 68, 68, 0.12);
+    color: #fecaca;
+}
+
+.debug-status-success {
+    border-left: 3px solid var(--accent-green);
+    background: rgba(34, 197, 94, 0.12);
+    color: #bbf7d0;
+}
+
+.debug-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 7px;
+    border-radius: 999px;
+    border: 1px solid var(--accent, var(--accent-blue));
+    color: var(--accent, var(--accent-blue));
+    background: rgba(0, 0, 0, 0.22);
+    font-size: 10px;
+    line-height: 1.2;
+}
+
+.form-label-xs {
+    font-size: 0.65rem;
+    opacity: 0.7;
+    display: block;
+    margin-bottom: var(--space-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Log Modal Unification */
+.log-viewer-filter-toggles {
+    display: flex;
+    gap: var(--space-md);
+    align-items: center;
+}
+
+.filter-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    font-size: 0.8rem;
+    cursor: pointer;
+    user-select: none;
+    opacity: 0.8;
+}
+
+.btn-row {
+    display: flex;
+    gap: var(--space-md);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.debug-action-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
+}
+
+.debug-log-line {
+    padding: 4px 8px;
+    color: var(--line-color, #94a3b8);
+    background: var(--line-bg, transparent);
+    font-size: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.35;
+}
+
+/* --- Looked Cards Panel (Sidebar) --- */
+.looked-cards-panel {
+    display: none; /* Managed by JS */
+    flex-direction: column;
+    gap: var(--space-md);
+    background: rgba(255, 255, 255, 0.03);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin: 0;
+    flex: 0 0 auto;
+}
+
+.looked-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: 8px;
+    padding: 0;
+    min-height: 80px;
+}
+
+.looked-cards-meta,
+.looked-cards-header,
+.looked-cards-subtitle {
+    grid-column: 1 / -1;
+    width: 100%;
+}
+
+.looked-cards-header {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: bold;
+    color: var(--accent-pink);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+}
+
+.looked-cards-subtitle {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.pending-choice-indicator {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    overflow: visible;
+    max-height: none;
+}
+
+.choice-options-container {
+    overflow: visible;
+    max-height: none;
+    flex: 0 0 auto;
+}

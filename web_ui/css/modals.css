@@ -1,0 +1,140 @@
+/* --- Modal Shared --- */
+.modal-overlay, .modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: var(--z-modal);
+    backdrop-filter: blur(4px);
+    padding: 10px;
+}
+
+.modal-content {
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    width: min(90vw, 800px);
+    max-height: 98vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.6);
+    animation: modal-enter 0.4s var(--ease-out-expo);
+    position: relative;
+}
+
+.performance-modal-content {
+    width: 95vw;
+    max-width: 1400px;
+    height: 92vh;
+    max-height: 92vh;
+}
+
+@keyframes modal-enter {
+    from { opacity: 0; transform: scale(0.95) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-content.large { 
+    width: min(95vw, 1200px); 
+    max-width: none; 
+}
+
+.modal-header {
+    padding: var(--space-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+}
+
+.modal-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    color: var(--accent-gold);
+}
+
+.modal-body {
+    padding: var(--space-lg);
+    overflow-y: auto;
+    flex: 1;
+}
+
+.close-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: var(--transition-fast);
+}
+
+.close-btn:hover {
+    opacity: 1;
+    transform: rotate(90deg);
+}
+
+/* --- Specific Modals --- */
+
+/* Lobby Styles */
+.lobby-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-xl);
+}
+
+.lobby-btn:hover { background: var(--accent-blue); }
+
+.lobby-divider {
+    text-align: center;
+    margin: var(--space-xl) 0;
+    color: var(--text-dim);
+    position: relative;
+}
+
+.lobby-divider::before, .lobby-divider::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background: var(--border);
+}
+.lobby-divider::before { left: 0; }
+.lobby-divider::after { right: 0; }
+
+/* Setup & Lists */
+.selection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--space-md);
+}
+
+
+/* Tab System */
+.modal-tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 2px solid var(--border);
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 10px 20px;
+    cursor: pointer;
+    font-weight: bold;
+    border-bottom: 2px solid transparent;
+}
+
+.tab-btn.active {
+    color: var(--text);
+    border-bottom-color: var(--accent-gold);
+}

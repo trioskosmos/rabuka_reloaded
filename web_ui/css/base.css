@@ -1,0 +1,158 @@
+:root {
+    /* --- Brand & Theme Colors --- */
+    --bg-primary: #0f141e;
+    --bg-secondary: #1a2332;
+    --bg-tertiary: #2a2a35;
+    --bg-zone: rgba(255, 255, 255, 0.05);
+    --border: rgba(255, 255, 255, 0.1);
+
+    --text: #ffffff;
+    --text-dim: #a0aec0;
+    --text-muted: #718096;
+
+    /* --- Semantic Accents --- */
+    --accent-pink: #ff55aa;
+    --accent-pink-dark: #cc4488;
+    --accent-gold: #f59e0b;
+    --accent-gold-dark: #d97706;
+    --accent-blue: #4a9eff;
+    --accent-blue-dark: #2a7edd;
+    --accent-green: #2ecc71;
+    --accent-green-dark: #27ae60;
+    --accent-purple: #9b59b6;
+    --accent-purple-dark: #8e44ad;
+    --accent-red: #ef4444;
+    --accent-valid: #2ecc71;
+
+    /* --- Spacing Scale - Fluid --- */
+    --space-xxs: clamp(2px, 0.2vw, 4px);
+    --space-xs: clamp(4px, 0.4vw, 8px);
+    --space-sm: clamp(8px, 0.8vw, 12px);
+    --space-md: clamp(12px, 1.2vw, 16px);
+    --space-lg: clamp(16px, 1.6vw, 24px);
+    --space-xl: clamp(24px, 2.4vw, 32px);
+    --space-xxl: clamp(32px, 3.2vw, 48px);
+
+    /* --- Typography - Fluid --- */
+    --font-size-xs: clamp(0.7rem, 0.65rem + 0.25vw, 0.8rem);
+    --font-size-sm: clamp(0.8rem, 0.75rem + 0.25vw, 0.9rem);
+    --font-size-base: clamp(0.9rem, 0.8rem + 0.5vw, 1.1rem);
+    --font-size-lg: clamp(1.1rem, 1rem + 0.5vw, 1.3rem);
+    --font-size-xl: clamp(1.3rem, 1.15rem + 0.75vw, 1.6rem);
+    --font-size-xxl: clamp(1.6rem, 1.4rem + 1vw, 2.2rem);
+
+    /* --- Sizing - Responsive Card System --- */
+    --card-h: clamp(120px, 25vh, 260px);
+    --card-w: calc(var(--card-h) * (512 / 720));
+    --card-h-mini: calc(var(--card-h) * 0.6);
+    --card-w-mini: calc(var(--card-w) * 0.6);
+    --card-h-compact: calc(var(--card-h) * 0.35);
+    --card-w-compact: calc(var(--card-w) * 0.35);
+
+    /* --- Effects --- */
+    --transition-fast: 0s;
+    --transition-base: 0s;
+    --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 10px rgba(0, 0, 0, 0.4);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-full: 9999px;
+
+    /* --- Glassmorphism & Effects --- */
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --glass-blur: blur(12px);
+    
+    --glow-pink: 0 0 15px rgba(255, 85, 170, 0.5), 0 0 5px rgba(255, 85, 170, 0.3);
+    --glow-gold: 0 0 15px rgba(245, 158, 11, 0.5), 0 0 5px rgba(245, 158, 11, 0.3);
+    --glow-green: 0 0 15px rgba(46, 204, 113, 0.5), 0 0 5px rgba(46, 204, 113, 0.3);
+    --glow-blue: 0 0 15px rgba(74, 158, 255, 0.5), 0 0 5px rgba(74, 158, 255, 0.3);
+    --glow-purple: 0 0 15px rgba(155, 89, 182, 0.5), 0 0 5px rgba(155, 89, 182, 0.3);
+    --glow-red: 0 0 15px rgba(239, 68, 68, 0.5), 0 0 5px rgba(239, 68, 68, 0.3);
+
+    --glow-pink-strong: 0 0 25px rgba(255, 85, 170, 0.7), 0 0 10px rgba(255, 85, 170, 0.4);
+    --glow-gold-strong: 0 0 25px rgba(245, 158, 11, 0.7), 0 0 10px rgba(245, 158, 11, 0.4);
+
+    /* --- Z-Index Stack --- */
+    --z-base: 1;
+    --z-sidebar: 100;
+    --z-header: 500;
+    --z-overlay: 1000;
+    --z-modal: 2000;
+    --z-tooltip: 3000;
+    --z-max: 9999;
+
+    /* --- Animation Tokens --- */
+    --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+/* Animations */
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 5px var(--accent-pink, #ff55aa), 0 0 0px var(--accent-pink, #ff55aa); }
+    50% { box-shadow: 0 0 20px var(--accent-pink, #ff55aa), 0 0 10px var(--accent-pink, #ff55aa); }
+    100% { box-shadow: 0 0 5px var(--accent-pink, #ff55aa), 0 0 0px var(--accent-pink, #ff55aa); }
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(0px); }
+}
+
+/* Base Global Styles */
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg-primary);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--accent-blue);
+    border-radius: 2px;
+}
+
+/* Accessibility Focus */
+:focus-visible {
+    outline: 3px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ============================================================
+   CSS SCOPING: Rabukasim Root Namespace
+   
+   All app styles are scoped under .rabukasim-root to prevent
+   global selector collisions. Applied to <body> tag.
+   
+   This prevents conflicts when CSS from different sources
+   (individual files, built bundles) would otherwise override
+   each other due to cascade order.
+   ============================================================ */
+.rabukasim-root {
+    /* Explicitly inherit from root defaults */
+    --bg-primary: #0f141e;
+    --bg-secondary: #1a2332;
+    --text: #ffffff;
+}
+
+/* All component selectors are implicitly scoped by HTML structure hierarchy,
+   which is fine since the app uses semantic class names and explicit
+   descendant selectors. No additional prefixing needed. */

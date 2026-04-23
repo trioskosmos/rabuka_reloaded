@@ -529,6 +529,12 @@ impl AbilityExecutor {
                 ("deck" | "デッキ", "hand" | "手札") => {
                     self.draw_cards(player, count_usize)?;
                 }
+                ("deck_top", "hand" | "手札") => {
+                    self.draw_cards(player, count_usize)?;
+                }
+                ("hand" | "手札", "deck_bottom") => {
+                    self.move_from_hand_to_deck_bottom(player, count_usize)?;
+                }
                 _ => {
                     return Err(format!(
                         "Unsupported move: {} -> {}",
@@ -739,6 +745,32 @@ impl AbilityExecutor {
                 return Err("Deck is empty".to_string());
             }
         }
+        Ok(())
+    }
+
+    fn move_from_hand_to_deck_bottom(&mut self, player: &mut Player, count: usize) -> Result<(), String> {
+        // This requires user choice - if multiple cards available, prompt for selection
+        if player.hand.cards.len() > count {
+            // Create pending choice for user to select which cards to move
+            let description = format!("Select {} card(s) from hand to move to bottom of deck ({} available)", count, player.hand.cards.len());
+
+            self.pending_choice = Some(Choice::SelectCard {
+                zone: "hand".to_string(),
+                card_type: None,
+                count,
+                description,
+            });
+
+            return Err("Pending choice required: select cards to move from hand to deck bottom".to_string());
+        }
+
+        // If count equals or exceeds hand size, move all cards to bottom
+        let cards_to_move: Vec<_> = player.hand.cards.iter().take(count).copied().collect();
+        for card_id in cards_to_move {
+            player.main_deck.cards.push(card_id);
+        }
+        let remove_count = count.min(player.hand.cards.len());
+        player.hand.cards.drain(..remove_count);
         Ok(())
     }
 
@@ -1387,9 +1419,18 @@ impl AbilityExecutor {
         cost: &AbilityCost,
         player: &mut Player,
         game_state: &mut GameState,
-        _perspective_player_id: &str,
+        perspective_player_id: &str,
     ) -> Result<(), String> {
         match cost.cost_type.as_deref() {
+            Some("sequential_cost") => {
+                // Execute multiple costs in sequence
+                if let Some(ref costs) = cost.costs {
+                    for sub_cost in costs {
+                        self.execute_cost(sub_cost, player, game_state, perspective_player_id)?;
+                    }
+                }
+                Ok(())
+            }
             Some("move_cards") => {
                 let source = cost.source.as_deref().unwrap_or("");
                 let destination = cost.destination.as_deref().unwrap_or("");
@@ -1404,6 +1445,12 @@ impl AbilityExecutor {
                         let count = cost.count.unwrap_or(1);
                         let count_usize: usize = count.try_into().unwrap_or(usize::MAX);
                         self.move_from_hand_to_discard(player, count_usize)?;
+                    }
+                    ("hand" | "手札", "deck_bottom") => {
+                        // Move card from hand to bottom of deck
+                        let count = cost.count.unwrap_or(1);
+                        let count_usize: usize = count.try_into().unwrap_or(usize::MAX);
+                        self.move_from_hand_to_deck_bottom(player, count_usize)?;
                     }
                     _ => {
                         return Err(format!(
@@ -1450,6 +1497,12 @@ impl AbilityExecutor {
                     // Orientation is now tracked in GameState modifiers
                     // For now, this is a no-op
                 }
+                Ok(())
+            }
+            Some("reveal") => {
+                // Reveal cost - typically used to show cards from hand
+                // For now, this is a no-op as the UI handles revelation
+                eprintln!("Reveal cost: {}", cost.text);
                 Ok(())
             }
             _ => Err(format!("Unknown cost type: {:?}", cost.cost_type)),

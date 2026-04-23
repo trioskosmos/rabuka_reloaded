@@ -171,6 +171,28 @@ impl CardLoader {
                             }
                         }
                     }
+                    
+                    // Fix: If effect has per_unit: true and action is draw/draw_card but count is None, set count to 1
+                    // Also fix nested actions in sequential effects
+                    if let Some(ref mut effect) = ability.effect {
+                        if effect.per_unit == Some(true) {
+                            if (effect.action == "draw" || effect.action == "draw_card") && effect.count.is_none() {
+                                effect.count = Some(1);
+                            }
+                        }
+                        // Fix nested actions - rebuild the actions array with count set
+                        if let Some(ref actions) = effect.actions.clone() {
+                            let fixed_actions: Vec<crate::card::AbilityEffect> = actions.iter().map(|action| {
+                                let mut fixed_action = action.clone();
+                                if (fixed_action.action == "draw" || fixed_action.action == "draw_card") && fixed_action.count.is_none() {
+                                    fixed_action.count = Some(1);
+                                }
+                                fixed_action
+                            }).collect();
+                            effect.actions = Some(fixed_actions);
+                        }
+                    }
+                    
                     if let Some(card_list) = ability_entry.get("cards").and_then(|v| v.as_array()) {
                         for card_entry in card_list {
                             if let Some(card_str) = card_entry.as_str() {

@@ -1,0 +1,290 @@
+.log-section {
+    margin-bottom: var(--space-sm);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: var(--space-xs);
+}
+
+.log-section:last-child {
+    border-bottom: none;
+}
+
+.log-section-header {
+    font-weight: bold;
+    font-size: 0.85rem;
+    color: var(--accent-gold);
+    padding: var(--space-xs) var(--space-sm);
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-xs);
+}
+
+.active-effects-section .log-section-header {
+    color: var(--accent-pink);
+    background: rgba(255, 85, 170, 0.1);
+}
+
+.log-entry.active-effect {
+    border-left-color: var(--accent-pink);
+    background: rgba(255, 85, 170, 0.05);
+}
+
+.log-entry.turn-event {
+    border-left-color: var(--accent-blue);
+}
+
+.log-entry.turn-event.play {
+    border-left-color: #4ade80;
+}
+
+.log-entry.turn-event.activate {
+    border-left-color: #f59e0b;
+}
+
+.log-entry.turn-event.trigger {
+    border-left-color: #ef4444;
+}
+
+.log-entry.turn-event.effect {
+    border-left-color: #8b5cf6;
+}
+
+.log-entry.turn-event.yell {
+    border-left-color: #ec4899;
+}
+
+.log-entry.turn-event.rule {
+    border-left-color: #6b7280;
+}
+
+/* New event types (Phase 2) */
+.log-entry.turn-event.phase {
+    border-left-color: #06b6d4;
+}
+
+.log-entry.turn-event.draw {
+    border-left-color: #3b82f6;
+}
+
+.log-entry.turn-event.score {
+    border-left-color: #10b981;
+}
+
+.log-entry.turn-event.heart {
+    border-left-color: #f472b6;
+}
+
+.log-entry.turn-event.baton {
+    border-left-color: #a855f7;
+}
+
+.log-entry.turn-event.live {
+    border-left-color: #f43f5e;
+}
+
+.player-badge {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: bold;
+    margin-right: 4px;
+}
+
+.player-badge.p0,
+.player-badge.p1 {
+    background: rgba(74, 158, 255, 0.2);
+    color: #4a9eff;
+}
+
+.turn-badge,
+.phase-badge {
+    display: inline-block;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    margin-right: 4px;
+}
+
+.turn-badge {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--accent-gold);
+}
+
+.phase-badge {
+    background: rgba(74, 158, 255, 0.2);
+    color: #4a9eff;
+}
+
+.event-type {
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    margin-right: 4px;
+}
+
+.event-desc {
+    font-size: 0.8rem;
+}
+
+/* --- Filter Controls --- */
+.log-filter-controls {
+    padding: var(--space-sm) var(--space-md);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-sm);
+    margin-bottom: var(--space-sm);
+}
+
+.filter-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.filter-row:last-child {
+    margin-bottom: 0;
+}
+
+.log-search-input {
+    flex: 1;
+    min-width: 100px;
+    padding: 4px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text-primary);
+    font-size: 0.75rem;
+}
+
+.log-search-input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.filter-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    user-select: none;
+}
+
+.filter-checkbox:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.filter-checkbox input {
+    margin: 0;
+    cursor: pointer;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+    .log-filter-controls {
+        padding: 4px;
+    }
+
+    .filter-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .log-search-input {
+        width: 100%;
+    }
+
+    .event-type-filters {
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .filter-checkbox {
+        font-size: 0.65rem;
+        padding: 2px 4px;
+    }
+}
+
+/* --- Mobile Enhancements (Phase 3) --- */
+@media (max-width: 480px) {
+    .log-section {
+        margin-bottom: 4px;
+        padding-bottom: 4px;
+    }
+
+    .log-section-header {
+        font-size: 0.7rem;
+        padding: 2px 4px;
+    }
+
+    .log-entry {
+        padding: 2px 4px;
+        font-size: 0.7rem;
+        border-left-width: 2px;
+    }
+
+    .turn-badge,
+    .phase-badge,
+    .player-badge {
+        font-size: 0.55rem;
+        padding: 1px 2px;
+    }
+
+    .event-type {
+        font-size: 0.65rem;
+    }
+
+    .event-desc {
+        font-size: 0.7rem;
+    }
+
+    /* Collapsible sections for mobile */
+    .log-section.collapsed .log-entry,
+    .log-section.collapsed .log-group-block {
+        display: none;
+    }
+
+    .log-section-header {
+        cursor: pointer;
+        position: relative;
+    }
+
+    .log-section-header::after {
+        content: '▼';
+        position: absolute;
+        right: 4px;
+        font-size: 0.6rem;
+        opacity: 0.5;
+    }
+
+    .log-section.collapsed .log-section-header::after {
+        content: '▶';
+    }
+}
+
+/* Touch-friendly targets */
+@media (pointer: coarse) {
+    .filter-checkbox {
+        min-height: 32px;
+        padding: 6px 8px;
+    }
+
+    .log-entry {
+        min-height: 36px;
+    }
+
+    .log-section-header {
+        min-height: 36px;
+    }
+}
+
+/* Landscape orientation adjustments */
+@media (max-width: 896px) and (orientation: landscape) {
+    .log-section {
+        max-height: 150px;
+        overflow-y: auto;
+    }
+}

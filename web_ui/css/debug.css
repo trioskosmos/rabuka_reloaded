@@ -1,0 +1,40 @@
+/* --- Debug & Tools --- */
+
+.debug-overlay {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.85);
+    color: #00ff00;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    font-family: monospace;
+    font-size: 10px;
+    z-index: var(--z-overlay);
+    border: 1px solid #00ff00;
+    pointer-events: none;
+}
+
+.floating-tooltip {
+    position: fixed;
+    z-index: var(--z-tooltip);
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.95);
+    color: white;
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
+    border: 1px solid var(--border);
+    max-width: 300px;
+    box-shadow: var(--shadow-lg);
+}
+
+/* Bytecode Viewer */
+.bytecode-log-viewer {
+    background: #000;
+    color: #0f0;
+    padding: var(--space-md);
+    font-family: monospace;
+    overflow-y: auto;
+    height: 100%;
+}

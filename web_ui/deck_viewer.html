@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deck Viewer</title>
+    <link rel="stylesheet" href="css/base.css?v=17">
+    <link rel="stylesheet" href="css/components.css?v=17">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            min-height: 100vh;
+            padding: var(--space-xl);
+            color: var(--text);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 2rem;
+            background: linear-gradient(90deg, #ff6b9d, #c44dff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .stats {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #aaa;
+        }
+
+        .deck-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card-item {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-md);
+            padding: var(--space-md);
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+        }
+
+        .card-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(196, 77, 255, 0.3);
+        }
+
+        .card-item img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .card-name {
+            font-size: 0.85rem;
+            color: #fff;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-type {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+
+        .card-type.member {
+            background: #4CAF50;
+        }
+
+        .card-type.live {
+            background: #2196F3;
+        }
+
+        .card-type.energy {
+            background: #FF9800;
+        }
+
+        .card-count {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ff6b9d;
+        }
+
+        .card-id {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            margin-top: var(--space-xs);
+        }
+
+        .loading {
+            text-align: center;
+            font-size: 1.5rem;
+            color: #aaa;
+            padding: 50px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Deck Viewer</h1>
+    <div class="stats" id="stats">Loading...</div>
+    <div class="deck-grid" id="deck-grid">
+        <div class="loading">Loading cards...</div>
+    </div>
+
+    <script>
+        // Deck data extracted from decktest.txt
+        const deckData = {
+            "PL!-bp3-026-L": 1,
+            "PL!-pb1-008-R": 4,
+            "PL!-pb1-015-R": 2,
+            "PL!-sd1-002-SD": 2,
+            "PL!HS-bp2-012-N": 4,
+            "PL!N-bp1-026-L": 3,
+            "PL!N-bp1-034-PE": 1,
+            "PL!N-bp1-035-PE": 1,
+            "PL!N-bp1-036-PE": 1,
+            "PL!N-bp1-037-PE": 1,
+            "PL!N-bp1-038-PE": 1,
+            "PL!N-bp3-004-R": 2,
+            "PL!N-bp3-016-N": 2,
+            "PL!N-bp3-022-N": 4,
+            "PL!N-bp3-027-L": 4,
+            "PL!N-bp3-031-L": 4,
+            "PL!N-bp3-037-PE": 1,
+            "PL!N-bp3-038-PE": 1,
+            "PL!N-bp3-039-PE": 1,
+            "PL!N-bp4-020-N": 4,
+            "PL!N-bp4-038-PE": 1,
+            "PL!N-bp4-039-PE": 1,
+            "PL!N-bp4-040-PE": 1,
+            "PL!N-bp4-041-PE": 1,
+            "PL!N-pb1-004-R": 1,
+            "PL!N-pb1-008-R": 2,
+            "PL!N-pb1-034-N": 4,
+            "PL!N-sd1-011-SD": 3,
+            "PL!S-pb1-004-R": 3,
+            "PL!SP-bp1-020-N": 4,
+            "PL!SP-bp2-009-R＋": 4
+        };
+
+        async function loadCards() {
+            try {
+                const response = await fetch('data/cards.json');
+                const cardsDb = await response.json();
+
+                const grid = document.getElementById('deck-grid');
+                grid.innerHTML = '';
+
+                let totalCards = 0;
+                let memberCount = 0;
+                let liveCount = 0;
+                let energyCount = 0;
+
+                for (const [cardId, count] of Object.entries(deckData)) {
+                    totalCards += count;
+                    const card = cardsDb[cardId];
+
+                    const item = document.createElement('div');
+                    item.className = 'card-item';
+
+                    if (card) {
+                        const type = card.type || 'Unknown';
+                        const typeClass = type.includes('メンバー') ? 'member' :
+                            type.includes('ライブ') ? 'live' :
+                                type.includes('エネルギー') ? 'energy' : '';
+
+                        if (typeClass === 'member') memberCount += count;
+                        else if (typeClass === 'live') liveCount += count;
+                        else if (typeClass === 'energy') energyCount += count;
+
+                        item.innerHTML = `
+                            <img src="${card.img}" alt="${card.name}" loading="lazy">
+                            <div class="card-name">${card.name}</div>
+                            <span class="card-type ${typeClass}">${type}</span>
+                            <div class="card-count">×${count}</div>
+                            <div class="card-id">${cardId}</div>
+                        `;
+                    } else {
+                        item.innerHTML = `
+                            <div style="height:200px;background:#333;border-radius:8px;display:flex;align-items:center;justify-content:center;">?</div>
+                            <div class="card-name">Unknown Card</div>
+                            <div class="card-count">×${count}</div>
+                            <div class="card-id">${cardId}</div>
+                        `;
+                    }
+
+                    grid.appendChild(item);
+                }
+
+                document.getElementById('stats').textContent =
+                    `Total: ${totalCards} cards | Members: ${memberCount} | Live: ${liveCount} | Energy: ${energyCount} | Unique: ${Object.keys(deckData).length}`;
+
+            } catch (error) {
+                document.getElementById('deck-grid').innerHTML =
+                    `<div class="loading">Error loading cards: ${error.message}</div>`;
+            }
+        }
+
+        loadCards();
+    </script>
+</body>
+
+</html>

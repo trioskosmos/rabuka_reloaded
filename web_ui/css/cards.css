@@ -1,0 +1,645 @@
+/* --- Card Base & Variants --- */
+.card-area {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.card {
+    width: var(--card-w);
+    height: var(--card-h);
+    position: relative;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-tertiary);
+    cursor: pointer;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* --- Base Image & Aspect Handling --- */
+.card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* --- Card Size Variants --- */
+.card.card-mini {
+    width: var(--card-w-mini);
+    height: var(--card-h-mini);
+}
+
+.card.card-compact {
+    width: var(--card-w-compact);
+    height: var(--card-h-compact);
+}
+
+/* --- Card Type Cosmetics --- */
+.card.type-standard {
+    border: 2px solid var(--border);
+}
+
+.card.type-backup {
+    opacity: 0.8;
+    border: 2px solid var(--accent-blue);
+}
+
+.card.type-live {
+    border: 2px solid var(--accent-pink);
+    box-shadow: 0 0 10px rgba(233, 30, 99, 0.3);
+}
+
+.card.card-back {
+    background: linear-gradient(135deg, #4a3a2a, #2a1a1a);
+    border: 1px solid #666;
+}
+
+/* --- Unified Orientation & Rotation --- */
+.card.orientation-landscape {
+    width: var(--card-h) !important;
+    height: var(--card-w) !important;
+    overflow: visible !important; /* Ensure content like shadows or rotated images aren't clipped */
+}
+
+.card.card-mini.orientation-landscape {
+    width: var(--card-h-mini) !important;
+    height: var(--card-w-mini) !important;
+}
+
+.card.card-compact.orientation-landscape {
+    width: var(--card-h-compact) !important;
+    height: var(--card-w-compact) !important;
+}
+
+/* Ensure landscape orientation box (not rotated) has enough height */
+.orientation-landscape {
+    min-height: var(--card-w) !important; 
+}
+
+/* Image-level rotation logic */
+.card.rotate-img-90 img {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    /* Native portrait dimensions - these remain same so after 90deg rotation they fit landscape container */
+    width: var(--card-w) !important;
+    height: var(--card-h) !important;
+    transform: translate(-50%, -50%) rotate(-90deg) !important;
+    object-fit: cover;
+}
+
+.card.orientation-landscape.rotate-img-90 img {
+    /* When box is landscape, the image (native portrait) must be sized to original portrait dimensions 
+       so that its rotated form (landscape) fills the landscape container (swapped W/H). */
+    width: var(--card-w) !important;
+    height: var(--card-h) !important;
+}
+
+.card.card-mini.rotate-img-90 img {
+    width: var(--card-w-mini) !important;
+    height: var(--card-h-mini) !important;
+}
+
+.card.orientation-landscape.card-mini.rotate-img-90 img {
+    width: var(--card-w-mini) !important;
+    height: var(--card-h-mini) !important;
+}
+
+.card.card-compact.rotate-img-90 img {
+    width: var(--card-w-compact) !important;
+    height: var(--card-h-compact) !important;
+}
+
+.card.orientation-landscape.card-compact.rotate-img-90 img {
+    width: var(--card-w-compact) !important;
+    height: var(--card-h-compact) !important;
+}
+
+/* --- Inner Overlays --- */
+.card .cost {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: var(--accent-pink);
+    color: white;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    font-weight: bold;
+    z-index: 2;
+}
+
+.card .name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 2px;
+    font-size: 0.5rem;
+    text-align: center;
+    z-index: 2;
+}
+
+
+/* --- Hand Row Refined --- */
+.hand-row {
+    height: auto;
+    min-height: calc(var(--card-h) + 12px);
+    overflow: visible;
+    display: flex;
+    align-items: center;
+    padding-bottom: 4px; /* Space for potential scrollbar */
+}
+
+.hand-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden; /* Contain the scrollable area */
+}
+
+.hand-row .card {
+    transition: transform 0.1s ease-out;
+    flex-shrink: 0;
+    margin-right: 0; 
+    z-index: 1;
+}
+
+/* Fix: Landscape cards (type-live) must allow image to extend beyond card container
+   Problem: .card has overflow: hidden which clips landscape image on left/right edges
+   Root cause: Landscape image (720/512) in portrait container (512/720) gets clipped
+   Solution: Handled by global .orientation-landscape overflow: visible */
+
+
+.hand-row .card:hover,
+.hand-row .card.hover-highlight {
+    z-index: 100 !important;
+    transform: translateY(-2px) scale(1.01);
+}
+
+.area-count {
+    background: var(--accent-blue);
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: bold;
+    flex-shrink: 0;
+    box-shadow: 0 0 5px rgba(0,0,0,0.5);
+}
+
+.hand {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    height: calc(var(--card-h) + 20px); /* Extra height for hover growth + scrollbar space */
+    padding: 10px;
+    overflow-x: auto;
+    overflow-y: hidden; /* We handle vertical growth via height padding */
+    scrollbar-gutter: stable;
+    width: 100%;
+}
+
+/* Custom Premium Scrollbar for Hand */
+.hand::-webkit-scrollbar {
+    height: 6px;
+}
+
+.hand::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+
+.hand::-webkit-scrollbar-thumb {
+    background: linear-gradient(to right, var(--accent-blue), var(--accent-purple));
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hand::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to right, var(--accent-blue-bright), var(--accent-pink));
+}
+
+.successful-live-area-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden; /* Prevent seeping to the right */
+    width: 100%;
+    padding: var(--space-xxs);
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-sm);
+}
+
+.successful-live-area-container .card-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.successful-live-area-container .card {
+    box-shadow: var(--shadow-lg);
+    margin: 4px 0;
+    width: min(110px, 90%) !important; /* Cap width and ensure it stays inside */
+    height: auto !important;
+    aspect-ratio: 720 / 512;
+    flex-shrink: 0;
+}
+
+.successful-live-area-container .card:first-child { margin-top: 0; }
+.successful-live-area-container .card:hover { 
+    z-index: 10;
+}
+
+/* --- Highlights (Consolidated System) --- */
+.valid-target { 
+    cursor: pointer !important; 
+}
+
+/* Gold: Main Interactive / Success / Selected */
+.card.valid-target,
+.card.selected,
+.card.mulligan-selected,
+.hover-highlight {
+    z-index: 100 !important;
+    border: 2px solid var(--accent-gold) !important;
+    box-shadow: 0 0 15px var(--accent-gold), var(--shadow-lg) !important;
+    transform: translateY(-2px) scale(1.02) !important;
+}
+
+/* Pink: Source / Initiator */
+.highlight-source {
+    border-color: var(--accent-pink) !important;
+    box-shadow: var(--glow-pink-strong) !important;
+    z-index: 25;
+}
+
+/* Blue: Target / Secondary */
+.highlight-target,
+.highlight-target-opp {
+    border-color: var(--accent-blue) !important;
+    box-shadow: var(--glow-blue) !important;
+}
+
+/* Keyframes removed for snappiness */
+
+/* --- Energy & Misc --- */
+.energy-row-hud {
+    padding: 0;
+    background: rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    margin-bottom: var(--space-xs);
+}
+
+.energy-area-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+    align-items: center;
+    min-height: 40px;
+}
+
+.energy-area-container.horizontal {
+    flex-direction: row;
+    overflow-x: auto;
+}
+
+.card-area.energy {
+    gap: 4px;
+}
+
+.energy-pip {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-full);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden; /* Ensure image doesn't bleed out */
+}
+
+.energy-pip img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 50%;
+}
+
+.energy-pip.tapped {
+    opacity: 0.4;
+    filter: grayscale(1);
+    transform: rotate(-15deg); /* Subtle tilt for tapped energy */
+}
+
+.discard-pile-visual {
+    width: var(--card-w-mini);
+    height: var(--card-h-mini);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.2);
+    overflow: hidden;
+}
+
+.discard-pile-visual img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+/* --- Live Zone Cards --- */
+.live-zone-cards {
+    display: flex;
+    gap: var(--space-md);
+    padding: var(--space-xxs);
+    border: none;
+    min-height: 0;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap; 
+    flex: 1;
+    overflow-x: auto;
+    position: relative;
+    background: transparent;
+}
+
+.live-zone-cards .card {
+    flex-shrink: 0;
+    margin: 0 var(--space-xxs);
+}
+
+.live-zone-cards .card:hover {
+    z-index: 15;
+}
+
+.live-zone-cards .card.empty {
+    border: 2px dashed var(--border);
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* Live card inner wrapper */
+.live-card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.live-card-inner img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.live-card-inner .cost {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: var(--accent-pink);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.65rem;
+    font-weight: bold;
+    z-index: 3;
+}
+
+.live-card-inner .perf-badge {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    background: var(--accent-green);
+    color: white;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-size: 0.5rem;
+    font-weight: bold;
+    z-index: 3;
+}
+
+.live-card-inner.perf-legal {
+    border: 1px solid var(--accent-green);
+}
+
+/* --- Member Stage Layout --- */
+.stage {
+    display: flex;
+    flex-direction: row;
+    gap: var(--space-md);
+    justify-content: center;
+    align-items: stretch;
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+}
+
+.stage-group {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.member-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    padding: var(--space-xxs);
+    min-width: 0;
+    flex: 1;
+    height: 100%;
+}
+
+.member-slot {
+    height: 100%;
+    max-width: 100%;
+    aspect-ratio: 512 / 720;
+    border: 2px dashed var(--border);
+    border-radius: var(--radius-sm);
+    position: relative;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s, opacity 0.2s;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.member-slot.tapped {
+    transform: rotate(-90deg) scale(0.9);
+    opacity: 0.85;
+    z-index: 5;
+    box-shadow: none;
+    overflow: visible; /* Allow rotated card to peek out of portrait bounds */
+}
+
+.member-slot.filled {
+    border-style: solid;
+    background: var(--bg-tertiary);
+}
+
+.member-slot img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+
+.member-slot.valid-target {
+    cursor: pointer;
+}
+
+.board-slot-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 1;
+    width: 100%;
+    height: 100%;
+}
+
+.deck-discard-group.simplified {
+    display: none; /* Removed as requested/conflicted */
+}
+
+.deck-pills-wrapper {
+    display: flex;
+    gap: 4px;
+}
+
+.deck-pills-wrapper .deck-pill {
+    flex: 1;
+    font-size: 0.65rem !important;
+    padding: 2px 4px !important;
+}
+
+.field-row {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    align-items: stretch; /* Stretch to fill height */
+    flex: 1; /* Take all available vertical space */
+    min-height: 0;
+    flex-wrap: nowrap; /* ABSOLUTELY NO WRAPPing */
+}
+
+.play-area-left {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0; /* Tighten */
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: var(--radius-md);
+    padding: 0; /* Removed padding */
+    min-width: 0;
+    height: 100%;
+}
+
+.utility-column-right {
+    width: 140px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 0;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+}
+
+.deck-discard-group.simplified {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+.selection-card-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: var(--radius-md);
+    transition: transform 0.2s;
+}
+
+.selection-card-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.selection-card-img {
+    width: 100%;
+    height: auto;
+    max-height: clamp(100px, 15vh, 180px);
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-sm);
+}
+
+.selection-card-name {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    text-align: center;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* --- Deck Bottom Area (Mulligan) --- */
+.deck-bottom-area {
+    display: flex;
+    flex-direction: column;
+    margin-top: 5px;
+    align-items: center;
+    height: auto;
+    min-height: 20px;
+}
+
+.deck-bottom-area .card {
+    transform: scale(0.6) translateY(-20px);
+    margin-bottom: -115px; /* Extremely tight stack */
+    transition: transform 0.2s ease;
+    filter: brightness(0.8);
+}
+
+.deck-bottom-area .card:hover {
+    transform: scale(0.9) translateY(-40px);
+    filter: brightness(1);
+    z-index: 100;
+}

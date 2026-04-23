@@ -472,6 +472,8 @@ pub struct AbilityCost {
     pub self_cost: Option<bool>, // True if the card itself is the cost (e.g., "このメンバーを")
     #[serde(default)]
     pub exclude_self: Option<bool>, // True if the cost excludes the activating card (e.g., "このメンバー以外")
+    #[serde(default)]
+    pub costs: Option<Vec<AbilityCost>>, // For sequential_cost with multiple cost steps
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -483,6 +485,7 @@ pub struct AbilityEffect {
     pub source: Option<String>,
     pub destination: Option<String>,
     pub count: Option<u32>,
+    pub target_count: Option<u32>,
     pub card_type: Option<String>,
     pub target: Option<String>,
     pub duration: Option<String>,
@@ -531,6 +534,8 @@ pub struct AbilityEffect {
     pub dynamic_count: Option<DynamicCount>,
     pub placement_order: Option<String>,
     pub cost_limit: Option<u32>,
+    #[serde(default)]
+    pub any_number: Option<bool>, // For look_and_select - allows selecting any number of cards
     pub unit: Option<String>,
     pub distinct: Option<String>,
     pub target_player: Option<String>,

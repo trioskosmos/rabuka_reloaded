@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ラブカ ! | ゲームボード</title>
+
+    <link rel="icon" href="./assets/icon_energy--Z2NmAzM.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS Load Order managed by Vite via style.css -->
+  <script type="module" crossorigin src="./assets/main-vKB-8yS2.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/main-Dc8bvquh.css">
+</head>
+
+<body class="rabukasim-root">
+    <!-- Floating Tooltip -->
+    <div id="floating-tooltip" class="floating-tooltip" style="display: none;"></div>
+
+    <!-- Permanent Debug Overlay (Phase 4) -->
+    <div id="debug-overlay" class="debug-overlay">
+        <div>ROOM: <span id="debug-room">---</span></div>
+        <div>SESS: <span id="debug-session">---</span></div>
+        <div>VIEW: <span id="debug-view">---</span></div>
+        <div>POLL: <span id="debug-poll">0</span></div>
+        <div>DLAY: <span id="debug-delay">---</span></div>
+        <div>SYNC: <span id="debug-sync" style="font-weight:bold;">???</span></div>
+        <div id="debug-error-panel" class="debug-error-panel" style="display: none;">ERR:
+            <span id="debug-error-msg"></span>
+        </div>
+    </div>
+
+    <button id="mobile-sidebar-toggle" data-action="toggle-sidebar">
+        <span class="icon">Menu</span>
+        <span class="label">ACTIONS</span>
+    </button>
+    
+    <!-- Mobile Action Bar -->
+    <div id="mobile-action-bar" class="mobile-action-bar"></div>
+
+    <header class="header">
+        <div class="info-bar">
+            <!-- Group: Game Connectivity/Meta -->
+
+            <div class="stat-group">
+                <span class="stat" title="Connection"><span class="stat-icon"></span> <strong id="header-debug-info"
+                        class="debug-badge">PvE</strong></span>
+                <span id="room-display" class="stat" title="Room Code" style="display: none;">
+                    <span class="stat-icon"></span> <span>Room</span> <strong id="room-code-header">----</strong>
+                </span>
+                <span class="stat" title="System Status" style="display: none;"><span class="stat-icon"></span> <strong
+                        id="system-status-badge" class="debug-badge">Checking...</strong></span>
+                <span class="stat" title="Spectators"><span class="stat-icon"></span> <strong
+                        id="spectator-count">0</strong></span>
+            </div>
+
+            <!-- Group: Turn & Phase -->
+            <div class="stat-group main-game-stats">
+                <span class="stat" title="Turn"><span class="stat-icon"></span> <span class="stat-label"
+                        data-i18n="turn">ターン</span> <strong id="turn">1</strong></span>
+                <span class="stat" title="Phase"><span class="stat-icon"></span> <span class="stat-label"
+                        data-i18n="phase">フェーズ</span> <strong id="phase">MAIN</strong></span>
+            </div>
+
+            <!-- Group: Score & Progress -->
+            <div class="stat-group score-stats">
+                <span class="stat" title="Score"><span class="stat-icon"></span> <span class="stat-label"
+                        data-i18n="score">スコア</span> <strong id="score">0 - 0</strong></span>
+                <span class="stat summary-pips" title="Hearts">
+                    <div id="total-hearts-summary"></div>
+                </span>
+                <span class="stat summary-pips" title="Blades">
+                    <div id="total-blades-summary"></div>
+                </span>
+            </div>
+
+            <!-- Group: Energy -->
+            <div class="stat-group energy-stats">
+                <span class="stat" title="Energy"><span class="stat-icon">En</span>
+                    <span class="stat-label" data-i18n="energy">エネルギー</span> <strong id="header-energy">0 /
+                        0</strong></span>
+            </div>
+
+            <div class="controls">
+                <button id="save-state-btn" class="btn btn-secondary btn-sm" data-action="save-state"
+                    title="Save Board State to JSON File">Save</button>
+                <button id="load-state-btn" class="btn btn-secondary btn-sm" data-action="load-state"
+                    title="Load Board State String">Load</button>
+                <button id="undo-btn" class="btn btn-secondary btn-sm" data-action="rewind" title="Undo last action">Undo</button>
+                <button id="redo-btn" class="btn btn-secondary btn-sm" data-action="redo" title="Redo last undo">Redo</button>
+                <button id="debug-modal-btn" class="btn btn-secondary btn-sm" data-action="open-debug-modal"
+                    title="Debug / State Editor">Debug</button>
+                <button id="report-btn-header" class="btn btn-primary btn-sm" data-action="open-report-modal" data-i18n="report"
+                    title="Report Issue">報告</button>
+                <button class="btn btn-accent-gray btn-sm" data-action="open-settings-modal" title="Settings"
+                        data-i18n="settings">設定</button>
+                <button id="exit-room-btn" class="btn btn-accent-red btn-sm" data-action="leave-room" title="Exit Room">Exit</button>
+            </div>
+        </div>
+
+        <div class="replay-controls" id="replay-controls" style="display: none;">
+            <button class="btn" data-action="click-target" data-target-id="replay-file-input"
+                style="font-size:0.8rem; padding:2px 8px;">Open</button>
+            <input type="file" id="replay-file-input" accept=".json" style="display:none"
+                onchange="loadReplayFromFile(this)">
+            <button class="btn" data-action="open-paste-replay-modal" style="font-size:0.8rem; padding:2px 8px;">
+                Paste</button>
+            <button class="btn" data-action="load-replay" style="font-size:0.8rem; padding:2px 8px;">Load</button>
+            <input type="text" id="replay-file" value="ai_match.json" placeholder="ai_match.json"
+                style="width:120px; padding:2px 6px; background:rgba(0,0,0,0.5); border:1px solid #444; color:white; border-radius:4px; font-size: 0.8rem;">
+            <div style="width:1px; height:20px; background:#555; margin:0 4px;"></div>
+            <button class="btn" data-action="replay-prev-turn"
+                style="font-size:0.75rem; padding:2px 6px; background:#444;">[Turn]</button>
+            <button class="btn" data-action="replay-prev-phase"
+                style="font-size:0.75rem; padding:2px 6px; background:#555;">[Phase]</button>
+            <button class="btn" data-action="replay-prev" style="font-size:0.8rem; padding:2px 10px;">Prev</button>
+            <button class="btn" id="play-btn" data-action="toggle-play"
+                style="font-size:0.8rem; padding:2px 10px; min-width:60px; background:#4a9eff;">Play / Pause</button>
+            <button class="btn" data-action="replay-next" style="font-size:0.8rem; padding:2px 10px;">Next</button>
+            <button class="btn" data-action="replay-next-phase"
+                style="font-size:0.75rem; padding:2px 6px; background:#555;">Phase [Next]</button>
+            <button class="btn" data-action="replay-next-turn"
+                style="font-size:0.75rem; padding:2px 6px; background:#444;">Turn [Next]</button>
+            <span style="color:#aaa; font-size:0.8rem; margin-left:8px;">Fr: <span id="frame-num">0</span>/<span
+                    id="total-frames">0</span></span>
+            <input type="number" id="jump-frame" placeholder="#"
+                style="width:50px; padding:2px 4px; background:rgba(0,0,0,0.5); border:1px solid #444; color:white; border-radius:4px; font-size:0.8rem;"
+                onchange="window.jumpToFrame(this.value)">
+        </div>
+    </header>
+
+    <div id="phase-stepper" class="phase-stepper"></div>
+
+    <div class="game-container" id="game-container">
+        <!-- LEFT SIDEBAR (Rule Log) -->
+        <div class="sidebar sidebar-left" id="sidebar-left">
+            <div class="sidebar-section panel-container">
+                <div id="card-desc-panel" class="card-desc-panel">
+                    <h3 id="card-desc-title" class="card-desc-title" data-i18n="card_ability">カード能力</h3>
+                    <div id="card-desc-content" class="card-desc-content"></div>
+                </div>
+                <div id="active-abilities-panel" class="active-abilities-panel">
+                    <h3 data-i18n="active_effects_applied">適用中の効果</h3>
+                    <div id="active-abilities-list" class="ability-list"></div>
+                </div>
+                <div class="log-container">
+                    <h3 data-i18n="rule_log">ルールログ</h3>
+                    <div class="rule-log-list" id="rule-log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resizer Left -->
+        <div class="resizer" id="resizer-left"></div>
+
+        <!-- CENTER GAME BOARD -->
+        <div class="game-board">
+            <!-- Board Toggle (Tabbed View) -->
+            <div class="board-toggle">
+                <button class="btn btn-toggle active" id="btn-show-player" data-action="switch-board" data-value="player">My Board
+                    (Player 1)</button>
+                <button class="btn btn-toggle" id="btn-show-opponent" data-action="switch-board" data-value="opponent">Opponent
+                    (Player 2)</button>
+            </div>
+
+            <!-- OPPONENT SECTION -->
+            <div class="player-section opponent" id="board-opponent" style="display: none;">
+                <div class="player-label">
+                    <span data-i18n="opponent_player">対戦相手 <span id="opp-agent-name" class="player-subtext">(Player
+                            2)</span></span>
+                    <span class="score-badge" id="opp-score">0 <span data-i18n="live_unit">ライブ</span></span>
+                </div>
+                <div class="board-inner">
+                    <!-- TOP: Live Zone (Full Width) -->
+                    <div class="live-group-row">
+                        <div class="live-group">
+                            <div class="card-area live-zone-cards" id="opp-live"></div>
+                        </div>
+                    </div>
+
+                    <!-- MAIN FIELD: 2 COLUMNS -->
+                    <div class="field-row">
+                        <!-- LEFT: Play Area (Stage) -->
+                        <div class="play-area-left">
+                            <div class="stage-group">
+                                <div class="card-area stage" id="opp-stage"></div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: Utility Area (Success & Decks) -->
+                        <div class="utility-column-right">
+                            <div class="utility-counts-box">
+                                <div class="stat-item clickable" data-action="show-zone-viewer" data-owner="opponent" title="Opponent's Main Deck">Main: <strong id="opp-deck-count">0</strong></div>
+                                <div id="opp-deck-bottom" class="deck-bottom-area" style="display: none;"></div>
+                                <div class="stat-item clickable" data-action="show-zone-viewer" data-owner="opponent" title="Opponent's Energy Deck">E: <strong id="opp-energy-deck-count">0</strong></div>
+                                <div class="stat-item clickable" data-action="show-discard" data-owner="opponent" title="Opponent's Discard">X: <strong id="opp-discard-count">0</strong></div>
+                            </div>
+                            <div class="discard-visual-container">
+                                <div id="opp-discard-visual" class="discard-pile-visual"></div>
+                            </div>
+                            <div class="successful-live-area-container">
+                                <div class="card-area" id="opp-success"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MINIMIZED ENERGY HUD -->
+                    <div class="energy-row-hud">
+                        <div class="energy-area-container horizontal">
+                            <span class="area-count" id="opp-energy-count">0</span>
+                            <div class="card-area energy" id="opp-energy"></div>
+                        </div>
+                    </div>
+
+                    <!-- HAND -->
+                    <div class="hand-row">
+                        <div class="hand-group">
+                            <span class="area-count" id="opp-hand-count">0</span>
+                            <div class="card-area hand" id="opp-hand"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PLAYER SECTION -->
+            <div class="player-section" id="board-player">
+                <div class="player-label">
+                    <span data-i18n="you_player">あなた <span id="my-agent-name" class="player-subtext">(Player
+                            1)</span></span>
+                    <span class="score-badge" id="my-score">0 <span data-i18n="live_unit">ライブ</span></span>
+                </div>
+                <div class="board-inner">
+                    <!-- TOP: Live Zone (Full Width) -->
+                    <div class="live-group-row">
+                        <div class="live-group">
+                            <div class="card-area live-zone-cards" id="my-live"></div>
+                        </div>
+                    </div>
+
+                    <!-- MAIN FIELD: 2 COLUMNS -->
+                    <div class="field-row">
+                        <!-- LEFT: Play Area (Stage) -->
+                        <div class="play-area-left">
+                            <div class="stage-group">
+                                <div class="card-area stage" id="my-stage"></div>
+                            </div>
+                        </div>
+
+                        <!-- RIGHT: Utility Area (Success & Decks) -->
+                        <div class="utility-column-right">
+                            <div class="utility-counts-box">
+                                <div class="stat-item clickable" data-action="show-zone-viewer" data-owner="my" title="Main Deck">Main: <strong id="my-deck-count">0</strong></div>
+                                <div id="my-deck-bottom" class="deck-bottom-area" style="display: none;"></div>
+                                <div class="stat-item clickable" data-action="show-zone-viewer" data-owner="my" title="Your Energy Deck">E: <strong id="my-energy-deck-count">0</strong></div>
+                                <div class="stat-item clickable" data-action="show-discard" data-owner="my" title="Your Discard">X: <strong id="my-discard-count">0</strong></div>
+                            </div>
+                            <div class="discard-visual-container">
+                                <div id="my-discard-visual" class="discard-pile-visual"></div>
+                            </div>
+                            <div class="successful-live-area-container">
+                                <div class="card-area" id="my-success"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MINIMIZED ENERGY HUD -->
+                    <div class="energy-row-hud">
+                        <div class="energy-area-container horizontal">
+                            <span class="area-count" id="my-energy-count">0</span>
+                            <div class="card-area energy" id="my-energy"></div>
+                        </div>
+                    </div>
+
+                    <!-- HAND -->
+                    <div class="hand-row">
+                        <div class="hand-group">
+                            <span class="area-count" id="my-hand-count">0</span>
+                            <div class="card-area hand" id="my-hand"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resizer Right -->
+        <div class="resizer" id="resizer-right"></div>
+
+        <!-- RIGHT SIDEBAR (Actions) -->
+        <div class="sidebar sidebar-right" id="sidebar-right">
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">
+                    <h3>アクション</h3>
+                    <button class="sidebar-close-btn" data-action="close-sidebar" aria-label="Close action panel">×</button>
+                </div>
+                <div class="performance-check-container">
+                    <button class="btn btn-accent-purple btn-sm" data-action="show-last-performance" data-i18n="check_performance" style="width: 100%;">
+                        パフォーマンス確認
+                    </button>
+                </div>
+                <div class="action-list" id="actions"></div>
+            </div>
+
+
+            <div id="perf-guide-panel" class="sidebar-section" style="display: none;">
+                <h3 class="guide-title" data-i18n="live_guide">ライブガイド</h3>
+                <div id="perf-guide-content" class="guide-content">
+                    <!-- Content populated by JS -->
+                </div>
+            </div>
+            <div class="sidebar-section looked-cards-panel" id="looked-cards-panel">
+                <div id="looked-cards-content" class="looked-cards-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title"><span data-i18n="settings">設定</span></span>
+                <button class="close-btn" data-action="close-settings-modal">&times;</button>
+            </div>
+            <div class="modal-body settings-grid">
+                <div class="settings-group">
+                    <label>Main Actions</label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button class="btn" data-action="fetch-state" title="Update State"><span class="btn-text"
+                                data-i18n="update">更新</span></button>
+                        <button class="btn btn-primary" data-action="reset-game" title="Reset Game"><span class="btn-text"
+                                data-i18n="reset">リセット</span></button>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <label>Game Controls</label>
+                    <button class="btn btn-accent-purple" data-action="navigate" data-href="/deck_builder.html"
+                        data-i18n="deck_creator">🛠
+                        デッキ作成</button>
+                    <button class="btn btn-accent-blue" data-action="open-deck-modal" data-i18n="set_deck">🎴
+                        デッキ設定</button>
+                    <button id="pvp-btn" class="btn btn-accent-gray" data-action="toggle-hotseat">Shared Screen:
+                        OFF</button>
+                    <button id="switch-btn" class="btn btn-accent-blue" data-action="toggle-perspective">Switch View
+                        (P1/P2)</button>
+                </div>
+
+                <div class="settings-group">
+                    <label>View & Support</label>
+                    <div style="margin-bottom: 5px;">
+                        <label style="font-size: 0.75rem; color: #aaa;">Board Zoom: <span
+                                id="zoom-value">1.0</span>x</label>
+                        <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.0"
+                            class="zoom-slider-input" oninput="updateBoardScale(this.value)">
+                    </div>
+                    <button id="live-watch-btn" class="btn btn-accent-pink" data-action="toggle-live-watch"
+                        data-i18n="live_watch">ライブ監視: OFF</button>
+                    <button id="friendly-abilities-btn" class="btn btn-accent-green" data-action="toggle-friendly-abilities"
+                        data-i18n="friendly_abilities">読みやすい能力テキスト: ON</button>
+                    <button id="lang-btn" class="btn" data-action="toggle-lang"
+                        style="border:1px solid #aaa;">English</button>
+                    <button class="btn" data-action="open-help-modal"
+                        style="border:1px solid var(--accent-gold); color:var(--accent-gold);">ヘルプ</button>
+                </div>
+
+                <div class="settings-group">
+                    <label>Tools</label>
+                    <button class="btn" data-action="toggle-replay-mode" data-i18n="replay_mode">リプレイモード Toggle</button>
+                    <button id="debug-mode-btn" class="btn" data-action="toggle-debug-mode"
+                        style="border: 1px solid var(--accent-blue); margin-top: 8px;">Toggle Bytecode Logging</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Result Modal -->
+    <div id="performance-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content performance-modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="perf-title" data-i18n="live_result">ライブ結果</div>
+                <button class="close-btn" data-action="close-performance-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-tabs">
+                    <button id="tab-btn-result" class="tab-btn active" data-action="show-performance-tab" data-value="result">
+                        <span data-t="perf_result">結果概要</span>
+                    </button>
+                    <button id="tab-btn-engine" class="tab-btn" data-action="show-performance-tab" data-value="engine">
+                        <span data-t="engine_mechanics">エンジン解説</span>
+                    </button>
+                    <button id="tab-btn-history" class="tab-btn" data-action="show-performance-tab" data-value="history">
+                        <span data-t="turn_history">ターン履歴</span>
+                    </button>
+                </div>
+                <div id="perf-tab-result" class="perf-tab-content">
+                    <div id="performance-result-content">
+                        <!-- Performance results will be rendered here -->
+                    </div>
+                </div>
+                <div id="perf-tab-engine" class="perf-tab-content" style="display: none;">
+                    <div id="performance-engine-content">
+                        <!-- Engine flow will be rendered here -->
+                    </div>
+                </div>
+                <div id="perf-tab-history" class="perf-tab-content" style="display: none;">
+                    <div id="performance-history-content" class="turn-history-list">
+                        <!-- Turn events will be rendered here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-action="close-performance-modal" data-i18n="close">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Selection Modal (for deck search, discard pick, etc) -->
+    <div id="selection-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content selection-modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="selection-title">カード選択</div>
+                <button class="close-btn" data-action="close-selection-modal">✕</button>
+            </div>
+            <div id="selection-description" class="modal-description"></div>
+            <div class="modal-body selection-grid" id="selection-content">
+                <!-- Choice cards will be rendered here -->
+            </div>
+            <div class="modal-footer" id="selection-footer">
+                <!-- Cancel button if optional -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Reporting Modal -->
+    <div id="report-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Report Issue / Save State</div>
+                <button class="close-btn" data-action="close-report-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-hint">
+                    Describe what happened or the failure point. Downloading saves the current snapshot, raw checkpoint
+                    timeline, and viewer diagnostics in one bundle for debugging.
+                </p>
+                <textarea id="report-explanation" class="report-textarea"
+                    placeholder="Explain the issue here..."></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" data-action="download-report">Download Report</button>
+                <button class="btn" data-action="close-report-modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help / FAQ Modal -->
+    <div id="help-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">ヘルプ & FAQ (Help)</span>
+                <button class="close-btn" data-action="close-help-modal">×</button>
+            </div>
+            <div class="modal-body help-body">
+                <h3>デッキのセット方法 (Deck Setup)</h3>
+                <ul>
+                    <li><b>Deck Log:</b> Bushiroad Deck Log からHTMLをコピーして「Option 2」に貼り付けます。</li>
+                    <li><b>Test Deck:</b> 「Load Test Deck」ボタンで、テスト用（2倍量）デッキを読み込みます。</li>
+                    <li><b>Random Deck:</b> 「Generate Random Deck」ボタンで、ランダムな有効デッキを生成します。</li>
+                </ul>
+
+                <h3>📱 モバイル操作 (Mobile)</h3>
+                <ul>
+                    <li>画面右下の <b>Menu ボタン</b> でサイドバー（アクション履歴、ログ）を開閉できます。</li>
+                    <li>手札やステージなどのゾーンは横スクロール可能です。</li>
+                </ul>
+
+                <h3>🎮 ゲーム操作 (Controls)</h3>
+                <ul>
+                    <li><b>更新 (Update):</b> ゲームの状態を再取得します。</li>
+                    <li><b>リセット (Reset):</b> ゲームを初期状態の最初からやり直します。</li>
+                    <li>カードをクリックして使用・移動します。</li>
+                    <li>アクションを選択したら、サイドバーの「Do Action」等は自動で進む場合があります。</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-action="close-help-modal">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deck Setup Modal -->
+    <div id="deck-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">デッキセット (Set Deck)</span>
+                <button class="close-btn" data-action="close-deck-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-item">
+                    <label>プレイヤー選択:</label>
+                    <select id="deck-player-select" class="form-select">
+                        <option value="0">プレイヤー1 (あなた)</option>
+                        <option value="1">プレイヤー2 (AI)</option>
+                        <option value="both">両方 (Both)</option>
+                    </select>
+                </div>
+
+                <div class="info-note">
+                    <div class="note-title">📍 デッキデータの取得方法:</div>
+                    <ol>
+                        <li><a href="https://decklog.bushiroad.com/search?c=11" target="_blank"
+                                class="accent-link">デッキログ (ラブライブ！Solo)</a> にログイン。</li>
+                        <li>デッキを選択し、虫眼鏡アイコンをクリック。</li>
+                        <li><b>F12</b> キーを押して開発者ツールを開く。</li>
+                        <li>In the <b>Elements</b> tab, right-click the top <code>&lt;html&gt;</code> tag.</li>
+                        <li>Select <b>Copy</b> &rarr; <b>Copy outerHTML</b>.</li>
+                        <li>Paste the result below.</li>
+                    </ol>
+                </div>
+
+                <div class="setup-quick-actions">
+                    <label>Option 1: Quick Load</label>
+                    <input type="file" id="deck-file-input" accept=".html,.txt,.json">
+                    <button class="btn btn-test-deck" data-action="load-test-deck">
+                        Load Test Deck (Doubled)
+                    </button>
+                    <button class="btn btn-random-deck" data-action="load-random-deck">
+                        Generate Random Deck
+                    </button>
+                </div>
+
+                <div class="setup-paste-area">
+                    <label>Option 2: Paste Deck HTML:</label>
+                    <textarea id="deck-html-input" class="report-textarea"
+                        placeholder="Paste the HTML content from a deck page here..."></textarea>
+                </div>
+                <div id="deck-preview" class="preview-text"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-action="close-deck-modal">Cancel</button>
+                <button class="btn btn-primary" data-action="submit-deck">Apply Deck</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Paste Replay Modal -->
+    <div id="paste-replay-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="width: 600px;">
+            <div class="modal-header">
+                <span class="modal-title">Paste Replay JSON</span>
+                <button data-action="close-paste-replay-modal"
+                    style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer;">×</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:#ccc; font-size:0.8rem; margin-bottom:8px;">Paste the full JSON content of a replay file
+                    here.</p>
+                <textarea id="paste-replay-input" class="report-textarea" style="height: 300px; font-family:monospace;"
+                    placeholder='{"game_id": 123, "states": [...]}'></textarea>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-action="close-paste-replay-modal">Cancel</button>
+                <button class="btn btn-primary" data-action="submit-paste-replay">Load Replay</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Game Setup Modal -->
+    <div id="setup-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content setup-modal-content highlight-hover">
+            <div class="modal-header">
+                <span class="modal-title" id="setup-title">Game Setup</span>
+                <button class="close-btn" data-action="close-setup-modal">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="setup-mode-display" class="setup-mode-badge">
+                    Mode: Solo (PvE)
+                </div>
+
+                <div class="setting-item" style="margin-bottom: 15px;">
+                    <label>Card Set:</label>
+                    <select id="card-set-select" class="form-select highlight-hover">
+                        <option value="compiled">Standard (Compiled)</option>
+                        <option value="vanilla">Vanilla (Base Set)</option>
+                    </select>
+                </div>
+
+                <div class="setup-grid">
+                    <!-- Player 0 -->
+                    <div id="setup-p0-col" class="setup-column">
+                        <h4 style="color: var(--accent-blue);">Player 1 (You)</h4>
+                        <div class="setting-item">
+                            <label>Select Deck:</label>
+                            <select id="p0-deck-select" class="form-select highlight-hover"
+                                onchange="onDeckSelectChange(0, this.value)">
+                                <option value="random">🎲 Random Deck</option>
+                                <option value="paste">📋 Paste Deck List...</option>
+                            </select>
+                        </div>
+                        <div id="p0-paste-area" class="setup-paste-container" style="display:none;">
+                            <textarea id="p0-deck-paste" class="report-textarea"
+                                placeholder="Paste deck list here..."></textarea>
+                        </div>
+                        <div id="p0-deck-preview" class="preview-text"></div>
+                    </div>
+
+                    <!-- Player 1 -->
+                    <div id="setup-p1-col" class="setup-column">
+                        <h4 style="color: var(--accent-pink);">Player 2</h4>
+                        <div class="setting-item">
+                            <label>Select Deck:</label>
+                            <select id="p1-deck-select" class="form-select highlight-hover"
+                                onchange="onDeckSelectChange(1, this.value)">
+                                <option value="paste">📋 Paste Deck List...</option>
+                                <option value="random">🎲 Random Deck</option>
+                            </select>
+                        </div>
+                        <div id="p1-paste-area" class="setup-paste-container" style="display:none;">
+                            <textarea id="p1-deck-paste" class="report-textarea"
+                                placeholder="Paste deck list here..."></textarea>
+                        </div>
+                        <div id="p1-deck-preview" class="preview-text"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-footer-actions">
+                <button class="btn btn-primary" data-action="submit-game-setup">Start Game</button>
+                <a href="deck_converter.html" target="_blank" class="btn btn-accent">Deck Converter</a>
+            </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- Room Identification Modal -->
+    <div id="room-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content room-modal-content">
+            <div class="modal-header">
+                <span class="modal-title">RabukaSim Lobby</span>
+
+            </div>
+            <div class="modal-body lobby-body">
+                <div id="room-waiting-hint" style="margin-bottom: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: rgba(255,255,255,0.03); color: var(--text-muted, #aaa); font-size: 0.9rem;">
+                    Join a private room or create a new one.
+                </div>
+                <div class="lobby-actions">
+                    <button class="btn btn-primary lobby-btn" data-action="open-setup-modal" data-value="pve">PvE (vs AI)</button>
+                    <button class="btn btn-accent lobby-btn" data-action="open-setup-modal" data-value="pvp">PvP (Manual)</button>
+                </div>
+
+                <div class="lobby-divider">OR</div>
+
+                <div class="lobby-join-section">
+                    <div class="setting-item">
+                        <label>Join Private Room:</label>
+                        <input type="text" id="room-code-input" class="form-input" placeholder="ABCD" maxlength="4"
+                            oninput="this.value = this.value.toUpperCase()">
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Select Your Deck:</label>
+                        <select id="pjoin-deck-select" class="form-select" onchange="onDeckSelectChange('join')">
+                            <option value="random">🎲 Random Deck</option>
+                            <option value="paste">📋 Paste Deck List...</option>
+                        </select>
+                    </div>
+
+                    <div id="pjoin-paste-area" class="setup-paste-container" style="display:none;">
+                        <textarea id="pjoin-deck-paste" class="report-textarea"
+                            placeholder="Paste deck list here..."></textarea>
+                    </div>
+
+                    <button class="btn btn-primary join-btn" data-action="join-room" style="width: 100%; margin-top: 10px;">Join
+                        Room</button>
+                </div>
+
+                <div class="lobby-offline">
+                    <button class="btn offline-btn" data-action="start-offline">Start Offline (WASM)</button>
+                </div>
+                <div
+                    style="margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; justify-content: center;">
+                    <button class="btn" data-action="force-reset"
+                        style="font-size: 0.8rem; background: #444; color: #aaa; border: 1px solid #555;">Clear Local
+                        Data & Cache</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Perspective Selection Modal -->
+    <div id="perspective-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content perspective-modal-content">
+            <div class="modal-header">
+                <span class="modal-title">Select Your Seat</span>
+            </div>
+            <div class="modal-body">
+                <p class="modal-hint">Which player are you?</p>
+                <div class="perspective-grid">
+                    <button class="btn btn-p1" data-action="set-perspective" data-value="0">Player 1 (Host)</button>
+                    <button class="btn btn-p2" data-action="set-perspective" data-value="1">Player 2 (Joiner)</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Viewer Modal -->
+    <div id="log-viewer-modal" style="display: none;">
+        <div class="log-viewer-modal-content">
+            <div class="log-viewer-modal-header">
+                <div class="log-viewer-modal-title" data-i18n="rule_log">ルールログ</div>
+                <button class="log-viewer-close-btn" data-action="close-log-viewer">✕</button>
+            </div>
+            <div id="log-viewer-content" class="log-viewer-content"></div>
+        </div>
+    </div>
+    <!-- Debug / State Editor Modal -->
+    <div id="debug-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content large" style="height: 92vh; width: min(96vw, 1800px); max-width: 1800px; display: flex; flex-direction: column; overflow: hidden;">
+            <div class="modal-header" style="padding: 5px 12px; min-height: auto;">
+                <h3 style="margin: 0; font-size: 15px;">Debug Inspector and State Editor</h3>
+                <div style="display: flex; gap: 8px; margin-left: auto; margin-right: 15px; font-size: 11px;">
+                    <button class="btn btn-secondary btn-sm" data-action="debug-rewind" title="Undo" style="padding: 2px 8px;">Undo</button>
+                    <button class="btn btn-secondary btn-sm" data-action="debug-redo" title="Redo" style="padding: 2px 8px;">Redo</button>
+                    <div style="width: 1px; background: var(--border); margin: 0 4px;"></div>
+                    <button class="btn btn-secondary btn-sm" data-action="toggle-debug-mode" title="Engine Debug" style="padding: 2px 8px;">Debug Mode</button>
+                    <button class="btn btn-secondary btn-sm" data-action="debug-render-all" title="Refresh" style="padding: 2px 8px;">Refresh</button>
+                </div>
+                <button class="close-btn" data-action="close-debug-modal">✕</button>
+            </div>
+
+            <div class="modal-body" style="padding: 0; display: flex; flex: 1; gap: 0; overflow: hidden; flex-direction: column;">
+                <div style="display: flex; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border); gap: 0; flex-wrap: wrap;">
+                        <button data-tab-btn="inspector" data-action="debug-switch-tab" data-value="inspector"
+                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); cursor: pointer; font-size: 11px;">
+                            Inspector</button>
+                        <button data-tab-btn="trace" data-action="debug-switch-tab" data-value="trace"
+                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); cursor: pointer; font-size: 11px;">
+                            Trace</button>
+                        <button data-tab-btn="string" data-action="debug-switch-tab" data-value="string"
+                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); cursor: pointer; font-size: 11px;">
+                            State String</button>
+                        <button data-tab-btn="json" data-action="debug-switch-tab" data-value="json"
+                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid var(--accent-blue); color: #fff; cursor: pointer; font-size: 11px; font-weight: bold;">
+                            JSON Editor</button>
+                </div>
+
+                <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0;">
+                    <div data-tab-pane="inspector" style="flex: 1; overflow-y: auto; display: none; min-height: 0;">
+                    </div>
+
+                    <div data-tab-pane="trace" style="flex: 1; overflow: hidden; display: none; min-height: 0;">
+                    </div>
+
+                    <div data-tab-pane="string" style="flex: 1; overflow-y: auto; display: none; min-height: 0;">
+                    </div>
+
+                    <div data-tab-pane="json" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discard / Deck View Modal -->
+    <div id="discard-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2 id="discard-modal-title">Discard Pile</h2>
+                <button class="close-btn" data-action="close-discard-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="discard-modal-cards" class="discard-grid"></div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

@@ -252,7 +252,7 @@ pub fn run_test_mode() {
                         &crate::game_setup::ActionType::RockChoice,
                         None,
                         None,
-                        None,
+                        Some(crate::zones::MemberArea::LeftSide), // Rock
                         None,
                     );
                 }

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Double Baton UI Preview</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a2e;
+            color: #fff;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .action-list {
+            width: 400px;
+            background: #2a2a40;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+        }
+
+        .category-header {
+            color: var(--accent-gold);
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 15px 0 10px 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 5px;
+        }
+
+        /* Group Container */
+        .action-group-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+            margin-bottom: 12px;
+            transition: all 0.2s ease;
+        }
+
+        .action-group-header {
+            padding: 10px 12px;
+            background: rgba(0, 0, 0, 0.2);
+            font-weight: 600;
+            font-size: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: #ffda79;
+        }
+
+        .action-group-buttons {
+            padding: 10px;
+        }
+
+        /* 3-Slot Grid (Standard Play) */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        /* Double Baton Grid */
+        .double-baton-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 0 10px 10px 10px;
+            border-top: 1px dashed rgba(255, 215, 0, 0.3);
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        /* Base Button Styles */
+        button.action-btn {
+            background: linear-gradient(180deg, #444 0%, #333 100%);
+            border: 1px solid #555;
+            color: white;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            font-family: inherit;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+        }
+
+        button.action-btn:hover {
+            transform: translateY(-2px);
+            background: linear-gradient(180deg, #555 0%, #444 100%);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Mini button layout (for 3-slot grid) */
+        button.action-btn.mini {
+            padding: 8px 4px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        /* Double Baton button styles */
+        button.action-btn.double-baton-btn {
+            background: linear-gradient(180deg, rgba(255, 215, 0, 0.2) 0%, rgba(255, 215, 0, 0.1) 100%);
+            border: 1px solid rgba(255, 215, 0, 0.3);
+            width: 100%;
+            padding: 8px;
+            min-height: 50px;
+            color: #ffda79;
+        }
+
+        button.action-btn.double-baton-btn:hover {
+            background: linear-gradient(180deg, rgba(255, 215, 0, 0.3) 0%, rgba(255, 215, 0, 0.2) 100%);
+            border-color: rgba(255, 215, 0, 0.5);
+        }
+
+        .action-title {
+            font-size: 0.95em;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .action-cost {
+            font-size: 1.1em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* Mock icons */
+        .icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background-color: #ffda79;
+            mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 22L2 12.5C.2 10.7.2 7.8 2 6l.2-.2c1.8-1.8 4.7-1.8 6.5 0L11.5 8.6 14.3 5.8c1.8-1.8 4.7-1.8 6.5 0l.2.2c1.8 1.8 1.8 4.7 0 6.5L11.5 22z" fill="white"/></svg>') no-repeat center;
+            -webkit-mask: url('data:image/svg+xml;utf8,<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11.5 22L2 12.5C.2 10.7.2 7.8 2 6l.2-.2c1.8-1.8 4.7-1.8 6.5 0L11.5 8.6 14.3 5.8c1.8-1.8 4.7-1.8 6.5 0l.2.2c1.8 1.8 1.8 4.7 0 6.5L11.5 22z" fill="white"/></svg>') no-repeat center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="action-list">
+        <div class="category-header" style="color: #ffda79;">PLAY MEMBER</div>
+
+        <!-- Example Card: Tang Keke -->
+        <div class="action-group-card">
+            <div class="action-group-header">
+                <span>Keke Tang (PL!HS-PR-029-PR)</span>
+                <span class="header-base-cost" style="display: flex; align-items: center; gap: 4px;">
+                    <span class="icon"></span> 10
+                </span>
+            </div>
+
+            <!-- Standard 3-slot grid (Single Baton / Empty Placements) -->
+            <div class="action-group-buttons grid-3">
+                <button class="action-btn mini">
+                    <span><span class="icon"></span>2 [B]</span>
+                </button>
+                <!-- Mid slot hidden -> Not legal to single-baton here -->
+                <div style="visibility: hidden; min-height: 36px;"></div>
+                <button class="action-btn mini">
+                    <span><span class="icon"></span>4 [B]</span>
+                </button>
+            </div>
+
+            <!-- NEW: Double Baton Visually Mapped Grid -->
+            <div style="margin-top: 8px; border-top: 1px dashed rgba(255, 215, 0, 0.3); background: rgba(0,0,0,0.15);">
+                <!-- Pair: Left & Mid -->
+                <div class="action-group-buttons grid-3"
+                    style="background: rgba(255, 215, 0, 0.05); padding: 4px; border-radius: 4px; margin-top: 4px;">
+                    <button class="action-btn double-baton-btn" style="min-height: 40px; padding: 4px;">
+                        <div class="action-title" style="font-size:0.7em;">(L&M)->L</div>
+                        <div class="action-cost"><span class="icon"></span>0</div>
+                    </button>
+                    <button class="action-btn double-baton-btn" style="min-height: 40px; padding: 4px;">
+                        <div class="action-title" style="font-size:0.7em;">(L&M)->M</div>
+                        <div class="action-cost"><span class="icon"></span>0</div>
+                    </button>
+                    <div style="visibility: hidden;"></div>
+                </div>
+                <!-- Pair: Left & Right (The "Gap in Middle" Case) -->
+                <div class="action-group-buttons grid-3"
+                    style="background: rgba(255, 215, 0, 0.05); padding: 4px; border-radius: 4px; margin-top: 4px;">
+                    <button class="action-btn double-baton-btn" style="min-height: 40px; padding: 4px;">
+                        <div class="action-title" style="font-size:0.7em;">(L&R)->L</div>
+                        <div class="action-cost"><span class="icon"></span>0</div>
+                    </button>
+                    <div
+                        style="min-height: 30px; display: flex; align-items: center; justify-content: center; opacity: 0.2; font-size: 0.6em; border: 1px dashed rgba(255,255,255,0.1);">
+                        GAP</div>
+                    <button class="action-btn double-baton-btn" style="min-height: 40px; padding: 4px;">
+                        <div class="action-title" style="font-size:0.7em;">(L&R)->R</div>
+                        <div class="action-cost"><span class="icon"></span>0</div>
+                    </button>
+                </div>
+                <!-- Pair: Mid & Right -->
+                <div class="action-group-buttons grid-3"
+                    style="background: rgba(255, 215, 0, 0.05); padding: 4px; border-radius: 4px; margin-top: 4px; margin-bottom: 8px;">
+                    <div style="visibility: hidden;"></div>
+                    <button class="action-btn double-baton-btn" style="min-height: 40px; padding: 4px;">
+                        <div class="action-title" style="font-size:0.7em;">(M&R)->M</div>
+                        <div class="action-cost"><span class="icon"></span>0</div>
+                    </button>
+                    <button class="action-btn double-baton-btn" style="min-height: 40px; padding: 4px;">
+                        <div class="action-title" style="font-size:0.7em;">(M&R)->R</div>
+                        <div class="action-cost"><span class="icon"></span>0</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</body>
+
+</html>

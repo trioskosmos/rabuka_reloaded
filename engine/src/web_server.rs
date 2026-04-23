@@ -269,13 +269,20 @@ async fn execute_action(
         .and_then(|t| t.parse::<crate::game_setup::ActionType>().ok())
         .unwrap_or_else(|| crate::game_setup::ActionType::Pass);
     
+    // For SelectMulligan, convert card_index to card_indices to handle duplicate cards
+    let card_indices = if action_type == crate::game_setup::ActionType::SelectMulligan {
+        req.card_index.map(|idx| vec![idx])
+    } else {
+        req.card_indices.clone()
+    };
+
     // Execute the action using turn engine with card_id directly
     // Turn engine handles card_id to card_index lookup internally
     let result = crate::turn::TurnEngine::execute_main_phase_action(
         &mut game_state,
         &action_type,
         requested_card_id,
-        req.card_indices.clone(),
+        card_indices,
         requested_stage_area,
         req.use_baton_touch,
     );

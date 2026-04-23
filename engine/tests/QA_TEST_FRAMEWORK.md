@@ -9,6 +9,200 @@ The primary goal of QA-based tests is to stress-test the game engine by simulati
 4. **Verify expected behavior** - Compare engine output against official Q&A answers.
 5. **Track all state changes** - Every ability execution must verify all affected game state variables.
 
+## Test Failures = Engine Bugs
+
+**If a test fails, the engine is broken.** Do not ignore tests or mark them as `#[ignore]`. A failing test indicates:
+
+- The engine doesn't implement a required rule/mechanic
+- The engine has a bug in ability resolution
+- The engine's state management is incorrect
+- The engine's validation logic is missing
+
+**Never ignore failing tests.** Each failure is a concrete bug that must be fixed in the engine code, not the test code. The Q&A answers are the source of truth; the engine must conform to them.
+
+## Gameplay Testing vs Superficial Flag Testing
+
+### What NOT to Do: Superficial Flag Testing
+
+Superficial tests only check internal flags or intermediate states without validating the actual gameplay outcome. These tests give a false sense of security.
+
+**Bad Example - Flag Checking Only:**
+```rust
+#[test]
+fn test_bad_appearance_ability() {
+    // BAD: Only checks if a flag was set, not if the ability actually worked
+    let mut game_state = setup_game();
+    play_card_to_stage(&mut game_state, card_id);
+    
+    // This only checks a flag - doesn't verify cards were actually drawn
+    assert!(game_state.appearance_triggered);
+    assert!(game_state.ability_executed);
+}
+```
+
+**Problems with this approach:**
+- Doesn't verify the actual effect (drawing cards, modifying scores, etc.)
+- Flags can be set incorrectly while the effect fails
+- No validation of game state changes
+- Tests pass even when gameplay is broken
+
+### What TO Do: Gameplay Testing
+
+Gameplay tests simulate the actual player experience and verify the concrete results of abilities.
+
+**Good Example - Gameplay Validation:**
+```rust
+#[test]
+fn test_good_appearance_ability() {
+    // GOOD: Verifies actual gameplay outcome
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+    
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    
+    // Find the specific card with the appearance ability
+    let member_card = cards.iter()
+        .find(|c| c.card_no == "PL!-bp3-004-R＋")
+        .expect("Should have the card");
+    let member_id = get_card_id(member_card, &card_database);
+    
+    // Set up deck with cards to draw
+    let deck_cards: Vec<_> = cards.iter()
+        .filter(|c| !c.is_member() && !c.is_live())
+        .take(5)
+        .collect();
+    for deck_card in deck_cards.iter() {
+        player1.main_deck.cards.push(get_card_id(deck_card, &card_database));
+    }
+    
+    setup_player_with_hand(&mut player1, vec![member_id]);
+    setup_player_with_energy(&mut player1, energy_card_ids);
+    
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    game_state.current_phase = Phase::Main;
+    
+    // Record initial state
+    let initial_hand_size = game_state.player1.hand.cards.len();
+    let initial_deck_size = game_state.player1.main_deck.cards.len();
+    
+    // Execute the gameplay action
+    TurnEngine::execute_main_phase_action(
+        &mut game_state,
+        &ActionType::PlayMemberToStage,
+        Some(member_id),
+        None,
+        Some(MemberArea::Center),
+        Some(false),
+    ).expect("Should play card to stage");
+    
+    // Verify the ACTUAL gameplay outcome
+    let hand_size_after = game_state.player1.hand.cards.len();
+    let deck_size_after = game_state.player1.main_deck.cards.len();
+    
+    // Concrete assertion: 1 card was drawn from deck to hand
+    assert_eq!(hand_size_after, initial_hand_size + 1, 
+        "Should have drawn 1 card after appearance");
+    assert_eq!(deck_size_after, initial_deck_size - 1,
+        "Deck should have 1 fewer card after drawing");
+}
+```
+
+**Benefits of this approach:**
+- Validates the actual gameplay effect (cards moved from deck to hand)
+- Tests the complete execution chain (trigger → resolve → effect)
+- Verifies state changes in concrete, observable ways
+- Tests fail when gameplay is actually broken
+
+### Key Differences
+
+| Aspect | Superficial Testing | Gameplay Testing |
+|--------|-------------------|------------------|
+| **What it checks** | Internal flags, intermediate states | Final game state, observable outcomes |
+| **Example assertion** | `assert!(ability_triggered)` | `assert_eq!(hand_size, expected)` |
+| **False positive risk** | High - flags can be set incorrectly | Low - concrete state must match |
+| **Debugging value** | Low - doesn't show what's broken | High - shows exactly what's wrong |
+| **Maintenance** | Easy but misleading | Harder but meaningful |
+
+### When to Use Each Approach
+
+**Use Gameplay Testing for:**
+- Ability effects (draw, discard, gain blades/hearts, modify scores)
+- Card movement between zones
+- Cost payment and resource consumption
+- Turn and phase transitions
+- Win/loss conditions
+
+**Use Flag/State Testing ONLY for:**
+- Timing validation (when abilities should trigger)
+- Restriction checking (what actions are allowed)
+- Turn tracking (what happened this turn)
+- These should still be validated with concrete gameplay outcomes when possible
+
+### Concrete Gameplay Assertions
+
+Always prefer assertions that validate observable game state:
+
+**✅ Good - Concrete assertions:**
+```rust
+// Card counts
+assert_eq!(player.hand.cards.len(), 5);
+assert_eq!(player.stage.stage.iter().filter(|&&id| id != -1).count(), 3);
+
+// Resource amounts
+assert_eq!(player.energy_zone.cards.len(), 10);
+assert_eq!(calculate_total_blades(&player.stage, &card_db), 5);
+
+// Score/heart values
+assert_eq!(calculate_total_score(&player.live_card_area), 12);
+assert_eq!(player.stage.all_heart_icons(&card_db).len(), 8);
+
+// Card locations
+assert!(player.stage.stage[1] != -1); // Card in center
+assert!(player.hand.cards.contains(&card_id));
+```
+
+**❌ Bad - Abstract assertions:**
+```rust
+// Flag checks without concrete validation
+assert!(game_state.ability_triggered);
+assert!(game_state.cost_paid);
+assert!(game_state.phase_changed);
+
+// Intermediate state without final outcome
+assert_eq!(game_state.pending_abilities.len(), 1);
+assert!(game_state.effect_queue.is_empty());
+```
+
+### Testing Complex Interactions
+
+For complex multi-step abilities, verify each step's concrete outcome:
+
+```rust
+#[test]
+fn test_sequential_ability() {
+    // Ability: "Draw 1 card, then discard 1 card"
+    
+    let initial_hand = game_state.player1.hand.cards.len();
+    let initial_deck = game_state.player1.main_deck.cards.len();
+    let initial_discard = game_state.player1.waitroom.cards.len();
+    
+    execute_ability(&mut game_state, ability);
+    
+    // Step 1: Verify draw
+    assert_eq!(game_state.player1.hand.cards.len(), initial_hand + 1,
+        "Should have drawn 1 card");
+    assert_eq!(game_state.player1.main_deck.cards.len(), initial_deck - 1,
+        "Deck should have 1 fewer card");
+    
+    // Step 2: Verify discard
+    assert_eq!(game_state.player1.hand.cards.len(), initial_hand,
+        "Should have discarded 1 card (back to original hand size)");
+    assert_eq!(game_state.player1.waitroom.cards.len(), initial_discard + 1,
+        "Discard should have 1 more card");
+}
+```
+
 ## Critical Variable Tracking
 
 Every test MUST track and verify the following variables when abilities are executed:
@@ -342,3 +536,314 @@ Begin with Q1, Q2, etc. (lowest numbers) and work upward. Prioritize:
 - Simple mechanical tests first (cost payment, basic card movement)
 - Complex interaction tests later (multi-card combos, timing issues)
 - Edge cases last (empty zones, maximum limits, unusual states)
+
+## Test Organization and Naming
+
+### File Structure
+Organize tests by category to maintain clarity:
+```
+tests/
+├── qa/
+│   ├── cost_payment.rs
+│   ├── ability_triggering.rs
+│   ├── card_counting.rs
+│   ├── baton_touch.rs
+│   ├── heart_score.rs
+│   ├── deck_hand.rs
+│   └── live_mechanics.rs
+└── integration/
+    └── full_game_scenarios.rs
+```
+
+### Test Naming Convention
+Use descriptive names that indicate:
+- The Q&A number being tested
+- The mechanic being validated
+- The expected outcome
+
+**Good examples:**
+```rust
+fn test_q234_cost_payment_with_insufficient_energy()
+fn test_q225_multi_member_card_counting()
+fn test_q193_baton_touch_area_selection()
+fn test_appearance_ability_draws_one_card()
+```
+
+**Bad examples:**
+```rust
+fn test_cost()
+fn test_card_count()
+fn test_baton()
+fn test_ability()
+```
+
+## Test Data Management
+
+### Card Loading Strategy
+Load cards once per test module to avoid redundant I/O:
+```rust
+lazy_static! {
+    static ref CARDS: Vec<Card> = load_cards();
+    static ref CARD_DATABASE: Arc<CardDatabase> = Arc::new(CardDatabase::load_or_create(CARDS.clone()));
+}
+```
+
+### Test-Specific Card Selection
+Create helper functions to find specific cards:
+```rust
+fn find_card_by_number(card_no: &str) -> i16 {
+    CARDS.iter()
+        .find(|c| c.card_no == card_no)
+        .map(|c| get_card_id(c, &CARD_DATABASE))
+        .expect(&format!("Card {} not found", card_no))
+}
+
+fn find_cards_by_character(character_name: &str) -> Vec<i16> {
+    CARDS.iter()
+        .filter(|c| c.name.contains(character_name))
+        .map(|c| get_card_id(c, &CARD_DATABASE))
+        .collect()
+}
+```
+
+### State Snapshot Helpers
+Create reusable snapshot functions:
+```rust
+fn snapshot_game_state(game_state: &GameState) -> GameStateSnapshot {
+    GameStateSnapshot {
+        hand_size: game_state.player1.hand.cards.len(),
+        deck_size: game_state.player1.main_deck.cards.len(),
+        discard_size: game_state.player1.waitroom.cards.len(),
+        energy_count: game_state.player1.energy_zone.cards.len(),
+        stage_members: game_state.player1.stage.stage.iter()
+            .filter(|&&id| id != -1)
+            .count(),
+        total_blades: game_state.player1.stage.total_blades(&game_state.card_database),
+        total_hearts: game_state.player1.stage.all_heart_icons(&game_state.card_database).len(),
+        total_score: calculate_total_score(&game_state.player1.live_card_area),
+        current_phase: game_state.current_phase.clone(),
+        turn_number: game_state.turn_number,
+    }
+}
+```
+
+## Regression Testing
+
+### When to Add Regression Tests
+Add regression tests when:
+1. A bug is found and fixed
+2. A Q&A reveals an edge case not previously covered
+3. Complex interactions are discovered during gameplay
+4. Engine behavior changes due to refactoring
+
+### Regression Test Template
+```rust
+#[test]
+fn test_regression_[issue_number]_[brief_description]() {
+    // Issue: [description of the bug]
+    // Fix: [description of the fix]
+    // Q&A: [relevant Q&A number if applicable]
+
+    let cards = load_cards();
+    let card_database = Arc::new(CardDatabase::load_or_create(cards.clone()));
+
+    // Setup the exact scenario that triggered the bug
+    let (mut player1, mut player2) = create_test_players();
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+
+    // ... specific setup ...
+
+    // Execute the action that previously failed
+    let result = execute_action(&mut game_state, action);
+
+    // Verify the fix works
+    assert!(result.is_ok(), "Action should succeed after fix");
+    // Verify concrete gameplay outcome
+    assert_eq!(game_state.player1.hand.cards.len(), expected_hand_size);
+}
+```
+
+## Test Maintenance
+
+### Updating Tests When Abilities Change
+When ability parsing or implementation changes:
+1. Run the full test suite to identify failures
+2. Check if the test expectation was wrong or the implementation changed
+3. Update test expectations only if the Q&A confirms the new behavior
+4. Document the reason for the change in comments
+
+### Deprecating Tests
+When a test is no longer relevant:
+1. Add a comment explaining why it's deprecated
+2. Mark with `#[ignore]` instead of deleting
+3. Consider if the test can be repurposed for a different scenario
+
+```rust
+#[test]
+#[ignore = "Q123 was superseded by Q456 - see test_q456 instead"]
+fn test_q123_old_behavior() {
+    // This test is kept for historical reference
+}
+```
+
+## Integration with CI/CD
+
+### Test Execution in CI
+Configure CI to:
+1. Run all QA tests on every commit
+2. Run tests with `--release` for performance
+3. Generate test reports for failed tests
+4. Mark builds as failed if any QA test fails
+
+### Performance Considerations
+- Use `cargo test --release` for faster test execution
+- Parallelize independent tests using `cargo test --test-threads=4`
+- Cache card loading between tests using lazy_static
+- Avoid expensive operations in test setup
+
+## Common Pitfalls
+
+### Pitfall 1: Testing Implementation Details
+**Bad:** Testing internal function calls
+```rust
+assert!(game_state.ability_resolver.called);
+```
+
+**Good:** Testing observable outcomes
+```rust
+assert_eq!(game_state.player1.hand.cards.len(), expected);
+```
+
+### Pitfall 2: Fragile Test Setup
+**Bad:** Hard-coded indices that break easily
+```rust
+game_state.player1.hand.cards[0] = card_id; // Assumes hand is empty
+```
+
+**Good:** Using helper functions that handle state
+```rust
+add_card_to_hand(&mut game_state.player1, card_id);
+```
+
+### Pitfall 3: Not Cleaning Up State
+**Bad:** Tests that leave state dirty
+```rust
+// Test modifies game_state but doesn't reset
+```
+
+**Good:** Each test creates fresh state
+```rust
+let mut game_state = create_fresh_game_state();
+```
+
+### Pitfall 4: Overly Specific Assertions
+**Bad:** Asserting exact card order when order doesn't matter
+```rust
+assert_eq!(game_state.player1.hand.cards[0], card_id);
+```
+
+**Good:** Asserting presence when order is irrelevant
+```rust
+assert!(game_state.player1.hand.cards.contains(&card_id));
+```
+
+## Advanced Testing Patterns
+
+### Property-Based Testing
+For rules that should hold across many scenarios:
+```rust
+#[test]
+fn test_property_draw_increases_hand() {
+    // Property: Drawing N cards always increases hand by N
+    for n in 1..=5 {
+        let initial_hand = game_state.player1.hand.cards.len();
+        draw_cards(&mut game_state, n);
+        assert_eq!(game_state.player1.hand.cards.len(), initial_hand + n);
+    }
+}
+```
+
+### State Transition Testing
+Verify that state transitions are valid:
+```rust
+#[test]
+fn test_phase_transitions() {
+    let mut game_state = setup_game();
+    
+    // Can only go from Main to Live, not backwards
+    game_state.current_phase = Phase::Main;
+    transition_phase(&mut game_state, Phase::Live);
+    assert_eq!(game_state.current_phase, Phase::Live);
+    
+    // Should not be able to transition backwards
+    let result = transition_phase(&mut game_state, Phase::Main);
+    assert!(result.is_err());
+}
+```
+
+### Boundary Testing
+Test edge cases and limits:
+```rust
+#[test]
+fn test_maximum_hand_size() {
+    // Test drawing when hand is at maximum
+    fill_hand_to_max(&mut game_state);
+    let result = draw_card(&mut game_state);
+    assert!(result.is_err() || game_state.player1.waitroom.cards.len() > 0);
+}
+```
+
+## Documentation and Comments
+
+### Test Documentation
+Each test should have:
+1. A brief description of what it tests
+2. Reference to relevant Q&A number
+3. Expected behavior
+4. Any special setup requirements
+
+```rust
+/// Tests Q193: Baton touch area selection
+/// 
+/// When using baton touch, you can choose any area that the touched member
+/// occupied. This test verifies that the new member is placed in the same
+/// area as the touched member.
+#[test]
+fn test_q193_baton_touch_area_selection() {
+    // ...
+}
+```
+
+### Complex Test Logic Comments
+For complex test setup, add inline comments:
+```rust
+// Setup: Player has 3 energy cards in energy zone
+// This is required to pay the cost of the member card
+let energy_cards = vec![card_id_1, card_id_2, card_id_3];
+game_state.player1.energy_zone.cards.extend(energy_cards);
+
+// The member card costs 2 energy, so we expect 1 energy remaining
+let expected_remaining_energy = 1;
+```
+
+## Continuous Improvement
+
+### Reviewing Test Coverage
+Regularly review:
+1. Which Q&A questions are covered
+2. Which game mechanics have tests
+3. Areas with sparse test coverage
+4. Tests that are frequently flaky
+
+### Test Metrics to Track
+- Number of Q&A questions covered
+- Test execution time
+- Test failure rate
+- Number of regression tests added
+
+### Updating the Framework
+This document should be updated when:
+1. New testing patterns are discovered
+2. Common pitfalls are identified
+3. Best practices evolve
+4. New game mechanics are added

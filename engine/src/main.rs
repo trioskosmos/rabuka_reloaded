@@ -17,10 +17,11 @@ use card::CardDatabase;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use serde_json;
+use game_setup::{ActionParameters, AreaInfo};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ActionsResponse {
-    pub actions: Vec<game_setup::Action>,
+    pub actions: Vec<Action>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -58,6 +59,13 @@ pub struct GameStateDisplay {
     pub phase: String,
     pub player1: PlayerDisplay,
     pub player2: PlayerDisplay,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Action {
+    pub description: String,
+    pub action_type: String,
+    pub parameters: Option<ActionParameters>,
 }
 
 pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>) -> Option<CardDisplay> {
@@ -382,7 +390,31 @@ fn initialize_game() {
 fn output_actions() {
     let game_state = GAME_STATE.lock().unwrap();
     if let Some(ref state) = *game_state {
-        let actions = game_setup::generate_possible_actions(state);
+        let actions = game_setup::generate_possible_actions(state)
+            .into_iter()
+            .map(|sa| Action {
+                description: sa.description,
+                action_type: sa.action_type.to_string(),
+                parameters: sa.parameters.map(|p| ActionParameters {
+                    card_id: p.card_id,
+                    card_index: p.card_index,
+                    card_indices: p.card_indices,
+                    stage_area: p.stage_area,
+                    use_baton_touch: p.use_baton_touch,
+                    card_name: p.card_name,
+                    card_no: p.card_no,
+                    base_cost: p.base_cost,
+                    final_cost: p.final_cost,
+                    available_areas: p.available_areas.map(|areas| areas.into_iter().map(|ai| AreaInfo {
+                        area: ai.area,
+                        available: ai.available,
+                        cost: ai.cost,
+                        is_baton_touch: ai.is_baton_touch,
+                        existing_member_name: ai.existing_member_name,
+                    }).collect()),
+                }),
+            })
+            .collect();
         let response = ActionsResponse { actions };
         println!("{}", serde_json::to_string(&response).unwrap());
     } else {

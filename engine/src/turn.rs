@@ -193,8 +193,11 @@ impl TurnEngine {
             }
             crate::game_setup::ActionType::SelectMulligan => {
                 // Toggle card selection for mulligan
-                let idx = if let Some(cid) = card_id {
-                    // Use current_mulligan_player instead of active_player
+                // Use card_indices parameter to handle duplicate cards correctly
+                let idx = if let Some(indices) = _card_indices {
+                    indices.get(0).copied().unwrap_or(0)
+                } else if let Some(cid) = card_id {
+                    // Fallback to HashMap lookup if card_indices not provided
                     let mulligan_player = if game_state.current_mulligan_player == "player1" {
                         &game_state.player1
                     } else {
@@ -202,7 +205,7 @@ impl TurnEngine {
                     };
                     mulligan_player.get_card_index_by_id(cid).unwrap_or(0)
                 } else {
-                    0 // Fallback to index 0 if no card_id provided
+                    0
                 };
                 if let Some(pos) = game_state.mulligan_selected_indices.iter().position(|&x| x == idx) {
                     // Already selected, deselect
@@ -362,7 +365,10 @@ impl TurnEngine {
 
                 // Trigger 登場 abilities for the played card
                 // Q197/Q198: Auto abilities don't trigger when played via baton touch with cost 10+
-                Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid);
+                Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid, baton_touch_used);
+                
+                // Process the triggered debut abilities
+                game_state.process_pending_auto_abilities(&player_id);
                 
                 // Trigger baton touch event if baton touch was used
                 if baton_touch_used {
@@ -920,7 +926,7 @@ impl TurnEngine {
         }
     }
 
-    fn check_duplicate_members(player: &mut crate::player::Player) {
+    fn check_duplicate_members(_player: &mut crate::player::Player) {
         // Rule 10.4: Check for duplicate members in same area
         // Rule 10.4.1: If multiple members in one area, keep the last one, send others to discard
         // Note: The current stage implementation uses an array where each position can only have one card
@@ -1225,12 +1231,12 @@ impl TurnEngine {
     }
 
     /// Trigger debut abilities for a player when a card is placed on stage
-    fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, cost_paid: u32) {
+    fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, cost_paid: u32, baton_touch_used: bool) {
         // Rule 11.4: Trigger Debut (登場) automatic abilities
         // Rule 11.4.2: "【自動】 このメンバーが登場したとき、（効果）"
         
         // Q197/Q198: Auto abilities don't trigger when played via baton touch with cost 10+
-        if cost_paid >= 10 {
+        if baton_touch_used && cost_paid >= 10 {
             return;
         }
         
@@ -1239,6 +1245,29 @@ impl TurnEngine {
         
         // Collect abilities to trigger first to avoid borrow conflicts
         let mut abilities_to_trigger = Vec::new();
+        
+        // Get the played card's cost for Q229 condition check
+        let _played_card_cost = {
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            
+            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            let mut found_cost = None;
+            for area in areas {
+                if let Some(card_id) = player.stage.get_area(area) {
+                    if let Some(card) = game_state.card_database.get_card(card_id) {
+                        if card.card_no == card_no_clone {
+                            found_cost = Some(card.cost);
+                            break;
+                        }
+                    }
+                }
+            }
+            found_cost
+        };
         
         {
             let player = if player_id_clone == game_state.player1.id {
@@ -1257,6 +1286,19 @@ impl TurnEngine {
                             for ability in &card.abilities {
                                 // Check if ability has Debut trigger
                                 if ability.triggers.as_ref().map_or(false, |t| t == "登場") {
+                                    // Q229: Check if ability requires baton touch from lower-cost member
+                                    // The ability text contains "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合"
+                                    let requires_baton_touch = ability.full_text.contains("バトンタッチして登場した場合");
+                                    
+                                    if requires_baton_touch {
+                                        // Only trigger if played via baton touch
+                                        if !baton_touch_used {
+                                            continue;
+                                        }
+                                        // Check if replaced member had lower cost (simplified - assumes baton touch was valid)
+                                        // In a full implementation, we'd track the replaced member's cost
+                                    }
+                                    
                                     let ability_id = format!("{}_{}", card_no_clone, ability.full_text);
                                     abilities_to_trigger.push((ability_id, card_no_clone.clone()));
                                 }
