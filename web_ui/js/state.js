@@ -342,7 +342,22 @@ const stateInternal = {
     },
 
     resolveCardData: (cid) => {
-        if (cid === null || cid === undefined || cid < 0) return null;
+        if (cid === null || cid === undefined) return null;
+
+        // Handle string card_no lookups (e.g., "PL!-sd1-001-SD")
+        if (typeof cid === 'string') {
+            if (State.cardIndex) {
+                return State.cardIndex[cid];
+            }
+            // Fallback to static database
+            if (State.staticCardDatabase && State.staticCardDatabase[cid]) {
+                return State.staticCardDatabase[cid];
+            }
+            return null;
+        }
+
+        // Handle numeric ID lookups
+        if (cid < 0) return null;
 
         const templateId = cid & State.TEMPLATE_MASK;
 
@@ -380,6 +395,32 @@ const stateInternal = {
             const found = state.looked_cards.find(c => c && (c.id === cid || c.card_id === cid || c.card_no === cid));
             if (found) return found;
         }
+        return null;
+    },
+
+    resolveCardDataByName: (cardName) => {
+        if (!cardName || typeof cardName !== 'string') return null;
+
+        // Search in card index first
+        if (State.cardIndex) {
+            for (const key in State.cardIndex) {
+                const card = State.cardIndex[key];
+                if (card && card.name === cardName) {
+                    return card;
+                }
+            }
+        }
+
+        // Fallback to static database
+        if (State.staticCardDatabase) {
+            for (const key in State.staticCardDatabase) {
+                const card = State.staticCardDatabase[key];
+                if (card && card.name === cardName) {
+                    return card;
+                }
+            }
+        }
+
         return null;
     },
 

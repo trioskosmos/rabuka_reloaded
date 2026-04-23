@@ -58,10 +58,11 @@ export const CardRenderer = {
         let resolvedCard = card;
         if (typeof card === 'number') {
             resolvedCard = State.resolveCardData(card);
-        } else if (card.card_no && !card.name) {
-            // Card has card_no but no name - try to resolve from index
+        } else if (card.card_no) {
+            // Card has card_no - always try to enrich from index/static database
+            // This ensures we get _img and other static data even if name is present
             const indexed = State.resolveCardData(card.card_no);
-            if (indexed && indexed.name) {
+            if (indexed) {
                 resolvedCard = { ...card, ...indexed };
             }
         }

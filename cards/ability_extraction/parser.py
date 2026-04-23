@@ -379,7 +379,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Check for count conditions like "2枚以上ある" or "6枚以上ある"
     count_match = re.search(r'(\d+)枚以上ある', text)
     if count_match:
-        condition['type'] = 'card_count_condition'
+        condition['condition_type'] = 'card_count_condition'
         condition['count'] = int(count_match.group(1))
         condition['operator'] = '>='
         return condition
@@ -387,7 +387,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Check for count conditions with unit like "2人以上いる"
     unit_count_match = re.search(r'(\d+)(人|枚|つ)以上いる', text)
     if unit_count_match:
-        condition['type'] = 'card_count_condition'
+        condition['condition_type'] = 'card_count_condition'
         condition['count'] = int(unit_count_match.group(1))
         condition['operator'] = '>='
         condition['unit'] = unit_count_match.group(2)
@@ -395,12 +395,12 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for "それらが両方ある" (both present) condition
     if 'それらが両方ある' in text:
-        condition['type'] = 'both_condition'
+        condition['condition_type'] = 'both_condition'
         return condition
     
     # Check for temporal conditions with "移動していない" (not moved)
     if 'このターン' in text and '移動していない' in text:
-        condition['type'] = 'temporal_condition'
+        condition['condition_type'] = 'temporal_condition'
         condition['temporal'] = 'this_turn'
         condition['condition'] = {
             'type': 'not_moved'
@@ -413,7 +413,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for temporal conditions with "移動している" (has moved)
     if 'このターン' in text and '移動している' in text:
-        condition['type'] = 'temporal_condition'
+        condition['condition_type'] = 'temporal_condition'
         condition['temporal'] = 'this_turn'
         condition['condition'] = {
             'type': 'has_moved'
@@ -426,7 +426,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for temporal conditions with "ライブを成功させていた" (live success)
     if 'このターン' in text and 'ライブを成功させていた' in text:
-        condition['type'] = 'temporal_condition'
+        condition['condition_type'] = 'temporal_condition'
         condition['temporal'] = 'this_turn'
         condition['condition'] = {
             'type': 'opponent_live_success'
@@ -438,7 +438,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for temporal conditions with specific turn phase
     if 'このゲームの' in text and 'ターン目' in text and 'ライブフェイズ' in text:
-        condition['type'] = 'temporal_condition'
+        condition['condition_type'] = 'temporal_condition'
         # Extract turn number
         turn_match = re.search(r'(\d+)ターン目', text)
         if turn_match:
@@ -450,7 +450,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     if 'バトンタッチして登場した' in text:
         # Use location_condition with baton_touch_trigger field instead of baton_touch_condition
         # since engine doesn't have a handler for baton_touch_condition
-        condition['type'] = 'location_condition'
+        condition['condition_type'] = 'location_condition'
         condition['location'] = 'stage'
         condition['target'] = 'self'
         condition['baton_touch_trigger'] = True
@@ -475,7 +475,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Check for "このターン、自分のステージにメンバーが3回登場したとき" type temporal count conditions
     # Check this BEFORE appearance condition to prevent override
     if ('このターン' in text or 'ターン目' in text) and ('回' in text or '登場' in text):
-        condition['type'] = 'temporal_condition'
+        condition['condition_type'] = 'temporal_condition'
         condition['temporal'] = 'this_turn'
         # Extract count if present (e.g., "3回登場した" or "2回以上登場している")
         count_match = re.search(r'(\d+)回', text)
@@ -509,7 +509,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     if '名前が異なる' in text or 'ユニット名がそれぞれ異なる' in text:
         # Use location_condition with distinct field instead of distinct_condition
         # since engine doesn't have a handler for distinct_condition
-        condition['type'] = 'location_condition'
+        condition['condition_type'] = 'location_condition'
         condition['location'] = 'stage'
         condition['target'] = 'self'
         condition['distinct'] = True
@@ -535,7 +535,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for movement conditions
     if '移動した' in text:
-        condition['type'] = 'movement_condition'
+        condition['condition_type'] = 'movement_condition'
         # movement is already set to 'moved' string by extract_movement
         # Don't override with boolean
         if 'movement' not in condition:
@@ -547,7 +547,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for appearance conditions (登場 = appearance/appear)
     if '登場' in text:
-        condition['type'] = 'appearance_condition'
+        condition['condition_type'] = 'appearance_condition'
         condition['appearance'] = True
         # Check for all_areas flag (e.g., "エリアすべて")
         if 'エリアすべて' in text:
@@ -556,24 +556,24 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for energy state conditions (アクティブ状態のエネルギーがある)
     if 'エネルギーがある' in text:
-        condition['type'] = 'energy_state_condition'
+        condition['condition_type'] = 'energy_state_condition'
         if 'アクティブ状態' in text:
             condition['state'] = 'active'
         return condition
     
     # Check for state conditions
     if 'ウェイト状態である' in text or 'ウェイト状態にある' in text:
-        condition['type'] = 'state_condition'
+        condition['condition_type'] = 'state_condition'
         condition['state'] = 'wait'
         return condition
     if 'アクティブ状態である' in text or 'アクティブ状態にある' in text or 'アクティブ状態の' in text:
-        condition['type'] = 'state_condition'
+        condition['condition_type'] = 'state_condition'
         condition['state'] = 'active'
         # Check if it's about energy
     
     # Check for appearance conditions (登場 = appearance/appear)
     if '登場' in text:
-        condition['type'] = 'appearance_condition'
+        condition['condition_type'] = 'appearance_condition'
         condition['appearance'] = True
         # Check for all_areas flag (e.g., "エリアすべて")
         if 'エリアすべて' in text:
@@ -582,18 +582,18 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for energy state conditions (アクティブ状態のエネルギーがある)
     if 'エネルギーがある' in text:
-        condition['type'] = 'energy_state_condition'
+        condition['condition_type'] = 'energy_state_condition'
         if 'アクティブ状態' in text:
             condition['state'] = 'active'
         return condition
     
     # Check for state conditions
     if 'ウェイト状態である' in text or 'ウェイト状態にある' in text:
-        condition['type'] = 'state_condition'
+        condition['condition_type'] = 'state_condition'
         condition['state'] = 'wait'
         return condition
     if 'アクティブ状態である' in text or 'アクティブ状態にある' in text or 'アクティブ状態の' in text:
-        condition['type'] = 'state_condition'
+        condition['condition_type'] = 'state_condition'
         condition['state'] = 'active'
         # Check if it's about energy
         if 'エネルギー' in text:
@@ -602,7 +602,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for appearance conditions (登場 = appearance/appear)
     if '登場' in text:
-        condition['type'] = 'appearance_condition'
+        condition['condition_type'] = 'appearance_condition'
         condition['appearance'] = True
         # Check for all_areas flag (e.g., "エリアすべて")
         if 'エリアすべて' in text:
@@ -620,7 +620,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     }
     for keyword, position in position_keywords.items():
         if keyword in text:
-            condition['type'] = 'position_condition'
+            condition['condition_type'] = 'position_condition'
             # Don't set position as string - Rust expects PositionInfo struct
             # condition['position'] = position
             return condition
@@ -634,42 +634,42 @@ def parse_condition(text: str) -> Dict[str, Any]:
     }
     for keyword, state in state_keywords.items():
         if keyword in text:
-            condition['type'] = 'state_condition'
+            condition['condition_type'] = 'state_condition'
             condition['state'] = state
             return condition
     
     # Check for active energy condition (アクティブ状態の自分のエネルギーがある)
     if 'アクティブ状態の自分のエネルギー' in text or 'アクティブ状態のエネルギー' in text:
-        condition['type'] = 'active_energy_condition'
+        condition['condition_type'] = 'active_energy_condition'
         condition['card_type'] = 'energy_card'
         return condition
     
     # Check for state transition conditions (アクティブ状態からウェイト状態になった)
     if 'から' in text and '状態' in text and 'なった' in text:
-        condition['type'] = 'state_transition_condition'
+        condition['condition_type'] = 'state_transition_condition'
         return condition
     
     # Check for ability negation
     if '能力も持たない' in text or '能力を持たない' in text:
-        condition['type'] = 'ability_negation_condition'
+        condition['condition_type'] = 'ability_negation_condition'
         condition['ability_negation'] = True
         return condition
     
     # Check for heart negation (ブレードハートを持たない)
     if 'ブレードハートを持たない' in text or 'ハートを持たない' in text:
-        condition['type'] = 'heart_negation_condition'
+        condition['condition_type'] = 'heart_negation_condition'
         condition['heart_negation'] = True
         return condition
     
     # Check for same group name condition
     if '同じグループ名を持つ' in text:
-        condition['type'] = 'same_group_condition'
+        condition['condition_type'] = 'same_group_condition'
         condition['same_group'] = True
         return condition
     
     # Check for heart variety condition (6種類以上ある)
     if '種類以上ある' in text or '種類以上含まれる' in text:
-        condition['type'] = 'heart_variety_condition'
+        condition['condition_type'] = 'heart_variety_condition'
         variety_count = extract_count(text)
         if variety_count:
             condition['variety_count'] = variety_count
@@ -677,7 +677,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for energy payment negation (E支払わないかぎり)
     if '支払わないかぎり' in text:
-        condition['type'] = 'payment_negation_condition'
+        condition['condition_type'] = 'payment_negation_condition'
         condition['negated'] = True
         # Extract payment amount
         payment_count = extract_count(text)
@@ -687,7 +687,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for negative choice (そうしなかった)
     if 'そうしなかった' in text:
-        condition['type'] = 'negative_choice_condition'
+        condition['condition_type'] = 'negative_choice_condition'
         return condition
     
     # Check for any_of conditions (いずれか)
@@ -696,7 +696,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         values_match = re.search(r'(\d+)[、\s]*(\d+)[、\s]*(\d+)[、\s]*(\d+)[、\s]*(\d+)', text)
         if values_match:
             values = [int(g) for g in values_match.groups()]
-            condition['type'] = 'any_of_condition'
+            condition['condition_type'] = 'any_of_condition'
             condition['values'] = values
             # Don't set any_of as boolean - type already indicates it's any_of condition
             # condition['any_of'] = True
@@ -704,23 +704,23 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for yell-revealed card conditions (エールにより公開された自分のカードの中に〜)
     if 'エールにより公開された自分のカードの中に' in text or 'エールによって公開される自分のカードの中に' in text:
-        condition['type'] = 'yell_revealed_condition'
+        condition['condition_type'] = 'yell_revealed_condition'
         condition['source'] = 'yell_revealed'
         return condition
     # Check for yell action conditions (自分がエールした)
     if 'エールした' in text:
-        condition['type'] = 'yell_action_condition'
+        condition['condition_type'] = 'yell_action_condition'
         return condition
     
     # Check for live card count conditions (自分のライブ中のライブカードが〜)
     if '自分のライブ中のライブカード' in text:
-        condition['type'] = 'location_count_condition'
+        condition['condition_type'] = 'location_count_condition'
         condition['location'] = 'live'
         return condition
     
     # Check for character presence conditions (自分のステージに「X」がいる)
     if re.search(r'自分のステージに「[^」]+」がいる', text) or re.search(r'自分のステージに「[^」]+」か「[^」]+」がいる', text) or re.search(r'自分のステージに「[^」]+」と「[^」]+」がいる', text):
-        condition['type'] = 'character_presence_condition'
+        condition['condition_type'] = 'character_presence_condition'
         # Extract character names - exclude ability names (which contain icons or are longer)
         char_match = re.findall(r'「([^」]+)」', text)
         if char_match:
@@ -746,7 +746,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
             # Don't filter out custom conditions - keep structure even if unparsed
             if len(parsed_conditions) >= 2:
                 compound = {
-                    'type': 'compound',
+                    'condition_type': 'compound',
                     'operator': 'and',
                     'conditions': parsed_conditions,
                     'text': text
@@ -756,7 +756,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Check for name-based matching conditions (～と同じ名前を持つ)
     if 'と同じ名前を持つ' in text or 'と同じ名前の' in text:
-        condition['type'] = 'name_match_condition'
+        condition['condition_type'] = 'name_match_condition'
         # Extract the reference name
         name_match = re.search(r'([^と]+)と同じ名前', text)
         if name_match:
@@ -899,7 +899,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         condition['operator'] = '='
         if '同じ' in text:
             condition['comparison_type'] = 'equality'
-            condition['type'] = 'comparison_condition'
+            condition['condition_type'] = 'comparison_condition'
     
     # Extract negation (いない = not exist)
     if 'いない' in text and 'メンバーがいない' in text:
@@ -1002,51 +1002,51 @@ def parse_condition(text: str) -> Dict[str, Any]:
     
     # Determine condition type
     if location and count and operator:
-        condition['type'] = 'location_count_condition'
+        condition['condition_type'] = 'location_count_condition'
         # If group is present, it's a group-specific location count condition
         if group:
-            condition['type'] = 'group_location_count_condition'
+            condition['condition_type'] = 'group_location_count_condition'
     elif cost_limit:
-        condition['type'] = 'cost_limit_condition'
+        condition['condition_type'] = 'cost_limit_condition'
     elif condition.get('resource_type') and count and operator:
         # Heart count or energy count conditions with group/location context
-        condition['type'] = 'resource_count_condition'
+        condition['condition_type'] = 'resource_count_condition'
         if group:
-            condition['type'] = 'group_resource_count_condition'
+            condition['condition_type'] = 'group_resource_count_condition'
     elif group or group_names:
-        condition['type'] = 'group_condition'
+        condition['condition_type'] = 'group_condition'
     elif location and card_type:
-        condition['type'] = 'location_condition'
+        condition['condition_type'] = 'location_condition'
     elif location and position:
-        condition['type'] = 'position_condition'
+        condition['condition_type'] = 'position_condition'
     elif condition.get('resource_type') == 'energy' and count:
-        condition['type'] = 'energy_condition'
+        condition['condition_type'] = 'energy_condition'
     elif condition.get('resource_type') == 'surplus_heart':
-        condition['type'] = 'surplus_heart_condition'
+        condition['condition_type'] = 'surplus_heart_condition'
     elif source and destination:
-        condition['type'] = 'move_action_condition'
+        condition['condition_type'] = 'move_action_condition'
     elif (source or destination) and (location or condition.get('destination')):
-        condition['type'] = 'location_condition'
+        condition['condition_type'] = 'location_condition'
     elif condition.get('comparison_target') or condition.get('comparison_type'):
-        condition['type'] = 'comparison_condition'
+        condition['condition_type'] = 'comparison_condition'
     elif condition.get('operator') and condition.get('target'):
-        condition['type'] = 'comparison_condition'
+        condition['condition_type'] = 'comparison_condition'
     elif condition.get('aggregate') == 'total':
-        condition['type'] = 'score_threshold_condition'
+        condition['condition_type'] = 'score_threshold_condition'
     elif condition.get('movement') and count:
-        condition['type'] = 'movement_count_condition'
+        condition['condition_type'] = 'movement_count_condition'
     elif condition.get('except') and condition.get('card_type'):
-        condition['type'] = 'action_restriction_condition'
+        condition['condition_type'] = 'action_restriction_condition'
     elif condition.get('except') and count:
-        condition['type'] = 'except_count_condition'
+        condition['condition_type'] = 'except_count_condition'
     elif condition.get('card_type') and count:
-        condition['type'] = 'card_count_condition'
+        condition['condition_type'] = 'card_count_condition'
     elif (location or condition.get('target')) and count and operator:
-        condition['type'] = 'location_count_condition'
+        condition['condition_type'] = 'location_count_condition'
     elif location and condition.get('target'):
-        condition['type'] = 'location_condition'
+        condition['condition_type'] = 'location_condition'
     else:
-        condition['type'] = 'custom'
+        condition['condition_type'] = 'custom'
     
     return condition
 
@@ -1886,13 +1886,13 @@ def parse_cost(text: str) -> Dict[str, Any]:
                     cost_parts.append(cost_part)
                 return {
                     'text': text,
-                    'type': 'sequential_cost',
+                    'cost_type': 'sequential_cost',
                     'costs': cost_parts
                 }
     
     # Check for reveal action (公開する/公開し)
     if '公開する' in text or '公開し' in text:
-        cost['type'] = 'reveal'
+        cost['cost_type'] = 'reveal'
         cost['action'] = 'reveal'
         # Extract source if present
         if '手札' in text:
@@ -1939,7 +1939,7 @@ def parse_cost(text: str) -> Dict[str, Any]:
     # Special case: deck_bottom destination (check early to avoid custom fallback)
     if 'デッキの一番下に置く' in text or 'デッキの一番下に置いて' in text or 'デッキの下に置く' in text or 'デッキの下に置いて' in text or '山札の下に置く' in text or '山札の下に置いて' in text:
         cost['destination'] = 'deck_bottom'
-        cost['type'] = 'move_cards'
+        cost['cost_type'] = 'move_cards'
         cost['action'] = 'move_cards'
         if 'もよい' in text or 'てもよい' in text:
             cost['optional'] = True
@@ -1963,15 +1963,15 @@ def parse_cost(text: str) -> Dict[str, Any]:
     state_change = extract_state_change(text)
     if state_change:
         cost['state_change'] = state_change
-        cost['type'] = 'state_change'  # Set type for wait/active costs
+        cost['cost_type'] = 'state_change'  # Set type for wait/active costs
     
     # Check for reveal card pattern (公開してもよい)
     if '公開してもよい' in text:
-        cost['type'] = 'reveal_condition'
+        cost['cost_type'] = 'reveal_condition'
     
     # Check for energy cost (エネルギーをエネルギーデッキに置く)
     if 'エネルギー' in text and 'エネルギーデッキに置く' in text:
-        cost['type'] = 'energy_condition'
+        cost['cost_type'] = 'energy_condition'
     
     # Extract count
     count = extract_count(text)
@@ -2052,32 +2052,32 @@ def parse_cost(text: str) -> Dict[str, Any]:
     
     # Determine cost type - check energy first
     if 'エネルギー' in text and 'エネルギーデッキに置く' in text:
-        cost['type'] = 'energy_condition'
+        cost['cost_type'] = 'energy_condition'
     elif '公開してもよい' in text:
-        cost['type'] = 'reveal_condition'
+        cost['cost_type'] = 'reveal_condition'
     elif cost.get('source') and cost.get('destination'):
-        cost['type'] = 'move_cards'
+        cost['cost_type'] = 'move_cards'
     elif 'ウェイトにする' in text or 'ウェイト状態で置く' in text or 'ウェイト状態で登場させる' in text or 'アクティブにする' in text:
-        cost['type'] = 'change_state'
+        cost['cost_type'] = 'change_state'
     elif state_change:
-        cost['type'] = 'change_state'
+        cost['cost_type'] = 'change_state'
     elif '公開する' in text:
-        cost['type'] = 'reveal_condition'
+        cost['cost_type'] = 'reveal_condition'
     elif '{{icon_energy.png|E}}' in text:
-        cost['type'] = 'pay_energy'
+        cost['cost_type'] = 'pay_energy'
         cost['energy'] = text.count('{{icon_energy.png|E}}')
     elif cost.get('source'):
         # If source but no destination, infer based on common patterns
         if cost['source'] == 'hand' and ('控え室に置く' in text or '控え室に置いて' in text):
             cost['destination'] = 'discard'
-            cost['type'] = 'move_cards'
+            cost['cost_type'] = 'move_cards'
         elif cost['source'] == 'discard' and '手札に加える' in text:
             cost['destination'] = 'hand'
-            cost['type'] = 'move_cards'
+            cost['cost_type'] = 'move_cards'
         else:
-            cost['type'] = 'custom'
+            cost['cost_type'] = 'custom'
     else:
-        cost['type'] = 'custom'
+        cost['cost_type'] = 'custom'
     
     return cost
 
@@ -2650,7 +2650,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
             condition_text = baton_match.group(0)
             action_text = text.replace(condition_text, '').strip()
             condition = parse_condition(condition_text)
-            condition['type'] = 'baton_touch'
+            condition['condition_type'] = 'baton_touch'
             # Extract source group if present (e.g., "『スリーズブーケ』のメンバーから")
             group_match = re.search(r'「([^」]+)」のメンバーから', condition_text)
             if group_match:
