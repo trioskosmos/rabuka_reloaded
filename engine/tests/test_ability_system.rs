@@ -488,7 +488,7 @@ fn test_q57_prohibition_precedence_with_real_cards() {
 fn test_q58_turn_limited_abilities_per_card_instance() {
     // Rule: When you have 2 copies of the same member on stage, each with a turn-limited ability,
     // each can use their ability once in the same turn. Abilities are tracked per card instance.
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -529,7 +529,7 @@ fn test_q59_card_movement_resets_turn_limit() {
     // Rule: When a card moves zones (excluding stage-to-stage), it's treated as a new card.
     // A member that uses a turn-limited ability, leaves stage to waitroom, then returns
     // to stage in the same turn can use the ability again.
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -579,7 +579,7 @@ fn test_q60_mandatory_auto_abilities() {
     // Rule: Non-turn-limited auto abilities that trigger must be used.
     // If they have a cost to resolve, you can choose not to pay the cost,
     // but you cannot choose not to use the ability itself.
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -619,7 +619,7 @@ fn test_q61_optional_turn_limited_auto_abilities() {
     // Rule: Turn-limited auto abilities are optional when they trigger.
     // You can choose not to use them at one timing, and if conditions are met
     // again later in the same turn, the ability can trigger again.
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -669,7 +669,7 @@ fn test_q61_optional_turn_limited_auto_abilities() {
 fn test_q62_card_names_with_ampersand() {
     // Rule: Cards with names like "◯◯＆△△" have both names "◯◯" and "△△".
     // Example: "上原歩夢＆澁谷かのん＆日野下花帆" has the names "上原歩夢", "澁谷かのん", and "日野下花帆".
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -707,7 +707,7 @@ fn test_q62_card_names_with_ampersand() {
 fn test_q63_ability_placement_no_cost() {
     // Rule: When an ability effect places a member card on stage, you don't pay
     // the member card's cost (only the ability's cost if any).
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -739,7 +739,7 @@ fn test_q63_ability_placement_no_cost() {
 fn test_q64_conditions_match_ampersand_names() {
     // Rule: When checking conditions, cards with names like "◯◯＆△△" match
     // against any of their component names (e.g., matches "◯◯", "△△", or the full name).
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -787,7 +787,7 @@ fn test_q65_multi_name_card_not_multiple_cards_for_cost() {
     let card_database = create_card_database(&cards);
     let mut game_state = GameState::new(player1, player2, card_database.clone());
     
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     // Set up: Card with 3 names joined by ＆
@@ -839,7 +839,7 @@ fn test_q66_score_comparison_opponent_no_live_cards() {
     let card_database = create_card_database(&cards);
     let mut game_state = GameState::new(player1, player2, card_database.clone());
     
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     // Set up: Player1 has live card with score 0
@@ -880,7 +880,7 @@ fn test_q67_all_heart_timing() {
     let card_database = create_card_database(&cards);
     let mut game_state = GameState::new(player1, player2, card_database.clone());
     
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     // Set up: Member card on stage with ALL heart
@@ -917,7 +917,7 @@ fn test_q68_cannot_live_state() {
     // Rule: A player in "cannot live" state can place cards face-down in live card zone,
     // but during performance phase, all cards (including live cards) are sent to waitroom.
     // No live is performed (no live start abilities, no cheer).
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -972,7 +972,7 @@ fn test_q69_cost_payment_multiple_copies() {
     // Rule: When an ability requires discarding specific named cards (e.g., "A", "B", "C"),
     // you can pay with any combination of cards that have any of those names.
     // Example: Can pay with "3 copies of A" or "2 copies of B and 1 copy of C".
-    let cards_path = std::path::Path::new("cards\\cards.json");
+    let cards_path = std::path::Path::new("..\\cards\\cards.json");
     let cards = rabuka_engine::card_loader::CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
