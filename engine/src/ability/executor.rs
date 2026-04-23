@@ -542,15 +542,54 @@ impl AbilityExecutor {
     }
 
     fn move_from_discard_to_hand(
-        &self,
+        &mut self,
         player: &mut Player,
         count: usize,
         card_type: &str,
         game_state: &GameState,
     ) -> Result<(), String> {
+        let card_db = &game_state.card_database;
+
+        // First, count how many matching cards are in discard
+        let matching_indices: Vec<usize> = player.waitroom.cards.iter().enumerate()
+            .filter(|(_, card_id)| {
+                if let Some(card) = card_db.get_card(**card_id) {
+                    match card_type {
+                        "member_card" | "メンバー" => card.is_member(),
+                        "live_card" | "ライブ" => card.is_live(),
+                        _ => true,
+                    }
+                } else {
+                    false
+                }
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        if matching_indices.len() < count {
+            return Err(format!(
+                "Not enough cards in discard: needed {}, have {}",
+                count, matching_indices.len()
+            ));
+        }
+
+        // If there are more matching cards than needed, prompt user to choose
+        if matching_indices.len() > count {
+            let description = format!("Select {} card(s) from discard to add to hand ({} available)", count, matching_indices.len());
+            
+            self.pending_choice = Some(Choice::SelectCard {
+                zone: "discard".to_string(),
+                card_type: Some(card_type.to_string()),
+                count,
+                description,
+            });
+            
+            return Err("Pending choice required: select cards from discard to add to hand".to_string());
+        }
+
+        // If exact number or fewer (already checked), move them automatically
         let mut moved = 0;
         let mut indices_to_remove = Vec::new();
-        let card_db = &game_state.card_database;
 
         for (i, card_id) in player.waitroom.cards.iter().enumerate() {
             if moved >= count {
@@ -577,13 +616,6 @@ impl AbilityExecutor {
         // Remove cards from waitroom (in reverse order to maintain indices)
         for i in indices_to_remove.into_iter().rev() {
             player.waitroom.cards.remove(i);
-        }
-
-        if moved < count {
-            return Err(format!(
-                "Not enough cards in discard: needed {}, moved {}",
-                count, moved
-            ));
         }
 
         Ok(())
@@ -1007,6 +1039,7 @@ impl AbilityExecutor {
                         created_phase: current_phase.clone(),
                         target_player_id: target_player.id.clone(),
                         description: format!("Set blade type to {} for {}", blade_type, card_db.get_card(card_id).map(|c| c.name.as_str()).unwrap_or("unknown")),
+                        creation_order: 0,
                     };
                     temp_effects.push(temp_effect);
                 }

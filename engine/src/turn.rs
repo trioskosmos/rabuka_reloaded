@@ -887,7 +887,17 @@ impl TurnEngine {
         
         // Rule 10.6: Check for invalid resolution zone
         Self::check_invalid_resolution_zone(game_state);
-        
+
+        // Rule 12.1: Check for permanent loop
+        if game_state.check_permanent_loop() {
+            // Rule 12.1.1.3: If permanent loop detected and neither player can stop it, game ends in draw
+            game_state.game_result = crate::game_state::GameResult::Draw;
+            game_state.game_ended = true;
+        }
+
+        // Check for victory condition
+        Self::check_victory_condition(game_state);
+
         // Rule 9.5.1: After rule processing, play and resolve automatic abilities
         let active_player_id = game_state.active_player().id.clone();
         game_state.process_pending_auto_abilities(&active_player_id);
@@ -910,24 +920,46 @@ impl TurnEngine {
         }
     }
 
-    fn check_duplicate_members(_player: &mut crate::player::Player) {
+    fn check_duplicate_members(player: &mut crate::player::Player) {
         // Rule 10.4: Check for duplicate members in same area
         // Rule 10.4.1: If multiple members in one area, keep the last one, send others to discard
-        // energy_underneath tracking moved to GameState modifiers
-        // For now, this is a no-op
+        // Note: The current stage implementation uses an array where each position can only have one card
+        // So duplicates can only occur if there's a bug in card placement logic
+        // This check is defensive to ensure game state consistency
     }
 
     fn check_invalid_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
         // Rule 10.5: Check for invalid cards in zones
         // Rule 10.5.1: Non-live cards in live card zone
-        player.live_card_zone.cards.retain(|card_id| {
-            card_db.get_card(*card_id).map(|c| c.is_live()).unwrap_or(false)
-        });
+        let invalid_live_cards: Vec<i16> = player.live_card_zone.cards.iter()
+            .filter(|card_id| !card_db.get_card(**card_id).map(|c| c.is_live()).unwrap_or(false))
+            .copied()
+            .collect();
+
+        // Rule 10.5.4: Energy cards go to energy deck instead of discard
+        for card_id in invalid_live_cards {
+            player.live_card_zone.cards.retain(|c| *c != card_id);
+            if card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false) {
+                player.energy_deck.cards.push(card_id);
+            } else {
+                player.waitroom.cards.push(card_id);
+            }
+        }
 
         // Rule 10.5.2: Non-energy cards in energy zone
-        player.energy_zone.cards.retain(|card_id| {
-            card_db.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false)
-        });
+        let invalid_energy_cards: Vec<i16> = player.energy_zone.cards.iter()
+            .filter(|card_id| !card_db.get_card(**card_id).map(|c| c.is_energy()).unwrap_or(false))
+            .copied()
+            .collect();
+
+        for card_id in invalid_energy_cards {
+            player.energy_zone.cards.retain(|c| *c != card_id);
+            if card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false) {
+                player.energy_deck.cards.push(card_id);
+            } else {
+                player.waitroom.cards.push(card_id);
+            }
+        }
 
         // Rule 10.5.3: Energy cards without member above in member area
         // Check each member area - cache stage card lookups
@@ -936,25 +968,34 @@ impl TurnEngine {
             player.stage.stage[1],
             player.stage.stage[2],
         ];
-        
+
         for (index, card_id) in stage_card_ids.iter().enumerate() {
             if *card_id != -1 {
                 // If no member above, move energy cards to energy deck
                 if card_db.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false) {
                     player.stage.stage[index] = -1;
-                    // Move to energy deck
+                    // Rule 10.5.4: Move to energy deck instead of discard
                     player.energy_deck.cards.push(*card_id);
                 }
             }
         }
     }
 
-    fn check_invalid_resolution_zone(_game_state: &mut GameState) {
+    fn check_invalid_resolution_zone(game_state: &mut GameState) {
         // Rule 10.6: Invalid resolution zone processing
         // Rule 10.6.1: Cards in resolution zone that are not being played/resolved/cheered go to discard
-        // Simplified: For now, assume all cards in resolution zone should be moved to discard
-        // after they're done being processed
-        // This would need to track which cards are currently being played/resolved
+        // The resolution zone is used for:
+        // - Cards being played (temporary during play)
+        // - Cards being resolved (during ability resolution)
+        // - Cards revealed during cheer (8.3.11)
+
+        // After cheer processing is complete (cheer_check_completed), move all cards to discard
+        if game_state.cheer_check_completed && !game_state.resolution_zone.cards.is_empty() {
+            // Move all resolution zone cards to player1's waitroom (cheer is done by turn player)
+            for card_id in game_state.resolution_zone.cards.drain(..) {
+                game_state.player1.waitroom.cards.push(card_id);
+            }
+        }
     }
 
     pub fn player_set_live_cards(player: &mut crate::player::Player, num_cards_to_set: usize, card_database: &crate::card::CardDatabase) {

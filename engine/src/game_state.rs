@@ -63,6 +63,17 @@ pub struct TemporaryEffect {
     pub created_phase: Phase,
     pub target_player_id: String,
     pub description: String,
+    pub creation_order: u32, // For effect layering - order in which effects were generated
+}
+
+#[derive(Debug, Clone)]
+pub struct ReplacementEffect {
+    pub card_id: i16,
+    pub player_id: String,
+    pub original_event: String, // The event being replaced (e.g., "draw_card", "pay_energy")
+    pub replacement_effects: Vec<crate::card::AbilityEffect>, // The replacement action(s)
+    pub is_choice_based: bool, // Whether this is a choice-based replacement (Rule 9.10.3)
+    pub applied_this_event: bool, // Track if already applied to current event (Rule 9.10.2.3)
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +157,9 @@ pub struct GameState {
     pub heart_color_decision_phase: String, // "live_start" or "required_hearts_check"
     // Deck refresh tracking (Q53) - tracks whether a deck refresh is pending
     pub deck_refresh_pending: bool, // Whether a deck refresh needs to be performed
+    // Position/Formation change tracking for keyword validation
+    pub position_change_occurred_this_turn: bool, // Whether position change occurred this turn
+    pub formation_change_occurred_this_turn: bool, // Whether formation change occurred this turn
     // Partial effect resolution tracking (Q55, Q92, Q93) - tracks whether partial resolution is allowed
     pub partial_resolution_allowed: bool, // Whether effects can be partially resolved
     // Cost payment validation tracking (Q56) - tracks whether full cost payment is required
@@ -177,6 +191,14 @@ pub struct GameState {
     pub turn_player_priority_enabled: bool, // Whether turn player chooses auto ability order first
     // Action validation tracking (Q88) - tracks whether arbitrary player actions are restricted
     pub arbitrary_actions_restricted: bool, // Whether players can only perform actions allowed by game rules
+    // Replacement effects tracking (Rule 9.10)
+    pub replacement_effects: Vec<ReplacementEffect>, // Active replacement effects
+    // Effect creation order counter for layering (Rule 9.9.1.7)
+    pub effect_creation_counter: u32, // Counter for tracking order of effect creation
+    // Permanent loop detection (Rule 12.1)
+    pub game_state_history: Vec<String>, // Track game states for loop detection
+    pub max_state_history_size: usize, // Limit history size for loop detection
+    pub loop_detected: bool, // Whether a permanent loop has been detected
 }
 
 #[derive(Debug, Clone)]
@@ -272,6 +294,13 @@ impl GameState {
             multi_victory_selection_enabled: true,
             turn_player_priority_enabled: true,
             arbitrary_actions_restricted: true,
+            replacement_effects: Vec::new(),
+            position_change_occurred_this_turn: false,
+            formation_change_occurred_this_turn: false,
+            effect_creation_counter: 0,
+            game_state_history: Vec::new(),
+            max_state_history_size: 100,
+            loop_detected: false,
         }
     }
 
@@ -461,8 +490,12 @@ impl GameState {
         // Reset cheer blade heart counts at start of new turn
         self.player1_cheer_blade_heart_count = 0;
         self.player2_cheer_blade_heart_count = 0;
+        // Reset position/formation change flags at start of new turn
+        self.reset_change_flags();
         // Reset cheer check state
         self.cheer_check_completed = false;
+        // Reset loop detection at start of new turn
+        self.reset_loop_detection();
     }
 
     pub fn perform_cheer_check(&mut self, player_id: &str, blade_count: u32) -> Result<(), String> {
@@ -1588,6 +1621,7 @@ impl GameState {
                         if player_id == self.player1.id { self.player2.id.clone() } else { self.player1.id.clone() }
                     },
                     description: format!("Set blade type to {}", blade_type),
+                    creation_order: 0,
                 };
                 self.temporary_effects.push(temp_effect);
             }
@@ -1854,6 +1888,8 @@ impl GameState {
         target_player_id: String,
         description: String,
     ) {
+        let order = self.effect_creation_counter;
+        self.effect_creation_counter += 1;
         self.temporary_effects.push(TemporaryEffect {
             effect_type,
             duration,
@@ -1861,7 +1897,16 @@ impl GameState {
             created_phase: self.current_phase.clone(),
             target_player_id,
             description,
+            creation_order: order,
         });
+    }
+
+    /// Get temporary effects in proper layering order (Rule 9.9.1.7)
+    /// Effects are applied in the order they were generated
+    pub fn get_temporary_effects_in_order(&self) -> Vec<&TemporaryEffect> {
+        let mut effects = self.temporary_effects.iter().collect::<Vec<_>>();
+        effects.sort_by_key(|e| e.creation_order);
+        effects
     }
 
     /// Check and remove expired effects based on current game state
@@ -1919,6 +1964,120 @@ impl GameState {
             .iter()
             .filter(|e| e.target_player_id == player_id)
             .collect()
+    }
+
+    // ============== REPLACEMENT EFFECT MANAGEMENT (Rule 9.10) ==============
+
+    /// Add a replacement effect (Rule 9.10)
+    pub fn add_replacement_effect(
+        &mut self,
+        card_id: i16,
+        player_id: String,
+        original_event: String,
+        replacement_effects: Vec<crate::card::AbilityEffect>,
+        is_choice_based: bool,
+    ) {
+        self.replacement_effects.push(ReplacementEffect {
+            card_id,
+            player_id,
+            original_event,
+            replacement_effects,
+            is_choice_based,
+            applied_this_event: false,
+        });
+    }
+
+    /// Remove all replacement effects for a specific card
+    pub fn remove_replacement_effects_for_card(&mut self, card_id: i16) {
+        self.replacement_effects.retain(|e| e.card_id != card_id);
+    }
+
+    /// Get replacement effects for a specific event
+    pub fn get_replacement_effects_for_event(&self, event: &str) -> Vec<&ReplacementEffect> {
+        self.replacement_effects
+            .iter()
+            .filter(|e| e.original_event == event && !e.applied_this_event)
+            .collect()
+    }
+
+    /// Reset the applied_this_event flags for all replacement effects (call before new event)
+    pub fn reset_replacement_effect_flags(&mut self) {
+        for effect in &mut self.replacement_effects {
+            effect.applied_this_event = false;
+        }
+    }
+
+    /// Mark a replacement effect as applied for the current event
+    pub fn mark_replacement_effect_applied(&mut self, card_id: i16) {
+        if let Some(effect) = self.replacement_effects.iter_mut().find(|e| e.card_id == card_id) {
+            effect.applied_this_event = true;
+        }
+    }
+
+    /// Mark that a formation change occurred this turn (for keyword validation)
+    pub fn set_formation_change_occurred(&mut self) {
+        self.formation_change_occurred_this_turn = true;
+    }
+
+    /// Reset position/formation change flags at start of new turn
+    pub fn reset_change_flags(&mut self) {
+        self.position_change_occurred_this_turn = false;
+        self.formation_change_occurred_this_turn = false;
+    }
+
+    // ============== PERMANENT LOOP DETECTION (Rule 12.1) ==============
+
+    /// Check for permanent loop (Rule 12.1)
+    /// Rule 12.1.1: If a permanent loop is detected, active player declares the loop action and count
+    /// Rule 12.1.1.2: If the same game state occurs twice in a turn, it's a loop
+    /// Rule 12.1.1.3: If neither player can stop the loop, game ends in draw
+    pub fn check_permanent_loop(&mut self) -> bool {
+        // Generate a hash of the current game state
+        let state_hash = self.generate_state_hash();
+
+        // Check if this state has been seen before
+        if self.game_state_history.contains(&state_hash) {
+            self.loop_detected = true;
+            return true;
+        }
+
+        // Add current state to history
+        self.game_state_history.push(state_hash);
+
+        // Limit history size
+        if self.game_state_history.len() > self.max_state_history_size {
+            self.game_state_history.remove(0);
+        }
+
+        false
+    }
+
+    /// Generate a hash of the current game state for loop detection
+    fn generate_state_hash(&self) -> String {
+        // Simplified state hash - include key game state elements
+        format!(
+            "t{}_p1h{}_p1e{}_p1w{}_p2h{}_p2e{}_p2w{}_p1s{:?}_p2s{:?}",
+            self.turn_number,
+            self.player1.hand.cards.len(),
+            self.player1.energy_zone.cards.len(),
+            self.player1.waitroom.cards.len(),
+            self.player2.hand.cards.len(),
+            self.player2.energy_zone.cards.len(),
+            self.player2.waitroom.cards.len(),
+            self.player1.stage.stage,
+            self.player2.stage.stage
+        )
+    }
+
+    /// Reset loop detection at start of new turn
+    pub fn reset_loop_detection(&mut self) {
+        self.game_state_history.clear();
+        self.loop_detected = false;
+    }
+
+    /// Check if a permanent loop has been detected
+    pub fn is_loop_detected(&self) -> bool {
+        self.loop_detected
     }
 
     /// Save current state to history before making a change

@@ -51,15 +51,56 @@ fn create_test_game_state(player1: Player, player2: Player) -> GameState {
         mulligan_player2_done: false,
         current_mulligan_player: String::new(),
         mulligan_selected_indices: Vec::new(),
+        rps_winner: None,
         live_card_set_player1_done: false,
         live_card_set_player2_done: false,
         history: Vec::new(),
         future: Vec::new(),
         max_history_size: 100,
         blade_modifiers: std::collections::HashMap::new(),
+        blade_type_modifiers: std::collections::HashMap::new(),
         heart_modifiers: std::collections::HashMap::new(),
-        need_heart_modifiers: std::collections::HashMap::new(),
+        activating_card: None,
         score_modifiers: std::collections::HashMap::new(),
+        need_heart_modifiers: std::collections::HashMap::new(),
+        orientation_modifiers: std::collections::HashMap::new(),
+        cost_modifiers: std::collections::HashMap::new(),
+        revealed_cards: std::collections::HashSet::new(),
+        optional_cost_behavior: "auto".to_string(),
+        pending_ability: None,
+        areas_placed_this_turn: std::collections::HashSet::new(),
+        cards_appeared_this_turn: std::collections::HashSet::new(),
+        turn_order_changed: false,
+        auto_ability_trigger_counts: std::collections::HashMap::new(),
+        turn_limit_usage: std::collections::HashMap::new(),
+        card_instance_counter: 0,
+        card_instance_mapping: std::collections::HashMap::new(),
+        baton_touch_count: 0,
+        heart_color_decision_phase: String::new(),
+        deck_refresh_pending: false,
+        position_change_occurred_this_turn: false,
+        formation_change_occurred_this_turn: false,
+        partial_resolution_allowed: false,
+        full_cost_payment_required: false,
+        auto_abilities_mandatory: false,
+        search_count_adjustment_enabled: false,
+        allow_replacement_placement: false,
+        allow_live_without_stage_members: false,
+        live_being_performed: false,
+        game_ended: false,
+        draw_state: false,
+        prohibition_precedence_enabled: false,
+        effect_resumption_state: String::new(),
+        gained_abilities: std::collections::HashMap::new(),
+        card_set_search_enabled: false,
+        multi_victory_selection_enabled: false,
+        turn_player_priority_enabled: false,
+        arbitrary_actions_restricted: false,
+        replacement_effects: Vec::new(),
+        effect_creation_counter: 0,
+        game_state_history: Vec::new(),
+        max_state_history_size: 100,
+        loop_detected: false,
     }
 }
 
@@ -71,7 +112,7 @@ fn place_card_on_stage(player: &mut Player, card_id: i16, area: MemberArea) {
 /// Execute an ability and return the result
 fn execute_ability(game_state: &mut GameState, ability: &Ability) -> Result<(), String> {
     let mut resolver = AbilityResolver::new(game_state);
-    resolver.resolve_ability(ability)
+    resolver.resolve_ability(ability, None)
 }
 
 #[test]

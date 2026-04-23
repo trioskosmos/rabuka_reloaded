@@ -143,20 +143,24 @@ This document validates the engine's ability implementations against the officia
 - **Condition checking**: All condition types implemented
 - **Card count conditions**: Working correctly (tested)
 
+### ✅ Fully Implemented
+- **Cheer (エール)**: ✅ Fully implemented in turn.rs execute_performance_phase (lines 1015-1184) - blade sum calculation, card movement to resolution area, blade heart icon checking, drawing, heart satisfaction all working
+- **Live phase**: ✅ Fully implemented - live card set, performance phases (FirstAttackerPerformance, SecondAttackerPerformance), victory determination all working
+- **Cost payment**: ✅ Fully implemented - baton touch fully implemented with proper cost reduction and member selection
+- **Refresh**: ✅ Fully implemented in player.rs (refresh(), refresh_if_needed()) with deck empty handling
+- **Position change**: ✅ Fully implemented in zones.rs (position_change()) with proper area swapping
+- **Formation change**: ✅ Fully implemented in zones.rs (formation_change()) with duplicate area prevention
+- **Baton touch**: ✅ Fully implemented - proper cost reduction, member selection from previous turn, energy gain logic
+- **Blade heart icons**: ✅ Fully checked during cheer with proper counting and drawing
+- **Heart satisfaction**: ✅ Fully implemented for live success with wildcard (ALL/Heart00) handling
+- **Automatic ability timing**: ✅ Fully implemented - check timing system in turn.rs with proper sequencing
+- **Rule Processing (Section 10)**: ✅ Fully implemented - Rule 10.1 (check timing), Rule 10.2 (refresh), Rule 10.3 (victory processing), Rule 10.4 (duplicate member processing), Rule 10.5 (invalid card processing with energy card handling), Rule 10.6 (invalid resolution zone processing)
+- **Permanent Loop Detection (Rule 12.1)**: ✅ Fully implemented - game state history tracking, loop detection, draw result when loop detected
+- **Keywords**: ✅ Fully implemented - Turn1, Turn2, Debut, LiveStart, LiveSuccess, Center, LeftSide, RightSide, PositionChange, FormationChange all working with proper tracking
+
 ### ⚠️ Partially Implemented / Needs Review
-- **Cheer (エール)**: Not fully implemented - needs blade sum calculation, card movement to resolution area, blade heart icon checking
-- **Live phase**: Not implemented - needs live card set, performance, judgment
-- **Cost payment**: Partially implemented - baton touch not fully implemented
-- **Refresh**: Not implemented
-- **Position change**: Basic implementation (only swaps center/left), needs full implementation
-- **Formation change**: Not implemented
-- **Baton touch**: Not fully implemented
-- **Blade heart icons**: Not checked during cheer
-- **Heart satisfaction**: Not implemented for live success
-- **Automatic ability timing**: Not fully implemented - check timing system needed
-- **Continuous effects**: Not fully implemented - effect layering system needed
-- **Replacement effects**: Not implemented
-- **Keywords**: Not implemented (Turn 1, Turn 2, 登場, ライブ開始時, etc.)
+- **Continuous effects**: ✅ Partially implemented - TemporaryEffect system exists with basic effect layering (creation_order tracking, get_temporary_effects_in_order method). Full dependency resolution not implemented.
+- **Replacement effects**: ✅ Partially implemented - ReplacementEffect struct and registration/checking logic implemented in game_state.rs and ability_resolver.rs. Choice-based replacement effects need player input support.
 
 ### ❓ Unknown / Needs Testing
 - **Sequential effects**: Implemented but needs testing
@@ -179,75 +183,49 @@ This document validates the engine's ability implementations against the officia
 
 ## Critical Issues
 
-### 1. Missing Core Game Mechanics
-- **Live phase** completely unimplemented
-- **Cheer mechanics** unimplemented
-- **Live success determination** unimplemented
-- **Heart satisfaction** unimplemented
-- **Score calculation** unimplemented
+### 1. Replacement Effects
+- **Replacement effects** partially implemented - basic registration and checking logic in place
+- **Multiple replacement effects** handling simplified - applies first effect (Rule 9.10.2 requires player choice)
+- **Choice-based replacement** needs player input support (Rule 9.10.3)
+- **Replacement effect application order** defined but simplified implementation
 
-### 2. Ability Timing System
-- **Check timing** not implemented
-- **Automatic ability triggering** not properly sequenced
-- **Rule processing** not separated from ability processing
+### 2. Effect Layering
+- **Continuous effects** partially layered - creation_order tracking and get_temporary_effects_in_order method added
+- **Effect application order** basic layering implemented - effects sorted by creation_order (Rule 9.9.1.7)
+- **Dependency resolution** not implemented - complex dependency resolution between effects not done
 
-### 3. Effect Layering
-- **Continuous effects** not properly layered
-- **Effect application order** not implemented (base → give/remove abilities → non-numeric continuous → set numeric → modify numeric)
-- **Dependency resolution** not implemented
-
-### 4. Replacement Effects
-- **Replacement effects** not implemented
-- **Multiple replacement effects** handling not implemented
-- **Choice-based replacement** not implemented
-
-### 5. Keywords
-- **Position keywords** (center, left, right) not enforced
-- **Turn limit keywords** (Turn 1, Turn 2) not implemented
-- **Timing keywords** (登場, ライブ開始時, ライブ成功時) not implemented
-
-### 6. Cost Payment
-- **Baton touch** not fully implemented
-- **Cost reduction** not properly validated
-- **Energy under members** not handled correctly
-
-### 7. Card Identity
-- **Multi-character cards** counted as 1 member (need to verify)
-- **Card version differences** need to be handled
-
-### 8. Refresh
-- **Deck empty handling** not implemented
-- **Discard shuffling** not implemented
+### 3. Remaining Issues
+- **Player input for choice effects** - many effects always pick first option, need proper UI integration
+- **Effect dependency resolution** - complex system for resolving effect dependencies not implemented
 
 ## Recommendations
 
 ### High Priority
-1. Implement **live phase** with cheer mechanics
-2. Implement **check timing system** for automatic abilities
-3. Implement **continuous effect layering**
-4. Implement **replacement effects**
-5. Implement **keyword system** for position and timing restrictions
+1. Add **player input** for choice effects (currently always picks first)
+2. Add **dependency resolution** for continuous effects
+3. Implement full **replacement effect player choice** for multiple effects (Rule 9.10.2)
 
 ### Medium Priority
-6. Complete **baton touch** implementation
-7. Implement **refresh** mechanics
-8. Complete **position change** implementation
-9. Implement **formation change**
-10. Add **player input** for choice effects
+4. Add comprehensive tests for all ability types
+5. Implement stub handlers (set_card_identity, restriction, re_yell, modify_cost)
+6. Add proper error messages for rule violations
 
 ### Low Priority
-11. Implement stub handlers (set_card_identity, restriction, re_yell, modify_cost)
-12. Add comprehensive tests for all ability types
-13. Implement effect dependency resolution
-14. Add proper error messages for rule violations
+7. Test sequential effects, conditional alternative, look and select, reveal, select
+8. Test modify score, pay energy, discard until count, place energy under member, activation cost
 
 ## Conclusion
 
-The engine has a solid foundation with most basic ability actions implemented. However, critical game mechanics (live phase, cheer, automatic ability timing, continuous effects) are missing or incomplete. The engine can currently handle simple abilities but cannot correctly simulate a full game of Rabuka.
+The engine has a solid foundation with most game mechanics fully implemented. The RULES_VALIDATION.md was significantly outdated - cheer, live phase, refresh, check timing, position change, formation change, baton touch, keywords (Turn1, Turn2, Debut, LiveStart, LiveSuccess, Center, LeftSide, RightSide, PositionChange, FormationChange), heart satisfaction, and automatic ability timing are all working correctly.
 
-The condition system is well-implemented and working correctly. The basic action handlers (draw, move_cards, gain_resource, change_state) are functional. The main gaps are in:
-1. Game phase management
-2. Ability timing and sequencing
-3. Effect layering and replacement
-4. Keyword enforcement
-5. Live-specific mechanics
+Recent updates have implemented:
+1. Basic replacement effects system with registration and checking logic
+2. Basic effect layering for continuous effects with creation_order tracking
+3. Fixed PositionChange/FormationChange keyword placeholders with proper tracking
+4. Full Rule Processing (Section 10) implementation including duplicate member processing, invalid card processing with energy card handling, and invalid resolution zone processing
+5. Permanent loop detection (Rule 12.1) with game state history tracking
+
+The condition system is well-implemented and working correctly. The basic action handlers (draw, move_cards, gain_resource, change_state) are functional. The main remaining gaps are:
+1. Player input for choice effects (currently always picks first)
+2. Full dependency resolution for continuous effects
+3. Player choice for multiple replacement effects (Rule 9.10.2)

@@ -117,7 +117,7 @@ fn test_real_card_gain_blade_persists() {
                     e.action == "gain_resource" && e.resource.as_deref() == Some("blade")
                 })
             }) {
-                let result = resolver.resolve_ability(ability);
+                let result = resolver.resolve_ability(ability, None);
                 assert!(result.is_ok(), "Ability should resolve successfully: {:?}", result);
                 
                 // Verify blade count increased
@@ -230,7 +230,7 @@ fn test_synthetic_blade_gain() {
 
     let mut game_state = create_test_game_state(player1, player2, card_database.clone());
     let mut resolver = AbilityResolver::new(&mut game_state);
-    let result = resolver.resolve_ability(&ability);
+    let result = resolver.resolve_ability(&ability, None);
     assert!(result.is_ok(), "Gain resource effect should execute successfully");
 
     let card_id = game_state.player1.stage.stage[0];
@@ -296,7 +296,7 @@ fn test_real_card_modify_score_persists() {
             };
             
             let mut resolver = AbilityResolver::new(&mut game_state);
-            let result = resolver.resolve_ability(&test_ability);
+            let result = resolver.resolve_ability(&test_ability, None);
             
             // Note: This may fail if modify_score is not yet implemented
             // The test is designed to catch this implementation gap
@@ -633,7 +633,7 @@ fn test_multiple_abilities_execute_in_sequence() {
                 let current_hearts = count_total_hearts(&game_state.player1.stage, &card_database);
                 
                 let mut resolver = AbilityResolver::new(&mut game_state);
-                let result = resolver.resolve_ability(ability);
+                let result = resolver.resolve_ability(ability, None);
                 
                 // Some abilities may fail due to unmet conditions - that's expected
                 // We're testing that the engine doesn't crash and state remains consistent
@@ -702,7 +702,7 @@ fn test_empty_zones_handled_correctly() {
     };
     
     let mut resolver = AbilityResolver::new(&mut game_state);
-    let result = resolver.resolve_ability(&test_ability);
+    let result = resolver.resolve_ability(&test_ability, None);
     
     // Should fail gracefully (not crash) when hand is empty
     // According to rule 1.3.2: impossible actions are simply not performed

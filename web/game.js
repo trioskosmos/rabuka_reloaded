@@ -150,6 +150,8 @@ class GameScene extends Phaser.Scene {
         this.pendingImageUpdates = new Map(); // Map imageKey to array of containers to update
         this.cardImageMap = new Map(); // Map card_no to image file name
         this.cardContainers = [];
+        this.loadingActions = false; // Flag to prevent concurrent action loading
+        this.pendingActionsLoad = false; // Flag to track if a load is pending
     }
 
     preload() {
@@ -526,8 +528,11 @@ class GameScene extends Phaser.Scene {
         this.p1HeartIcons = [];
         this.p1HeartCounts = [];
         const iconScale = Math.max(0.4, Math.min(0.6, h * 0.0008));
+        // Get actual blade icon width to position text correctly
+        const bladeTexture = this.textures.get('icon_blade');
+        const bladeWidth = bladeTexture.getSourceImage().width * iconScale;
         this.p1BladeIcon = this.add.image(50, 0, 'icon_blade').setScale(iconScale).setOrigin(0, 0.5);
-        this.p1BladeCount = this.add.text(50 + iconScale * 20, 0, '0', {
+        this.p1BladeCount = this.add.text(50 + bladeWidth + 5, 0, '0', {
             fontSize: `${statsSize}px`,
             color: '#48bb78',
             fontStyle: 'bold'
@@ -545,7 +550,7 @@ class GameScene extends Phaser.Scene {
         this.p2HeartIcons = [];
         this.p2HeartCounts = [];
         this.p2BladeIcon = this.add.image(70, 0, 'icon_blade').setScale(iconScale).setOrigin(0, 0.5);
-        this.p2BladeCount = this.add.text(70 + iconScale * 20, 0, '0', {
+        this.p2BladeCount = this.add.text(70 + bladeWidth + 5, 0, '0', {
             fontSize: `${statsSize}px`,
             color: '#718096',
             fontStyle: 'bold'
@@ -716,7 +721,6 @@ class GameScene extends Phaser.Scene {
         // Create dynamic heart icons for player 1 with responsive sizing
         const h = this.scale.height;
         const iconScale = Math.max(0.35, Math.min(0.55, h * 0.0007));
-        const heartIconSize = Math.max(10, Math.floor(iconScale * 30));
         const heartCountSize = Math.max(10, Math.floor(h * 0.014));
         const heartSpacing = Math.max(20, Math.floor(h * 0.025));
         
@@ -736,7 +740,10 @@ class GameScene extends Phaser.Scene {
                 }
                 const iconKey = `heart_${heartNum}`;
                 const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(iconScale).setOrigin(0, 0.5);
-                const heartCount = this.add.text(xOffset + heartIconSize, 0, count.toString(), {
+                // Get actual heart icon width to position text correctly
+                const heartTexture = this.textures.get(iconKey);
+                const heartWidth = heartTexture.getSourceImage().width * iconScale;
+                const heartCount = this.add.text(xOffset + heartWidth + 5, 0, count.toString(), {
                     fontSize: `${heartCountSize}px`,
                     color: '#48bb78',
                     fontStyle: 'bold'
@@ -745,14 +752,16 @@ class GameScene extends Phaser.Scene {
                 this.p1HeartIcons.push(heartIcon);
                 this.p1HeartCounts.push(heartCount);
                 this.p1StatsContainer.add([heartIcon, heartCount]);
-                xOffset += heartSpacing;
+                xOffset += heartWidth + 5 + Math.max(15, heartCountSize * 2); // Spacing based on actual content
             }
         }
         
         // Reposition blade icon and count based on heart icons
+        const bladeTexture = this.textures.get('icon_blade');
+        const bladeWidth = bladeTexture.getSourceImage().width * iconScale;
         this.p1BladeIcon.setScale(iconScale);
         this.p1BladeIcon.setX(xOffset);
-        this.p1BladeCount.setX(xOffset + heartIconSize);
+        this.p1BladeCount.setX(xOffset + bladeWidth + 5);
         this.p1BladeCount.setFontSize(`${heartCountSize}px`);
         
         // Create dynamic heart icons for player 2 with responsive sizing
@@ -772,7 +781,10 @@ class GameScene extends Phaser.Scene {
                 }
                 const iconKey = `heart_${heartNum}`;
                 const heartIcon = this.add.image(xOffset, 0, iconKey).setScale(iconScale).setOrigin(0, 0.5);
-                const heartCount = this.add.text(xOffset + heartIconSize, 0, count.toString(), {
+                // Get actual heart icon width to position text correctly
+                const heartTexture = this.textures.get(iconKey);
+                const heartWidth = heartTexture.getSourceImage().width * iconScale;
+                const heartCount = this.add.text(xOffset + heartWidth + 5, 0, count.toString(), {
                     fontSize: `${heartCountSize}px`,
                     color: '#718096',
                     fontStyle: 'bold'
@@ -781,14 +793,14 @@ class GameScene extends Phaser.Scene {
                 this.p2HeartIcons.push(heartIcon);
                 this.p2HeartCounts.push(heartCount);
                 this.p2StatsContainer.add([heartIcon, heartCount]);
-                xOffset += heartSpacing;
+                xOffset += heartWidth + 5 + Math.max(15, heartCountSize * 2); // Spacing based on actual content
             }
         }
         
         // Reposition blade icon and count based on heart icons
         this.p2BladeIcon.setScale(iconScale);
         this.p2BladeIcon.setX(xOffset);
-        this.p2BladeCount.setX(xOffset + heartIconSize);
+        this.p2BladeCount.setX(xOffset + bladeWidth + 5);
         this.p2BladeCount.setFontSize(`${heartCountSize}px`);
         
         if (this.p1BladeCount) {
@@ -1111,6 +1123,15 @@ class GameScene extends Phaser.Scene {
     }
 
     async loadActions() {
+        // If already loading, mark as pending and return
+        if (this.loadingActions) {
+            this.pendingActionsLoad = true;
+            return;
+        }
+
+        this.loadingActions = true;
+        this.pendingActionsLoad = false;
+
         try {
             const response = await fetch('/api/actions');
             const data = await response.json();
@@ -1118,6 +1139,15 @@ class GameScene extends Phaser.Scene {
             this.createActionButtons();
         } catch (error) {
             console.error('Failed to load actions:', error);
+        } finally {
+            this.loadingActions = false;
+
+            // If a load was pending, trigger it now
+            if (this.pendingActionsLoad) {
+                this.pendingActionsLoad = false;
+                // Small delay to ensure UI has time to update
+                setTimeout(() => this.loadActions(), 50);
+            }
         }
     }
 

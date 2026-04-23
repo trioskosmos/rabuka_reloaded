@@ -1175,6 +1175,21 @@ def parse_action(text: str) -> Dict[str, Any]:
     if target:
         action['target'] = target
     
+    # Extract exclude_self for actions (e.g., "このメンバー以外の" or "「character name」以外")
+    if 'このメンバー以外' in text or 'ほかのメンバー' in text:
+        action['exclude_self'] = True
+    # Also check for specific character name exclusions like "「鬼塚冬毬」以外"
+    if re.search(r'「.+」以外', text):
+        action['exclude_self'] = True
+        # Extract the quoted character names being excluded
+        quoted_exclusions = extract_quoted_text(text)
+        if quoted_exclusions:
+            categorized = categorize_quoted_text(quoted_exclusions)
+            if categorized['abilities']:
+                action['except_abilities'] = categorized['abilities']
+            if categorized['characters']:
+                action['except_characters'] = categorized['characters']
+    
     # Extract group
     group = extract_group(text)
     if group:
@@ -1909,9 +1924,20 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if target:
         cost['target'] = target
     
-    # Extract exclude_self for costs (e.g., "このメンバー以外の")
+    # Extract exclude_self for costs (e.g., "このメンバー以外の" or "「character name」以外")
     if 'このメンバー以外' in text or 'ほかのメンバー' in text:
         cost['exclude_self'] = True
+    # Also check for specific character name exclusions like "「鬼塚冬毬」以外"
+    if re.search(r'「.+」以外', text):
+        cost['exclude_self'] = True
+        # Extract the quoted character names being excluded
+        quoted_exclusions = extract_quoted_text(text)
+        if quoted_exclusions:
+            categorized = categorize_quoted_text(quoted_exclusions)
+            if categorized['abilities']:
+                cost['except_abilities'] = categorized['abilities']
+            if categorized['characters']:
+                cost['except_characters'] = categorized['characters']
     
     # Extract self_cost for costs (e.g., "このメンバーを" - the card itself is the cost)
     # This is distinct from exclude_self - here the card itself is being acted upon
@@ -2947,3 +2973,41 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             ability['parsed'] = parsed
 
     return data
+
+
+if __name__ == '__main__':
+    import json
+    from pathlib import Path
+    
+    abilities_file = Path(__file__).parent.parent / 'abilities.json'
+    
+    with open(abilities_file, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    # Process abilities
+    result = process_abilities(data)
+    
+    # Update cost fields from parsed results
+    for ability in result['unique_abilities']:
+        parsed = ability.get('parsed', {})
+        if 'cost' in parsed:
+            # Update existing cost with fields from parsed cost
+            cost = ability.get('cost', {})
+            parsed_cost = parsed['cost']
+            
+            # Merge fields from parsed cost into existing cost
+            for key, value in parsed_cost.items():
+                if key not in cost:
+                    cost[key] = value
+            
+            ability['cost'] = cost
+    
+    # Remove parsed field
+    for ability in result['unique_abilities']:
+        if 'parsed' in ability:
+            del ability['parsed']
+    
+    with open(abilities_file, 'w', encoding='utf-8') as f:
+        json.dump(result, f, ensure_ascii=False, indent=2)
+    
+    print("Processed abilities.json with parser.py")

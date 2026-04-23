@@ -150,11 +150,11 @@ impl Stage {
                 return Err("Cannot move multiple members to same area".to_string());
             }
         }
-        
+
         for (from, to) in assignments {
             self.position_change(from, to)?;
         }
-        
+
         Ok(())
     }
 

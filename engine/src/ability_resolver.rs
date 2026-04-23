@@ -1122,17 +1122,33 @@ impl<'a> AbilityResolver<'a> {
                 }
                 Keyword::PositionChange => {
                     // Only valid when a position change has occurred this turn
-                    // This would need to track position changes - for now return true
-                    // A proper implementation would check if a card moved to a different stage area
+                    return self.game_state.position_change_occurred_this_turn;
                 }
                 Keyword::FormationChange => {
                     // Only valid when a formation change has occurred this turn
-                    // This would need to track when multiple members move simultaneously
-                    // For now return true - proper implementation would check formation changes
+                    return self.game_state.formation_change_occurred_this_turn;
                 }
             }
         }
         true
+    }
+
+    /// Extract the original event from replacement effect text
+    /// For example, "draw card" from "instead of drawing, do X"
+    fn extract_original_event_from_text(&self, text: &str) -> Option<String> {
+        // Simplified implementation - looks for common patterns
+        if text.contains("引く時") || text.contains("draw") {
+            Some("draw".to_string())
+        } else if text.contains("支払う時") || text.contains("pay") {
+            Some("pay_energy".to_string())
+        } else if text.contains("置く時") || text.contains("place") {
+            Some("move_cards".to_string())
+        } else if text.contains("ライブする時") || text.contains("live") {
+            Some("live".to_string())
+        } else {
+            // Default: try to extract action from text
+            None
+        }
     }
 
     /// Execute an ability effect
@@ -1149,13 +1165,76 @@ impl<'a> AbilityResolver<'a> {
             }
         }
 
-        // Infer action and other fields from text if action field is empty
+        // Rule 9.10: Check for replacement effects before executing the action
+        // Reset replacement effect flags for this new event
+        self.game_state.reset_replacement_effect_flags();
+
+        // Check if this action has a replacement effect
         let action_to_use = if effect.action.is_empty() {
             // Try to infer from text at runtime
             self.infer_action_from_text(&effect.text)
         } else {
             effect.action.clone()
         };
+
+        // Check for replacement effects for this action
+        let replacement_effects: Vec<crate::game_state::ReplacementEffect> = self.game_state.get_replacement_effects_for_event(&action_to_use)
+            .iter()
+            .map(|r| (*r).clone())
+            .collect();
+        if !replacement_effects.is_empty() {
+            // Rule 9.10.2: If multiple replacement effects, affected player decides order
+            // Apply all replacement effects in order
+            for replacement in &replacement_effects {
+                // Rule 9.10.3: Choice-based replacement effects require the choice to be executable
+                if replacement.is_choice_based {
+                    // For now, we'll skip choice-based replacements as they require player input
+                    eprintln!("Choice-based replacement effect found, skipping (requires player input)");
+                } else {
+                    // Apply the replacement effects instead of the original action
+                    eprintln!("Applying replacement effect for action: {}", action_to_use);
+                    for replacement_effect in &replacement.replacement_effects {
+                        self.execute_effect(replacement_effect)?;
+                    }
+                    // Mark as applied (Rule 9.10.2.3)
+                    self.game_state.mark_replacement_effect_applied(replacement.card_id);
+                }
+            }
+            return Ok(());
+        }
+
+        // Rule 9.2.1: If this effect is a replacement effect, register it instead of executing
+        if let Some(ref effect_type) = effect.effect_type {
+            if effect_type == "replacement" {
+                // Parse the replacement effect to determine what event it replaces
+                // For now, this is a simplified implementation
+                // A full implementation would parse the text to extract the original event
+                let original_event = self.extract_original_event_from_text(&effect.text);
+                let is_choice_based = effect.text.contains("してよい") || effect.text.contains("may");
+                
+                // Get the current card being activated
+                let card_id = self.game_state.activating_card.unwrap_or(-1);
+                let player_id = if self.game_state.current_turn_phase == crate::game_state::TurnPhase::FirstAttackerNormal {
+                    self.game_state.player1.id.clone()
+                } else {
+                    self.game_state.player2.id.clone()
+                };
+                
+                // Register the replacement effect
+                if let Some(event) = original_event {
+                    let event_clone = event.clone();
+                    self.game_state.add_replacement_effect(
+                        card_id,
+                        player_id,
+                        event,
+                        vec![effect.clone()],
+                        is_choice_based,
+                    );
+                    eprintln!("Registered replacement effect for event: {}", event_clone);
+                }
+                return Ok(());
+            }
+        }
 
         match action_to_use.as_str() {
             "sequential" => self.execute_sequential_effect(effect),
@@ -1323,8 +1402,8 @@ impl<'a> AbilityResolver<'a> {
         let destination = effect.destination.as_deref().unwrap_or("hand");
         let card_type_filter = effect.card_type.as_deref();
         let resource_icon_count = effect.resource_icon_count;
-        let group_filter = effect.group.as_ref().and_then(|g| Some(&g.name));
-        let cost_limit = effect.cost_limit;
+        let group_filter: Option<&String> = None;
+        let cost_limit: Option<u32> = None;
         let per_unit = effect.per_unit;
         let per_unit_count = effect.per_unit_count.unwrap_or(1);
         let per_unit_type = effect.per_unit_type.as_deref();
@@ -1548,6 +1627,7 @@ impl<'a> AbilityResolver<'a> {
                     created_phase: self.game_state.current_phase.clone(),
                     target_player_id: target.to_string(),
                     description: format!("Modify activation cost by {} {}", operation, value),
+                    creation_order: 0,
                 };
                 self.game_state.temporary_effects.push(temp_effect);
             }
@@ -1745,204 +1825,131 @@ impl<'a> AbilityResolver<'a> {
 
         match source {
             "stage" => {
-                // Move card from stage to destination
-                let mut moved = 0;
-                // For now, move from center position - would need position parameter
-                if player.stage.stage[1] != -1 {
-                    let center_card = player.stage.stage[1];
-                    player.stage.stage[1] = -1;
-                    if matches_card_type(center_card, card_type_filter) && matches_group(center_card, group_filter) && matches_cost_limit(center_card, cost_limit) {
-                        match destination {
-                            "discard" => {
-                                player.waitroom.add_card(center_card);
-                                moved += 1;
-                            }
-                            "hand" => {
-                                player.hand.add_card(center_card);
-                                moved += 1;
-                            }
-                            "deck_bottom" => {
-                                player.main_deck.cards.push(center_card);
-                                moved += 1;
-                            }
-                            "deck_top" => {
-                                player.main_deck.cards.insert(0, center_card);
-                                moved += 1;
-                            }
-                            "live_card_zone" => {
-                                player.live_card_zone.cards.push(center_card);
-                                moved += 1;
-                            }
-                            "success_live_zone" => {
-                                player.success_live_card_zone.cards.push(center_card);
-                                moved += 1;
-                            }
-                            "under_member" => {
-                                // Place card underneath a member on stage (as energy)
-                                // For now, place under center - would need position parameter
-                                // Energy tracking moved to GameState modifiers
-                                // For now, just put card back to hand
-                                player.hand.add_card(center_card);
-                            }
-                            "empty_area" => {
-                                // Place in first empty stage area
-                                if player.stage.stage[1] == -1 {
-                                    player.stage.stage[1] = center_card;
-                                    moved += 1;
-                                } else if player.stage.stage[0] == -1 {
-                                    player.stage.stage[0] = center_card;
-                                    moved += 1;
-                                } else if player.stage.stage[2] == -1 {
-                                    player.stage.stage[2] = center_card;
-                                    moved += 1;
+                // Handle self-cost and exclude_self for stage moves
+                let is_self_cost = effect.self_cost.unwrap_or(false);
+                let exclude_self = effect.exclude_self.unwrap_or(false);
+                
+                if is_self_cost {
+                    // Self-cost: the activating card itself is the cost
+                    if let Some(activating_card_id) = self.game_state.activating_card {
+                        let mut found = false;
+                        for i in 0..3 {
+                            if player.stage.stage[i] == activating_card_id {
+                                if matches_card_type(activating_card_id, card_type_filter) && 
+                                   matches_group(activating_card_id, group_filter) && 
+                                   matches_cost_limit(activating_card_id, cost_limit) {
+                                    let card_id = player.stage.stage[i];
+                                    player.stage.stage[i] = -1;
+                                    match destination {
+                                        "discard" => {
+                                            player.waitroom.add_card(card_id);
+                                        }
+                                        "hand" => {
+                                            player.hand.add_card(card_id);
+                                        }
+                                        "deck_bottom" => {
+                                            player.main_deck.cards.push(card_id);
+                                        }
+                                        "deck_top" => {
+                                            player.main_deck.cards.insert(0, card_id);
+                                        }
+                                        "live_card_zone" => {
+                                            player.live_card_zone.cards.push(card_id);
+                                        }
+                                        "success_live_zone" => {
+                                            player.success_live_card_zone.cards.push(card_id);
+                                        }
+                                        _ => {
+                                            player.hand.add_card(card_id);
+                                        }
+                                    }
+                                    eprintln!("Self-cost: moved activating card {} from stage position {} to {}", activating_card_id, i, destination);
+                                    found = true;
                                 } else {
-                                    // No empty area, put card back to hand
-                                    player.hand.add_card(center_card);
+                                    return Err(format!("Activating card {} does not match cost requirements", activating_card_id));
                                 }
+                                break;
                             }
-                            "same_area" => {
-                                // Move to same area (no-op for stage to stage)
-                                player.hand.add_card(center_card);
-                            }
-                            _ => {
-                                // Put card back to hand
-                                player.hand.add_card(center_card);
-                            }
+                        }
+                        if !found {
+                            return Err(format!("Activating card {} not found on stage", activating_card_id));
                         }
                     } else {
-                        // Put card back if it doesn't match
-                        player.hand.add_card(center_card);
+                        return Err("Self-cost required but no activating card tracked".to_string());
                     }
-                }
-                // Also check left and right sides
-                if moved < count {
-                    if player.stage.stage[0] != -1 {
-                        let left_card_id = player.stage.stage[0];
-                        if matches_card_type(left_card_id, card_type_filter) && matches_group(left_card_id, group_filter) && matches_cost_limit(left_card_id, cost_limit) {
-                            match destination {
-                                "discard" => {
-                                    player.waitroom.add_card(left_card_id);
-                                    moved += 1;
-                                }
-                                "hand" => {
-                                    player.hand.add_card(left_card_id);
-                                    moved += 1;
-                                }
-                                "deck_bottom" => {
-                                    player.main_deck.cards.push(left_card_id);
-                                    moved += 1;
-                                }
-                                "deck_top" => {
-                                    player.main_deck.cards.insert(0, left_card_id);
-                                    moved += 1;
-                                }
-                                "live_card_zone" => {
-                                    player.live_card_zone.cards.push(left_card_id);
-                                    moved += 1;
-                                }
-                                "success_live_zone" => {
-                                    player.success_live_card_zone.cards.push(left_card_id);
-                                    moved += 1;
-                                }
-                                "under_member" => {
-                                    // Place card underneath a member on stage (as energy)
-                                    if player.stage.stage[0] != -1 {
-                                        // There's a member in left side, place energy under it
-                                        eprintln!("under_member: placing energy under left member");
-                                        player.hand.add_card(left_card_id);
-                                    } else {
-                                        // No member in left side, put card back to hand
-                                        player.hand.add_card(left_card_id);
-                                    }
-                                }
-                                "empty_area" => {
-                                    // Place in first empty stage area
-                                    if player.stage.stage[1] == -1 {
-                                        player.stage.stage[1] = left_card_id;
-                                        moved += 1;
-                                    } else if player.stage.stage[0] == -1 {
-                                        player.stage.stage[0] = left_card_id;
-                                        moved += 1;
-                                    } else if player.stage.stage[2] == -1 {
-                                        player.stage.stage[2] = left_card_id;
-                                        moved += 1;
-                                    } else {
-                                        // No empty area, put card back to hand
-                                        player.hand.add_card(left_card_id);
-                                    }
-                                }
-                                "same_area" => {
-                                    // Move to same area (no-op for stage to stage)
-                                    player.hand.add_card(left_card_id);
-                                }
-                                _ => {
-                                    player.hand.add_card(left_card_id);
-                                }
+                } else {
+                    // Non-self-cost: collect valid cards, apply exclude_self filter, then move
+                    let mut valid_cards: Vec<(usize, i16)> = Vec::new();
+                    let activating_card_id = self.game_state.activating_card;
+                    
+                    for i in 0..3 {
+                        if player.stage.stage[i] != -1 {
+                            let card_id = player.stage.stage[i];
+                            // Skip if exclude_self and this is the activating card
+                            if exclude_self && activating_card_id == Some(card_id) {
+                                eprintln!("Excluding activating card {} from selection", card_id);
+                                continue;
                             }
-                        } else {
-                            // Card doesn't match, put it back (already in stage)
+                            if matches_card_type(card_id, card_type_filter) && 
+                               matches_group(card_id, group_filter) && 
+                               matches_cost_limit(card_id, cost_limit) {
+                                valid_cards.push((i, card_id));
+                            }
                         }
                     }
-                }
-                if moved < count {
-                    if player.stage.stage[2] != -1 {
-                        let right_card_id = player.stage.stage[2];
-                        if matches_card_type(right_card_id, card_type_filter) && matches_group(right_card_id, group_filter) && matches_cost_limit(right_card_id, cost_limit) {
-                            match destination {
-                                "discard" => {
-                                    player.waitroom.add_card(right_card_id);
-                                }
-                                "hand" => {
-                                    player.hand.add_card(right_card_id);
-                                }
-                                "deck_bottom" => {
-                                    player.main_deck.cards.push(right_card_id);
-                                }
-                                "deck_top" => {
-                                    player.main_deck.cards.insert(0, right_card_id);
-                                }
-                                "live_card_zone" => {
-                                    player.live_card_zone.cards.push(right_card_id);
-                                }
-                                "success_live_zone" => {
-                                    player.success_live_card_zone.cards.push(right_card_id);
-                                }
-                                "under_member" => {
-                                    // Place card underneath a member on stage (as energy)
-                                    if player.stage.stage[2] != -1 {
-                                        // There's a member in right side, place energy under it
-                                        eprintln!("under_member: placing energy under right member");
-                                        player.hand.add_card(right_card_id);
-                                    } else {
-                                        // No member in right side, put card back to hand
-                                        player.hand.add_card(right_card_id);
-                                    }
-                                }
-                                "empty_area" => {
-                                    // Place in first empty stage area
-                                    if player.stage.stage[1] == -1 {
-                                        player.stage.stage[1] = right_card_id;
-                                    } else if player.stage.stage[0] == -1 {
-                                        player.stage.stage[0] = right_card_id;
-                                    } else if player.stage.stage[2] == -1 {
-                                        player.stage.stage[2] = right_card_id;
-                                    } else {
-                                        // No empty area, put card back to hand
-                                        player.hand.add_card(right_card_id);
-                                    }
-                                }
-                                "same_area" => {
-                                    // Move to same area - track original position (right side)
-                                    // For stage to stage, this is a no-op, card stays in place
-                                    eprintln!("same_area: keeping card in right position");
-                                }
-                                _ => {
-                                    player.hand.add_card(right_card_id);
-                                }
-                            }
+                    
+                    if valid_cards.len() < (count as usize) {
+                        return Err(format!(
+                            "Not enough valid cards on stage: needed {}, have {} (after exclude_self filter)",
+                            count, valid_cards.len()
+                        ));
+                    }
+                    
+                    // If more valid cards than needed, prompt user to choose
+                    if valid_cards.len() > (count as usize) {
+                        let card_type_desc = if let Some(ct) = card_type_filter {
+                            format!("{} ", ct)
                         } else {
-                            // Card doesn't match, put it back (already in stage)
+                            "".to_string()
+                        };
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "stage".to_string(),
+                            card_type: card_type_filter.map(|s| s.to_string()),
+                            count: count as usize,
+                            description: format!("Select {} {}card(s) from stage to move to {} ({} available)", count, card_type_desc, destination, valid_cards.len()),
+                            allow_skip: false,
+                        });
+                        // Return early - execution will continue after user provides choice
+                        return Ok(());
+                    }
+                    
+                    // If exact number or fewer (already checked), move them automatically
+                    for (i, card_id) in valid_cards.iter().take(count as usize) {
+                        player.stage.stage[*i] = -1;
+                        match destination {
+                            "discard" => {
+                                player.waitroom.add_card(*card_id);
+                            }
+                            "hand" => {
+                                player.hand.add_card(*card_id);
+                            }
+                            "deck_bottom" => {
+                                player.main_deck.cards.push(*card_id);
+                            }
+                            "deck_top" => {
+                                player.main_deck.cards.insert(0, *card_id);
+                            }
+                            "live_card_zone" => {
+                                player.live_card_zone.cards.push(*card_id);
+                            }
+                            "success_live_zone" => {
+                                player.success_live_card_zone.cards.push(*card_id);
+                            }
+                            _ => {
+                                player.hand.add_card(*card_id);
+                            }
                         }
+                        eprintln!("Moved card {} from stage position {} to {}", card_id, i, destination);
                     }
                 }
             }
@@ -2100,6 +2107,42 @@ impl<'a> AbilityResolver<'a> {
             "discard" => {
                 match destination {
                     "hand" => {
+                        // First, count how many matching cards are in discard
+                        let matching_indices: Vec<usize> = player.waitroom.cards.iter().enumerate()
+                            .filter(|(_, card)| {
+                                matches_card_type(**card, card_type_filter) && 
+                                matches_group(**card, group_filter) && 
+                                matches_cost_limit(**card, cost_limit)
+                            })
+                            .map(|(i, _)| i)
+                            .collect();
+
+                        if matching_indices.len() < (count as usize) {
+                            return Err(format!(
+                                "Not enough cards in discard: needed {}, have {}",
+                                count, matching_indices.len()
+                            ));
+                        }
+
+                        // If there are more matching cards than needed, prompt user to choose
+                        if matching_indices.len() > (count as usize) {
+                            let card_type_desc = if let Some(ct) = card_type_filter {
+                                format!("{} ", ct)
+                            } else {
+                                "".to_string()
+                            };
+                            self.pending_choice = Some(Choice::SelectCard {
+                                zone: "discard".to_string(),
+                                card_type: card_type_filter.map(|s| s.to_string()),
+                                count: count as usize,
+                                description: format!("Select {} {}card(s) from discard to add to hand ({} available)", count, card_type_desc, matching_indices.len()),
+                                allow_skip: false,
+                            });
+                            // Return early - execution will continue after user provides choice
+                            return Ok(());
+                        }
+
+                        // If exact number or fewer (already checked), move them automatically
                         let mut moved = 0;
                         let mut indices_to_remove = Vec::new();
                         for (i, card) in player.waitroom.cards.iter().enumerate() {
@@ -2600,6 +2643,7 @@ impl<'a> AbilityResolver<'a> {
                 created_phase: self.game_state.current_phase.clone(),
                 target_player_id: player.id.clone(),
                 description: format!("Gain {} {} for {}", final_count, resource, target),
+                creation_order: 0,
             };
             self.game_state.temporary_effects.push(temp_effect);
         }
@@ -2980,6 +3024,7 @@ impl<'a> AbilityResolver<'a> {
                 created_phase: self.game_state.current_phase.clone(),
                 target_player_id: player.id.clone(),
                 description: format!("Modify score by {} {} for {}", operation, value, target),
+                creation_order: 0,
             };
             self.game_state.temporary_effects.push(temp_effect);
         }
@@ -3137,6 +3182,7 @@ impl<'a> AbilityResolver<'a> {
                 created_phase: self.game_state.current_phase.clone(),
                 target_player_id: target.to_string(),
                 description: format!("Set blade type to {}", blade_type_str),
+                creation_order: 0,
             };
             self.game_state.temporary_effects.push(temp_effect);
         }
@@ -3526,6 +3572,9 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
 
+        // Mark that a position change occurred this turn (for keyword validation)
+        self.game_state.position_change_occurred_this_turn = true;
+
         // Otherwise, it's an actual movement effect
         // Move a member to a different area
         let target = effect.target.as_deref().unwrap_or("self");
@@ -3565,7 +3614,7 @@ impl<'a> AbilityResolver<'a> {
         if let Some(ref destination) = effect.destination {
             // Parse destination options (if multiple destinations are available)
             let destinations: Vec<&str> = destination.split("|").collect();
-            
+
             let description = if destinations.len() > 1 {
                 // Multiple destinations available - show them in a numbered list
                 let dest_display = destinations.iter()
@@ -3579,7 +3628,7 @@ impl<'a> AbilityResolver<'a> {
             } else {
                 format!("{} (destination: {})", effect.text, destination)
             };
-            
+
             self.pending_choice = Some(Choice::SelectTarget {
                 target: destination.clone(),
                 description: description,
@@ -4048,6 +4097,7 @@ impl<'a> AbilityResolver<'a> {
                     count: cost.count,
                     card_type: cost.card_type.clone(),
                     target: cost.target.clone(),
+                    effect_type: None,
                     ..Default::default()
                 };
                 self.execute_move_cards(&effect)
@@ -4170,6 +4220,7 @@ impl Default for AbilityEffect {
             state_change: None,
             optional: None,
             max: None,
+            effect_type: None,
             effect_constraint: None,
             shuffle_target: None,
             icon_count: None,
@@ -4216,6 +4267,8 @@ impl Default for AbilityEffect {
             triggers: None,
             restricted_destination: None,
             restriction_type: None,
+            self_cost: None,
+            exclude_self: None,
         }
     }
 }

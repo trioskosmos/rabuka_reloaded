@@ -547,6 +547,13 @@ pub struct AbilityEffect {
     pub card_count: Option<u32>,
     pub use_limit: Option<u32>,
     pub triggers: Option<String>,
+    #[serde(default)]
+    pub self_cost: Option<bool>,
+    #[serde(default)]
+    pub exclude_self: Option<bool>,
+    // Effect type for replacement/continuous effects (Rule 9.2.1)
+    #[serde(default)]
+    pub effect_type: Option<String>, // "one_shot", "continuous_effect", "replacement"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

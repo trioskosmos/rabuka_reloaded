@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-04-23T02:33:49.270127",
+  "generated_at": "2026-04-23T16:58:40.460378",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2047,6 +2047,7 @@
             "count": 1,
             "card_type": "member_card",
             "target": "self",
+            "exclude_self": true,
             "group": {
               "name": "Aqours"
             },
@@ -2247,6 +2248,7 @@
             "count": 1,
             "card_type": "member_card",
             "target": "self",
+            "exclude_self": true,
             "action": "change_state"
           },
           {
@@ -4122,6 +4124,7 @@
           "count": 5,
           "card_type": "member_card",
           "target": "self",
+          "exclude_self": true,
           "action": "look_at",
           "source": "deck_top"
         },
@@ -4670,6 +4673,7 @@
             "text": "自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
             "card_type": "member_card",
             "target": "self",
+            "exclude_self": true,
             "group": {
               "name": "Aqours"
             },
@@ -6986,6 +6990,10 @@
         "destination": "discard",
         "count": 1,
         "card_type": "member_card",
+        "exclude_self": true,
+        "except_characters": [
+          "鬼塚冬毬"
+        ],
         "group": {
           "name": "Liella!"
         },
@@ -8350,6 +8358,7 @@
         "text": "好きなハートの色を1つ指定する。ライブ終了時まで、自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る",
         "card_type": "member_card",
         "target": "self",
+        "exclude_self": true,
         "group": {
           "name": "虹ヶ咲"
         },
@@ -8990,6 +8999,7 @@
         "duration": "live_end",
         "card_type": "member_card",
         "target": "self",
+        "exclude_self": true,
         "action": "gain_resource",
         "resource": "blade",
         "count": 1
@@ -14823,6 +14833,7 @@
         "duration": "live_end",
         "card_type": "member_card",
         "target": "self",
+        "exclude_self": true,
         "action": "gain_resource",
         "count": 2
       }
@@ -14847,6 +14858,7 @@
         },
         "card_type": "member_card",
         "target": "self",
+        "exclude_self": true,
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
@@ -17977,6 +17989,7 @@
         "duration": "live_end",
         "card_type": "member_card",
         "target": "self",
+        "exclude_self": true,
         "group": {
           "name": "蓮ノ空"
         },
