@@ -2,7 +2,7 @@
 // These tests use real cards from cards.json and test real conditions
 // from actual card abilities to ensure the engine correctly evaluates conditions
 
-use rabuka_engine::card::{Ability, AbilityEffect, Condition, Card};
+use rabuka_engine::card::{Condition, Card};
 use rabuka_engine::ability_resolver::AbilityResolver;
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::card::CardDatabase;
@@ -219,7 +219,7 @@ fn test_real_card_hand_count_condition() {
 fn test_empty_hand_condition_with_real_cards() {
     let cards = load_all_cards();
     
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Hand is empty (no cards added)

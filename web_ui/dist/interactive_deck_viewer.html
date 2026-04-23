@@ -262,14 +262,6 @@
         }
         init();
 
-        function attachCardImageFallback(img, placeholder) {
-            if (!img || !placeholder) return;
-            img.onerror = () => {
-                img.style.display = 'none';
-                placeholder.style.display = 'flex';
-            };
-        }
-
         function clearAll() {
             document.getElementById('deckInput').value = '';
             document.getElementById('results').innerHTML = '';
@@ -452,15 +444,7 @@
                     img.src = imgSrc;
                     img.alt = cardName;
                     img.loading = 'lazy';
-
-                    const placeholder = document.createElement('div');
-                    placeholder.className = 'card-placeholder';
-                    placeholder.style.display = 'none';
-                    placeholder.textContent = '?';
-
                     item.appendChild(img);
-                    item.appendChild(placeholder);
-                    attachCardImageFallback(img, placeholder);
                 } else {
                     const placeholder = document.createElement('div');
                     placeholder.className = 'card-placeholder';

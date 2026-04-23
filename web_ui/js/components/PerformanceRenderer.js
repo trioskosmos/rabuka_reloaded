@@ -15,16 +15,8 @@ const HEART_ICONS = HEART_LABELS.map((_, index) => (
     index === 6 ? 'img/texticon/icon_all.png' : `img/texticon/heart_0${index + 1}.png`
 ));
 
-function tr(key, fallback, params) {
-    try {
-        const value = i18n.t(key, params);
-        if (!value || value === key) {
-            return fallback;
-        }
-        return value;
-    } catch {
-        return fallback;
-    }
+function tr(key, params) {
+    return i18n.t(key, params);
 }
 
 function escapeHtml(value) {
@@ -42,15 +34,15 @@ function enrichText(value) {
 }
 
 function sumHearts(hearts) {
-    return (Array.isArray(hearts) ? hearts : []).reduce((total, value) => total + (value || 0), 0);
+    return hearts.reduce((total, value) => total + (value || 0), 0);
 }
 
 function countPassedLives(lives) {
-    return (Array.isArray(lives) ? lives : []).filter((live) => live && live.passed).length;
+    return lives.filter((live) => live && live.passed).length;
 }
 
 function sumPassedLiveScores(lives) {
-    return (Array.isArray(lives) ? lives : [])
+    return lives
         .filter((live) => live && live.passed)
         .reduce((total, live) => total + (live.score || 0), 0);
 }
@@ -69,8 +61,8 @@ function getDisplayResults(results) {
 
 function getPlayerName(playerId) {
     return playerId === State.perspectivePlayer
-        ? tr('you', 'You')
-        : tr('opponent', 'Opponent');
+        ? tr('you')
+        : tr('opponent');
 }
 
 function getTurnLabel(turn) {
@@ -116,7 +108,7 @@ function renderTextMetric(label, value, detail = '') {
 }
 
 function renderHeartsGrid(hearts) {
-    const values = Array.isArray(hearts) ? hearts : [];
+    const values = hearts;
     const filtered = HEART_LABELS.map((label, index) => ({
         label,
         count: values[index] || 0,
@@ -184,8 +176,8 @@ function renderHeartProgress(filled, required) {
 }
 
 function renderSuccessEquation(have, need) {
-    const haveValues = Array.isArray(have) ? [...have] : [0, 0, 0, 0, 0, 0, 0];
-    const needValues = Array.isArray(need) ? need : [0, 0, 0, 0, 0, 0, 0];
+    const haveValues = [...have];
+    const needValues = need;
     const totalHave = sumHearts(haveValues);
     const totalNeed = sumHearts(needValues);
 
@@ -248,8 +240,8 @@ function renderTurnNavigation() {
                 const isLatest = turn === latestTurn;
                 const isSelected = State.selectedPerfTurn === turn || (State.selectedPerfTurn === -1 && isLatest);
                 const label = isLatest
-                    ? tr('current_turn', `Current Turn ${turn}`, { turn })
-                    : tr('turn_label', `Turn ${turn}`, { turn });
+                    ? tr('current_turn', { turn })
+                    : tr('turn_label', { turn });
                 return `<button class="perf-nav-btn ${isSelected ? 'active' : ''}" data-action="show-performance-turn" data-value="${turn}">${escapeHtml(label)}</button>`;
             }).join('')}
         </div>
@@ -335,13 +327,13 @@ function renderComparisonBanner(displayResults) {
 }
 
 function renderStoryCards(result) {
-    const lives = Array.isArray(result?.lives) ? result.lives : [];
+    const lives = result?.lives || [];
     const passedLives = countPassedLives(lives);
     const totalLives = lives.length;
     const totalHearts = sumHearts(result?.total_hearts || []);
-    const yellCards = Array.isArray(result?.yell_cards) ? result.yell_cards.length : 0;
-    const scoreLines = Array.isArray(result?.breakdown?.scores) ? result.breakdown.scores.length : 0;
-    const bonusLines = Array.isArray(result?.triggered_abilities) ? result.triggered_abilities.length : 0;
+    const yellCards = result?.yell_cards?.length || 0;
+    const scoreLines = result?.breakdown?.scores?.length || 0;
+    const bonusLines = result?.triggered_abilities?.length || 0;
 
     const cards = [
         {
@@ -407,14 +399,15 @@ function renderLiveCards(result) {
             <div class="perf-live-grid">
                 ${lives.map((live, index) => {
                     const spare = live?.spare || [0, 0, 0, 0, 0, 0, 0];
-                    const adjustments = Array.isArray(live?.adjustments) ? live.adjustments : [];
+                    const adjustments = live.adjustments;
                     const spareTotal = sumHearts(spare);
                     return `
                         <article class="perf-live-card ${live?.passed ? 'success' : 'failure'}">
                             <div class="perf-live-card-head">
                                 <div class="perf-card-id-badge">Live ${index + 1}</div>
                                 <div class="perf-live-card-title">
-                                    ${live?.img ? `<img src="${fixImg(live.img)}" class="perf-live-art" alt="${escapeHtml(live.name || 'Live')}">` : ''}
+                                    // Support both img and img_path field names
+                                    ${live?.img || live?.img_path ? `<img src="${fixImg(live.img || live.img_path)}" class="perf-live-art" alt="${escapeHtml(live.name || 'Live')}">` : ''}
                                     <div>
                                         <h4>${escapeHtml(live?.name || 'Live')}</h4>
                                         <div class="perf-live-card-meta">Printed score ${live?.score || 0}</div>
@@ -456,7 +449,7 @@ function renderLiveCards(result) {
 }
 
 function renderAllocationSection(result) {
-    const allocations = Array.isArray(result?.breakdown?.allocations) ? result.breakdown.allocations : [];
+    const allocations = result.breakdown.allocations;
     if (allocations.length === 0) {
         return `
             <section class="perf-section-card">
@@ -519,7 +512,7 @@ function renderAllocationSection(result) {
 }
 
 function renderContributionSection(result) {
-    const members = Array.isArray(result?.member_contributions) ? result.member_contributions : [];
+    const members = result.member_contributions;
     if (members.length === 0) {
         return `
             <section class="perf-section-card">
@@ -543,8 +536,8 @@ function renderContributionSection(result) {
             </div>
             <div class="perf-contrib-grid">
                 ${members.map((member) => {
-                    const heartBonuses = Array.isArray(member?.ability_heart_bonuses) ? member.ability_heart_bonuses : [];
-                    const bladeBonuses = Array.isArray(member?.ability_blade_bonuses) ? member.ability_blade_bonuses : [];
+                    const heartBonuses = member.ability_heart_bonuses;
+                    const bladeBonuses = member.ability_blade_bonuses;
                     return `
                         <article class="perf-contrib-card" data-member-id="${member?.source_id ?? ''}" data-member-slot="${member?.slot ?? ''}">
                             <div class="perf-contrib-header">
@@ -605,9 +598,9 @@ function renderContributionSection(result) {
 }
 
 function renderYellSection(result) {
-    const yellCards = Array.isArray(result?.yell_cards) ? result.yell_cards : [];
-    const heartSources = Array.isArray(result?.breakdown?.hearts) ? result.breakdown.hearts : [];
-    const bladeSources = Array.isArray(result?.breakdown?.blades) ? result.breakdown.blades : [];
+    const yellCards = result.yell_cards;
+    const heartSources = result.breakdown.hearts;
+    const bladeSources = result.breakdown.blades;
 
     return `
         <section class="perf-section-card">
@@ -664,10 +657,10 @@ function renderYellSection(result) {
 }
 
 function renderEffectsSection(result) {
-    const requirementEffects = Array.isArray(result?.breakdown?.requirements) ? result.breakdown.requirements : [];
-    const transforms = Array.isArray(result?.breakdown?.transforms) ? result.breakdown.transforms : [];
-    const scoreLines = Array.isArray(result?.breakdown?.scores) ? result.breakdown.scores : [];
-    const triggered = Array.isArray(result?.triggered_abilities) ? result.triggered_abilities : [];
+    const requirementEffects = result.breakdown.requirements;
+    const transforms = result.breakdown.transforms;
+    const scoreLines = result.breakdown.scores;
+    const triggered = result.triggered_abilities;
 
     return `
         <section class="perf-section-card">
@@ -731,10 +724,10 @@ function renderEffectsSection(result) {
 
 function renderPlayerPanel(playerId, result) {
     if (!result) return '';
-    const lives = Array.isArray(result?.lives) ? result.lives : [];
+    const lives = result.lives;
     const passedLives = countPassedLives(lives);
     const totalLives = lives.length;
-    const totalHearts = sumHearts(result?.total_hearts || []);
+    const totalHearts = sumHearts(result.total_hearts);
     const baseLiveScore = sumPassedLiveScores(lives);
     const outcome = getOutcomeLabel(playerId, result);
 
@@ -794,7 +787,7 @@ export const PerformanceRenderer = {
     renderPerformanceGuide: () => {
         const state = State.data;
         const perspectivePlayer = State.perspectivePlayer;
-        const player = state?.players?.[perspectivePlayer] || state?.players?.[0];
+        const player = perspectivePlayer === 0 ? state.player1 : state.player2;
         const guide = player?.performance_guide;
         const panel = document.getElementById('perf-guide-panel');
         const contentEl = document.getElementById('perf-guide-content');
@@ -817,7 +810,8 @@ export const PerformanceRenderer = {
             if (!live || typeof live !== 'object') return;
             html += `
                 <div class="perf-guide-entry" style="opacity:${live.passed ? 1 : 0.72}">
-                    ${live.img ? `<img src="${fixImg(live.img)}" class="perf-guide-img" alt="${escapeHtml(live.name || 'Live')}">` : ''}
+                    // Support both img and img_path field names
+                    ${live.img || live.img_path ? `<img src="${fixImg(live.img || live.img_path)}" class="perf-guide-img" alt="${escapeHtml(live.name || 'Live')}">` : ''}
                     <div class="perf-guide-info">
                         <div class="perf-guide-name">${escapeHtml(live.name || 'Live')} <span class="perf-guide-score">(${live.score || 0} pts)</span></div>
                         <div class="perf-guide-pips">${renderHeartProgress(live.filled, live.required)}</div>
@@ -929,18 +923,16 @@ export const PerformanceRenderer = {
 
     _getPhaseKey: (phase) => {
         const perspectivePlayer = State.perspectivePlayer;
-        if (phase === Phase.RPS) return 'rps';
-        if (phase === Phase.SETUP) return 'setup';
-        if (phase === Phase.MULLIGAN_P1) return perspectivePlayer === 0 ? 'mulligan_you' : 'mulligan_opp';
-        if (phase === Phase.MULLIGAN_P2) return perspectivePlayer === 1 ? 'mulligan_you' : 'mulligan_opp';
+        if (phase === Phase.ROCK_PAPER_SCISSORS) return 'rps';
+        if (phase === Phase.MULLIGAN) return 'mulligan';
         if (phase === Phase.ACTIVE) return 'active';
         if (phase === Phase.ENERGY) return 'energy';
         if (phase === Phase.DRAW) return 'draw';
         if (phase === Phase.MAIN) return 'main';
-        if (phase === Phase.LIVE_SET) return 'live_set';
-        if (phase === Phase.PERFORMANCE_P1) return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
-        if (phase === Phase.PERFORMANCE_P2) return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
-        if (phase === Phase.LIVE_RESULT) return 'live_result';
+        if (phase === Phase.LIVE_CARD_SET) return 'live_set';
+        if (phase === Phase.FIRST_ATTACKER_PERFORMANCE) return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
+        if (phase === Phase.SECOND_ATTACKER_PERFORMANCE) return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
+        if (phase === Phase.LIVE_VICTORY_DETERMINATION) return 'live_result';
         return 'wait';
     },
 

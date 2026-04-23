@@ -23,13 +23,17 @@ export class WasmAdapter {
                 await init();
                 console.log("[WASM] Loaded.");
 
-                // Load Card DB - select file based on cardSet
-                const base = getAppBaseUrl();
-                const cardFile = State.cardSet === 'vanilla' ? 'cards_vanilla.json' : 'cards_compiled.json';
-                const res = await fetch(`${base}data/${cardFile}`);
-                const text = await res.text();
-                this.cardDbRaw = text;
-                this.cardDb = JSON.parse(text); // Keep a JS copy for lookups
+                // Load Card DB - use cards.json from the cards directory
+                const res = await fetch('/cards/cards.json');
+                if (!res.ok) {
+                    throw new Error(`Failed to load cards.json: ${res.status}`);
+                }
+                const cardsData = await res.json();
+                this.cardDb = cardsData; // Keep a JS copy for lookups
+
+                // WASM engine expects a different format - need to convert
+                // For now, use empty JSON as placeholder since WASM mode may not be fully functional
+                this.cardDbRaw = '{}';
 
                 this.engine = new WasmEngine(this.cardDbRaw);
                 this.initialized = true;
@@ -186,48 +190,30 @@ export class WasmAdapter {
     }
 
     async resolveDeckList(deckList) {
-        if (!this.initialized) await this.init();
-        if (!this.cardDb) throw new Error("Card database not loaded");
-        if (!this.cardMap) this.buildCardMap();
+        if (!deckList || !Array.isArray(deckList)) return { deck: [], energy: [], lives: [] };
 
         const deck = [];
         const energy = [];
         const lives = [];
 
-        if (!deckList || !Array.isArray(deckList)) return { deck, energy, lives };
-
         deckList.forEach(rawId => {
-            let info = null;
-            if (typeof rawId === 'number') {
-                info = this.cardDb.member_db[rawId] || this.cardDb.energy_db[rawId];
-                if (!info && this.cardDb.live_db) info = this.cardDb.live_db[rawId];
-            } else {
-                info = this.cardMap[rawId];
-            }
-
-            if (info) {
-                const id = info.card_id;
-                if (this.cardDb.energy_db[id]) energy.push(id);
-                else if (this.cardDb.live_db && this.cardDb.live_db[id]) lives.push(id);
-                else deck.push(id);
+            // Resolve card using State.resolveCardData
+            const card = State.resolveCardData(rawId);
+            if (card) {
+                const id = card.card_no || rawId;
+                // Determine card type from card data
+                const cardType = card.type || card.card_type || '';
+                if (cardType === 'energy' || cardType === 'エネルギー' || String(id).startsWith('LL-E')) {
+                    energy.push(id);
+                } else if (cardType === 'live' || cardType === 'ライブ' || card.score !== undefined) {
+                    lives.push(id);
+                } else {
+                    deck.push(id);
+                }
             }
         });
 
         return { deck, energy, lives };
-    }
-
-    buildCardMap() {
-        if (!this.cardDb) return;
-        this.cardMap = {};
-        const dbs = [this.cardDb.member_db, this.cardDb.live_db, this.cardDb.energy_db];
-        for (const db of dbs) {
-            if (!db) continue;
-            for (const key in db) {
-                const card = db[key];
-                if (card.card_no) this.cardMap[card.card_no] = card;
-                this.cardMap[card.card_id] = card; // Also map ID
-            }
-        }
     }
 
     parseDeckLogHtml(html) {
@@ -252,65 +238,178 @@ export class WasmAdapter {
 
     enrichLegalActions(state) {
         const rawIds = this.engine.get_legal_actions(); // Uint32Array
-        return Array.from(rawIds).map(id => this.enrichAction(id, state));
+        console.log('[WASM] Raw action IDs:', Array.from(rawIds));
+        const actions = Array.from(rawIds).map(id => this.enrichAction(id, state)).filter(a => a !== null);
+        console.log('[WASM] Enriched actions:', actions);
+
+        // Don't deduplicate - each action ID encodes the specific stage area
+        // The ActionListView will group them by hand_idx for display
+        console.log('[WASM] Final actions:', actions);
+        return actions;
     }
 
     enrichAction(id, state) {
         // Logic to reverse-engineer action details from ID and State
         // Rust backend format: player1, player2
-        const p = state.current_player === 0 ? state.player1 : state.player2;
+        const currentPlayer = state.current_player ?? state.active_player ?? 0;
+        const p = currentPlayer === 0 ? state.player1 : state.player2;
 
         if (id === ActionBases.PASS) return { id, desc: "Pass / Confirm" };
 
-        // Play Member (Simple)
+        // Play Member (Simple) - convert to available_areas format
         if (id >= ActionBases.HAND && id < ActionBases.HAND_CHOICE) {
             const adj = id - ActionBases.HAND;
             const handIdx = Math.floor(adj / 3);
-            const slotIdx = adj % 3;
-            // Rust backend: hand is { cards: [...] }
-            const cardId = p?.hand?.cards?.[handIdx]?.card_no;
-            const card = this.getCard(cardId);
+            const handCards = p.hand.cards;
+            const card = typeof handCards[handIdx] === 'object' ? handCards[handIdx] : this.getCard(handCards[handIdx]);
+            const cardId = card?.card_no || handCards[handIdx];
+            const cardCost = card?.cost || 0;
+
+            // Check which areas are available
+            const stageCards = [p.stage.left_side, p.stage.center, p.stage.right_side];
+            const energyCards = p.energy.cards;
+            const activeEnergyCount = energyCards.filter(e => e && e.orientation !== 'Wait').length;
+
+            const areaNames = ['left_side', 'center', 'right_side'];
+            const availableAreas = [];
+
+            for (let i = 0; i < 3; i++) {
+                const existingCard = stageCards[i];
+                let areaInfo = {
+                    area: areaNames[i],
+                    available: false,
+                    cost: cardCost,
+                    is_baton_touch: false,
+                    existing_member_name: null
+                };
+
+                if (existingCard && existingCard.card_no !== -1) {
+                    // Baton touch - check if enough energy
+                    if (activeEnergyCount >= 1) {
+                        const existingCost = existingCard.cost || 0;
+                        const costToPay = Math.max(0, cardCost - existingCost);
+                        if (activeEnergyCount >= costToPay) {
+                            areaInfo.available = true;
+                            areaInfo.cost = costToPay;
+                            areaInfo.is_baton_touch = true;
+                            areaInfo.existing_member_name = existingCard.name || `Card ${existingCard.card_no}`;
+                        }
+                    }
+                } else {
+                    // Play to empty area
+                    if (activeEnergyCount >= cardCost) {
+                        areaInfo.available = true;
+                    }
+                }
+
+                availableAreas.push(areaInfo);
+            }
+
+            // Only return action if at least one area is available
+            const hasAvailable = availableAreas.some(a => a.available);
+            if (!hasAvailable) return null;
+
             return {
                 id,
+                index: id,
                 type: 'PLAY',
+                category: 'PLAY',
+                action_type: 'PlayMemberToStage',
                 hand_idx: handIdx,
-                area_idx: slotIdx,
                 name: card ? card.name : "Unknown",
-                img: card ? (card.img_path.startsWith('img/') ? card.img_path : 'img/' + card.img_path) : null,
-                cost: card ? card.cost : 0,
-                desc: `Play ${card ? card.name : 'Card'} to Slot ${slotIdx}`
+                img: card ? card._img : null,
+                cost: cardCost,
+                description: card ? `${card.name} (${card.card_no})` : "Unknown",
+                parameters: {
+                    card_id: cardId,
+                    card_index: handIdx,
+                    available_areas: availableAreas
+                }
             };
         }
 
-        // Play with Choice
+        // Play with Choice - convert to available_areas format
         if (id >= ActionBases.HAND_CHOICE && id < ActionBases.HAND_SELECT) {
             const adj = id - ActionBases.HAND_CHOICE;
             const handIdx = Math.floor(adj / 30);
-            const slotIdx = Math.floor((adj % 30) / 10);
-            const cardId = p.hand[handIdx];
-            const card = this.getCard(cardId);
+            const handCards = p.hand.cards;
+            const card = typeof handCards[handIdx] === 'object' ? handCards[handIdx] : this.getCard(handCards[handIdx]);
+            const cardId = card?.card_no || handCards[handIdx];
+            const cardCost = card?.cost || 0;
+
+            // Check which areas are available
+            const stageCards = [p.stage.left_side, p.stage.center, p.stage.right_side];
+            const energyCards = p.energy.cards;
+            const activeEnergyCount = energyCards.filter(e => e && e.orientation !== 'Wait').length;
+
+            const areaNames = ['left_side', 'center', 'right_side'];
+            const availableAreas = [];
+
+            for (let i = 0; i < 3; i++) {
+                const existingCard = stageCards[i];
+                let areaInfo = {
+                    area: areaNames[i],
+                    available: false,
+                    cost: cardCost,
+                    is_baton_touch: false,
+                    existing_member_name: null
+                };
+
+                if (existingCard && existingCard.card_no !== -1) {
+                    // Baton touch
+                    if (activeEnergyCount >= 1) {
+                        const existingCost = existingCard.cost || 0;
+                        const costToPay = Math.max(0, cardCost - existingCost);
+                        if (activeEnergyCount >= costToPay) {
+                            areaInfo.available = true;
+                            areaInfo.cost = costToPay;
+                            areaInfo.is_baton_touch = true;
+                            areaInfo.existing_member_name = existingCard.name || `Card ${existingCard.card_no}`;
+                        }
+                    }
+                } else {
+                    if (activeEnergyCount >= cardCost) {
+                        areaInfo.available = true;
+                    }
+                }
+
+                availableAreas.push(areaInfo);
+            }
+
+            const hasAvailable = availableAreas.some(a => a.available);
+            if (!hasAvailable) return null;
+
             return {
                 id,
+                index: id,
                 type: 'PLAY',
+                category: 'PLAY',
+                action_type: 'PlayMemberToStage',
                 hand_idx: handIdx,
-                area_idx: slotIdx,
                 name: card ? card.name : "Unknown",
-                img: card ? (card.img_path.startsWith('img/') ? card.img_path : 'img/' + card.img_path) : null,
-                desc: `Play ${card ? card.name : 'Card'} to Slot ${slotIdx} (with choice)`
+                img: card ? card._img : null,
+                cost: cardCost,
+                description: card ? `${card.name} (${card.card_no})` : "Unknown",
+                parameters: {
+                    card_id: cardId,
+                    card_index: handIdx,
+                    available_areas: availableAreas
+                }
             };
         }
 
         // Select Hand / Discard
         if (id >= ActionBases.HAND_SELECT && id < ActionBases.STAGE) {
             const handIdx = id - ActionBases.HAND_SELECT;
-            const cardId = p.hand[handIdx];
+            const handCards = p.hand.cards;
+            const cardId = handCards[handIdx];
             const card = this.getCard(cardId);
             return {
                 id,
                 type: 'SELECT_HAND',
                 hand_idx: handIdx,
                 name: card ? card.name : "Unknown",
-                img: card ? (card.img_path.startsWith('img/') ? card.img_path : 'img/' + card.img_path) : null,
+                img: card ? card._img : null,
                 desc: `Select ${card ? card.name : 'Card'}`
             };
         }
@@ -328,14 +427,15 @@ export class WasmAdapter {
                 slotIdx = Math.floor(adj / 100);
             }
             const abIdx = Math.floor((adj % 100) / 10);
-            const cardId = p.stage[slotIdx];
+            const stageCards = [p.stage.left_side, p.stage.center, p.stage.right_side];
+            const cardId = stageCards[slotIdx];
             const card = this.getCard(cardId);
             return {
                 id,
                 type: 'ABILITY',
                 area_idx: slotIdx,
                 name: card ? card.name : "Unknown",
-                img: card ? (card.img_path.startsWith('img/') ? card.img_path : 'img/' + card.img_path) : null,
+                img: card ? card._img : null,
                 desc: id >= ActionBases.STAGE_CHOICE ? `Activate ${card ? card.name : 'Card'} (with choice)` : `Activate ${card ? card.name : 'Card'}`,
             };
         }
@@ -345,7 +445,8 @@ export class WasmAdapter {
             const adj = id - ActionBases.DISCARD_ACTIVATE;
             const discardIdx = Math.floor(adj / 10);
             const abIdx = adj % 10;
-            const cardId = p.discard[discardIdx];
+            const discardCards = p.waitroom.cards;
+            const cardId = discardCards[discardIdx];
             const card = this.getCard(cardId);
             return {
                 id,
@@ -353,7 +454,7 @@ export class WasmAdapter {
                 discard_idx: discardIdx,
                 ab_idx: abIdx,
                 name: card ? card.name : "Unknown",
-                img: card ? (card.img_path.startsWith('img/') ? card.img_path : 'img/' + card.img_path) : null,
+                img: card ? card._img : null,
                 desc: `Activate ${card ? card.name : 'Card'} from Discard`
             };
         }
@@ -388,13 +489,12 @@ export class WasmAdapter {
             return { id, type: 'SELECT', index: id - ActionBases.CHOICE, desc: `Choice ${id - ActionBases.CHOICE}` };
         }
 
-        // Fallback
         return { id, desc: `Action ${id}` };
     }
 
     getCard(id) {
-        if (!this.cardDb) return null;
-        return this.cardDb.member_db[id] || (this.cardDb.live_db ? this.cardDb.live_db[id] : null) || this.cardDb.energy_db[id];
+        // Use State.resolveCardData which handles both game state cards and static database
+        return State.resolveCardData(id);
     }
 }
 

@@ -99,14 +99,22 @@ export const Rendering = {
         // Rust backend format: state.player1, state.player2
         if (!state || (!state.player1 && !state.player2)) return;
 
-        // --- Proactive Pre-loading ---
         const assetsToLoad = [];
         [state.player1, state.player2].forEach(p => {
-            if (p?.hand?.cards) p.hand.cards.forEach(c => { if (c?.card_no) assetsToLoad.push(`img/cards_webp/${c.card_no}.webp`); });
+            const handCards = p.hand.cards;
+            handCards.forEach(c => {
+                if (c?.card_no) {
+                    const imgPath = State.resolveCardData(c.card_no)?._img;
+                    if (imgPath) assetsToLoad.push(imgPath);
+                }
+            });
             if (p?.stage) {
-                if (p.stage.left_side?.card_no) assetsToLoad.push(`img/cards_webp/${p.stage.left_side.card_no}.webp`);
-                if (p.stage.center?.card_no) assetsToLoad.push(`img/cards_webp/${p.stage.center.card_no}.webp`);
-                if (p.stage.right_side?.card_no) assetsToLoad.push(`img/cards_webp/${p.stage.right_side.card_no}.webp`);
+                [p.stage.left_side, p.stage.center, p.stage.right_side].forEach(slot => {
+                    if (slot?.card_no) {
+                        const imgPath = State.resolveCardData(slot.card_no)?._img;
+                        if (imgPath) assetsToLoad.push(imgPath);
+                    }
+                });
             }
         });
 
@@ -125,7 +133,7 @@ export const Rendering = {
 
         const { p0, p1 } = viewState;
 
-        if (p0) state.looked_cards = p0.looked_cards || [];
+        if (p0) state.looked_cards = p0.looked_cards;
         if (!p0 || !p1) return;
 
         // Update UI Headers, Stats, etc. (Logic moved from main.js)
@@ -136,12 +144,12 @@ export const Rendering = {
 
         if (viewState.isMulligan) {
             // Unselected cards in Hand - Rust backend: hand is { cards: [...] }
-            Rendering.renderCards('my-hand', p0.hand?.cards || [], true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection, viewState.handFilter);
+            Rendering.renderCards('my-hand', p0.hand.cards, true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection, viewState.handFilter);
             
             // Selected cards shown at bottom of deck during mulligan (visual representation)
             // Do not show in "Confirmed Cards" panel during mulligan
         } else {
-            Rendering.renderCards('my-hand', p0.hand?.cards || [], true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection);
+            Rendering.renderCards('my-hand', p0.hand.cards, true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection);
             Rendering.renderLookedCards(validTargets.selection);
         }
         Rendering.renderSelectionModal(viewState.selectionModal);
@@ -160,19 +168,30 @@ export const Rendering = {
 
     getPhaseKey: (phase) => {
         const perspectivePlayer = State.perspectivePlayer;
-        if (phase === Phase.RPS) return 'rps';
-        if (phase === Phase.SETUP) return 'setup';
-        if (phase === Phase.MULLIGAN_P1) return (perspectivePlayer === 0) ? 'mulligan_you' : 'mulligan_opp';
-        if (phase === Phase.MULLIGAN_P2) return (perspectivePlayer === 1) ? 'mulligan_you' : 'mulligan_opp';
-        if (phase === Phase.ACTIVE) return 'active';
-        if (phase === Phase.ENERGY) return 'energy';
-        if (phase === Phase.DRAW) return 'draw';
-        if (phase === Phase.MAIN) return 'main';
-        if (phase === Phase.LIVE_SET) return 'live_set';
-        if (phase === Phase.PERFORMANCE_P1) return (perspectivePlayer === 0) ? 'perf_p1' : 'perf_p2';
-        if (phase === Phase.PERFORMANCE_P2) return (perspectivePlayer === 1) ? 'perf_p1' : 'perf_p2';
-        if (phase === Phase.LIVE_RESULT) return 'live_result';
-        return 'wait';
+        if (!phase) return 'wait';
+        
+        // Normalize phase to match Rust Debug format (case-insensitive)
+        const phaseLower = String(phase).toLowerCase();
+        
+        // Log unknown phases for debugging
+        const knownPhases = Object.values(Phase).map(p => String(p).toLowerCase());
+        if (!knownPhases.includes(phaseLower)) {
+            console.log('Unknown phase:', phase, 'Lower:', phaseLower, 'Known:', knownPhases);
+        }
+        
+        if (phaseLower === 'rockpaperscissors') return 'rps';
+        if (phaseLower === 'choosefirstattacker') return 'choose_first_attacker';
+        if (phaseLower === 'mulligan') return 'mulligan';
+        if (phaseLower === 'active') return 'active';
+        if (phaseLower === 'energy') return 'energy';
+        if (phaseLower === 'draw') return 'draw';
+        if (phaseLower === 'main') return 'main';
+        if (phaseLower === 'livecardset') return 'live_card_set';
+        if (phaseLower === 'firstattackerperformance') return (perspectivePlayer === 0) ? 'perf_p1' : 'perf_p2';
+        if (phaseLower === 'secondattackerperformance') return (perspectivePlayer === 1) ? 'perf_p1' : 'perf_p2';
+        if (phaseLower === 'livevictorydetermination') return 'live_victory_determination';
+        
+        return phaseLower.replace(/_/g, '_');
     },
 
 

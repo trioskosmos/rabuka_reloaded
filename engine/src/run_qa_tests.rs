@@ -81,7 +81,7 @@ fn test_q23_member_card_to_stage_procedure() {
         .expect("Should have action to play member card");
     
     let action_params = play_action.parameters.as_ref().unwrap();
-    let card_index = action_params.card_index.unwrap();
+    let _card_index = action_params.card_index.unwrap();
     let available_areas = action_params.available_areas.as_ref().unwrap();
     let available_area = available_areas.iter().find(|a| a.available).unwrap();
     
@@ -135,7 +135,7 @@ fn test_q24_baton_touch_procedure() {
         .expect("Should have action to play member card");
     
     let action_params = play_action.parameters.as_ref().unwrap();
-    let card_index = action_params.card_index.unwrap();
+    let _card_index = action_params.card_index.unwrap();
     let available_areas = action_params.available_areas.as_ref().unwrap();
     let available_area = available_areas.iter().find(|a| a.available).unwrap();
     
@@ -174,7 +174,7 @@ fn test_q24_baton_touch_procedure() {
         .expect("Should have action to play member card");
     
     let action_params = play_action.parameters.as_ref().unwrap();
-    let card_index = action_params.card_index.unwrap();
+    let _card_index = action_params.card_index.unwrap();
     let available_areas = action_params.available_areas.as_ref().unwrap();
     let baton_area = available_areas.iter().find(|a| a.available && a.is_baton_touch).unwrap_or_else(|| {
         println!("No baton touch area found, using available area");
@@ -666,6 +666,7 @@ fn test_q29_cannot_baton_touch_same_turn() {
     }
 }
 
+#[allow(dead_code)]
 fn test_q30_can_play_same_card_multiple_times() {
     println!("\nRunning Q30 test: Can play same card multiple times to stage");
     
@@ -1158,7 +1159,7 @@ fn test_q37_auto_abilities_multiple_uses() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Setup: Add live card to hand to play it
     let live_card = cards.iter().filter(|c| c.is_live()).take(1).next().expect("No live card");
@@ -1281,7 +1282,7 @@ fn test_q39_cheer_checks_before_required_hearts() {
     // Q39: Cheer checks must be performed before checking required hearts
     // Even if it's known that required hearts will be met, cheer checks must still be performed
     
-    let initial_cheer_checks_done = game_state.cheer_checks_done;
+    let _initial_cheer_checks_done = game_state.cheer_checks_done;
     
     // Perform cheer checks
     let player_id = game_state.player1.id.clone();
@@ -1307,7 +1308,7 @@ fn test_ability_optional_cost_user_choice() {
     
     // Find a card with optional cost ability (桜坂しずく - PL!N-bp1-003-R＋)
     let sakura_card = cards.iter().find(|c| c.card_no == "PL!N-bp1-003-R＋").expect("Card not found");
-    let sakura_id = get_card_id(sakura_card, &card_database);
+    let _sakura_id = get_card_id(sakura_card, &card_database);
     
     // Setup hand with multiple cards
     let hand_cards: Vec<i16> = cards.iter()
@@ -1344,7 +1345,7 @@ fn test_ability_cost_limit_filtering() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
     
-    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let _player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Setup opponent stage with members of various costs
@@ -1388,7 +1389,7 @@ fn test_ability_group_filtering() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let _player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Setup discard with live cards from different groups
     let nijigasaki_live = cards.iter()
@@ -1439,7 +1440,7 @@ fn test_ability_sequential_effects() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let _player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Setup deck with cards
     let deck_cards: Vec<i16> = cards.iter()
@@ -1505,7 +1506,7 @@ fn test_ability_activation_cost_targeting() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Find a member with activation ability that costs moving itself (星空 凛 - PL!-sd1-005-SD)
     let rin_card = cards.iter().find(|c| c.card_no == "PL!-sd1-005-SD").expect("Card not found");
@@ -1515,7 +1516,7 @@ fn test_ability_activation_cost_targeting() {
     // Test 1: Center position
     player1.stage.stage[1] = rin_id;
     
-    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    let game_state = GameState::new(player1, player2, card_database.clone());
     
     let center_card = game_state.player1.stage.stage[1];
     println!("Member in center: card_id={}", center_card);

@@ -75,14 +75,27 @@ export const Tooltips = {
                 // Rust backend format: player1, player2
                 const p = perspectivePlayer === 0 ? state.player1 : state.player2;
                 if (p) {
-                    const params = actionObj.parameters || {};
-                    if (!cardObj && params.card_index !== undefined && p.hand?.cards) cardObj = p.hand.cards[params.card_index];
-                    else if (!cardObj && params.stage_area !== undefined && p.stage) {
-                        const areaMap = { 'left_side': p.stage.left_side, 'center': p.stage.center, 'right_side': p.stage.right_side };
+                    // Support both parameters and params field names
+                    const params = actionObj.parameters || actionObj.params || {};
+                    const handCards = p.hand.cards;
+                    const liveCards = p.live_zone.cards;
+                    const energyCards = p.energy.cards;
+                    
+                    if (!cardObj && params.card_index !== undefined && handCards.length > 0) cardObj = handCards[params.card_index];
+                    else if (!cardObj && params.stage_area && p.stage) {
+                        // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+                        // Support both formats for compatibility
+                        const areaMap = { 
+                            'left': p.stage.left_side, 
+                            'left_side': p.stage.left_side, 
+                            'center': p.stage.center, 
+                            'right': p.stage.right_side, 
+                            'right_side': p.stage.right_side 
+                        };
                         cardObj = areaMap[params.stage_area.toLowerCase()];
                     }
-                    else if (!cardObj && params.card_indices !== undefined && p.live_zone?.cards) cardObj = p.live_zone.cards[params.card_indices[0]];
-                    else if (!cardObj && params.card_index !== undefined && p.energy?.cards) cardObj = p.energy.cards[params.card_index];
+                    else if (!cardObj && params.card_indices !== undefined && liveCards.length > 0) cardObj = liveCards[params.card_indices[0]];
+                    else if (!cardObj && params.card_index !== undefined && energyCards.length > 0) cardObj = energyCards[params.card_index];
                 }
                 if (!cardObj && actionObj.source_card_id !== undefined && actionObj.source_card_id !== -1) {
                     cardObj = Tooltips.findCardById(actionObj.source_card_id);
@@ -106,7 +119,6 @@ export const Tooltips = {
         const cardText = (State.cardSet === 'vanilla') ? "" : (cardObj ? (TextEnricher.getEffectiveRawText(cardObj) || "") : "");
         let finalAbilityText = cardText;
 
-        // 2. Fallback or additional text
         let actionLabel = dText || "";
 
         // Action enrichment: If we have an action object, try to get even better text
@@ -128,8 +140,6 @@ export const Tooltips = {
         let combinedText = finalAbilityText;
 
         if (!combinedText) {
-            // Only fallback to dText (raw instruction) if we DON'T have a card.
-            // If we have a card but no ability text, we want to stay clean.
             if (!cardObj) {
                 combinedText = dText || "";
             } else if (cardText) {

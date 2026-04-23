@@ -482,6 +482,7 @@ export const DebugModal = {
         if (!State.data?.pending_choice) return '';
 
         const pending = State.data.pending_choice;
+        // Support both choice_type and type field names
         const choiceType = CHOICE_NAMES[pending.choice_type] || CHOICE_NAMES[pending.type] || 'PENDING_CHOICE';
 
         return `
@@ -618,8 +619,16 @@ export const DebugModal = {
 
     _collectAbilityRows: (visibleCards) => visibleCards.flatMap((entry) => {
         const card = entry.card;
+        // Resolve card name using static database fallback if needed
+        let cardName = card.name;
+        if (!cardName && card.id !== undefined) {
+            const resolved = State.resolveCardData(card.id);
+            if (resolved && resolved.name) {
+                cardName = resolved.name;
+            }
+        }
         return (card.abilities || []).map((ability, abilityIndex) => ({
-            cardName: card.name || `Card ${card.id}`,
+            cardName: cardName || `Card ${card.id}`,
             cardId: card.id ?? card.card_id ?? '?',
             slotLabel: entry.slotLabel,
             abilityIndex,
@@ -818,21 +827,32 @@ export const DebugModal = {
         if (!card) return '';
 
         const abilities = card.abilities || [];
-        const cardType = card.type || (card.score !== undefined ? 'live' : 'member');
+        // Support both card_type and type field names
+        const cardType = card.card_type || card.type || (card.score !== undefined ? 'live' : 'member');
+        // Support both tapped boolean and orientation === 'Wait'
         const statusBits = [
-            card.tapped ? 'TAPPED' : null,
+            (card.tapped || card.orientation === 'Wait') ? 'TAPPED' : null,
             card.moved ? 'MOVED' : null,
             card.revealed ? 'REVEALED' : null,
             card.is_active ? 'ACTIVE' : null,
             card.waiting ? 'WAIT' : null,
         ].filter(Boolean);
 
+        // Resolve card name using static database fallback if needed
+        let displayName = card.name;
+        if (!displayName && card.id !== undefined) {
+            const resolved = State.resolveCardData(card.id);
+            if (resolved && resolved.name) {
+                displayName = resolved.name;
+            }
+        }
+
         return `
             <div style="background:rgba(255,255,255,0.045); border:1px solid #334155; border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08);">
                     <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
                         <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">
-                            <strong style="font-size:13px; color:${cardType === 'live' ? '#f87171' : '#7dd3fc'};">${escapeHtml(card.name || `Card ${card.id}`)}</strong>
+                            <strong style="font-size:13px; color:${cardType === 'live' ? '#f87171' : '#7dd3fc'};">${escapeHtml(displayName || `Card ${card.id}`)}</strong>
                             <span style="font-size:9px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.08); opacity:0.75;">${escapeHtml(entry.zoneLabel)}</span>
                             <span style="font-size:9px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.08); opacity:0.75;">${escapeHtml(cardType.toUpperCase())}</span>
                             <span style="font-size:9px; opacity:0.55;">#${index + 1}</span>
@@ -1118,7 +1138,7 @@ export const DebugModal = {
     renderRichJSON: () => {
         DebugModal._jsonMode = 'viewer';
         const textarea = document.getElementById('debug-json-textarea');
-        if (textarea) textarea.value = JSON.stringify(State.data, null, 2);
+        if (textarea) textarea.value = JSON.stringify(State.data);
         DebugModal._updateJsonModeBanner();
     },
 

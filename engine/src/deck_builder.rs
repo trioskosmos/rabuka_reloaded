@@ -26,6 +26,7 @@ impl Deck {
         self.main_deck = cards.into();
     }
 
+    #[allow(dead_code)]
     pub fn shuffle_main_deck_with_rng<R: rand::Rng>(&mut self, rng: &mut R) {
         use rand::seq::SliceRandom;
         let mut cards: Vec<i16> = self.main_deck.drain(..).collect();
@@ -40,6 +41,7 @@ impl Deck {
         self.energy_deck = cards.into();
     }
 
+    #[allow(dead_code)]
     pub fn shuffle_energy_deck_with_rng<R: rand::Rng>(&mut self, rng: &mut R) {
         use rand::seq::SliceRandom;
         let mut cards: Vec<i16> = self.energy_deck.drain(..).collect();

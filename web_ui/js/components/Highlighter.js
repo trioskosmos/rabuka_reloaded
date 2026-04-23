@@ -38,7 +38,7 @@ export const Highlighter = {
         Highlighter.clearHighlights();
 
         const perspectivePlayer = State.perspectivePlayer;
-        const actingPlayer = state.current_player ?? state.active_player;
+        const actingPlayer = state.current_player ?? state.active_player ?? 0;
         const selfPrefix = (actingPlayer === perspectivePlayer ? 'my' : 'opp');
         const oppPrefix = (actingPlayer === perspectivePlayer ? 'opp' : 'my');
 
@@ -47,18 +47,26 @@ export const Highlighter = {
             return (targetId === perspectivePlayer ? 'my' : 'opp');
         };
 
-        const m = a.metadata || {};
+        // Support both metadata and meta field names
+        const m = a.metadata || a.meta || {};
         const targetPlayer = m.target_player;
         const targetPrefix = getPlayerPrefix(targetPlayer);
 
         let specificHighlighted = false;
 
-        if (a.action_type === 'PlayMemberToStage' || a.type === 'PLAY') {
+        // Support both action_type and type field names
+        const actionType = a.action_type || a.type;
+        const category = a.category || a.type;
+
+        if (actionType === 'PlayMemberToStage' || category === 'PLAY') {
+            // Support both hand_idx and card_index
             const hIdx = a.hand_idx !== undefined ? a.hand_idx : a.parameters?.card_index;
+            // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+            // Support both formats for compatibility
             const sIdx = a.parameters?.stage_area ? (
-                a.parameters.stage_area === 'left_side' ? 0 :
+                a.parameters.stage_area === 'left' || a.parameters.stage_area === 'left_side' ? 0 :
                 a.parameters.stage_area === 'center' ? 1 :
-                a.parameters.stage_area === 'right_side' ? 2 : undefined
+                a.parameters.stage_area === 'right' || a.parameters.stage_area === 'right_side' ? 2 : undefined
             ) : a.area_idx;
             if (hIdx !== undefined) {
                 Highlighter.addHighlight(`${selfPrefix}-hand-card-${hIdx}`, 'highlight-source');
@@ -68,7 +76,8 @@ export const Highlighter = {
                 Highlighter.addHighlight(`${selfPrefix}-stage-slot-${sIdx}`, 'highlight-target');
                 specificHighlighted = true;
             }
-        } else if (a.action_type === 'SetLiveCard' || a.type === 'LIVE_SET') {
+        } else if (actionType === 'set_live_card' || category === 'LIVE_SET') {
+            // Support both hand_idx and card_index
             const hIdx = a.hand_idx !== undefined ? a.hand_idx : a.parameters?.card_index;
             if (hIdx !== undefined) {
                 Highlighter.addHighlight(`${selfPrefix}-hand-card-${hIdx}`, 'highlight-source');
@@ -76,14 +85,16 @@ export const Highlighter = {
             }
             Highlighter.addHighlight(`${selfPrefix}-live`, 'highlight-target');
             specificHighlighted = true;
-        } else if (a.action_type === 'UseAbility' || a.type === 'ABILITY' || m.category === 'ABILITY') {
+        } else if (actionType === 'use_ability' || category === 'ABILITY' || m.category === 'ABILITY') {
             if (a.location === 'discard' || m.location === 'discard') {
                 Highlighter.addHighlight(`${selfPrefix}-discard`, 'highlight-source');
                 specificHighlighted = true;
             } else if (a.parameters?.stage_area) {
-                const sIdx = a.parameters.stage_area === 'left_side' ? 0 :
+                // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+                // Support both formats for compatibility
+                const sIdx = a.parameters.stage_area === 'left' || a.parameters.stage_area === 'left_side' ? 0 :
                              a.parameters.stage_area === 'center' ? 1 :
-                             a.parameters.stage_area === 'right_side' ? 2 : undefined;
+                             a.parameters.stage_area === 'right' || a.parameters.stage_area === 'right_side' ? 2 : undefined;
                 if (sIdx !== undefined) {
                     Highlighter.addHighlight(`${selfPrefix}-stage-slot-${sIdx}`, 'highlight-source');
                     specificHighlighted = true;
@@ -99,12 +110,15 @@ export const Highlighter = {
                 Highlighter.addHighlight(`${targetPrefix}-stage-slot-${a.slot_idx}`, 'highlight-source');
                 specificHighlighted = true;
             }
-        } else if (a.type === 'CHOICE' || m.category === 'CHOICE') {
+        } else if (category === 'CHOICE' || m.category === 'CHOICE') {
+            // Support both hand_idx and card_index
             const hIdx = a.hand_idx !== undefined ? a.hand_idx : a.parameters?.card_index;
+            // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+            // Support both formats for compatibility
             const sIdx = a.parameters?.stage_area ? (
-                a.parameters.stage_area === 'left_side' ? 0 :
+                a.parameters.stage_area === 'left' || a.parameters.stage_area === 'left_side' ? 0 :
                 a.parameters.stage_area === 'center' ? 1 :
-                a.parameters.stage_area === 'right_side' ? 2 : undefined
+                a.parameters.stage_area === 'right' || a.parameters.stage_area === 'right_side' ? 2 : undefined
             ) : a.area_idx ?? a.slot_idx;
             if (hIdx !== undefined) {
                 Highlighter.addHighlight(`${selfPrefix}-hand-card-${hIdx}`, 'highlight-target');
@@ -116,13 +130,15 @@ export const Highlighter = {
                 Highlighter.addHighlight(`select-list-item-${a.index}`, 'highlight-target');
                 specificHighlighted = true;
             }
-        } else if (a.action_type === 'SelectMulligan' || a.action_type === 'MulliganHeader') {
+        } else if (actionType === 'select_mulligan' || actionType === 'mulligan_header') {
+            // Support both hand_idx and card_index
             const hIdx = a.hand_idx !== undefined ? a.hand_idx : (a.parameters?.card_index);
             if (hIdx !== undefined) {
                 Highlighter.addHighlight(`${selfPrefix}-hand-card-${hIdx}`, 'highlight-target');
                 specificHighlighted = true;
             }
-        } else if (a.action_type === 'PlayMemberToStage' || a.action_type === 'UseAbility') {
+        } else if (actionType === 'play_member_to_stage' || actionType === 'use_ability') {
+            // Support both hand_idx and card_index
             let hIdx = a.hand_idx ?? m.hand_idx;
             if (hIdx === undefined) {
                 hIdx = a.parameters?.card_index;
@@ -132,24 +148,27 @@ export const Highlighter = {
                 Highlighter.addHighlight(id, 'highlight-source');
                 specificHighlighted = true;
             }
-        } else if (a.action_type === 'PlayMemberToStage' || a.action_type === 'Formation') {
+        } else if (actionType === 'play_member_to_stage' || actionType === 'formation') {
+            // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+            // Support both formats for compatibility
             const idx = a.parameters?.stage_area ? (
-                a.parameters.stage_area === 'left_side' ? 0 :
+                a.parameters.stage_area === 'left' || a.parameters.stage_area === 'left_side' ? 0 :
                 a.parameters.stage_area === 'center' ? 1 :
-                a.parameters.stage_area === 'right_side' ? 2 : undefined
+                a.parameters.stage_area === 'right' || a.parameters.stage_area === 'right_side' ? 2 : undefined
             ) : (a.slot_idx ?? a.area_idx ?? m.slot_idx);
             if (idx !== undefined) {
                 Highlighter.addHighlight(`${targetPrefix}-stage-slot-${idx}`, 'highlight-target');
                 specificHighlighted = true;
             }
-        } else if (a.action_type === 'SetLiveCard' || a.type === 'SELECT_LIVE') {
+        } else if (actionType === 'SetLiveCard' || category === 'SELECT_LIVE') {
             const idx = a.parameters?.card_indices?.[0] ?? a.area_idx ?? a.slot_idx;
             if (idx !== undefined) {
                 Highlighter.addHighlight(`${targetPrefix}-live-slot-${idx}`, 'highlight-target');
                 specificHighlighted = true;
             }
-        } else if (a.action_type === 'ActivateEnergy') {
-            const idx = a.parameters?.card_index;
+        } else if (actionType === 'ActivateEnergy') {
+            // Support both card_index and hand_idx
+            const idx = a.parameters?.card_index ?? a.hand_idx;
             if (idx !== undefined) {
                 Highlighter.addHighlight(`${selfPrefix}-energy-slot-${idx}`, 'highlight-target');
                 specificHighlighted = true;
@@ -157,28 +176,30 @@ export const Highlighter = {
         }
 
         if (!specificHighlighted) {
-            if (a.action_type === 'SELECT_DISCARD' || (a.metadata && (a.metadata.from_discard || a.metadata.category === 'DISCARD'))) {
+            if (actionType === 'SELECT_DISCARD' || (a.metadata && (a.metadata.from_discard || a.metadata.category === 'DISCARD'))) {
                 Highlighter.addHighlight(`${selfPrefix}-discard-visual`, 'highlight-target');
                 specificHighlighted = true;
-            } else if (a.action_type === 'SelectMulligan' || a.action_type === 'MulliganHeader') {
-                const hIdx = a.parameters?.card_index;
+            } else if (actionType === 'select_mulligan' || actionType === 'mulligan_header') {
+                // Support both card_index and hand_idx
+                const hIdx = a.parameters?.card_index ?? a.hand_idx;
                 if (hIdx !== undefined && state.phase && state.phase.includes('Mulligan')) {
                     Highlighter.addHighlight(`${selfPrefix}-hand-card-${hIdx}`, 'highlight-target');
                     specificHighlighted = true;
                 }
-            } else if (a.action_type === 'SetLiveCard') {
-                const hIdx = a.parameters?.card_index;
+            } else if (actionType === 'set_live_card') {
+                // Support both card_index and hand_idx
+                const hIdx = a.parameters?.card_index ?? a.hand_idx;
                 if (hIdx !== undefined) {
                     Highlighter.addHighlight(`${selfPrefix}-hand-card-${hIdx}`, 'highlight-source');
                     Highlighter.addHighlight(`${selfPrefix}-live`, 'highlight-target');
                     specificHighlighted = true;
                 }
-            } else if (a.action_type === 'ChooseFirstAttacker' || a.action_type === 'ChooseSecondAttacker' || a.action_type === 'RockChoice' || a.action_type === 'PaperChoice' || a.action_type === 'ScissorsChoice') {
+            } else if (actionType === 'choose_first_attacker' || actionType === 'choose_second_attacker' || actionType === 'rock_choice' || actionType === 'paper_choice' || actionType === 'scissors_choice') {
                 // Do nothing - these are RPS-related
             } else {
                 const slotIdx = a.slot_idx !== undefined ? a.slot_idx : (a.index !== undefined ? a.index : a.choice_idx);
                 if (slotIdx !== undefined && slotIdx !== -1) {
-                    if (a.action_type === 'SetLiveCard') {
+                    if (actionType === 'set_live_card') {
                         Highlighter.addHighlight(`${selfPrefix}-live-slot-${slotIdx}`, 'highlight-target');
                     } else {
                         Highlighter.addHighlight(`${selfPrefix}-stage-slot-${slotIdx}`, 'highlight-target');
@@ -197,7 +218,8 @@ export const Highlighter = {
         if (!specificHighlighted) {
             let srcCardId = a.source_card_id;
             if ((srcCardId === undefined || srcCardId === -1) && state.pending_choice) {
-                srcCardId = state.pending_choice.source_card_id || state.pending_choice.card_id || (state.pending_choice.params ? state.pending_choice.params.source_card_id : -1);
+                // Support both params and parameters field names
+                srcCardId = state.pending_choice.source_card_id || state.pending_choice.card_id || (state.pending_choice.params || state.pending_choice.parameters ? (state.pending_choice.params?.source_card_id || state.pending_choice.parameters?.source_card_id) : -1);
             }
 
             if (srcCardId !== undefined && srcCardId !== -1) {
@@ -210,21 +232,25 @@ export const Highlighter = {
         const state = State.data;
         if (!state || !state.pending_choice) return;
         const choice = state.pending_choice;
-        const srcId = choice.source_card_id || choice.card_id || (choice.params ? choice.params.source_card_id : -1);
+        // Support both params and parameters field names
+        const srcId = choice.source_card_id || choice.card_id || (choice.params || choice.parameters ? (choice.params?.source_card_id || choice.parameters?.source_card_id) : -1);
 
         if (srcId === undefined || srcId === -1) return;
 
         let found = false;
         const perspectivePlayer = State.perspectivePlayer;
-        const selfPrefix = (state.active_player === perspectivePlayer ? 'my' : 'opp');
+        const activePlayer = state.current_player ?? state.active_player ?? 0;
+        const selfPrefix = (activePlayer === perspectivePlayer ? 'my' : 'opp');
 
-        const area = choice.area !== undefined ? choice.area : (choice.params ? choice.params.area : undefined);
+        // Support both params and parameters field names
+        const area = choice.area !== undefined ? choice.area : (choice.params || choice.parameters ? (choice.params?.area || choice.parameters?.area) : undefined);
         if (area !== undefined) {
             Highlighter.addHighlight(`${selfPrefix}-stage-slot-${area}`, 'highlight-source');
             found = true;
         }
 
-        const handIdx = choice.hand_idx !== undefined ? choice.hand_idx : (choice.params ? choice.params.hand_idx : undefined);
+        // Support both params and parameters field names
+        const handIdx = choice.hand_idx !== undefined ? choice.hand_idx : (choice.params || choice.parameters ? (choice.params?.hand_idx || choice.parameters?.hand_idx) : undefined);
         if (handIdx !== undefined) {
             Highlighter.addHighlight(`${selfPrefix}-hand-card-${handIdx}`, 'highlight-source');
             found = true;
@@ -262,10 +288,10 @@ export const Highlighter = {
                     }
                 }
             }
-            // Rust backend: hand is { cards: [...] }
-            if (p.hand && p.hand.cards) {
-                for (let idx = 0; idx < p.hand.cards.length; idx++) {
-                    const card = p.hand.cards[idx];
+            const handCards = p.hand.cards;
+            if (handCards.length > 0) {
+                for (let idx = 0; idx < handCards.length; idx++) {
+                    const card = handCards[idx];
                     const cid = card ? card.card_no : -1;
                     if (cid === srcId) {
                         Highlighter.addHighlight(`${pMap.prefix}-hand-card-${idx}`, className);
@@ -273,10 +299,10 @@ export const Highlighter = {
                     }
                 }
             }
-            // Rust backend: live_zone is { cards: [...] }
-            if (p.live_zone && p.live_zone.cards) {
-                for (let idx = 0; idx < p.live_zone.cards.length; idx++) {
-                    const cardObj = p.live_zone.cards[idx];
+            const liveCards = p.live_zone.cards;
+            if (liveCards.length > 0) {
+                for (let idx = 0; idx < liveCards.length; idx++) {
+                    const cardObj = liveCards[idx];
                     const cid = cardObj ? cardObj.card_no : -1;
                     if (cid === srcId) {
                         Highlighter.addHighlight(`${pMap.prefix}-live-slot-${idx}`, className);
@@ -288,10 +314,10 @@ export const Highlighter = {
                 Highlighter.addHighlight(`${pMap.prefix}-discard-visual`, className);
                 if (firstOnly) return;
             }
-            // Rust backend: energy is { cards: [...] }
-            if (p.energy && p.energy.cards) {
-                for (let idx = 0; idx < p.energy.cards.length; idx++) {
-                    const e = p.energy.cards[idx];
+            const energyCards = p.energy.cards;
+            if (energyCards.length > 0) {
+                for (let idx = 0; idx < energyCards.length; idx++) {
+                    const e = energyCards[idx];
                     const cid = e ? e.card_no : -1;
                     if (cid === srcId) {
                         Highlighter.addHighlight(`${pMap.prefix}-energy-slot-${idx}`, className);
@@ -311,16 +337,23 @@ export const Highlighter = {
 
         state.legal_actions.forEach(a => {
             const params = a.parameters || {};
+            // Support both action_type and type
+            const actionType = a.action_type || a.type;
+            
             if (source === 'hand') {
-                if (params.card_index === handIdx) {
-                    if (a.action_type === 'PlayMemberToStage' || a.action_type === 'Formation') {
+                // Support both card_index and hand_idx
+                const cardIndex = params.card_index ?? a.hand_idx;
+                if (cardIndex === handIdx) {
+                    if (actionType === 'play_member_to_stage' || actionType === 'formation') {
                         if (params.stage_area) {
-                            const areaMap = { 'left_side': 0, 'center': 1, 'right_side': 2 };
+                            // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+                            // Support both formats for compatibility
+                            const areaMap = { 'left': 0, 'left_side': 0, 'center': 1, 'right': 2, 'right_side': 2 };
                             const stageIdx = areaMap[params.stage_area.toLowerCase()];
                             if (stageIdx !== undefined) validTargets.add(`my-stage-slot-${stageIdx}`);
                         }
                     }
-                    if (a.action_type === 'LiveCardSet') {
+                    if (actionType === 'LiveCardSet') {
                         if (params.card_indices) {
                             params.card_indices.forEach(idx => {
                                 validTargets.add(`my-live-slot-${idx}`);
@@ -330,23 +363,28 @@ export const Highlighter = {
                         }
                     }
                 }
-                if ((params.card_index === handIdx || params.card_indices?.includes(handIdx)) &&
-                    (a.action_type === 'SelectHand' || a.description?.includes('Discard'))) {
+                // Support both card_index and hand_idx
+                const cardIndexOrIndices = params.card_index ?? a.hand_idx;
+                const cardIndices = params.card_indices ?? a.card_indices;
+                if ((cardIndexOrIndices === handIdx || cardIndices?.includes(handIdx)) &&
+                    (actionType === 'SelectHand' || a.description?.includes('Discard'))) {
                     validTargets.add('my-discard-visual');
                 }
             } else if (source === 'stage') {
                 const sourceSlot = index;
                 if (params.stage_area) {
-                    const areaMap = { 'left_side': 0, 'center': 1, 'right_side': 2 };
+                    // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+                    // Support both formats for compatibility
+                    const areaMap = { 'left': 0, 'left_side': 0, 'center': 1, 'right': 2, 'right_side': 2 };
                     const stageIdx = areaMap[params.stage_area.toLowerCase()];
                     if (stageIdx !== undefined) validTargets.add(`opp-stage-slot-${stageIdx}`);
                 }
             } else if (source === 'discard') {
-                if (a.action_type === 'SelectDiscard' || a.action_type === 'SelectCard') {
+                if (actionType === 'SelectDiscard' || actionType === 'SelectCard') {
                     validTargets.add('my-hand');
                 }
             } else if (source === 'deck') {
-                if (a.action_type === 'Draw') {
+                if (actionType === 'Draw') {
                     validTargets.add('my-hand');
                 }
             }

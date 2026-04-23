@@ -54,6 +54,48 @@
     margin-bottom: 0;
 }
 
+/* Play member buttons with zone differentiation */
+.action-btn.play-member {
+    border-left: 3px solid var(--accent-gold);
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.1) 0%, transparent 100%);
+}
+
+.action-btn.play-member:hover {
+    border-left-color: #ffd700;
+    background: linear-gradient(90deg, rgba(255, 215, 0, 0.2) 0%, transparent 100%);
+}
+
+/* Zone-specific styling */
+.action-btn.play-member-left_side {
+    border-left-color: #ff6b6b;
+    background: linear-gradient(90deg, rgba(255, 107, 107, 0.15) 0%, transparent 100%);
+}
+
+.action-btn.play-member-left_side:hover {
+    border-left-color: #ff8787;
+    background: linear-gradient(90deg, rgba(255, 107, 107, 0.25) 0%, transparent 100%);
+}
+
+.action-btn.play-member-center {
+    border-left-color: #51cf66;
+    background: linear-gradient(90deg, rgba(81, 207, 102, 0.15) 0%, transparent 100%);
+}
+
+.action-btn.play-member-center:hover {
+    border-left-color: #69db7c;
+    background: linear-gradient(90deg, rgba(81, 207, 102, 0.25) 0%, transparent 100%);
+}
+
+.action-btn.play-member-right_side {
+    border-left-color: #4dabf7;
+    background: linear-gradient(90deg, rgba(77, 171, 247, 0.15) 0%, transparent 100%);
+}
+
+.action-btn.play-member-right_side:hover {
+    border-left-color: #74c0fc;
+    background: linear-gradient(90deg, rgba(77, 171, 247, 0.25) 0%, transparent 100%);
+}
+
 .truncate-name {
     display: inline-block;
     max-width: 160px;

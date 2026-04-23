@@ -2,7 +2,7 @@
 // These tests use real cards from cards.json and track comprehensive state changes
 // to ensure the engine correctly implements game mechanics
 
-use rabuka_engine::card::{Ability, AbilityCost, AbilityEffect, Card, CardType, HeartColor};
+use rabuka_engine::card::Card;
 use rabuka_engine::game_state::{GameState, Phase, TurnPhase, GameResult};
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::card::CardDatabase;
@@ -24,6 +24,7 @@ fn create_card_database(cards: Vec<Card>) -> Arc<CardDatabase> {
 }
 
 /// Helper function to place a card on stage
+#[allow(dead_code)]
 fn place_card_on_stage(player: &mut Player, card: Card, area: MemberArea) {
     let card_id = card.card_no.parse::<i16>().unwrap_or(0);
     match area {
@@ -57,7 +58,7 @@ fn test_game_state_initialization_with_real_cards() {
 
 #[test]
 fn test_player_creation_with_real_cards() {
-    let cards = load_all_cards();
+    let _cards = load_all_cards();
     
     let player = Player::new("test_player".to_string(), "Test Player".to_string(), true);
     
@@ -112,7 +113,7 @@ fn test_move_real_card_from_hand_to_stage() {
     player.hand.cards.push(member_card.card_no.parse::<i16>().unwrap_or(0));
 
     let initial_hand_count = player.hand.cards.len();
-    let initial_stage_count = if player.stage.stage[1] != -1 { 1 } else { 0 };
+    let _initial_stage_count = if player.stage.stage[1] != -1 { 1 } else { 0 };
 
     // Move card to stage (using cost 0 if possible, or will fail if cost > 0)
     let cards = load_all_cards();
@@ -232,7 +233,7 @@ fn test_victory_condition_with_real_live_cards() {
     }
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Add 3 live cards to player1's success zone
     for card in live_cards {

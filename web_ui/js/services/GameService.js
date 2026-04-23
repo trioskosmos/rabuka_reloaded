@@ -96,10 +96,12 @@ export const GameService = {
                 const actionsRes = await fetch('api/actions');
                 if (actionsRes.ok) {
                     const actionsData = await actionsRes.json();
-                    legalActions = (actionsData.actions || []).map((action, index) => ({
+                    console.log('[GameService] Raw actions from API:', actionsData);
+                    legalActions = actionsData.actions.map((action, index) => ({
                         ...action,
                         index: action.index !== undefined ? action.index : index
                     }));
+                    console.log('[GameService] Processed legal actions:', legalActions);
                 }
             } catch (e) {
                 console.warn('Failed to fetch legal actions:', e);
@@ -233,13 +235,13 @@ export const GameService = {
             // Fetch legal actions after reset
             let legalActions = [];
             try {
-                const actionsRes = (await fetch('api/actions').map((action, index) => ({
-                        ...action,
-                        index: action.index !== undefined ? action.index : index
-                    })));
+                const actionsRes = await fetch('api/actions');
                 if (actionsRes.ok) {
                     const actionsData = await actionsRes.json();
-                    legalActions = actionsData.actions || [];
+                    legalActions = (actionsData.actions || []).map((action, index) => ({
+                        ...action,
+                        index: action.index !== undefined ? action.index : index
+                    }));
                 }
             } catch (e) {
                 console.warn('Failed to fetch legal actions:', e);

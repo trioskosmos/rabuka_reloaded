@@ -6,6 +6,16 @@ import { DOMUtils } from '../utils/DOMUtils.js';
 
 export const BoardRenderer = {
     renderBoard: (state, p0, p1, validTargets, showDiscardModalCallback) => {
+        // Validate required zone objects exist - engine should always send these
+        if (!p0?.hand?.cards || !p1?.hand?.cards ||
+            !p0?.energy?.cards || !p1?.energy?.cards ||
+            !p0?.live_zone?.cards || !p1?.live_zone?.cards ||
+            !p0?.discard?.cards || !p1?.discard?.cards ||
+            !p0?.success_live_card_zone?.cards || !p1?.success_live_card_zone?.cards) {
+            console.warn('[BoardRenderer] Incomplete player state from engine, skipping render');
+            return;
+        }
+
         // Rust backend format: stage is { left_side, center, right_side }, live_zone is { cards }
         const myStage = p0.stage ? [p0.stage.left_side, p0.stage.center, p0.stage.right_side].filter(c => c) : [];
         const oppStage = p1.stage ? [p1.stage.left_side, p1.stage.center, p1.stage.right_side].filter(c => c) : [];
@@ -13,23 +23,17 @@ export const BoardRenderer = {
         CardRenderer.renderStage('my-stage', myStage, true, validTargets.myStage, validTargets.hasSelection);
         CardRenderer.renderStage('opp-stage', oppStage, true, validTargets.oppStage, validTargets.hasSelection);
         
-        const myLive = p0.live_zone ? p0.live_zone.cards : [];
-        const oppLive = p1.live_zone ? p1.live_zone.cards : [];
-        CardRenderer.renderLiveZone('my-live', myLive, true, validTargets.myLive, validTargets.hasSelection);
-        CardRenderer.renderLiveZone('opp-live', oppLive, true, validTargets.oppLive, validTargets.hasSelection);
+        CardRenderer.renderLiveZone('my-live', p0.live_zone.cards, true, validTargets.myLive, validTargets.hasSelection);
+        CardRenderer.renderLiveZone('opp-live', p1.live_zone.cards, true, validTargets.oppLive, validTargets.hasSelection);
         
-        CardRenderer.renderDiscardPile('my-discard-visual', p0.discard || [], 0, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
-        CardRenderer.renderDiscardPile('opp-discard-visual', p1.discard || [], 1, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
+        CardRenderer.renderDiscardPile('my-discard-visual', p0.discard.cards, 0, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
+        CardRenderer.renderDiscardPile('opp-discard-visual', p1.discard.cards, 1, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
 
-        const myEnergy = p0.energy ? p0.energy.cards : [];
-        const oppEnergy = p1.energy ? p1.energy.cards : [];
-        BoardRenderer.renderEnergy('my-energy', myEnergy, true, validTargets.myEnergy, validTargets.hasSelection, state);
-        BoardRenderer.renderEnergy('opp-energy', oppEnergy, true, validTargets.oppEnergy, validTargets.hasSelection, state);
+        BoardRenderer.renderEnergy('my-energy', p0.energy.cards, true, validTargets.myEnergy, validTargets.hasSelection, state);
+        BoardRenderer.renderEnergy('opp-energy', p1.energy.cards, true, validTargets.oppEnergy, validTargets.hasSelection, state);
 
-        const mySuccess = p0.success_live_card_zone ? p0.success_live_card_zone.cards : [];
-        const oppSuccess = p1.success_live_card_zone ? p1.success_live_card_zone.cards : [];
-        CardRenderer.renderCards('my-success', mySuccess, true, true);
-        CardRenderer.renderCards('opp-success', oppSuccess, false, true);
+        CardRenderer.renderCards('my-success', p0.success_live_card_zone.cards, true, true);
+        CardRenderer.renderCards('opp-success', p1.success_live_card_zone.cards, false, true);
 
         BoardRenderer.renderDeckCounts(p0, p1);
     },
@@ -46,19 +50,22 @@ export const BoardRenderer = {
 
         console.log('[BoardRenderer] renderDeckCounts - p0.hand:', p0?.hand, 'p0.energy:', p0?.energy);
 
-        // Rust backend format
         updateCount('my-deck-count', p0.main_deck_count);
         updateCount('opp-deck-count', p1.main_deck_count);
         updateCount('my-energy-deck-count', p0.energy_deck_count);
         updateCount('opp-energy-deck-count', p1.energy_deck_count);
-        updateCount('my-discard-count', p0.waitroom_count || 0);
-        updateCount('opp-discard-count', p1.waitroom_count || 0);
+        updateCount('my-discard-count', p0.waitroom_count);
+        updateCount('opp-discard-count', p1.waitroom_count);
 
-        // Update hand and energy counts
-        updateCount('my-hand-count', p0.hand ? p0.hand.cards.length : 0);
-        updateCount('my-energy-count', p0.energy ? p0.energy.cards.length : 0);
-        updateCount('opp-hand-count', p1.hand ? p1.hand.cards.length : 0);
-        updateCount('opp-energy-count', p1.energy ? p1.energy.cards.length : 0);
+        const myHandCount = p0.hand.cards.length;
+        const oppHandCount = p1.hand.cards.length;
+        const myEnergyCount = p0.energy.cards.length;
+        const oppEnergyCount = p1.energy.cards.length;
+        
+        updateCount('my-hand-count', myHandCount);
+        updateCount('opp-hand-count', oppHandCount);
+        updateCount('my-energy-count', myEnergyCount);
+        updateCount('opp-energy-count', oppEnergyCount);
     },
 
     renderEnergy: (containerId, energy, clickable = false, validActionMap = {}, hasGlobalSelection = false, state = null) => {

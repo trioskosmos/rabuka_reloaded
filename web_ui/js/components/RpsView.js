@@ -23,14 +23,20 @@ export const RpsView = {
 
         const baseId = (perspectivePlayer === 1) ? ActionBases.RPS_P2 : ActionBases.RPS;
         const signs = [
-            { actionType: 'RockChoice', name: i18n.t('rps_rock') },
-            { actionType: 'PaperChoice', name: i18n.t('rps_paper') },
-            { actionType: 'ScissorsChoice', name: i18n.t('rps_scissors') }
+            { actionType: 'RockChoice', snakeType: 'rock_choice', name: i18n.t('rps_rock') },
+            { actionType: 'PaperChoice', snakeType: 'paper_choice', name: i18n.t('rps_paper') },
+            { actionType: 'ScissorsChoice', snakeType: 'scissors_choice', name: i18n.t('rps_scissors') }
         ];
 
         signs.forEach((sign, idx) => {
-            const legalAction = state.legal_actions && state.legal_actions.find(a => a.action_type === sign.actionType);
+            // Rust engine sends snake_case action_type (e.g., "rock_choice")
+            const legalAction = state.legal_actions && state.legal_actions.find(a => 
+                a.action_type === sign.actionType || a.action_type === sign.snakeType
+            );
             const hasAction = !!legalAction;
+            
+            // Debug: log what we're checking against
+            console.log('RPS sign:', sign.actionType, 'Legal actions:', state.legal_actions, 'Found:', hasAction);
             const a = legalAction || { action_type: sign.actionType, description: sign.name, index: idx };
             // Ensure the action has an index for execution
             if (legalAction && legalAction.index === undefined) {

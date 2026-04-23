@@ -8,6 +8,7 @@ import { Tooltips } from '../ui_tooltips.js';
 import { State } from '../state.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS } from '../constants_dom.js';
+import { ImageLoader } from './CardRenderer.js';
 
 export const ZoneViewer = {
     cache: {
@@ -115,16 +116,17 @@ export const ZoneViewer = {
         if (!card) return document.createElement('div');
         const div = document.createElement('div');
         div.className = isMini ? 'card card-mini' : 'card';
-        const imgPath = card.img || card.img_path || '';
+        
+        // Resolve card data if card_no is present but no image path
+        let imgPath = card.img || card.img_path || card.image || '';
+        if (!imgPath && card.card_no) {
+            const resolved = State.resolveCardData(card.card_no);
+            imgPath = resolved?._img || '';
+        }
+        
         const img = document.createElement('img');
-        img.src = fixImg(imgPath);
-        img.onerror = () => {
-            if (img.getAttribute('src') !== 'img/texticon/icon_energy.png') {
-                img.setAttribute('src', 'img/texticon/icon_energy.png');
-                return;
-            }
-            img.onerror = null;
-        };
+        img.draggable = false;
+        ImageLoader.loadImage(img, fixImg(imgPath));
         div.appendChild(img);
         
         const rawText = Tooltips.getEffectiveRawText(card);

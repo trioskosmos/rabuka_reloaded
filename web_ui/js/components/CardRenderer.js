@@ -5,6 +5,45 @@ import { Tooltips } from '../ui_tooltips.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
 
+// Simple image loading without fallbacks
+export const ImageLoader = {
+    loadedImages: new Set(),
+    observer: null,
+
+    init() {
+        if (typeof IntersectionObserver !== 'undefined' && !this.observer) {
+            this.observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        if (img.dataset.src && !img.complete) {
+                            img.src = img.dataset.src;
+                        }
+                    }
+                });
+            }, { rootMargin: '50px' });
+        }
+    },
+
+    loadImage(img, src) {
+        this.init();
+        
+        if (this.loadedImages.has(src)) {
+            img.src = src;
+            return;
+        }
+
+        img.src = src;
+        img.onload = () => {
+            this.loadedImages.add(src);
+        };
+        
+        if (this.observer) {
+            this.observer.observe(img);
+        }
+    }
+};
+
 export const CardRenderer = {
     /**
      * Maps engine card data to UI-specific properties (CSS classes, labels, etc.)
@@ -15,15 +54,29 @@ export const CardRenderer = {
         const state = State.data;
         const { isSelected, isValid, mini, containerId } = options;
 
+        // Resolve card data if it's just a number or missing name
+        let resolvedCard = card;
+        if (typeof card === 'number') {
+            resolvedCard = State.resolveCardData(card);
+        } else if (card.card_no && !card.name) {
+            // Card has card_no but no name - try to resolve from index
+            const indexed = State.resolveCardData(card.card_no);
+            if (indexed && indexed.name) {
+                resolvedCard = { ...card, ...indexed };
+            }
+        }
+
         // Rust backend format: card_no, name, card_type, orientation
-        const isHidden = card.hidden || card.card_no === -2;
-        const isLive = card.card_type === 'Live' || card.card_type === 'ライブ';
+        // Support both hidden field and card_no === -2/-1 for hidden cards
+        const isHidden = resolvedCard.hidden || resolvedCard.is_hidden || resolvedCard.card_no === -2 || resolvedCard.card_no === -1;
+        // Support both 'Live' and 'ライブ' for card type
+        const isLive = resolvedCard.card_type === 'Live' || resolvedCard.card_type === 'ライブ' || resolvedCard.type === 'live';
 
         // 1. Determine CSS Classes
         const classNames = ['card'];
         if (isHidden) classNames.push('hidden');
         if (mini) classNames.push('card-mini');
-        if (card.is_new) classNames.push('new-card');
+        if (resolvedCard.is_new) classNames.push('new-card');
         if (isLive) classNames.push('type-live');
 
         // Orientation Logic (Consolidated Matrix)
@@ -44,7 +97,7 @@ export const CardRenderer = {
         }
 
         if (isSelected) {
-            const isMulligan = (state.phase === Phase.MULLIGAN_P1 || state.phase === Phase.MULLIGAN_P2);
+            const isMulligan = (state.phase === Phase.MULLIGAN);
             classNames.push(isMulligan ? 'mulligan-selected' : 'selected');
         }
         if (isValid && containerId !== 'my-hand') classNames.push('valid-target');
@@ -61,11 +114,13 @@ export const CardRenderer = {
         let imgPath = '';
 
         if (!isHidden) {
-            // Construct image path from card_no (Rust backend format)
-            if (card.card_no) {
-                imgPath = `img/cards_webp/${card.card_no}.webp`;
+            // Use _img field from cards.json if available, otherwise construct from card_no
+            if (resolvedCard._img) {
+                imgPath = resolvedCard._img;
+            } else if (resolvedCard.card_no) {
+                imgPath = `img/cards_webp/${resolvedCard.card_no}.webp`;
             }
-            displayName = card.name || `[${card.card_type}]` || 'Card';
+            displayName = resolvedCard.name || `[${resolvedCard.card_type}]` || 'Card';
         }
 
         return {
@@ -93,11 +148,8 @@ export const CardRenderer = {
         if (!viewModel.isHidden) {
             if (viewModel.imgPath) {
                 const img = document.createElement('img');
-                img.src = viewModel.imgPath;
                 img.draggable = false;
-                img.onerror = () => {
-                    img.style.display = 'none';
-                };
+                ImageLoader.loadImage(img, viewModel.imgPath);
                 div.appendChild(img);
             }
 
@@ -173,17 +225,15 @@ export const CardRenderer = {
             
             if (existingImg) {
                 if (imgPath && existingImg.getAttribute('src') !== imgPath) {
-                    existingImg.setAttribute('src', imgPath);
+                    ImageLoader.loadImage(existingImg, imgPath);
                     existingImg.style.display = '';
                 } else if (!imgPath) {
                     existingImg.style.display = 'none';
                 }
-                existingImg.onerror = () => existingImg.style.display = 'none';
             } else if (imgPath) {
                 const img = document.createElement('img');
-                img.src = imgPath;
                 img.draggable = false;
-                img.onerror = () => img.style.display = 'none';
+                ImageLoader.loadImage(img, imgPath);
                 el.prepend(img);
             }
 
@@ -340,10 +390,26 @@ export const CardRenderer = {
             slotDiv.id = `${containerId}-slot-${i}`;
 
             if (slot && slot.card_no) {
-                // Rust backend: construct image path from card_no
-                const imgPath = `img/cards_webp/${slot.card_no}.webp`;
-                const expectedHtml = `<img src="${fixImgPath(imgPath)}">`;
-                if (slotDiv.innerHTML !== expectedHtml) slotDiv.innerHTML = expectedHtml;
+                const resolved = State.resolveCardData(slot.card_no);
+                const imgPath = resolved?._img;
+
+                if (imgPath) {
+                    const fixedPath = fixImgPath(imgPath);
+                    const existingImg = slotDiv.querySelector('img');
+                    if (existingImg) {
+                        if (existingImg.src !== fixedPath) {
+                            ImageLoader.loadImage(existingImg, fixedPath);
+                        }
+                    } else {
+                        const img = document.createElement('img');
+                        img.draggable = false;
+                        ImageLoader.loadImage(img, fixedPath);
+                        slotDiv.innerHTML = '';
+                        slotDiv.appendChild(img);
+                    }
+                } else {
+                    slotDiv.innerHTML = '';
+                }
 
                 Tooltips.attachCardData(area, slot, isValid ? action : undefined);
                 Tooltips.attachCardData(slotDiv, slot, isValid ? action : undefined);
@@ -428,18 +494,44 @@ export const CardRenderer = {
             if (slot.className !== newClassName) slot.className = newClassName;
             slot.id = `${containerId}-slot-${i}`;
 
-            // Rust backend format: card is { card_no, name, card_type }
             if (card && card.card_no) {
-                const imgPath = `img/cards_webp/${card.card_no}.webp`;
-                const expectedInnerHtml = `
-                    <div class="live-card-inner">
-                        <img src="${fixImgPath(imgPath)}">
-                        <div class="cost">0</div>
-                        <div class="card-no">${card.card_no}</div>
-                    </div>
-                `;
-                
-                if (slot.innerHTML !== expectedInnerHtml) slot.innerHTML = expectedInnerHtml;
+                const resolved = State.resolveCardData(card.card_no);
+                const imgPath = resolved?._img;
+
+                if (imgPath) {
+                    const fixedPath = fixImgPath(imgPath);
+                    const existingImg = slot.querySelector('img');
+                    const existingInner = slot.querySelector('.live-card-inner');
+
+                    if (existingInner && existingImg) {
+                        if (existingImg.src !== fixedPath) {
+                            ImageLoader.loadImage(existingImg, fixedPath);
+                        }
+                    } else {
+                        const img = document.createElement('img');
+                        img.draggable = false;
+                        ImageLoader.loadImage(img, fixedPath);
+
+                        const inner = document.createElement('div');
+                        inner.className = 'live-card-inner';
+                        inner.appendChild(img);
+
+                        const costDiv = document.createElement('div');
+                        costDiv.className = 'cost';
+                        costDiv.textContent = '0';
+                        inner.appendChild(costDiv);
+
+                        const cardNoDiv = document.createElement('div');
+                        cardNoDiv.className = 'card-no';
+                        cardNoDiv.textContent = card.card_no;
+                        inner.appendChild(cardNoDiv);
+
+                        slot.innerHTML = '';
+                        slot.appendChild(inner);
+                    }
+                } else {
+                    slot.innerHTML = '';
+                }
                 
                 const rawText = Tooltips.getEffectiveRawText(card);
                 if (rawText) DOMUtils.patchAttributes(slot, { 'data-text': rawText });
@@ -491,8 +583,7 @@ export const CardRenderer = {
                 const card = discard[discard.length - 1 - i];
                 const div = document.createElement('div');
                 div.className = 'card card-mini';
-                // Rust backend: construct image path from card_no
-                const imgPath = card.card_no ? `img/cards_webp/${card.card_no}.webp` : '';
+                const imgPath = card.card_no ? State.resolveCardData(card.card_no)?._img : '';
                 div.innerHTML = `<img src="${fixImgPath(imgPath)}">`;
                 div.style.transform = `translate(${i * 2}px, ${i * 2}px)`;
                 div.style.zIndex = 10 - i;

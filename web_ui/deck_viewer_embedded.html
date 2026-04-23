@@ -106,13 +106,9 @@
             const imgSrc = card._img || card.img || '';
 
             const img = document.createElement('img');
-            img.src = imgSrc;
             img.alt = card.name;
             img.loading = 'lazy';
-            img.onerror = () => {
-                img.src = 'https://via.placeholder.com/150x210?text=No+Image';
-                img.onerror = null;
-            };
+            img.src = imgSrc;
             item.appendChild(img);
 
             const nameEl = document.createElement('div');

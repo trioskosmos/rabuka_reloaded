@@ -138,6 +138,8 @@ pub struct GameState {
     pub optional_cost_behavior: String,
     // Pending ability execution state for user interaction
     pub pending_ability: Option<PendingAbilityExecution>,
+    // Pending choice for user interaction - persists across resolver instances
+    pub pending_choice: Option<crate::ability_resolver::Choice>,
     // Area placement tracking - tracks which areas had cards placed this turn (Q70, Q71, Q75, Q76, Q79, Q80)
     pub areas_placed_this_turn: std::collections::HashSet<String>, // "player1:center", "player1:left", etc.
     // Card appearance tracking - tracks which cards appeared this turn (Q77)
@@ -146,6 +148,8 @@ pub struct GameState {
     pub turn_order_changed: bool,
     // Ability trigger tracking (Q94) - tracks how many times an auto ability has triggered this turn
     pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>, // card_id -> trigger count
+    // Baton touch cost tracking - tracks if baton touch resulted in 0 cost (Q25)
+    pub baton_touch_zero_cost: bool, // true if the most recent baton touch had 0 cost
     // Turn limit tracking per card instance (Q58, Q59) - tracks how many times a card instance has used turn-limited abilities
     pub turn_limit_usage: std::collections::HashMap<String, u32>, // "player1:card_instance_id" -> usage count
     // Card identity tracking for zone movement (Q59) - tracks card instance IDs
@@ -268,10 +272,12 @@ impl GameState {
             revealed_cards: std::collections::HashSet::new(),
             optional_cost_behavior: "always_pay".to_string(), // Default to always pay for bot/test mode
             pending_ability: None,
+            pending_choice: None,
             areas_placed_this_turn: std::collections::HashSet::new(),
             cards_appeared_this_turn: std::collections::HashSet::new(),
             turn_order_changed: false,
             auto_ability_trigger_counts: std::collections::HashMap::new(),
+            baton_touch_zero_cost: false,
             turn_limit_usage: std::collections::HashMap::new(),
             card_instance_counter: 0,
             card_instance_mapping: std::collections::HashMap::new(),
@@ -1268,24 +1274,14 @@ impl GameState {
         }
         
         // Execute the choice result using the resolver
-        // Clone pending_ability before creating resolver to avoid borrow issues
-        let pending_ability_clone = self.pending_ability.clone();
+        // Clone pending_choice before creating resolver to avoid borrow issues
+        let pending_choice_clone = self.pending_choice.clone();
         
         let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
         
-        // If there's a pending choice stored in conditional_choice, restore it to the resolver
-        if let Some(ref pending) = pending_ability_clone {
-            if let Some(ref choice_str) = pending.conditional_choice {
-                // Parse the choice string back into a Choice enum
-                if choice_str.contains("SelectTarget") {
-                    if choice_str.contains("pay_optional_cost") {
-                        resolver.pending_choice = Some(crate::ability_resolver::Choice::SelectTarget {
-                            target: "pay_optional_cost:skip_optional_cost".to_string(),
-                            description: "Pay optional cost".to_string(),
-                        });
-                    }
-                }
-            }
+        // Restore pending choice from GameState if it exists
+        if let Some(choice) = pending_choice_clone {
+            resolver.pending_choice = Some(choice);
         }
         
         resolver.provide_choice_result(result)?;

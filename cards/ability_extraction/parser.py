@@ -14,16 +14,17 @@ SPLIT_LIMIT = 1
 
 # ============== SOURCE PATTERNS (FROM) ==============
 SOURCE_PATTERNS = [
-    ('手札から', 'hand'),
-    ('手札にある', 'hand'),
     ('控え室から', 'discard'),
-    ('控え室にある', 'discard'),
-    ('自分の控え室にある', 'discard'),
-    ('ステージから', 'stage'),
+    ('控え室か ら', 'discard'),  # Q226: Handle unusual spacing
+    ('手札から', 'hand'),
+    ('デッキから', 'deck'),
     ('デッキの上から', 'deck_top'),
+    ('山札から', 'deck'),
+    ('ステージから', 'stage'),
     ('エネルギー置き場から', 'energy_zone'),
-    ('エネルギー置き場にある', 'energy_zone'),
-    ('自分のエネルギー置き場にある', 'energy_zone'),
+    ('ライブカード置き場から', 'live_card_zone'),
+    ('成功ライブカード置き場から', 'success_live_zone'),
+    ('からライブカード', 'discard'),  # Q226: Handle "～からライブカード" pattern
     ('デッキの一番下から', 'deck_bottom'),
     ('相手の控え室から', 'discard'),
     ('相手の控え室にある', 'discard'),
@@ -35,13 +36,22 @@ DESTINATION_PATTERNS = [
     ('控え室に置いて', 'discard'),  # Handle te-form
     # Removed overly broad ('控え室', 'discard') - it was matching source locations
     ('手札に加える', 'hand'),
-    ('手札に', 'hand'),
-    ('ステージに登場させる', 'stage'),
+    ('手札に加えて', 'hand'),  # Handle te-form
+    ('手札に置く', 'hand'),
     ('ステージに置く', 'stage'),
+    ('ステージに登場させる', 'stage'),
+    ('エネルギー置き場に置く', 'energy_zone'),
+    ('ライブカード置き場に置く', 'live_card_zone'),
+    ('成功ライブカード置き場に置く', 'success_live_zone'),
     ('デッキの上に置く', 'deck_top'),
+    ('デッキの一番上に置く', 'deck_top'),
+    ('デッキの下に置く', 'deck_bottom'),
     ('デッキの一番下に置く', 'deck_bottom'),
     ('デッキの一番下に置いて', 'deck_bottom'),  # Handle te-form
-    ('成功ライブカード置き場に置く', 'success_live_card_zone'),
+    ('デッキの一番上から4枚目に置く', 'deck_position_4'),  # Q226: 4th from top
+    ('デッキの一番上から(\d+)枚目に置く', 'deck_position'),  # Q226: General deck position pattern
+    ('デッキに置く', 'deck'),  # Q226: General deck placement
+    ('成功ライブカード置き場に置く', 'success_live_zone'),
     ('メンバーのいないエリア', 'empty_area'),
     ('そのメンバーがいたエリア', 'same_area'),
     ('このメンバーの下に置く', 'under_member'),
@@ -125,10 +135,21 @@ def extract_by_pattern(text: str, patterns: List[Tuple[str, str]]) -> Optional[s
 
 def extract_source(text: str) -> Optional[str]:
     """Extract source location (FROM)."""
+    # Special case for Q226: "自分の控え室からライブカード" pattern
+    if '控え室からライブカード' in text:
+        return 'discard'
     return extract_by_pattern(text, SOURCE_PATTERNS)
 
 def extract_destination(text: str) -> Optional[str]:
     """Extract destination location (TO)."""
+    # First check for specific deck position patterns (Q226)
+    deck_pos_match = re.search(r'デッキの一番上から(\d+)枚目に置く', text)
+    if deck_pos_match:
+        return 'deck'  # Return 'deck' as the destination, position will be extracted separately
+    # Also check for "置いてもよい" pattern (Q226)
+    deck_pos_match2 = re.search(r'デッキの一番上から(\d+)枚目に置いてもよい', text)
+    if deck_pos_match2:
+        return 'deck'
     return extract_by_pattern(text, DESTINATION_PATTERNS)
 
 def extract_location(text: str) -> Optional[str]:
@@ -180,6 +201,28 @@ def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
         return int(match.group(1))
     return None
 
+def extract_deck_position(text: str) -> Optional[int]:
+    """Extract deck position from text like '一番上から4枚目' (4th from top)."""
+    # Match patterns like "一番上から4枚目" or "上から4枚目"
+    match = re.search(r'一番上から(\d+)枚目', text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'上から(\d+)枚目', text)
+    if match:
+        return int(match.group(1))
+    return None
+
+def extract_deck_position_for_action(text: str) -> Optional[Dict[str, Any]]:
+    """Extract deck position for action, returns PositionInfo format."""
+    pos = extract_deck_position(text)
+    if pos:
+        return {
+            'position': {
+                'position': str(pos)
+            }
+        }
+    return None
+
 def extract_position(text: str) -> Dict[str, Any]:
     """Extract position requirement with target."""
     result = {}
@@ -192,6 +235,13 @@ def extract_position(text: str) -> Dict[str, Any]:
     # Check for both players effect (自分と相手はそれぞれ) - override target
     if '自分と相手はそれぞれ' in text:
         result['target'] = 'both'
+    
+    # Extract deck position (Q226: 一番上から4枚目)
+    deck_pos = extract_deck_position(text)
+    if deck_pos:
+        result['position'] = {
+            'position': str(deck_pos)
+        }
     
     # Note: Position field removed to avoid deserialization errors
     # Rust expects PositionInfo struct, not string
@@ -1127,6 +1177,11 @@ def parse_action(text: str) -> Dict[str, Any]:
         action['source'] = 'under_member'
         action['card_type'] = 'energy_card'
     
+    # Extract source
+    source = extract_source(text)
+    if source:
+        action['source'] = source
+    
     # Extract destination
     destination = extract_destination(text)
     if destination:
@@ -1137,6 +1192,11 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Check for "好きな順番で" (in any order) placement
     if '好きな順番で' in text:
         action['placement_order'] = 'any_order'
+    
+    # Extract deck position (Q226: 一番上から4枚目)
+    deck_position = extract_deck_position_for_action(text)
+    if deck_position:
+        action.update(deck_position)
     
     # Extract cost limit specifically for move_cards actions
     cost_limit = extract_cost_limit(text)
@@ -1473,8 +1533,12 @@ def parse_action(text: str) -> Dict[str, Any]:
                     destination = 'deck_top'
                 elif 'デッキの下に置く' in text:
                     destination = 'deck_bottom'
-                elif 'デッキに戻す' in text:
+                elif 'デッキに戻す' in text or 'デッキに置く' in text or 'デッキの一番上から' in text:
                     destination = 'deck'
+                    # Check for deck position (Q226: 一番上から4枚目)
+                    deck_position = extract_deck_position_for_action(text)
+                    if deck_position:
+                        action.update(deck_position)
                 elif '山札の下に置く' in text:
                     destination = 'deck_bottom'
                 elif '山札の上に置く' in text:
@@ -3001,6 +3065,37 @@ if __name__ == '__main__':
                     cost[key] = value
             
             ability['cost'] = cost
+    
+    # Update effect fields from parsed results
+    for ability in result['unique_abilities']:
+        parsed = ability.get('parsed', {})
+        if 'effect' in parsed:
+            # Update existing effect with fields from parsed effect
+            effect = ability.get('effect', {})
+            parsed_effect = parsed['effect']
+            
+            # Merge fields from parsed effect into existing effect
+            for key, value in parsed_effect.items():
+                if key == 'actions' and isinstance(value, list):
+                    # For sequential actions, merge each action
+                    existing_actions = effect.get('actions', [])
+                    for i, parsed_action in enumerate(value):
+                        if i < len(existing_actions):
+                            # Merge fields into existing action
+                            for action_key, action_value in parsed_action.items():
+                                # Always overwrite position with PositionInfo format
+                                if action_key == 'position' and isinstance(action_value, dict):
+                                    existing_actions[i][action_key] = action_value
+                                elif action_key not in existing_actions[i]:
+                                    existing_actions[i][action_key] = action_value
+                        else:
+                            # Add new action
+                            existing_actions.append(parsed_action)
+                    effect['actions'] = existing_actions
+                elif key not in effect:
+                    effect[key] = value
+            
+            ability['effect'] = effect
     
     # Remove parsed field
     for ability in result['unique_abilities']:

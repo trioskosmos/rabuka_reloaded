@@ -23,7 +23,7 @@ export const ActionMenu = {
         if (!actionsDiv) return;
 
         // 1. RPS Phase
-        if (state.phase === Phase.RPS) {
+        if (state.phase === Phase.ROCK_PAPER_SCISSORS) {
             RpsView.render(state, perspectivePlayer, actionsDiv);
             return;
         }

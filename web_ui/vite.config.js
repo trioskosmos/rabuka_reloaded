@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { copyFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 function copyDirSync(src, dest) {
@@ -35,7 +35,41 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
+    fs: {
+      strict: false,
+      allow: ['..'],
+    },
   },
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      if (req.url?.startsWith('/cards/') || req.url?.startsWith('/engine/')) {
+        const filePath = resolve(__dirname, '..', req.url);
+        console.log(`[Vite Middleware] Serving ${req.url} from ${filePath}`);
+        try {
+          if (!existsSync(filePath)) {
+            console.warn(`[Vite Middleware] File not found: ${filePath}`);
+            res.statusCode = 404;
+            res.end('File not found');
+            return;
+          }
+          const content = readFileSync(filePath);
+          if (req.url.endsWith('.json')) {
+            res.setHeader('Content-Type', 'application/json');
+          }
+          console.log(`[Vite Middleware] Successfully served ${req.url} (${content.length} bytes)`);
+          res.end(content);
+        } catch (e) {
+          console.error(`[Vite Middleware] Error serving ${req.url}:`, e.message);
+          res.statusCode = 500;
+          res.end('Server error');
+        }
+      } else {
+        next();
+      }
+    });
+  },
+  publicDir: false,
+  assetsInclude: ['**/*.json'],
   plugins: [
     {
       name: 'copy-assets',
@@ -70,6 +104,16 @@ export default defineConfig({
           console.log('decks copied successfully');
         } else {
           console.log('decks source not found:', decksSrc);
+        }
+        // Copy cards folder to dist/cards
+        const cardsSrc = resolve(__dirname, '..', 'cards');
+        const cardsDest = resolve(__dirname, 'dist', 'cards');
+        console.log('Copying cards from', cardsSrc, 'to', cardsDest);
+        if (existsSync(cardsSrc)) {
+          copyDirSync(cardsSrc, cardsDest);
+          console.log('cards copied successfully');
+        } else {
+          console.log('cards source not found:', cardsSrc);
         }
         console.log('Asset copying complete');
       },

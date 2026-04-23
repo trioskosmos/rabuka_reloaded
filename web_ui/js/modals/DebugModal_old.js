@@ -280,11 +280,13 @@ export const DebugModal = {
             return `<div style="font-size:11px; opacity:0.3; padding:8px; border:1px dashed #444; border-radius:4px; text-align:center;">EMPTY (${slotLabel})</div>`;
         }
         const flags = [];
-        if (c.tapped) flags.push('<span style="color:#e74c3c">TAPPED</span>');
+        // Support both tapped boolean and orientation === 'Wait'
+        if (c.tapped || c.orientation === 'Wait') flags.push('<span style="color:#e74c3c">TAPPED</span>');
         if (c.moved) flags.push('<span style="color:#3498db">MOVED</span>');
         if (c.revealed) flags.push('<span style="color:#2ecc71">REVEALED</span>');
 
-        const type = c.type || (c.score !== undefined ? 'live' : 'member');
+        // Support both card_type and type field names
+        const type = c.card_type || c.type || (c.score !== undefined ? 'live' : 'member');
         const isLive = type === 'live';
 
         return `

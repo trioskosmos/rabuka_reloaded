@@ -37,6 +37,7 @@ fn place_card_on_stage(player: &mut Player, card_id: i16, area: MemberArea) {
 }
 
 /// Helper function to count total blades on stage
+#[allow(dead_code)]
 fn count_total_blades(stage: &rabuka_engine::zones::Stage, card_db: &CardDatabase) -> u32 {
     let mut total = 0u32;
     for &card_id in &stage.stage {
@@ -50,6 +51,7 @@ fn count_total_blades(stage: &rabuka_engine::zones::Stage, card_db: &CardDatabas
 }
 
 /// Helper function to count total hearts on stage
+#[allow(dead_code)]
 fn count_total_hearts(stage: &rabuka_engine::zones::Stage, card_db: &CardDatabase) -> u32 {
     let mut total = 0u32;
     for &card_id in &stage.stage {
@@ -1372,7 +1374,7 @@ fn test_q15_energy_zone_face_up() {
     
     // Verify energy zone card is face up
     let energy_card_id = game_state.player1.energy_zone.cards[0];
-    let energy_card = card_database.get_card(energy_card_id).expect("Card should exist");
+    let _energy_card = card_database.get_card(energy_card_id).expect("Card should exist");
     // face_state now tracked in GameState modifiers
     // For now, just verify the card exists
     assert!(energy_card_id != -1, "Energy zone card exists");
@@ -1476,7 +1478,9 @@ fn test_q30_multiple_same_cards_on_stage() {
     let left_card_id = game_state.player1.stage.stage[0];
     let center_card = card_database.get_card(center_card_id).expect("Card should exist");
     let left_card = card_database.get_card(left_card_id).expect("Card should exist");
-    let ability = left_card.abilities[0].clone();
+    if !left_card.abilities.is_empty() {
+        let _ability = left_card.abilities[0].clone();
+    }
     assert_eq!(center_card.name, left_card.name, "Same name");
     
     // This is allowed - you can have multiple same cards on stage
@@ -1546,7 +1550,7 @@ fn test_q18_mulligan_once_per_player() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     let card_database = create_card_database(&cards);
-    let game_state = GameState::new(player1, player2, card_database);
+    let _game_state = GameState::new(player1, player2, card_database);
     
     // Each player can mulligan at most once
     let max_mulligans_per_player = 1;
@@ -1572,7 +1576,7 @@ fn test_q19_mulligan_not_required() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
 
     let card_database = create_card_database(&cards);
-    let game_state = GameState::new(player1, player2, card_database);
+    let _game_state = GameState::new(player1, player2, card_database);
     
     // Players can choose not to mulligan
     let player1_did_mulligan = false;
@@ -1664,7 +1668,7 @@ fn test_q24_baton_touch_procedure() {
     // Baton touch procedure: [1] Reveal card from hand, [2] Specify stage area, [3] Move existing card to waitroom, [4] Pay energy difference, [5] Place new card on stage
     let existing_cost = existing_card.cost.unwrap_or(0);
     let new_cost = new_card.cost.unwrap_or(0);
-    let energy_to_pay = new_cost.saturating_sub(existing_cost);
+    let _energy_to_pay = new_cost.saturating_sub(existing_cost);
     
     // Simulate baton touch: remove existing card, place new card
     let _removed_card_id = game_state.player1.stage.stage[1];
@@ -1786,7 +1790,7 @@ fn test_q32_no_cheer_if_no_live_cards() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
 
     let card_database = create_card_database(&cards);
-    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    let game_state = GameState::new(player1, player2, card_database.clone());
     
     // Live card zone is empty
     assert_eq!(game_state.player1.live_card_zone.len(), 0, "No live cards in zone");
@@ -1806,7 +1810,7 @@ fn test_q33_live_start_timing() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     let card_database = create_card_database(&cards);
-    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    let _game_state = GameState::new(player1, player2, card_database.clone());
     
     // Live start timing: after flipping all live cards face up, removing non-live cards, before cheer confirmation
     // This is in the performance phase
@@ -1830,7 +1834,7 @@ fn test_q34_live_card_fate_hearts_satisfied() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     let card_database = create_card_database(&cards);
-    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    let _game_state = GameState::new(player1, player2, card_database.clone());
     
     // When required hearts are satisfied, live cards remain in live card zone
     // After live win/loss determination phase, they go to waitroom with cheer cards
@@ -1854,7 +1858,7 @@ fn test_q35_live_card_fate_hearts_not_satisfied() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     let card_database = create_card_database(&cards);
-    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    let _game_state = GameState::new(player1, player2, card_database.clone());
     
     // When required hearts are not satisfied, live cards go to waitroom immediately
     // This happens before live win/loss determination phase
@@ -1877,7 +1881,7 @@ fn test_q36_live_success_timing() {
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     let card_database = create_card_database(&cards);
-    let game_state = GameState::new(player1, player2, card_database);
+    let _game_state = GameState::new(player1, player2, card_database);
     
     // Live success timing: after both players' performance phases, before determining live winner
     let both_performance_phases_done = true;

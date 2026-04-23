@@ -86,7 +86,8 @@ export class DeckValidator {
                         name: card.name,
                         type: card.type,
                         valid: true,
-                        img: card.img || card._img
+                        // Support both img, img_path, and _img field names
+                        img: card.img || card.img_path || card._img
                     });
                 } else {
                     // Skip very short strings or common garbage
@@ -215,8 +216,8 @@ export class DeckValidator {
 
     _renderItem(p) {
         return `
-            <div class="preview-item ${p.valid ? 'valid' : 'invalid'}" title="${p.name || 'Unknown'}">
-                ${p.img ? `<img src="${p.img}" class="preview-card-img" data-hide-on-error="true">` : ''}
+            <div class="preview-item ${p.img ? 'valid' : 'invalid'}" title="${p.name || 'Unknown'}">
+                ${p.img ? `<img src="${p.img}" class="preview-card-img">` : ''}
                 <div class="preview-badge">${p.count}x</div>
                 <div class="preview-code">${p.code}</div>
             </div>

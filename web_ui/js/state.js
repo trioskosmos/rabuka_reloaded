@@ -24,7 +24,7 @@ const stateInternal = {
     gameHasStarted: false, // Track if we've moved past Setup phase (prevents deck modal from showing during gameplay)
 
     // Connectivity & Mode
-    offlineMode: false,
+    offlineMode: false, // Using Rust backend via Express proxy, not WASM
     wasmAdapter: null,
     hotseatMode: false,
     replayMode: false,
@@ -47,6 +47,12 @@ const stateInternal = {
     // Card ID Index for O(1) lookups (performance optimization)
     cardIndex: null,
     lastIndexedStateId: null,
+
+    // Static card database from cards.json
+    staticCardDatabase: null,
+
+    // Card ID mapping from engine/card_id_mapping.json (numeric ID -> string card_no)
+    cardIdMapping: null,
 
     // Config
     currentLang: localStorage.getItem('lovelive_lang') || 'jp',
@@ -107,14 +113,14 @@ const stateInternal = {
                     indices = selection;
                 } else if (typeof selection === 'number') {
                     // Rust backend: hand is { cards: [...] }
-                    const handCards = pOld.hand?.cards || [];
+                    const handCards = pOld.hand.cards;
                     for (let i = 0; i < handCards.length; i++) {
                         if ((selection >> i) & 1) indices.push(i);
                     }
                 }
                 if (indices.length > 0) {
                     // Rust backend: hand is { cards: [...] }
-                    const handCards = pOld.hand?.cards || [];
+                    const handCards = pOld.hand.cards;
                     State.lastMulliganCards = indices.map(idx => handCards[idx]).filter(c => c !== null);
                 }
             }
@@ -125,6 +131,11 @@ const stateInternal = {
         State.rawData = JSON.parse(JSON.stringify(newData));
         State.data = newData;  // Replace entirely instead of merging
         
+        // Debug: Log the phase received from engine
+        if (newData.phase) {
+            console.log('Received phase from engine:', newData.phase, typeof newData.phase);
+        }
+        
         // Rebuild card index when state updates
         State.rebuildCardIndex();
 
@@ -132,8 +143,8 @@ const stateInternal = {
         State.emit('change-detected');
 
         // Detect Mulligan Finish
-        const isMulliganOld = State.lastPhase === -1 || State.lastPhase === 0; // Constants.Phase.MULLIGAN_P1/P2
-        const isMulliganNew = newData.phase === -1 || newData.phase === 0;
+        const isMulliganOld = State.lastPhase === 'Mulligan';
+        const isMulliganNew = newData.phase === 'Mulligan';
 
         // Clear local selection on phase change
         if (State.lastPhase !== newData.phase) {
@@ -174,7 +185,8 @@ const stateInternal = {
      */
     rebuildCardIndex: () => {
         const state = State.data;
-        if (!state || !state.players) {
+        const playersList = [state.player1, state.player2];
+        if (!state || (!state.player1 && !state.player2)) {
             State.cardIndex = null;
             return;
         }
@@ -213,14 +225,15 @@ const stateInternal = {
         if (state.master_cards) state.master_cards.forEach(c => addCard(c, 'master'));
         if (state.all_cards) state.all_cards.forEach(c => addCard(c, 'all_cards'));
 
-        state.players.forEach((p, playerIdx) => {
+        // Index player zones (using playersList already defined above)
+        playersList.forEach((p, playerIdx) => {
             if (!p) return;
 
-            // Index all zones (p.hand here usually contains integer IDs in raw data,
-            // but the launcher might provide rich objects)
             const indexZone = (zoneData) => {
                 if (!zoneData) return;
-                zoneData.forEach(c => {
+                const cards = zoneData.cards;
+                if (!Array.isArray(cards)) return;
+                cards.forEach(c => {
                     if (typeof c === 'number') {
                         // Create a skeleton for the ID so addCard can enrich it from index[templateId]
                         addCard({ id: c }, 'zone');
@@ -234,13 +247,47 @@ const stateInternal = {
             indexZone(p.stage);
             indexZone(p.live_zone);
             indexZone(p.looked_cards);
-            if (p.energy) indexZone(p.energy.map(e => (e && e.card) ? e.card : e));
+            if (p.energy) {
+                const energyCards = p.energy.cards;
+                indexZone(energyCards.map(e => (e && e.card) ? e.card : e));
+            }
             indexZone(p.discard);
             indexZone(p.success_lives || p.success_zone || p.success_pile);
         });
 
         State.cardIndex = index;
         console.log(`[State] Card index rebuilt. Size: ${Object.keys(index).length}`);
+    },
+
+    /**
+     * Loads static card database from cards.json
+     */
+    loadStaticCardDatabase: async () => {
+        if (State.staticCardDatabase && State.cardIdMapping) return; // Already loaded
+
+        try {
+            // Load card_id_mapping.json
+            const mappingResponse = await fetch('/engine/card_id_mapping.json');
+            if (mappingResponse.ok) {
+                const mappingData = await mappingResponse.json();
+                State.cardIdMapping = mappingData;
+                console.log('[State] Loaded card ID mapping, total mappings:', Object.keys(mappingData).length);
+            } else {
+                console.warn('[State] Failed to load card_id_mapping.json:', mappingResponse.status);
+            }
+
+            // Load cards.json
+            const cardsResponse = await fetch('/cards/cards.json');
+            if (!cardsResponse.ok) {
+                console.warn('[State] Failed to load cards.json:', cardsResponse.status);
+                return;
+            }
+            const cardsData = await cardsResponse.json();
+            State.staticCardDatabase = cardsData;
+            console.log('[State] Loaded static card database, total cards:', Object.keys(cardsData).length);
+        } catch (e) {
+            console.warn('[State] Failed to load static card database:', e);
+        }
     },
 
     /**
@@ -271,17 +318,42 @@ const stateInternal = {
     resolveCardData: (cid) => {
         if (cid === null || cid === undefined || cid < 0) return null;
 
-        // Mask to find template if not directly indexed
         const templateId = cid & State.TEMPLATE_MASK;
 
-        // O(1) lookup using card index
         if (State.cardIndex) {
             if (State.cardIndex[cid]) return State.cardIndex[cid];
             if (State.cardIndex[templateId]) return { ...State.cardIndex[templateId], id: cid };
         }
 
-        // Fallback: return placeholder
-        return { id: cid, name: `Card ${templateId}`, img: 'icon_blade.png', text: "", original_text: "" };
+        if (State.cardIdMapping && State.staticCardDatabase) {
+            const cardNoString = Object.keys(State.cardIdMapping).find(key => State.cardIdMapping[key] === cid);
+            if (cardNoString && State.staticCardDatabase[cardNoString]) {
+                const card = State.staticCardDatabase[cardNoString];
+                const convertedCard = { ...card, id: cid, card_no: cardNoString };
+                if (card._img) {
+                    const match = card._img.match(/([^\/]+)\.(png|jpg|jpeg|webp)$/i);
+                    if (match) convertedCard._img = `img/cards_webp/${match[1]}.webp`;
+                } else {
+                    convertedCard._img = `img/cards_webp/${cardNoString}.webp`;
+                }
+                return convertedCard;
+            }
+
+            const templateCardNoString = Object.keys(State.cardIdMapping).find(key => State.cardIdMapping[key] === templateId);
+            if (templateCardNoString && State.staticCardDatabase[templateCardNoString]) {
+                const card = State.staticCardDatabase[templateCardNoString];
+                const convertedCard = { ...card, id: cid, card_no: templateCardNoString };
+                if (card._img) {
+                    const match = card._img.match(/([^\/]+)\.(png|jpg|jpeg|webp)$/i);
+                    if (match) convertedCard._img = `img/cards_webp/${match[1]}.webp`;
+                } else {
+                    convertedCard._img = `img/cards_webp/${templateCardNoString}.webp`;
+                }
+                return convertedCard;
+            }
+        }
+
+        return { id: cid, name: `Card ${templateId}`, _img: `img/cards_webp/${templateId}.webp`, text: "", original_text: "" };
     },
 
     resolveCardDataByName: (name) => {
@@ -295,10 +367,21 @@ const stateInternal = {
             }
         }
 
-        // Fallback to linear search
-        for (const p of state.players) {
+        const playersList = [state.player1, state.player2];
+        for (const p of playersList) {
             if (!p) continue;
-            const allZones = [(p.hand || []), (p.stage || []), (p.live_zone || []), (p.energy || []), (p.discard || []), (p.success_lives || p.success_zone || [])];
+            const getZoneCards = (zone) => {
+                if (!zone) return [];
+                return zone.cards;
+            };
+            const allZones = [
+                getZoneCards(p.hand),
+                getZoneCards(p.stage),
+                getZoneCards(p.live_zone),
+                getZoneCards(p.energy),
+                getZoneCards(p.waitroom || p.discard),
+                getZoneCards(p.success_live_card_zone || p.success_lives || p.success_zone || p.success_pile)
+            ];
             for (const zone of allZones) {
                 for (const c of zone) {
                     const card = (typeof c === 'object' && c !== null) ? (c.card || c) : null;

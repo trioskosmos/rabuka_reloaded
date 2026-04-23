@@ -38,16 +38,18 @@ export const DebugService = {
             ].forEach(k => { if (p[k] !== undefined) out[k] = p[k]; });
 
             if (Array.isArray(p.hand)) {
-                if (!p.hand.some(c => c && c.hidden)) out.hand = p.hand.map(slimCard).filter(Boolean);
+                // Support both hidden field and card_no === -2 for hidden cards
+                if (!p.hand.some(c => c && (c.hidden || c.card_no === -2 || c.card_no === -1))) out.hand = p.hand.map(slimCard).filter(Boolean);
             }
             if (Array.isArray(p.stage)) out.stage = p.stage.map(s => s ? slimCard(s) : null);
             if (Array.isArray(p.live_zone) && p.live_zone.some(l => l !== null)) out.live_zone = p.live_zone.map(l => l ? slimCard(l) : null);
             if (Array.isArray(p.success_lives) && p.success_lives.length > 0) out.success_lives = p.success_lives.map(slimCard);
             if (Array.isArray(p.discard) && p.discard.length > 0) out.discard = p.discard.map(slimCard);
             if (Array.isArray(p.energy)) {
+                // Support both tapped boolean and orientation === 'Wait'
                 out.energy_summary = {
-                    tapped: p.energy.filter(e => e && e.tapped).length,
-                    untapped: p.energy.filter(e => e && !e.tapped).length
+                    tapped: p.energy.filter(e => e && (e.tapped || e.orientation === 'Wait')).length,
+                    untapped: p.energy.filter(e => e && !e.tapped && e.orientation !== 'Wait').length
                 };
             }
             return out;

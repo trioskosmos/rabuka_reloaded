@@ -659,7 +659,17 @@ class GameScene extends Phaser.Scene {
         members.forEach(member => {
             if (member && member.card_no) {
                 // Look up card data to get heart information
-                const cardData = this.cardData.get(member.card_no);
+                // Try both as-is and as string
+                let cardData = this.cardData.get(member.card_no);
+                if (!cardData && typeof member.card_no === 'number') {
+                    // Try to find by numeric ID by searching all cards
+                    for (const [key, value] of this.cardData.entries()) {
+                        if (value.id === member.card_no) {
+                            cardData = value;
+                            break;
+                        }
+                    }
+                }
                 if (cardData && cardData.base_heart) {
                     // heart is an object like { heart01: 1, heart03: 2, heart06: 1 }
                     // Handle all heart types dynamically, but exclude blade hearts (b_heart)
@@ -683,7 +693,17 @@ class GameScene extends Phaser.Scene {
         members.forEach(member => {
             if (member && member.card_no) {
                 // Look up card data to get blade information
-                const cardData = this.cardData.get(member.card_no);
+                // Try both as-is and as string
+                let cardData = this.cardData.get(member.card_no);
+                if (!cardData && typeof member.card_no === 'number') {
+                    // Try to find by numeric ID by searching all cards
+                    for (const [key, value] of this.cardData.entries()) {
+                        if (value.id === member.card_no) {
+                            cardData = value;
+                            break;
+                        }
+                    }
+                }
                 if (cardData && cardData.blade) {
                     // blade is a number
                     totalBlades += cardData.blade || 0;
@@ -702,7 +722,10 @@ class GameScene extends Phaser.Scene {
         
         // Update turn and phase text
         this.turnText.setText(`Turn: ${this.gameState.turn}`);
-        this.phaseText.setText(`Phase: ${this.gameState.phase}`);
+        
+        // Convert phase string to readable name (Rust engine sends strings like "Active", "Main", etc.)
+        const phaseName = this.gameState.phase || 'Unknown';
+        this.phaseText.setText(`Phase: ${phaseName}`);
         
         // Update player stats (heart vector and blade count)
         // Calculate heart vector from stage members
@@ -1021,8 +1044,25 @@ class GameScene extends Phaser.Scene {
         container.add(bg);
         
         // Get image file name from mapping
-        const imageKey = card.card_no;
-        const imgFileName = this.cardImageMap ? this.cardImageMap.get(imageKey) : `${imageKey}.webp`;
+        // Try both numeric and string keys
+        let imageKey = card.card_no;
+        let imgFileName = this.cardImageMap ? this.cardImageMap.get(imageKey) : null;
+        
+        // If not found with numeric key, try string key
+        if (!imgFileName && typeof imageKey === 'number') {
+            for (const [key, value] of this.cardImageMap.entries()) {
+                if (key === String(imageKey)) {
+                    imgFileName = value;
+                    imageKey = key;
+                    break;
+                }
+            }
+        }
+        
+        // Fallback if still not found
+        if (!imgFileName) {
+            imgFileName = `${imageKey}.webp`;
+        }
 
         // Set container size before rotation for correct hit detection
         container.setSize(width, height);

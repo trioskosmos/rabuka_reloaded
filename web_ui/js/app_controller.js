@@ -207,6 +207,8 @@ export const AppController = {
         };
 
         await loadTranslations(State.currentLang);
+        // Load static card database for fallback card resolution
+        State.loadStaticCardDatabase();
         AppController.restartPolling();
         
         const syncRoomState = () => syncRoomDisplay();

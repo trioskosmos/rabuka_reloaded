@@ -60,7 +60,7 @@ impl<'a> AbilityResolver<'a> {
 
     /// Get pending choice (if any)
     pub fn get_pending_choice(&self) -> Option<&Choice> {
-        self.pending_choice.as_ref()
+        self.game_state.pending_choice.as_ref()
     }
 
     /// Expire all effects with duration "live_end"
@@ -89,12 +89,14 @@ impl<'a> AbilityResolver<'a> {
                     _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
                 }
                 self.pending_choice = None;
+                self.game_state.pending_choice = None;
                 Ok(())
             }
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
                 // User chose to skip optional cost - don't execute cost, proceed to effect
                 eprintln!("User skipped optional cost");
                 self.pending_choice = None;
+                self.game_state.pending_choice = None;
                 Ok(())
             }
             (Some(Choice::SelectTarget { target, .. }), ChoiceResult::TargetSelected { target: selected }) => {
@@ -105,6 +107,7 @@ impl<'a> AbilityResolver<'a> {
                     if selected == "skip_optional_cost" {
                         eprintln!("User chose to skip optional cost");
                         self.pending_choice = None;
+                self.game_state.pending_choice = None;
                         return Ok(());
                     } else if selected == "pay_optional_cost" {
                         eprintln!("User chose to pay optional cost - continuing with effect");
@@ -116,6 +119,7 @@ impl<'a> AbilityResolver<'a> {
                                 eprintln!("Failed to execute effect after optional cost: {}", e);
                             }
                             self.pending_choice = None;
+                self.game_state.pending_choice = None;
                             return Ok(());
                         }
                     }
@@ -126,14 +130,17 @@ impl<'a> AbilityResolver<'a> {
                     // This would need to be stored and retrieved when resuming execution
                     // For now, just clear the pending choice
                     self.pending_choice = None;
+                self.game_state.pending_choice = None;
                     return Ok(());
                 }
                 // Handle other target selections
                 self.pending_choice = None;
+                self.game_state.pending_choice = None;
                 Ok(())
             }
             (Some(Choice::SelectPosition { .. }), ChoiceResult::PositionSelected { .. }) => {
                 self.pending_choice = None;
+                self.game_state.pending_choice = None;
                 Ok(())
             }
             _ => Err("Choice result does not match pending choice".to_string()),
@@ -649,7 +656,7 @@ impl<'a> AbilityResolver<'a> {
             // This ability only triggers when the card appeared via baton touch
             // Check if the activating card was played via baton touch
             if let Some(ref activating_card) = self.game_state.activating_card {
-                if let Some(card) = self.game_state.card_database.get_card(*activating_card) {
+                if let Some(_card) = self.game_state.card_database.get_card(*activating_card) {
                     // Check if this card was played via baton touch this turn
                     // We need to track this in game state - for now, check if baton touch was used recently
                     // This is a simplified check - proper implementation needs game state tracking
@@ -1419,13 +1426,15 @@ impl<'a> AbilityResolver<'a> {
                         count, available_count, placement_order.unwrap_or("default"))
                 };
 
-                self.pending_choice = Some(Choice::SelectCard {
+                let choice = Choice::SelectCard {
                     zone: "looked_at".to_string(),
                     card_type: None,
                     count: max_select,
                     description,
                     allow_skip: optional || any_number, // Allow skip if optional or any_number
-                });
+                };
+                self.pending_choice = Some(choice.clone());
+                self.game_state.pending_choice = Some(choice);
                 // Return early - execution will continue after user provides choice
                 return Ok(());
             }
@@ -1445,8 +1454,8 @@ impl<'a> AbilityResolver<'a> {
         let destination = effect.destination.as_deref().unwrap_or("hand");
         let card_type_filter = effect.card_type.as_deref();
         let resource_icon_count = effect.resource_icon_count;
-        let group_filter: Option<&String> = None;
-        let cost_limit: Option<u32> = None;
+        let _group_filter: Option<&String> = None;
+        let _cost_limit: Option<u32> = None;
         let per_unit = effect.per_unit;
         let per_unit_count = effect.per_unit_count.unwrap_or(1);
         let per_unit_type = effect.per_unit_type.as_deref();
@@ -1711,14 +1720,42 @@ impl<'a> AbilityResolver<'a> {
     fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let count = effect.count.unwrap_or(1);
         let _max = effect.max.unwrap_or(false);
-        let source = effect.source.as_deref().unwrap_or("");
-        let destination = effect.destination.as_deref().unwrap_or("");
+        let source_raw = effect.source.as_deref().unwrap_or("");
+        let mut source = source_raw;
+        let mut destination = effect.destination.as_deref().unwrap_or("");
         let card_type_filter = effect.card_type.as_deref();
         let target = effect.target.as_deref().unwrap_or("self");
-        let optional = effect.optional.unwrap_or(false);
+        let _optional = effect.optional.unwrap_or(false);
         let group_filter = effect.group.as_ref().and_then(|g| Some(&g.name));
         let cost_limit = effect.cost_limit;
         let _placement_order = effect.placement_order.as_deref();
+
+        // Fallback: infer source and destination from text if they are None
+        let text = &effect.text;
+        // Remove spaces to handle unusual spacing (e.g., "控え室か ら" -> "控え室から")
+        let text_normalized = text.replace(" ", "");
+        if source.is_empty() {
+            if text.contains("控え室") || text_normalized.contains("控え室から") {
+                source = "discard";
+            } else if text.contains("デッキ") || text.contains("deck") {
+                source = "deck";
+            } else if text.contains("手札") || text.contains("hand") {
+                source = "hand";
+            } else if text.contains("ステージ") || text.contains("stage") {
+                source = "stage";
+            }
+        }
+        if destination.is_empty() {
+            if text.contains("控え室") || text.contains("discard") {
+                destination = "discard";
+            } else if text.contains("デッキ") || text.contains("deck") {
+                destination = "deck";
+            } else if text.contains("手札") || text.contains("hand") {
+                destination = "hand";
+            } else if text.contains("ステージ") || text.contains("stage") {
+                destination = "stage";
+            }
+        }
 
         let player = match target {
             "self" => &mut self.game_state.player1,
@@ -1728,153 +1765,6 @@ impl<'a> AbilityResolver<'a> {
 
         // Clone card_database to avoid borrow conflicts
         let card_db = self.game_state.card_database.clone();
-
-        // Helper function to check if card matches cost limit
-        let matches_cost_limit = |card_id: i16, limit: Option<u32>| -> bool {
-            match limit {
-                Some(max_cost) => card_db.get_card(card_id).map(|c| c.cost.unwrap_or(0) <= max_cost).unwrap_or(false),
-                None => true,
-            }
-        };
-
-        // Handle optional costs - only for AUTO abilities, not ACTIVATION abilities
-        // Rule 9.4.2.2: Activation ability costs are mandatory
-        // Rule 9.7.3.1.1: Auto abilities can have optional costs
-        if optional {
-            // Check if this is an activation ability - if so, cost is mandatory
-            if let Some(current_ability) = &self.current_ability {
-                if current_ability.triggers.as_ref().map_or(false, |t| t == "起動") {
-                    // Activation ability - cost is mandatory, ignore optional flag
-                    eprintln!("Activation ability - cost is mandatory, proceeding with payment");
-                } else {
-                    // Auto ability - optional cost, show card selection with skip option
-                    // For costs that require card selection (e.g., discard from hand), show the selection UI directly
-                    // with a skip option, rather than a separate pay/skip prompt
-                    if source == "hand" || source == "deck" || source == "discard" || source == "energy_zone" {
-                        // Cost requires card selection - show selection UI with skip option
-                        let count_to_select = count;
-                        let card_type_filter = card_type_filter;
-                        
-                        self.pending_choice = Some(Choice::SelectCard {
-                            zone: source.to_string(),
-                            card_type: card_type_filter.map(|s| s.to_string()),
-                            count: count_to_select as usize,
-                            description: format!("Select card(s) to pay optional cost (or skip): {}", effect.text),
-                            allow_skip: true,
-                        });
-                        
-                        // Store effect for resuming after choice
-                        self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                            card_no: "optional_cost".to_string(),
-                            player_id: "self".to_string(),
-                            action_index: 0,
-                            effect: effect.clone(),
-                            conditional_choice: None,
-                            activating_card: None,
-                            ability_index: 0,
-                            cost: None,
-                            cost_choice: None,
-                        });
-                        
-                        return Ok(());
-                    } else {
-                        // Non-card-selection cost (e.g., state change, energy) - show pay/skip prompt
-                        // Show more descriptive message about what the cost does
-                        let cost_description = if effect.text.contains("ウェイト") {
-                            "Put this member to wait state"
-                        } else if effect.text.contains("エネルギー") || effect.text.contains("E") {
-                            "Pay energy"
-                        } else if effect.text.contains("控え室") {
-                            "Send card to discard"
-                        } else {
-                            "Pay cost"
-                        };
-                        
-                        self.pending_choice = Some(Choice::SelectTarget {
-                            target: "pay_optional_cost:skip_optional_cost".to_string(),
-                            description: format!("Pay optional cost: {}? (pay or skip)", cost_description),
-                        });
-                        
-                        // Store effect for resuming after choice
-                        self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                            card_no: "optional_cost".to_string(),
-                            player_id: "self".to_string(),
-                            action_index: 0,
-                            effect: effect.clone(),
-                            conditional_choice: None,
-                            activating_card: None,
-                            ability_index: 0,
-                            cost: None,
-                            cost_choice: None,
-                        });
-                        
-                        return Ok(());
-                    }
-                }
-            } else {
-                // No current ability context, assume auto ability with optional cost
-                if source == "hand" || source == "deck" || source == "discard" || source == "energy_zone" {
-                    // Cost requires card selection - show selection UI with skip option
-                    let count_to_select = count;
-                    let card_type_filter = card_type_filter;
-                    
-                    self.pending_choice = Some(Choice::SelectCard {
-                        zone: source.to_string(),
-                        card_type: card_type_filter.map(|s| s.to_string()),
-                        count: count_to_select as usize,
-                        description: format!("Select card(s) to pay optional cost (or skip): {}", effect.text),
-                        allow_skip: true,
-                    });
-                    
-                    // Store effect for resuming after choice
-                    self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                        card_no: "optional_cost".to_string(),
-                        player_id: "self".to_string(),
-                        action_index: 0,
-                        effect: effect.clone(),
-                        conditional_choice: None,
-                        activating_card: None,
-                        ability_index: 0,
-                        cost: None,
-                        cost_choice: None,
-                    });
-                    
-                    return Ok(());
-                } else {
-                    // Non-card-selection cost - show pay/skip prompt
-                    // Show more descriptive message about what the cost does
-                    let cost_description = if effect.text.contains("ウェイト") {
-                        "Put this member to wait state"
-                    } else if effect.text.contains("エネルギー") || effect.text.contains("E") {
-                        "Pay energy"
-                    } else if effect.text.contains("控え室") {
-                        "Send card to discard"
-                    } else {
-                        "Pay cost"
-                    };
-                    
-                    self.pending_choice = Some(Choice::SelectTarget {
-                        target: "pay_optional_cost:skip_optional_cost".to_string(),
-                        description: format!("Pay optional cost: {}? (pay or skip)", cost_description),
-                    });
-                    
-                    // Store effect for resuming after choice
-                    self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                        card_no: "optional_cost".to_string(),
-                        player_id: "self".to_string(),
-                        action_index: 0,
-                        effect: effect.clone(),
-                        conditional_choice: None,
-                        activating_card: None,
-                        ability_index: 0,
-                        cost: None,
-                        cost_choice: None,
-                    });
-                    
-                    return Ok(());
-                }
-            }
-        }
 
         // Helper function to check if card matches type filter
         let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
@@ -1891,6 +1781,14 @@ impl<'a> AbilityResolver<'a> {
         let matches_group = |card_id: i16, filter: Option<&String>| -> bool {
             match filter {
                 Some(group_name) => card_db.get_card(card_id).map(|c| c.group == *group_name).unwrap_or(false),
+                None => true,
+            }
+        };
+
+        // Helper function to check if card matches cost limit
+        let matches_cost_limit = |card_id: i16, limit: Option<u32>| -> bool {
+            match limit {
+                Some(max_cost) => card_db.get_card(card_id).map(|c| c.cost.unwrap_or(0) <= max_cost).unwrap_or(false),
                 None => true,
             }
         };
@@ -2026,7 +1924,7 @@ impl<'a> AbilityResolver<'a> {
                 }
             }
             "deck" | "deck_top" => {
-                let mut moved = 0;
+                let moved = 0;
                 while moved < count {
                     if let Some(card) = player.main_deck.draw() {
                         if matches_card_type(card, card_type_filter) && matches_group(card, group_filter) && matches_cost_limit(card, cost_limit) {
@@ -2180,6 +2078,7 @@ impl<'a> AbilityResolver<'a> {
             "discard" => {
                 match destination {
                     "hand" => {
+
                         // First, count how many matching cards are in discard
                         let matching_indices: Vec<usize> = player.waitroom.cards.iter().enumerate()
                             .filter(|(_, card)| {
@@ -2268,6 +2167,49 @@ impl<'a> AbilityResolver<'a> {
                         for i in indices_to_remove.into_iter().rev() {
                             let card = player.waitroom.cards.remove(i);
                             player.main_deck.cards.insert(0, card);
+                        }
+                    }
+                    "deck" => {
+                        // Handle position-based deck placement (Q226: 一番上から4枚目)
+                        let position_info = effect.position.as_ref();
+                        let mut moved = 0;
+                        let mut indices_to_remove = Vec::new();
+                        for (i, card) in player.waitroom.cards.iter().enumerate() {
+                            if moved >= count {
+                                break;
+                            }
+                            if matches_card_type(*card, card_type_filter) && matches_group(*card, group_filter) && matches_cost_limit(*card, cost_limit) {
+                                indices_to_remove.push(i);
+                                moved += 1;
+                            }
+                        }
+                        // Remove in reverse order to maintain indices
+                        for i in indices_to_remove.into_iter().rev() {
+                            let card = player.waitroom.cards.remove(i);
+                            // Calculate insertion index based on position
+                            // PositionInfo has position field as Option<String>
+                            // Position is 1-indexed from top (e.g., 4 = 4th from top)
+                            // If deck has fewer cards than position, place at bottom
+                            if let Some(pos_info) = position_info {
+                                let deck_len = player.main_deck.cards.len();
+                                let insert_index = if let Some(pos_str) = &pos_info.position {
+                                    if let Ok(pos_num) = pos_str.parse::<usize>() {
+                                        if pos_num > deck_len {
+                                            deck_len // Place at bottom if position exceeds deck size
+                                        } else {
+                                            pos_num.saturating_sub(1) // Convert to 0-indexed
+                                        }
+                                    } else {
+                                        0 // Default to top if parsing fails
+                                    }
+                                } else {
+                                    0 // No position specified, place at top
+                                };
+                                player.main_deck.cards.insert(insert_index, card);
+                            } else {
+                                // No position specified, place at top
+                                player.main_deck.cards.insert(0, card);
+                            }
                         }
                     }
                     "stage" => {
@@ -2623,7 +2565,7 @@ impl<'a> AbilityResolver<'a> {
                 }
             }
             _ => {
-                eprintln!("Unknown source for move_cards: {}", source);
+                eprintln!("Move from source '{}' not yet implemented", source);
             }
         }
 
@@ -4290,6 +4232,12 @@ impl<'a> AbilityResolver<'a> {
                 // Pay energy cost
                 let energy = cost.energy.unwrap_or(0);
                 let target = cost.target.as_deref().unwrap_or("self");
+                
+                // Q25: Skip energy cost if baton touch resulted in 0 cost (equal or lower cost)
+                if self.game_state.baton_touch_zero_cost && energy > 0 {
+                    eprintln!("Skipping pay_energy cost of {} due to baton touch zero cost", energy);
+                    return Ok(());
+                }
                 
                 let player = match target {
                     "self" => &mut self.game_state.player1,

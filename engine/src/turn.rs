@@ -360,6 +360,9 @@ impl TurnEngine {
 
                 let (cost_paid, baton_touch_used) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
 
+                // Q25: Track if baton touch resulted in 0 cost (equal or lower cost)
+                game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
+
                 // turn_played tracking moved to GameState modifiers
                 // For now, this is a no-op
 
@@ -663,7 +666,6 @@ impl TurnEngine {
                 }
                 Ok(())
             }
-            _ => Err(format!("Unknown action: {}", action))
         }
     }
 

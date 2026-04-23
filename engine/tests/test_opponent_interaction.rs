@@ -1,7 +1,7 @@
 // Integration tests for opponent-targeting and both-player abilities
 // These tests simulate normal gameplay using engine-generated actions
 
-use rabuka_engine::card::{Card, CardDatabase};
+use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game_state::{GameState, Phase, TurnPhase, AbilityTrigger};
 use rabuka_engine::player::Player;
@@ -27,6 +27,7 @@ fn get_card_id(card: &rabuka_engine::card::Card, card_db: &CardDatabase) -> i16 
         .expect("Card ID not found")
 }
 
+#[allow(dead_code)]
 fn setup_player_with_hand(player: &mut Player, card_ids: Vec<i16>) {
     player.hand.cards = card_ids.into_iter().collect();
     player.rebuild_hand_index_map();

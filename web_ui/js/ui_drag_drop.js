@@ -266,7 +266,9 @@ export const DragDrop = {
             }
         } else if (source === 'stage') {
             if (targetZone === 'stage') {
-                action = state.legal_actions.find(a => (a.type === 'FORMATION' || a.type === 'MOVE') && (a.source_idx === index || a.prev_idx === index) && (a.area_idx === targetIndex || a.slot_idx === targetIndex));
+                // Support both action_type and type
+                const actionType = a => a.action_type || a.type;
+                action = state.legal_actions.find(a => (actionType(a) === 'FORMATION' || actionType(a) === 'MOVE') && (a.source_idx === index || a.prev_idx === index) && (a.area_idx === targetIndex || a.slot_idx === targetIndex));
             }
         }
 

@@ -18,6 +18,8 @@ const distPath = path.resolve(__dirname, '..', 'web_ui', 'dist');
 app.use(express.static(distPath));
 // Also serve from assets folder for Vite build output
 app.use('/assets', express.static(path.resolve(__dirname, '..', 'web_ui', 'dist', 'assets')));
+// Serve cards directory for static card database access
+app.use('/cards', express.static(path.resolve(__dirname, '..', 'cards')));
 
 // Proxy requests to Rust backend
 app.get('/api/game-state', async (req, res) => {
@@ -165,9 +167,33 @@ app.get('/api/get_random_deck', async (req, res) => {
     }
 });
 
-// Stub endpoints for old UI compatibility
+// Proxy status endpoint to Rust backend
 app.get('/api/status', async (req, res) => {
-    res.json({ status: 'ok', version: '1.0.0' });
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/status`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to get status' });
+    }
+});
+
+app.post('/api/set_ai', async (req, res) => {
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/set_ai`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(req.body)
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to set AI mode' });
+    }
 });
 
 app.post('/api/rooms/leave', async (req, res) => {

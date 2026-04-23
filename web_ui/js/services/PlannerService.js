@@ -11,7 +11,8 @@ export const PlannerService = {
     getPlannerFetchKey: () => {
         const state = State.data;
         if (!state || !State.roomCode) return null;
-        return `${State.roomCode}:${state.turn}:${state.active_player}:${state.phase}`;
+        const activePlayer = state.active_player ?? state.current_player ?? 0;
+        return `${State.roomCode}:${state.turn}:${activePlayer}:${state.phase}`;
     },
 
     shouldAutoFetchPlanner: () => {
@@ -21,7 +22,8 @@ export const PlannerService = {
         }
 
         const trackedPhases = [Phase.MAIN, Phase.LIVE_SET, Phase.RESPONSE];
-        const isRelevantTurn = trackedPhases.includes(state.phase) && state.active_player === State.perspectivePlayer && !state.game_over;
+        const activePlayer = state.active_player ?? state.current_player ?? 0;
+        const isRelevantTurn = trackedPhases.includes(state.phase) && activePlayer === State.perspectivePlayer && !state.game_over;
         const needsCompletionRefresh = State.plannerData?.your_sequence?.status === 'in_progress' && !isRelevantTurn;
         return isRelevantTurn || needsCompletionRefresh;
     },

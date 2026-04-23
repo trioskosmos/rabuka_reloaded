@@ -36,11 +36,21 @@ fn test_actual_card_ability_execution() {
     // Add the card to player's hand
     game_state.player1.add_card_to_hand(card_id);
     
-    // Add a live card to discard for the ability to target
-    let live_card_no = "PL!-sd1-004-SD";
+    // Add a live card to waitroom (discard zone) for the ability to target
+    let live_card_no = "PL!-sd1-019-SD"; // START:DASH!! is a live card
     if let Some(live_card_id) = game_state.card_database.get_card_id(live_card_no) {
-        game_state.player1.waitroom.add_card(live_card_id);
+        game_state.player1.waitroom.cards.push(live_card_id);
     }
+    
+    // Put the card on stage first (activation ability requires it to be on stage as cost)
+    let hand_index = game_state.player1.get_card_index_by_id(card_id).expect("Card should be in hand");
+    let stage_area = rabuka_engine::zones::MemberArea::Center;
+    let _ = game_state.player1.move_card_from_hand_to_stage(
+        hand_index,
+        stage_area,
+        false,
+        &game_state.card_database
+    );
     
     // Get the card and its abilities, clone the effect to avoid borrow conflict
     let card = game_state.card_database.get_card(card_id).expect("Card should exist");
@@ -347,11 +357,20 @@ fn test_change_state_with_multiple_targets() {
     // Test that change_state with multiple valid targets prompts user using real cards
     let mut game_state = setup_test_game_with_cards();
     
-    // Add multiple energy cards
-    let energy_card_id = game_state.card_database.get_card_id("LL-E-001-SD").unwrap();
-    for _ in 0..5 {
-        game_state.player1.energy_zone.cards.push(energy_card_id);
+    // Add multiple energy cards (use different card IDs to ensure valid targets are counted correctly)
+    let energy_card_ids = vec![
+        "LL-E-001-SD",
+        "LL-E-002-SD", 
+        "LL-E-003-SD",
+        "LL-E-004-SD",
+        "LL-E-005-SD"
+    ];
+    for card_no in energy_card_ids {
+        if let Some(card_id) = game_state.card_database.get_card_id(card_no) {
+            game_state.player1.energy_zone.cards.push(card_id);
+        }
     }
+    println!("Added {} energy cards to zone", game_state.player1.energy_zone.cards.len());
     game_state.player1.energy_zone.active_energy_count = 5;
     
     let mut resolver = AbilityResolver::new(&mut game_state);
@@ -363,11 +382,12 @@ fn test_change_state_with_multiple_targets() {
         state_change: Some("wait".to_string()),
         count: Some(2),
         target: Some("self".to_string()),
-        target_location: Some("energy_zone".to_string()),
+        source: Some("energy_zone".to_string()),
+        card_type: Some("energy_card".to_string()),
         ..Default::default()
     };
     
-    // Execute the effect - engine should set up pending choice
+    // Execute the effect - engine should set up pending choice when count < valid targets
     let result = resolver.execute_effect(&effect);
     assert!(result.is_ok(), "Effect execution should succeed");
     

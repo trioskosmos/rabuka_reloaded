@@ -139,16 +139,6 @@ impl Player {
                             let member_card_id = existing_member;
                             let cost = card_db.get_card(member_card_id).map(|c| c.cost.unwrap_or(1)).unwrap_or(1);
 
-                            // Clear the target area since member will be sent to waitroom
-                            match stage_area {
-                                crate::zones::MemberArea::LeftSide => self.stage.stage[0] = -1,
-                                crate::zones::MemberArea::Center => self.stage.stage[1] = -1,
-                                crate::zones::MemberArea::RightSide => self.stage.stage[2] = -1,
-                            }
-
-                            // Send member to waitroom
-                            self.waitroom.cards.push(member_card_id);
-
                             // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
                             cost_to_pay = cost_to_pay.saturating_sub(cost);
                             true
@@ -173,6 +163,13 @@ impl Player {
                 return Err(e);
             }
         }
+
+        // Store the replaced member card ID if using baton touch
+        let replaced_member = if baton_touch_used {
+            self.stage.get_area(stage_area)
+        } else {
+            None
+        };
 
         match stage_area {
             crate::zones::MemberArea::LeftSide => {
@@ -214,6 +211,11 @@ impl Player {
                     self.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide);
                 }
             }
+        }
+
+        // Send replaced member to waitroom if baton touch was used
+        if let Some(member_id) = replaced_member {
+            self.waitroom.cards.push(member_id);
         }
         
         // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event

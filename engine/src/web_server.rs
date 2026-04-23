@@ -1,11 +1,9 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use actix_cors::Cors;
-use actix_files as fs;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
 
-use crate::game_setup::AreaInfo;
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::card_loader;
@@ -33,9 +31,9 @@ pub struct PlayerDisplay {
     pub stage: StageDisplay,
     pub live_zone: ZoneDisplay,
     pub success_live_card_zone: ZoneDisplay,
+    pub waitroom: ZoneDisplay,
     pub main_deck_count: usize,
     pub energy_deck_count: usize,
-    pub waitroom_count: usize,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -65,7 +63,16 @@ pub struct ActionParameters {
     pub card_no: Option<String>,
     pub base_cost: Option<u32>,
     pub final_cost: Option<u32>,
-    pub available_areas: Option<Vec<crate::game_setup::AreaInfo>>,
+    pub available_areas: Option<Vec<WebAreaInfo>>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct WebAreaInfo {
+    pub area: String,
+    pub available: bool,
+    pub cost: u32,
+    pub is_baton_touch: bool,
+    pub existing_member_name: Option<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -83,7 +90,7 @@ pub struct ActionsResponse {
 #[derive(Deserialize)]
 pub struct ExecuteActionRequest {
     pub action_index: usize,
-    pub stage_area: Option<crate::zones::MemberArea>,
+    pub stage_area: Option<String>, // Accept string from webapp, will parse to MemberArea
     pub action_type: Option<String>,
     pub card_id: Option<i16>, // Database card ID - reliable identifier
     pub card_index: Option<usize>, // Array position - kept for backward compatibility
@@ -157,9 +164,9 @@ pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::
         stage: stage_to_display(&player.stage, card_db),
         live_zone: zone_to_display_from_card_ids(&player.live_card_zone.cards, card_db),
         success_live_card_zone: zone_to_display_from_card_ids(&player.success_live_card_zone.cards, card_db),
+        waitroom: zone_to_display_from_card_ids(&player.waitroom.cards, card_db),
         main_deck_count: player.main_deck.cards.len(),
         energy_deck_count: player.energy_deck.cards.len(),
-        waitroom_count: player.waitroom.cards.len(),
     }
 }
 
@@ -211,6 +218,75 @@ async fn get_actions(data: web::Data<AppState>) -> impl Responder {
         }
     }
     
+    // Auto-play for Player 2: keep executing random actions until it's Player 1's turn
+    loop {
+        // Check if it's Player 2's turn (active player is player2)
+        let is_player2_turn = game_state.active_player().id == game_state.player2.id;
+        
+        if !is_player2_turn {
+            break; // It's Player 1's turn, exit the loop
+        }
+        
+        // Generate possible actions for Player 2
+        let setup_actions = crate::game_setup::generate_possible_actions(&game_state);
+        
+        if setup_actions.is_empty() {
+            // No actions available, advance phase
+            crate::turn::TurnEngine::advance_phase(&mut game_state);
+            
+            // Continue loop to check if we need to keep auto-playing for Player 2
+            continue;
+        }
+        
+        // Use AI to choose a random action for Player 2
+        let ai = crate::bot::ai::AIPlayer::new("Player2AI".to_string());
+        let chosen_index = ai.choose_action(&setup_actions);
+        let chosen_action = &setup_actions[chosen_index];
+        
+        println!("Player 2 (AI) choosing action: {}", chosen_action.description);
+        
+        // Execute the chosen action
+        let result = crate::turn::TurnEngine::execute_main_phase_action(
+            &mut game_state,
+            &chosen_action.action_type,
+            chosen_action.parameters.as_ref().and_then(|p| p.card_id),
+            chosen_action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
+            chosen_action.parameters.as_ref().and_then(|p| p.stage_area),
+            chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
+        );
+        
+        if let Err(e) = result {
+            eprintln!("Player 2 auto-action execution error: {}", e);
+            break; // Exit on error
+        }
+        
+        // Auto-advance automatic phases after Player 2's action
+        loop {
+            let current_phase = game_state.current_phase.clone();
+            match current_phase {
+                crate::game_state::Phase::FirstAttackerPerformance |
+                crate::game_state::Phase::SecondAttackerPerformance |
+                crate::game_state::Phase::LiveVictoryDetermination => {
+                    crate::turn::TurnEngine::advance_phase(&mut game_state);
+                }
+                crate::game_state::Phase::Active |
+                crate::game_state::Phase::Energy |
+                crate::game_state::Phase::Draw => {
+                    crate::turn::TurnEngine::advance_phase(&mut game_state);
+                }
+                _ => break,
+            }
+        }
+        
+        // Check if it's still Player 2's turn - if not, break to let Player 1 play
+        let still_player2_turn = game_state.active_player().id == game_state.player2.id;
+        if !still_player2_turn {
+            break; // Turn passed to Player 1
+        }
+        
+        // Otherwise continue the loop to play another action for Player 2
+    }
+    
     println!("Current phase: {:?}", game_state.current_phase);
     
     // Generate possible actions based on current game state
@@ -241,8 +317,8 @@ fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             card_no: p.card_no,
             base_cost: p.base_cost,
             final_cost: p.final_cost,
-            available_areas: p.available_areas.map(|areas| areas.into_iter().map(|ai| AreaInfo {
-                area: ai.area,
+            available_areas: p.available_areas.map(|areas| areas.into_iter().map(|ai| WebAreaInfo {
+                area: ai.area.to_string(),
                 available: ai.available,
                 cost: ai.cost,
                 is_baton_touch: ai.is_baton_touch,
@@ -257,7 +333,8 @@ async fn execute_action(
     req: web::Json<ExecuteActionRequest>,
 ) -> impl Responder {
     let _action_index = req.action_index;
-    let requested_stage_area = req.stage_area.clone();
+    let requested_stage_area = req.stage_area.as_ref()
+        .and_then(|s| s.parse::<crate::zones::MemberArea>().ok());
     let _requested_action_type = req.action_type.clone();
     let requested_card_id = req.card_id;
     let _requested_card_index = req.card_index;
@@ -317,6 +394,24 @@ async fn execute_action(
             HttpResponse::BadRequest().json(e)
         }
     }
+}
+
+async fn get_status(data: web::Data<AppState>) -> impl Responder {
+    let game_state = data.game_state.lock().unwrap();
+    let members = game_state.card_database.cards.len();
+    HttpResponse::Ok().json(serde_json::json!({
+        "status": "rust_server",
+        "members": members,
+        "lives": 0,
+        "instance_id": 1
+    }))
+}
+
+async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) -> impl Responder {
+    // Placeholder for AI mode setting
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true
+    }))
 }
 
 async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -> impl Responder {
@@ -434,9 +529,7 @@ async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -
 
 pub async fn run_web_server(game_state: Arc<Mutex<GameState>>) -> std::io::Result<()> {
     let app_state = web::Data::new(AppState { game_state });
-    
-    // Get the web directory path
-    let web_dir = PathBuf::from("../web");
+
     HttpServer::new(move || {
         let cors = Cors::permissive();
 
@@ -447,9 +540,8 @@ pub async fn run_web_server(game_state: Arc<Mutex<GameState>>) -> std::io::Resul
             .route("/api/actions", web::get().to(get_actions))
             .route("/api/execute-action", web::post().to(execute_action))
             .route("/api/init", web::post().to(init_game))
-            .service(fs::Files::new("/decks", PathBuf::from("../game/decks")))
-            .service(fs::Files::new("/cards", PathBuf::from("../cards")))
-            .service(fs::Files::new("/", web_dir.clone()).index_file("index.html"))
+            .route("/api/status", web::get().to(get_status))
+            .route("/api/set_ai", web::post().to(set_ai))
     })
     .bind("127.0.0.1:8080")?
     .run()

@@ -15,26 +15,6 @@ const REGEX_NEWLINE = /\\n/g;
 const ZONE_LIST = ['控え室', 'メンバー置場', 'ライブ置場', 'エナジー置場', '待機室', '手札', 'デッキ', '山札', 'Discard', 'Stage', 'Live Zone', 'Hand', 'Deck', 'Performance'];
 const REGEX_ZONES = new RegExp(`(${ZONE_LIST.join('|')})`, 'g');
 
-if (typeof document !== 'undefined' && !document.__lovecaImageErrorHandlerBound) {
-    document.addEventListener('error', (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLImageElement)) return;
-
-        if (target.dataset.hideOnError === 'true') {
-            target.style.display = 'none';
-        }
-
-        if (target.dataset.visibilityHiddenOnError === 'true') {
-            target.style.visibility = 'hidden';
-        }
-
-        if (target.dataset.showNextOnError === 'true' && target.nextElementSibling) {
-            target.style.display = 'none';
-            target.nextElementSibling.style.display = 'inline';
-        }
-    }, true);
-    document.__lovecaImageErrorHandlerBound = true;
-}
 
 // Pre-built icon map with pre-compiled regexes
 export const ICON_MAP = {
@@ -56,23 +36,24 @@ export const ICON_MAP = {
     'ライブスタート': { path: 'live_start.png', regex: /【ライブスタート】/g },
     'LIVE START': { path: 'live_start.png', regex: /【LIVE START】/g },
     '[Start]': { path: 'live_start.png', regex: /\[Start\]/g },
-    'ピンク': { path: 'color_pink.png', regex: /【ピンク】/g },
-    'Pink': { path: 'color_pink.png', regex: /【Pink】/g },
-    'レッド': { path: 'color_red.png', regex: /【レッド】/g },
-    '赤': { path: 'color_red.png', regex: /【赤】/g },
-    'Red': { path: 'color_red.png', regex: /【Red】/g },
-    'イエロー': { path: 'color_yellow.png', regex: /【イエロー】/g },
-    '黄': { path: 'color_yellow.png', regex: /【黄】/g },
-    'Yellow': { path: 'color_yellow.png', regex: /【Yellow】/g },
-    'グリーン': { path: 'color_green.png', regex: /【グリーン】/g },
-    '緑': { path: 'color_green.png', regex: /【緑】/g },
-    'Green': { path: 'color_green.png', regex: /【Green】/g },
-    'ブルー': { path: 'color_blue.png', regex: /【ブルー】/g },
-    '青': { path: 'color_blue.png', regex: /【青】/g },
-    'Blue': { path: 'color_blue.png', regex: /【Blue】/g },
-    'パープル': { path: 'color_purple.png', regex: /【パープル】/g },
-    '紫': { path: 'color_purple.png', regex: /【紫】/g },
-    'Purple': { path: 'color_purple.png', regex: /【Purple】/g },
+    // Color icons not available - commented out
+    // 'ピンク': { path: 'color_pink.png', regex: /【ピンク】/g },
+    // 'Pink': { path: 'color_pink.png', regex: /【Pink】/g },
+    // 'レッド': { path: 'color_red.png', regex: /【レッド】/g },
+    // '赤': { path: 'color_red.png', regex: /【赤】/g },
+    // 'Red': { path: 'color_red.png', regex: /【Red】/g },
+    // 'イエロー': { path: 'color_yellow.png', regex: /【イエロー】/g },
+    // '黄': { path: 'color_yellow.png', regex: /【黄】/g },
+    // 'Yellow': { path: 'color_yellow.png', regex: /【Yellow】/g },
+    // 'グリーン': { path: 'color_green.png', regex: /【グリーン】/g },
+    // '緑': { path: 'color_green.png', regex: /【緑】/g },
+    // 'Green': { path: 'color_green.png', regex: /【Green】/g },
+    // 'ブルー': { path: 'color_blue.png', regex: /【ブルー】/g },
+    // '青': { path: 'color_blue.png', regex: /【青】/g },
+    // 'Blue': { path: 'color_blue.png', regex: /【Blue】/g },
+    // 'パープル': { path: 'color_purple.png', regex: /【パープル】/g },
+    // '紫': { path: 'color_purple.png', regex: /【紫】/g },
+    // 'Purple': { path: 'color_purple.png', regex: /【Purple】/g },
     'オール': { path: 'icon_all.png', regex: /【オール】/g },
     'All': { path: 'icon_all.png', regex: /【All】/g },
     'ライブ開始時': { path: 'live_start.png', regex: /【ライブ開始時】/g },
@@ -191,7 +172,7 @@ export const TextEnricher = {
             if (typeof ICON_DATA_URIs !== 'undefined' && ICON_DATA_URIs[iconKey]) {
                 src = ICON_DATA_URIs[iconKey];
             }
-            return `<span class="icon-wrapper"><img src="${src}" alt="${alt}" style="${style}" data-show-next-on-error="true"><span style="display:none;">${alt}</span></span>`;
+            return `<span class="icon-wrapper"><img src="${src}" alt="${alt}" style="${style}"><span style="display:none;">${alt}</span></span>`;
         });
         text = text.replace(REGEX_NEWLINE, '<br>');
 
@@ -391,7 +372,7 @@ export const TextEnricher = {
         if (!action || !action.triggers) return "";
         const tags = [];
         if (action.triggers.includes(1)) tags.push(`<img src="img/texticon/toujyou.png" alt="[登場時]" style="height:14px; vertical-align:middle;">`);
-        if (action.triggers.includes(2)) tags.push(`<img src="img/texticon/live_kaishi.png" alt="[開始時]" style="height:14px; vertical-align:middle;">`);
+        if (action.triggers.includes(2)) tags.push(`<img src="img/texticon/live_start.png" alt="[開始時]" style="height:14px; vertical-align:middle;">`);
         if (action.triggers.includes(7)) tags.push(`<img src="img/texticon/kidou.png" alt="[起動]" style="height:14px; vertical-align:middle;">`);
         if (action.triggers.includes(6)) tags.push(`<img src="img/texticon/jyouji.png" alt="[常時]" style="height:14px; vertical-align:middle;">`);
 

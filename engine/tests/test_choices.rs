@@ -3,12 +3,11 @@
 // to ensure the engine correctly handles player decisions
 
 use rabuka_engine::ability::{AbilityExecutor, Choice, ChoiceResult};
-use rabuka_engine::card::{Ability, AbilityCost, AbilityEffect, Card, CardType, HeartColor, CardDatabase};
+use rabuka_engine::card::{Card, CardDatabase};
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
 use rabuka_engine::zones::MemberArea;
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -24,6 +23,7 @@ fn create_card_database(cards: &[Card]) -> Arc<CardDatabase> {
 }
 
 /// Helper function to place a card on stage
+#[allow(dead_code)]
 fn place_card_on_stage(player: &mut Player, card_id: i16, area: MemberArea) {
     player.stage.set_area(area, card_id);
 }
@@ -36,7 +36,7 @@ fn test_ability_executor_new() {
 
 #[test]
 fn test_request_select_card_choice_with_real_cards() {
-    let cards = load_all_cards();
+    let _cards = load_all_cards();
     
     let mut executor = AbilityExecutor::new();
     let choice = Choice::SelectCard {
@@ -64,7 +64,7 @@ fn test_request_select_card_choice_with_real_cards() {
 
 #[test]
 fn test_provide_card_choice_result_with_real_cards() {
-    let cards = load_all_cards();
+    let _cards = load_all_cards();
     
     let mut executor = AbilityExecutor::new();
     let choice = Choice::SelectCard {
@@ -84,7 +84,7 @@ fn test_provide_card_choice_result_with_real_cards() {
 
 #[test]
 fn test_choice_result_mismatch_with_real_cards() {
-    let cards = load_all_cards();
+    let _cards = load_all_cards();
     
     let mut executor = AbilityExecutor::new();
     let choice = Choice::SelectCard {
@@ -109,7 +109,7 @@ fn test_select_target_choice_with_real_cards() {
     let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     let card_database = create_card_database(&cards);
-    let game_state = GameState::new(player1, player2, card_database);
+    let _game_state = GameState::new(player1, player2, card_database);
     
     let mut executor = AbilityExecutor::new();
     
@@ -131,7 +131,7 @@ fn test_select_target_choice_with_real_cards() {
 
 #[test]
 fn test_real_card_selection_edge_case_empty_hand() {
-    let cards = load_all_cards();
+    let _cards = load_all_cards();
     
     let mut executor = AbilityExecutor::new();
     
@@ -156,7 +156,7 @@ fn test_real_card_selection_edge_case_empty_hand() {
 
 #[test]
 fn test_multiple_card_selection_with_real_cards() {
-    let cards = load_all_cards();
+    let _cards = load_all_cards();
     
     let mut executor = AbilityExecutor::new();
     

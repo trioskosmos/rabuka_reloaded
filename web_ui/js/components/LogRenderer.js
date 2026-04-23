@@ -101,7 +101,8 @@ export const LogRenderer = {
                 });
             }
 
-            if (p.prevent_baton_touch > 0) {
+            // Support both prevent_baton_touch and prevent_baton
+            if ((p.prevent_baton_touch ?? p.prevent_baton ?? 0) > 0) {
                 result.push({
                     player: playerLabel,
                     desc: i18n.t('cannot_baton_touch'),
@@ -281,18 +282,16 @@ export const LogRenderer = {
     getPhaseKey: (phase) => {
         const perspectivePlayer = State.perspectivePlayer;
         switch (phase) {
-            case Phase.RPS: return 'rps';
-            case Phase.SETUP: return 'setup';
-            case Phase.MULLIGAN_P1: return perspectivePlayer === 0 ? 'mulligan_you' : 'mulligan_opp';
-            case Phase.MULLIGAN_P2: return perspectivePlayer === 1 ? 'mulligan_you' : 'mulligan_opp';
+            case Phase.ROCK_PAPER_SCISSORS: return 'rps';
+            case Phase.MULLIGAN: return 'mulligan';
             case Phase.ACTIVE: return 'active';
             case Phase.ENERGY: return 'energy';
             case Phase.DRAW: return 'draw';
             case Phase.MAIN: return 'main';
-            case Phase.LIVE_SET: return 'live_set';
-            case Phase.PERFORMANCE_P1: return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
-            case Phase.PERFORMANCE_P2: return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
-            case Phase.LIVE_RESULT: return 'live_result';
+            case Phase.LIVE_CARD_SET: return 'live_set';
+            case Phase.FIRST_ATTACKER_PERFORMANCE: return perspectivePlayer === 0 ? 'perf_p1' : 'perf_p2';
+            case Phase.SECOND_ATTACKER_PERFORMANCE: return perspectivePlayer === 1 ? 'perf_p1' : 'perf_p2';
+            case Phase.LIVE_VICTORY_DETERMINATION: return 'live_result';
             default: return String(phase);
         }
     },
@@ -623,7 +622,8 @@ export const LogRenderer = {
                 });
             }
 
-            if (p.prevent_baton_touch > 0) {
+            // Support both prevent_baton_touch and prevent_baton
+            if ((p.prevent_baton_touch ?? p.prevent_baton ?? 0) > 0) {
                 effects.push({ title: i18n.t('restriction'), desc: i18n.t('cannot_baton_touch'), duration: i18n.t('until_end_of_turn'), type: 'restriction' });
             }
             if (p.prevent_activate > 0) {

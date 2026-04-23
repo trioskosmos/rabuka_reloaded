@@ -27,7 +27,8 @@ export const InteractionAdapter = {
         if (!state.legal_actions) return valid;
 
         state.legal_actions.forEach((action, index) => {
-            const params = action.parameters || {};
+            // Support both parameters and params field names
+            const params = action.parameters || action.params || {};
             const cardIndex = params.card_index;
             const cardIndices = params.card_indices;
             const stageArea = params.stage_area;
@@ -46,8 +47,9 @@ export const InteractionAdapter = {
 
             // Stage area actions
             if (stageArea) {
-                // Map stage area names to indices
-                const areaMap = { 'left_side': 0, 'center': 1, 'right_side': 2 };
+                // Rust engine MemberArea serializes as lowercase without underscores: "left", "center", "right"
+                // Support both formats for compatibility
+                const areaMap = { 'left': 0, 'left_side': 0, 'center': 1, 'right': 2, 'right_side': 2 };
                 const stageIdx = areaMap[stageArea.toLowerCase()];
                 if (stageIdx !== undefined) {
                     valid.myStage[stageIdx] = { ...action, index };
@@ -57,8 +59,9 @@ export const InteractionAdapter = {
             // Live zone actions
             if (action.action_type.includes('Live') || action.action_type.includes('Performance')) {
                 // For now, mark all live cards as valid targets
-                if (state.player1 && state.player1.live_zone && state.player1.live_zone.cards) {
-                    state.player1.live_zone.cards.forEach((_, idx) => {
+                const liveCards = state.player1 ? state.player1.live_zone.cards : [];
+                if (liveCards.length > 0) {
+                    liveCards.forEach((_, idx) => {
                         valid.myLive[idx] = { ...action, index };
                     });
                 }
@@ -66,8 +69,9 @@ export const InteractionAdapter = {
 
             // Energy zone actions
             if (action.action_type.includes('Energy') || action.action_type.includes('Activate')) {
-                if (state.player1 && state.player1.energy && state.player1.energy.cards) {
-                    state.player1.energy.cards.forEach((_, idx) => {
+                const energyCards = state.player1 ? state.player1.energy.cards : [];
+                if (energyCards.length > 0) {
+                    energyCards.forEach((_, idx) => {
                         valid.myEnergy[idx] = { ...action, index };
                     });
                 }

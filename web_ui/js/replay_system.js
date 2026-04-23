@@ -124,7 +124,6 @@ export const Replay = {
             updateStateData(frame);
             log(`Frame ${State.currentFrame}: T${frame.turn} ${frame.phase} P${frame.current_player} (Act: ${frame.action_taken || 0})`);
         } else {
-            // Fallback to minimal display
             const turnEl = document.getElementById('turn');
             if (turnEl) turnEl.textContent = frame.turn;
             const phaseEl = document.getElementById('phase');
