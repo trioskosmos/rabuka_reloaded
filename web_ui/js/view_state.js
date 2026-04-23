@@ -6,17 +6,20 @@ function getSelectedIndices(state, uiState, perspectivePlayer) {
         const player = perspectivePlayer === 0 ? state.player1 : state.player2;
         const serverSelection = player.mulligan_selection;
         const indices = new Set(uiState.localMulliganSelection);
-        
-        if (typeof serverSelection === 'number') {
-            // Rust backend: hand is { cards: [...] }
-            const handCards = player.hand.cards;
-            for (let i = 0; i < handCards.length; i++) {
-                if ((serverSelection >> i) & 1) indices.add(i);
+
+        // Engine may not send mulligan_selection in PlayerDisplay
+        if (serverSelection !== undefined) {
+            if (typeof serverSelection === 'number') {
+                // Rust backend: hand is { cards: [...] }
+                const handCards = player.hand.cards;
+                for (let i = 0; i < handCards.length; i++) {
+                    if ((serverSelection >> i) & 1) indices.add(i);
+                }
+            } else if (Array.isArray(serverSelection)) {
+                serverSelection.forEach(idx => indices.add(Number(idx)));
             }
-        } else if (Array.isArray(serverSelection)) {
-            serverSelection.forEach(idx => indices.add(Number(idx)));
         }
-        
+
         return Array.from(indices);
     }
     return uiState.selectedHandIdx !== -1 ? [uiState.selectedHandIdx] : [];
@@ -49,8 +52,8 @@ function hasActiveEffects(state, p0, p1) {
 
 export const ViewState = {
     buildRenderModel(state, uiState, validTargets) {
-        const perspectivePlayer = uiState.hotseatMode && (state.active_player !== undefined || state.current_player !== undefined)
-            ? (state.active_player ?? state.current_player ?? 0)
+        const perspectivePlayer = uiState.hotseatMode && state.active_player !== undefined
+            ? state.active_player
             : uiState.perspectivePlayer;
 
         // Rust backend format: state.player1, state.player2

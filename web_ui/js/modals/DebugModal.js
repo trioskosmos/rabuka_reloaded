@@ -111,7 +111,7 @@ const zoneDefinitions = (player) => [
     { key: 'stage', label: 'Stage', cards: player?.stage || [] },
     { key: 'live', label: 'Live', cards: player?.live_zone || [] },
     { key: 'hand', label: 'Hand', cards: player?.hand || [] },
-    { key: 'success', label: 'Success', cards: player?.success_lives || player?.success_zone || player?.success_pile || [] },
+    { key: 'success', label: 'Success', cards: player?.success_live_card_zone || [] },
     { key: 'energy', label: 'Energy', cards: player?.energy || [] },
     { key: 'discard', label: 'Discard', cards: player?.discard || [] },
     { key: 'looked', label: 'Looked', cards: player?.looked_cards || [] },
@@ -315,7 +315,7 @@ export const DebugModal = {
             phase: PHASE_NAMES[state?.phase] || state?.phase || '?',
             currentPlayer: (state?.current_player ?? 0) + 1,
             score: Array.isArray(state?.players)
-                ? state.players.map((player) => player?.score ?? 0).join(' - ')
+                ? state.players.map((player) => player?.success_live_card_zone?.cards?.length ?? 0).join(' - ')
                 : '?',
         }));
     },
@@ -467,7 +467,7 @@ export const DebugModal = {
                     <div style="background:${index === DebugModal._filters.selectedPlayer ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.04)'}; border:1px solid ${index === DebugModal._filters.selectedPlayer ? 'rgba(56,189,248,0.4)' : 'rgba(255,255,255,0.08)'}; border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:6px;">
                         <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
                             <strong style="font-size:11px; color:${index === DebugModal._filters.selectedPlayer ? '#7dd3fc' : '#fff'};">Player ${index + 1}${State.data.active_player === index ? ' [active]' : ''}</strong>
-                            <span style="font-size:10px; opacity:0.72;">Score ${escapeHtml(player?.score ?? 0)}</span>
+                            <span style="font-size:10px; opacity:0.72;">Score ${escapeHtml(player?.success_live_card_zone?.cards?.length ?? 0)}</span>
                         </div>
                         <div style="display:grid; grid-template-columns:repeat(2, minmax(70px, 1fr)); gap:6px;">
                             ${zoneDefinitions(player).map((zone) => renderScalarCell(zone.label, String(zone.cards.length))).join('')}
@@ -519,7 +519,7 @@ export const DebugModal = {
         let totalNotes = 0;
 
         entries.forEach(({ card }) => {
-            if (card.tapped) tapped += 1;
+            if (card.orientation === 'Wait') tapped += 1;
             if (card.moved) moved += 1;
             if (card.revealed) revealed += 1;
             totalNotes += Number(card.note_icons || 0);
@@ -827,11 +827,11 @@ export const DebugModal = {
         if (!card) return '';
 
         const abilities = card.abilities || [];
-        // Support both card_type and type field names
-        const cardType = card.card_type || card.type || (card.score !== undefined ? 'live' : 'member');
-        // Support both tapped boolean and orientation === 'Wait'
+        // Engine sends card_type
+        const cardType = card.card_type || (card.score !== undefined ? 'Live' : 'Member');
+        // Engine sends orientation, not tapped
         const statusBits = [
-            (card.tapped || card.orientation === 'Wait') ? 'TAPPED' : null,
+            card.orientation === 'Wait' ? 'TAPPED' : null,
             card.moved ? 'MOVED' : null,
             card.revealed ? 'REVEALED' : null,
             card.is_active ? 'ACTIVE' : null,
@@ -1111,10 +1111,10 @@ export const DebugModal = {
                 stage: getIds(player.stage || []),
                 live_zone: getIds(player.live_zone || []),
                 hand: getIds(player.hand || []),
-                energy: getIds(player.energy_zone || player.energy || []),
+                energy: getIds(player.energy || []),
                 tapped_energy_mask: player.tapped_energy_mask ?? 0,
                 discard: getIds(player.discard || []),
-                success_lives: getIds(player.success_lives || player.success_zone || player.success_pile || []),
+                success_lives: getIds(player.success_live_card_zone || []),
                 looked_cards: getIds(player.looked_cards || []),
             })),
         };

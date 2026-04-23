@@ -105,7 +105,7 @@ for (const [key, data] of Object.entries(ICON_MAP)) {
 
     ICON_REPLACEMENTS[key] = {
         regex: data.regex,
-        replacement: `<span class="icon-wrapper"><img src="${src}" alt="${key}" style="${style}" data-visibility-hidden-on-error="true"></span>`
+        replacement: `<span class="icon-wrapper"><img src="${src}" alt="${key}" style="${style}"></span>`
     };
 }
 

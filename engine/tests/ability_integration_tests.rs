@@ -370,7 +370,6 @@ fn test_change_state_with_multiple_targets() {
             game_state.player1.energy_zone.cards.push(card_id);
         }
     }
-    println!("Added {} energy cards to zone", game_state.player1.energy_zone.cards.len());
     game_state.player1.energy_zone.active_energy_count = 5;
     
     let mut resolver = AbilityResolver::new(&mut game_state);

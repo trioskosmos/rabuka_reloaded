@@ -39,7 +39,8 @@ export const fixImg = (path) => {
 
     const isGithub = window.location.hostname.includes('github') || window.location.hostname.includes('rabukasim');
 
-    if (isGithub && url.toLowerCase().endsWith('.png') && !url.toLowerCase().includes('.webp')) {
+    // Don't convert texticon or cards_webp to .webp - they already have correct format
+    if (isGithub && url.toLowerCase().endsWith('.png') && !url.toLowerCase().includes('.webp') && !url.includes('texticon') && !url.includes('cards_webp')) {
         url = url.replace(/\.png$/i, '.webp');
     }
 

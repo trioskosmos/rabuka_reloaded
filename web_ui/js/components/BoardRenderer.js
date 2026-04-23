@@ -6,15 +6,18 @@ import { DOMUtils } from '../utils/DOMUtils.js';
 
 export const BoardRenderer = {
     renderBoard: (state, p0, p1, validTargets, showDiscardModalCallback) => {
-        // Validate required zone objects exist - engine should always send these
-        if (!p0?.hand?.cards || !p1?.hand?.cards ||
-            !p0?.energy?.cards || !p1?.energy?.cards ||
-            !p0?.live_zone?.cards || !p1?.live_zone?.cards ||
-            !p0?.discard?.cards || !p1?.discard?.cards ||
-            !p0?.success_live_card_zone?.cards || !p1?.success_live_card_zone?.cards) {
-            console.warn('[BoardRenderer] Incomplete player state from engine, skipping render');
-            return;
-        }
+        // Engine sends correct data - don't skip render for missing zones
+        // Just log warnings for debugging
+        if (!p0?.hand?.cards) console.warn('[BoardRenderer] p0.hand.cards missing');
+        if (!p1?.hand?.cards) console.warn('[BoardRenderer] p1.hand.cards missing');
+        if (!p0?.energy?.cards) console.warn('[BoardRenderer] p0.energy.cards missing');
+        if (!p1?.energy?.cards) console.warn('[BoardRenderer] p1.energy.cards missing');
+        if (!p0?.live_zone?.cards) console.warn('[BoardRenderer] p0.live_zone.cards missing');
+        if (!p1?.live_zone?.cards) console.warn('[BoardRenderer] p1.live_zone.cards missing');
+        if (!p0?.discard?.cards) console.warn('[BoardRenderer] p0.discard.cards missing');
+        if (!p1?.discard?.cards) console.warn('[BoardRenderer] p1.discard.cards missing');
+        if (!p0?.success_live_card_zone?.cards) console.warn('[BoardRenderer] p0.success_live_card_zone.cards missing');
+        if (!p1?.success_live_card_zone?.cards) console.warn('[BoardRenderer] p1.success_live_card_zone.cards missing');
 
         // Rust backend format: stage is { left_side, center, right_side }, live_zone is { cards }
         const myStage = p0.stage ? [p0.stage.left_side, p0.stage.center, p0.stage.right_side].filter(c => c) : [];
@@ -25,9 +28,12 @@ export const BoardRenderer = {
         
         CardRenderer.renderLiveZone('my-live', p0.live_zone.cards, true, validTargets.myLive, validTargets.hasSelection);
         CardRenderer.renderLiveZone('opp-live', p1.live_zone.cards, true, validTargets.oppLive, validTargets.hasSelection);
-        
-        CardRenderer.renderDiscardPile('my-discard-visual', p0.discard.cards, 0, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
-        CardRenderer.renderDiscardPile('opp-discard-visual', p1.discard.cards, 1, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
+
+        // Engine sends waitroom, fallback to discard for compatibility
+        const p0Discard = p0.discard?.cards || p0.waitroom?.cards;
+        const p1Discard = p1.discard?.cards || p1.waitroom?.cards;
+        CardRenderer.renderDiscardPile('my-discard-visual', p0Discard, 0, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
+        CardRenderer.renderDiscardPile('opp-discard-visual', p1Discard, 1, validTargets.discard, validTargets.hasSelection, showDiscardModalCallback);
 
         BoardRenderer.renderEnergy('my-energy', p0.energy.cards, true, validTargets.myEnergy, validTargets.hasSelection, state);
         BoardRenderer.renderEnergy('opp-energy', p1.energy.cards, true, validTargets.oppEnergy, validTargets.hasSelection, state);
@@ -54,8 +60,9 @@ export const BoardRenderer = {
         updateCount('opp-deck-count', p1.main_deck_count);
         updateCount('my-energy-deck-count', p0.energy_deck_count);
         updateCount('opp-energy-deck-count', p1.energy_deck_count);
-        updateCount('my-discard-count', p0.waitroom_count);
-        updateCount('opp-discard-count', p1.waitroom_count);
+        // Engine sends waitroom zone, calculate count from cards
+        updateCount('my-discard-count', (p0.waitroom?.cards?.length || p0.discard?.cards?.length || 0));
+        updateCount('opp-discard-count', (p1.waitroom?.cards?.length || p1.discard?.cards?.length || 0));
 
         const myHandCount = p0.hand.cards.length;
         const oppHandCount = p1.hand.cards.length;

@@ -69,8 +69,8 @@ export const CardRenderer = {
         // Rust backend format: card_no, name, card_type, orientation
         // Support both hidden field and card_no === -2/-1 for hidden cards
         const isHidden = resolvedCard.hidden || resolvedCard.is_hidden || resolvedCard.card_no === -2 || resolvedCard.card_no === -1;
-        // Support both 'Live' and 'ライブ' for card type
-        const isLive = resolvedCard.card_type === 'Live' || resolvedCard.card_type === 'ライブ' || resolvedCard.type === 'live';
+        // Engine sends card_type as string enum
+        const isLive = resolvedCard.card_type === 'Live' || resolvedCard.card_type === 'ライブ';
 
         // 1. Determine CSS Classes
         const classNames = ['card'];
@@ -114,10 +114,12 @@ export const CardRenderer = {
         let imgPath = '';
 
         if (!isHidden) {
-            // Use _img field from cards.json if available, otherwise construct from card_no
-            if (resolvedCard._img) {
-                imgPath = resolvedCard._img;
-            } else if (resolvedCard.card_no) {
+            // Use card image mapping if available (maps card_no to actual webp filename)
+            if (resolvedCard.card_no && State.cardImageMapping && State.cardImageMapping[resolvedCard.card_no]) {
+                imgPath = State.cardImageMapping[resolvedCard.card_no];
+            }
+            // Fallback: construct webp path from card_no
+            else if (resolvedCard.card_no) {
                 imgPath = `img/cards_webp/${resolvedCard.card_no}.webp`;
             }
             displayName = resolvedCard.name || `[${resolvedCard.card_type}]` || 'Card';

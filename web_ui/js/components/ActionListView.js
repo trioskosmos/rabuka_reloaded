@@ -22,7 +22,22 @@ export const ActionListView = {
 
         state.legal_actions.forEach(a => {
             const category = a.category || a.type;
-            const hIdx = a.hand_idx;
+            // Engine sends card_no in parameters for play_member_to_stage
+            const cardNo = a.parameters?.card_no;
+            const handIdx = a.parameters?.card_index;
+
+            if (a.action_type === 'play_member_to_stage') {
+                console.log('[ActionListView] PLAY action FULL object:', JSON.stringify(a, null, 2));
+                console.log('[ActionListView] PLAY action details:', {
+                    action_type: a.action_type,
+                    card_no: cardNo,
+                    card_index: handIdx,
+                    card_id: a.parameters?.card_id,
+                    parameters: a.parameters,
+                    hasParameters: !!a.parameters,
+                    parametersKeys: a.parameters ? Object.keys(a.parameters) : []
+                });
+            }
 
             if (a.action_type === 'pass' ||
                 a.action_type === 'skip_mulligan' ||
@@ -32,13 +47,16 @@ export const ActionListView = {
                 a.action_type === 'choose_second_attacker' ||
                 a.action_type === 'set_live_card') {
                 systemActions.push(a);
-            } else if (a.action_type === 'play_member_to_stage' && hIdx !== undefined) {
-                if (!playActionsByHand[hIdx]) playActionsByHand[hIdx] = [];
-                playActionsByHand[hIdx].push(a);
-                console.log('[ActionListView] Grouped PLAY action for hand_idx', hIdx, ':', a);
+            } else if (a.action_type === 'play_member_to_stage' && cardNo !== undefined) {
+                // Group by card_no - engine's primary identifier for cards
+                if (!playActionsByHand[cardNo]) playActionsByHand[cardNo] = [];
+                playActionsByHand[cardNo].push(a);
+                console.log('[ActionListView] Grouped PLAY action for card_no', cardNo, ':', a);
             } else if (category === 'MULLIGAN' || a.action_type === 'select_mulligan' || a.action_type === 'mulligan_header') {
-                if (!mulliganActions[hIdx]) mulliganActions[hIdx] = [];
-                mulliganActions[hIdx].push(a);
+                if (handIdx !== undefined) {
+                    if (!mulliganActions[handIdx]) mulliganActions[handIdx] = [];
+                    mulliganActions[handIdx].push(a);
+                }
             } else if (category === 'ABILITY' || a.action_type === 'use_ability') {
                 abilityActions.push(a);
             }
@@ -72,8 +90,8 @@ export const ActionListView = {
 
         if (Object.keys(playActionsByHand).length > 0) {
             addHeader(i18n.t('event_play').toUpperCase(), 'var(--accent-gold)');
-            Object.keys(playActionsByHand).sort((a, b) => parseInt(a) - parseInt(b)).forEach(hIdx => {
-                const actions = playActionsByHand[hIdx];
+            Object.keys(playActionsByHand).forEach(cardNo => {
+                const actions = playActionsByHand[cardNo];
                 const firstA = actions[0];
                 const groupDiv = document.createElement('div');
                 groupDiv.className = 'action-group-card';
@@ -86,19 +104,7 @@ export const ActionListView = {
                 header.innerHTML = `<span class="truncate-name" style="max-width: 180px;">${cleanName}</span> <span class="header-base-cost">${energyIcon}${displayCost}</span>`;
                 groupDiv.appendChild(header);
 
-                console.log('[ActionListView] Play action for hand', hIdx, ':', JSON.stringify(firstA, null, 2));
-                console.log('[ActionListView] parameters:', firstA.parameters);
-                console.log('[ActionListView] parameters keys:', Object.keys(firstA.parameters || {}));
-
                 const availableAreas = firstA.parameters?.available_areas;
-                console.log('[ActionListView] available_areas:', availableAreas);
-                console.log('[ActionListView] available_areas type:', typeof availableAreas);
-                console.log('[ActionListView] available_areas length:', availableAreas?.length);
-                if (availableAreas) {
-                    availableAreas.forEach((area, i) => {
-                        console.log(`[ActionListView] Area ${i}:`, JSON.stringify(area, null, 2));
-                    });
-                }
 
                 if (availableAreas && availableAreas.length > 0) {
                     const areasDiv = document.createElement('div');

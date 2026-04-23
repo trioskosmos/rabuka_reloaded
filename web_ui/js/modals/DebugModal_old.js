@@ -280,14 +280,14 @@ export const DebugModal = {
             return `<div style="font-size:11px; opacity:0.3; padding:8px; border:1px dashed #444; border-radius:4px; text-align:center;">EMPTY (${slotLabel})</div>`;
         }
         const flags = [];
-        // Support both tapped boolean and orientation === 'Wait'
-        if (c.tapped || c.orientation === 'Wait') flags.push('<span style="color:#e74c3c">TAPPED</span>');
+        // Engine sends orientation
+        if (c.orientation === 'Wait') flags.push('<span style="color:#e74c3c">TAPPED</span>');
         if (c.moved) flags.push('<span style="color:#3498db">MOVED</span>');
         if (c.revealed) flags.push('<span style="color:#2ecc71">REVEALED</span>');
 
-        // Support both card_type and type field names
-        const type = c.card_type || c.type || (c.score !== undefined ? 'live' : 'member');
-        const isLive = type === 'live';
+        // Engine sends card_type
+        const type = c.card_type || (c.score !== undefined ? 'Live' : 'Member');
+        const isLive = type === 'Live' || type === 'ライブ';
 
         return `
             <div style="font-size:11px; background: rgba(255,255,255,0.03); padding: 10px; border: 1px solid #444; border-radius: 4px; display:flex; flex-direction:column; gap:6px;">
@@ -584,7 +584,6 @@ export const DebugModal = {
                             ${F('GrantedAbs', p.granted_abilities_count ?? 0)}
                             ${F('UsedAbs', p.used_abilities_count ?? 0)}
                             ${F('Restrictions', JSON.stringify(p.restrictions || []))}
-                            ${F('MullSelection', `0x${(p.mulligan_selection || 0).toString(16).toUpperCase()}`)}
                             ${F('ObtSuccess', p.obtained_success_live ? 'YES' : 'NO')}
                             ${F('LvRevealed', JSON.stringify(p.live_zone_revealed || [false, false, false]))}
                             <!-- NEW: Additional Missing Fields -->

@@ -105,6 +105,7 @@ const stateInternal = {
         if (State.data) {
             State.lastPhase = State.data.phase;
             const pOld = State.perspectivePlayer === 0 ? State.data.player1 : State.data.player2;
+            // Engine may not send mulligan_selection in PlayerDisplay
             if (pOld && pOld.mulligan_selection !== undefined) {
                 // If it's a number (bitmask), we need to extract indices
                 const selection = pOld.mulligan_selection;
@@ -130,12 +131,7 @@ const stateInternal = {
         // Only if newData is from server (non-circular)
         State.rawData = JSON.parse(JSON.stringify(newData));
         State.data = newData;  // Replace entirely instead of merging
-        
-        // Debug: Log the phase received from engine
-        if (newData.phase) {
-            console.log('Received phase from engine:', newData.phase, typeof newData.phase);
-        }
-        
+
         // Rebuild card index when state updates
         State.rebuildCardIndex();
 
@@ -196,27 +192,47 @@ const stateInternal = {
         // Helper to add cards to index
         const addCard = (card, zone) => {
             if (!card) return;
-            // Support both 'id' (client/runtime) and 'card_id' (server/master data)
+
+            // Engine sends CardDisplay with card_no, name, card_type, orientation
+            // Frontend also expects id/card_id for compatibility
             const rawCid = card.id !== undefined ? card.id : card.card_id;
-            if (rawCid === undefined || rawCid < 0) return;
+            const cardNo = card.card_no;
 
-            // Mask the ID to find the template
-            const templateId = rawCid & State.TEMPLATE_MASK;
+            // Enrich with static database data if available (for _img field)
+            let enrichedCard = { ...card };
+            if (cardNo && State.staticCardDatabase && State.staticCardDatabase[cardNo]) {
+                const staticCard = State.staticCardDatabase[cardNo];
+                // Merge static data into engine CardDisplay
+                enrichedCard = { ...enrichedCard, ...staticCard };
+                console.log('[State] Enriched card', cardNo, 'with _img:', staticCard._img);
+            } else if (cardNo) {
+                console.log('[State] No static data for card_no:', cardNo, 'staticCardDatabase exists:', !!State.staticCardDatabase);
+            }
 
-            if (templateId >= 0) {
-                // Store first occurrence OR update if this one has more data (name, text)
-                // We use the templateId as the key for metadata resolution
-                const existing = index[templateId];
-                const cardText = card.original_text || card.ability_text || card.ability || card.text;
-                const existingText = existing ? (existing.original_text || existing.ability_text || existing.ability || existing.text) : null;
-
-                if (!existing || (!existingText && cardText) || (!existing.name && card.name)) {
-                    index[templateId] = { ...card, id: templateId };
+            // Use card_no as the key for engine CardDisplay format
+            if (cardNo) {
+                const existing = index[cardNo];
+                // Only update if we have more data
+                if (!existing || (!existing.name && card.name) || (!existing._img && enrichedCard._img)) {
+                    index[cardNo] = enrichedCard;
                 }
+            }
 
-                // Also store the packed version if it's different and we are in a dynamic zone
-                if (rawCid !== templateId) {
-                    index[rawCid] = { ...index[templateId], id: rawCid };
+            // Also support numeric IDs for compatibility
+            if (rawCid !== undefined && rawCid >= 0) {
+                const templateId = rawCid & State.TEMPLATE_MASK;
+                if (templateId >= 0) {
+                    const existing = index[templateId];
+                    const cardText = card.original_text || card.ability_text || card.ability || card.text;
+                    const existingText = existing ? (existing.original_text || existing.ability_text || existing.ability || existing.text) : null;
+
+                    if (!existing || (!existingText && cardText) || (!existing.name && card.name) || (!existing._img && enrichedCard._img)) {
+                        index[templateId] = { ...enrichedCard, id: templateId };
+                    }
+
+                    if (rawCid !== templateId) {
+                        index[rawCid] = { ...index[templateId], id: rawCid };
+                    }
                 }
             }
         };
@@ -251,8 +267,8 @@ const stateInternal = {
                 const energyCards = p.energy.cards;
                 indexZone(energyCards.map(e => (e && e.card) ? e.card : e));
             }
-            indexZone(p.discard);
-            indexZone(p.success_lives || p.success_zone || p.success_pile);
+            indexZone(p.waitroom || p.discard);
+            indexZone(p.success_live_card_zone);
         });
 
         State.cardIndex = index;
@@ -285,6 +301,16 @@ const stateInternal = {
             const cardsData = await cardsResponse.json();
             State.staticCardDatabase = cardsData;
             console.log('[State] Loaded static card database, total cards:', Object.keys(cardsData).length);
+
+            // Load card_image_mapping.json
+            const imageMappingResponse = await fetch('/js/card_image_mapping.json');
+            if (imageMappingResponse.ok) {
+                const imageMappingData = await imageMappingResponse.json();
+                State.cardImageMapping = imageMappingData;
+                console.log('[State] Loaded card image mapping, total mappings:', Object.keys(imageMappingData).length);
+            } else {
+                console.warn('[State] Failed to load card_image_mapping.json:', imageMappingResponse.status);
+            }
         } catch (e) {
             console.warn('[State] Failed to load static card database:', e);
         }
@@ -320,53 +346,14 @@ const stateInternal = {
 
         const templateId = cid & State.TEMPLATE_MASK;
 
-        if (State.cardIndex) {
-            if (State.cardIndex[cid]) return State.cardIndex[cid];
-            if (State.cardIndex[templateId]) return { ...State.cardIndex[templateId], id: cid };
-        }
-
-        if (State.cardIdMapping && State.staticCardDatabase) {
-            const cardNoString = Object.keys(State.cardIdMapping).find(key => State.cardIdMapping[key] === cid);
-            if (cardNoString && State.staticCardDatabase[cardNoString]) {
-                const card = State.staticCardDatabase[cardNoString];
-                const convertedCard = { ...card, id: cid, card_no: cardNoString };
-                if (card._img) {
-                    const match = card._img.match(/([^\/]+)\.(png|jpg|jpeg|webp)$/i);
-                    if (match) convertedCard._img = `img/cards_webp/${match[1]}.webp`;
-                } else {
-                    convertedCard._img = `img/cards_webp/${cardNoString}.webp`;
-                }
-                return convertedCard;
-            }
-
-            const templateCardNoString = Object.keys(State.cardIdMapping).find(key => State.cardIdMapping[key] === templateId);
-            if (templateCardNoString && State.staticCardDatabase[templateCardNoString]) {
-                const card = State.staticCardDatabase[templateCardNoString];
-                const convertedCard = { ...card, id: cid, card_no: templateCardNoString };
-                if (card._img) {
-                    const match = card._img.match(/([^\/]+)\.(png|jpg|jpeg|webp)$/i);
-                    if (match) convertedCard._img = `img/cards_webp/${match[1]}.webp`;
-                } else {
-                    convertedCard._img = `img/cards_webp/${templateCardNoString}.webp`;
-                }
-                return convertedCard;
-            }
-        }
-
-        return { id: cid, name: `Card ${templateId}`, _img: `img/cards_webp/${templateId}.webp`, text: "", original_text: "" };
-    },
-
-    resolveCardDataByName: (name) => {
-        const state = State.data;
-        if (!state) return null;
+        if (!State.data) return null;
 
         // Use card index if available
         if (State.cardIndex) {
-            for (const card of Object.values(State.cardIndex)) {
-                if (card && card.name === name) return card;
-            }
+            return State.cardIndex[templateId] || State.cardIndex[cid];
         }
 
+        const state = State.data;
         const playersList = [state.player1, state.player2];
         for (const p of playersList) {
             if (!p) continue;
@@ -380,17 +367,17 @@ const stateInternal = {
                 getZoneCards(p.live_zone),
                 getZoneCards(p.energy),
                 getZoneCards(p.waitroom || p.discard),
-                getZoneCards(p.success_live_card_zone || p.success_lives || p.success_zone || p.success_pile)
+                getZoneCards(p.success_live_card_zone)
             ];
             for (const zone of allZones) {
                 for (const c of zone) {
                     const card = (typeof c === 'object' && c !== null) ? (c.card || c) : null;
-                    if (card && card.name === name) return card;
+                    if (card && (card.id === cid || card.card_id === cid || card.card_no === cid)) return card;
                 }
             }
         }
         if (state.looked_cards) {
-            const found = state.looked_cards.find(c => c && c.name === name);
+            const found = state.looked_cards.find(c => c && (c.id === cid || c.card_id === cid || c.card_no === cid));
             if (found) return found;
         }
         return null;
@@ -431,11 +418,6 @@ const stateInternal = {
                 // NOTE: Preserve 'winner' for proper state restoration
                 // NOTE: Preserve 'undo_stack', 'redo_stack' if they exist for history replay
             ];
-
-            // Map keys for engine compatibility without mutating the source object.
-            if (obj.active_player !== undefined && obj.current_player === undefined) {
-                stripped.current_player = obj.active_player;
-            }
 
             for (const [key, value] of Object.entries(obj)) {
                 if (blacklistedKeys.includes(key)) continue;

@@ -202,10 +202,10 @@ export class WasmAdapter {
             if (card) {
                 const id = card.card_no || rawId;
                 // Determine card type from card data
-                const cardType = card.type || card.card_type || '';
-                if (cardType === 'energy' || cardType === 'エネルギー' || String(id).startsWith('LL-E')) {
+                const cardType = card.card_type || '';
+                if (cardType === 'Energy' || cardType === 'エネルギー' || String(id).startsWith('LL-E')) {
                     energy.push(id);
-                } else if (cardType === 'live' || cardType === 'ライブ' || card.score !== undefined) {
+                } else if (cardType === 'Live' || cardType === 'ライブ' || card.score !== undefined) {
                     lives.push(id);
                 } else {
                     deck.push(id);
@@ -251,7 +251,7 @@ export class WasmAdapter {
     enrichAction(id, state) {
         // Logic to reverse-engineer action details from ID and State
         // Rust backend format: player1, player2
-        const currentPlayer = state.current_player ?? state.active_player ?? 0;
+        const currentPlayer = state.active_player ?? 0;
         const p = currentPlayer === 0 ? state.player1 : state.player2;
 
         if (id === ActionBases.PASS) return { id, desc: "Pass / Confirm" };

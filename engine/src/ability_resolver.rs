@@ -2956,7 +2956,7 @@ impl<'a> AbilityResolver<'a> {
                         // Store valid targets temporarily for selection
                         self.looked_at_cards = valid_targets;
                         
-                        self.pending_choice = Some(Choice::SelectCard {
+                        self.game_state.pending_choice = Some(Choice::SelectCard {
                             zone: "energy_zone".to_string(),
                             card_type: card_type_filter.map(|s| s.to_string()),
                             count: count_usize,

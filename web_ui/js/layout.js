@@ -29,6 +29,11 @@ function updateMobileSidebarToggleState(isOpen) {
 let mobileSidebarOverlayHandler = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Pre-load static card database
+    import('./state.js').then(({ State }) => {
+        State.loadStaticCardDatabase();
+    });
+
     // Elements
     const leftSidebar = DOMUtils.getElement(DOM_IDS.SIDEBAR_LEFT);
     const rightSidebar = DOMUtils.getElement(DOM_IDS.SIDEBAR_RIGHT);

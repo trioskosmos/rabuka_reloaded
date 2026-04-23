@@ -41,6 +41,7 @@ export const HeaderStats = {
         if (HeaderStats.cache.phase) HeaderStats.cache.phase.textContent = i18n.t(phaseKey);
 
         if (HeaderStats.cache.score) {
+            // Engine doesn't send player score - calculate from success_live_card_zone
             const p0Success = state.player1.success_live_card_zone.cards;
             const p1Success = state.player2.success_live_card_zone.cards;
             const p0Score = p0Success.length || 0;
@@ -49,7 +50,8 @@ export const HeaderStats = {
         }
 
         if (HeaderStats.cache.energy && p0) {
-            const active = p0.energy.active_energy_count || 0;
+            // Engine sends orientation in each energy card - calculate active count
+            const active = p0.energy.cards.filter(e => e && e.orientation === 'Active').length;
             const total = p0.energy.cards.length;
             HeaderStats.cache.energy.textContent = `${active}/${total}`;
         }
@@ -109,12 +111,14 @@ export const HeaderStats = {
         if (state.player1) {
             if (HeaderStats.cache.p1.deck) HeaderStats.cache.p1.deck.textContent = state.player1.main_deck_count;
             if (HeaderStats.cache.p1.energy) HeaderStats.cache.p1.energy.textContent = state.player1.energy_deck_count;
-            if (HeaderStats.cache.p1.discard) HeaderStats.cache.p1.discard.textContent = state.player1.waitroom_count;
+            // Engine sends waitroom zone, calculate count from cards
+            if (HeaderStats.cache.p1.discard) HeaderStats.cache.p1.discard.textContent = (state.player1.waitroom?.cards?.length || state.player1.discard?.cards?.length || 0);
         }
         if (state.player2) {
             if (HeaderStats.cache.p2.deck) HeaderStats.cache.p2.deck.textContent = state.player2.main_deck_count;
             if (HeaderStats.cache.p2.energy) HeaderStats.cache.p2.energy.textContent = state.player2.energy_deck_count;
-            if (HeaderStats.cache.p2.discard) HeaderStats.cache.p2.discard.textContent = state.player2.waitroom_count;
+            // Engine sends waitroom zone, calculate count from cards
+            if (HeaderStats.cache.p2.discard) HeaderStats.cache.p2.discard.textContent = (state.player2.waitroom?.cards?.length || state.player2.discard?.cards?.length || 0);
         }
     }
 };

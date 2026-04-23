@@ -11,7 +11,7 @@ export const PlannerService = {
     getPlannerFetchKey: () => {
         const state = State.data;
         if (!state || !State.roomCode) return null;
-        const activePlayer = state.active_player ?? state.current_player ?? 0;
+        const activePlayer = state.active_player ?? 0;
         return `${State.roomCode}:${state.turn}:${activePlayer}:${state.phase}`;
     },
 
@@ -22,7 +22,7 @@ export const PlannerService = {
         }
 
         const trackedPhases = [Phase.MAIN, Phase.LIVE_SET, Phase.RESPONSE];
-        const activePlayer = state.active_player ?? state.current_player ?? 0;
+        const activePlayer = state.active_player ?? 0;
         const isRelevantTurn = trackedPhases.includes(state.phase) && activePlayer === State.perspectivePlayer && !state.game_over;
         const needsCompletionRefresh = State.plannerData?.your_sequence?.status === 'in_progress' && !isRelevantTurn;
         return isRelevantTurn || needsCompletionRefresh;

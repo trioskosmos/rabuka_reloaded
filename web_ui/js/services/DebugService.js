@@ -43,13 +43,14 @@ export const DebugService = {
             }
             if (Array.isArray(p.stage)) out.stage = p.stage.map(s => s ? slimCard(s) : null);
             if (Array.isArray(p.live_zone) && p.live_zone.some(l => l !== null)) out.live_zone = p.live_zone.map(l => l ? slimCard(l) : null);
-            if (Array.isArray(p.success_lives) && p.success_lives.length > 0) out.success_lives = p.success_lives.map(slimCard);
+            if (Array.isArray(p.success_live_card_zone) && p.success_live_card_zone.length > 0) out.success_live_card_zone = p.success_live_card_zone.map(slimCard);
+            if (Array.isArray(p.waitroom) && p.waitroom.length > 0) out.waitroom = p.waitroom.map(slimCard);
             if (Array.isArray(p.discard) && p.discard.length > 0) out.discard = p.discard.map(slimCard);
             if (Array.isArray(p.energy)) {
-                // Support both tapped boolean and orientation === 'Wait'
+                // Engine sends orientation
                 out.energy_summary = {
-                    tapped: p.energy.filter(e => e && (e.tapped || e.orientation === 'Wait')).length,
-                    untapped: p.energy.filter(e => e && !e.tapped && e.orientation !== 'Wait').length
+                    tapped: p.energy.filter(e => e && e.orientation === 'Wait').length,
+                    untapped: p.energy.filter(e => e && e.orientation === 'Active').length
                 };
             }
             return out;
@@ -250,8 +251,8 @@ export const DebugService = {
             index,
             turn: state?.turn ?? '?',
             phase: state?.phase ?? '?',
-            current_player: state?.current_player ?? 0,
-            score: Array.isArray(state?.players) ? state.players.map((player) => player?.score ?? 0) : [],
+            current_player: state?.active_player ?? state?.current_player ?? 0,
+            score: Array.isArray(state?.players) ? state.players.map((player) => player?.success_live_card_zone?.cards?.length ?? 0) : [],
             serialized: JSON.stringify(state),
             state,
         }));
