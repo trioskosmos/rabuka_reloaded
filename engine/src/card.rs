@@ -474,6 +474,8 @@ pub struct AbilityCost {
     pub exclude_self: Option<bool>, // True if the cost excludes the activating card (e.g., "このメンバー以外")
     #[serde(default)]
     pub costs: Option<Vec<AbilityCost>>, // For sequential_cost with multiple cost steps
+    #[serde(default)]
+    pub cost_limit: Option<u32>, // Maximum cost of cards that can be used for this cost
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -505,10 +507,21 @@ pub struct AbilityEffect {
     pub ability_gain: Option<String>,
     pub quoted_text: Option<QuotedText>,
     pub per_unit: Option<bool>,
+    pub destination_choice: Option<bool>,
     pub condition: Option<Condition>,
     pub primary_effect: Option<Box<AbilityEffect>>,
     pub alternative_condition: Option<Condition>,
     pub alternative_effect: Option<Box<AbilityEffect>>,
+    // New fields for conditional_on_result
+    #[serde(default)]
+    pub result_condition: Option<Condition>,
+    #[serde(default)]
+    pub followup_action: Option<Box<AbilityEffect>>,
+    // New fields for conditional_on_optional
+    #[serde(default)]
+    pub optional_action: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub conditional_action: Option<Box<AbilityEffect>>,
     pub operation: Option<String>,
     pub value: Option<u32>,
     pub aggregate: Option<String>,
@@ -559,6 +572,22 @@ pub struct AbilityEffect {
     // Effect type for replacement/continuous effects (Rule 9.2.1)
     #[serde(default)]
     pub effect_type: Option<String>, // "one_shot", "continuous_effect", "replacement"
+    // New fields for heart color specification
+    #[serde(default)]
+    pub choice: Option<bool>, // For specify_heart_color - whether player can choose
+    // New fields for ALL blade timing
+    #[serde(default)]
+    pub timing: Option<String>, // Timing for effect (e.g., "check_required_hearts")
+    #[serde(default)]
+    pub treat_as: Option<String>, // What to treat resource as (e.g., "any_heart_color")
+    // New fields for card identity
+    #[serde(default)]
+    pub identities: Option<Vec<String>>, // Group identities for card
+    // New fields for opponent action handling
+    #[serde(default)]
+    pub action_by: Option<String>, // "opponent" if action is performed by opponent
+    #[serde(default)]
+    pub opponent_action: Option<Box<AbilityEffect>>, // The opponent action to execute
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -598,6 +627,7 @@ pub struct QuotedText {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub struct Condition {
+    #[serde(default = "default_empty_string")]
     pub text: String,
     #[serde(rename = "type")]
     pub condition_type: Option<String>,
@@ -640,6 +670,9 @@ pub struct Condition {
     pub includes: Option<bool>,
     pub appearance: Option<bool>,
     pub conditions: Option<Vec<Condition>>,
+    pub options: Option<Vec<serde_json::Value>>,
+    #[serde(default)]
+    pub condition: Option<Box<Condition>>, // For nested conditions (e.g., temporal_condition with not_moved)
     // New fields from parser improvements
     pub all_areas: Option<bool>,
     pub no_excess_heart: Option<bool>,
@@ -650,6 +683,65 @@ pub struct Condition {
     pub cost_result_reference: Option<bool>,
     pub cost_result_group_match: Option<bool>,
     pub group_matching: Option<bool>,
+}
+
+impl Default for Condition {
+    fn default() -> Self {
+        Condition {
+            text: String::new(),
+            condition_type: None,
+            location: None,
+            count: None,
+            operator: None,
+            card_type: None,
+            target: None,
+            group: None,
+            group_names: None,
+            characters: None,
+            state: None,
+            position: None,
+            temporal_scope: None,
+            distinct: None,
+            unique: None,
+            exclude_self: None,
+            any_of: None,
+            cost_limit: None,
+            exact_match: None,
+            negation: None,
+            includes_pattern: None,
+            movement_condition: None,
+            baton_touch_trigger: None,
+            movement_state: None,
+            energy_state: None,
+            aggregate_flags: None,
+            comparison_target: None,
+            comparison_operator: None,
+            movement: None,
+            heart_variety: None,
+            activation_condition: None,
+            activation_position: None,
+            trigger_type: None,
+            trigger_event: None,
+            temporal: None,
+            phase: None,
+            aggregate: None,
+            comparison_type: None,
+            includes: None,
+            appearance: None,
+            conditions: None,
+            options: None,
+            condition: None,
+            all_areas: None,
+            no_excess_heart: None,
+            exclude_this_member: None,
+            resource_type: None,
+            unit: None,
+            location_condition: None,
+            cost_result_reference: None,
+            cost_result_group_match: None,
+            group_matching: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

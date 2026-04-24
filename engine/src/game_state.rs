@@ -140,6 +140,8 @@ pub struct GameState {
     pub pending_ability: Option<PendingAbilityExecution>,
     // Pending choice for user interaction - persists across resolver instances
     pub pending_choice: Option<crate::ability_resolver::Choice>,
+    // Pending sequential actions to resume after user choice
+    pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
     // Area placement tracking - tracks which areas had cards placed this turn (Q70, Q71, Q75, Q76, Q79, Q80)
     pub areas_placed_this_turn: std::collections::HashSet<String>, // "player1:center", "player1:left", etc.
     // Card appearance tracking - tracks which cards appeared this turn (Q77)
@@ -157,6 +159,8 @@ pub struct GameState {
     pub card_instance_mapping: std::collections::HashMap<i16, u32>, // card_id -> instance_id
     // Baton touch tracking per turn (Q87) - tracks how many times baton touch has been used this turn
     pub baton_touch_count: u32, // Number of baton touches performed this turn
+    // Card movement tracking - tracks which cards have moved this turn (for not_moved/has_moved conditions)
+    pub cards_moved_this_turn: std::collections::HashSet<i16>, // card_ids that have moved this turn
     // Heart color decision tracking (Q46, Q67) - tracks when heart color decisions are made
     pub heart_color_decision_phase: String, // "live_start" or "required_hearts_check"
     // Deck refresh tracking (Q53) - tracks whether a deck refresh is pending
@@ -273,6 +277,7 @@ impl GameState {
             optional_cost_behavior: "always_pay".to_string(), // Default to always pay for bot/test mode
             pending_ability: None,
             pending_choice: None,
+            pending_sequential_actions: None,
             areas_placed_this_turn: std::collections::HashSet::new(),
             cards_appeared_this_turn: std::collections::HashSet::new(),
             turn_order_changed: false,
@@ -282,6 +287,7 @@ impl GameState {
             card_instance_counter: 0,
             card_instance_mapping: std::collections::HashMap::new(),
             baton_touch_count: 0,
+            cards_moved_this_turn: std::collections::HashSet::new(),
             heart_color_decision_phase: "none".to_string(),
             deck_refresh_pending: false,
             partial_resolution_allowed: true,
@@ -728,6 +734,19 @@ impl GameState {
 
     pub fn clear_baton_touch_tracking(&mut self) {
         self.baton_touch_count = 0;
+    }
+
+    // Card movement tracking methods (for not_moved/has_moved conditions)
+    pub fn record_card_movement(&mut self, card_id: i16) {
+        self.cards_moved_this_turn.insert(card_id);
+    }
+
+    pub fn has_card_moved_this_turn(&self, card_id: i16) -> bool {
+        self.cards_moved_this_turn.contains(&card_id)
+    }
+
+    pub fn clear_card_movement_tracking(&mut self) {
+        self.cards_moved_this_turn.clear();
     }
 
     // Heart color decision tracking methods (Q46, Q67)
@@ -1316,8 +1335,9 @@ impl GameState {
                 let destination = effect.destination.as_deref().unwrap_or("");
                 let card_type = effect.card_type.as_deref();
                 let target = effect.target.as_deref().unwrap_or("self");
-                
-                
+                let destination_choice = effect.destination_choice.unwrap_or(false);
+
+
                 let player = if target == "self" {
                     if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
                 } else {
@@ -1379,6 +1399,49 @@ impl GameState {
                                     }
                                     player.hand.cards.push(card_id);
                                     player.rebuild_hand_index_map();
+                                }
+                            }
+                            "empty_area" | "メンバーのいないエリア" => {
+                                // Move from waitroom to empty stage area
+                                let card_ids_to_move: Vec<_> = player.waitroom.cards.iter()
+                                    .filter(|c| {
+                                        if let Some(ct) = card_type {
+                                            if let Some(card) = self.card_database.get_card(**c) {
+                                                match ct {
+                                                    "live_card" | "ライブカード" => card.is_live(),
+                                                    "member_card" | "メンバーカード" => card.is_member(),
+                                                    _ => true
+                                                }
+                                            } else {
+                                                false
+                                            }
+                                        } else {
+                                            true
+                                        }
+                                    })
+                                    .take(count as usize)
+                                    .copied()
+                                    .collect();
+
+                                for card_id in card_ids_to_move {
+                                    // Find first empty stage area
+                                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                                    let mut placed = false;
+                                    for area in areas {
+                                        if player.stage.get_area(area).is_none() {
+                                            // Found empty area, place card
+                                            if let Some(pos) = player.waitroom.cards.iter().position(|&c| c == card_id) {
+                                                player.waitroom.cards.remove(pos);
+                                                player.stage.set_area(area, card_id);
+                                                placed = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    if !placed {
+                                        // No empty area available, card stays in waitroom
+                                        break;
+                                    }
                                 }
                             }
                             _ => {}
@@ -1832,6 +1895,61 @@ impl GameState {
         // Rule 11.6: Live Success - when player's live is successful
         // This is determined by comparing live scores during LiveVictoryDetermination phase
         self.current_phase == Phase::LiveVictoryDetermination
+    }
+
+    /// Check if a card can be placed in a zone based on constant ability restrictions
+    pub fn can_place_card_in_zone(&self, card_id: i16, zone: &str, _player_id: &str) -> bool {
+        if let Some(card) = self.card_database.get_card(card_id) {
+            // Check all constant abilities (常時) for restrictions
+            for ability in &card.abilities {
+                if ability.triggers.as_ref().map_or(false, |t| t == "常時") {
+                    if let Some(ref effect) = ability.effect {
+                        if effect.action == "restriction" 
+                            && effect.restriction_type.as_deref() == Some("cannot_place")
+                            && (effect.restricted_destination.as_deref() == Some(zone)
+                                || effect.restricted_destination.as_deref() == Some("live_card_zone") && zone == "success_live_zone"
+                                || effect.restricted_destination.as_deref() == Some("success_live_zone") && zone == "live_card_zone")
+                        {
+                            eprintln!("Card {} cannot be placed in {} due to constant ability restriction", card.card_no, zone);
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// Enforce constant ability restrictions for all cards in play
+    pub fn enforce_constant_ability_restrictions(&mut self) {
+        // Check all cards in all zones for constant ability restrictions
+        // This should be called before any action that could violate a restriction
+        
+        // Collect cards to check first (to avoid borrow checker issues)
+        let cards_to_check: Vec<(String, Vec<(usize, i16)>)> = vec![
+            (self.player1.id.clone(), self.player1.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect()),
+            (self.player2.id.clone(), self.player2.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect()),
+        ];
+        
+        // Check which cards need to be removed
+        let mut cards_to_remove: Vec<(String, usize)> = Vec::new();
+        for (player_id, cards) in cards_to_check {
+            for (index, card_id) in cards {
+                if !self.can_place_card_in_zone(card_id, "live_card_zone", &player_id) {
+                    cards_to_remove.push((player_id.clone(), index));
+                }
+            }
+        }
+        
+        // Remove cards that violate restrictions
+        for (player_id, index) in cards_to_remove {
+            let player = if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
+            let card = player.live_card_zone.cards.remove(index);
+            player.waitroom.cards.push(card);
+            if let Some(card_data) = self.card_database.get_card(card) {
+                eprintln!("Removed card {} from live_card_zone due to constant ability restriction", card_data.card_no);
+            }
+        }
     }
 
     /// Get all triggerable abilities for a card given current game state

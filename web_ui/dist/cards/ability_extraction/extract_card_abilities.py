@@ -319,7 +319,7 @@ def extract_all_abilities(cards_file: Path) -> dict:
                             # If the quoted text contains ability keywords, convert to gain_ability
                             if 'ライブ' in quoted_content or 'スコア' in quoted_content:
                                 obj['action'] = 'gain_ability'
-                                obj['ability'] = [quoted_content]
+                                obj['ability_gain'] = quoted_content  # Use ability_gain as string to match engine
                                 # Remove resource and count fields if they were added incorrectly
                                 if 'resource' in obj:
                                     del obj['resource']

@@ -1302,13 +1302,24 @@ impl AbilityExecutor {
     ) -> Result<(), String> {
         let actions = effect.actions.as_ref().ok_or("No actions in sequential effect")?;
 
-        for sub_effect in actions {
+        for (index, sub_effect) in actions.iter().enumerate() {
             match sub_effect.action.as_str() {
                 "draw" => {
                     self.execute_draw(sub_effect, player)?;
                 }
                 "move_cards" => {
-                    self.execute_move_cards(sub_effect, player, game_state, perspective_player_id)?;
+                    match self.execute_move_cards(sub_effect, player, game_state, perspective_player_id) {
+                        Ok(_) => {},
+                        Err(e) if e.contains("Pending choice required") => {
+                            // Save the remaining actions to resume after user choice
+                            let remaining_actions: Vec<AbilityEffect> = actions[index + 1..].to_vec();
+                            if !remaining_actions.is_empty() {
+                                game_state.pending_sequential_actions = Some(remaining_actions);
+                            }
+                            return Err(e);
+                        }
+                        Err(e) => return Err(e),
+                    }
                 }
                 "look_at" => {
                     // Just look, no movement

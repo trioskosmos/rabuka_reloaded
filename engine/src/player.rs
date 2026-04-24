@@ -148,7 +148,9 @@ impl Player {
                     }
                 } else {
                     // No member in target area, can't baton touch
-                    false
+                    self.hand.cards.insert(hand_index, card_id);
+                    self.rebuild_hand_index_map();
+                    return Err("Cannot baton touch - no member in target area".to_string());
                 }
             } else {
                 false

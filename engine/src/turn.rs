@@ -360,6 +360,9 @@ impl TurnEngine {
 
                 let (cost_paid, baton_touch_used) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
 
+                // Record card movement for temporal condition tracking
+                game_state.record_card_movement(card_id);
+
                 // Q25: Track if baton touch resulted in 0 cost (equal or lower cost)
                 game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
 
@@ -754,6 +757,10 @@ impl TurnEngine {
             Self::trigger_live_success_abilities(game_state, &p2_id);
         }
         
+        // Process triggered live success abilities BEFORE moving cards
+        // This ensures abilities execute while cards are still in live_card_zone
+        game_state.process_pending_auto_abilities(&game_state.player1.id.clone());
+        
         // Rule 8.4.7: Move winning live card to success zone
         // First, send cards with "cannot_place" restriction straight to discard
         let card_db = game_state.card_database.clone();
@@ -774,7 +781,8 @@ impl TurnEngine {
                     if let Some(ref effect) = ability.effect {
                         effect.action == "restriction" 
                             && effect.restriction_type.as_deref() == Some("cannot_place")
-                            && effect.restricted_destination.as_deref() == Some("success_live_zone")
+                            && (effect.restricted_destination.as_deref() == Some("success_live_zone")
+                                || effect.restricted_destination.as_deref() == Some("live_card_zone"))
                     } else {
                         false
                     }
@@ -795,35 +803,63 @@ impl TurnEngine {
         }
     }
 
-    fn move_live_to_success(player: &mut crate::player::Player, card_index: usize) {
+    fn move_live_to_success(player: &mut crate::player::Player, card_index: usize, card_db: &CardDatabase) {
         // Move specified card from live card zone to success live card zone
         if card_index < player.live_card_zone.cards.len() {
             let card = player.live_card_zone.cards.remove(card_index);
-            player.success_live_card_zone.cards.push(card);
+            
+            // Check if card has constant ability restriction preventing placement in success live zone
+            let can_place = if let Some(card_data) = card_db.get_card(card) {
+                !card_data.abilities.iter().any(|ability| {
+                    if let Some(ref effect) = ability.effect {
+                        effect.action == "restriction" 
+                            && ability.triggers.as_ref().map_or(false, |t| t == "常時")
+                            && effect.restriction_type.as_deref() == Some("cannot_place")
+                            && (effect.restricted_destination.as_deref() == Some("success_live_zone")
+                                || effect.restricted_destination.as_deref() == Some("live_card_zone"))
+                    } else {
+                        false
+                    }
+                })
+            } else {
+                true
+            };
+            
+            if can_place {
+                player.success_live_card_zone.cards.push(card);
+            } else {
+                // Send to discard instead due to restriction
+                player.waitroom.cards.push(card);
+                if let Some(card_data) = card_db.get_card(card) {
+                    eprintln!("Card {} cannot be placed in success live zone due to constant restriction, sent to discard", card_data.card_no);
+                }
+            }
         }
     }
 
     fn move_live_to_success_and_handle_wins(game_state: &mut GameState, player1_won: bool, player2_won: bool) {
+        let card_db = game_state.card_database.clone();
+        
         if player1_won && player2_won {
             // Both won - check if either has 2 cards
             if game_state.player1.live_card_zone.cards.len() == 2 {
                 // Player1 has 2 cards, doesn't move
             } else {
                 let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player1);
-                Self::move_live_to_success(&mut game_state.player1, card_index);
+                Self::move_live_to_success(&mut game_state.player1, card_index, &card_db);
             }
             if game_state.player2.live_card_zone.cards.len() == 2 {
                 // Player2 has 2 cards, doesn't move
             } else {
                 let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player2);
-                Self::move_live_to_success(&mut game_state.player2, card_index);
+                Self::move_live_to_success(&mut game_state.player2, card_index, &card_db);
             }
         } else if player1_won {
             let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player1);
-            Self::move_live_to_success(&mut game_state.player1, card_index);
+            Self::move_live_to_success(&mut game_state.player1, card_index, &card_db);
         } else if player2_won {
             let card_index = crate::bot::ai::AIPlayer::choose_live_card_for_success(&game_state.player2);
-            Self::move_live_to_success(&mut game_state.player2, card_index);
+            Self::move_live_to_success(&mut game_state.player2, card_index, &card_db);
         }
         
         // Rule 8.4.8: Move remaining live cards and cheer cards to discard
