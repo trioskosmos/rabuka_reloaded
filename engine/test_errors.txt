@@ -1,0 +1,3259 @@
+﻿cargo : warning: unused variable: `destination_choice`
+発生場所 行:1 文字:62
++ ... a_reloaded\engine; cargo test --test qa_individual_tests 2>&1 | Out-F ...
++                        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: unused...ination_choice`:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    --> src\game_state.rs:1338:21
+     |
+1338 |                 let destination_choice = effect.destination_choice.unwrap_or(false);
+     |                     ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_destination_choice`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `condition`
+    --> src\ability_resolver.rs:1110:41
+     |
+1110 |     fn evaluate_choice_condition(&self, condition: &Condition) -> bool {
+     |                                         ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_condition`
+
+warning: `rabuka_engine` (lib) generated 2 warnings (run `cargo fix --lib -p rabuka_engine` to apply 2 suggestions)
+warning: `rabuka_engine` (bin "rabuka_engine") generated 2 warnings (2 duplicates)
+   Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
+error[E0428]: the name `q200_ability_debut_abilities` is defined multiple times
+   --> tests\qa_individual_tests.rs:107:5
+    |
+ 94 |     pub mod q200_ability_debut_abilities;
+    |     ------------------------------------- previous definition of the module `q200_ability_debut_abilities` here
+...
+107 |     pub mod q200_ability_debut_abilities;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `q200_ability_debut_abilities` redefined here
+    |
+    = note: `q200_ability_debut_abilities` must be defined only once in the type namespace of this module
+
+error[E0425]: cannot find value `bp1` in this scope
+  --> tests\qa_individual\q216_combined_name_cost.rs:26:36
+   |
+26 |         .find(|c| c.card_no == "LL-bp1-001-R繝ｻ繝ｻ);
+   |                                    ^^^ not found in this scope
+
+error[E0425]: cannot find value `R繝ｻ繝ｻ` in this scope
+  --> tests\qa_individual\q216_combined_name_cost.rs:26:44
+   |
+26 |         .find(|c| c.card_no == "LL-bp1-001-R繝ｻ繝ｻ);
+   |                                            ^^^^^ not found in this scope
+
+error[E0425]: cannot find value `combined_card` in this scope
+  --> tests\qa_individual\q216_combined_name_cost.rs:29:32
+   |
+29 |         if let Some(ll_card) = combined_card {
+   |                                ^^^^^^^^^^^^^ not found in this scope
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+  --> tests\qa_individual\common.rs:13:9
+   |
+13 | pub use rabuka_engine::zones::MemberArea;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q28_play_member_without_baton.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q31_same_live_cards_multiple.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q41_cheer_check_card_timing.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q41_cheer_check_card_timing.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q41_cheer_check_card_timing.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\qa_individual\q51_turn_order_single_success.rs:1:5
+  |
+1 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `get_card_id`, `setup_player_with_energy`, and `setup_player_with_hand`
+ --> tests\qa_individual\q51_turn_order_single_success.rs:3:74
+  |
+3 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                          ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\qa_individual\q52_turn_order_no_success.rs:1:5
+  |
+1 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `get_card_id`, `setup_player_with_energy`, and `setup_player_with_hand`
+ --> tests\qa_individual\q52_turn_order_no_success.rs:3:74
+  |
+3 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                          ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\qa_individual\q54_draw_condition.rs:1:5
+  |
+1 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `get_card_id`, `setup_player_with_energy`, and `setup_player_with_hand`
+ --> tests\qa_individual\q54_draw_condition.rs:3:74
+  |
+3 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                          ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\qa_individual\q55_partial_effect_resolution.rs:1:5
+  |
+1 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `get_card_id`, `setup_player_with_energy`, and `setup_player_with_hand`
+ --> tests\qa_individual\q55_partial_effect_resolution.rs:3:74
+  |
+3 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                          ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\qa_individual\q56_cost_must_be_full.rs:1:5
+  |
+1 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `get_card_id`, `setup_player_with_energy`, and `setup_player_with_hand`
+ --> tests\qa_individual\q56_cost_must_be_full.rs:3:74
+  |
+3 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                          ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\qa_individual\q57_prohibition_over_permission.rs:1:5
+  |
+1 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `get_card_id`, `setup_player_with_energy`, and `setup_player_with_hand`
+ --> tests\qa_individual\q57_prohibition_over_permission.rs:3:74
+  |
+3 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                          ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q62_card_name_ampersand.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q62_card_name_ampersand.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q62_card_name_ampersand.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q65_cost_payment_combined_names.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q65_cost_payment_combined_names.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q65_cost_payment_combined_names.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\qa_individual\q73_refresh_during_effect.rs:1:5
+  |
+1 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused imports: `get_card_id`, `setup_player_with_energy`, and `setup_player_with_hand`
+ --> tests\qa_individual\q73_refresh_during_effect.rs:3:74
+  |
+3 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                          ^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q81_constant_ability_names.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q81_constant_ability_names.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q81_constant_ability_names.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q82_card_name_search.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q82_card_name_search.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q82_card_name_search.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q84_auto_ability_timing.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q84_auto_ability_timing.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q84_auto_ability_timing.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q85_deck_search_insufficient.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q85_deck_search_insufficient.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q85_deck_search_insufficient.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q86_deck_search_equal.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q86_deck_search_equal.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q86_deck_search_equal.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q87_baton_touch_multiple.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q92_auto_ability_cost.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q92_auto_ability_cost.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q98_live_start_member_count.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q98_live_start_member_count.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q98_live_start_member_count.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q98_live_start_member_count.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q99_live_start_debut_move.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q99_live_start_debut_move.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q99_live_start_debut_move.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q99_live_start_debut_move.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q100_cheer_refresh.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q100_cheer_refresh.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q101_cheer_deck_empty.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q101_cheer_deck_empty.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q102_deck_search_live.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q102_deck_search_live.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q103_sequential_energy_score.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q103_sequential_energy_score.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q104_deck_discard.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q104_deck_discard.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q105_combined_name_reference_live.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q105_combined_name_reference_live.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q106_invalidate_ability.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q106_invalidate_ability.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q106_invalidate_ability.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q106_invalidate_ability.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q107_cheer_reference.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q107_cheer_reference.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q183_ability_wait_opponent.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q183_ability_wait_opponent.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q183_ability_wait_opponent.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q183_ability_wait_opponent.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q186_hand_card_cost_reduction.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q186_hand_card_cost_reduction.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q186_hand_card_cost_reduction.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q187_member_selection_blade.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q187_member_selection_blade.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q187_member_selection_blade.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q187_member_selection_blade.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q188_debut_auto_trigger.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q188_debut_auto_trigger.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q188_debut_auto_trigger.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q188_debut_auto_trigger.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q189_opponent_chooses_wait.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q200_ability_debut_abilities.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q200_ability_debut_abilities.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q200_ability_debut_abilities.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q201_debut_ability_usable.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q201_debut_ability_usable.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q202_debut_ability_usable_mia.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q202_debut_ability_usable_mia.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q191_cannot_choose_same_effect_twice.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q191_cannot_choose_same_effect_twice.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q191_cannot_choose_same_effect_twice.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q192_blade_heart_color_change.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q192_blade_heart_color_change.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q192_blade_heart_color_change.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q193_two_member_baton_area.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q193_two_member_baton_area.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q193_two_member_baton_area.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q193_two_member_baton_area.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q194_two_member_baton_turn.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q194_two_member_baton_turn.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q194_two_member_baton_turn.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q194_two_member_baton_turn.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q195_blade_count_modification.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q195_blade_count_modification.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q195_blade_count_modification.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q197_auto_baton_cost_10.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q197_auto_baton_cost_10.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q197_auto_baton_cost_10.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q198_auto_baton_cost_11.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q198_auto_baton_cost_11.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q198_auto_baton_cost_11.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q198_auto_baton_cost_11.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q199_baton_same_turn.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q199_baton_same_turn.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q199_baton_same_turn.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_hand`
+ --> tests\qa_individual\q199_baton_same_turn.rs:6:87
+  |
+6 | use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+  |                                                                                       ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q203_wait_activation_not_score.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q203_wait_activation_not_score.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q203_wait_activation_not_score.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q204_combined_name_counting.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q204_combined_name_counting.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q204_combined_name_counting.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q204_combined_name_counting.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q205_heart_condition_different.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q205_heart_condition_different.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q205_heart_condition_different.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q206_wait_baton_cost.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q206_wait_baton_cost.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q206_wait_baton_cost.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q206_wait_baton_cost.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q207_combined_name_reference.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q207_combined_name_reference.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q207_combined_name_reference.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q207_combined_name_reference.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q208_combined_name_with_regular.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q208_combined_name_with_regular.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q208_combined_name_with_regular.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q208_combined_name_with_regular.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q209_live_card_cost_retrieval.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q209_live_card_cost_retrieval.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q209_live_card_cost_retrieval.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q209_live_card_cost_retrieval.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q210_deck_minimum_cost.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q210_deck_minimum_cost.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q210_deck_minimum_cost.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q211_auto_trigger_multiple.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q211_auto_trigger_multiple.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q211_auto_trigger_multiple.rs:5:137
+  |
+5 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q212_score_icon_effect.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q212_score_icon_effect.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q213_score_negative_effect.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q213_score_negative_effect.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q214_success_live_zero.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q214_success_live_zero.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q215_debut_draw_three.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q215_debut_draw_three.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q216_combined_name_cost.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q216_combined_name_cost.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q216_combined_name_cost.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q217_live_start_cost_auto.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q217_live_start_cost_auto.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q218_live_card_to_deck.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q218_live_card_to_deck.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q219_combined_name_member_count.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q219_combined_name_member_count.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q219_combined_name_member_count.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q220_heart_condition_all.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q220_heart_condition_all.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q220_heart_condition_all.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q220_heart_condition_all.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q221_opponent_position_choice.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q221_opponent_position_choice.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\q221_opponent_position_choice.rs:5:5
+  |
+5 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `setup_player_with_stage`
+ --> tests\qa_individual\q221_opponent_position_choice.rs:6:137
+  |
+6 | ...d, setup_player_with_hand, setup_player_with_energy, setup_player_with_stage};
+  |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q222_live_start_repeat.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q222_live_start_repeat.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q223_combined_name_search.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q223_combined_name_search.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q224_live_card_version.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q224_live_card_version.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q225_live_card_version_reverse.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q225_live_card_version_reverse.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q226_card_name_containment_search.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q226_card_name_containment_search.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q227_group_unit_names.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q227_group_unit_names.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q228_manual_operations.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q228_manual_operations.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q229_baton_multiple_turn.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q229_baton_multiple_turn.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q230_deck_search_equal.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q230_deck_search_equal.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q231_deck_search_insufficient.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q231_deck_search_insufficient.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q232_auto_ability_timing.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q232_auto_ability_timing.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q233_multiple_live_cards.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q233_multiple_live_cards.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q234_card_name_search.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q234_card_name_search.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q235_constant_ability_names.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q235_constant_ability_names.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q236_auto_ability_no_live.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q236_auto_ability_no_live.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::game_setup::ActionType`
+ --> tests\qa_individual\q237_partial_discard.rs:2:5
+  |
+2 | use rabuka_engine::game_setup::ActionType;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::turn::TurnEngine`
+ --> tests\qa_individual\q237_partial_discard.rs:4:5
+  |
+4 | use rabuka_engine::turn::TurnEngine;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: suffixes on string literals are invalid
+  --> tests\qa_individual\q216_combined_name_cost.rs:22:32
+   |
+22 |           .find(|c| c.card_no == "PL!-bp5-004-R繝ｻ繝ｻ);
+   |  ________________________________^
+23 | |     
+24 | |     // Find the combined name card: LL-bp1-001-R+
+25 | |     let combined_card = cards.iter()
+26 | |         .find(|c| c.card_no == "LL-bp1-001-R繝ｻ繝ｻ);
+   | |__________________________________^ invalid suffix `LL`
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q100_cheer_refresh.rs:41:34
+   |
+41 |         while game_state.player1.deck.cards.len() > 5 {
+   |                                  ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q100_cheer_refresh.rs:42:32
+   |
+42 |             game_state.player1.deck.cards.pop();
+   |                                ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q100_cheer_refresh.rs:49:39
+   |
+49 |         assert_eq!(game_state.player1.deck.cards.len(), 5,
+   |                                       ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q101_cheer_deck_empty.rs:41:34
+   |
+41 |         while game_state.player1.deck.cards.len() > 2 {
+   |                                  ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q101_cheer_deck_empty.rs:42:32
+   |
+42 |             game_state.player1.deck.cards.pop();
+   |                                ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q101_cheer_deck_empty.rs:49:39
+   |
+49 |         assert_eq!(game_state.player1.deck.cards.len(), 2,
+   |                                       ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q104_deck_discard.rs:43:34
+   |
+43 |         while game_state.player1.deck.cards.len() > 4 {
+   |                                  ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q104_deck_discard.rs:44:32
+   |
+44 |             game_state.player1.deck.cards.pop();
+   |                                ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q104_deck_discard.rs:51:39
+   |
+51 |         assert_eq!(game_state.player1.deck.cards.len(), 4,
+   |                                       ^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0308]: mismatched types
+  --> tests\qa_individual\q105_combined_name_reference_live.rs:46:56
+   |
+46 |             setup_player_with_stage(&mut player1, vec![(ll_card_id, MemberArea::Center)]);
+   |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i16`, found `(i16, MemberArea)`
+   |
+   = note: expected type `i16`
+             found tuple `(i16, MemberArea)`
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q210_deck_minimum_cost.rs:43:34
+   |
+43 |         while game_state.player1.draw_deck.cards.len() > 2 {
+   |                                  ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q210_deck_minimum_cost.rs:44:32
+   |
+44 |             game_state.player1.draw_deck.cards.pop();
+   |                                ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q210_deck_minimum_cost.rs:51:39
+   |
+51 |         assert_eq!(game_state.player1.draw_deck.cards.len(), 2,
+   |                                       ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q218_live_card_to_deck.rs:42:34
+   |
+42 |         while game_state.player1.draw_deck.cards.len() > 2 {
+   |                                  ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q218_live_card_to_deck.rs:43:32
+   |
+43 |             game_state.player1.draw_deck.cards.pop();
+   |                                ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q218_live_card_to_deck.rs:50:39
+   |
+50 |         assert_eq!(game_state.player1.draw_deck.cards.len(), 2,
+   |                                       ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q230_deck_search_equal.rs:42:34
+   |
+42 |         while game_state.player1.draw_deck.cards.len() > 3 {
+   |                                  ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q230_deck_search_equal.rs:43:32
+   |
+43 |             game_state.player1.draw_deck.cards.pop();
+   |                                ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q230_deck_search_equal.rs:50:39
+   |
+50 |         assert_eq!(game_state.player1.draw_deck.cards.len(), 3,
+   |                                       ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q231_deck_search_insufficient.rs:42:34
+   |
+42 |         while game_state.player1.draw_deck.cards.len() > 2 {
+   |                                  ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q231_deck_search_insufficient.rs:43:32
+   |
+43 |             game_state.player1.draw_deck.cards.pop();
+   |                                ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0609]: no field `draw_deck` on type `rabuka_engine::player::Player`
+  --> tests\qa_individual\q231_deck_search_insufficient.rs:50:39
+   |
+50 |         assert_eq!(game_state.player1.draw_deck.cards.len(), 2,
+   |                                       ^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `name`, `is_first_attacker`, `stage`, `live_card_zone` ... and 12 others
+
+error[E0308]: mismatched types
+  --> tests\qa_individual\q235_constant_ability_names.rs:45:56
+   |
+45 |             setup_player_with_stage(&mut player1, vec![(ll_card_id, MemberArea::Center)]);
+   |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `i16`, found `(i16, MemberArea)`
+   |
+   = note: expected type `i16`
+             found tuple `(i16, MemberArea)`
+
+warning: unused variable: `member_cost`
+  --> tests\qa_individual\q4_energy_cost.rs:90:9
+   |
+90 |     let member_cost = member_card.cost.unwrap_or(0);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_member_cost`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `total_cost`
+   --> tests\qa_individual\q5_stage_positions.rs:153:9
+    |
+153 |     let total_cost = member1.cost.unwrap_or(0) + member2.cost.unwrap_or(0) + member3.cost.unwrap_or(0);
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_total_cost`
+
+warning: unused variable: `expected_cost_reduction`
+  --> tests\qa_individual\q24_baton_touch_procedure.rs:39:9
+   |
+39 |     let expected_cost_reduction = new_cost - existing_cost;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_expected_cost_reduction`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q28_play_member_without_baton.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q31_same_live_cards_multiple.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q33_live_start_timing.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q33_live_start_timing.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q34_live_cards_remain_when_hearts_met.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q34_live_cards_remain_when_hearts_met.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q34_live_cards_remain_when_hearts_met.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q35_live_cards_to_waitroom_when_hearts_not_met.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q35_live_cards_to_waitroom_when_hearts_not_met.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q35_live_cards_to_waitroom_when_hearts_not_met.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q36_live_success_timing.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q36_live_success_timing.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q36_live_success_timing.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q37_auto_abilities_multiple_uses.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q37_auto_abilities_multiple_uses.rs:38:13
+   |
+38 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q37_auto_abilities_multiple_uses.rs:38:13
+   |
+38 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q38_card_during_live_definition.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q38_card_during_live_definition.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q38_card_during_live_definition.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q39_cheer_checks_required.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q39_cheer_checks_required.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q41_cheer_check_card_timing.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `initial_waitroom_count`
+  --> tests\qa_individual\q41_cheer_check_card_timing.rs:45:13
+   |
+45 |         let initial_waitroom_count = game_state.player1.waitroom.cards.len();
+   |             ^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_initial_waitroom_count`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q42_cheer_check_ability_timing.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q43_cheer_check_draw_effect.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `initial_hand_count`
+  --> tests\qa_individual\q43_cheer_check_draw_effect.rs:50:13
+   |
+50 |         let initial_hand_count = game_state.player1.hand.cards.len();
+   |             ^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_initial_hand_count`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q44_cheer_check_score_effect.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `initial_score`
+  --> tests\qa_individual\q44_cheer_check_score_effect.rs:42:13
+   |
+42 |         let initial_score = game_state.player1.live_score;
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_initial_score`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q45_cheer_check_all_blade.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q46_heart_color_timing.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q47_live_failure_score.rs:19:9
+   |
+19 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q48_live_zero_score_win.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q49_turn_order_no_winner.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q51_turn_order_single_success.rs:16:9
+   |
+16 |     let mut player1 = Player::new("player1".to_string(), "Player A (first attacker)".to_string(), true);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q51_turn_order_single_success.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player B (second attacker)".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_database`
+  --> tests\qa_individual\q51_turn_order_single_success.rs:14:9
+   |
+14 |     let card_database = create_card_database(cards.clone());
+   |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_database`
+
+warning: unused variable: `player1`
+  --> tests\qa_individual\q51_turn_order_single_success.rs:16:9
+   |
+16 |     let mut player1 = Player::new("player1".to_string(), "Player A (first attacker)".to_string(), true);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player1`
+
+warning: unused variable: `player2`
+  --> tests\qa_individual\q51_turn_order_single_success.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player B (second attacker)".to_string(), false);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player2`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q52_turn_order_no_success.rs:16:9
+   |
+16 |     let mut player1 = Player::new("player1".to_string(), "Player A (first attacker)".to_string(), true);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q52_turn_order_no_success.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player B (second attacker)".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_database`
+  --> tests\qa_individual\q52_turn_order_no_success.rs:14:9
+   |
+14 |     let card_database = create_card_database(cards.clone());
+   |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_database`
+
+warning: unused variable: `player1`
+  --> tests\qa_individual\q52_turn_order_no_success.rs:16:9
+   |
+16 |     let mut player1 = Player::new("player1".to_string(), "Player A (first attacker)".to_string(), true);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player1`
+
+warning: unused variable: `player2`
+  --> tests\qa_individual\q52_turn_order_no_success.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player B (second attacker)".to_string(), false);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player2`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q54_draw_condition.rs:13:9
+   |
+13 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q54_draw_condition.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_database`
+  --> tests\qa_individual\q54_draw_condition.rs:11:9
+   |
+11 |     let card_database = create_card_database(cards.clone());
+   |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_database`
+
+warning: unused variable: `player1`
+  --> tests\qa_individual\q54_draw_condition.rs:13:9
+   |
+13 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player1`
+
+warning: unused variable: `player2`
+  --> tests\qa_individual\q54_draw_condition.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player2`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q55_partial_effect_resolution.rs:14:9
+   |
+14 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q55_partial_effect_resolution.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_database`
+  --> tests\qa_individual\q55_partial_effect_resolution.rs:12:9
+   |
+12 |     let card_database = create_card_database(cards.clone());
+   |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_database`
+
+warning: unused variable: `player1`
+  --> tests\qa_individual\q55_partial_effect_resolution.rs:14:9
+   |
+14 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player1`
+
+warning: unused variable: `player2`
+  --> tests\qa_individual\q55_partial_effect_resolution.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player2`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q56_cost_must_be_full.rs:14:9
+   |
+14 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q56_cost_must_be_full.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_database`
+  --> tests\qa_individual\q56_cost_must_be_full.rs:12:9
+   |
+12 |     let card_database = create_card_database(cards.clone());
+   |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_database`
+
+warning: unused variable: `player1`
+  --> tests\qa_individual\q56_cost_must_be_full.rs:14:9
+   |
+14 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player1`
+
+warning: unused variable: `player2`
+  --> tests\qa_individual\q56_cost_must_be_full.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player2`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q57_prohibition_over_permission.rs:13:9
+   |
+13 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q57_prohibition_over_permission.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_database`
+  --> tests\qa_individual\q57_prohibition_over_permission.rs:11:9
+   |
+11 |     let card_database = create_card_database(cards.clone());
+   |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_database`
+
+warning: unused variable: `player1`
+  --> tests\qa_individual\q57_prohibition_over_permission.rs:13:9
+   |
+13 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player1`
+
+warning: unused variable: `player2`
+  --> tests\qa_individual\q57_prohibition_over_permission.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player2`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q58_multiple_copies_turn1_abilities.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q58_multiple_copies_turn1_abilities.rs:38:13
+   |
+38 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q58_multiple_copies_turn1_abilities.rs:38:13
+   |
+38 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q60_auto_ability_must_use.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q61_auto_ability_turn_one_skip.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q62_card_name_ampersand.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `member_cost`
+  --> tests\qa_individual\q63_ability_play_no_cost.rs:25:9
+   |
+25 |     let member_cost = member_card.cost.unwrap_or(0);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_member_cost`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q64_condition_verification.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q65_cost_payment_combined_names.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q66_score_comparison_no_live.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q72_live_set_no_stage_members.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q72_live_set_no_stage_members.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q72_live_set_no_stage_members.rs:34:13
+   |
+34 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q73_refresh_during_effect.rs:13:9
+   |
+13 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q73_refresh_during_effect.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_database`
+  --> tests\qa_individual\q73_refresh_during_effect.rs:11:9
+   |
+11 |     let card_database = create_card_database(cards.clone());
+   |         ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_database`
+
+warning: unused variable: `player1`
+  --> tests\qa_individual\q73_refresh_during_effect.rs:13:9
+   |
+13 |     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player1`
+
+warning: unused variable: `player2`
+  --> tests\qa_individual\q73_refresh_during_effect.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_player2`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q74_group_name_reference.rs:14:9
+   |
+14 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q74_group_name_reference.rs:36:13
+   |
+36 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q74_group_name_reference.rs:36:13
+   |
+36 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q75_baton_after_discard_to_stage.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q75_baton_after_discard_to_stage.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q75_baton_after_discard_to_stage.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q76_discard_to_stage_occupied_area.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q76_discard_to_stage_occupied_area.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q76_discard_to_stage_occupied_area.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q77_condition_only_this_card_debuted.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q77_condition_only_this_card_debuted.rs:37:13
+   |
+37 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q77_condition_only_this_card_debuted.rs:37:13
+   |
+37 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q78_constant_ability_from_activation.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q78_constant_ability_from_activation.rs:37:13
+   |
+37 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q78_constant_ability_from_activation.rs:37:13
+   |
+37 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q79_area_unlock_after_cost.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q79_area_unlock_after_cost.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q79_area_unlock_after_cost.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q80_debut_area_placement.rs:20:9
+   |
+20 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q81_constant_ability_names.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q82_card_name_search.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q83_multiple_live_cards.rs:16:9
+   |
+16 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q85_deck_search_insufficient.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q86_deck_search_equal.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q87_baton_touch_multiple.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q88_manual_operations.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q89_group_unit_names.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q90_card_name_containment.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q90_card_name_containment.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q90_card_name_containment.rs:35:13
+   |
+35 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q91_auto_ability_no_live.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q91_auto_ability_no_live.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q91_auto_ability_no_live.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q92_auto_ability_cost.rs:19:9
+   |
+19 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q92_auto_ability_cost.rs:50:17
+   |
+16 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+50 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q93_partial_discard.rs:16:9
+   |
+16 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q93_partial_discard.rs:37:13
+   |
+37 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q93_partial_discard.rs:37:13
+   |
+37 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q94_auto_multiple_triggers.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q94_auto_multiple_triggers.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q94_auto_multiple_triggers.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q95_discard_to_stage_limit.rs:16:9
+   |
+16 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q95_discard_to_stage_limit.rs:36:13
+   |
+36 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q95_discard_to_stage_limit.rs:36:13
+   |
+36 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q96_condition_check_timing.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q96_condition_check_timing.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q96_condition_check_timing.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q97_sequential_condition_check.rs:15:9
+   |
+15 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q97_sequential_condition_check.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ----^^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q97_sequential_condition_check.rs:39:13
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |             ^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q98_live_start_member_count.rs:19:9
+   |
+19 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q98_live_start_member_count.rs:46:17
+   |
+16 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+46 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q99_live_start_debut_move.rs:19:9
+   |
+19 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q99_live_start_debut_move.rs:45:17
+   |
+16 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+45 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q102_deck_search_live.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q102_deck_search_live.rs:44:17
+   |
+15 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+38 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+44 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+38 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q103_sequential_energy_score.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q103_sequential_energy_score.rs:44:17
+   |
+15 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+38 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+44 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+38 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q106_invalidate_ability.rs:19:9
+   |
+19 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q106_invalidate_ability.rs:45:17
+   |
+16 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+45 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q107_cheer_reference.rs:19:9
+   |
+19 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q107_cheer_reference.rs:45:17
+   |
+16 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+39 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+45 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+39 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q183_ability_wait_opponent.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q184_energy_under_member_counting.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q186_hand_card_cost_reduction.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_db_clone`
+  --> tests\qa_individual\q186_hand_card_cost_reduction.rs:53:13
+   |
+53 |         let card_db_clone = card_database.clone();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_db_clone`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q187_member_selection_blade.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q187_member_selection_blade.rs:44:17
+   |
+15 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+38 |         let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                               ------------- value moved here
+...
+44 |         assert!(card_database.get_card(card_id).is_some(),
+   |                 ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+38 |         let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                            ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q188_debut_auto_trigger.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q188_debut_auto_trigger.rs:50:21
+   |
+15 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+44 |             let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                                   ------------- value moved here
+...
+50 |             assert!(card_database.get_card(card_id).is_some(),
+   |                     ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+44 |             let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                                ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q200_ability_debut_abilities.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q201_debut_ability_usable.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q201_debut_ability_usable.rs:49:21
+   |
+14 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+43 |             let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                                   ------------- value moved here
+...
+49 |             assert!(card_database.get_card(card_id).is_some(),
+   |                     ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+43 |             let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                                ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q202_debut_ability_usable_mia.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+error[E0382]: borrow of moved value: `card_database`
+  --> tests\qa_individual\q202_debut_ability_usable_mia.rs:49:21
+   |
+14 |     let card_database = create_card_database(cards.clone());
+   |         ------------- move occurs because `card_database` has type `Arc<CardDatabase>`, which does not implement the `Copy` trait
+...
+43 |             let mut game_state = GameState::new(player1, player2, card_database);
+   |                                                                   ------------- value moved here
+...
+49 |             assert!(card_database.get_card(card_id).is_some(),
+   |                     ^^^^^^^^^^^^^ value borrowed here after move
+   |
+   = note: borrow occurs due to deref coercion to `CardDatabase`
+help: clone the value to increment its reference count
+   |
+43 |             let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                                                                                ++++++++
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q190_cannot_choose_all_heart.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_db_clone`
+  --> tests\qa_individual\q190_cannot_choose_all_heart.rs:45:13
+   |
+45 |         let card_db_clone = card_database.clone();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_db_clone`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q191_cannot_choose_same_effect_twice.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_db_clone`
+  --> tests\qa_individual\q191_cannot_choose_same_effect_twice.rs:45:13
+   |
+45 |         let card_db_clone = card_database.clone();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_db_clone`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q192_blade_heart_color_change.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_db_clone`
+  --> tests\qa_individual\q192_blade_heart_color_change.rs:45:13
+   |
+45 |         let card_db_clone = card_database.clone();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_db_clone`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q193_two_member_baton_area.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q194_two_member_baton_turn.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_db_clone`
+  --> tests\qa_individual\q194_two_member_baton_turn.rs:44:13
+   |
+44 |         let card_db_clone = card_database.clone();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_db_clone`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q195_blade_count_modification.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q196_activation_zero_members.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_db_clone`
+  --> tests\qa_individual\q196_activation_zero_members.rs:43:13
+   |
+43 |         let card_db_clone = card_database.clone();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_db_clone`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q197_auto_baton_cost_10.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `card_db_clone`
+  --> tests\qa_individual\q197_auto_baton_cost_10.rs:55:13
+   |
+55 |         let card_db_clone = card_database.clone();
+   |             ^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_db_clone`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q198_auto_baton_cost_11.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q199_baton_same_turn.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q199_baton_same_turn.rs:41:13
+   |
+41 |         let game_state = GameState::new(player1, player2, card_database.clone());
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q203_wait_activation_not_score.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q204_combined_name_counting.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q204_combined_name_counting.rs:38:13
+   |
+38 |         let game_state = GameState::new(player1, player2, card_database.clone());
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q205_heart_condition_different.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q206_wait_baton_cost.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q207_combined_name_reference.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q207_combined_name_reference.rs:38:13
+   |
+38 |         let game_state = GameState::new(player1, player2, card_database.clone());
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q208_combined_name_with_regular.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q208_combined_name_with_regular.rs:38:13
+   |
+38 |         let game_state = GameState::new(player1, player2, card_database.clone());
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q209_live_card_cost_retrieval.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q211_auto_trigger_multiple.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q212_score_icon_effect.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q213_score_negative_effect.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q214_success_live_zero.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q215_debut_draw_three.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q217_live_start_cost_auto.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q219_combined_name_member_count.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q220_heart_condition_all.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q221_opponent_position_choice.rs:18:9
+   |
+18 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q222_live_start_repeat.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q223_combined_name_search.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q224_live_card_version.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q225_live_card_version_reverse.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q226_card_name_containment_search.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q227_group_unit_names.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q227_group_unit_names.rs:37:13
+   |
+37 |         let game_state = GameState::new(player1, player2, card_database.clone());
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q228_manual_operations.rs:16:9
+   |
+16 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: unused variable: `game_state`
+  --> tests\qa_individual\q228_manual_operations.rs:36:13
+   |
+36 |         let game_state = GameState::new(player1, player2, card_database.clone());
+   |             ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q229_baton_multiple_turn.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q232_auto_ability_timing.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q233_multiple_live_cards.rs:16:9
+   |
+16 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q234_card_name_search.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q236_auto_ability_no_live.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q237_partial_discard.rs:16:9
+   |
+16 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> tests\qa_individual\direct_engine_faults.rs:200:9
+    |
+200 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    |         ----^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `card_cost`
+   --> tests\qa_individual\direct_engine_faults.rs:797:13
+    |
+797 |         let card_cost = card.cost.unwrap_or(0);
+    |             ^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_card_cost`
+
+warning: variable does not need to be mutable
+    --> tests\qa_individual\direct_engine_faults.rs:1132:9
+     |
+1132 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+     |         ----^^^^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> tests\qa_individual\direct_engine_faults.rs:1211:9
+     |
+1211 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+     |         ----^^^^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> tests\qa_individual\direct_engine_faults.rs:1263:9
+     |
+1263 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+     |         ----^^^^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> tests\qa_individual\direct_engine_faults.rs:1312:9
+     |
+1312 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+     |         ----^^^^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+    --> tests\qa_individual\direct_engine_faults.rs:1361:9
+     |
+1361 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+     |         ----^^^^^^^
+     |         |
+     |         help: remove this `mut`
+
+warning: unused variable: `initial_stage_count`
+  --> tests\qa_individual\hard_edge_cases.rs:47:17
+   |
+47 |             let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+   |                 ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_initial_stage_count`
+
+warning: unused variable: `initial_stage_count`
+   --> tests\qa_individual\hard_edge_cases.rs:213:13
+    |
+213 |         let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+    |             ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_initial_stage_count`
+
+Some errors have detailed explanations: E0308, E0382, E0425, E0428, E0609.
+For more information about an error, try `rustc --explain E0308`.
+warning: `rabuka_engine` (test "qa_individual_tests") generated 420 warnings (1 duplicate)
+error: could not compile `rabuka_engine` (test "qa_individual_tests") due to 39 previous errors; 420 warnings emitted

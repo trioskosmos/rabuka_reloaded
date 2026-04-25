@@ -588,6 +588,17 @@ pub struct AbilityEffect {
     pub action_by: Option<String>, // "opponent" if action is performed by opponent
     #[serde(default)]
     pub opponent_action: Option<Box<AbilityEffect>>, // The opponent action to execute
+    // Missing fields from parser
+    #[serde(default)]
+    pub lose_blade_hearts: Option<bool>, // For re_yell - whether to lose blade hearts
+    #[serde(default)]
+    pub conditional: Option<bool>, // For sequential effects - marks as conditional
+    #[serde(default)]
+    pub choice_type: Option<String>, // For choice actions - specifies the type of choice
+    #[serde(default)]
+    pub heart_type: Option<String>, // For set_heart_type - the heart type to set
+    #[serde(default)]
+    pub values: Option<Vec<u32>>, // For comparison conditions - list of valid values
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -683,6 +694,9 @@ pub struct Condition {
     pub cost_result_reference: Option<bool>,
     pub cost_result_group_match: Option<bool>,
     pub group_matching: Option<bool>,
+    // Missing field from parser
+    #[serde(default)]
+    pub values: Option<Vec<u32>>, // For comparison conditions - list of valid values
 }
 
 impl Default for Condition {
@@ -715,6 +729,7 @@ impl Default for Condition {
             energy_state: None,
             aggregate_flags: None,
             comparison_target: None,
+            values: None,
             comparison_operator: None,
             movement: None,
             heart_variety: None,

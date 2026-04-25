@@ -38,7 +38,7 @@ fn test_baton_touch_equal_cost_zero_payment() {
             setup_player_with_hand(&mut player1, vec![member1_id, member2_id]);
             setup_player_with_energy(&mut player1, energy_card_ids);
             
-            let mut game_state = GameState::new(player1, player2, card_database);
+            let mut game_state = GameState::new(player1, player2, card_database.clone());
             game_state.current_phase = rabuka_engine::game_state::Phase::Main;
             game_state.turn_number = 1;
             game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -121,7 +121,7 @@ fn test_optional_cost_auto_ability_via_gameplay() {
     // Find a card with auto ability that has optional cost
     let test_card = cards.iter()
         .find(|c| c.abilities.iter().any(|a| {
-            a.triggers.as_deref() == Some("自動") &&
+            a.triggers.as_deref() == Some("自勁E) &&
             a.cost.as_ref().map_or(false, |c| c.optional == Some(true))
         }));
     
@@ -138,7 +138,7 @@ fn test_optional_cost_auto_ability_via_gameplay() {
         setup_player_with_hand(&mut player1, vec![card_id]);
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -204,7 +204,7 @@ fn test_stage_full_cannot_place_member() {
         setup_player_with_hand(&mut player1, member_ids.clone());
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -289,7 +289,7 @@ fn test_baton_turn_restriction() {
         setup_player_with_hand(&mut player1, vec![member1_id, member2_id]);
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -335,3 +335,4 @@ fn test_baton_turn_restriction() {
         println!("Skipping test: insufficient member cards");
     }
 }
+

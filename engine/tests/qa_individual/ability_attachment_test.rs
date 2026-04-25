@@ -28,7 +28,7 @@ fn test_specific_card_has_abilities() {
     let cards = load_all_cards();
     
     // Find a card that should have abilities according to abilities.json
-    // PL!-sd1-005-SD | 星空 凛 (ab#0) should have the first ability in the list
+    // PL!-sd1-005-SD | 星空 凁E(ab#0) should have the first ability in the list
     let target_card = cards.iter()
         .find(|c| c.card_no == "PL!-sd1-005-SD");
     
@@ -43,10 +43,10 @@ fn test_specific_card_has_abilities() {
     
     // Verify the ability has the expected trigger
     let has_kidou_trigger = card.abilities.iter()
-        .any(|a| a.triggers.as_deref() == Some("起動"));
+        .any(|a| a.triggers.as_deref() == Some("起勁E));
     
     assert!(has_kidou_trigger, 
-        "Card PL!-sd1-005-SD should have an ability with '起動' trigger");
+        "Card PL!-sd1-005-SD should have an ability with '起勁E trigger");
 }
 
 #[test]
@@ -73,3 +73,4 @@ fn test_ability_fields_populated() {
             "Ability effect should have an action populated");
     }
 }
+

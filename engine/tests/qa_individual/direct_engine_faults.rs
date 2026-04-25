@@ -34,7 +34,7 @@ fn test_choice_condition_cost_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -92,7 +92,7 @@ fn test_pay_energy_validation_via_gameplay() {
     setup_player_with_hand(&mut player1, vec![member_card_id]);
     setup_player_with_mixed_energy(&mut player1, vec![], member_cost as usize - 1);
     
-    let mut game_state = GameState::new(player1, player2, card_database);
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = rabuka_engine::game_state::Phase::Main;
     game_state.turn_number = 1;
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -157,7 +157,7 @@ fn test_move_cards_validation_via_gameplay() {
         .collect();
     setup_player_with_energy(&mut player1, energy_card_ids);
     
-    let mut game_state = GameState::new(player1, player2, card_database);
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = rabuka_engine::game_state::Phase::Main;
     game_state.turn_number = 1;
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -224,7 +224,7 @@ fn test_temporal_condition_movement_tracking() {
     setup_player_with_hand(&mut player1, vec![member1_id, member2_id]);
     setup_player_with_energy(&mut player1, energy_card_ids);
     
-    let mut game_state = GameState::new(player1, player2, card_database);
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = rabuka_engine::game_state::Phase::Main;
     game_state.turn_number = 1;
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -302,7 +302,7 @@ fn test_sequential_cost_execution() {
     setup_player_with_hand(&mut player1, vec![member1_id, member2_id]);
     setup_player_with_energy(&mut player1, energy_card_ids);
     
-    let mut game_state = GameState::new(player1, player2, card_database);
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = rabuka_engine::game_state::Phase::Main;
     game_state.turn_number = 1;
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -348,7 +348,7 @@ fn test_deck_position_placement() {
         player1.main_deck.cards.push(*card_id);
     }
     
-    let game_state = GameState::new(player1, player2, card_database);
+    let game_state = GameState::new(player1, player2, card_database.clone());
     
     // Verify deck has 10 cards
     assert_eq!(game_state.player1.main_deck.cards.len(), 10,
@@ -379,7 +379,7 @@ fn test_energy_state_transition() {
     
     setup_player_with_energy(&mut player1, energy_card_ids);
     
-    let mut game_state = GameState::new(player1, player2, card_database);
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     
     // Activate all energy
     game_state.player1.activate_all_energy();
@@ -417,7 +417,7 @@ fn test_per_unit_scaling_with_count() {
     
     setup_player_with_hand(&mut player1, members.clone());
     
-    let game_state = GameState::new(player1, player2, card_database);
+    let game_state = GameState::new(player1, player2, card_database.clone());
     
     // Verify hand has 3 cards
     assert_eq!(game_state.player1.hand.cards.len(), 3,
@@ -459,7 +459,7 @@ fn test_specific_card_has_abilities() {
     let cards = load_all_cards();
     
     // Find a card that should have abilities according to abilities.json
-    // PL!-sd1-005-SD | 星空 凛 (ab#0) should have the first ability in the list
+    // PL!-sd1-005-SD | 星空 凁E(ab#0) should have the first ability in the list
     let target_card = cards.iter()
         .find(|c| c.card_no == "PL!-sd1-005-SD");
     
@@ -474,10 +474,10 @@ fn test_specific_card_has_abilities() {
     
     // Verify the ability has the expected trigger
     let has_kidou_trigger = card.abilities.iter()
-        .any(|a| a.triggers.as_deref() == Some("起動"));
+        .any(|a| a.triggers.as_deref() == Some("起勁E));
     
     assert!(has_kidou_trigger, 
-        "Card PL!-sd1-005-SD should have an ability with '起動' trigger");
+        "Card PL!-sd1-005-SD should have an ability with '起勁E trigger");
 }
 
 #[test]
@@ -514,11 +514,11 @@ fn test_ability_execution_activation() {
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find a card with an activation ability (起動)
-    // Using 鬼塚冬毬 (PL!SP-bp1-011-R) which has: 起動 - move self to discard: add live card from discard to hand
+    // Find a card with an activation ability (起勁E
+    // Using 鬼塚�E毬 (PL!SP-bp1-011-R) which has: 起勁E- move self to discard: add live card from discard to hand
     let activation_card = cards.iter()
         .find(|c| c.card_no == "PL!SP-bp1-011-R")
-        .expect("Should find 鬼塚冬毬");
+        .expect("Should find 鬼塚�E毬");
     let activation_id = get_card_id(activation_card, &card_database);
     
     // Find a live card for the effect
@@ -540,7 +540,7 @@ fn test_ability_execution_activation() {
     // Add live card to waitroom for the ability effect
     player1.waitroom.add_card(live_card_id);
     
-    let mut game_state = GameState::new(player1, player2, card_database);
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = rabuka_engine::game_state::Phase::Main;
     game_state.turn_number = 1;
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -604,7 +604,7 @@ fn test_shuffle_ability_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -656,7 +656,7 @@ fn test_conditional_on_result_ability_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -705,7 +705,7 @@ fn test_sequential_with_conditions_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -754,7 +754,7 @@ fn test_sequential_cost_via_gameplay() {
         setup_player_with_hand(&mut player1, vec![card_id]);
         setup_player_with_mixed_energy(&mut player1, vec![], card_cost as usize + 2);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -806,7 +806,7 @@ fn test_per_unit_scaling_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -857,7 +857,7 @@ fn test_distinct_condition_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -905,7 +905,7 @@ fn test_or_condition_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -954,7 +954,7 @@ fn test_cost_limit_enforcement_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1003,7 +1003,7 @@ fn test_effect_constraint_enforcement_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1052,7 +1052,7 @@ fn test_placement_order_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1101,7 +1101,7 @@ fn test_distinct_selection_via_gameplay() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1150,7 +1150,7 @@ fn test_full_turn_gameplay_with_multiple_abilities() {
     setup_player_with_hand(&mut player1, member_cards.clone());
     setup_player_with_energy(&mut player1, energy_card_ids);
     
-    let mut game_state = GameState::new(player1, player2, card_database);
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
     game_state.current_phase = rabuka_engine::game_state::Phase::Main;
     game_state.turn_number = 1;
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
@@ -1210,11 +1210,11 @@ fn test_ability_activation_with_cost_payment() {
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find a card with an activation ability (起動)
+    // Find a card with an activation ability (起勁E
     let activation_card = cards.iter()
         .filter(|c| c.is_member())
         .find(|c| c.abilities.iter().any(|a| {
-            a.triggers.as_deref() == Some("起動")
+            a.triggers.as_deref() == Some("起勁E)
         }));
     
     if let Some(card) = activation_card {
@@ -1229,7 +1229,7 @@ fn test_ability_activation_with_cost_payment() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1281,7 +1281,7 @@ fn test_conditional_ability_execution() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1330,7 +1330,7 @@ fn test_sequential_ability_actions() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1379,7 +1379,7 @@ fn test_per_unit_scaling_ability() {
             .collect();
         setup_player_with_energy(&mut player1, energy_card_ids);
         
-        let mut game_state = GameState::new(player1, player2, card_database);
+        let mut game_state = GameState::new(player1, player2, card_database.clone());
         game_state.current_phase = rabuka_engine::game_state::Phase::Main;
         game_state.turn_number = 1;
         
@@ -1398,3 +1398,4 @@ fn test_per_unit_scaling_ability() {
         println!("Skipping test: no card with per-unit effect found");
     }
 }
+

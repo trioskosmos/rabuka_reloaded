@@ -302,3 +302,4 @@ fn test_complex_nested_ability() {
         println!("Skipping test: no sufficiently complex ability found");
     }
 }
+

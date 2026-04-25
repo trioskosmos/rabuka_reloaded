@@ -1094,7 +1094,8 @@ impl AbilityExecutor {
         game_state: &mut GameState,
         perspective_player_id: &str,
     ) -> Result<(), String> {
-        let heart_type = effect.heart_color.as_deref().unwrap_or("heart00");
+        // Use heart_type field if available, otherwise fall back to heart_color
+        let heart_type = effect.heart_type.as_deref().or(effect.heart_color.as_deref()).unwrap_or("heart00");
         let target = effect.target.as_deref().unwrap_or("self");
         let count = effect.count.unwrap_or(1) as i32;
 

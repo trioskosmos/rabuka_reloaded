@@ -82,3 +82,4 @@ pub fn setup_player_with_stage(player: &mut Player, card_ids: Vec<i16>) {
         }
     }
 }
+

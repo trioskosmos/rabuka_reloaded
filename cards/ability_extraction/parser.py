@@ -376,6 +376,25 @@ def parse_condition(text: str) -> Dict[str, Any]:
         'text': text
     }
     
+    # Check for distinct conditions (名前が異なる) - MUST CHECK EARLY before count conditions
+    if '名前が異なる' in text or 'ユニット名がそれぞれ異なる' in text:
+        # Use location_condition with distinct field instead of distinct_condition
+        # since engine doesn't have a handler for distinct_condition
+        condition['type'] = 'location_condition'
+        condition['location'] = 'stage'
+        condition['target'] = 'self'
+        condition['distinct'] = True
+        # Set all_areas if present
+        if 'エリアすべて' in text:
+            condition['all_areas'] = True
+        # Also check for count in the same text (e.g., "名前が異なるメンバーが3人以上いる")
+        unit_count_match = re.search(r'(\d+)(人|枚|つ)以上いる', text)
+        if unit_count_match:
+            condition['count'] = int(unit_count_match.group(1))
+            condition['operator'] = '>='
+            condition['unit'] = unit_count_match.group(2)
+        return condition
+    
     # Check for count conditions like "2枚以上ある" or "6枚以上ある"
     count_match = re.search(r'(\d+)枚以上ある', text)
     if count_match:
@@ -486,19 +505,6 @@ def parse_condition(text: str) -> Dict[str, Any]:
         # Return early to prevent being overridden by appearance check
         return condition
     
-    # Check for distinct conditions (名前が異なる) - MUST CHECK BEFORE compound conditions
-    if '名前が異なる' in text or 'ユニット名がそれぞれ異なる' in text:
-        # Use location_condition with distinct field instead of distinct_condition
-        # since engine doesn't have a handler for distinct_condition
-        condition['type'] = 'location_condition'
-        condition['location'] = 'stage'
-        condition['target'] = 'self'
-        condition['distinct'] = True
-        # Set all_areas if present
-        if 'エリアすべて' in text:
-            condition['all_areas'] = True
-        return condition
-    
     # Check for OR conditions (か、 = or) - MUST CHECK BEFORE movement condition
     if 'か、' in text:
         parts = [p.strip() for p in text.split('か、') if p.strip()]
@@ -513,6 +519,28 @@ def parse_condition(text: str) -> Dict[str, Any]:
                 }
                 # Don't set target on compound - let sub-conditions have their own targets
                 return compound
+    
+    # Check for "自分か相手の" (self or opponent) pattern for locations
+    if '自分か相手の' in text:
+        # Extract the location after "自分か相手の"
+        location_match = re.search(r'自分か相手の(.+?)(?:に|が|にある)', text)
+        if location_match:
+            location_text = location_match.group(1).strip()
+            # Map location text to standard location codes
+            location_map = {
+                '成功ライブカード置き場': 'success_live_zone',
+                'ライブカード置き場': 'live_card_zone',
+                '控え室': 'discard',
+                '手札': 'hand',
+                'ステージ': 'stage',
+                'エネルギー置き場': 'energy_zone'
+            }
+            for loc_keyword, loc_code in location_map.items():
+                if loc_keyword in location_text:
+                    condition['type'] = 'location_condition'
+                    condition['location'] = loc_code
+                    condition['target'] = 'either'  # either self or opponent
+                    return condition
     
     # Check for movement conditions
     if '移動した' in text:
@@ -543,7 +571,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         return condition
     
     # Check for state conditions
-    if 'ウェイト状態である' in text or 'ウェイト状態にある' in text:
+    if 'ウェイト状態である' in text or 'ウェイト状態にある' in text or 'ウェイト状態の' in text:
         condition['type'] = 'state_condition'
         condition['state'] = 'wait'
         return condition
@@ -606,24 +634,51 @@ def parse_condition(text: str) -> Dict[str, Any]:
     location = extract_location(text)
     if location:
         condition['location'] = location
+    # Check for "ライブ中" (during live) - this is a temporal condition with location
+    if 'ライブ中' in text:
+        condition['type'] = 'temporal_condition'
+        condition['temporal'] = 'during_live'
+        # Extract location if present
+        if '手札にある' in text:
+            condition['location'] = 'hand'
+        elif 'ステージにいる' in text:
+            condition['location'] = 'stage'
+        return condition
     
     # Extract heart count condition (e.g., "heart02を3つ以上持つ") - extract BEFORE other extractions
     if 'heart' in text and ('つ以上持つ' in text or '枚持つ' in text or 'つ持つ' in text):
         heart_count = extract_count(text)
         if heart_count:
             condition['count'] = heart_count
-            # Extract specific heart type from icon pattern
-            heart_types = {
-                'heart_01': 'heart_01',
-                'heart_02': 'heart_02',
-                'heart_06': 'heart_06'
-            }
-            for pattern, resource_type in heart_types.items():
-                if pattern in text:
-                    condition['resource_type'] = resource_type
-                    break
+            # Check for multiple heart types (e.g., "heart01、heart02、heart03、heart04、heart05、heart06のうち合計5種類以上")
+            multiple_heart_match = re.search(r'heart_\d+.*?heart_\d+', text)
+            if multiple_heart_match:
+                # Multiple heart types present - extract all of them
+                heart_types = []
+                for i in range(1, 7):
+                    if f'heart_0{i}' in text:
+                        heart_types.append(f'heart_0{i}')
+                if heart_types:
+                    condition['resource_type'] = 'heart'
+                    condition['heart_types'] = heart_types
+                    # Check for "合計X種類以上" pattern
+                    types_count_match = re.search(r'合計(\d+)種類以上', text)
+                    if types_count_match:
+                        condition['types_count'] = int(types_count_match.group(1))
+                        condition['operator'] = '>='
             else:
-                condition['resource_type'] = 'heart'
+                # Single heart type
+                heart_types = {
+                    'heart_01': 'heart_01',
+                    'heart_02': 'heart_02',
+                    'heart_06': 'heart_06'
+                }
+                for pattern, resource_type in heart_types.items():
+                    if pattern in text:
+                        condition['resource_type'] = resource_type
+                        break
+                else:
+                    condition['resource_type'] = 'heart'
     
     # Extract energy count condition
     if 'エネルギー' in text and '枚' in text:
@@ -969,6 +1024,20 @@ def parse_action(text: str) -> Dict[str, Any]:
     target = extract_target(text)
     if target:
         action['target'] = target
+    
+    # Extract position restrictions (e.g., "センター", "センターエリア")
+    position_keywords = {
+        'センターエリア': 'center',
+        '左サイドエリア': 'left_side',
+        '右サイドエリア': 'right_side',
+        'センター': 'center',
+        '左サイド': 'left_side',
+        '右サイド': 'right_side'
+    }
+    for keyword, position in position_keywords.items():
+        if keyword in text:
+            action['position'] = position
+            break
     
     # Extract exclude_self for actions (e.g., "このメンバー以外の" or "「character name」以外")
     if 'このメンバー以外' in text or 'ほかのメンバー' in text:
@@ -1558,6 +1627,14 @@ def parse_action(text: str) -> Dict[str, Any]:
         # Check if it's "好きな" (any/choose)
         if '好きな' in text:
             action['choice'] = True
+    # Check for choose from specific heart types pattern (heart01かheart03かheart06のうち、1つを選ぶ)
+    elif re.search(r'{{heart_\d+\.png\|heart\d+}}.*か.*{{heart_\d+\.png\|heart\d+}}.*のうち.*選ぶ', text):
+        action['action'] = 'choose_heart_type'
+        # Extract the heart options
+        heart_icons = re.findall(r'{{heart_(\d+)\.png\|heart\d+}}', text)
+        if heart_icons:
+            action['options'] = [f'heart_{h}' for h in heart_icons]
+        action['count'] = 1
     # Check for modify required hearts for success pattern (成功させるための必要ハートが～多くなる/少なくなる)
     elif '成功させるための必要ハート' in text:
         action['action'] = 'modify_required_hearts_success'
@@ -1580,6 +1657,20 @@ def parse_action(text: str) -> Dict[str, Any]:
         heart_icons = re.findall(r'{{heart_\d+\.png\|heart\d+}}', text)
         if heart_icons:
             action['value'] = len(heart_icons)
+    # Check for reveal action in effects (公開する/公開して)
+    elif '公開する' in text or '公開して' in text:
+        action['action'] = 'reveal'
+        # Extract source if present
+        if '手札' in text:
+            action['source'] = 'hand'
+        # Extract count if present
+        count_match = re.search(r'(\d+)枚', text)
+        if count_match:
+            action['count'] = int(count_match.group(1))
+        # Extract card type if present
+        card_type = extract_card_type(text)
+        if card_type:
+            action['card_type'] = card_type
     # Check for ALL blade timing pattern (必要ハートを確認する時、エールで出たALLブレードは任意の色のハートとして扱う)
     elif '必要ハートを確認する時' in text and 'ALLブレード' in text and '任意の色のハートとして扱う' in text:
         action['action'] = 'all_blade_timing'
@@ -1738,11 +1829,17 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if extract_optional(text):
         cost['optional'] = True
     
-    # Determine cost type - check energy first
-    if 'エネルギー' in text and 'エネルギーデッキに置く' in text:
+    # Determine cost type - check energy FIRST (before other type determinations)
+    if '{{icon_energy.png|E}}' in text:
+        cost['type'] = 'pay_energy'
+        cost['energy'] = text.count('{{icon_energy.png|E}}')
+    elif 'エネルギー' in text and 'エネルギーデッキに置く' in text:
         cost['type'] = 'energy_condition'
     elif '公開してもよい' in text:
         cost['type'] = 'reveal_condition'
+    elif '下に置く' in text and 'エネルギー' in text:
+        # place_energy_under_member cost pattern
+        cost['type'] = 'place_energy_under_member'
     elif cost.get('source') and cost.get('destination'):
         cost['type'] = 'move_cards'
     elif 'ウェイトにする' in text or 'ウェイト状態で置く' in text or 'ウェイト状態で登場させる' in text or 'アクティブにする' in text:
@@ -1751,9 +1848,6 @@ def parse_cost(text: str) -> Dict[str, Any]:
         cost['type'] = 'change_state'
     elif '公開する' in text:
         cost['type'] = 'reveal_condition'
-    elif '{{icon_energy.png|E}}' in text:
-        cost['type'] = 'pay_energy'
-        cost['energy'] = text.count('{{icon_energy.png|E}}')
     elif cost.get('source'):
         # If source but no destination, infer based on common patterns
         if cost['source'] == 'hand' and ('控え室に置く' in text or '控え室に置いて' in text):
@@ -1925,6 +2019,24 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 effect.update(remaining_effect)
             return effect
     
+    # Check for "自分か相手を選ぶ" (choose self or opponent) pattern
+    if text.startswith('自分か相手を選ぶ。'):
+        choice_text = '自分か相手を選ぶ'
+        remaining_text = text[len(choice_text):].strip()
+        effect['action'] = 'sequential'
+        effect['actions'] = [
+            {
+                'action': 'choose_target',
+                'options': ['self', 'opponent'],
+                'text': choice_text
+            }
+        ]
+        # Parse the remaining text which should use the chosen target
+        if remaining_text:
+            remaining_effect = parse_effect(remaining_text)
+            effect['actions'].append(remaining_effect)
+        return effect
+    
     # Check for opponent actions after conditional markers (e.g., "そうした場合、相手は～")
     if '、相手は' in text:
         # Split by the opponent action marker (including comma)
@@ -1971,11 +2083,50 @@ def parse_effect(text: str) -> Dict[str, Any]:
             select_text = action_match.group(1).strip()
             
             # Check for "X枚を手札に加え、残りを控え室に置く" pattern
-            # This should be parsed as sequential actions
+            # This should be parsed as sequential actions: reveal + add to hand, then discard rest
             if '手札に加え' in select_text and '残りを控え室に置く' in select_text:
                 # Split into two sequential actions
                 parts = select_text.split('、', SPLIT_LIMIT)
-                # Skip quoted_text extraction for now to avoid errors
+                if len(parts) == 2:
+                    # First action: reveal and add to hand
+                    first_part = parts[0].strip()
+                    # Check if it contains "公開して" (reveal)
+                    if '公開して' in first_part:
+                        # Split reveal from add to hand
+                        reveal_match = re.search(r'(.+?)公開して(.+)', first_part)
+                        if reveal_match:
+                            # Create sequential: reveal action, then add to hand action
+                            reveal_text = reveal_match.group(1).strip() + '公開する'
+                            add_text = reveal_match.group(2).strip()
+                            
+                            reveal_action = parse_action(reveal_text)
+                            add_action = parse_action(add_text)
+                            
+                            # Ensure add_action destination is hand
+                            if add_action.get('action') == 'move_cards':
+                                add_action['destination'] = 'hand'
+                            
+                            # Second action: discard rest
+                            second_action = parse_action(parts[1].strip())
+                            
+                            effect['select_action'] = {
+                                'action': 'sequential',
+                                'actions': [reveal_action, add_action, second_action],
+                                'text': select_text
+                            }
+                            return effect
+                    else:
+                        # No explicit reveal, just add to hand then discard
+                        first_action = parse_action(first_part)
+                        if first_action.get('action') == 'move_cards':
+                            first_action['destination'] = 'hand'
+                        second_action = parse_action(parts[1].strip())
+                        effect['select_action'] = {
+                            'action': 'sequential',
+                            'actions': [first_action, second_action],
+                            'text': select_text
+                        }
+                        return effect
 
             # Check for "好きな枚数を好きな順番でデッキの上に置き" in select_text and '残りを控え室に置く' in select_text:
             # This should be parsed as sequential actions with deck_top destination
@@ -2106,7 +2257,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
     
     # Check for conditional alternative effects ("代わりに" - instead/otherwise)
     if '代わりに' in text:
-        # Pattern: "～場合、～。～場合、代わりに～"
+        # Pattern: "～場合、～。～場合、代わりに～" or "X場合、Y。Z場合、代わりにW"
         if '場合' in text:
             parts = text.split('代わりに', SPLIT_LIMIT)
             if len(parts) == 2:
@@ -2114,11 +2265,36 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 alternative_effect = parse_effect(parts[1].strip())
                 
                 # The first part contains: primary_effect + alternative_condition
-                # Pattern: "primary_effect. condition、代わりに"
+                # Pattern: "primary_effect. condition、代わりに" or "X場合、Y。Z場合、"
                 first_part = parts[0].strip()
                 
-                # First, split by period to separate primary effect from alternative condition
-                # This handles: "primary_effect. condition、代わりに"
+                # Try to find the last "場合、" to split - this handles threshold-based alternatives
+                # Pattern: "X場合、Y。Z場合、代わりにW" -> primary: "X場合、Y", alt_condition: "Z"
+                last_case_index = first_part.rfind('場合、')
+                if last_case_index != -1:
+                    # Everything before the last "場合、" is the primary effect (including its condition)
+                    primary_text = first_part[:last_case_index + len('場合、')].strip()
+                    # Everything after "場合、" is the alternative condition
+                    condition_text = first_part[last_case_index + len('場合、'):].strip()
+                    
+                    # Parse the primary effect (it may contain its own condition)
+                    primary_effect = parse_effect(primary_text)
+                    
+                    # Parse alternative condition
+                    condition = parse_condition(condition_text)
+                    # If condition text is empty or condition has empty text, set to None
+                    if not condition_text or (condition and condition.get('text') == ''):
+                        condition = None
+                    
+                    effect['action'] = 'conditional_alternative'
+                    if primary_effect:
+                        effect['primary_effect'] = primary_effect
+                    effect['alternative_condition'] = condition
+                    effect['alternative_effect'] = alternative_effect
+                    effect['text'] = text
+                    return effect
+                
+                # Fallback: try to split by period
                 if '。' in first_part:
                     period_parts = first_part.split('。')
                     if len(period_parts) >= 2:
@@ -2130,8 +2306,8 @@ def parse_effect(text: str) -> Dict[str, Any]:
                         if condition_text.endswith('場合、'):
                             condition_text = condition_text[:-len('場合、')].strip()
                         
-                        # Store primary effect as raw text (don't parse it since it contains its own condition)
-                        primary_effect = {'text': primary_text}
+                        # Parse the primary effect
+                        primary_effect = parse_effect(primary_text)
                         
                         # Parse alternative condition
                         condition = parse_condition(condition_text)
@@ -2146,38 +2322,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
                         effect['alternative_effect'] = alternative_effect
                         effect['text'] = text
                         return effect
-                
-                # Fallback: try to find the last "場合、" to split
-                last_case_index = first_part.rfind('場合、')
-                if last_case_index != -1:
-                    # Everything before the last "場合、" is the primary effect
-                    primary_text = first_part[:last_case_index].strip()
-                    # Everything after "場合、" is the alternative condition
-                    condition_text = first_part[last_case_index + len('場合、'):].strip()
-                    
-                    # Store primary effect as raw text (don't parse it since it contains its own condition)
-                    primary_effect = {'text': primary_text}
-                    
-                    # Parse alternative condition
-                    condition = parse_condition(condition_text)
-                    # If condition text is empty or condition has empty text, set to None
-                    if not condition_text or (condition and condition.get('text') == ''):
-                        condition = None
-                else:
-                    # If no clear split, treat entire first part as condition
-                    primary_effect = None
-                    condition = parse_condition(first_part)
-                    # If condition has empty text, set to None
-                    if condition and condition.get('text') == '':
-                        condition = None
-                
-                effect['action'] = 'conditional_alternative'
-                if primary_effect:
-                    effect['primary_effect'] = primary_effect
-                effect['alternative_condition'] = condition
-                effect['alternative_effect'] = alternative_effect
-                effect['text'] = text
-                return effect
     
     # Check for sequential actions
     if SEQUENTIAL_MARKER in text:

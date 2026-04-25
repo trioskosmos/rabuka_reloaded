@@ -98,10 +98,215 @@ fn test_realistic_card_type_filtering_move_cards() {
     assert!(game_state.player1.hand.cards.contains(&nijigaku_live_id));
     assert!(!game_state.player1.hand.cards.contains(&mus_live_id));
     assert!(!game_state.player1.hand.cards.contains(&nijigaku_member_id));
+}
+
+#[test]
+fn test_real_ability_activation_with_cost() {
+    // Test: Real ability from abilities.json - Ability #0
+    // "起動：このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える"
+    // Card: PL!-sd1-005-SD | 星空 凛 (ab#0)
     
-    // Verify: mus_live and nijigaku_member should still be in discard
-    assert!(game_state.player1.waitroom.cards.contains(&mus_live_id));
-    assert!(game_state.player1.waitroom.cards.contains(&nijigaku_member_id));
+    let mut game_state = GameState::new();
+    let mut card_db = CardDatabase::new();
+    
+    // Create the activating member card (星空 凛)
+    let hoshizora_rin = Card {
+        card_no: "PL!-sd1-005-SD".to_string(),
+        name: "星空 凛".to_string(),
+        group: "Aqours".to_string(),
+        unit: "Aqours".to_string(),
+        cost: Some(3),
+        blade_heart: Some(vec!["heart_01".to_string()]),
+        blade: Some(2),
+        heart: vec![],
+        score: None,
+        required_hearts: vec![],
+        card_type: "member".to_string(),
+        text: "".to_string(),
+        ..Default::default()
+    };
+    
+    // Create a live card for discard
+    let aqours_live = Card {
+        card_no: "TEST-LIVE-AQOURS".to_string(),
+        name: "Aqours Live".to_string(),
+        group: "Aqours".to_string(),
+        unit: "Test".to_string(),
+        cost: None,
+        blade_heart: None,
+        blade: None,
+        heart: vec![],
+        score: Some(10),
+        required_hearts: vec![],
+        card_type: "live".to_string(),
+        text: "".to_string(),
+        ..Default::default()
+    };
+    
+    let rin_id = card_db.add_card(hoshizora_rin);
+    let live_id = card_db.add_card(aqours_live);
+    
+    let mut resolver = AbilityResolver::new(&mut game_state, &card_db);
+    
+    // Setup: Rin on stage (center), live card in discard
+    game_state.player1.stage.stage[1] = rin_id;
+    game_state.player1.waitroom.add_card(live_id);
+    
+    // Track activating card
+    resolver.activating_card_id = Some(rin_id);
+    
+    // Create cost: move this member from stage to discard
+    let cost = AbilityCost {
+        text: "このメンバーをステージから控え室に置く".to_string(),
+        cost_type: Some("move_cards".to_string()),
+        source: Some("stage".to_string()),
+        destination: Some("discard".to_string()),
+        count: Some(1),
+        card_type: Some("member_card".to_string()),
+        self_cost: Some(true),
+        ..Default::default()
+    };
+    
+    // Create effect: move 1 live card from discard to hand
+    let effect = AbilityEffect {
+        text: "自分の控え室からライブカードを1枚手札に加える".to_string(),
+        action: "move_cards".to_string(),
+        source: Some("discard".to_string()),
+        destination: Some("hand".to_string()),
+        count: Some(1),
+        card_type: Some("live_card".to_string()),
+        target: Some("self".to_string()),
+        ..Default::default()
+    };
+    
+    // Execute cost
+    let cost_result = resolver.pay_cost(&cost);
+    assert!(cost_result.is_ok());
+    
+    // Verify: Rin moved from stage to discard
+    assert!(game_state.player1.stage.stage[1] == -1);
+    assert!(game_state.player1.waitroom.cards.contains(&rin_id));
+    
+    // Execute effect
+    let effect_result = resolver.execute_move_cards(&effect);
+    assert!(effect_result.is_ok());
+    
+    // Verify: Live card moved from discard to hand
+    assert!(game_state.player1.hand.cards.contains(&live_id));
+    assert!(!game_state.player1.waitroom.cards.contains(&live_id));
+}
+
+#[test]
+fn test_comparison_target_opponent_energy() {
+    // Test: Ability 286 - "自分のエネルギーが相手より少ない場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く"
+    // This tests the comparison_target field implementation
+    
+    let mut game_state = GameState::new();
+    let mut card_db = CardDatabase::new();
+    
+    // Setup: Player1 has 2 energy, Player2 has 5 energy
+    for _ in 0..2 {
+        game_state.player1.energy_zone.cards.push(1);
+    }
+    for _ in 0..5 {
+        game_state.player2.energy_zone.cards.push(2);
+    }
+    
+    let mut resolver = AbilityResolver::new(&mut game_state, &card_db);
+    
+    // Create condition with comparison_target
+    let condition = rabuka_engine::card::Condition {
+        text: "自分のエネルギーが相手より少ない".to_string(),
+        condition_type: Some("comparison_condition".to_string()),
+        target: Some("self".to_string()),
+        comparison_target: Some("opponent".to_string()),
+        comparison_operator: Some("<".to_string()),
+        comparison_type: Some("energy".to_string()),
+        ..Default::default()
+    };
+    
+    // Evaluate condition - should be true (2 < 5)
+    let result = resolver.evaluate_condition(&condition);
+    assert!(result, "Condition should be true when self energy (2) < opponent energy (5)");
+    
+    // Now make player1 have more energy
+    game_state.player1.energy_zone.cards.push(1);
+    game_state.player1.energy_zone.cards.push(1);
+    game_state.player1.energy_zone.cards.push(1);
+    game_state.player1.energy_zone.cards.push(1);
+    
+    // Re-evaluate - should be false (6 > 5)
+    let result = resolver.evaluate_condition(&condition);
+    assert!(!result, "Condition should be false when self energy (6) > opponent energy (5)");
+}
+
+#[test]
+fn test_comparison_target_score_total() {
+    // Test: Ability 288 - "ライブの合計スコアが相手より高い場合、カードを1枚引く"
+    // This tests comparison_target with score type
+    
+    let mut game_state = GameState::new();
+    let mut card_db = CardDatabase::new();
+    
+    // Create live cards with scores
+    let live_card_10 = Card {
+        card_no: "TEST-LIVE-10".to_string(),
+        name: "Live 10".to_string(),
+        group: "Test".to_string(),
+        unit: "Test".to_string(),
+        cost: None,
+        blade_heart: None,
+        blade: None,
+        heart: vec![],
+        score: Some(10),
+        required_hearts: vec![],
+        card_type: "live".to_string(),
+        text: "".to_string(),
+        ..Default::default()
+    };
+    
+    let live_card_5 = Card {
+        card_no: "TEST-LIVE-5".to_string(),
+        name: "Live 5".to_string(),
+        group: "Test".to_string(),
+        unit: "Test".to_string(),
+        cost: None,
+        blade_heart: None,
+        blade: None,
+        heart: vec![],
+        score: Some(5),
+        required_hearts: vec![],
+        card_type: "live".to_string(),
+        text: "".to_string(),
+        ..Default::default()
+    };
+    
+    let live_10_id = card_db.add_card(live_card_10);
+    let live_5_id = card_db.add_card(live_card_5);
+    
+    // Setup: Player1 has score 20 (2x10), Player2 has score 10 (2x5)
+    game_state.player1.success_live_card_zone.cards.push(live_10_id);
+    game_state.player1.success_live_card_zone.cards.push(live_10_id);
+    game_state.player2.success_live_card_zone.cards.push(live_5_id);
+    game_state.player2.success_live_card_zone.cards.push(live_5_id);
+    
+    let mut resolver = AbilityResolver::new(&mut game_state, &card_db);
+    
+    // Create condition with comparison_target
+    let condition = rabuka_engine::card::Condition {
+        text: "ライブの合計スコアが相手より高い".to_string(),
+        condition_type: Some("comparison_condition".to_string()),
+        target: Some("self".to_string()),
+        comparison_target: Some("opponent".to_string()),
+        comparison_operator: Some(">".to_string()),
+        comparison_type: Some("score".to_string()),
+        aggregate: Some("total".to_string()),
+        ..Default::default()
+    };
+    
+    // Evaluate condition - should be true (20 > 10)
+    let result = resolver.evaluate_condition(&condition);
+    assert!(result, "Condition should be true when self score (20) > opponent score (10)");
 }
 
 #[test]

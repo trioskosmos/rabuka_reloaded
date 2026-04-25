@@ -482,7 +482,23 @@ impl<'a> AbilityResolver<'a> {
 
     fn evaluate_comparison_condition(&self, condition: &Condition) -> bool {
         let count = self.get_count_for_condition(condition);
-        let target_count = condition.count.unwrap_or(0);
+        
+        // Handle "values" field - check if count is one of the specified values
+        if let Some(ref values) = condition.values {
+            return values.contains(&(count as u32));
+        }
+        
+        // Handle comparison_target - compare against opponent's value
+        let target_count = if let Some(ref comparison_target) = condition.comparison_target {
+            if comparison_target == "opponent" {
+                // Get the same count for opponent
+                self.get_count_for_target(condition, "opponent")
+            } else {
+                condition.count.unwrap_or(0)
+            }
+        } else {
+            condition.count.unwrap_or(0)
+        };
 
         match condition.operator.as_deref() {
             Some(">=") => count >= target_count,
@@ -1137,6 +1153,74 @@ impl<'a> AbilityResolver<'a> {
         }
     }
 
+    fn get_count_for_target(&self, condition: &Condition, target: &str) -> u32 {
+        let location = condition.location.as_deref().unwrap_or("");
+        let comparison_type = condition.comparison_type.as_deref(); // e.g., "score", "cost", "energy"
+
+        let player = match target {
+            "self" => &self.game_state.player1,
+            "opponent" => &self.game_state.player2,
+            _ => &self.game_state.player1,
+        };
+
+        // Handle comparison_type for more specific counts
+        if let Some(comp_type) = comparison_type {
+            match comp_type {
+                "score" => {
+                    // Get total score from success_live_card_zone
+                    let mut total_score = 0;
+                    for card_id in &player.success_live_card_zone.cards {
+                        if let Some(card) = self.game_state.card_database.get_card(*card_id) {
+                            total_score += card.score.unwrap_or(0);
+                        }
+                    }
+                    total_score
+                }
+                "cost" => {
+                    // Get total cost from stage
+                    let mut total_cost = 0;
+                    for card_id in &player.stage.stage {
+                        if *card_id != -1 {
+                            if let Some(card) = self.game_state.card_database.get_card(*card_id) {
+                                total_cost += card.cost.unwrap_or(0);
+                            }
+                        }
+                    }
+                    total_cost
+                }
+                "energy" => {
+                    // Get energy count
+                    player.energy_zone.cards.len() as u32
+                }
+                _ => {
+                    // Default to location-based count
+                    match location {
+                        "stage" => player.stage.total_blades(&self.game_state.card_database),
+                        "hand" => player.hand.len() as u32,
+                        "deck" => player.main_deck.len() as u32,
+                        "discard" => player.waitroom.len() as u32,
+                        "energy_zone" => player.energy_zone.cards.len() as u32,
+                        "live_card_zone" => player.live_card_zone.len() as u32,
+                        "success_live_zone" => player.success_live_card_zone.len() as u32,
+                        _ => 0,
+                    }
+                }
+            }
+        } else {
+            // No comparison_type, use location-based count
+            match location {
+                "stage" => player.stage.total_blades(&self.game_state.card_database),
+                "hand" => player.hand.len() as u32,
+                "deck" => player.main_deck.len() as u32,
+                "discard" => player.waitroom.len() as u32,
+                "energy_zone" => player.energy_zone.cards.len() as u32,
+                "live_card_zone" => player.live_card_zone.len() as u32,
+                "success_live_zone" => player.success_live_card_zone.len() as u32,
+                _ => 0,
+            }
+        }
+    }
+
     fn get_group_card_count(&self, condition: &Condition) -> u32 {
         // Count cards of a specific group
         let group_filter = condition.group_names.as_ref();
@@ -1524,7 +1608,7 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_sequential_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let conditional = effect.condition.is_some();
+        let conditional = effect.conditional.unwrap_or(false) || effect.condition.is_some();
         let condition = effect.condition.as_ref();
         let is_further = effect.is_further.unwrap_or(false);
 
@@ -2117,6 +2201,23 @@ impl<'a> AbilityResolver<'a> {
                                         }
                                         "deck_top" => {
                                             player.main_deck.cards.insert(0, card_id);
+                                        }
+                                        "same_area" => {
+                                            // Place in the same area as the activating card
+                                            if let Some(activating_card_id) = self.activating_card_id {
+                                                // Find which position the activating card was in
+                                                for (pos_idx, &stage_card_id) in player.stage.stage.iter().enumerate() {
+                                                    if stage_card_id == activating_card_id {
+                                                        // Place the card in the same position
+                                                        player.stage.stage[pos_idx] = card_id;
+                                                        eprintln!("Placed card {} in same area as activating card at position {}", card_id, pos_idx);
+                                                        break;
+                                                    }
+                                                }
+                                            } else {
+                                                // No activating card, default to hand
+                                                player.hand.add_card(card_id);
+                                            }
                                         }
                                         "live_card_zone" => {
                                             // Validate card type - only live cards can go to live card zone
@@ -3731,7 +3832,8 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_set_heart_type(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
+        // Use heart_type field if available, otherwise fall back to heart_color
+        let heart_color = effect.heart_type.as_deref().or(effect.heart_color.as_deref()).unwrap_or("heart00");
         let target = effect.target.as_deref().unwrap_or("self");
         let card_type_filter = effect.card_type.as_deref();
         let value = effect.value.unwrap_or(1);
@@ -3842,13 +3944,32 @@ impl<'a> AbilityResolver<'a> {
     fn execute_gain_ability(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let target = effect.target.as_deref().unwrap_or("self");
         let duration = effect.duration.as_deref();
-        let ability_text = effect.text.clone();
+        let ability_text = effect.ability_gain.as_ref().map(|a| a.clone())
+            .or_else(|| Some(effect.text.clone()));
 
-        // Track granted ability as a temporary effect
-        // A full implementation would parse the ability and add it to the card
-        // For now, track it as a prohibition effect to indicate the ability exists
-        let granted_ability = format!("gain_ability:{}:{}:{}", target, ability_text, duration.unwrap_or("permanent"));
-        self.game_state.prohibition_effects.push(granted_ability);
+        if let Some(ability_text) = ability_text {
+            // Parse the ability text to extract the actual ability structure
+            // For now, track it as a temporary effect with the ability text
+            // A full implementation would parse this into an Ability structure
+            let granted_ability = format!("gain_ability:{}:{}:{}", target, ability_text, duration.unwrap_or("permanent"));
+            self.game_state.prohibition_effects.push(granted_ability);
+
+            // If the ability is a simple score modification, track it as a score modifier
+            if ability_text.contains("ライブの合計スコアを＋") {
+                // Extract the score value
+                if let Some(score_match) = ability_text.find("＋") {
+                    let score_part = &ability_text[score_match + 3..]; // Skip "＋"
+                    if let Some(end) = score_part.find("する") {
+                        let score_str = &score_part[..end];
+                        if let Ok(score_value) = score_str.parse::<i32>() {
+                            // Track as a score modifier for the live
+                            // Use a generic key for live-wide score modifiers
+                            self.game_state.score_modifiers.insert(-1, score_value);
+                        }
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -4308,10 +4429,15 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_choice(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         // Execute one of the choice options
+        let choice_type = effect.choice_type.as_deref();
+        
         if let Some(ref options) = effect.choice_options {
             // Request user to make a choice
             let description = if effect.text.is_empty() {
-                "Make a choice".to_string()
+                match choice_type {
+                    Some("emma_punch") => "Choose your response to Emma Punch".to_string(),
+                    _ => "Make a choice".to_string()
+                }
             } else {
                 effect.text.clone()
             };
@@ -4455,6 +4581,7 @@ impl<'a> AbilityResolver<'a> {
     fn execute_re_yell(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let count = effect.count.unwrap_or(1);
         let target = effect.target.as_deref().unwrap_or("self");
+        let lose_blade_hearts = effect.lose_blade_hearts.unwrap_or(false);
 
         let _player = match target {
             "self" => &mut self.game_state.player1,
@@ -4465,6 +4592,12 @@ impl<'a> AbilityResolver<'a> {
         // Track re-yell as a temporary effect
         for _ in 0..count {
             self.game_state.prohibition_effects.push(format!("re_yell:{}", target));
+        }
+
+        // If lose_blade_hearts is true, remove blade hearts from the player
+        if lose_blade_hearts {
+            eprintln!("re_yell: losing blade hearts for {}", target);
+            // TODO: Implement blade heart removal logic
         }
 
         Ok(())
