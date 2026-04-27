@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q150_heart_total_comparison() {
@@ -12,7 +12,7 @@ fn test_q150_heart_total_comparison() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Find the live card with this ability (PL!-bp3-026-L "Oh,Love&Peace!")
     let live_card = cards.iter()
@@ -22,7 +22,7 @@ fn test_q150_heart_total_comparison() {
         let live_id = get_card_id(live, &card_database);
         
         // Setup: Live card in live card zone
-        player1.live_card_zone.push(live_id);
+        player1.live_card_zone.cards.push(live_id);
         
         // Add members to player1 stage (2, 3, 5 hearts)
         let members: Vec<_> = cards.iter()
@@ -88,7 +88,7 @@ fn test_q150_heart_total_comparison() {
         assert!(condition_met, "Condition should be met (10 > 9)");
         
         // Add +1 to score
-        let score_bonus = 1;
+        let _score_bonus = 1;
         
         // The key assertion: heart total comparison works correctly
         // Total hearts are counted regardless of color

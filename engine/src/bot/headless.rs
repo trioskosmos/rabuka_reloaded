@@ -446,10 +446,14 @@ pub fn run_headless_game() {
                     &mut game_state,
                     &actions[0].action_type,
                     actions[0].parameters.as_ref().and_then(|p| p.card_id),
-                    actions[0].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[0].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
                     actions[0].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
+            }
+            crate::game_state::Phase::LiveStart | crate::game_state::Phase::LiveSuccess | crate::game_state::Phase::Cheer => {
+                // Handle new phases - skip for now
+                println!("Skipping new phase: {:?}", game_state.current_phase);
             }
             crate::game_state::Phase::ChooseFirstAttacker => {
                 // Q16: RPS winner chooses turn order (simplified: always choose first)
@@ -461,7 +465,7 @@ pub fn run_headless_game() {
                     &mut game_state,
                     &actions[0].action_type,
                     actions[0].parameters.as_ref().and_then(|p| p.card_id),
-                    actions[0].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[0].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
                     actions[0].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
@@ -478,7 +482,7 @@ pub fn run_headless_game() {
                     &mut game_state,
                     &actions[chosen_index].action_type,
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
@@ -507,7 +511,7 @@ pub fn run_headless_game() {
                     println!("Choosing: {}", actions[chosen_index].description);
                     
                     // Execute the chosen action
-                    let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type, actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id), actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.clone()), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch));
+                    let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &actions[chosen_index].action_type, actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id), actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(), actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area.as_ref()).copied(), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch));
                     
                     // Print state after action for first few iterations
                     if turn_count <= 20 {
@@ -694,7 +698,7 @@ fn execute_action_and_log(game_state: &mut GameState, action: &crate::game_setup
         game_state,
         &action.action_type,
         action.parameters.as_ref().and_then(|p| p.card_id),
-        action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
+        action.parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
         action.parameters.as_ref().and_then(|p| p.stage_area),
         action.parameters.as_ref().and_then(|p| p.use_baton_touch),
     );
@@ -712,7 +716,7 @@ fn execute_action_and_log(game_state: &mut GameState, action: &crate::game_setup
 
 fn auto_advance_automatic_phases(game_state: &mut GameState) {
     loop {
-        let current_phase = game_state.current_phase.clone();
+        let current_phase = &game_state.current_phase;
         match current_phase {
             crate::game_state::Phase::Active |
             crate::game_state::Phase::Energy |

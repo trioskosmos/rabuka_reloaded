@@ -121,7 +121,9 @@ export const ZoneViewer = {
         let imgPath = card.img || card.img_path || card.image || '';
         if (!imgPath && card.card_no) {
             const resolved = State.resolveCardData(card.card_no);
-            imgPath = resolved?._img || '';
+            imgPath = (State.cardImageMapping && State.cardImageMapping[card.card_no])
+                ? State.cardImageMapping[card.card_no]
+                : (card.card_no ? `img/cards_webp/${card.card_no}.webp` : '');
         }
         
         const img = document.createElement('img');

@@ -30,16 +30,42 @@ fn test_q006_different_card_numbers() {
             valid_deck.push_back(card2_id);
         }
         
-        // Fill with other cards to reach 60
-        let other_cards: Vec<_> = cards.iter()
-            .filter(|c| c.is_member() && c.card_no != member_cards[0].card_no && c.card_no != member_cards[1].card_no)
+        // Fill with other member cards to reach 48 member cards (8 + 40 = 48)
+        let mut seen_card_nos = std::collections::HashSet::new();
+        seen_card_nos.insert(member_cards[0].card_no.clone());
+        seen_card_nos.insert(member_cards[1].card_no.clone());
+        
+        let other_member_cards: Vec<_> = cards.iter()
+            .filter(|c| c.is_member())
             .filter(|c| card_database.get_card_id(&c.card_no).is_some())
-            .take(52)
+            .filter(|c| {
+                let card_no = &c.card_no;
+                if seen_card_nos.contains(card_no) {
+                    false
+                } else {
+                    seen_card_nos.insert(card_no.clone());
+                    true
+                }
+            })
+            .take(40)
             .collect();
         
-        for other in &other_cards {
+        for other in &other_member_cards {
             if let Some(other_id) = card_database.get_card_id(&other.card_no) {
                 valid_deck.push_back(other_id);
+            }
+        }
+        
+        // Add 12 live cards
+        let live_cards: Vec<_> = cards.iter()
+            .filter(|c| c.is_live())
+            .filter(|c| card_database.get_card_id(&c.card_no).is_some())
+            .take(12)
+            .collect();
+        
+        for live in &live_cards {
+            if let Some(live_id) = card_database.get_card_id(&live.card_no) {
+                valid_deck.push_back(live_id);
             }
         }
         

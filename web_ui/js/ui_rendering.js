@@ -104,14 +104,18 @@ export const Rendering = {
             const handCards = p.hand.cards;
             handCards.forEach(c => {
                 if (c?.card_no) {
-                    const imgPath = State.resolveCardData(c.card_no)?._img;
+                    const imgPath = (State.cardImageMapping && State.cardImageMapping[c.card_no])
+                        ? State.cardImageMapping[c.card_no]
+                        : `img/cards_webp/${c.card_no}.webp`;
                     if (imgPath) assetsToLoad.push(imgPath);
                 }
             });
             if (p?.stage) {
                 [p.stage.left_side, p.stage.center, p.stage.right_side].forEach(slot => {
                     if (slot?.card_no) {
-                        const imgPath = State.resolveCardData(slot.card_no)?._img;
+                        const imgPath = (State.cardImageMapping && State.cardImageMapping[slot.card_no])
+                            ? State.cardImageMapping[slot.card_no]
+                            : `img/cards_webp/${slot.card_no}.webp`;
                         if (imgPath) assetsToLoad.push(imgPath);
                     }
                 });
@@ -368,6 +372,8 @@ window.highlightActionBtn = (actionId, active) => {
         else el.classList.remove('hover-highlight');
     });
 };
+
+window.highlightActionTarget = window.highlightActionBtn;
 
 window.highlightActionTarget = window.highlightActionBtn;
 

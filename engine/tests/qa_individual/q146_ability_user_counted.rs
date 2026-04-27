@@ -1,22 +1,22 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q146_ability_user_counted() {
     // Q146: Debut ability - draw 1 card for each member on stage, then discard 1 card from hand
-    // Question: If only the ability user (園田海未) is on stage when using this ability, can you draw 1 card?
+    // Question: If only the ability user () is on stage when using this ability, can you draw 1 card?
     // Answer: Yes, you can. The ability user is also counted among the members on stage.
     
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the member card with this ability (PL!-bp3-004-R+ "園田海未")
+    // Find the member card with this ability (PL!-bp3-004-R＋ "")
     let member_card = cards.iter()
-        .find(|c| c.card_no == "PL!-bp3-004-R+");
+        .find(|c| c.card_no == "PL!-bp3-004-R＋");
     
     if let Some(member) = member_card {
         let member_id = get_card_id(member, &card_database);
@@ -50,7 +50,7 @@ fn test_q146_ability_user_counted() {
         assert_eq!(cards_to_draw, 1, "Should draw 1 card (ability user counted)");
         
         // Then discard 1 card from hand
-        let cards_to_discard = 1;
+        let _cards_to_discard = 1;
         
         // The key assertion: ability user is counted among members on stage
         // Even if only the ability user is on stage, they count as 1 member
@@ -60,6 +60,6 @@ fn test_q146_ability_user_counted() {
         println!("Only ability user on stage: count = 1");
         println!("Draw 1 card, then discard 1 card");
     } else {
-        panic!("Required card PL!-bp3-004-R+ not found for Q146 test");
+        panic!("Required card PL!-bp3-004-R＋ not found for Q146 test");
     }
 }

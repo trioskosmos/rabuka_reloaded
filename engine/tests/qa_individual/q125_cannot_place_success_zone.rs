@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q125_cannot_place_success_zone() {
@@ -12,9 +12,9 @@ fn test_q125_cannot_place_success_zone() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the live card with this ability (PL!S-bp2-024-L "君のこころは輝いてるかい？")
+    // Find the live card with this ability (PL!S-bp2-024-L "EEEE)
     let live_card = cards.iter()
         .find(|c| c.card_no == "PL!S-bp2-024-L");
     
@@ -22,7 +22,7 @@ fn test_q125_cannot_place_success_zone() {
         let live_id = get_card_id(live, &card_database);
         
         // Setup: Live card in live card zone
-        player1.live_card_zone.push(live_id);
+        player1.live_card_zone.cards.push(live_id);
         
         // Add energy
         let energy_card_ids: Vec<_> = cards.iter()
@@ -38,7 +38,7 @@ fn test_q125_cannot_place_success_zone() {
         game_state.turn_number = 1;
         
         // Verify live card is in live card zone
-        assert!(game_state.player1.live_card_zone.contains(&live_id), "Live card should be in live card zone");
+        assert!(game_state.player1.live_card_zone.cards.contains(&live_id), "Live card should be in live card zone");
         
         // Simulate effect that would swap card into success live card zone
         // The constant ability prevents this

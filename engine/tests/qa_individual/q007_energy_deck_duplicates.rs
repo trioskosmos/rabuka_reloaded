@@ -25,7 +25,7 @@ fn test_q007_energy_deck_duplicates() {
             energy_deck.push_back(card_id);
         }
         
-        // Create a valid main deck
+        // Create a valid main deck (48 member + 12 live = 60)
         let member_cards: Vec<_> = cards.iter()
             .filter(|c| c.is_member())
             .filter(|c| card_database.get_card_id(&c.card_no).is_some())

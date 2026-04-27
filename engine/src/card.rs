@@ -296,7 +296,8 @@ impl CardDatabase {
     /// Used for multi-name card handling (Q65, Q69, Q81)
     pub fn get_card_names(&self, card_id: i16) -> Vec<String> {
         if let Some(card) = self.cards.get(&card_id) {
-            card.name.split('＆').map(|s| s.to_string()).collect()
+            // Handle both regular '&' and full-width '＆' separators
+            card.name.replace('＆', "&").split('&').map(|s| s.to_string()).collect()
         } else {
             Vec::new()
         }
@@ -476,6 +477,8 @@ pub struct AbilityCost {
     pub costs: Option<Vec<AbilityCost>>, // For sequential_cost with multiple cost steps
     #[serde(default)]
     pub cost_limit: Option<u32>, // Maximum cost of cards that can be used for this cost
+    #[serde(default)]
+    pub characters: Option<Vec<String>>, // Card names that must match for cost payment (e.g., "上原歩夢", "澁谷かのん")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -507,7 +510,7 @@ pub struct AbilityEffect {
     pub ability_gain: Option<String>,
     pub quoted_text: Option<QuotedText>,
     pub per_unit: Option<bool>,
-    pub destination_choice: Option<bool>,
+    pub destination_choice: Option<serde_json::Value>,
     pub condition: Option<Condition>,
     pub primary_effect: Option<Box<AbilityEffect>>,
     pub alternative_condition: Option<Condition>,
@@ -533,6 +536,7 @@ pub struct AbilityEffect {
     pub target_member: Option<String>,
     // New fields from parser improvements
     pub choice_options: Option<Vec<String>>,
+    pub options: Option<Vec<serde_json::Value>>, // Can be strings (heart options) or AbilityEffect objects (choice effects)
     pub group: Option<GroupInfo>,
     pub per_unit_count: Option<u32>,
     pub per_unit_type: Option<String>,
@@ -602,9 +606,22 @@ pub struct AbilityEffect {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PositionInfo {
-    pub position: Option<String>,
-    pub target: Option<String>,
+#[serde(untagged)]
+pub enum PositionInfo {
+    String(String),
+    Struct {
+        position: Option<String>,
+        target: Option<String>,
+    },
+}
+
+impl PositionInfo {
+    pub fn get_position(&self) -> Option<&str> {
+        match self {
+            PositionInfo::String(s) => Some(s.as_str()),
+            PositionInfo::Struct { position, .. } => position.as_deref(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -663,6 +680,8 @@ pub struct Condition {
     pub includes_pattern: Option<String>,
     pub movement_condition: Option<String>,
     pub baton_touch_trigger: Option<bool>,
+    pub baton_touch_source: Option<String>,
+    pub baton_touch_group: Option<String>,
     pub movement_state: Option<String>,
     pub energy_state: Option<String>,
     pub aggregate_flags: Option<Vec<String>>,
@@ -681,7 +700,7 @@ pub struct Condition {
     pub includes: Option<bool>,
     pub appearance: Option<bool>,
     pub conditions: Option<Vec<Condition>>,
-    pub options: Option<Vec<serde_json::Value>>,
+    pub options: Option<Vec<AbilityEffect>>, // Changed from Vec<serde_json::Value> to Vec<AbilityEffect> for choice effects
     #[serde(default)]
     pub condition: Option<Box<Condition>>, // For nested conditions (e.g., temporal_condition with not_moved)
     // New fields from parser improvements
@@ -689,6 +708,8 @@ pub struct Condition {
     pub no_excess_heart: Option<bool>,
     pub exclude_this_member: Option<bool>,
     pub resource_type: Option<String>,
+    pub heart_types: Option<Vec<serde_json::Value>>,
+    pub types_count: Option<u32>,
     pub unit: Option<String>,
     pub location_condition: Option<bool>,
     pub cost_result_reference: Option<bool>,
@@ -725,6 +746,8 @@ impl Default for Condition {
             includes_pattern: None,
             movement_condition: None,
             baton_touch_trigger: None,
+            baton_touch_source: None,
+            baton_touch_group: None,
             movement_state: None,
             energy_state: None,
             aggregate_flags: None,
@@ -750,6 +773,8 @@ impl Default for Condition {
             no_excess_heart: None,
             exclude_this_member: None,
             resource_type: None,
+            heart_types: None,
+            types_count: None,
             unit: None,
             location_condition: None,
             cost_result_reference: None,

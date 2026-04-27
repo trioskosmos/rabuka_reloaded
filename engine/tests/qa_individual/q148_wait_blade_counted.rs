@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q148_wait_blade_counted() {
@@ -12,9 +12,9 @@ fn test_q148_wait_blade_counted() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the live card with this ability (PL!-bp3-023-L "ミはμ'sicのミ")
+    // Find the live card with this ability (PL!-bp3-023-L "E'sicE)
     let live_card = cards.iter()
         .find(|c| c.card_no == "PL!-bp3-023-L");
     
@@ -22,7 +22,7 @@ fn test_q148_wait_blade_counted() {
         let live_id = get_card_id(live, &card_database);
         
         // Setup: Live card in live card zone, members on stage with total blade 10+ (including wait state)
-        player1.live_card_zone.push(live_id);
+        player1.live_card_zone.cards.push(live_id);
         
         // Add members to stage
         let members: Vec<_> = cards.iter()
@@ -63,7 +63,7 @@ fn test_q148_wait_blade_counted() {
         
         // Simulate wait state on one member
         // Wait state members still have blades that count for total
-        let wait_member_id = game_state.player1.stage.stage[0];
+        let _wait_member_id = game_state.player1.stage.stage[0];
         
         // Check condition: total blade on stage members is 10+
         // This includes wait state members' blades

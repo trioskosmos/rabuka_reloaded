@@ -14,7 +14,7 @@ fn test_q067_all_heart_timing() {
         .find(|c| c.card_no == "PL!N-bp1-027-L");
     
     if let Some(live) = live_card {
-        let live_id = get_card_id(live, &card_database);
+        let _live_id = get_card_id(live, &card_database);
         
         // Verify it's a live card
         assert!(live.is_live(), "Should be a live card");

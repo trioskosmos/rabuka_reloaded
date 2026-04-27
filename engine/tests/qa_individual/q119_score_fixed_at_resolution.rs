@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q119_score_fixed_at_resolution() {
@@ -12,9 +12,9 @@ fn test_q119_score_fixed_at_resolution() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the live card with this ability (PL!SP-bp2-024-L "ビタミンSUMMER！")
+    // Find the live card with this ability (PL!SP-bp2-024-L "SUMMEREE)
     let live_card = cards.iter()
         .find(|c| c.card_no == "PL!SP-bp2-024-L");
     
@@ -22,7 +22,7 @@ fn test_q119_score_fixed_at_resolution() {
         let live_id = get_card_id(live, &card_database);
         
         // Setup: Live card in live card zone, player1 has 5 cards in hand, player2 has 3 cards in hand
-        player1.live_card_zone.push(live_id);
+        player1.live_card_zone.cards.push(live_id);
         
         let hand_cards: Vec<_> = cards.iter()
             .filter(|c| get_card_id(c, &card_database) != live_id)
@@ -49,28 +49,28 @@ fn test_q119_score_fixed_at_resolution() {
         game_state.turn_number = 1;
         
         // Verify player1 has 5 cards, player2 has 0 cards
-        assert_eq!(game_state.player1.hand.len(), 5, "Player1 should have 5 cards");
-        assert_eq!(game_state.player2.hand.len(), 0, "Player2 should have 0 cards");
+        assert_eq!(game_state.player1.hand.cards.len(), 5, "Player1 should have 5 cards");
+        assert_eq!(game_state.player2.hand.cards.len(), 0, "Player2 should have 0 cards");
         
         // Simulate live success ability: check if player1 hand size > player2 hand size
-        let condition_met = game_state.player1.hand.len() > game_state.player2.hand.len();
+        let condition_met = game_state.player1.hand.cards.len() > game_state.player2.hand.cards.len();
         
         // Verify condition is met
         assert!(condition_met, "Player1 hand size should be greater than player2");
         
         // Add +1 to score
-        let score_bonus = 1;
+        let _score_bonus = 1;
         
         // Now change hand sizes (player1 loses cards, player2 gains cards)
         for _ in 0..3 {
-            if let Some(card_id) = game_state.player1.hand.pop() {
-                game_state.player1.discard_zone.push(card_id);
+            if let Some(card_id) = game_state.player1.hand.cards.pop() {
+                game_state.player1.waitroom.cards.push(card_id);
             }
         }
         
         let additional_cards: Vec<_> = cards.iter()
             .filter(|c| get_card_id(c, &card_database) != live_id)
-            .filter(|c| !game_state.player1.hand.contains(&get_card_id(c, &card_database)))
+            .filter(|c| !game_state.player1.hand.cards.contains(&get_card_id(c, &card_database)))
             .filter(|c| get_card_id(c, &card_database) != 0)
             .take(4)
             .map(|c| get_card_id(c, &card_database))
@@ -81,8 +81,8 @@ fn test_q119_score_fixed_at_resolution() {
         }
         
         // Verify hand sizes changed (player1: 2, player2: 4)
-        assert_eq!(game_state.player1.hand.len(), 2, "Player1 should have 2 cards now");
-        assert_eq!(game_state.player2.hand.len(), 4, "Player2 should have 4 cards now");
+        assert_eq!(game_state.player1.hand.cards.len(), 2, "Player1 should have 2 cards now");
+        assert_eq!(game_state.player2.hand.cards.len(), 4, "Player2 should have 4 cards now");
         
         // Score bonus should still be +1 (not removed even though condition is no longer met)
         // The key assertion: score bonus is fixed at resolution time

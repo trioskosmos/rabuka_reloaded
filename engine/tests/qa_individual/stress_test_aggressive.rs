@@ -64,7 +64,7 @@ fn test_stress_max_stage_capacity() {
     }
     
     // Verify stage is full
-    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
     assert!(stage_members >= 3, "Stage should have multiple members");
     
     // Try to play another member - should fail due to no available areas

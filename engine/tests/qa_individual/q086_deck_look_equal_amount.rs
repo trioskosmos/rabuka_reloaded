@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id};
 
 #[test]
 fn test_q086_deck_look_equal_amount() {
@@ -12,7 +12,7 @@ fn test_q086_deck_look_equal_amount() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Setup: Deck with exactly 5 cards (same as look amount)
     let deck_cards: Vec<_> = cards.iter()
@@ -22,7 +22,7 @@ fn test_q086_deck_look_equal_amount() {
         .collect();
     
     for card_id in deck_cards {
-        player1.deck.push(card_id);
+        player1.main_deck.cards.push(card_id);
     }
     
     let mut game_state = GameState::new(player1, player2, card_database.clone());
@@ -30,32 +30,32 @@ fn test_q086_deck_look_equal_amount() {
     game_state.turn_number = 1;
     
     // Verify deck has 5 cards
-    assert_eq!(game_state.player1.deck.len(), 5, "Deck should have 5 cards");
+    assert_eq!(game_state.player1.main_deck.cards.len(), 5, "Deck should have 5 cards");
     
     // Simulate effect: look at top 5 cards
-    let looked_at_count = game_state.player1.deck.len();
+    let looked_at_count = game_state.player1.main_deck.cards.len();
     assert_eq!(looked_at_count, 5, "Looked at 5 cards");
     
     // No refresh happens during the look when deck size equals look amount
     // This is the key difference from Q85
     
     // Simulate effect resolution: all 5 cards go to discard
-    let looked_cards: Vec<_> = game_state.player1.deck.drain(..).collect();
+    let looked_cards: Vec<_> = game_state.player1.main_deck.cards.drain(..).collect();
     for card_id in looked_cards {
-        game_state.player1.discard_zone.push(card_id);
+        game_state.player1.waitroom.cards.push(card_id);
     }
     
     // Verify deck is now 0
-    assert_eq!(game_state.player1.deck.len(), 0, "Deck should be 0 after effect resolution");
+    assert_eq!(game_state.player1.main_deck.cards.len(), 0, "Deck should be 0 after effect resolution");
     
     // Now refresh happens because deck is 0
-    let new_deck: Vec<_> = game_state.player1.discard_zone.drain(..).collect();
+    let new_deck: Vec<_> = game_state.player1.waitroom.cards.drain(..).collect();
     for card_id in new_deck {
-        game_state.player1.deck.push(card_id);
+        game_state.player1.main_deck.cards.push(card_id);
     }
     
     // Verify deck has cards after refresh
-    assert!(game_state.player1.deck.len() > 0, "Deck should have cards after refresh");
+    assert!(game_state.player1.main_deck.cards.len() > 0, "Deck should have cards after refresh");
     
     // The key assertion: when deck size equals look amount, no refresh during look
     // Refresh only happens if effect resolution makes deck 0

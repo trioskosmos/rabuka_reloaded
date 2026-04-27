@@ -91,7 +91,7 @@ fn test_stress_multiple_copies_complex_interactions() {
     assert!(result.is_ok(), "Should play third copy to right side: {:?}", result);
     
     // Verify all three copies are on stage
-    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
     assert_eq!(stage_members, 3, "Stage should have 3 members");
     
     // Advance turn to allow baton touch
@@ -116,7 +116,7 @@ fn test_stress_multiple_copies_complex_interactions() {
     
     // Verify original member is in waitroom
     assert!(!game_state.player1.stage.stage.contains(&member_card_id) || 
-            game_state.player1.stage.stage.iter().filter(|&&id| id == member_card_id).count() < 3,
+            game_state.player1.stage.stage.iter().filter(|&id| id !=  id == member_card_id).count() < 3,
         "One copy should be in waitroom after baton touch");
     
     println!("Stress test passed: 3 copies of same card on stage with baton touch");

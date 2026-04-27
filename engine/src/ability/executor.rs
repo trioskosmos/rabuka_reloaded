@@ -2,6 +2,7 @@ use crate::card::{Ability, AbilityCost, AbilityEffect, Condition};
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::zones::MemberArea;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct CostCalculation {
@@ -480,7 +481,7 @@ impl AbilityExecutor {
                 reason: "Ability can be executed".to_string(),
             }
         } else {
-            let cost_text = ability.cost.as_ref().map(|c| c.text.clone()).unwrap_or_default();
+            let cost_text = ability.cost.as_ref().map(|c| c.text.as_str()).unwrap_or("");
             AbilityValidation {
                 can_execute: false,
                 conditions_met: true,
@@ -526,7 +527,7 @@ impl AbilityExecutor {
                 ("hand" | "手札", "discard" | "控え室") => {
                     self.move_from_hand_to_discard(player, count_usize)?;
                 }
-                ("deck" | "デッキ", "hand" | "手札") => {
+                ("deck" | "チE��キ", "hand" | "手札") => {
                     self.draw_cards(player, count_usize)?;
                 }
                 ("deck_top", "hand" | "手札") => {
@@ -1072,6 +1073,7 @@ impl AbilityExecutor {
                         target_player_id: target_player.id.clone(),
                         description: format!("Set blade type to {} for {}", blade_type, card_db.get_card(card_id).map(|c| c.name.as_str()).unwrap_or("unknown")),
                         creation_order: 0,
+                        effect_data: None,
                     };
                     temp_effects.push(temp_effect);
                 }
@@ -1137,28 +1139,63 @@ impl AbilityExecutor {
         game_state: &mut GameState,
         perspective_player_id: &str,
     ) -> Result<(), String> {
-        let position = effect.position.as_ref().and_then(|p| p.position.as_deref()).unwrap_or("");
+        let position = effect.position.as_ref().and_then(|p| p.get_position()).unwrap_or("");
         let target = effect.target.as_deref().unwrap_or("self");
+        let target_member = effect.target_member.as_deref().unwrap_or("this_member");
 
+        let card_database = Arc::clone(&game_state.card_database); // Clone Arc to avoid borrow conflict
         let target_players = game_state.resolve_target_mut(target, perspective_player_id);
-
         for target_player in target_players {
             if target_player.id != player.id {
                 continue; // Skip for now, only implement self target
             }
 
-            // Move member to specified position
-            let _target_area = match position {
-                "center" | "センターエリア" => crate::zones::MemberArea::Center,
-                "left_side" | "左サイドエリア" => crate::zones::MemberArea::LeftSide,
-                "right_side" | "右サイドエリア" => crate::zones::MemberArea::RightSide,
+            let target_index = match position {
+                "center" | "センターエリア" => 1,
+                "left_side" | "左サイドエリア" => 0,
+                "right_side" | "右サイドエリア" => 2,
                 _ => return Err(format!("Unknown position: {}", position)),
             };
 
-            // Find and move the member (simplified - assumes moving from current position to target)
-            // This is a complex operation that requires user choice in real gameplay
-            // For now, we'll just log the intent
-            println!("Position change requested: move member to {}", position);
+            // Find the member to move based on target_member
+            let current_index = if target_member == "this_member" {
+                // Get the member that triggered this ability
+                // This should be stored in the context or passed differently
+                return Err("position_change with 'this_member' requires context tracking - not yet implemented".to_string());
+            } else {
+                // Find member by card number in stage array
+                target_player.stage.stage.iter()
+                    .position(|&card_id| {
+                        if card_id == -1 {
+                            false
+                        } else {
+                            card_database.get_card(card_id)
+                                .map(|c| c.card_no == target_member)
+                                .unwrap_or(false)
+                        }
+                    })
+            };
+
+            if let Some(current_idx) = current_index {
+                // Move the member from current_idx to target_index
+                let card_id = target_player.stage.stage[current_idx];
+                
+                // Check if target area is occupied
+                if target_player.stage.stage[target_index] != -1 {
+                    // Swap positions if occupied
+                    let occupying_card = target_player.stage.stage[target_index];
+                    target_player.stage.stage[target_index] = card_id;
+                    target_player.stage.stage[current_idx] = occupying_card;
+                    println!("Position change: swapped members between index {} and {}", current_idx, target_index);
+                } else {
+                    // Move to empty area
+                    target_player.stage.stage[target_index] = card_id;
+                    target_player.stage.stage[current_idx] = -1;
+                    println!("Position change: moved member from index {} to {}", current_idx, target_index);
+                }
+            } else {
+                return Err(format!("Member not found: {}", target_member));
+            }
         }
 
         Ok(())
@@ -1305,7 +1342,7 @@ impl AbilityExecutor {
 
         for (index, sub_effect) in actions.iter().enumerate() {
             match sub_effect.action.as_str() {
-                "draw" => {
+                "draw" | "draw_card" => {
                     self.execute_draw(sub_effect, player)?;
                 }
                 "move_cards" => {
@@ -1383,7 +1420,7 @@ impl AbilityExecutor {
             "move_cards" => {
                 self.execute_move_cards(effect, player, game_state, perspective_player_id)
             }
-            "draw" => self.execute_draw(effect, player),
+            "draw" | "draw_card" => self.execute_draw(effect, player),
             "gain_resource" => {
                 self.execute_gain_resource(effect, player, game_state, perspective_player_id)
             }
@@ -1490,7 +1527,7 @@ impl AbilityExecutor {
             }
             Some("change_state") => {
                 let state = cost.state_change.as_deref().unwrap_or("");
-                let position = cost.position.as_ref().and_then(|p| p.position.as_deref());
+                let position = cost.position.as_ref().and_then(|p| p.get_position());
 
                 if let Some(pos) = position {
                     let _area = match pos {

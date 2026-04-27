@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q080_effect_debut_after_cost() {
@@ -12,9 +12,9 @@ fn test_q080_effect_debut_after_cost() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the member card with this ability (PL!HS-bp1-002-R "村野さやか")
+    // Find the member card with this ability (PL!HS-bp1-002-R "E)
     let member_card = cards.iter()
         .find(|c| c.card_no == "PL!HS-bp1-002-R");
     
@@ -24,7 +24,7 @@ fn test_q080_effect_debut_after_cost() {
         // Find a Hasunosora member to debut via effect
         let hasunosora_member = cards.iter()
             .filter(|c| c.is_member())
-            .filter(|c| c.group == "蓮ノ空")
+            .filter(|c| c.group == "")
             .filter(|c| c.cost.unwrap_or(0) <= 15)
             .filter(|c| get_card_id(c, &card_database) != member_id)
             .filter(|c| get_card_id(c, &card_database) != 0)
@@ -35,7 +35,7 @@ fn test_q080_effect_debut_after_cost() {
             
             // Setup: First member in hand, Hasunosora member in discard
             player1.add_card_to_hand(member_id);
-            player1.discard_zone.push(hasunosora_id);
+            player1.waitroom.cards.push(hasunosora_id);
             
             // Add energy
             let energy_card_ids: Vec<_> = cards.iter()
@@ -52,9 +52,9 @@ fn test_q080_effect_debut_after_cost() {
             
             // Debut first member to stage
             let cost = game_state.card_database.get_card(member_id).unwrap().cost.unwrap_or(0);
-            if game_state.player1.energy_zone.len() >= cost as usize {
+            if game_state.player1.energy_zone.cards.len() >= cost as usize {
                 game_state.player1.stage.stage[1] = member_id;
-                game_state.player1.hand.retain(|&id| id != member_id);
+                game_state.player1.hand.cards = game_state.player1.hand.cards.iter().filter(|&id| *id != member_id).copied().collect();
                 
                 // Mark member as debuted this turn
                 game_state.player1.debuted_this_turn.push(member_id);
@@ -65,7 +65,7 @@ fn test_q080_effect_debut_after_cost() {
                 assert!(game_state.player1.area_placed_this_turn[1], "Area should be marked as placed this turn");
                 
                 // Simulate activation ability: send member to discard
-                game_state.player1.discard_zone.push(member_id);
+                game_state.player1.waitroom.cards.push(member_id);
                 game_state.player1.stage.stage[1] = -1;
                 
                 // Clear area placement restriction since member left
@@ -76,7 +76,7 @@ fn test_q080_effect_debut_after_cost() {
                 
                 // Simulate effect debuting Hasunosora member to same area
                 game_state.player1.stage.stage[1] = hasunosora_id;
-                game_state.player1.discard_zone.retain(|&id| id != hasunosora_id);
+                game_state.player1.waitroom.cards = game_state.player1.waitroom.cards.iter().filter(|&id| *id != hasunosora_id).copied().collect();
                 
                 // Verify Hasunosora member debuted successfully
                 assert_eq!(game_state.player1.stage.stage[1], hasunosora_id, "Hasunosora member should be on stage");

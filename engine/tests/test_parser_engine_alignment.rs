@@ -269,8 +269,8 @@ fn test_destination_choice_field_parsing() {
         
         if let Some(ability) = move_cards_effect {
             if let Some(effect) = &ability.effect {
-                if let Some(destination_choice) = effect.destination_choice {
-                    assert!(destination_choice == true || destination_choice == false,
+                if let Some(destination_choice) = &effect.destination_choice {
+                    assert!(destination_choice == &true || destination_choice == &false,
                         "destination_choice should be a boolean");
                 }
             }
@@ -297,13 +297,13 @@ fn test_destination_choice_extraction() {
         count: Some(1),
         source: Some("hand".to_string()),
         destination: Some("discard".to_string()),
-        destination_choice: Some(true),
+        destination_choice: Some(serde_json::Value::Bool(true)),
         ..Default::default()
     };
 
     // The field should be extracted without error
-    let destination_choice = effect_with_choice.destination_choice.unwrap_or(false);
-    assert_eq!(destination_choice, true, "destination_choice should be extracted as true");
+    let destination_choice = effect_with_choice.destination_choice.unwrap_or(serde_json::Value::Bool(false));
+    assert_eq!(destination_choice, serde_json::Value::Bool(true), "destination_choice should be extracted as true");
 
     // Test with destination_choice = false
     let effect_without_choice = rabuka_engine::card::AbilityEffect {
@@ -311,12 +311,12 @@ fn test_destination_choice_extraction() {
         count: Some(1),
         source: Some("hand".to_string()),
         destination: Some("discard".to_string()),
-        destination_choice: Some(false),
+        destination_choice: Some(serde_json::Value::Bool(false)),
         ..Default::default()
     };
 
-    let destination_choice = effect_without_choice.destination_choice.unwrap_or(false);
-    assert_eq!(destination_choice, false, "destination_choice should be extracted as false");
+    let destination_choice = effect_without_choice.destination_choice.unwrap_or(serde_json::Value::Bool(false));
+    assert_eq!(destination_choice, serde_json::Value::Bool(false), "destination_choice should be extracted as false");
 
     // Test with destination_choice = None (default)
     let effect_default = rabuka_engine::card::AbilityEffect {
@@ -328,8 +328,8 @@ fn test_destination_choice_extraction() {
         ..Default::default()
     };
 
-    let destination_choice = effect_default.destination_choice.unwrap_or(false);
-    assert_eq!(destination_choice, false, "destination_choice should default to false");
+    let destination_choice = effect_default.destination_choice.unwrap_or(serde_json::Value::Bool(false));
+    assert_eq!(destination_choice, serde_json::Value::Bool(false), "destination_choice should default to false");
 }
 
 /// Test: baton_touch_trigger condition evaluation
@@ -338,7 +338,7 @@ fn test_baton_touch_trigger_condition() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
 
     let mut game_state = GameState::new(player1, player2, card_database.clone());
@@ -366,13 +366,13 @@ fn test_baton_touch_trigger_condition() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&condition_no_baton);
     assert!(!result, "Condition should fail when baton_touch_count is 0");
 
     // Test with baton_touch_trigger = true after baton touch
     game_state.record_baton_touch();
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&condition_no_baton);
     assert!(result, "Condition should pass when baton_touch_count > 0");
 
@@ -387,7 +387,7 @@ fn test_baton_touch_trigger_condition() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&condition_no_trigger);
     // Should evaluate based on location only, not baton touch
     // Since stage has a card, this should pass
@@ -400,7 +400,7 @@ fn test_choice_condition_handler() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
 
     let mut game_state = GameState::new(player1, player2, card_database);
@@ -414,7 +414,7 @@ fn test_choice_condition_handler() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&choice_condition);
 
     // Choice conditions should return true (handled during cost resolution)
@@ -470,7 +470,7 @@ fn test_card_type_restrictions() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&member_condition);
     assert!(result, "Should find member cards in hand");
 
@@ -487,7 +487,7 @@ fn test_card_type_restrictions() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&live_condition);
     assert!(result, "Should find live cards in hand");
 }
@@ -531,7 +531,7 @@ fn test_area_selection() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&left_condition);
     assert!(result, "Should find member in left_side");
 
@@ -548,7 +548,7 @@ fn test_area_selection() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&center_condition);
     assert!(result, "Should find member in center");
 
@@ -565,8 +565,8 @@ fn test_area_selection() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
-    let result = resolver.evaluate_condition(&right_condition);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let _result = resolver.evaluate_condition(&right_condition);
     // Position filtering may not be fully implemented yet
     // For now, just verify the condition can be evaluated without error
     // assert!(!result, "Should not find member in empty right_side");
@@ -578,7 +578,7 @@ fn test_negation_condition() {
     let cards = load_all_cards();
     let card_database = create_card_database(cards.clone());
 
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
 
     let mut game_state = GameState::new(player1, player2, card_database);
@@ -599,8 +599,8 @@ fn test_negation_condition() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
-    let result = resolver.evaluate_condition(&negated_condition);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let _result = resolver.evaluate_condition(&negated_condition);
     // Note: negation may not be fully implemented yet
     // assert!(result, "Negated condition should invert result (empty stage with negation = true)");
 }
@@ -642,8 +642,8 @@ fn test_count_comparison_condition() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
-    let result = resolver.evaluate_condition(&count_condition);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let _result = resolver.evaluate_condition(&count_condition);
     // Note: card_count_condition may not be fully implemented yet
     // assert!(result, "Should have 3 cards in hand");
 
@@ -659,8 +659,8 @@ fn test_count_comparison_condition() {
         ..Default::default()
     };
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
-    let result = resolver.evaluate_condition(&high_count_condition);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let _result = resolver.evaluate_condition(&high_count_condition);
     // Note: card_count_condition may not be fully implemented yet
     // assert!(!result, "Should not have more than 5 cards in hand");
 }
@@ -673,7 +673,7 @@ fn test_execution_context_none_initially() {
 
     let card_database = std::sync::Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards.clone()));
 
-    let mut player1 = rabuka_engine::player::Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player1 = rabuka_engine::player::Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = rabuka_engine::player::Player::new("player2".to_string(), "Player 2".to_string(), false);
 
     let mut game_state = rabuka_engine::game_state::GameState::new(player1, player2, card_database.clone());
@@ -869,7 +869,7 @@ fn test_not_moved_condition() {
     };
 
     // Card has not moved yet, so condition should be true
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&not_moved_condition);
     assert!(result, "Card should not have moved yet");
 
@@ -877,7 +877,7 @@ fn test_not_moved_condition() {
     game_state.record_card_movement(member_card_id);
 
     // Re-evaluate - should now be false
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&not_moved_condition);
     assert!(!result, "Card has moved, condition should be false");
 }
@@ -922,7 +922,7 @@ fn test_has_moved_condition() {
     };
 
     // Card has not moved yet, so condition should be false
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&has_moved_condition);
     assert!(!result, "Card has not moved yet");
 
@@ -930,7 +930,7 @@ fn test_has_moved_condition() {
     game_state.record_card_movement(member_card_id);
 
     // Re-evaluate - should now be true
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
     let result = resolver.evaluate_condition(&has_moved_condition);
     assert!(result, "Card has moved, condition should be true");
 }
@@ -943,12 +943,12 @@ fn test_negation_field() {
 
     let card_database = std::sync::Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards.clone()));
 
-    let mut player1 = rabuka_engine::player::Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player1 = rabuka_engine::player::Player::new("player1".to_string(), "Player 1".to_string(), true);
     let player2 = rabuka_engine::player::Player::new("player2".to_string(), "Player 2".to_string(), false);
 
     let mut game_state = rabuka_engine::game_state::GameState::new(player1, player2, card_database.clone());
 
-    let mut resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
+    let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
 
     // Create a location condition that should be true (stage is empty)
     let location_condition = rabuka_engine::card::Condition {

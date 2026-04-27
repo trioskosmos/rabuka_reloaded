@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q154_conditional_debut() {
@@ -12,11 +12,11 @@ fn test_q154_conditional_debut() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the member card with this ability (PL!S-bp3-006-R+ "津島善子")
+    // Find the member card with this ability (PL!S-bp3-006-R＋ "EE)
     let member_card = cards.iter()
-        .find(|c| c.card_no == "PL!S-bp3-006-R+");
+        .find(|c| c.card_no == "PL!S-bp3-006-R＋");
     
     if let Some(member) = member_card {
         let member_id = get_card_id(member, &card_database);
@@ -65,8 +65,8 @@ fn test_q154_conditional_debut() {
             let required_cost = aqours_cost + 2;
             
             // Verify no Aqours member in discard with required cost
-            let matching_member_in_discard = game_state.player1.discard_zone.iter()
-                .filter(|&id| {
+            let matching_member_in_discard = game_state.player1.waitroom.cards.iter()
+                .filter(|&&id| {
                     if let Some(card) = game_state.card_database.get_card(id) {
                         card.is_member() && card.group == "Aqours" && card.cost.unwrap_or(0) == required_cost
                     } else {
@@ -79,7 +79,7 @@ fn test_q154_conditional_debut() {
             
             // Simulate activation ability: wait this member, discard 1 card, send Aqours member to discard
             game_state.player1.stage.stage[1] = -1; // Member becomes wait
-            game_state.player1.discard_zone.push(aqours_id); // Aqours member to discard
+            game_state.player1.waitroom.cards.push(aqours_id); // Aqours member to discard
             game_state.player1.stage.stage[0] = -1; // Remove from stage
             
             // Try to debut Aqours member with cost = required_cost
@@ -99,6 +99,6 @@ fn test_q154_conditional_debut() {
             println!("Ability processing ends successfully");
         }
     } else {
-        panic!("Required card PL!S-bp3-006-R+ not found for Q154 test");
+        panic!("Required card PL!S-bp3-006-R＋ not found for Q154 test");
     }
 }

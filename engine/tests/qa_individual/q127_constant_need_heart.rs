@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q127_constant_need_heart() {
@@ -12,11 +12,11 @@ fn test_q127_constant_need_heart() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the member card with this constant ability (PL!SP-bp2-010-R+ "ウィーン・マルガレーテ")
+    // Find the member card with this constant ability (PL!SP-bp2-010-R＋ "E)
     let member_card = cards.iter()
-        .find(|c| c.card_no == "PL!SP-bp2-010-R+");
+        .find(|c| c.card_no == "PL!SP-bp2-010-R＋");
     
     if let Some(member) = member_card {
         let member_id = get_card_id(member, &card_database);
@@ -41,7 +41,7 @@ fn test_q127_constant_need_heart() {
         
         if let Some(live) = opponent_live {
             let live_id = get_card_id(live, &card_database);
-            player2.live_card_zone.push(live_id);
+            player2.live_card_zone.cards.push(live_id);
             
             let mut game_state = GameState::new(player1, player2, card_database.clone());
             game_state.current_phase = rabuka_engine::game_state::Phase::Main;
@@ -51,10 +51,10 @@ fn test_q127_constant_need_heart() {
             assert_eq!(game_state.player1.stage.stage[1], member_id, "Member should be on stage");
             
             // Verify opponent has live card
-            assert!(game_state.player2.live_card_zone.contains(&live_id), "Opponent should have live card");
+            assert!(game_state.player2.live_card_zone.cards.contains(&live_id), "Opponent should have live card");
             
             // Simulate live card that changes need heart (e.g., from heart02 to heart03)
-            let base_need_heart = 2; // heart02
+            let _base_need_heart = 2; // heart02
             let changed_need_heart = 3; // heart03 (after condition met)
             
             // Constant ability adds +1 to need heart
@@ -75,6 +75,6 @@ fn test_q127_constant_need_heart() {
             println!("Final need heart: 4");
         }
     } else {
-        panic!("Required card PL!SP-bp2-010-R+ not found for Q127 test");
+        panic!("Required card PL!SP-bp2-010-R＋ not found for Q127 test");
     }
 }

@@ -41,12 +41,12 @@ fn test_stress_multiple_live_cards() {
     
     // Add multiple live cards to live card zone
     for &live_id in &live_card_ids {
-        player1.live_card_zone.add_card(live_id, false, &card_database)
+        game_state.player1.live_card_zone.add_card(live_id, false, &card_database)
             .expect("Failed to add live card");
     }
     
     // Verify multiple live cards are in zone
-    assert_eq!(player1.live_card_zone.cards.len(), live_card_ids.len(),
+    assert_eq!(game_state.player1.live_card_zone.cards.len(), live_card_ids.len(),
         "Should have all live cards in live card zone");
     
     println!("Stress test passed: Multiple live cards in live card zone");
@@ -124,7 +124,7 @@ fn test_stress_live_card_with_member_conditions() {
     assert!(result.is_ok(), "Should play member2 to left side: {:?}", result);
     
     // Verify both members are on stage
-    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
     assert_eq!(stage_members, 2, "Stage should have 2 members");
     
     // Add live card to live card zone

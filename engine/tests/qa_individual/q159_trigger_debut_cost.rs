@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q159_trigger_debut_cost() {
@@ -12,9 +12,9 @@ fn test_q159_trigger_debut_cost() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the member card with this ability (PL!N-bp3-003-R "桜坂しずく")
+    // Find the member card with this ability (PL!N-bp3-003-R "E)
     let member_card = cards.iter()
         .find(|c| c.card_no == "PL!N-bp3-003-R");
     
@@ -26,7 +26,7 @@ fn test_q159_trigger_debut_cost() {
         
         let nijigasaki_member = cards.iter()
             .filter(|c| c.is_member())
-            .filter(|c| c.group == "虹ヶ咲")
+            .filter(|c| c.group == "")
             .filter(|c| c.cost.unwrap_or(0) <= 4)
             .filter(|c| get_card_id(c, &card_database) != member_id)
             .filter(|c| get_card_id(c, &card_database) != 0)
@@ -34,7 +34,7 @@ fn test_q159_trigger_debut_cost() {
         
         if let Some(nijigasaki) = nijigasaki_member {
             let nijigasaki_id = get_card_id(nijigasaki, &card_database);
-            player1.discard_zone.push(nijigasaki_id);
+            player1.waitroom.cards.push(nijigasaki_id);
             
             // Add energy
             let energy_card_ids: Vec<_> = cards.iter()
@@ -50,7 +50,7 @@ fn test_q159_trigger_debut_cost() {
             game_state.turn_number = 1;
             
             // Verify Nijigasaki member is in discard
-            assert!(game_state.player1.discard_zone.contains(&nijigasaki_id), "Nijigasaki member should be in discard");
+            assert!(game_state.player1.waitroom.cards.contains(&nijigasaki_id), "Nijigasaki member should be in discard");
             
             // Simulate debut ability: choose Nijigasaki member from discard, try to trigger its debut ability
             // The Nijigasaki member has a debut ability with "wait this member optionally" cost

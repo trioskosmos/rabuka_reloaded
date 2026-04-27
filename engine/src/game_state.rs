@@ -1,4 +1,5 @@
 use crate::card::CardDatabase;
+use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::player::Player;
 use crate::zones::ResolutionZone;
 use std::sync::Arc;
@@ -12,6 +13,7 @@ pub enum AbilityTrigger {
     PerformancePhaseStart, // パフォーマンスフェイズの始めに (8.3.3)
     Constant,            // 常時
     Auto,                // 自動 (generic auto ability)
+    AreaMovement,        // エリア移動 (Rule 9.7.4 - area movement trigger)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,6 +39,10 @@ pub enum Phase {
     FirstAttackerPerformance,
     SecondAttackerPerformance,
     LiveVictoryDetermination,
+    // Additional phases for bot compatibility
+    LiveStart,
+    LiveSuccess,
+    Cheer,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +70,7 @@ pub struct TemporaryEffect {
     pub target_player_id: String,
     pub description: String,
     pub creation_order: u32, // For effect layering - order in which effects were generated
+    pub effect_data: Option<serde_json::Value>, // Store effect-specific data for reverting (e.g., which cards got how many blades)
 }
 
 #[derive(Debug, Clone)]
@@ -126,22 +133,22 @@ pub struct GameState {
     pub blade_modifiers: std::collections::HashMap<i16, i32>, // card_id -> blade delta
     pub blade_type_modifiers: std::collections::HashMap<i16, crate::card::BladeColor>, // card_id -> blade type override
     pub heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> heart delta
-    // Activating card tracking - for self-cost abilities where the card itself is the cost
-    pub activating_card: Option<i16>, // card_id of the card currently activating an ability
-    pub score_modifiers: std::collections::HashMap<i16, i32>, // card_id -> score delta
-    pub need_heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> need_heart delta
     pub orientation_modifiers: std::collections::HashMap<i16, String>, // card_id -> "active" or "wait"
     pub cost_modifiers: std::collections::HashMap<i16, i32>, // card_id -> cost delta
     // Reveal tracking - tracks which cards have been revealed to opponent
     pub revealed_cards: std::collections::HashSet<i16>, // card_ids that are currently revealed
     // Optional cost behavior: "always_pay", "never_pay", "auto" (pay if beneficial)
     pub optional_cost_behavior: String,
-    // Pending ability execution state for user interaction
+    // Activating card tracking - for self-cost abilities where the card itself is the cost
+    pub activating_card: Option<i16>, // card_id of the card currently activating an ability
+    // Pending ability for resumption after optional cost payment
+    pub pending_current_ability: Option<crate::card::Ability>, // Full ability object for resumption
+    // Pending ability execution context
     pub pending_ability: Option<PendingAbilityExecution>,
-    // Pending choice for user interaction - persists across resolver instances
     pub pending_choice: Option<crate::ability_resolver::Choice>,
-    // Pending sequential actions to resume after user choice
     pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
+    pub score_modifiers: std::collections::HashMap<i16, i32>, // card_id -> score delta
+    pub need_heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> need_heart delta
     // Area placement tracking - tracks which areas had cards placed this turn (Q70, Q71, Q75, Q76, Q79, Q80)
     pub areas_placed_this_turn: std::collections::HashSet<String>, // "player1:center", "player1:left", etc.
     // Card appearance tracking - tracks which cards appeared this turn (Q77)
@@ -231,9 +238,49 @@ pub struct PendingAutoAbility {
 }
 
 impl GameState {
+    /// Invariant check: turn phase and current phase must be consistent according to game rules
+    pub fn phase_invariant(&self) -> bool {
+        match self.current_turn_phase {
+            TurnPhase::FirstAttackerNormal | TurnPhase::SecondAttackerNormal => {
+                // Normal phase sub-phases: Active, Energy, Draw, Main
+                matches!(self.current_phase, Phase::Active | Phase::Energy | Phase::Draw | Phase::Main)
+            }
+            TurnPhase::Live => {
+                // Live phase sub-phases: LiveCardSet, FirstAttackerPerformance, SecondAttackerPerformance, LiveVictoryDetermination
+                matches!(self.current_phase, Phase::LiveCardSet | Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination)
+            }
+        }
+    }
+
+    /// Invariant check: modifier HashMaps should not contain invalid card IDs
+    pub fn modifier_invariant(&self) -> bool {
+        // Check that all card IDs in modifier HashMaps exist in the card database
+        for &card_id in self.blade_modifiers.keys() {
+            if self.card_database.get_card(card_id).is_none() {
+                return false;
+            }
+        }
+        for &card_id in self.heart_modifiers.keys() {
+            if self.card_database.get_card(card_id).is_none() {
+                return false;
+            }
+        }
+        for &card_id in self.cost_modifiers.keys() {
+            if self.card_database.get_card(card_id).is_none() {
+                return false;
+            }
+        }
+        for &card_id in self.score_modifiers.keys() {
+            if self.card_database.get_card(card_id).is_none() {
+                return false;
+            }
+        }
+        true
+    }
+
     pub fn new(player1: Player, player2: Player, card_database: Arc<CardDatabase>) -> Self {
         let is_first_turn = true;
-        GameState {
+        let state = GameState {
             player1,
             player2,
             current_turn_phase: TurnPhase::FirstAttackerNormal,
@@ -269,15 +316,16 @@ impl GameState {
             blade_modifiers: std::collections::HashMap::new(),
             blade_type_modifiers: std::collections::HashMap::new(),
             heart_modifiers: std::collections::HashMap::new(),
-            score_modifiers: std::collections::HashMap::new(),
-            need_heart_modifiers: std::collections::HashMap::new(),
             orientation_modifiers: std::collections::HashMap::new(),
             cost_modifiers: std::collections::HashMap::new(),
             revealed_cards: std::collections::HashSet::new(),
             optional_cost_behavior: "always_pay".to_string(), // Default to always pay for bot/test mode
+            pending_current_ability: None,
             pending_ability: None,
             pending_choice: None,
             pending_sequential_actions: None,
+            score_modifiers: std::collections::HashMap::new(),
+            need_heart_modifiers: std::collections::HashMap::new(),
             areas_placed_this_turn: std::collections::HashSet::new(),
             cards_appeared_this_turn: std::collections::HashSet::new(),
             turn_order_changed: false,
@@ -311,8 +359,41 @@ impl GameState {
             formation_change_occurred_this_turn: false,
             effect_creation_counter: 0,
             game_state_history: Vec::new(),
-            max_state_history_size: 100,
+            max_state_history_size: DEFAULT_HISTORY_SIZE,
             loop_detected: false,
+        };
+        debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
+        debug_assert!(state.modifier_invariant(), "GameState modifier invariant violated after creation");
+        state
+    }
+
+    /// Helper method to determine active player during LiveCardSet phase
+    /// This consolidates the logic for determining which player is currently setting live cards
+    fn active_player_for_live_card_set(&self) -> &Player {
+        let p1_is_first = self.player1.is_first_attacker;
+        let p1_done = self.live_card_set_player1_done;
+        let p2_done = self.live_card_set_player2_done;
+
+        if !p1_done && p2_done {
+            // P1 is currently taking their turn (P2 already done)
+            &self.player1
+        } else if !p2_done && p1_done {
+            // P2 is currently taking their turn (P1 already done)
+            &self.player2
+        } else if !p1_done && !p2_done {
+            // Neither has finished yet - first attacker goes first
+            if p1_is_first {
+                &self.player1
+            } else {
+                &self.player2
+            }
+        } else {
+            // Both done - shouldn't happen during live card set, default to first attacker
+            if p1_is_first {
+                &self.player1
+            } else {
+                &self.player2
+            }
         }
     }
 
@@ -324,31 +405,7 @@ impl GameState {
             TurnPhase::Live => {
                 // During live card set phase, determine which player is currently setting cards
                 // based on completion flags
-                let p1_is_first = self.player1.is_first_attacker;
-                let p1_done = self.live_card_set_player1_done;
-                let p2_done = self.live_card_set_player2_done;
-
-                if !p1_done && p2_done {
-                    // P1 is currently taking their turn (P2 already done)
-                    &self.player1
-                } else if !p2_done && p1_done {
-                    // P2 is currently taking their turn (P1 already done)
-                    &self.player2
-                } else if !p1_done && !p2_done {
-                    // Neither has finished yet - first attacker goes first
-                    if p1_is_first {
-                        &self.player1
-                    } else {
-                        &self.player2
-                    }
-                } else {
-                    // Both done - shouldn't happen during live card set
-                    if p1_is_first {
-                        &self.player1
-                    } else {
-                        &self.player2
-                    }
-                }
+                self.active_player_for_live_card_set()
             }
         }
     }
@@ -371,26 +428,23 @@ impl GameState {
             }
             TurnPhase::Live => {
                 // During live card set phase, determine which player is currently setting cards
-                // based on completion flags
+                // based on completion flags - use the same logic as active_player()
                 let p1_is_first = self.player1.is_first_attacker;
                 let p1_done = self.live_card_set_player1_done;
                 let p2_done = self.live_card_set_player2_done;
 
                 if !p1_done && p2_done {
-                    // P1 is currently taking their turn (P2 already done)
                     &mut self.player1
                 } else if !p2_done && p1_done {
-                    // P2 is currently taking their turn (P1 already done)
                     &mut self.player2
                 } else if !p1_done && !p2_done {
-                    // Neither has finished yet - first attacker goes first
                     if p1_is_first {
                         &mut self.player1
                     } else {
                         &mut self.player2
                     }
                 } else {
-                    // Both done - shouldn't happen during live card set
+                    // Both done - default to first attacker
                     if p1_is_first {
                         &mut self.player1
                     } else {
@@ -567,6 +621,15 @@ impl GameState {
         *self.blade_modifiers.entry(card_id).or_insert(0) += delta;
     }
 
+    pub fn remove_blade_modifier(&mut self, card_id: i16, delta: i32) {
+        if let Some(modifier) = self.blade_modifiers.get_mut(&card_id) {
+            *modifier -= delta;
+            if *modifier == 0 {
+                self.blade_modifiers.remove(&card_id);
+            }
+        }
+    }
+
     pub fn get_blade_modifier(&self, card_id: i16) -> i32 {
         *self.blade_modifiers.get(&card_id).unwrap_or(&0)
     }
@@ -586,6 +649,20 @@ impl GameState {
     pub fn add_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
         let colors = self.heart_modifiers.entry(card_id).or_insert_with(std::collections::HashMap::new);
         *colors.entry(color).or_insert(0) += delta;
+    }
+
+    pub fn remove_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
+        if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
+            if let Some(modifier) = colors.get_mut(&color) {
+                *modifier -= delta;
+                if *modifier == 0 {
+                    colors.remove(&color);
+                }
+            }
+            if colors.is_empty() {
+                self.heart_modifiers.remove(&card_id);
+            }
+        }
     }
 
     pub fn get_heart_modifier(&self, card_id: i16, color: crate::card::HeartColor) -> i32 {
@@ -1074,6 +1151,12 @@ impl GameState {
         // Execute collected abilities
         for (card_no, player_id) in abilities_to_execute {
             self.execute_card_ability(&card_no, &player_id);
+            
+            // If execution resulted in a pending choice, stop processing further abilities
+            // until the choice is resolved
+            if self.pending_ability.is_some() {
+                break;
+            }
         }
     }
     
@@ -1133,7 +1216,7 @@ impl GameState {
         
         if let Some(card) = card {
             let abilities = card.abilities.clone();
-            for ability in abilities.iter() {
+            for (ability_index, ability) in abilities.iter().enumerate() {
                 // Check if there's a pending ability execution
                 let pending = self.pending_ability.clone();
                 if let Some(ref pending) = pending {
@@ -1173,8 +1256,11 @@ impl GameState {
                     }
                 } else {
                     // Start new ability execution
+                    // Set activating_card before resolving the ability
+                    self.activating_card = card_id;
+                    
                     let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-                    if let Err(e) = resolver.resolve_ability(ability, card_id) {
+                    if let Err(e) = resolver.resolve_ability(ability, card_id, ability_index) {
                         eprintln!("Failed to resolve ability: {}", e);
                     }
                     // Check if there's a pending choice after execution
@@ -1185,7 +1271,7 @@ impl GameState {
                             self.pending_ability = Some(PendingAbilityExecution {
                                 card_no: card_no.to_string(),
                                 player_id: player_id.to_string(),
-                                ability_index: 0, // Simplified
+                                ability_index, // Use actual ability_index
                                 effect: effect.clone(),
                                 conditional_choice: None,
                                 activating_card: card_id, // Store activating card for resume
@@ -1194,6 +1280,9 @@ impl GameState {
                                 cost_choice: None,
                             });
                         }
+                    } else {
+                        // Clear activating_card if no pending choice (ability completed)
+                        self.activating_card = None;
                     }
                 }
             }
@@ -1335,7 +1424,7 @@ impl GameState {
                 let destination = effect.destination.as_deref().unwrap_or("");
                 let card_type = effect.card_type.as_deref();
                 let target = effect.target.as_deref().unwrap_or("self");
-                let destination_choice = effect.destination_choice.unwrap_or(false);
+                let _destination_choice = effect.destination_choice.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
 
 
                 let player = if target == "self" {
@@ -1664,23 +1753,26 @@ impl GameState {
             "set_blade_type" => {
                 let blade_type = effect.blade_type.as_deref().unwrap_or("");
                 let target = effect.target.as_deref().unwrap_or("self");
+                let duration = effect.duration.as_deref();
                 // Track as temporary effect
+                let duration_enum = match duration {
+                    Some("live_end") => Duration::LiveEnd,
+                    Some("this_turn") => Duration::ThisTurn,
+                    Some("this_live") => Duration::ThisLive,
+                    Some("permanent") => Duration::Permanent,
+                    _ => Duration::ThisLive,
+                };
                 let temp_effect = TemporaryEffect {
-                    effect_type: format!("set_blade_type:{}", blade_type),
-                    duration: effect.duration.clone().map(|d| match d.as_str() {
-                        "live_end" => Duration::LiveEnd,
-                        "this_turn" => Duration::ThisTurn,
-                        "this_live" => Duration::ThisLive,
-                        "permanent" => Duration::Permanent,
-                        _ => Duration::ThisLive,
-                    }).unwrap_or(Duration::ThisLive),
+                    effect_type: format!("set_blade_type_{}", blade_type),
+                    duration: duration_enum,
                     created_turn: self.turn_number,
                     created_phase: self.current_phase.clone(),
-                    target_player_id: if target == "self" { player_id.to_string() } else { 
+                    target_player_id: if target == "self" { player_id.to_string() } else {
                         if player_id == self.player1.id { self.player2.id.clone() } else { self.player1.id.clone() }
                     },
                     description: format!("Set blade type to {}", blade_type),
                     creation_order: 0,
+                    effect_data: None,
                 };
                 self.temporary_effects.push(temp_effect);
             }
@@ -1706,11 +1798,11 @@ impl GameState {
                 
                 // Now apply modifiers after the borrow is released
                 for card_id in card_ids_to_modify {
-                    self.add_heart_modifier(card_id, color.clone(), count as i32);
+                    self.add_heart_modifier(card_id, color, count as i32);
                 }
             }
             "position_change" => {
-                let _position = effect.position.as_ref().and_then(|p| p.position.as_deref()).unwrap_or("");
+                let _position = effect.position.as_ref().and_then(|p| p.get_position()).unwrap_or("");
                 // Position change requires user choice - simplified for now
             }
             "place_energy_under_member" => {
@@ -1925,25 +2017,28 @@ impl GameState {
         // Check all cards in all zones for constant ability restrictions
         // This should be called before any action that could violate a restriction
         
-        // Collect cards to check first (to avoid borrow checker issues)
-        let cards_to_check: Vec<(String, Vec<(usize, i16)>)> = vec![
-            (self.player1.id.clone(), self.player1.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect()),
-            (self.player2.id.clone(), self.player2.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect()),
-        ];
+        // Collect player IDs and card data first (to avoid borrow checker issues)
+        let p1_id = self.player1.id.clone();
+        let p2_id = self.player2.id.clone();
+        let p1_cards: Vec<(usize, i16)> = self.player1.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect();
+        let p2_cards: Vec<(usize, i16)> = self.player2.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect();
         
         // Check which cards need to be removed
-        let mut cards_to_remove: Vec<(String, usize)> = Vec::new();
-        for (player_id, cards) in cards_to_check {
-            for (index, card_id) in cards {
-                if !self.can_place_card_in_zone(card_id, "live_card_zone", &player_id) {
-                    cards_to_remove.push((player_id.clone(), index));
-                }
+        let mut cards_to_remove: Vec<(&str, usize)> = Vec::new();
+        for (index, card_id) in p1_cards {
+            if !self.can_place_card_in_zone(card_id, "live_card_zone", &p1_id) {
+                cards_to_remove.push((&p1_id, index));
+            }
+        }
+        for (index, card_id) in p2_cards {
+            if !self.can_place_card_in_zone(card_id, "live_card_zone", &p2_id) {
+                cards_to_remove.push((&p2_id, index));
             }
         }
         
         // Remove cards that violate restrictions
         for (player_id, index) in cards_to_remove {
-            let player = if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
+            let player = if *player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
             let card = player.live_card_zone.cards.remove(index);
             player.waitroom.cards.push(card);
             if let Some(card_data) = self.card_database.get_card(card) {
@@ -1966,7 +2061,7 @@ impl GameState {
                     ability.triggers.as_ref().map_or(false, |t| t == "起動")
                 }
                 AbilityTrigger::Debut => {
-                    ability.triggers.as_ref().map_or(false, |t| t == "登場")
+                    ability.triggers.as_ref().map_or(false, |t| t == "登場" || t == "Debut")
                         && self.should_trigger_debut(player, card)
                 }
                 AbilityTrigger::LiveStart => {
@@ -1987,6 +2082,17 @@ impl GameState {
                 AbilityTrigger::Auto => {
                     // Generic auto abilities (not tied to specific timing)
                     ability.triggers.as_ref().map_or(false, |t| t == "自動")
+                }
+                AbilityTrigger::AreaMovement => {
+                    // Area movement triggers (Rule 9.7.4)
+                    // Matches abilities that trigger when a card moves areas
+                    // Check triggers field and full_text for area movement indicators
+                    let triggers_match = ability.triggers.as_ref().map_or(false, |t| {
+                        t.contains("エリアを移動") || t.contains("area_movement")
+                    });
+                    let text_match = ability.full_text.contains("エリアを移動") || 
+                                   ability.full_text.contains("area_movement");
+                    triggers_match || text_match
                 }
             }
         }).collect()
@@ -2012,6 +2118,7 @@ impl GameState {
             target_player_id,
             description,
             creation_order: order,
+            effect_data: None,
         });
     }
 
@@ -2053,8 +2160,6 @@ impl GameState {
         for i in expired_indices.into_iter().rev() {
             let effect = self.temporary_effects.remove(i);
             // Revert the effect based on effect type
-            // For now, this is a simplified implementation
-            // Full implementation would track and revert specific effect changes
             match effect.effect_type.as_str() {
                 "activation_cost_increase" => {
                     // Remove cost increase from prohibition effects
@@ -2063,6 +2168,43 @@ impl GameState {
                 "activation_cost_decrease" => {
                     // Remove cost decrease from prohibition effects
                     self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
+                }
+                "gain_resource_blade" => {
+                    // Revert blade gains
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(cards) = data.as_array() {
+                            for card_data in cards {
+                                if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
+                                    if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
+                                        self.remove_blade_modifier(card_id as i16, amount as i32);
+                                        eprintln!("Reverted {} blades from card {}", amount, card_id);
+                                    }
+                                }
+                            }
+                        } else if let Some(card_data) = data.as_object() {
+                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
+                                if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
+                                    self.remove_blade_modifier(card_id as i16, amount as i32);
+                                    eprintln!("Reverted {} blades from card {}", amount, card_id);
+                                }
+                            }
+                        }
+                    }
+                }
+                "gain_resource_heart" => {
+                    // Revert heart gains
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(cards) = data.as_array() {
+                            for card_data in cards {
+                                if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
+                                    if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
+                                        self.remove_heart_modifier(card_id as i16, crate::card::HeartColor::Heart01, amount as i32);
+                                        eprintln!("Reverted {} hearts from card {}", amount, card_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 _ => {
                     // Log other effect expirations

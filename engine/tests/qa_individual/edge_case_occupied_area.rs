@@ -14,7 +14,7 @@ fn test_edge_case_occupied_area() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Find two member cards
     let member1 = cards.iter()
@@ -58,6 +58,7 @@ fn test_edge_case_occupied_area() {
     assert!(result.is_ok(), "Should play first member to center: {:?}", result);
     
     // Try to play second member to the same occupied center area
+    // According to rules, this should succeed and send the existing member to waitroom
     let result = TurnEngine::execute_main_phase_action(
         &mut game_state,
         &ActionType::PlayMemberToStage,
@@ -67,16 +68,20 @@ fn test_edge_case_occupied_area() {
         Some(false),
     );
     
-    // Verify the play failed (area is occupied)
-    assert!(result.is_err(), "Should fail to play to occupied area: {:?}", result);
+    // Verify the play succeeds (engine allows replacement, sends existing to waitroom)
+    assert!(result.is_ok(), "Should succeed to play to occupied area (replacement): {:?}", result);
     
-    // Verify second card is still in hand
-    assert!(game_state.player1.hand.cards.contains(&member2_id),
-        "Second card should still be in hand when play fails");
+    // Verify second card is now on stage
+    assert_eq!(game_state.player1.stage.stage[1], member2_id,
+        "Second card should now be on stage");
     
-    // Verify first card is still on stage
-    assert_eq!(game_state.player1.stage.stage[1], member1_id,
-        "First card should still be on stage");
+    // Verify first card was sent to waitroom
+    assert!(game_state.player1.waitroom.cards.contains(&member1_id),
+        "First card should be in waitroom after replacement");
     
-    println!("Edge case test: Occupied area handled correctly");
+    // Verify second card is no longer in hand
+    assert!(!game_state.player1.hand.cards.contains(&member2_id),
+        "Second card should not be in hand after being played");
+    
+    println!("Edge case test: Occupied area handled correctly (replacement to waitroom)");
 }

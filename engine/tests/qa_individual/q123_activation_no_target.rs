@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q123_activation_no_target() {
@@ -12,9 +12,9 @@ fn test_q123_activation_no_target() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the member card with this ability (PL!SP-pb1-011-R "鬼塚冬毬")
+    // Find the member card with this ability (PL!SP-pb1-011-R "E")
     let member_card = cards.iter()
         .find(|c| c.card_no == "PL!SP-pb1-011-R");
     
@@ -41,17 +41,17 @@ fn test_q123_activation_no_target() {
         assert_eq!(game_state.player1.stage.stage[1], member_id, "Member should be on stage");
         
         // Verify no live cards in discard
-        let live_cards_in_discard = game_state.player1.discard_zone.iter()
-            .filter(|&id| game_state.card_database.get_card(id).map(|c| c.is_live()).unwrap_or(false))
+        let live_cards_in_discard = game_state.player1.waitroom.cards.iter()
+            .filter(|&id| game_state.card_database.get_card(*id).map(|c| c.is_live()).unwrap_or(false))
             .count();
         assert_eq!(live_cards_in_discard, 0, "Should have 0 live cards in discard");
         
         // Simulate activation ability: send member from stage to discard
-        game_state.player1.discard_zone.push(member_id);
+        game_state.player1.waitroom.cards.push(member_id);
         game_state.player1.stage.stage[1] = -1;
         
         // Verify member is in discard
-        assert!(game_state.player1.discard_zone.contains(&member_id), "Member should be in discard");
+        assert!(game_state.player1.waitroom.cards.contains(&member_id), "Member should be in discard");
         
         // Try to add live card from discard to hand
         // Since no live cards in discard, nothing happens

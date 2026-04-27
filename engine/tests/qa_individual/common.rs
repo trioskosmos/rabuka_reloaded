@@ -7,10 +7,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 // Re-export types for use in test files
-pub use rabuka_engine::game_state::GameState;
 pub use rabuka_engine::player::Player;
-pub use rabuka_engine::turn::TurnEngine;
-pub use rabuka_engine::zones::MemberArea;
 
 /// Load all cards from cards.json
 pub fn load_all_cards() -> Vec<Card> {
@@ -42,17 +39,20 @@ pub fn setup_player_with_energy(player: &mut Player, card_ids: Vec<i16>) {
 }
 
 /// Set up a player with specific energy cards (mixed active/wait)
+#[allow(dead_code)]
 pub fn setup_player_with_mixed_energy(player: &mut Player, card_ids: Vec<i16>, active_count: usize) {
     player.energy_zone.cards = card_ids.into_iter().collect();
     player.energy_zone.active_energy_count = active_count;
 }
 
 /// Find a card by card number from the loaded cards
+#[allow(dead_code)]
 pub fn find_card_by_no<'a>(cards: &'a [Card], card_no: &str) -> Option<&'a Card> {
     cards.iter().find(|c| c.card_no == card_no)
 }
 
 /// Find a member card with a specific cost
+#[allow(dead_code)]
 pub fn find_member_card_with_cost(cards: &[Card], cost: u32) -> Option<&Card> {
     cards.iter()
         .filter(|c| c.is_member())
@@ -60,16 +60,19 @@ pub fn find_member_card_with_cost(cards: &[Card], cost: u32) -> Option<&Card> {
 }
 
 /// Find an energy card
+#[allow(dead_code)]
 pub fn find_energy_card(cards: &[Card]) -> Option<&Card> {
     cards.iter().find(|c| c.is_energy())
 }
 
 /// Find a live card
+#[allow(dead_code)]
 pub fn find_live_card(cards: &[Card]) -> Option<&Card> {
     cards.iter().find(|c| c.is_live())
 }
 
 /// Set up a player with specific cards in deck
+#[allow(dead_code)]
 pub fn setup_player_with_deck(player: &mut Player, card_ids: Vec<i16>) {
     player.main_deck.cards = card_ids.into_iter().collect();
 }

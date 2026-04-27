@@ -14,7 +14,7 @@ fn test_edge_case_empty_hand() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Set up player with energy but NO cards in hand
     let energy_card_ids: Vec<_> = cards.iter()

@@ -393,25 +393,21 @@ export const CardRenderer = {
             slotDiv.id = `${containerId}-slot-${i}`;
 
             if (slot && slot.card_no) {
-                const resolved = State.resolveCardData(slot.card_no);
-                const imgPath = resolved?._img;
-
-                if (imgPath) {
-                    const fixedPath = fixImgPath(imgPath);
-                    const existingImg = slotDiv.querySelector('img');
-                    if (existingImg) {
-                        if (existingImg.src !== fixedPath) {
-                            ImageLoader.loadImage(existingImg, fixedPath);
-                        }
-                    } else {
-                        const img = document.createElement('img');
-                        img.draggable = false;
-                        ImageLoader.loadImage(img, fixedPath);
-                        slotDiv.innerHTML = '';
-                        slotDiv.appendChild(img);
+                const imgPath = (State.cardImageMapping && State.cardImageMapping[slot.card_no]) 
+                    ? State.cardImageMapping[slot.card_no] 
+                    : `img/cards_webp/${slot.card_no}.webp`;
+                const fixedPath = fixImgPath(imgPath);
+                const existingImg = slotDiv.querySelector('img');
+                if (existingImg) {
+                    if (existingImg.src !== fixedPath) {
+                        ImageLoader.loadImage(existingImg, fixedPath);
                     }
                 } else {
+                    const img = document.createElement('img');
+                    img.draggable = false;
+                    ImageLoader.loadImage(img, fixedPath);
                     slotDiv.innerHTML = '';
+                    slotDiv.appendChild(img);
                 }
 
                 Tooltips.attachCardData(area, slot, isValid ? action : undefined);
@@ -498,42 +494,38 @@ export const CardRenderer = {
             slot.id = `${containerId}-slot-${i}`;
 
             if (card && card.card_no) {
-                const resolved = State.resolveCardData(card.card_no);
-                const imgPath = resolved?._img;
+                const imgPath = (State.cardImageMapping && State.cardImageMapping[card.card_no]) 
+                    ? State.cardImageMapping[card.card_no] 
+                    : `img/cards_webp/${card.card_no}.webp`;
+                const fixedPath = fixImgPath(imgPath);
+                const existingImg = slot.querySelector('img');
+                const existingInner = slot.querySelector('.live-card-inner');
 
-                if (imgPath) {
-                    const fixedPath = fixImgPath(imgPath);
-                    const existingImg = slot.querySelector('img');
-                    const existingInner = slot.querySelector('.live-card-inner');
-
-                    if (existingInner && existingImg) {
-                        if (existingImg.src !== fixedPath) {
-                            ImageLoader.loadImage(existingImg, fixedPath);
-                        }
-                    } else {
-                        const img = document.createElement('img');
-                        img.draggable = false;
-                        ImageLoader.loadImage(img, fixedPath);
-
-                        const inner = document.createElement('div');
-                        inner.className = 'live-card-inner';
-                        inner.appendChild(img);
-
-                        const costDiv = document.createElement('div');
-                        costDiv.className = 'cost';
-                        costDiv.textContent = '0';
-                        inner.appendChild(costDiv);
-
-                        const cardNoDiv = document.createElement('div');
-                        cardNoDiv.className = 'card-no';
-                        cardNoDiv.textContent = card.card_no;
-                        inner.appendChild(cardNoDiv);
-
-                        slot.innerHTML = '';
-                        slot.appendChild(inner);
+                if (existingInner && existingImg) {
+                    if (existingImg.src !== fixedPath) {
+                        ImageLoader.loadImage(existingImg, fixedPath);
                     }
                 } else {
+                    const img = document.createElement('img');
+                    img.draggable = false;
+                    ImageLoader.loadImage(img, fixedPath);
+
+                    const inner = document.createElement('div');
+                    inner.className = 'live-card-inner';
+                    inner.appendChild(img);
+
+                    const costDiv = document.createElement('div');
+                    costDiv.className = 'cost';
+                    costDiv.textContent = '0';
+                    inner.appendChild(costDiv);
+
+                    const cardNoDiv = document.createElement('div');
+                    cardNoDiv.className = 'card-no';
+                    cardNoDiv.textContent = card.card_no;
+                    inner.appendChild(cardNoDiv);
+
                     slot.innerHTML = '';
+                    slot.appendChild(inner);
                 }
                 
                 const rawText = Tooltips.getEffectiveRawText(card);
@@ -586,7 +578,9 @@ export const CardRenderer = {
                 const card = discard[discard.length - 1 - i];
                 const div = document.createElement('div');
                 div.className = 'card card-mini';
-                const imgPath = card.card_no ? State.resolveCardData(card.card_no)?._img : '';
+                const imgPath = card.card_no ? (State.cardImageMapping && State.cardImageMapping[card.card_no] 
+                    ? State.cardImageMapping[card.card_no] 
+                    : `img/cards_webp/${card.card_no}.webp`) : '';
                 div.innerHTML = `<img src="${fixImgPath(imgPath)}">`;
                 div.style.transform = `translate(${i * 2}px, ${i * 2}px)`;
                 div.style.zIndex = 10 - i;

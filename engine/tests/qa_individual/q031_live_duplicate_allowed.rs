@@ -14,7 +14,7 @@ fn test_q031_live_duplicate_allowed() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Find a live card
     let live_card = cards.iter()
@@ -70,32 +70,40 @@ fn test_q031_live_duplicate_allowed() {
                     &ActionType::PlayMemberToStage,
                     Some(*member_id),
                     None,
-                    Some(MemberArea::Left),
+                    Some(MemberArea::LeftSide),
                     Some(false),
                 );
             }
         }
         
-        // Play both live cards
-        let live_result1 = TurnEngine::execute_main_phase_action(
-            &mut game_state,
-            &ActionType::PlayLive,
-            Some(live_id),
-            None,
-            None,
-            None,
-        );
-        assert!(live_result1.is_ok(), "First live should succeed: {:?}", live_result1);
+        // Set live cards using proper SetLiveCard action
+        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSet;
+        game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
         
-        let live_result2 = TurnEngine::execute_main_phase_action(
+        // Set first live card
+        let result1 = TurnEngine::execute_main_phase_action(
             &mut game_state,
-            &ActionType::PlayLive,
+            &ActionType::SetLiveCard,
             Some(live_id),
             None,
             None,
             None,
         );
-        assert!(live_result2.is_ok(), "Second live should succeed: {:?}", live_result2);
+        assert!(result1.is_ok(), "Should be able to set first live card");
+        
+        // Set second live card (same card number)
+        let result2 = TurnEngine::execute_main_phase_action(
+            &mut game_state,
+            &ActionType::SetLiveCard,
+            Some(live_id),
+            None,
+            None,
+            None,
+        );
+        assert!(result2.is_ok(), "Should be able to set second live card (duplicate)");
+        
+        // Verify both live cards are in zone
+        assert_eq!(game_state.player1.live_card_zone.cards.len(), 2, "Should have 2 live cards");
         
         // The key assertion: can put 2+ copies of same card in live area
         // This tests the live duplicate allowed rule

@@ -230,6 +230,15 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 parameters: None,
             });
         }
+        crate::game_state::Phase::LiveStart => {
+            // Live start phase - currently no specific actions
+        }
+        crate::game_state::Phase::LiveSuccess => {
+            // Live success phase - currently no specific actions
+        }
+        crate::game_state::Phase::Cheer => {
+            // Cheer phase - currently no specific actions
+        }
         crate::game_state::Phase::ChooseFirstAttacker => {
             // Q16: RPS winner chooses whether to go first or second
             let rps_winner = game_state.rps_winner.unwrap_or(1);
@@ -551,38 +560,17 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
         }
         crate::game_state::Phase::LiveCardSet => {
             // Rule 8.2: Live Card Set Phase - Can place up to 3 cards face-down
-            // Determine which player is currently taking their turn based on completion flags
-            let p1_is_first = game_state.player1.is_first_attacker;
-            let p1_done = game_state.live_card_set_player1_done;
-            let p2_done = game_state.live_card_set_player2_done;
-            
-            // Determine the active player for live card set
-            let active_player = if !p1_done && p2_done {
-                // P1 is currently taking their turn (P2 already done)
-                &game_state.player1
-            } else if !p2_done && p1_done {
-                // P2 is currently taking their turn (P1 already done)
-                &game_state.player2
-            } else if !p1_done && !p2_done {
-                // Neither has finished yet - first attacker goes first
-                if p1_is_first {
-                    &game_state.player1
-                } else {
-                    &game_state.player2
-                }
-            } else {
-                // Both done - don't generate any actions, let phase auto-advance
-                return actions;
-            };
-            
+            // Use the consolidated active_player() method to determine which player is currently setting cards
+            let active_player = game_state.active_player();
+
             // Allow individual card selection (any card from hand, not just live cards)
             let cards_in_hand: Vec<_> = active_player.hand.cards.iter()
                 .enumerate()
                 .collect();
-            
+
             let current_live_count = active_player.live_card_zone.cards.len();
             let can_add_more = current_live_count < 3;
-            
+
             if can_add_more {
                 // Generate individual card selection actions
                 for (hand_index, card_id) in cards_in_hand {
@@ -596,7 +584,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     } else {
                         format!("unknown:{}", card_id)
                     };
-                    
+
                     actions.push(Action {
                         description: format!("Place {} ({}) to live zone", card_name, card_no),
                         action_type: ActionType::SetLiveCard,
@@ -615,7 +603,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     });
                 }
             }
-            
+
             // Add action to finish live card set
             let player_name = if active_player.id == "player1" { "Player 1" } else { "Player 2" };
             actions.push(Action {

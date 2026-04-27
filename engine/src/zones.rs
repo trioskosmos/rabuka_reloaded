@@ -47,49 +47,61 @@ impl std::str::FromStr for MemberArea {
 }
 
 // CardInZone removed for performance - use i16 IDs directly
+use crate::constants::{STAGE_SIZE, EMPTY_SLOT};
+
 // Orientation and other state tracked in GameState modifiers
 
 #[derive(Debug, Clone)]
 pub struct Stage {
     // Rule 5.3: Stage - Where member cards are placed during Main Phase
     // Has three areas: Left Side, Center, Right Side
-    // Use -1 to indicate empty slot (like old engine)
-    pub stage: [i16; 3],  // [left_side, center, right_side]
+    // Use EMPTY_SLOT to indicate empty slot (like old engine)
+    pub stage: [i16; STAGE_SIZE],  // [left_side, center, right_side]
 }
 
 impl Stage {
     pub fn new() -> Self {
         Stage {
-            stage: [-1, -1, -1],  // [left_side, center, right_side], -1 indicates empty
+            stage: [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT],  // [left_side, center, right_side], EMPTY_SLOT indicates empty
         }
     }
 
+    /// Invariant check: stage must always have exactly STAGE_SIZE positions
+    pub fn invariant(&self) -> bool {
+        self.stage.len() == STAGE_SIZE
+    }
+
     pub fn get_area(&self, area: MemberArea) -> Option<i16> {
+        debug_assert!(self.invariant(), "Stage invariant violated");
         let index = match area {
             MemberArea::LeftSide => 0,
             MemberArea::Center => 1,
             MemberArea::RightSide => 2,
         };
         let card_id = self.stage[index];
-        if card_id == -1 { None } else { Some(card_id) }
+        if card_id == EMPTY_SLOT { None } else { Some(card_id) }
     }
 
     pub fn set_area(&mut self, area: MemberArea, card_id: i16) {
+        debug_assert!(self.invariant(), "Stage invariant violated before set");
         let index = match area {
             MemberArea::LeftSide => 0,
             MemberArea::Center => 1,
             MemberArea::RightSide => 2,
         };
         self.stage[index] = card_id;
+        debug_assert!(self.invariant(), "Stage invariant violated after set");
     }
 
     pub fn clear_area(&mut self, area: MemberArea) {
+        debug_assert!(self.invariant(), "Stage invariant violated before clear");
         let index = match area {
             MemberArea::LeftSide => 0,
             MemberArea::Center => 1,
             MemberArea::RightSide => 2,
         };
-        self.stage[index] = -1;
+        self.stage[index] = EMPTY_SLOT;
+        debug_assert!(self.invariant(), "Stage invariant violated after clear");
     }
 
     pub fn member_in_position(&self, position: Keyword) -> bool {
@@ -103,7 +115,7 @@ impl Stage {
         self.stage[index] != -1
     }
 
-    pub fn position_change(&mut self, from_area: MemberArea, to_area: MemberArea) -> Result<(), String> {
+    pub fn position_change(&mut self, from_area: MemberArea, to_area: MemberArea) -> Result<i16, String> {
         // Rule 11.10: Position Change - move member to different area
         // Rule 11.10.2: If destination has a member, it swaps positions
         if from_area == to_area {
@@ -138,7 +150,7 @@ impl Stage {
             self.stage[from_index] = -1;
         }
 
-        Ok(())
+        Ok(card_id)
     }
 
     pub fn formation_change(&mut self, assignments: Vec<(MemberArea, MemberArea)>) -> Result<(), String> {
@@ -251,7 +263,7 @@ pub fn parse_blade_color(s: &str) -> crate::card::BladeColor {
 #[derive(Debug, Clone)]
 pub struct LiveCardZone {
     // Rule 5.2: Live Card Zone - Where member and live cards are placed during Live Card Set Phase
-    pub cards: SmallVec<[i16; 10]>,  // Card IDs - stack-allocated for typical sizes
+    pub cards: SmallVec<[i16; MAX_LIVE_CARDS]>,  // Card IDs - stack-allocated for up to MAX_LIVE_CARDS cards
 }
 
 impl LiveCardZone {
@@ -281,7 +293,7 @@ impl LiveCardZone {
         }).copied().collect()
     }
 
-    pub fn clear(&mut self) -> SmallVec<[i16; 10]> {
+    pub fn clear(&mut self) -> SmallVec<[i16; 3]> {
         std::mem::take(&mut self.cards)
     }
 
@@ -320,15 +332,17 @@ impl LiveCardZone {
         if self.cards.is_empty() {
             None
         } else {
-            Some(self.cards.drain(..1).next().unwrap())
+            self.cards.drain(..1).next()
         }
     }
 }
 
+use crate::constants::{MAX_ENERGY_CARDS, MAX_LIVE_CARDS};
+
 #[derive(Debug, Clone)]
 pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
-    pub cards: SmallVec<[i16; 20]>,  // Card IDs - stack-allocated for up to 20 energy cards
+    pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>,  // Card IDs - stack-allocated for up to MAX_ENERGY_CARDS energy cards
     pub active_energy_count: usize,  // Simple count of active energy cards (simpler than HashSet)
 }
 
@@ -342,12 +356,12 @@ impl EnergyZone {
 
     pub fn can_place_card(&self, card_db: &CardDatabase, card_id: i16) -> bool {
         // Rule 7.2: Only energy cards can be placed in Energy Zone
-        card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false)
+        card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or_else(|| false)
     }
 
     pub fn add_card(&mut self, card_id: i16, card_db: &CardDatabase) -> Result<(), String> {
         // Rule 7.2: Only energy cards can be placed in Energy Zone
-        if !card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false) {
+        if !card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or_else(|| false) {
             return Err("Only energy cards can be placed in Energy Zone".to_string());
         }
         

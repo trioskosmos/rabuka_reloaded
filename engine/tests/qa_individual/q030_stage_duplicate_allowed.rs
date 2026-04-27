@@ -14,7 +14,7 @@ fn test_q030_stage_duplicate_allowed() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Find a member card
     let member_card = cards.iter()
@@ -58,7 +58,7 @@ fn test_q030_stage_duplicate_allowed() {
             &ActionType::PlayMemberToStage,
             Some(member_id),
             None,
-            Some(MemberArea::Left),
+            Some(MemberArea::LeftSide),
             Some(false),
         );
         assert!(result2.is_ok(), "Second member should play to stage: {:?}", result2);

@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id};
 
 #[test]
 fn test_q103_multiple_ability_condition() {
@@ -12,9 +12,9 @@ fn test_q103_multiple_ability_condition() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the live card with this ability (PL!SP-pb1-023-L "ディストーション")
+    // Find the live card with this ability (PL!SP-pb1-023-L "EE")
     let live_card = cards.iter()
         .find(|c| c.card_no == "PL!SP-pb1-023-L");
     
@@ -34,8 +34,8 @@ fn test_q103_multiple_ability_condition() {
             let member2_id = get_card_id(catchu_members[1], &card_database);
             
             // Setup: 2 copies of live card in live card zone, 2 CatChu! members on stage, 7 energy in wait state
-            player1.live_card_zone.push(live_id);
-            player1.live_card_zone.push(live_id); // Second copy
+            player1.live_card_zone.cards.push(live_id);
+            player1.live_card_zone.cards.push(live_id); // Second copy
             player1.stage.stage[0] = member1_id;
             player1.stage.stage[1] = member2_id;
             
@@ -56,16 +56,16 @@ fn test_q103_multiple_ability_condition() {
             
             // Verify 7 energy in wait state
             assert_eq!(game_state.player1.energy_wait.len(), 7, "Should have 7 energy in wait state");
-            assert_eq!(game_state.player1.energy_zone.len(), 0, "Should have 0 active energy");
+            assert_eq!(game_state.player1.energy_zone.cards.len(), 0, "Should have 0 active energy");
             
             // First ability triggers: activate up to 6 energy
             let first_activation = game_state.player1.energy_wait.drain(..6).collect::<Vec<_>>();
             for card_id in first_activation {
-                game_state.player1.energy_zone.push(card_id);
+                game_state.player1.energy_zone.cards.push(card_id);
             }
             
             // Verify 6 energy active, 1 still in wait
-            assert_eq!(game_state.player1.energy_zone.len(), 6, "Should have 6 active energy");
+            assert_eq!(game_state.player1.energy_zone.cards.len(), 6, "Should have 6 active energy");
             assert_eq!(game_state.player1.energy_wait.len(), 1, "Should have 1 energy in wait");
             
             // First ability's second effect: if all energy is active, add +1 to score
@@ -75,11 +75,11 @@ fn test_q103_multiple_ability_condition() {
             // Second ability triggers: activate remaining energy
             let second_activation = game_state.player1.energy_wait.drain(..).collect::<Vec<_>>();
             for card_id in second_activation {
-                game_state.player1.energy_zone.push(card_id);
+                game_state.player1.energy_zone.cards.push(card_id);
             }
             
             // Verify all 7 energy active
-            assert_eq!(game_state.player1.energy_zone.len(), 7, "Should have 7 active energy");
+            assert_eq!(game_state.player1.energy_zone.cards.len(), 7, "Should have 7 active energy");
             assert_eq!(game_state.player1.energy_wait.len(), 0, "Should have 0 energy in wait");
             
             // Second ability's second effect: if all energy is active, add +1 to score

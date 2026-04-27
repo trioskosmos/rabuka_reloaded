@@ -1,6 +1,6 @@
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_energy};
 
 #[test]
 fn test_q144_up_to_keyword() {
@@ -12,9 +12,9 @@ fn test_q144_up_to_keyword() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string", false);
+    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
-    // Find the member card with this ability (PL!-bp3-002-R "絢瀬絵里")
+    // Find the member card with this ability (PL!-bp3-002-R "E)
     let member_card = cards.iter()
         .find(|c| c.card_no == "PL!-bp3-002-R");
     
@@ -54,7 +54,7 @@ fn test_q144_up_to_keyword() {
             // Count opponent's cost 4 or less members
             let cost4_members = game_state.player2.stage.stage.iter()
                 .filter(|&&id| id != -1)
-                .filter(|&id| {
+                .filter(|&&id| {
                     if let Some(card) = game_state.card_database.get_card(id) {
                         card.cost.unwrap_or(0) <= 4
                     } else {

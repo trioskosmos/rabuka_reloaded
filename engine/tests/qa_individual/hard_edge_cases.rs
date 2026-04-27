@@ -44,7 +44,7 @@ fn test_baton_touch_equal_cost_zero_payment() {
             game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
             
             let initial_hand_count = game_state.player1.hand.cards.len();
-            let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+            let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
             let initial_waitroom_count = game_state.player1.waitroom.cards.len();
             
             // Play first member to stage
@@ -121,7 +121,7 @@ fn test_optional_cost_auto_ability_via_gameplay() {
     // Find a card with auto ability that has optional cost
     let test_card = cards.iter()
         .find(|c| c.abilities.iter().any(|a| {
-            a.triggers.as_deref() == Some("自勁E) &&
+            a.triggers.as_deref() == Some("自勁") &&
             a.cost.as_ref().map_or(false, |c| c.optional == Some(true))
         }));
     
@@ -144,7 +144,7 @@ fn test_optional_cost_auto_ability_via_gameplay() {
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
         
         let initial_hand_count = game_state.player1.hand.cards.len();
-        let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+        let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
         
         // Play the card to stage (this should trigger auto abilities)
         let result = TurnEngine::execute_main_phase_action(
@@ -165,7 +165,7 @@ fn test_optional_cost_auto_ability_via_gameplay() {
             "Hand should have 1 fewer card");
         assert!(!game_state.player1.hand.cards.contains(&card_id),
             "Card should not be in hand after playing");
-        assert_eq!(game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count(), initial_stage_count + 1,
+        assert_eq!(game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count(), initial_stage_count + 1,
             "Stage should have 1 more member");
     } else {
         println!("Skipping test: no card with auto ability optional cost found");
@@ -210,7 +210,7 @@ fn test_stage_full_cannot_place_member() {
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
         
         let initial_hand_count = game_state.player1.hand.cards.len();
-        let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+        let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
         
         // Place 3 members to fill the stage
         let areas = [
@@ -245,7 +245,7 @@ fn test_stage_full_cannot_place_member() {
         assert!(result.is_err(), "Should fail when stage is full: {:?}", result);
         
         // Verify stage still has exactly 3 members
-        assert_eq!(game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count(), 3,
+        assert_eq!(game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count(), 3,
             "Stage should still have 3 members after failed placement");
         
         // Verify 4th member is still in hand
@@ -295,7 +295,7 @@ fn test_baton_turn_restriction() {
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::FirstAttackerNormal;
         
         let initial_hand_count = game_state.player1.hand.cards.len();
-        let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+        let initial_stage_count = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
         let initial_waitroom_count = game_state.player1.waitroom.cards.len();
         
         // Play first member
@@ -323,7 +323,7 @@ fn test_baton_turn_restriction() {
         assert!(result.is_err(), "Baton touch should fail in same turn: {:?}", result);
         
         // Verify state is unchanged (no baton touch occurred)
-        assert_eq!(game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count(), initial_stage_count + 1,
+        assert_eq!(game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count(), initial_stage_count + 1,
             "Stage should still have only 1 member (first member)");
         assert_eq!(game_state.player1.hand.cards.len(), initial_hand_count - 1,
             "Hand should have 1 fewer card (only first member played)");

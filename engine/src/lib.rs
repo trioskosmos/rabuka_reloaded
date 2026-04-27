@@ -1,6 +1,7 @@
 #![recursion_limit = "512"]
 
 pub mod card;
+pub mod constants;
 pub mod zones;
 pub mod player;
 pub mod game_state;

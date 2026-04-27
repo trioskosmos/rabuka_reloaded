@@ -3,6 +3,9 @@ use actix_cors::Cors;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
+use std::collections::HashMap;
+use std::time::{SystemTime, UNIX_EPOCH};
+use uuid::Uuid;
 
 use crate::game_state::GameState;
 use crate::player::Player;
@@ -99,6 +102,50 @@ pub struct ExecuteActionRequest {
     pub use_baton_touch: Option<bool>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct RoomSession {
+    pub session_id: String,
+    pub player_id: i32,
+    pub username: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Room {
+    pub room_id: String,
+    pub mode: String, // "pve" or "pvp"
+    pub public: bool,
+    pub created_at: u64,
+    pub last_active: u64,
+    pub sessions: HashMap<String, RoomSession>, // session_id -> session
+    pub usernames: HashMap<i32, String>, // player_id -> username
+    pub custom_decks: Option<HashMap<i32, CustomDeck>>,
+    #[serde(skip)]
+    pub game_state: Option<Arc<Mutex<GameState>>>, // Per-room game state
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct CustomDeck {
+    pub main: Vec<String>,
+    pub energy: Vec<String>,
+}
+
+#[derive(Deserialize)]
+pub struct CreateRoomRequest {
+    pub mode: Option<String>,
+    pub public: Option<bool>,
+    pub username: Option<String>,
+    pub p0_deck: Option<Vec<String>>,
+    pub p0_energy: Option<Vec<String>>,
+    pub p1_deck: Option<Vec<String>>,
+    pub p1_energy: Option<Vec<String>>,
+}
+
+#[derive(Deserialize)]
+pub struct JoinRoomRequest {
+    pub room_id: String,
+    pub username: Option<String>,
+}
+
 #[derive(Deserialize)]
 pub struct InitGameRequest {
     pub deck: Option<String>,
@@ -106,6 +153,7 @@ pub struct InitGameRequest {
 
 pub struct AppState {
     pub game_state: Arc<Mutex<GameState>>,
+    pub rooms: Arc<Mutex<HashMap<String, Room>>>,
 }
 
 pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>) -> Option<CardDisplay> {
@@ -187,9 +235,16 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
 }
 
 async fn get_actions(data: web::Data<AppState>) -> impl Responder {
-    let mut game_state = data.game_state.lock().unwrap();
+    let mut game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in get_actions: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
     
-    // Auto-advance automatic phases (Active, Energy, Draw) to ensure energy is activated
+    // Auto-advance automatic phases to ensure energy is activated and phases are correct
+    // Keep looping until we hit a manual phase (Main, LiveCardSet, etc.)
     loop {
         let current_phase = game_state.current_phase.clone();
         match current_phase {
@@ -198,17 +253,27 @@ async fn get_actions(data: web::Data<AppState>) -> impl Responder {
             crate::game_state::Phase::Draw => {
                 crate::turn::TurnEngine::advance_phase(&mut game_state);
             }
-            // LiveCardSet - auto-advance if both players are done
-            crate::game_state::Phase::LiveCardSet => {
-                if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
-                    // Both players finished, directly advance since advance_phase returns early for LiveCardSet
-                    crate::turn::TurnEngine::check_timing(&mut game_state);
-                    game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
+            crate::game_state::Phase::Main => {
+                // Main is manual for Player 1, but if it's Player 2's turn and they have no actions, advance
+                let is_player2_turn = game_state.active_player().id == game_state.player2.id;
+                let setup_actions = crate::game_setup::generate_possible_actions(&game_state);
+                if is_player2_turn && setup_actions.is_empty() {
+                    crate::turn::TurnEngine::advance_phase(&mut game_state);
                 } else {
                     break;
                 }
             }
-            // Live phase automatic phases - auto-advance to prevent softlock
+            crate::game_state::Phase::LiveCardSet => {
+                // LiveCardSet is manual unless both players are done
+                if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
+                    crate::turn::TurnEngine::check_timing(&mut game_state);
+                    game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
+                } else {
+                    // current_turn_phase is already set to Live by advance_phase in turn.rs
+                    // No need to set it again here
+                    break;
+                }
+            }
             crate::game_state::Phase::FirstAttackerPerformance |
             crate::game_state::Phase::SecondAttackerPerformance |
             crate::game_state::Phase::LiveVictoryDetermination => {
@@ -229,6 +294,11 @@ async fn get_actions(data: web::Data<AppState>) -> impl Responder {
         
         // Generate possible actions for Player 2
         let setup_actions = crate::game_setup::generate_possible_actions(&game_state);
+        println!("DEBUG: Player 2 AI actions generation - Phase: {:?}", game_state.current_phase);
+        println!("DEBUG: Player 2 AI generated {} actions", setup_actions.len());
+        for action in &setup_actions {
+            println!("DEBUG:   - {}", action.description);
+        }
         
         if setup_actions.is_empty() {
             // No actions available, advance phase
@@ -245,12 +315,15 @@ async fn get_actions(data: web::Data<AppState>) -> impl Responder {
         
         println!("Player 2 (AI) choosing action: {}", chosen_action.description);
         
+        // Save state before Player 2 AI action for undo/redo support
+        game_state.save_state();
+        
         // Execute the chosen action
         let result = crate::turn::TurnEngine::execute_main_phase_action(
             &mut game_state,
             &chosen_action.action_type,
             chosen_action.parameters.as_ref().and_then(|p| p.card_id),
-            chosen_action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
+            chosen_action.parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
             chosen_action.parameters.as_ref().and_then(|p| p.stage_area),
             chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
         );
@@ -287,10 +360,42 @@ async fn get_actions(data: web::Data<AppState>) -> impl Responder {
         // Otherwise continue the loop to play another action for Player 2
     }
     
+    // Auto-advance automatic phases after Player 2's turn completes
+    loop {
+        let current_phase = game_state.current_phase.clone();
+        match current_phase {
+            crate::game_state::Phase::Active |
+            crate::game_state::Phase::Energy |
+            crate::game_state::Phase::Draw => {
+                crate::turn::TurnEngine::advance_phase(&mut game_state);
+            }
+            crate::game_state::Phase::Main => {
+                // After Player 2's turn, if we're still in Main phase, advance to next turn phase
+                crate::turn::TurnEngine::advance_phase(&mut game_state);
+            }
+            crate::game_state::Phase::LiveCardSet => {
+                if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
+                    crate::turn::TurnEngine::check_timing(&mut game_state);
+                    game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
+                } else {
+                    // current_turn_phase is already set to Live by advance_phase in turn.rs
+                    break;
+                }
+            }
+            crate::game_state::Phase::FirstAttackerPerformance |
+            crate::game_state::Phase::SecondAttackerPerformance |
+            crate::game_state::Phase::LiveVictoryDetermination => {
+                crate::turn::TurnEngine::advance_phase(&mut game_state);
+            }
+            _ => break,
+        }
+    }
+    
     println!("Current phase: {:?}", game_state.current_phase);
     
     // Generate possible actions based on current game state
     let actions = generate_possible_actions(&game_state);
+    println!("DEBUG: Final action generation - Phase: {:?}", game_state.current_phase);
     println!("Generated {} actions", actions.len());
     for action in &actions {
         println!("  - {}: {}", action.action_type, action.description);
@@ -339,7 +444,16 @@ async fn execute_action(
     let requested_card_id = req.card_id;
     let _requested_card_index = req.card_index;
     let _requested_card_no = req.card_no.clone();
-    let mut game_state = data.game_state.lock().unwrap();
+    let mut game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in execute_action: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
+    
+    // Save state before executing action for undo/redo support
+    game_state.save_state();
     
     // Parse action type from request
     let action_type = req.action_type.as_ref()
@@ -350,7 +464,7 @@ async fn execute_action(
     let card_indices = if action_type == crate::game_setup::ActionType::SelectMulligan {
         req.card_index.map(|idx| vec![idx])
     } else {
-        req.card_indices.clone()
+        req.card_indices.as_ref().cloned()
     };
 
     // Execute the action using turn engine with card_id directly
@@ -370,7 +484,7 @@ async fn execute_action(
             loop {
                 let current_phase = game_state.current_phase.clone();
                 match current_phase {
-                    // Live phase phases - LiveCardSet is manual, others are automatic
+                    // Live phase phases - LiveCardSet is manual (handled by action), others are automatic
                     crate::game_state::Phase::FirstAttackerPerformance |
                     crate::game_state::Phase::SecondAttackerPerformance |
                     crate::game_state::Phase::LiveVictoryDetermination => {
@@ -382,7 +496,11 @@ async fn execute_action(
                     crate::game_state::Phase::Draw => {
                         crate::turn::TurnEngine::advance_phase(&mut game_state);
                     }
-                    // LiveCardSet is manual - only advance when both players explicitly finish
+                    // LiveCardSet - handle_finish_live_card_set already advances if both done
+                    crate::game_state::Phase::LiveCardSet => {
+                        // current_turn_phase is already set to Live by advance_phase in turn.rs
+                        break;
+                    }
                     _ => break,
                 }
             }
@@ -397,7 +515,13 @@ async fn execute_action(
 }
 
 async fn get_status(data: web::Data<AppState>) -> impl Responder {
-    let game_state = data.game_state.lock().unwrap();
+    let game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in get_status: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
     let members = game_state.card_database.cards.len();
     HttpResponse::Ok().json(serde_json::json!({
         "status": "rust_server",
@@ -411,6 +535,401 @@ async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) 
     // Placeholder for AI mode setting
     HttpResponse::Ok().json(serde_json::json!({
         "success": true
+    }))
+}
+
+async fn undo(data: web::Data<AppState>) -> impl Responder {
+    let mut game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in undo: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
+    
+    match game_state.undo() {
+        Ok(_) => {
+            let display = game_state_to_display(&game_state);
+            HttpResponse::Ok().json(display)
+        }
+        Err(e) => {
+            HttpResponse::BadRequest().json(e)
+        }
+    }
+}
+
+async fn redo(data: web::Data<AppState>) -> impl Responder {
+    let mut game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in redo: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
+    
+    match game_state.redo() {
+        Ok(_) => {
+            let display = game_state_to_display(&game_state);
+            HttpResponse::Ok().json(display)
+        }
+        Err(e) => {
+            HttpResponse::BadRequest().json(e)
+        }
+    }
+}
+
+async fn debug_rewind(data: web::Data<AppState>) -> impl Responder {
+    let mut game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in debug_rewind: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
+        }
+    };
+    
+    match game_state.undo() {
+        Ok(_) => {
+            HttpResponse::Ok().json(serde_json::json!({"success": true}))
+        }
+        Err(e) => {
+            HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e}))
+        }
+    }
+}
+
+async fn debug_redo(data: web::Data<AppState>) -> impl Responder {
+    let mut game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in debug_redo: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
+        }
+    };
+    
+    match game_state.redo() {
+        Ok(_) => {
+            HttpResponse::Ok().json(serde_json::json!({"success": true}))
+        }
+        Err(e) => {
+            HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e}))
+        }
+    }
+}
+
+async fn debug_snapshot(data: web::Data<AppState>) -> impl Responder {
+    let game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in debug_snapshot: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
+        }
+    };
+    
+    let display = game_state_to_display(&game_state);
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "state": display}))
+}
+
+async fn debug_dump_state(data: web::Data<AppState>) -> impl Responder {
+    let game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in debug_dump_state: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
+        }
+    };
+    
+    let display = game_state_to_display(&game_state);
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "state": display}))
+}
+
+async fn export_game(data: web::Data<AppState>) -> impl Responder {
+    let game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in export_game: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
+        }
+    };
+    
+    let display = game_state_to_display(&game_state);
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "game_state": display}))
+}
+
+async fn get_decks(_data: web::Data<AppState>) -> impl Responder {
+    let decks = vec![
+        "Aqours Cup".to_string(),
+        "Muse Cup".to_string(),
+        "Nijigaku Cup".to_string(),
+        "Liella Cup".to_string(),
+        "Hasunosora Cup".to_string(),
+        "Fade Deck".to_string(),
+    ];
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "decks": decks}))
+}
+
+async fn get_random_deck(_data: web::Data<AppState>) -> impl Responder {
+    let decks = vec![
+        "Aqours Cup".to_string(),
+        "Muse Cup".to_string(),
+        "Nijigaku Cup".to_string(),
+        "Liella Cup".to_string(),
+        "Hasunosora Cup".to_string(),
+        "Fade Deck".to_string(),
+    ];
+    use rand::seq::SliceRandom;
+    let random_deck = decks.choose(&mut rand::thread_rng()).unwrap_or(&decks[0]);
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "deck": random_deck}))
+}
+
+async fn get_test_deck(_data: web::Data<AppState>) -> impl Responder {
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "deck": "Aqours Cup"}))
+}
+
+async fn get_card_registry(data: web::Data<AppState>) -> impl Responder {
+    let game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in get_card_registry: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
+        }
+    };
+    
+    let members = game_state.card_database.cards.len();
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "count": members}))
+}
+
+async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRequest>) -> impl Responder {
+    let room_id = Uuid::new_v4().to_string().to_uppercase();
+    let mode = req.mode.clone().unwrap_or_else(|| "pve".to_string());
+    let public = req.public.unwrap_or(false);
+    let username = req.username.clone();
+    
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    
+    // Build custom decks if provided
+    let mut custom_decks: Option<HashMap<i32, CustomDeck>> = None;
+    if req.p0_deck.is_some() || req.p1_deck.is_some() {
+        let mut decks = HashMap::new();
+        if let Some(p0_deck) = req.p0_deck.clone() {
+            decks.insert(0, CustomDeck {
+                main: p0_deck,
+                energy: req.p0_energy.clone().unwrap_or_default(),
+            });
+        }
+        if let Some(p1_deck) = req.p1_deck.clone() {
+            decks.insert(1, CustomDeck {
+                main: p1_deck,
+                energy: req.p1_energy.clone().unwrap_or_default(),
+            });
+        }
+        custom_decks = Some(decks);
+    }
+    
+    let room = Room {
+        room_id: room_id.clone(),
+        mode: mode.clone(),
+        public,
+        created_at: now,
+        last_active: now,
+        sessions: HashMap::new(),
+        usernames: HashMap::new(),
+        custom_decks,
+        game_state: None,
+    };
+    
+    {
+        let mut rooms = data.rooms.lock().unwrap();
+        rooms.insert(room_id.clone(), room);
+    }
+    
+    // Auto-join creator
+    let session_id = Uuid::new_v4().to_string();
+    let player_id = 0; // Creator always gets player 0
+    
+    {
+        let mut rooms = data.rooms.lock().unwrap();
+        if let Some(room) = rooms.get_mut(&room_id) {
+            room.sessions.insert(session_id.clone(), RoomSession {
+                session_id: session_id.clone(),
+                player_id,
+                username: username.clone(),
+            });
+            if let Some(name) = username {
+                room.usernames.insert(player_id, name);
+            }
+            room.last_active = now;
+        }
+    }
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "room_id": room_id,
+        "mode": mode,
+        "session": {
+            "session_id": session_id,
+            "player_id": player_id
+        }
+    }))
+}
+
+async fn rooms_join(data: web::Data<AppState>, req: web::Json<JoinRoomRequest>) -> impl Responder {
+    let room_id = req.room_id.to_uppercase();
+    let username = req.username.clone();
+    
+    let session_id = Uuid::new_v4().to_string();
+    let mut player_id = -1;
+    
+    {
+        let mut rooms = data.rooms.lock().unwrap();
+        if let Some(room) = rooms.get_mut(&room_id) {
+            // Check for recovery by username
+            if let Some(name) = &username {
+                for (pid, existing_name) in &room.usernames {
+                    if existing_name == name {
+                        player_id = *pid;
+                        room.sessions.insert(session_id.clone(), RoomSession {
+                            session_id: session_id.clone(),
+                            player_id,
+                            username: Some(name.clone()),
+                        });
+                        room.last_active = SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs();
+                        return HttpResponse::Ok().json(serde_json::json!({
+                            "success": true,
+                            "room_id": room_id,
+                            "mode": room.mode,
+                            "session": {
+                                "session_id": session_id,
+                                "player_id": player_id
+                            },
+                            "recovered": true
+                        }));
+                    }
+                }
+            }
+            
+            // Assign new player
+            let taken_pids: std::collections::HashSet<i32> = room.sessions.values()
+                .map(|s| s.player_id)
+                .collect();
+            
+            if !taken_pids.contains(&0) {
+                player_id = 0;
+            } else if !taken_pids.contains(&1) {
+                player_id = 1;
+            }
+            
+            if player_id >= 0 {
+                room.sessions.insert(session_id.clone(), RoomSession {
+                    session_id: session_id.clone(),
+                    player_id,
+                    username: username.clone(),
+                });
+                if let Some(name) = username {
+                    room.usernames.insert(player_id, name);
+                }
+                room.last_active = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+            }
+        } else {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "success": false,
+                "error": "Room not found"
+            }));
+        }
+    }
+    
+    if player_id < 0 {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "success": false,
+            "error": "Room is full"
+        }));
+    }
+    
+    let mode = {
+        let rooms = data.rooms.lock().unwrap();
+        rooms.get(&room_id).map(|r| r.mode.clone()).unwrap_or_else(|| "pve".to_string())
+    };
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "room_id": room_id,
+        "mode": mode,
+        "session": {
+            "session_id": session_id,
+            "player_id": player_id
+        }
+    }))
+}
+
+async fn rooms_leave(data: web::Data<AppState>, req: web::Json<serde_json::Value>) -> impl Responder {
+    let room_id = req.get("room_id").and_then(|v| v.as_str()).unwrap_or("").to_uppercase();
+    let session_token = req.get("session_id").and_then(|v| v.as_str());
+    
+    if room_id.is_empty() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "success": false,
+            "error": "Room ID required"
+        }));
+    }
+    
+    {
+        let mut rooms = data.rooms.lock().unwrap();
+        if let Some(room) = rooms.get_mut(&room_id) {
+            if let Some(token) = session_token {
+                room.sessions.remove(token);
+            }
+            
+            room.last_active = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            
+            // Delete room if no sessions
+            if room.sessions.is_empty() {
+                rooms.remove(&room_id);
+            }
+        } else {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "success": false,
+                "error": "Room not found"
+            }));
+        }
+    }
+    
+    HttpResponse::Ok().json(serde_json::json!({"success": true}))
+}
+
+async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
+    let rooms = data.rooms.lock().unwrap();
+    let public_rooms: Vec<_> = rooms.values()
+        .filter(|r| r.public)
+        .map(|r| {
+            let occupied_slots = r.sessions.values()
+                .filter(|s| s.player_id >= 0)
+                .map(|s| s.player_id)
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            
+            serde_json::json!({
+                "room_id": r.room_id,
+                "mode": r.mode,
+                "players": occupied_slots,
+                "created_at": r.created_at
+            })
+        })
+        .collect();
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "rooms": public_rooms
     }))
 }
 
@@ -520,7 +1039,13 @@ async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -
     crate::game_setup::setup_game(&mut game_state);
     
     // Replace the game state in the mutex
-    let mut state_guard = data.game_state.lock().unwrap();
+    let mut state_guard = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in init_game: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
     *state_guard = game_state;
     
     let display = game_state_to_display(&state_guard);
@@ -528,7 +1053,8 @@ async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -
 }
 
 pub async fn run_web_server(game_state: Arc<Mutex<GameState>>) -> std::io::Result<()> {
-    let app_state = web::Data::new(AppState { game_state });
+    let rooms = Arc::new(Mutex::new(HashMap::new()));
+    let app_state = web::Data::new(AppState { game_state, rooms });
 
     HttpServer::new(move || {
         let cors = Cors::permissive();
@@ -542,6 +1068,21 @@ pub async fn run_web_server(game_state: Arc<Mutex<GameState>>) -> std::io::Resul
             .route("/api/init", web::post().to(init_game))
             .route("/api/status", web::get().to(get_status))
             .route("/api/set_ai", web::post().to(set_ai))
+            .route("/api/undo", web::post().to(undo))
+            .route("/api/redo", web::post().to(redo))
+            .route("/api/debug/rewind", web::post().to(debug_rewind))
+            .route("/api/debug/redo", web::post().to(debug_redo))
+            .route("/api/debug/snapshot", web::get().to(debug_snapshot))
+            .route("/api/debug/dump_state", web::get().to(debug_dump_state))
+            .route("/api/export_game", web::get().to(export_game))
+            .route("/api/get_decks", web::get().to(get_decks))
+            .route("/api/get_random_deck", web::get().to(get_random_deck))
+            .route("/api/get_test_deck", web::get().to(get_test_deck))
+            .route("/api/get_card_registry", web::get().to(get_card_registry))
+            .route("/api/rooms/create", web::post().to(rooms_create))
+            .route("/api/rooms/join", web::post().to(rooms_join))
+            .route("/api/rooms/leave", web::post().to(rooms_leave))
+            .route("/api/rooms/list", web::get().to(rooms_list))
     })
     .bind("127.0.0.1:8080")?
     .run()

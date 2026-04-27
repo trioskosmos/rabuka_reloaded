@@ -203,6 +203,10 @@ fn run_single_game(
                     println!("RPS action failed: {}", e);
                 }
             }
+            crate::game_state::Phase::LiveStart | crate::game_state::Phase::LiveSuccess | crate::game_state::Phase::Cheer => {
+                // Handle new phases - skip for now
+                println!("Skipping new phase: {:?}", game_state.current_phase);
+            }
             crate::game_state::Phase::ChooseFirstAttacker => {
                 // Q16: RPS winner chooses turn order (simplified: always choose first)
                 let actions = crate::game_setup::generate_possible_actions(&game_state);

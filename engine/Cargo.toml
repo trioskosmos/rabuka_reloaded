@@ -12,6 +12,9 @@ actix-cors = "0.6"
 actix-files = "0.6"
 tokio = { version = "1.35", features = ["full"] }
 smallvec = "1.11"
+csv = "1.3"
+rayon = "1.8"
+uuid = { version = "1.6", features = ["v4", "serde"] }
 
 [dev-dependencies]
 criterion = "0.5"
@@ -25,3 +28,7 @@ harness = false
 [[bin]]
 name = "run_qa_tests"
 path = "src/run_qa_tests.rs"
+
+# [[bin]]
+# name = "analyze_common_voters"
+# path = "src/bin/analyze_common_voters.rs"

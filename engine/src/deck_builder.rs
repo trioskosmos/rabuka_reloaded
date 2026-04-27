@@ -11,6 +11,7 @@ pub struct Deck {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct DeckValidationResult {
     pub is_valid: bool,
     pub errors: Vec<String>,
@@ -18,6 +19,7 @@ pub struct DeckValidationResult {
 }
 
 impl DeckValidationResult {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         DeckValidationResult {
             is_valid: true,
@@ -26,11 +28,13 @@ impl DeckValidationResult {
         }
     }
 
+    #[allow(dead_code)]
     pub fn add_error(&mut self, error: String) {
         self.is_valid = false;
         self.errors.push(error);
     }
 
+    #[allow(dead_code)]
     pub fn add_warning(&mut self, warning: String) {
         self.warnings.push(warning);
     }
@@ -84,6 +88,7 @@ impl DeckBuilder {
     // Q5: Same card number different rarity validation (max 4 total regardless of rarity)
     // Q6: Different card numbers validation (can use 4 of each if card numbers differ)
     // Q7: Energy deck duplicates validation (any number of same cards allowed)
+    #[allow(dead_code)]
     pub fn validate_deck(card_db: &Arc<CardDatabase>, main_deck: &VecDeque<i16>, energy_deck: &VecDeque<i16>) -> DeckValidationResult {
         let mut result = DeckValidationResult::new();
 
@@ -156,6 +161,7 @@ impl DeckBuilder {
     }
 
     // Extract card number excluding rarity symbol (e.g., "PL!N-bp1-001-R+" -> "PL!N-bp1-001")
+    #[allow(dead_code)]
     fn extract_card_number(card_no: &str) -> String {
         // Card number format: SERIES-bp#-###-RARITY
         // We want to extract up to the card number (excluding rarity)

@@ -3,7 +3,7 @@ use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
-use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand};
 
 #[test]
 fn test_edge_case_insufficient_energy() {
@@ -14,7 +14,7 @@ fn test_edge_case_insufficient_energy() {
     let card_database = create_card_database(cards.clone());
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
     
     // Find a member card with high cost
     let member_card = cards.iter()

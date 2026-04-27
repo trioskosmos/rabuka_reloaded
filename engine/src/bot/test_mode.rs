@@ -205,7 +205,10 @@ pub fn run_test_mode() {
             match current_phase {
                 crate::game_state::Phase::Active |
                 crate::game_state::Phase::Energy |
-                crate::game_state::Phase::Draw => {
+                crate::game_state::Phase::Draw |
+                crate::game_state::Phase::LiveStart |
+                crate::game_state::Phase::LiveSuccess |
+                crate::game_state::Phase::Cheer => {
                     eprintln!("Auto-advancing {:?}...", current_phase);
                     turn::TurnEngine::advance_phase(&mut game_state);
                 }

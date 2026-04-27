@@ -96,7 +96,7 @@ fn test_stress_baton_touch_multiple_members() {
     assert!(result.is_ok(), "Should play member3 to right side: {:?}", result);
     
     // Verify all 3 members are on stage
-    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+    let stage_members = game_state.player1.stage.stage.iter().filter(|&&id| *id != -1).count();
     assert_eq!(stage_members, 3, "Stage should have 3 members");
     
     // Advance turn to allow baton touch
