@@ -2,7 +2,8 @@
 
 use crate::card::{Ability, AbilityCost, AbilityEffect, Condition, Keyword};
 
-use crate::game_state::GameState;
+use crate::game_state::{GameState, Phase};
+
 use crate::zones::MemberArea;
 use std::vec::Vec;
 use std::string::String;
@@ -629,6 +630,9 @@ impl<'a> AbilityResolver<'a> {
             Some("any_of_condition") => self.evaluate_any_of_condition(condition),
             Some("score_threshold_condition") => self.evaluate_score_threshold_condition(condition),
             Some("choice_condition") => self.evaluate_choice_condition(condition),
+            Some("position_change_condition") => self.evaluate_position_change_condition(condition),
+            Some("state_change_condition") => self.evaluate_state_change_condition(condition),
+            Some("opponent_choice_condition") => self.evaluate_opponent_choice_condition(condition),
             _ => {
                 // Default: unknown condition type, return true (fail-open)
                 eprintln!("Unknown condition type: {:?}", condition.condition_type);
@@ -837,6 +841,31 @@ impl<'a> AbilityResolver<'a> {
                     }).sum()
                 } else {
                     player.success_live_card_zone.cards.len() as u32
+                }
+            }
+            "revealed_cards" => {
+                // Check cards in the revealed_cards set
+                let revealed_count = self.game_state.revealed_cards.len() as u32;
+                
+                // If card_property is specified (e.g., has_blade_heart), filter by that
+                if let Some(property) = condition.card_property.as_deref() {
+                    let card_db = &self.game_state.card_database;
+                    match property {
+                        "has_blade_heart" => {
+                            self.game_state.revealed_cards.iter()
+                                .filter(|&&card_id| {
+                                    if let Some(card) = card_db.get_card(card_id) {
+                                        card.has_blade_heart()
+                                    } else {
+                                        false
+                                    }
+                                })
+                                .count() as u32
+                        }
+                        _ => revealed_count
+                    }
+                } else {
+                    revealed_count
                 }
             }
             _ => 0,
@@ -1307,6 +1336,68 @@ impl<'a> AbilityResolver<'a> {
         true
     }
 
+    fn evaluate_position_change_condition(&self, condition: &Condition) -> bool {
+        // Check if a position change occurred or is requested
+        // This condition type handles "ポジションチェンジしてもよい" patterns
+        let optional = condition.options.as_ref().map(|_| true).unwrap_or(false);
+        let _position = condition.position.as_ref().and_then(|p| p.get_position()).unwrap_or("");
+        
+        if optional {
+            // For optional position changes, check if position_change_occurred_this_turn
+            // and if the action was actually taken
+            if self.game_state.position_change_occurred_this_turn {
+                // Check if it was this specific member that changed position
+                // For now, we track that a position change happened
+                return true;
+            }
+            // Optional position change not taken yet - condition is not met
+            return false;
+        }
+        
+        // Non-optional position change condition
+        // Check if position change tracking is enabled and occurred
+        self.game_state.position_change_occurred_this_turn
+    }
+
+    fn evaluate_state_change_condition(&self, condition: &Condition) -> bool {
+        // Check for state transitions like active -> wait
+        let _text = &condition.text;
+        let _during_main_phase = condition.text.contains("main_phase");
+        
+        // Check if we're in main phase (if specified)
+        if _during_main_phase && self.game_state.current_phase != Phase::Main {
+            return false;
+        }
+        
+        // Check if state transition tracking exists
+        // For now, we check if any member recently changed from active to wait
+        // This would need proper tracking in game_state
+        // Return true as placeholder - proper implementation needs state transition history
+        true
+    }
+
+    fn evaluate_opponent_choice_condition(&self, condition: &Condition) -> bool {
+        // Check if opponent made a specific choice
+        // Pattern: "相手は手札を1枚控え室に置いてもよい。そうしなかった"
+        // The "そうしなかった" means the opponent chose NOT to do the optional action
+        
+        let _target = condition.target.as_deref().unwrap_or("opponent");
+        let negation = condition.negation.unwrap_or(false);
+        // Note: action type is determined from condition text parsing, not a separate field
+        
+        // Check if opponent_choice_declined flag is set in game_state
+        // This would be set when opponent declines an optional action
+        let opponent_declined = self.game_state.opponent_choice_declined;
+        
+        // If negation is true ("そうしなかった"), we return true when opponent declined
+        // If negation is false, we return true when opponent accepted
+        if negation {
+            opponent_declined
+        } else {
+            !opponent_declined
+        }
+    }
+
     fn get_count_for_condition(&self, condition: &Condition) -> u32 {
         let location = condition.location.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
@@ -1472,40 +1563,6 @@ impl<'a> AbilityResolver<'a> {
         count
     }
 
-    fn infer_action_from_text(&self, text: &str) -> String {
-        // Simple text-based inference for action types from Japanese text
-        if text.contains("手札に加える") || text.contains("手札に加えてもよい") {
-            // Add to hand - could be draw or move_cards
-            if text.contains("デッキの上から") || text.contains("カードを1枚引く") {
-                "draw".to_string()
-            } else if text.contains("控え室から") || text.contains("discard") {
-                "move_cards".to_string()
-            } else {
-                "draw".to_string() // Default to draw for adding to hand
-            }
-        } else if text.contains("控え室に置く") || text.contains("discard") {
-            "move_cards".to_string()
-        } else if text.contains("ステージに登場") || text.contains("stage") {
-            "move_cards".to_string()
-        } else if text.contains("公開する") || text.contains("reveal") {
-            "reveal".to_string()
-        } else if text.contains("アクティブ") || text.contains("ウェイト") {
-            "change_state".to_string()
-        } else if text.contains("ブレード") || text.contains("blade") {
-            "gain_resource".to_string()
-        } else if text.contains("スコア") || text.contains("score") {
-            "modify_score".to_string()
-        } else {
-            // Default: try to infer from common patterns
-            if text.contains("加える") {
-                "draw".to_string()
-            } else if text.contains("置く") {
-                "move_cards".to_string()
-            } else {
-                "".to_string() // Unknown
-            }
-        }
-    }
 
     /// Check if an effect can be activated based on its activation conditions
     pub fn can_activate_effect(&self, effect: &AbilityEffect) -> bool {
@@ -1648,13 +1705,8 @@ impl<'a> AbilityResolver<'a> {
         // Reset replacement effect flags for this new event
         self.game_state.reset_replacement_effect_flags();
 
-        // Check if this action has a replacement effect
-        let action_to_use = if effect.action.is_empty() {
-            // Try to infer from text at runtime
-            self.infer_action_from_text(&effect.text)
-        } else {
-            effect.action.clone()
-        };
+        // Use the action from the effect (abilities.json should have this populated)
+        let action_to_use = effect.action.clone();
 
         // Check for replacement effects for this action
         let replacement_effects: Vec<crate::game_state::ReplacementEffect> = self.game_state.get_replacement_effects_for_event(&action_to_use)
@@ -2258,32 +2310,8 @@ impl<'a> AbilityResolver<'a> {
         let cost_limit = effect.cost_limit;
         let _placement_order = effect.placement_order.as_deref();
 
-        // Fallback: infer source and destination from text if they are None
-        let text = &effect.text;
-        // Remove spaces to handle unusual spacing (e.g., "控え室か ら" -> "控え室から")
-        let text_normalized = text.replace(" ", "");
-        if source.is_empty() {
-            if text.contains("控え室") || text_normalized.contains("控え室から") {
-                source = "discard".to_string();
-            } else if text.contains("デッキ") || text.contains("deck") {
-                source = "deck".to_string();
-            } else if text.contains("手札") || text.contains("hand") {
-                source = "hand".to_string();
-            } else if text.contains("ステージ") || text.contains("stage") {
-                source = "stage".to_string();
-            }
-        }
-        if destination.is_empty() {
-            if text.contains("控え室") || text.contains("discard") {
-                destination = "discard".to_string();
-            } else if text.contains("デッキ") || text.contains("deck") {
-                destination = "deck".to_string();
-            } else if text.contains("手札") || text.contains("hand") {
-                destination = "hand".to_string();
-            } else if text.contains("ステージ") || text.contains("stage") {
-                destination = "stage".to_string();
-            }
-        }
+        // Source and destination should be populated from abilities.json
+        // No text-based fallback - data should be clean
 
         let player = match target {
             "self" => &mut self.game_state.player1,
@@ -2792,7 +2820,6 @@ impl<'a> AbilityResolver<'a> {
                             player.hand.add_card(card);
                             // Modifiers stay when moving to hand (card still in play)
                         }
-                        player.rebuild_hand_index_map();
                         // Record movements after mutable borrow ends
                         for card_id in cards_to_record {
                             self.game_state.record_card_movement(card_id);
@@ -3338,7 +3365,6 @@ impl<'a> AbilityResolver<'a> {
                             player.hand.add_card(card_id);
                             // Modifiers stay when moving to hand (card still in play)
                         }
-                        player.rebuild_hand_index_map();
                         // Clear modifiers after mutable borrow ends
                         for card_id in cards_to_clear {
                             self.game_state.clear_modifiers_for_card(card_id);
@@ -5105,7 +5131,6 @@ impl<'a> AbilityResolver<'a> {
                             player.waitroom.cards.push(card_id);
                         }
                     }
-                    player.rebuild_hand_index_map();
                 }
             }
             return Ok(());
@@ -5127,7 +5152,6 @@ impl<'a> AbilityResolver<'a> {
                     player.waitroom.cards.push(card_id);
                 }
             }
-            player.rebuild_hand_index_map();
         }
 
         Ok(())
@@ -6001,6 +6025,8 @@ impl Default for AbilityEffect {
             parenthetical: None,
             look_action: None,
             select_action: None,
+            name_constraint: None,
+            name_constraint_source: None,
             actions: None,
             resource: None,
             resource_icon_count: None,
@@ -6029,6 +6055,8 @@ impl Default for AbilityEffect {
             conditional_action: None,
             operation: None,
             value: None,
+            choice_condition: None,
+            choice_modifier: None,
             aggregate: None,
             comparison_type: None,
             choice_options: None,

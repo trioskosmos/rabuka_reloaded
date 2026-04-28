@@ -92,6 +92,7 @@ export function initializeGlobals(controller = {}) {
         leaveRoom: () => Network.leaveRoom(),
         joinRoom: (code) => Network.joinRoom(code),
         resetGame: () => Network.resetGame(),
+        startGame: (mode = 'pve') => Modals.startGame(mode),
         forceAdvance: () => Network.forceAction(-1),
         changeAI: (m) => Network.changeAI(m),
         forceAction: (id) => Network.forceAction(id),
@@ -118,6 +119,7 @@ export function initializeGlobals(controller = {}) {
     window.leaveRoom = window.Actions.leaveRoom;
     window.joinRoom = window.Actions.joinRoom;
     window.resetGame = window.Actions.resetGame;
+    window.startGame = window.Actions.startGame;
     window.forceAdvance = window.Actions.forceAdvance;
     window.changeAI = window.Actions.changeAI;
     window.forceAction = window.Actions.forceAction;

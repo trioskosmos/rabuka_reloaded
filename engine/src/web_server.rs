@@ -20,6 +20,9 @@ pub struct CardDisplay {
     #[serde(rename = "type")]
     pub card_type: String,
     pub orientation: Option<String>,
+    pub base_heart: Option<std::collections::HashMap<String, u32>>,
+    pub blade: u32,
+    pub id: i16,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -35,6 +38,7 @@ pub struct PlayerDisplay {
     pub live_zone: ZoneDisplay,
     pub success_live_card_zone: ZoneDisplay,
     pub waitroom: ZoneDisplay,
+    pub discard: ZoneDisplay, // Alias for waitroom for frontend compatibility
     pub main_deck_count: usize,
     pub energy_deck_count: usize,
 }
@@ -120,6 +124,7 @@ pub struct Room {
     pub usernames: HashMap<i32, String>, // player_id -> username
     pub custom_decks: Option<HashMap<i32, CustomDeck>>,
     #[serde(skip)]
+    #[allow(dead_code)]
     pub game_state: Option<Arc<Mutex<GameState>>>, // Per-room game state
 }
 
@@ -163,6 +168,25 @@ pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orient
             name: card.name.clone(),
             card_type: format!("{:?}", card.card_type),
             orientation: orientation.map(|o| format!("{:?}", o)),
+            base_heart: card.base_heart.as_ref().map(|bh| {
+                bh.hearts.iter().map(|(color, count)| {
+                    let color_str = match color {
+                        crate::card::HeartColor::Heart00 => "heart00",
+                        crate::card::HeartColor::Heart01 => "heart01",
+                        crate::card::HeartColor::Heart02 => "heart02",
+                        crate::card::HeartColor::Heart03 => "heart03",
+                        crate::card::HeartColor::Heart04 => "heart04",
+                        crate::card::HeartColor::Heart05 => "heart05",
+                        crate::card::HeartColor::Heart06 => "heart06",
+                        crate::card::HeartColor::BAll => "b_all",
+                        crate::card::HeartColor::Draw => "draw",
+                        crate::card::HeartColor::Score => "score",
+                    };
+                    (color_str.to_string(), *count)
+                }).collect()
+            }),
+            blade: card.blade,
+            id: card_id,
         })
     } else {
         None
@@ -206,13 +230,16 @@ pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::
             .collect(),
     };
 
+    let waitroom_display = zone_to_display_from_card_ids(&player.waitroom.cards, card_db);
+    
     PlayerDisplay {
         hand: zone_to_display_from_card_ids(&player.hand.cards, card_db),
         energy: energy_display,
         stage: stage_to_display(&player.stage, card_db),
         live_zone: zone_to_display_from_card_ids(&player.live_card_zone.cards, card_db),
         success_live_card_zone: zone_to_display_from_card_ids(&player.success_live_card_zone.cards, card_db),
-        waitroom: zone_to_display_from_card_ids(&player.waitroom.cards, card_db),
+        waitroom: waitroom_display.clone(),
+        discard: waitroom_display, // Same as waitroom for frontend compatibility
         main_deck_count: player.main_deck.cards.len(),
         energy_deck_count: player.energy_deck.cards.len(),
     }
@@ -228,179 +255,29 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
 }
 
 async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
-    let game_state = data.game_state.lock().unwrap();
-    
+    let game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in get_game_state: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
+
     let display = game_state_to_display(&game_state);
     HttpResponse::Ok().json(display)
 }
 
 async fn get_actions(data: web::Data<AppState>) -> impl Responder {
-    let mut game_state = match data.game_state.lock() {
+    let game_state = match data.game_state.lock() {
         Ok(guard) => guard,
         Err(e) => {
             eprintln!("Mutex poisoned in get_actions: {}", e);
             return HttpResponse::InternalServerError().json("Game state mutex poisoned");
         }
     };
-    
-    // Auto-advance automatic phases to ensure energy is activated and phases are correct
-    // Keep looping until we hit a manual phase (Main, LiveCardSet, etc.)
-    loop {
-        let current_phase = game_state.current_phase.clone();
-        match current_phase {
-            crate::game_state::Phase::Active |
-            crate::game_state::Phase::Energy |
-            crate::game_state::Phase::Draw => {
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            crate::game_state::Phase::Main => {
-                // Main is manual for Player 1, but if it's Player 2's turn and they have no actions, advance
-                let is_player2_turn = game_state.active_player().id == game_state.player2.id;
-                let setup_actions = crate::game_setup::generate_possible_actions(&game_state);
-                if is_player2_turn && setup_actions.is_empty() {
-                    crate::turn::TurnEngine::advance_phase(&mut game_state);
-                } else {
-                    break;
-                }
-            }
-            crate::game_state::Phase::LiveCardSet => {
-                // LiveCardSet is manual unless both players are done
-                if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
-                    crate::turn::TurnEngine::check_timing(&mut game_state);
-                    game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
-                } else {
-                    // current_turn_phase is already set to Live by advance_phase in turn.rs
-                    // No need to set it again here
-                    break;
-                }
-            }
-            crate::game_state::Phase::FirstAttackerPerformance |
-            crate::game_state::Phase::SecondAttackerPerformance |
-            crate::game_state::Phase::LiveVictoryDetermination => {
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            _ => break,
-        }
-    }
-    
-    // Auto-play for Player 2: keep executing random actions until it's Player 1's turn
-    loop {
-        // Check if it's Player 2's turn (active player is player2)
-        let is_player2_turn = game_state.active_player().id == game_state.player2.id;
-        
-        if !is_player2_turn {
-            break; // It's Player 1's turn, exit the loop
-        }
-        
-        // Generate possible actions for Player 2
-        let setup_actions = crate::game_setup::generate_possible_actions(&game_state);
-        println!("DEBUG: Player 2 AI actions generation - Phase: {:?}", game_state.current_phase);
-        println!("DEBUG: Player 2 AI generated {} actions", setup_actions.len());
-        for action in &setup_actions {
-            println!("DEBUG:   - {}", action.description);
-        }
-        
-        if setup_actions.is_empty() {
-            // No actions available, advance phase
-            crate::turn::TurnEngine::advance_phase(&mut game_state);
-            
-            // Continue loop to check if we need to keep auto-playing for Player 2
-            continue;
-        }
-        
-        // Use AI to choose a random action for Player 2
-        let ai = crate::bot::ai::AIPlayer::new("Player2AI".to_string());
-        let chosen_index = ai.choose_action(&setup_actions);
-        let chosen_action = &setup_actions[chosen_index];
-        
-        println!("Player 2 (AI) choosing action: {}", chosen_action.description);
-        
-        // Save state before Player 2 AI action for undo/redo support
-        game_state.save_state();
-        
-        // Execute the chosen action
-        let result = crate::turn::TurnEngine::execute_main_phase_action(
-            &mut game_state,
-            &chosen_action.action_type,
-            chosen_action.parameters.as_ref().and_then(|p| p.card_id),
-            chosen_action.parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
-            chosen_action.parameters.as_ref().and_then(|p| p.stage_area),
-            chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
-        );
-        
-        if let Err(e) = result {
-            eprintln!("Player 2 auto-action execution error: {}", e);
-            break; // Exit on error
-        }
-        
-        // Auto-advance automatic phases after Player 2's action
-        loop {
-            let current_phase = game_state.current_phase.clone();
-            match current_phase {
-                crate::game_state::Phase::FirstAttackerPerformance |
-                crate::game_state::Phase::SecondAttackerPerformance |
-                crate::game_state::Phase::LiveVictoryDetermination => {
-                    crate::turn::TurnEngine::advance_phase(&mut game_state);
-                }
-                crate::game_state::Phase::Active |
-                crate::game_state::Phase::Energy |
-                crate::game_state::Phase::Draw => {
-                    crate::turn::TurnEngine::advance_phase(&mut game_state);
-                }
-                _ => break,
-            }
-        }
-        
-        // Check if it's still Player 2's turn - if not, break to let Player 1 play
-        let still_player2_turn = game_state.active_player().id == game_state.player2.id;
-        if !still_player2_turn {
-            break; // Turn passed to Player 1
-        }
-        
-        // Otherwise continue the loop to play another action for Player 2
-    }
-    
-    // Auto-advance automatic phases after Player 2's turn completes
-    loop {
-        let current_phase = game_state.current_phase.clone();
-        match current_phase {
-            crate::game_state::Phase::Active |
-            crate::game_state::Phase::Energy |
-            crate::game_state::Phase::Draw => {
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            crate::game_state::Phase::Main => {
-                // After Player 2's turn, if we're still in Main phase, advance to next turn phase
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            crate::game_state::Phase::LiveCardSet => {
-                if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
-                    crate::turn::TurnEngine::check_timing(&mut game_state);
-                    game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
-                } else {
-                    // current_turn_phase is already set to Live by advance_phase in turn.rs
-                    break;
-                }
-            }
-            crate::game_state::Phase::FirstAttackerPerformance |
-            crate::game_state::Phase::SecondAttackerPerformance |
-            crate::game_state::Phase::LiveVictoryDetermination => {
-                crate::turn::TurnEngine::advance_phase(&mut game_state);
-            }
-            _ => break,
-        }
-    }
-    
-    println!("Current phase: {:?}", game_state.current_phase);
-    
+
     // Generate possible actions based on current game state
     let actions = generate_possible_actions(&game_state);
-    println!("DEBUG: Final action generation - Phase: {:?}", game_state.current_phase);
-    println!("Generated {} actions", actions.len());
-    for action in &actions {
-        println!("  - {}: {}", action.action_type, action.description);
-    }
-    
     HttpResponse::Ok().json(ActionsResponse { actions })
 }
 
@@ -431,6 +308,96 @@ fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             }).collect()),
         }),
     }).collect()
+}
+
+fn is_automatic_phase(game_state: &GameState) -> bool {
+    matches!(
+        game_state.current_phase,
+        crate::game_state::Phase::Active
+            | crate::game_state::Phase::Energy
+            | crate::game_state::Phase::Draw
+            | crate::game_state::Phase::FirstAttackerPerformance
+            | crate::game_state::Phase::SecondAttackerPerformance
+            | crate::game_state::Phase::LiveVictoryDetermination
+    )
+}
+
+fn is_human_decision_phase(game_state: &GameState) -> bool {
+    match game_state.current_phase {
+        crate::game_state::Phase::RockPaperScissors
+        | crate::game_state::Phase::ChooseFirstAttacker
+        | crate::game_state::Phase::MulliganP1Turn
+        | crate::game_state::Phase::LiveCardSetP1Turn => true,
+        crate::game_state::Phase::Mulligan => game_state.current_mulligan_player_idx == 0,
+        crate::game_state::Phase::LiveCardSet => game_state.current_live_card_set_player == 0,
+        crate::game_state::Phase::Main => game_state.active_player().id == game_state.player1.id,
+        _ => false,
+    }
+}
+
+fn is_player2_decision_phase(game_state: &GameState) -> bool {
+    match game_state.current_phase {
+        crate::game_state::Phase::MulliganP2Turn
+        | crate::game_state::Phase::LiveCardSetP2Turn => true,
+        crate::game_state::Phase::Mulligan => game_state.current_mulligan_player_idx == 1,
+        crate::game_state::Phase::LiveCardSet => game_state.current_live_card_set_player == 1,
+        crate::game_state::Phase::Main => game_state.active_player().id == game_state.player2.id,
+        _ => false,
+    }
+}
+
+fn execute_player2_ai_action(game_state: &mut GameState) -> Result<bool, String> {
+    if !is_player2_decision_phase(game_state) {
+        return Ok(false);
+    }
+
+    let actions = crate::game_setup::generate_possible_actions(game_state);
+    if actions.is_empty() {
+        return Err(format!(
+            "Player 2 reached {:?} with no legal actions",
+            game_state.current_phase
+        ));
+    }
+
+    let ai = crate::bot::ai::AIPlayer::new("Player2AI".to_string());
+    let chosen_index = ai.choose_action(&actions);
+    let chosen_action = actions
+        .get(chosen_index)
+        .ok_or_else(|| format!("Player 2 chose invalid action index {}", chosen_index))?;
+
+    crate::turn::TurnEngine::execute_main_phase_action(
+        game_state,
+        &chosen_action.action_type,
+        chosen_action.parameters.as_ref().and_then(|p| p.card_id),
+        chosen_action
+            .parameters
+            .as_ref()
+            .and_then(|p| p.card_indices.as_ref())
+            .cloned(),
+        chosen_action.parameters.as_ref().and_then(|p| p.stage_area),
+        chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
+    )?;
+
+    Ok(true)
+}
+
+fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> {
+    loop {
+        if is_human_decision_phase(game_state) {
+            return Ok(());
+        }
+
+        if is_automatic_phase(game_state) {
+            crate::turn::TurnEngine::advance_phase(game_state);
+            continue;
+        }
+
+        if execute_player2_ai_action(game_state)? {
+            continue;
+        }
+
+        return Ok(());
+    }
 }
 
 async fn execute_action(
@@ -480,36 +447,23 @@ async fn execute_action(
     
     match result {
         Ok(_) => {
-            // Auto-advance automatic phases after action execution
-            loop {
-                let current_phase = game_state.current_phase.clone();
-                match current_phase {
-                    // Live phase phases - LiveCardSet is manual (handled by action), others are automatic
-                    crate::game_state::Phase::FirstAttackerPerformance |
-                    crate::game_state::Phase::SecondAttackerPerformance |
-                    crate::game_state::Phase::LiveVictoryDetermination => {
-                        crate::turn::TurnEngine::advance_phase(&mut game_state);
-                    }
-                    // Early game automatic phases
-                    crate::game_state::Phase::Active |
-                    crate::game_state::Phase::Energy |
-                    crate::game_state::Phase::Draw => {
-                        crate::turn::TurnEngine::advance_phase(&mut game_state);
-                    }
-                    // LiveCardSet - handle_finish_live_card_set already advances if both done
-                    crate::game_state::Phase::LiveCardSet => {
-                        // current_turn_phase is already set to Live by advance_phase in turn.rs
-                        break;
-                    }
-                    _ => break,
-                }
+            if let Err(e) = settle_single_player_state(&mut game_state) {
+                eprintln!("Single-player settle error after action: {}", e);
+                return HttpResponse::BadRequest().json(serde_json::json!({
+                    "error": e,
+                    "phase": format!("{:?}", game_state.current_phase)
+                }));
             }
+
             let display = game_state_to_display(&game_state);
             HttpResponse::Ok().json(display)
         }
         Err(e) => {
             eprintln!("Action execution error: {}", e);
-            HttpResponse::BadRequest().json(e)
+            HttpResponse::BadRequest().json(serde_json::json!({
+                "error": e,
+                "phase": format!("{:?}", game_state.current_phase)
+            }))
         }
     }
 }
@@ -549,6 +503,10 @@ async fn undo(data: web::Data<AppState>) -> impl Responder {
     
     match game_state.undo() {
         Ok(_) => {
+            if let Err(e) = settle_single_player_state(&mut game_state) {
+                eprintln!("Single-player settle error after undo: {}", e);
+                return HttpResponse::BadRequest().json(serde_json::json!({"error": e}));
+            }
             let display = game_state_to_display(&game_state);
             HttpResponse::Ok().json(display)
         }
@@ -569,6 +527,10 @@ async fn redo(data: web::Data<AppState>) -> impl Responder {
     
     match game_state.redo() {
         Ok(_) => {
+            if let Err(e) = settle_single_player_state(&mut game_state) {
+                eprintln!("Single-player settle error after redo: {}", e);
+                return HttpResponse::BadRequest().json(serde_json::json!({"error": e}));
+            }
             let display = game_state_to_display(&game_state);
             HttpResponse::Ok().json(display)
         }
@@ -1037,6 +999,13 @@ async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -
     
     // Setup game (Rule 6.2)
     crate::game_setup::setup_game(&mut game_state);
+    if let Err(e) = settle_single_player_state(&mut game_state) {
+        eprintln!("Single-player settle error during init: {}", e);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": e,
+            "phase": format!("{:?}", game_state.current_phase)
+        }));
+    }
     
     // Replace the game state in the mutex
     let mut state_guard = match data.game_state.lock() {

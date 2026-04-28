@@ -47,12 +47,18 @@ pub enum ChoiceResult {
 #[derive(Debug, Clone)]
 pub struct AbilityExecutor {
     pending_choice: Option<Choice>,
+    // Track cards that were looked at during look_and_select operations
+    looked_at_cards: Vec<u32>,
+    // Track cards that were selected during select operations
+    selected_cards: Vec<u32>,
 }
 
 impl AbilityExecutor {
     pub fn new() -> Self {
         Self {
             pending_choice: None,
+            looked_at_cards: Vec::new(),
+            selected_cards: Vec::new(),
         }
     }
 
@@ -90,9 +96,9 @@ impl AbilityExecutor {
         let count_needed = cost.count.unwrap_or(1) as usize;
 
         let has_card = match source {
-            "stage" | "ステージ" => {
+            "stage" => {
                 // Check if player has a member on stage
-                if card_type == "member_card" || card_type == "メンバー" {
+                if card_type == "member_card" {
                     let count = (player.stage.stage[0] != -1) as usize +
                                    (player.stage.stage[1] != -1) as usize +
                                    (player.stage.stage[2] != -1) as usize;
@@ -101,13 +107,13 @@ impl AbilityExecutor {
                     false
                 }
             }
-            "hand" | "手札" => {
+            "hand" => {
                 let card_db = &game_state.card_database;
-                if card_type == "member_card" || card_type == "メンバー" {
+                if card_type == "member_card" {
                     player.hand.cards.iter().filter(|&id| {
                         card_db.get_card(*id).map_or(false, |c| c.is_member())
                     }).count() >= count_needed
-                } else if card_type == "live_card" || card_type == "ライブ" {
+                } else if card_type == "live_card" {
                     player.hand.cards.iter().filter(|&id| {
                         card_db.get_card(*id).map_or(false, |c| c.is_live())
                     }).count() >= count_needed
@@ -115,13 +121,13 @@ impl AbilityExecutor {
                     player.hand.cards.len() >= count_needed
                 }
             }
-            "discard" | "控え室" => {
+            "discard" => {
                 let card_db = &game_state.card_database;
-                if card_type == "member_card" || card_type == "メンバー" {
+                if card_type == "member_card" {
                     player.waitroom.cards.iter().filter(|&id| {
                         card_db.get_card(*id).map_or(false, |c| c.is_member())
                     }).count() >= count_needed
-                } else if card_type == "live_card" || card_type == "ライブ" {
+                } else if card_type == "live_card" {
                     player.waitroom.cards.iter().filter(|&id| {
                         card_db.get_card(*id).map_or(false, |c| c.is_live())
                     }).count() >= count_needed
@@ -129,7 +135,7 @@ impl AbilityExecutor {
                     player.waitroom.cards.len() >= count_needed
                 }
             }
-            "deck" | "デッキ" => {
+            "deck" => {
                 player.main_deck.cards.len() >= count_needed
             }
             "success_live_zone" => {
@@ -367,8 +373,8 @@ impl AbilityExecutor {
         let card_type = condition.card_type.as_deref().unwrap_or("");
 
         match location {
-            "stage" | "ステージ" => {
-                if card_type == "member_card" || card_type == "メンバー" {
+            "stage" => {
+                if card_type == "member_card" {
                     player.stage.stage[0] != -1
                         || player.stage.stage[1] != -1
                         || player.stage.stage[2] != -1
@@ -376,13 +382,13 @@ impl AbilityExecutor {
                     false
                 }
             }
-            "hand" | "手札" => {
+            "hand" => {
                 let card_db = &game_state.card_database;
-                if card_type == "member_card" || card_type == "メンバー" {
+                if card_type == "member_card" {
                     player.hand.cards.iter().map(|&id| {
                         card_db.get_card(id).map_or(false, |c| c.is_member())
                     }).any(|x| x)
-                } else if card_type == "live_card" || card_type == "ライブ" {
+                } else if card_type == "live_card" {
                     player.hand.cards.iter().any(|&id| {
                         card_db.get_card(id).map_or(false, |c| c.is_live())
                     })
@@ -448,8 +454,8 @@ impl AbilityExecutor {
         let state = condition.energy_state.as_deref().unwrap_or("");
 
         match state {
-            "active" | "アクティブ" => player.count_active_energy() > 0,
-            "wait" | "ウェイト" => player.count_wait_energy() > 0,
+            "active" => player.count_active_energy() > 0,
+            "wait" => player.count_wait_energy() > 0,
             _ => false,
         }
     }
@@ -518,23 +524,35 @@ impl AbilityExecutor {
         if !target_player_ids.is_empty() {
             let count_usize: usize = count.try_into().unwrap_or(usize::MAX);
             match (source, destination) {
-                ("discard" | "控え室", "hand" | "手札") => {
+                ("discard", "hand") => {
                     self.move_from_discard_to_hand(player, count_usize, card_type, game_state)?;
                 }
-                ("stage" | "ステージ", "discard" | "控え室") => {
+                ("stage", "discard") => {
                     self.move_from_stage_to_discard(player, false, false, game_state)?;
                 }
-                ("hand" | "手札", "discard" | "控え室") => {
+                ("hand", "discard") => {
                     self.move_from_hand_to_discard(player, count_usize)?;
                 }
-                ("deck" | "チE��キ", "hand" | "手札") => {
+                ("deck", "hand") => {
                     self.draw_cards(player, count_usize)?;
                 }
-                ("deck_top", "hand" | "手札") => {
+                ("deck_top", "hand") => {
                     self.draw_cards(player, count_usize)?;
                 }
-                ("hand" | "手札", "deck_bottom") => {
+                ("hand", "deck_bottom") => {
                     self.move_from_hand_to_deck_bottom(player, count_usize)?;
+                }
+                ("looked_at", "deck_top") => {
+                    // Move selected cards from looked-at set to deck top
+                    self.move_from_looked_at_to_deck_top(player, count_usize)?;
+                }
+                ("looked_at_remaining", "discard") => {
+                    // Move remaining looked-at cards to discard
+                    self.move_looked_at_remaining_to_discard(player)?;
+                }
+                ("selected_cards", "hand") => {
+                    // Move cards from selected set to hand
+                    self.move_from_selected_to_hand(player, count_usize)?;
                 }
                 _ => {
                     return Err(format!(
@@ -562,8 +580,8 @@ impl AbilityExecutor {
             .filter(|(_, card_id)| {
                 if let Some(card) = card_db.get_card(**card_id) {
                     match card_type {
-                        "member_card" | "メンバー" => card.is_member(),
-                        "live_card" | "ライブ" => card.is_live(),
+                        "member_card" => card.is_member(),
+                        "live_card" => card.is_live(),
                         _ => true,
                     }
                 } else {
@@ -605,8 +623,8 @@ impl AbilityExecutor {
 
             let matches_type = if let Some(card) = card_db.get_card(*card_id) {
                 match card_type {
-                    "member_card" | "メンバー" => card.is_member(),
-                    "live_card" | "ライブ" => card.is_live(),
+                    "member_card" => card.is_member(),
+                    "live_card" => card.is_live(),
                     _ => true,
                 }
             } else {
@@ -735,6 +753,32 @@ impl AbilityExecutor {
         }
         let remove_count = count.min(player.hand.cards.len());
         player.hand.cards.drain(..remove_count);
+        Ok(())
+    }
+
+    fn discard_until_count(&mut self, player: &mut Player, target_count: usize) -> Result<(), String> {
+        // Discard cards from hand until hand size reaches target_count
+        let current_count = player.hand.cards.len();
+        if current_count <= target_count {
+            // Already at or below target count, no discard needed
+            return Ok(());
+        }
+        
+        let cards_to_discard = current_count - target_count;
+        if cards_to_discard > 0 {
+            // Create pending choice for user to select which cards to discard
+            let description = format!("Select {} card(s) from hand to discard until hand has {} cards ({} available)", cards_to_discard, target_count, current_count);
+            
+            self.pending_choice = Some(Choice::SelectCard {
+                zone: "hand".to_string(),
+                card_type: None,
+                count: cards_to_discard,
+                description,
+            });
+            
+            return Err("Pending choice required: select cards to discard from hand".to_string());
+        }
+        
         Ok(())
     }
 
@@ -1066,6 +1110,7 @@ impl AbilityExecutor {
                             "this_turn" => crate::game_state::Duration::ThisTurn,
                             "this_live" => crate::game_state::Duration::ThisLive,
                             "permanent" => crate::game_state::Duration::Permanent,
+                            "as_long_as" => crate::game_state::Duration::ThisLive, // Map to ThisLive for now
                             _ => crate::game_state::Duration::ThisLive,
                         }).unwrap_or(crate::game_state::Duration::ThisLive),
                         created_turn: current_turn,
@@ -1339,6 +1384,22 @@ impl AbilityExecutor {
         perspective_player_id: &str,
     ) -> Result<(), String> {
         let actions = effect.actions.as_ref().ok_or("No actions in sequential effect")?;
+        let is_conditional = effect.conditional.unwrap_or(false);
+        let condition = effect.condition.as_ref();
+
+        // Check condition if this is a conditional sequential effect (e.g., "そうした場合")
+        if is_conditional {
+            if let Some(cond) = condition {
+                let condition_met = self.evaluate_condition(cond, player, game_state);
+                eprintln!("Conditional sequential effect with condition: {}, met: {}", cond.text, condition_met);
+                
+                // If condition is not met, skip execution
+                if !condition_met {
+                    eprintln!("Condition not met, skipping sequential actions");
+                    return Ok(());
+                }
+            }
+        }
 
         for (index, sub_effect) in actions.iter().enumerate() {
             match sub_effect.action.as_str() {
@@ -1421,6 +1482,146 @@ impl AbilityExecutor {
                 self.execute_move_cards(effect, player, game_state, perspective_player_id)
             }
             "draw" | "draw_card" => self.execute_draw(effect, player),
+            "discard_until_count" => {
+                let target_count = effect.target_count.unwrap_or(0) as usize;
+                self.discard_until_count(player, target_count)
+            }
+            "conditional_alternative" => {
+                self.execute_conditional_alternative(effect, player, game_state, perspective_player_id)
+            }
+            "specify_heart_color" => {
+                // This is a placeholder - heart color specification is handled by UI
+                eprintln!("Heart color specification: {}", effect.text);
+                Ok(())
+            }
+            "reveal" => {
+                // Reveal effect - placeholder for now
+                eprintln!("Reveal effect: {}", effect.text);
+                Ok(())
+            }
+            "gain_ability" => {
+                // Gain ability effect - placeholder for now
+                eprintln!("Gain ability effect: {}", effect.text);
+                Ok(())
+            }
+            "select" => {
+                // Select effect - placeholder for now
+                eprintln!("Select effect: {}", effect.text);
+                Ok(())
+            }
+            "choice" => {
+                // Choice effect - user chooses from multiple options
+                if let Some(ref options) = effect.options {
+                    eprintln!("Choice effect with {} options", options.len());
+                    // For now, just log the options - actual choice handling would require UI integration
+                    for (i, option) in options.iter().enumerate() {
+                        eprintln!("  Option {}: {}", i + 1, option.text);
+                    }
+                    Ok(())
+                } else {
+                    Err("Choice effect has no options".to_string())
+                }
+            }
+            "activation_cost" => {
+                // Activation cost effect - placeholder for now
+                eprintln!("Activation cost effect: {}", effect.text);
+                Ok(())
+            }
+            "shuffle" => {
+                // Shuffle effect - placeholder for now
+                eprintln!("Shuffle effect: {}", effect.text);
+                Ok(())
+            }
+            "draw_until_count" => {
+                // Draw until count effect - placeholder for now
+                eprintln!("Draw until count effect: {}", effect.text);
+                Ok(())
+            }
+            "appear" => {
+                // Appear effect - placeholder for now
+                eprintln!("Appear effect: {}", effect.text);
+                Ok(())
+            }
+            "modify_cost" => {
+                // Modify cost effect - placeholder for now
+                eprintln!("Modify cost effect: {}", effect.text);
+                Ok(())
+            }
+            "set_score" => {
+                // Set score effect - placeholder for now
+                eprintln!("Set score effect: {}", effect.text);
+                Ok(())
+            }
+            "set_cost" => {
+                // Set cost effect - placeholder for now
+                eprintln!("Set cost effect: {}", effect.text);
+                Ok(())
+            }
+            "set_blade_count" => {
+                // Set blade count effect - placeholder for now
+                eprintln!("Set blade count effect: {}", effect.text);
+                Ok(())
+            }
+            "modify_limit" => {
+                // Modify limit effect - placeholder for now
+                eprintln!("Modify limit effect: {}", effect.text);
+                Ok(())
+            }
+            "invalidate_ability" => {
+                // Invalidate ability effect - placeholder for now
+                eprintln!("Invalidate ability effect: {}", effect.text);
+                Ok(())
+            }
+            "choose_heart_type" => {
+                // Choose heart type effect - placeholder for now
+                eprintln!("Choose heart type effect: {}", effect.text);
+                Ok(())
+            }
+            "modify_required_hearts_success" => {
+                // Modify required hearts success effect - placeholder for now
+                eprintln!("Modify required hearts success effect: {}", effect.text);
+                Ok(())
+            }
+            "set_cost_to_use" => {
+                // Set cost to use effect - placeholder for now
+                eprintln!("Set cost to use effect: {}", effect.text);
+                Ok(())
+            }
+            "all_blade_timing" => {
+                // All blade timing effect - placeholder for now
+                eprintln!("All blade timing effect: {}", effect.text);
+                Ok(())
+            }
+            "set_card_identity_all_regions" => {
+                // Set card identity all regions effect - placeholder for now
+                eprintln!("Set card identity all regions effect: {}", effect.text);
+                Ok(())
+            }
+            "custom" => {
+                // Custom effect - placeholder for now
+                eprintln!("Custom effect: {}", effect.text);
+                Ok(())
+            }
+            "re_yell" => {
+                // Re-yell effect - placeholder for now
+                eprintln!("Re-yell effect: {}", effect.text);
+                Ok(())
+            }
+            "restriction" => {
+                // Restriction effect - placeholder for now
+                eprintln!("Restriction effect: {}", effect.text);
+                Ok(())
+            }
+            "activation_restriction" => {
+                // Activation restriction effect - placeholder for now
+                eprintln!("Activation restriction effect: {}", effect.text);
+                Ok(())
+            }
+            "set_card_identity" => {
+                // Set card identity effect - placeholder for now
+                eprintln!("Set card identity effect: {}", effect.text);
+                Ok(())
+            }
             "gain_resource" => {
                 self.execute_gain_resource(effect, player, game_state, perspective_player_id)
             }
@@ -1588,6 +1789,99 @@ impl AbilityExecutor {
 
         // Clear activating card after execution
         game_state.activating_card = None;
+
+        Ok(())
+    }
+
+    /// Move selected cards from looked-at set to deck top
+    fn move_from_looked_at_to_deck_top(
+        &mut self,
+        player: &mut Player,
+        count: usize,
+    ) -> Result<(), String> {
+        if self.looked_at_cards.is_empty() {
+            return Err("No looked-at cards available".to_string());
+        }
+
+        // For now, move all looked-at cards to deck top
+        // In a full implementation, this would use a choice to select which cards
+        let cards_to_move: Vec<u32> = self.looked_at_cards.drain(..).collect();
+        
+        // Add to deck in reverse order so they appear in the right order
+        for card_id in cards_to_move.into_iter().rev() {
+            player.main_deck.cards.insert(0, card_id as i16);
+        }
+
+        eprintln!("Moved {} looked-at cards to deck top", count);
+        Ok(())
+    }
+
+    /// Move remaining looked-at cards to discard
+    fn move_looked_at_remaining_to_discard(
+        &mut self,
+        player: &mut Player,
+    ) -> Result<(), String> {
+        // Move any remaining looked-at cards to discard
+        let remaining_count = self.looked_at_cards.len();
+        if remaining_count > 0 {
+            let cards_to_move: Vec<i16> = self.looked_at_cards.drain(..)
+                .map(|id| id.try_into().unwrap())
+                .collect();
+            for card_id in cards_to_move {
+                player.waitroom.add_card(card_id);
+            }
+            eprintln!("Moved {} remaining looked-at cards to discard", remaining_count);
+        }
+        Ok(())
+    }
+
+    /// Move selected cards to hand
+    fn move_from_selected_to_hand(
+        &mut self,
+        player: &mut Player,
+        count: usize,
+    ) -> Result<(), String> {
+        if self.selected_cards.is_empty() {
+            return Err("No selected cards available".to_string());
+        }
+
+        // Move specified count of selected cards to hand
+        let cards_to_move: Vec<i16> = self.selected_cards.drain(..)
+            .take(count)
+            .map(|id| id.try_into().unwrap())
+            .collect();
+        for card_id in cards_to_move {
+            player.hand.add_card(card_id);
+        }
+        Ok(())
+    }
+
+    /// Execute conditional alternative effect
+    fn execute_conditional_alternative(
+        &mut self,
+        effect: &AbilityEffect,
+        player: &mut Player,
+        game_state: &mut GameState,
+        perspective_player_id: &str,
+    ) -> Result<(), String> {
+        // Check if alternative condition is met
+        let use_alternative = if let Some(ref alt_condition) = effect.alternative_condition {
+            self.evaluate_condition(alt_condition, player, game_state)
+        } else {
+            false
+        };
+
+        if use_alternative {
+            // Execute alternative effect
+            if let Some(ref alt_effect) = effect.alternative_effect {
+                self.execute_effect(alt_effect, player, game_state, perspective_player_id)?;
+            }
+        } else {
+            // Execute primary effect
+            if let Some(ref primary_effect) = effect.primary_effect {
+                self.execute_effect(primary_effect, player, game_state, perspective_player_id)?;
+            }
+        }
 
         Ok(())
     }

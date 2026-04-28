@@ -11,7 +11,13 @@ impl TurnEngine {
     pub fn advance_phase(game_state: &mut GameState) {
         // Advance phase according to rules 7.1.2, 7.3.3, and 8.1.2
         debug_assert!(game_state.phase_invariant(), "Phase invariant violated before advance_phase");
-        
+
+        // Mulligan phases are manual - don't auto-advance them
+        // Players must explicitly choose SkipMulligan or ConfirmMulligan actions
+        if matches!(game_state.current_phase, Phase::MulliganP1Turn | Phase::MulliganP2Turn | Phase::Mulligan) {
+            return;
+        }
+
         // Handle normal phase sub-phases (Rule 7.3.3)
         if game_state.current_turn_phase == TurnPhase::FirstAttackerNormal || game_state.current_turn_phase == TurnPhase::SecondAttackerNormal {
             match game_state.current_phase {
@@ -51,10 +57,11 @@ impl TurnEngine {
                         // Set current_turn_phase to Live BEFORE setting current_phase to LiveCardSet
                         // This ensures active_player() works correctly during LiveCardSet
                         game_state.current_turn_phase = TurnPhase::Live;
-                        game_state.current_phase = Phase::LiveCardSet;
-                        // Reset live card set flags for new live phase
-                        game_state.live_card_set_player1_done = false;
-                        game_state.live_card_set_player2_done = false;
+                        game_state.current_phase = if game_state.player1.is_first_attacker {
+                            Phase::LiveCardSetP1Turn
+                        } else {
+                            Phase::LiveCardSetP2Turn
+                        };
                     }
                 }
                 _ => {}
@@ -63,9 +70,36 @@ impl TurnEngine {
         // Handle live phase sub-phases (Rule 8.1.2)
         else if game_state.current_turn_phase == TurnPhase::Live {
             match game_state.current_phase {
+                Phase::LiveCardSetP1Turn => {
+                    // Transition from P1 turn to P2 turn
+                    game_state.current_phase = Phase::LiveCardSetP2Turn;
+                    return;
+                }
+                Phase::LiveCardSetP2Turn => {
+                    // Both done, advance to FirstAttackerPerformance
+                    Self::check_timing(game_state);
+                    game_state.current_phase = Phase::FirstAttackerPerformance;
+                    let first_attacker_id = if game_state.player1.is_first_attacker {
+                        game_state.player1.id.clone()
+                    } else {
+                        game_state.player2.id.clone()
+                    };
+                    Self::trigger_live_start_abilities(game_state, &first_attacker_id);
+                    Self::trigger_performance_phase_start_abilities(game_state, &first_attacker_id);
+                    return;
+                }
                 Phase::LiveCardSet => {
-                    // Rule 8.2: Both players set live cards - manual phase, not auto-advanced
-                    // Players must manually choose live cards via actions
+                    // Legacy phase - should not be used anymore, but handle for compatibility
+                    // Transition to FirstAttackerPerformance
+                    Self::check_timing(game_state);
+                    game_state.current_phase = Phase::FirstAttackerPerformance;
+                    let first_attacker_id = if game_state.player1.is_first_attacker {
+                        game_state.player1.id.clone()
+                    } else {
+                        game_state.player2.id.clone()
+                    };
+                    Self::trigger_live_start_abilities(game_state, &first_attacker_id);
+                    Self::trigger_performance_phase_start_abilities(game_state, &first_attacker_id);
                     return;
                 }
                 Phase::FirstAttackerPerformance => {
@@ -107,6 +141,13 @@ impl TurnEngine {
                 Phase::LiveVictoryDetermination => {
                     // Rule 8.4: Determine live victory (automatic)
                     Self::execute_live_victory_determination(game_state);
+                    
+                    // After Live phase completes, start a new turn
+                    // Rule 7.1.2: Each turn consists of FirstAttackerNormal, SecondAttackerNormal, Live phases
+                    // After Live completes, increment turn number and start new FirstAttackerNormal phase
+                    game_state.turn_number += 1;
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
                 }
                 _ => {}
             }
@@ -118,11 +159,11 @@ impl TurnEngine {
         let idx = if let Some(indices) = _card_indices {
             indices.get(0).copied().unwrap_or(0)
         } else if let Some(cid) = card_id {
-            // Fallback to HashMap lookup if card_indices not provided
-            let mulligan_player = if game_state.current_mulligan_player == "player1" {
-                &game_state.player1
-            } else {
-                &game_state.player2
+            // Determine current player by phase
+            let mulligan_player = match game_state.current_phase {
+                Phase::MulliganP1Turn => &game_state.player1,
+                Phase::MulliganP2Turn => &game_state.player2,
+                _ => &game_state.player1, // fallback
             };
             mulligan_player.get_card_index_by_id(cid).unwrap_or(0)
         } else {
@@ -142,19 +183,12 @@ impl TurnEngine {
         // Rule 6.2.1.6: Mulligan - player has selected cards to mulligan
         let indices = game_state.mulligan_selected_indices.clone();
 
-        // Determine which player is mulliganing based on current_mulligan_player
-        let current_player = if game_state.current_mulligan_player == "player1" {
-            &mut game_state.player1
-        } else {
-            &mut game_state.player2
+        // Determine current player by phase
+        let current_player = match game_state.current_phase {
+            Phase::MulliganP1Turn => &mut game_state.player1,
+            Phase::MulliganP2Turn => &mut game_state.player2,
+            _ => return Err("Not in mulligan phase".to_string()),
         };
-
-        // Mark this player as done
-        if game_state.current_mulligan_player == "player1" {
-            game_state.mulligan_player1_done = true;
-        } else {
-            game_state.mulligan_player2_done = true;
-        }
 
         // Perform mulligan for selected cards
         if !indices.is_empty() {
@@ -193,50 +227,88 @@ impl TurnEngine {
             }
         }
 
-        // Clear selected indices for next player
+        // Clear selected indices and transition to the next mulligan turn.
+        // Mulligan order follows turn order, not player number.
         game_state.mulligan_selected_indices.clear();
+        let current_is_first_attacker = match game_state.current_phase {
+            Phase::MulliganP1Turn => game_state.player1.is_first_attacker,
+            Phase::MulliganP2Turn => game_state.player2.is_first_attacker,
+            Phase::Mulligan => game_state.current_mulligan_player_idx == 0,
+            _ => false,
+        };
 
-        // Check if both players have mulliganed
-        if game_state.mulligan_player1_done && game_state.mulligan_player2_done {
-            // Both done, advance to energy setup
-            Self::setup_initial_energy(game_state);
-            game_state.current_phase = crate::game_state::Phase::Active;
-        } else {
-            // Switch to other player and clear their selections
-            game_state.current_mulligan_player = if game_state.current_mulligan_player == "player1" {
-                "player2".to_string()
-            } else {
-                "player1".to_string()
-            };
-            game_state.mulligan_selected_indices.clear();
+        match game_state.current_phase {
+            Phase::MulliganP1Turn => {
+                if current_is_first_attacker {
+                    game_state.current_phase = Phase::MulliganP2Turn;
+                } else {
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
+                }
+            }
+            Phase::MulliganP2Turn => {
+                if current_is_first_attacker {
+                    game_state.current_phase = Phase::MulliganP1Turn;
+                } else {
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
+                }
+            }
+            Phase::Mulligan => {
+                // Legacy phase - use flag for compatibility
+                game_state.current_mulligan_player_idx += 1;
+                if game_state.current_mulligan_player_idx >= 2 {
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
+                }
+            }
+            _ => {}
         }
         Ok(())
     }
 
     fn handle_mulligan_skip(game_state: &mut GameState) -> Result<(), String> {
-        // Player chooses not to mulligan
-        // Mark this player as done
-        if game_state.current_mulligan_player == "player1" {
-            game_state.mulligan_player1_done = true;
-        } else {
-            game_state.mulligan_player2_done = true;
-        }
-
-        // Clear selected indices
+        // Player chooses not to mulligan - transition to next player's phase
         game_state.mulligan_selected_indices.clear();
+        let current_is_first_attacker = match game_state.current_phase {
+            Phase::MulliganP1Turn => game_state.player1.is_first_attacker,
+            Phase::MulliganP2Turn => game_state.player2.is_first_attacker,
+            Phase::Mulligan => game_state.current_mulligan_player_idx == 0,
+            _ => false,
+        };
 
-        // Check if both players have mulliganed (or skipped)
-        if game_state.mulligan_player1_done && game_state.mulligan_player2_done {
-            // Both done, advance to energy setup
-            Self::setup_initial_energy(game_state);
-            game_state.current_phase = crate::game_state::Phase::Active;
-        } else {
-            // Switch to other player
-            game_state.current_mulligan_player = if game_state.current_mulligan_player == "player1" {
-                "player2".to_string()
-            } else {
-                "player1".to_string()
-            };
+        match game_state.current_phase {
+            Phase::MulliganP1Turn => {
+                if current_is_first_attacker {
+                    game_state.current_phase = Phase::MulliganP2Turn;
+                } else {
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
+                }
+            }
+            Phase::MulliganP2Turn => {
+                if current_is_first_attacker {
+                    game_state.current_phase = Phase::MulliganP1Turn;
+                } else {
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
+                }
+            }
+            Phase::Mulligan => {
+                // Legacy phase - use flag for compatibility
+                game_state.current_mulligan_player_idx += 1;
+                if game_state.current_mulligan_player_idx >= 2 {
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
+                }
+            }
+            _ => {}
         }
         Ok(())
     }
@@ -259,7 +331,6 @@ impl TurnEngine {
                 let card = player.hand.cards.remove(idx);
                 let card_no = card_db.get_card(card).map(|c| c.card_no.clone()).unwrap_or_default();
                 let _ = player.live_card_zone.add_card(card, true, &card_db);
-                player.rebuild_hand_index_map();
 
                 // Trigger live start abilities for the set live card
                 let player_id = player.id.clone();
@@ -270,26 +341,30 @@ impl TurnEngine {
             }
         } else {
             // No card selected, finish this player's live card set
-            // Use GameState flags to track completion
-            if game_state.current_turn_phase == crate::game_state::TurnPhase::Live &&
-               game_state.current_phase == crate::game_state::Phase::LiveCardSet {
-
-                let _p1_is_first = game_state.player1.is_first_attacker;
-                let _p1_done = game_state.live_card_set_player1_done;
-                let _p2_done = game_state.live_card_set_player2_done;
-
-                // Mark current player as finished based on who is currently active
-                let active_player_id = game_state.active_player().id.clone();
-                if active_player_id == "player1" {
-                    game_state.live_card_set_player1_done = true;
-                } else {
-                    game_state.live_card_set_player2_done = true;
-                }
-
-                // Check if both players have finished - if so, advance phase
-                if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
-                    Self::check_timing(game_state);
-                    Self::advance_phase(game_state);
+            // Transition to next player's phase
+            if game_state.current_turn_phase == crate::game_state::TurnPhase::Live {
+                match game_state.current_phase {
+                    Phase::LiveCardSetP1Turn => {
+                        game_state.current_phase = Phase::LiveCardSetP2Turn;
+                    }
+                    Phase::LiveCardSetP2Turn => {
+                        // Both done - advance via advance_phase
+                        Self::advance_phase(game_state);
+                    }
+                    Phase::LiveCardSet => {
+                        // Legacy phase - use flag-based transition for compatibility
+                        if game_state.current_live_card_set_player == 0 {
+                            game_state.current_live_card_set_player = 1;
+                        } else {
+                            game_state.current_live_card_set_player = 2;
+                        }
+                        if game_state.current_live_card_set_player == 2 {
+                            Self::advance_phase(game_state);
+                        }
+                    }
+                    _ => {
+                        Self::advance_phase(game_state);
+                    }
                 }
             } else {
                 Self::advance_phase(game_state);
@@ -300,6 +375,7 @@ impl TurnEngine {
 
     fn handle_finish_live_card_set(game_state: &mut GameState) -> Result<(), String> {
         // Rule 8.2: Live Card Set Phase - Finish live card set and advance phase
+        // This should only be called during the Live phase
         if game_state.current_turn_phase == crate::game_state::TurnPhase::Live &&
            game_state.current_phase == crate::game_state::Phase::LiveCardSet {
 
@@ -312,17 +388,16 @@ impl TurnEngine {
             for _ in 0..cards_placed {
                 let _ = current_player.draw_card();
             }
-            current_player.rebuild_hand_index_map();
 
             // Mark current player as finished based on who is currently active
             if active_player_id == "player1" {
-                game_state.live_card_set_player1_done = true;
+                game_state.current_live_card_set_player = 1; // P1 done, advance to P2
             } else {
-                game_state.live_card_set_player2_done = true;
+                game_state.current_live_card_set_player = 2; // P2 done, mark both done
             }
 
             // Check if both players finished
-            if game_state.live_card_set_player1_done && game_state.live_card_set_player2_done {
+            if game_state.current_live_card_set_player == 2 {
                 Self::check_timing(game_state);
                 game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
                 let first_attacker_id = if game_state.player1.is_first_attacker {
@@ -334,7 +409,9 @@ impl TurnEngine {
                 Self::trigger_performance_phase_start_abilities(game_state, &first_attacker_id);
             }
         } else {
-            Self::advance_phase(game_state);
+            // Not in Live phase - this is an error condition, but don't regress phases
+            // Just return an error instead of calling advance_phase which could regress
+            return Err("Cannot finish live card set outside of Live phase".to_string());
         }
         Ok(())
     }
@@ -342,25 +419,21 @@ impl TurnEngine {
     fn handle_attacker_choice(game_state: &mut GameState, choose_first: bool) -> Result<(), String> {
         // Q16: RPS winner chooses turn order
         let rps_winner = game_state.rps_winner.unwrap_or(1);
+        
+        // Only the RPS winner should be able to make this choice
+        // If player 2 wins, player 1 (human) shouldn't be able to choose
+        if rps_winner == 2 {
+            return Err("Player 2 won RPS, only they can choose turn order".to_string());
+        }
 
         if choose_first {
             // Choose to be first attacker
-            if rps_winner == 1 {
-                game_state.player1.is_first_attacker = true;
-                game_state.player2.is_first_attacker = false;
-            } else {
-                game_state.player1.is_first_attacker = false;
-                game_state.player2.is_first_attacker = true;
-            }
+            game_state.player1.is_first_attacker = true;
+            game_state.player2.is_first_attacker = false;
         } else {
             // Choose to be second attacker
-            if rps_winner == 1 {
-                game_state.player1.is_first_attacker = false;
-                game_state.player2.is_first_attacker = true;
-            } else {
-                game_state.player1.is_first_attacker = true;
-                game_state.player2.is_first_attacker = false;
-            }
+            game_state.player1.is_first_attacker = false;
+            game_state.player2.is_first_attacker = true;
         }
 
         // Rule 6.2.5: Initial draw - Each player draws INITIAL_DRAW_COUNT cards from main deck to hand
@@ -370,12 +443,11 @@ impl TurnEngine {
         }
 
         // Advance to Mulligan phase
-        game_state.current_phase = crate::game_state::Phase::Mulligan;
-        // Initialize mulligan state - first attacker goes first
-        game_state.current_mulligan_player = if game_state.player1.is_first_attacker {
-            "player1".to_string()
+        game_state.current_mulligan_player_idx = 0;
+        game_state.current_phase = if game_state.player1.is_first_attacker {
+            crate::game_state::Phase::MulliganP1Turn
         } else {
-            "player2".to_string()
+            crate::game_state::Phase::MulliganP2Turn
         };
         game_state.mulligan_selected_indices.clear();
         Ok(())
@@ -496,9 +568,37 @@ impl TurnEngine {
                 Self::handle_finish_live_card_set(game_state)
             }
             crate::game_setup::ActionType::Pass => {
-                // Player passes, advance phase
-                Self::advance_phase(game_state);
-                Ok(())
+                // Handle Pass differently based on current phase
+                match game_state.current_phase {
+                    Phase::LiveCardSetP1Turn => {
+                        // P1 passes, transition to P2
+                        game_state.current_phase = Phase::LiveCardSetP2Turn;
+                        Ok(())
+                    }
+                    Phase::LiveCardSetP2Turn => {
+                        // P2 passes, advance to Performance
+                        Self::advance_phase(game_state);
+                        Ok(())
+                    }
+                    Phase::LiveCardSet => {
+                        // Legacy phase - use flag-based transition for compatibility
+                        if game_state.current_live_card_set_player == 0 {
+                            game_state.current_live_card_set_player = 1;
+                        } else {
+                            game_state.current_live_card_set_player = 2;
+                        }
+                        if game_state.current_live_card_set_player == 2 {
+                            Self::check_timing(game_state);
+                            Self::advance_phase(game_state);
+                        }
+                        Ok(())
+                    }
+                    _ => {
+                        // In other phases, Pass advances the phase
+                        Self::advance_phase(game_state);
+                        Ok(())
+                    }
+                }
             }
             crate::game_setup::ActionType::UseAbility => {
                 Self::handle_use_ability(game_state, card_id)
@@ -606,26 +706,62 @@ impl TurnEngine {
     fn handle_rps_choice(game_state: &mut GameState, p1_choice: i32) -> Result<(), String> {
         // Q16 from qa_data.json: Game preparation first/second attacker is determined by RPS
         // Winner of RPS chooses whether to be first or second attacker
-        use rand::Rng;
-        let mut rng = rand::thread_rng();
-        
-        let p2_choice = rng.gen_range(0..3);
-        
-        // Determine RPS winner: 0=Rock, 1=Paper, 2=Scissors
+
+        // Store P1's RPS choice in game state
+        game_state.player1_rps_choice = Some(p1_choice);
+
+        // Check if P2 has made their choice (from AI or other source)
+        // If not, generate random choice for AI/single-player mode
+        let p2_choice = if let Some(choice) = game_state.player2_rps_choice {
+            choice
+        } else {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            let choice = rng.gen_range(0..3);
+            game_state.player2_rps_choice = Some(choice);
+            choice
+        };
+
+        // Determine winner
         let rps_winner = match (p1_choice, p2_choice) {
             (0, 2) | (1, 0) | (2, 1) => 1, // Player 1 wins
             (2, 0) | (0, 1) | (1, 2) => 2, // Player 2 wins
             _ => {
-                // Tie - play again (simplified: player 1 wins on tie)
-                1
+                // Tie - need to replay
+                // Reset choices and wait for both players to choose again
+                game_state.player1_rps_choice = None;
+                game_state.player2_rps_choice = None;
+                return Ok(()); // Will be called again when both players make new choices
             }
         };
         
         // Store RPS winner in game state for the next phase (choosing turn order)
         game_state.rps_winner = Some(rps_winner);
         
-        // Advance to ChooseFirstAttacker phase where winner decides turn order
-        game_state.current_phase = crate::game_state::Phase::ChooseFirstAttacker;
+        // If Player 2 wins, they automatically choose turn order (AI strategy: prefer first)
+        if rps_winner == 2 {
+            // Player 2 chooses to be first attacker
+            game_state.player1.is_first_attacker = false;
+            game_state.player2.is_first_attacker = true;
+            
+            // Rule 6.2.5: Initial draw - Each player draws INITIAL_DRAW_COUNT cards from main deck to hand
+            for _ in 0..INITIAL_DRAW_COUNT {
+                game_state.player1.draw_card();
+                game_state.player2.draw_card();
+            }
+            
+            // Advance to Mulligan phase
+            game_state.current_phase = if game_state.player1.is_first_attacker {
+                crate::game_state::Phase::MulliganP1Turn
+            } else {
+                crate::game_state::Phase::MulliganP2Turn
+            };
+            game_state.mulligan_selected_indices.clear();
+        } else {
+            // Player 1 won, let them choose turn order
+            game_state.current_phase = crate::game_state::Phase::ChooseFirstAttacker;
+        }
+        
         Ok(())
     }
 
@@ -636,6 +772,9 @@ impl TurnEngine {
         let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count);
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
+        
+        println!("DEBUG LiveVictoryDetermination: P1 has_cards={}, score={}, P2 has_cards={}, score={}", 
+            player1_has_cards, player1_score, player2_has_cards, player2_score);
         
         let mut player1_won = false;
         let mut player2_won = false;
@@ -819,9 +958,6 @@ impl TurnEngine {
         // Rule 10.3: Victory processing - check for 3+ successful live cards
         Self::check_victory_condition(game_state);
         
-        // Rule 10.4: Check for duplicate members
-        Self::check_duplicate_members(&mut game_state.player1);
-        Self::check_duplicate_members(&mut game_state.player2);
         
         // Rule 10.5: Check for invalid cards
         Self::check_invalid_cards(&mut game_state.player1, &game_state.card_database);
@@ -860,14 +996,6 @@ impl TurnEngine {
         if p1_success_count >= VICTORY_CARD_COUNT && p2_success_count >= VICTORY_CARD_COUNT {
             game_state.game_result = crate::game_state::GameResult::Draw;
         }
-    }
-
-    fn check_duplicate_members(_player: &mut crate::player::Player) {
-        // Rule 10.4: Check for duplicate members in same area
-        // Rule 10.4.1: If multiple members in one area, keep the last one, send others to discard
-        // Note: The current stage implementation uses an array where each position can only have one card
-        // So duplicates can only occur if there's a bug in card placement logic
-        // This check is defensive to ensure game state consistency
     }
 
     fn check_invalid_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
@@ -1397,6 +1525,7 @@ impl TurnEngine {
         }
     }
 
+    #[allow(dead_code)]
     fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {
         // Rule 11.6: Trigger LiveSuccess automatic abilities
         // Rule 11.6.2: Trigger when live succeeds

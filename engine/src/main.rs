@@ -166,7 +166,7 @@ fn main() {
                 bot::headless::run_headless_game();
             }
             "interactive" => {
-                bot::headless::run_interactive_headless();
+                bot::interactive_headless::run_interactive_headless();
             }
             "test" => {
                 bot::test_mode::run_test_mode();
@@ -176,6 +176,15 @@ fn main() {
             }
             "tournament" => {
                 bot::tournament::run_tournament();
+            }
+            "mulligan-test" => {
+                bot::mulligan_test::test_mulligan_flow();
+            }
+            "full-game-test" => {
+                bot::full_game_test::test_full_game();
+            }
+            "automated" => {
+                bot::headless::run_interactive_headless();
             }
             _ => {
                 eprintln!("Unknown command: {}", args[1]);

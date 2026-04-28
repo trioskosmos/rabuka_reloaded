@@ -105,7 +105,6 @@ pub fn run_ability_test() {
         // Add it to hand
         if let Some(card_id) = card_database.get_card_id(&debut_card.card_no) {
             game_state.player1.hand.cards.push(card_id);
-            game_state.player1.rebuild_hand_index_map();
         } else {
             return;
         }

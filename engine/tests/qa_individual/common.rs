@@ -28,7 +28,6 @@ pub fn get_card_id(card: &Card, card_database: &Arc<CardDatabase>) -> i16 {
 /// Set up a player with specific cards in hand
 pub fn setup_player_with_hand(player: &mut Player, card_ids: Vec<i16>) {
     player.hand.cards = card_ids.into_iter().collect();
-    player.rebuild_hand_index_map();
 }
 
 /// Set up a player with specific energy cards (all active)

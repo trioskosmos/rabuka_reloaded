@@ -30,6 +30,7 @@ export const Modals = {
     getDeckConfig: (pid) => GameSetupModal.getDeckConfig(pid),
     resolveDeck: (config) => GameSetupModal.resolveDeck(config),
     submitGameSetup: () => GameSetupModal.submitGameSetup(),
+    startGame: (mode) => GameSetupModal.startGame(mode),
 
     openDeckSelectionForPvP: (pid) => GameSetupModal.openDeckSelectionForPvP(pid),
     submitPvPDeck: () => GameSetupModal.submitPvPDeck(),

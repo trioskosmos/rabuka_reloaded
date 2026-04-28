@@ -26,7 +26,81 @@ impl AIPlayer {
             return 0;
         }
         
-        // Simple random choice - no logic
+        // Prefer SkipMulligan when available (AI strategy: skip mulligan)
+        for (i, action) in actions.iter().enumerate() {
+            if action.action_type == crate::game_setup::ActionType::SkipMulligan {
+                return i;
+            }
+        }
+        
+        // Count action types to make phase-aware decisions
+        let set_live_card_count = actions.iter()
+            .filter(|a| a.action_type == crate::game_setup::ActionType::SetLiveCard)
+            .count();
+        let play_member_count = actions.iter()
+            .filter(|a| a.action_type == crate::game_setup::ActionType::PlayMemberToStage)
+            .count();
+        let use_ability_count = actions.iter()
+            .filter(|a| a.action_type == crate::game_setup::ActionType::UseAbility)
+            .count();
+        let has_pass = actions.iter()
+            .any(|a| a.action_type == crate::game_setup::ActionType::Pass);
+        
+        // In LiveCardSet: Always pass if no SetLiveCard actions available
+        // Otherwise, set 1-3 random cards then pass
+        if has_pass {
+            if set_live_card_count == 0 {
+                // No cards to set, must pass
+                for (i, action) in actions.iter().enumerate() {
+                    if action.action_type == crate::game_setup::ActionType::Pass {
+                        return i;
+                    }
+                }
+            } else {
+                // Have cards to set - 70% chance to set a card, 30% to pass
+                let mut rng = rand::thread_rng();
+                if rng.gen_bool(0.3) {
+                    for (i, action) in actions.iter().enumerate() {
+                        if action.action_type == crate::game_setup::ActionType::Pass {
+                            return i;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Prioritize SetLiveCard action when available (to set live cards during LiveCardSet phase)
+        for (i, action) in actions.iter().enumerate() {
+            if action.action_type == crate::game_setup::ActionType::SetLiveCard {
+                return i;
+            }
+        }
+        
+        // In Main phase: Prioritize playing members and using abilities over passing
+        // Only pass if no other actions available
+        if play_member_count > 0 || use_ability_count > 0 {
+            // Prefer PlayMemberToStage first
+            for (i, action) in actions.iter().enumerate() {
+                if action.action_type == crate::game_setup::ActionType::PlayMemberToStage {
+                    return i;
+                }
+            }
+            // Then UseAbility
+            for (i, action) in actions.iter().enumerate() {
+                if action.action_type == crate::game_setup::ActionType::UseAbility {
+                    return i;
+                }
+            }
+        }
+        
+        // Pass for other phases when available or when no other actions in Main phase
+        for (i, action) in actions.iter().enumerate() {
+            if action.action_type == crate::game_setup::ActionType::Pass {
+                return i;
+            }
+        }
+        
+        // Simple random choice for other actions
         let mut rng = rand::thread_rng();
         rng.gen_range(0..actions.len())
     }

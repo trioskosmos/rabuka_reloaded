@@ -376,7 +376,7 @@ pub fn run_headless_game() {
     
     // Run the game automatically
     let mut turn_count = 0;
-    let max_iterations = 100;
+    let max_iterations = 500; // Increase to allow games to reach victory conditions
     let mut last_turn_number = 0;
     let mut stuck_counter = 0;
     
@@ -455,6 +455,19 @@ pub fn run_headless_game() {
                 // Handle new phases - skip for now
                 println!("Skipping new phase: {:?}", game_state.current_phase);
             }
+            crate::game_state::Phase::MulliganP1Turn |
+            crate::game_state::Phase::MulliganP2Turn => {
+                // Mulligan phase - skip mulligan for now
+                println!("Skipping mulligan phase: {:?}", game_state.current_phase);
+                turn::TurnEngine::execute_main_phase_action(
+                    &mut game_state,
+                    &crate::game_setup::ActionType::SkipMulligan,
+                    None,
+                    None,
+                    None,
+                    None,
+                ).ok();
+            }
             crate::game_state::Phase::ChooseFirstAttacker => {
                 // Q16: RPS winner chooses turn order (simplified: always choose first)
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
@@ -470,22 +483,40 @@ pub fn run_headless_game() {
                     actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
-            crate::game_state::Phase::Mulligan => {
-                // Mulligan phase - let the AI choose
-                let ai = ai::AIPlayer::new("HeadlessAI".to_string());
-                let actions = crate::game_setup::generate_possible_actions(&game_state);
-                let chosen_index = ai.choose_action(&actions);
-                
-                println!("Mulligan choice: {}", actions[chosen_index].description);
-                
-                let _ = turn::TurnEngine::execute_main_phase_action(
+            crate::game_state::Phase::LiveCardSetP1Turn |
+            crate::game_state::Phase::LiveCardSetP2Turn => {
+                // LiveCardSet phase - skip for now
+                println!("Skipping live card set phase: {:?}", game_state.current_phase);
+                turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
-                    &actions[chosen_index].action_type,
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
-                );
+                    &crate::game_setup::ActionType::Pass,
+                    None,
+                    None,
+                    None,
+                    None,
+                ).ok();
+            }
+            crate::game_state::Phase::Mulligan => {
+                // Mulligan phase - auto-advance if both players are done
+                if game_state.current_mulligan_player_idx >= 2 {
+                    turn::TurnEngine::advance_phase(&mut game_state);
+                } else {
+                    // Let the AI choose
+                    let ai = ai::AIPlayer::new("HeadlessAI".to_string());
+                    let actions = crate::game_setup::generate_possible_actions(&game_state);
+                    let chosen_index = ai.choose_action(&actions);
+                    
+                    println!("Mulligan choice: {}", actions[chosen_index].description);
+                    
+                    let _ = turn::TurnEngine::execute_main_phase_action(
+                        &mut game_state,
+                        &actions[chosen_index].action_type,
+                        actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
+                        actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
+                        actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
+                        actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
+                    );
+                }
             }
             crate::game_state::Phase::Active | 
             crate::game_state::Phase::Energy | 
@@ -520,19 +551,57 @@ pub fn run_headless_game() {
                 }
             }
             crate::game_state::Phase::LiveCardSet => {
-                let p1_live_count = game_state.first_attacker().hand.cards.iter().filter(|c| {
-                    game_state.card_database.get_card(**c).map_or(false, |card| card.is_live())
-                }).count();
-                let p2_live_count = game_state.second_attacker().hand.cards.iter().filter(|c| {
-                    game_state.card_database.get_card(**c).map_or(false, |card| card.is_live())
-                }).count();
-                println!("Auto-advancing live card set phase (P1 live cards: {}, P2 live cards: {})...", p1_live_count, p2_live_count);
+                let p1_live_count = game_state.player1.live_card_zone.cards.len();
+                let p2_live_count = game_state.player2.live_card_zone.cards.len();
+                let actions = game_setup::generate_possible_actions(&game_state);
+                
+                println!("LiveCardSet: P1 live={}, P2 live={}, actions={}, current_player={}", 
+                    p1_live_count, p2_live_count, actions.len(), 
+                    game_state.current_live_card_set_player);
+                
+                // Print available actions for debugging
+                for (i, action) in actions.iter().enumerate() {
+                    println!("  Action {}: {}", i, action.description);
+                }
+                
+                // Advance if no actions available (both players done setting live cards)
+                if actions.is_empty() {
+                    println!("Auto-advancing live card set phase (P1 live cards: {}, P2 live cards: {})...", p1_live_count, p2_live_count);
+                    // Manually advance to FirstAttackerPerformance since advance_phase returns early for LiveCardSet
+                    game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
+                } else {
+                    // Need to set live cards - use AI to choose
+                    let ai = ai::AIPlayer::new("HeadlessAI".to_string());
+                    let chosen_index = ai.choose_action(&actions);
+                    let chosen_action = &actions[chosen_index];
+                    
+                    println!("Choosing action: {}", chosen_action.description);
+                    
+                    let result = turn::TurnEngine::execute_main_phase_action(
+                        &mut game_state,
+                        &chosen_action.action_type,
+                        chosen_action.parameters.as_ref().and_then(|p| p.card_id),
+                        chosen_action.parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
+                        chosen_action.parameters.as_ref().and_then(|p| p.stage_area),
+                        chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
+                    );
+                    
+                    if let Err(e) = result {
+                        eprintln!("Error executing action: {}", e);
+                        break;
+                    }
+                }
+            }
+            crate::game_state::Phase::FirstAttackerPerformance => {
+                println!("FirstAttackerPerformance: auto-advancing...");
                 turn::TurnEngine::advance_phase(&mut game_state);
             }
-            crate::game_state::Phase::FirstAttackerPerformance |
-            crate::game_state::Phase::SecondAttackerPerformance |
+            crate::game_state::Phase::SecondAttackerPerformance => {
+                println!("SecondAttackerPerformance: auto-advancing...");
+                turn::TurnEngine::advance_phase(&mut game_state);
+            }
             crate::game_state::Phase::LiveVictoryDetermination => {
-                println!("Auto-advancing live phase...");
+                println!("LiveVictoryDetermination: auto-advancing...");
                 turn::TurnEngine::advance_phase(&mut game_state);
             }
         }
@@ -603,11 +672,14 @@ pub fn run_interactive_headless() {
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
 
-    // Run multiple games for 10 seconds
+    // Run multiple games for 30 seconds for comprehensive testing
     let start_time = std::time::Instant::now();
-    let duration = std::time::Duration::from_secs(10);
+    let duration = std::time::Duration::from_secs(30);
     let mut game_count = 0;
     let mut total_turns = 0;
+    let mut p1_wins = 0;
+    let mut p2_wins = 0;
+    let mut draws = 0;
 
     while start_time.elapsed() < duration {
         game_count += 1;
@@ -643,7 +715,27 @@ pub fn run_interactive_headless() {
             // Check if game is finished
             let game_result = game_state.check_victory();
             if game_result != crate::game_state::GameResult::Ongoing {
+                match game_result {
+                    crate::game_state::GameResult::FirstAttackerWins => {
+                        if game_state.player1.is_first_attacker { p1_wins += 1; } else { p2_wins += 1; }
+                    }
+                    crate::game_state::GameResult::SecondAttackerWins => {
+                        if game_state.player1.is_first_attacker { p2_wins += 1; } else { p1_wins += 1; }
+                    }
+                    crate::game_state::GameResult::Draw => { draws += 1; }
+                    _ => {}
+                }
                 break;
+            }
+            
+            // Debug: log success live card counts periodically
+            if turn_count % 50 == 0 {
+                let p1_success = game_state.player1.success_live_card_zone.len();
+                let p2_success = game_state.player2.success_live_card_zone.len();
+                let p1_live = game_state.player1.live_card_zone.cards.len();
+                let p2_live = game_state.player2.live_card_zone.cards.len();
+                println!("Game {} Turn {}: P1 live={}, P1 success={}, P2 live={}, P2 success={}", 
+                    game_count, game_state.turn_number, p1_live, p1_success, p2_live, p2_success);
             }
             
             // Detect stuck state
@@ -654,7 +746,6 @@ pub fn run_interactive_headless() {
                 }
             } else {
                 stuck_counter = 0;
-                last_turn_number = game_state.turn_number;
             }
             
             // Auto-advance automatic phases
@@ -691,6 +782,9 @@ pub fn run_interactive_headless() {
     let avg_turns = if game_count > 0 { total_turns as f64 / game_count as f64 } else { 0.0 };
     println!("Games played: {}", game_count);
     println!("Average turns per game: {:.2}", avg_turns);
+    println!("Player 1 wins: {}", p1_wins);
+    println!("Player 2 wins: {}", p2_wins);
+    println!("Draws: {}", draws);
 }
 
 fn execute_action_and_log(game_state: &mut GameState, action: &crate::game_setup::Action) {
@@ -718,6 +812,14 @@ fn auto_advance_automatic_phases(game_state: &mut GameState) {
     loop {
         let current_phase = &game_state.current_phase;
         match current_phase {
+            crate::game_state::Phase::Mulligan => {
+                // Mulligan - auto-advance if both players are done (index >= 2)
+                if game_state.current_mulligan_player_idx >= 2 {
+                    turn::TurnEngine::advance_phase(game_state);
+                } else {
+                    break;
+                }
+            }
             crate::game_state::Phase::Active |
             crate::game_state::Phase::Energy |
             crate::game_state::Phase::Draw |

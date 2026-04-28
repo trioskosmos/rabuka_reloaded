@@ -7,7 +7,7 @@ import { CardRenderer } from './components/CardRenderer.js';
 import { BoardRenderer } from './components/BoardRenderer.js';
 import { ActionMenu } from './components/ActionMenu.js';
 
-import { Phase, fixImg } from './constants.js';
+import { Phase, fixImg, isMulliganPhase } from './constants.js';
 import * as i18n from './i18n/index.js';
 import { Tooltips } from './ui_tooltips.js';
 import { InteractionAdapter } from './interaction_adapter.js';
@@ -185,7 +185,7 @@ export const Rendering = {
         
         if (phaseLower === 'rockpaperscissors') return 'rps';
         if (phaseLower === 'choosefirstattacker') return 'choose_first_attacker';
-        if (phaseLower === 'mulligan') return 'mulligan';
+        if (isMulliganPhase(phase)) return 'mulligan';
         if (phaseLower === 'active') return 'active';
         if (phaseLower === 'energy') return 'energy';
         if (phaseLower === 'draw') return 'draw';

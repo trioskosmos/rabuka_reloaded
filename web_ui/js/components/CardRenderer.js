@@ -1,13 +1,15 @@
 import { State } from '../state.js';
-import { Phase, fixImg as fixImgPath } from '../constants.js';
+import { Phase, fixImg as fixImgPath, isMulliganPhase } from '../constants.js';
 import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
 
-// Simple image loading without fallbacks
+// Image loading with retry logic and error handling
 export const ImageLoader = {
     loadedImages: new Set(),
+    failedImages: new Map(), // src -> retry count
+    maxRetries: 2,
     observer: null,
 
     init() {
@@ -17,7 +19,7 @@ export const ImageLoader = {
                     if (entry.isIntersecting) {
                         const img = entry.target;
                         if (img.dataset.src && !img.complete) {
-                            img.src = img.dataset.src;
+                            this._doLoad(img, img.dataset.src);
                         }
                     }
                 });
@@ -25,19 +27,52 @@ export const ImageLoader = {
         }
     },
 
+    _doLoad(img, src) {
+        // Clear previous handlers to avoid duplicates
+        img.onload = null;
+        img.onerror = null;
+
+        img.onload = () => {
+            this.loadedImages.add(src);
+            this.failedImages.delete(src);
+            img.style.opacity = '1';
+        };
+
+        img.onerror = () => {
+            const retries = this.failedImages.get(src) || 0;
+            if (retries < this.maxRetries) {
+                this.failedImages.set(src, retries + 1);
+                // Retry with a small delay to avoid flooding
+                setTimeout(() => this._doLoad(img, src), 100 * (retries + 1));
+            } else {
+                console.warn('[ImageLoader] Failed to load image after retries:', src);
+                img.style.opacity = '0.3';
+            }
+        };
+
+        // Force reload by adding cache-busting on retry
+        const loadSrc = (this.failedImages.get(src) || 0) > 0
+            ? src + (src.includes('?') ? '&' : '?') + '_retry=' + Date.now()
+            : src;
+        img.src = loadSrc;
+    },
+
     loadImage(img, src) {
+        if (!src) return;
         this.init();
-        
+
+        // If already successfully loaded, just set it
         if (this.loadedImages.has(src)) {
             img.src = src;
+            img.style.opacity = '1';
             return;
         }
 
-        img.src = src;
-        img.onload = () => {
-            this.loadedImages.add(src);
-        };
-        
+        // For immediate load, set src directly
+        img.dataset.src = src;
+        this._doLoad(img, src);
+
+        // Also observe for lazy loading (in case img is off-screen)
         if (this.observer) {
             this.observer.observe(img);
         }
@@ -98,7 +133,7 @@ export const CardRenderer = {
         }
 
         if (isSelected) {
-            const isMulligan = (state.phase === Phase.MULLIGAN);
+            const isMulligan = isMulliganPhase(state.phase);
             classNames.push(isMulligan ? 'mulligan-selected' : 'selected');
         }
         if (isValid && containerId !== 'my-hand') classNames.push('valid-target');
@@ -393,8 +428,8 @@ export const CardRenderer = {
             slotDiv.id = `${containerId}-slot-${i}`;
 
             if (slot && slot.card_no) {
-                const imgPath = (State.cardImageMapping && State.cardImageMapping[slot.card_no]) 
-                    ? State.cardImageMapping[slot.card_no] 
+                const imgPath = (State.cardImageMapping && State.cardImageMapping[slot.card_no])
+                    ? State.cardImageMapping[slot.card_no]
                     : `img/cards_webp/${slot.card_no}.webp`;
                 const fixedPath = fixImgPath(imgPath);
                 const existingImg = slotDiv.querySelector('img');
@@ -494,8 +529,8 @@ export const CardRenderer = {
             slot.id = `${containerId}-slot-${i}`;
 
             if (card && card.card_no) {
-                const imgPath = (State.cardImageMapping && State.cardImageMapping[card.card_no]) 
-                    ? State.cardImageMapping[card.card_no] 
+                const imgPath = (State.cardImageMapping && State.cardImageMapping[card.card_no])
+                    ? State.cardImageMapping[card.card_no]
                     : `img/cards_webp/${card.card_no}.webp`;
                 const fixedPath = fixImgPath(imgPath);
                 const existingImg = slot.querySelector('img');
@@ -578,8 +613,8 @@ export const CardRenderer = {
                 const card = discard[discard.length - 1 - i];
                 const div = document.createElement('div');
                 div.className = 'card card-mini';
-                const imgPath = card.card_no ? (State.cardImageMapping && State.cardImageMapping[card.card_no] 
-                    ? State.cardImageMapping[card.card_no] 
+                const imgPath = card.card_no ? (State.cardImageMapping && State.cardImageMapping[card.card_no]
+                    ? State.cardImageMapping[card.card_no]
                     : `img/cards_webp/${card.card_no}.webp`) : '';
                 div.innerHTML = `<img src="${fixImgPath(imgPath)}">`;
                 div.style.transform = `translate(${i * 2}px, ${i * 2}px)`;

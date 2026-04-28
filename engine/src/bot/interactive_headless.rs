@@ -318,6 +318,14 @@ pub fn run_interactive_headless() {
         
         // Auto-advance automatic phases
         match game_state.current_phase {
+            crate::game_state::Phase::Mulligan => {
+                // Mulligan - auto-advance if both players are done (index >= 2)
+                if game_state.current_mulligan_player_idx >= 2 {
+                    println!("Auto-advancing Mulligan phase (both players done)...");
+                    turn::TurnEngine::advance_phase(&mut game_state);
+                    continue;
+                }
+            }
             crate::game_state::Phase::Active |
             crate::game_state::Phase::Energy |
             crate::game_state::Phase::Draw => {

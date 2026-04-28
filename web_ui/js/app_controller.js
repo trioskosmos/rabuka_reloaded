@@ -236,7 +236,18 @@ export const AppController = {
         Modals.updateLanguage();
         syncRoomDisplay();
         await Network.checkSystemStatus();
-        await Network.fetchState();
+
+        const shouldStartLocalGame =
+            !State.offlineMode &&
+            !State.replayMode &&
+            window.Actions &&
+            window.Actions.startGame;
+
+        if (shouldStartLocalGame) {
+            await window.Actions.startGame('pve');
+        } else {
+            await Network.fetchState();
+        }
         DragDrop.init();
 
         if (!healthCheckInterval) {
@@ -247,12 +258,6 @@ export const AppController = {
 
         const savedScale = localStorage.getItem('lovelive_board_scale');
         if (savedScale) Modals.updateBoardScale(savedScale);
-        // Simplified: Auto-start game instead of showing room modal
-        if (!State.roomCode && !State.offlineMode && !State.replayMode && !State.gameHasStarted) {
-            if (window.Actions && window.Actions.startGame) {
-                window.Actions.startGame('pve');
-            }
-        }
     },
 
     restartPolling() {

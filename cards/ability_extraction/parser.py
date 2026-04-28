@@ -424,6 +424,9 @@ def split_condition_action(text: str) -> Tuple[str, str]:
 
 def parse_condition(text: str) -> Dict[str, Any]:
     """Parse a condition text."""
+    # Strip parenthetical notes first
+    text = strip_parenthetical(text)
+    
     condition = {
         'text': text
     }
@@ -453,6 +456,23 @@ def parse_condition(text: str) -> Dict[str, Any]:
         condition['type'] = 'card_count_condition'
         condition['count'] = int(count_match.group(1))
         condition['operator'] = '>='
+        return condition
+    
+    # Check for count conditions with types like "6種類以上ある"
+    types_match = re.search(r'(\d+)種類以上ある', text)
+    if types_match:
+        condition['type'] = 'card_count_condition'
+        condition['count'] = int(types_match.group(1))
+        condition['operator'] = '>='
+        condition['unit'] = 'types'
+        return condition
+    
+    # Check for count conditions with exact count like "2枚ある"
+    exact_count_match = re.search(r'(\d+)枚ある', text)
+    if exact_count_match:
+        condition['type'] = 'card_count_condition'
+        condition['count'] = int(exact_count_match.group(1))
+        condition['operator'] = '='
         return condition
     
     # Check for count conditions with unit like "2人以上いる"
@@ -629,6 +649,57 @@ def parse_condition(text: str) -> Dict[str, Any]:
                 condition['resource_type'] = 'energy'
             return condition
 
+    # Check for revealed cards condition (エールにより公開された自分のカードの中に～がない)
+    if 'エールにより公開された自分のカードの中に' in text and 'ない' in text:
+        condition['type'] = 'location_condition'
+        condition['location'] = 'revealed_cards'
+        condition['target'] = 'self'
+        condition['negation'] = True
+        # Check for specific card property (e.g., "ブレードハートを持つカード")
+        if 'ブレードハートを持つ' in text:
+            condition['card_property'] = 'has_blade_heart'
+        return condition
+    
+    # Check for opponent choice condition (相手は～てもよい。そうしなかった)
+    if '相手は' in text and 'てもよい' in text and 'そうしなかった' in text:
+        condition['type'] = 'opponent_choice_condition'
+        condition['target'] = 'opponent'
+        condition['optional'] = True
+        condition['negation'] = True  # "そうしなかった" means they didn't do it
+        # Extract the action they could have done
+        if '手札を1枚控え室に置いてもよい' in text or '控え室に置いてもよい' in text:
+            condition['action'] = 'discard_card'
+            condition['count'] = 1
+            condition['source'] = 'hand'
+            condition['destination'] = 'discard'
+        return condition
+    
+    # Check for "unless pay energy" condition (支払わないかぎり)
+    # Use comparison_condition with negation - engine supports this
+    if '支払わないかぎり' in text:
+        condition['type'] = 'comparison_condition'
+        condition['negation'] = True
+        # Extract energy count
+        energy_count = text.count('{{icon_energy.png|E}}')
+        if energy_count > 0:
+            condition['resource_type'] = 'energy'
+            condition['count'] = energy_count
+            condition['operator'] = '>='
+        return condition
+    
+    # Check for position change optional condition (ポジションチェンジしてもよい)
+    if 'ポジションチェンジしてもよい' in text or 'ポジションチェンジする' in text:
+        condition['type'] = 'position_change_condition'
+        condition['action'] = 'position_change'
+        condition['optional'] = 'してもよい' in text
+        # Check for "自分と相手" (both players)
+        if '自分と相手' in text or '相手は' in text:
+            condition['target'] = 'both'
+        # Check for "センターエリア以外"
+        if 'センターエリア以外' in text:
+            condition['exclude_position'] = 'center'
+        return condition
+    
     # Check for position conditions using POSITION_KEYWORDS constant
     for keyword, position in POSITION_KEYWORDS.items():
         if keyword in text:
@@ -640,6 +711,30 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Check for ability negation - CHECK EARLY before other condition checks
     if '能力も持たない' in text or '能力を持たない' in text:
         condition['type'] = 'ability_negation_condition'
+        return condition
+    
+    # Check for state change conditions (アクティブ状態からウェイト状態になった)
+    if 'アクティブ状態からウェイト状態になった' in text or ('アクティブ状態' in text and 'ウェイト状態' in text):
+        condition['type'] = 'state_change_condition'
+        condition['from_state'] = 'active'
+        condition['to_state'] = 'wait'
+        if 'メインフェイズの間' in text:
+            condition['phase'] = 'main'
+        return condition
+    
+    # Check for heart possession conditions (ハートを持たない / 持つ)
+    heart_possession_match = re.search(r'{{icon_([^}]+)\.png\|[^}}]+}}(?:[^持]*)(持たない|を持つ)', text)
+    if heart_possession_match or ('ハート' in text and ('持たない' in text or 'を持つ' in text)):
+        # Check for negation (持たない = doesn't have)
+        if '持たない' in text:
+            condition['negation'] = True
+        # Check for specific heart type
+        if 'icon_all' in text:
+            condition['heart_type'] = 'all'
+        # Use location_condition with card_type filter
+        condition['type'] = 'location_condition'
+        condition['card_type'] = 'member_card'
+        condition['location'] = 'stage'
         return condition
     
     # Check for compound conditions (かつ or あり、) - MUST CHECK AFTER distinct conditions
@@ -887,6 +982,8 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Determine condition type
     if group or group_names:
         condition['type'] = 'group_condition'
+    elif condition.get('resource_type'):
+        condition['type'] = 'comparison_condition'
     elif location and card_type:
         condition['type'] = 'location_condition'
     elif location and position:
@@ -1026,6 +1123,16 @@ def parse_action(text: str) -> Dict[str, Any]:
     cost_limit = extract_cost_limit(text)
     if cost_limit:
         action['cost_limit'] = cost_limit
+    
+    # Check for card name matching constraints (Q236/Q237 - 日野下花帆 pattern)
+    # Pattern: "これにより公開したカードのカード名がすべて含まれる"
+    if 'カード名がすべて含まれる' in text or 'カード名が含まれる' in text:
+        action['name_constraint'] = 'contains_all'
+        action['name_constraint_source'] = 'revealed_card'
+    
+    # Check for distinct card name constraints (Q118)
+    if 'カード名の異なる' in text:
+        action['distinct'] = 'card_name'
     
     # Extract state change
     state_change = extract_state_change(text)
@@ -1529,14 +1636,12 @@ def parse_action(text: str) -> Dict[str, Any]:
         if heart_options:
             action['options'] = [f'heart_{h}' for h in heart_options]
     # Check for choose_required_hearts pattern (e.g., "必要ハートは、...のうち、選んだ1つにしてもよい")
+    # Simplify to placeholder for now - engine doesn't support this yet
     elif '必要ハートは' in text and '選んだ1つにしてもよい' in text:
         action['action'] = 'choose_required_hearts'
-        # Extract the heart option groups
-        heart_groups = re.findall(r'{{heart_\d+\.png\|heart\d+}}{{heart_\d+\.png\|heart\d+}}{{heart_\d+\.png\|heart\d+}}', text)
-        if heart_groups:
-            action['options'] = heart_groups
-        if 'してもよい' in text:
-            action['optional'] = True
+        action['optional'] = True
+        # Don't parse options as strings - engine expects AbilityEffect objects
+        # This will need proper implementation later
     # Check for set_card_identity pattern (e.g., "すべての領域にあるこのカードは『...』として扱う")
     elif 'として扱う' in text and 'すべての領域にあるこのカードは' in text:
         action['action'] = 'set_card_identity'
@@ -1544,24 +1649,24 @@ def parse_action(text: str) -> Dict[str, Any]:
         groups = re.findall(r'『([^』]+)』', text)
         if groups:
             action['identities'] = groups
-    elif 'スコアを' in text:
+    elif 'スコアを' in text or '合計スコアを' in text:
         action['action'] = 'modify_score'
-        if '＋' in text:
+        if '＋' in text or '+' in text:
             action['operation'] = 'add'
-            # Extract the value after +
-            value_match = re.search(r'＋(\d+)', text)
+            # Extract the value after + (handle both fullwidth and halfwidth)
+            value_match = re.search(r'[＋+](\d+)', text)
             if value_match:
                 action['value'] = int(value_match.group(1))
-        elif '－' in text:
+        elif '－' in text or '-' in text:
             action['operation'] = 'subtract'
-            # Extract the value after -
-            value_match = re.search(r'－(\d+)', text)
+            # Extract the value after - (handle both fullwidth and halfwidth)
+            value_match = re.search(r'[－-](\d+)', text)
             if value_match:
                 action['value'] = int(value_match.group(1))
     elif '必要ハート' in text and '少なくなる' in text:
         action['action'] = 'modify_required_hearts'
         action['operation'] = 'decrease'
-    elif '必要ハート' in text and '増える' in text:
+    elif '必要ハート' in text and ('増える' in text or '増やす' in text):
         action['action'] = 'modify_required_hearts'
         action['operation'] = 'increase'
     elif '必要ハート' in text and '減らす' in text:
@@ -1970,10 +2075,53 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     # Don't set per_unit_type if unknown - let engine handle it
                     pass
             
+            # Extract the action text (everything after the per-unit condition)
+            # Pattern: "[condition]につき、[action]"
+            action_text = text.split('につき', 1)[1].strip()
+            if action_text.startswith('、'):
+                action_text = action_text[1:].strip()
+            
+            # Check for "し" sequential pattern within the action text
+            # e.g., "スコアを＋2し、必要ハートを...増やす"
+            if '、' in action_text and 'し' in action_text:
+                parts = action_text.split('、')
+                if len(parts) >= 2 and 'し' in parts[0]:
+                    actions = []
+                    for part in parts:
+                        part_action = parse_action(part.strip().rstrip('、'))
+                        if part_action.get('action') != 'custom':
+                            # Merge per_unit info into each action
+                            part_action['per_unit'] = effect['per_unit']
+                            if 'per_unit_count' in effect:
+                                part_action['per_unit_count'] = effect['per_unit_count']
+                            if 'per_unit_type' in effect:
+                                part_action['per_unit_type'] = effect['per_unit_type']
+                            actions.append(part_action)
+                    if len(actions) >= 2:
+                        # Fix nested "draw" actions
+                        for action in actions:
+                            if action.get('action') == 'draw':
+                                action['action'] = 'draw_card'
+                        return {
+                            'text': text,
+                            'action': 'sequential',
+                            'actions': actions
+                        }
+            
+            # Parse the action
+            action = parse_action(action_text)
+            
+            # Merge per_unit info into the action
+            action['per_unit'] = effect['per_unit']
+            if 'per_unit_count' in effect:
+                action['per_unit_count'] = effect['per_unit_count']
+            if 'per_unit_type' in effect:
+                action['per_unit_type'] = effect['per_unit_type']
+            
             # Check for sequential action after per-unit (e.g., "その後、～")
-            if 'その後' in text:
+            if 'その後' in action_text:
                 # Split by "その後" to get the second action
-                parts = text.split('その後', 1)
+                parts = action_text.split('その後', 1)
                 if len(parts) == 2:
                     # First part is the per-unit action
                     first_part = parts[0].strip()
@@ -1997,7 +2145,9 @@ def parse_effect(text: str) -> Dict[str, Any]:
                         'actions': [first_action, second_action]
                     }
             
-            return effect
+            # Return the action with per_unit info
+            action['text'] = text
+            return action
     
     # Initialize effect dict
     effect = {
@@ -2092,6 +2242,46 @@ def parse_effect(text: str) -> Dict[str, Any]:
     # Strip parenthetical notes from text for further processing
     text = strip_parenthetical(text)
     
+    # Check for answer-based choice pattern (回答が = "answer is")
+    # This handles cards like "愛♡スクリ～ム！" with multiple answer branches
+    # For now, simplify to basic choice to match engine capabilities
+    if '回答が' in text:
+        effect['action'] = 'choice'
+        effect['choice_type'] = 'answer_based'
+        
+        # Extract the question part (if any) before the first 回答が
+        question_match = re.search(r'(.+?)(?=回答が)', text, re.DOTALL)
+        if question_match:
+            question_text = question_match.group(1).strip()
+            question_text = re.sub(r'[\n。]+$', '', question_text).strip()
+            if question_text:
+                effect['question'] = question_text
+        
+        # Simplify: just extract the actions as options, ignore answer conditions for now
+        # The engine will need UI integration to handle answer-based choices properly
+        options = []
+        # Find all action parts after 回答が patterns
+        action_matches = re.findall(r'回答が[^、。]+場合、([^、。]+)', text)
+        for action_text in action_matches:
+            action_text = action_text.strip()
+            if action_text:
+                parsed_action = parse_action(action_text)
+                parsed_action['text'] = action_text
+                options.append(parsed_action)
+        
+        # Also check for "それ以外の場合" (otherwise case)
+        otherwise_match = re.search(r'それ以外の場合、([^、。]+)', text)
+        if otherwise_match:
+            action_text = otherwise_match.group(1).strip()
+            if action_text:
+                parsed_action = parse_action(action_text)
+                parsed_action['text'] = action_text
+                options.append(parsed_action)
+        
+        if options:
+            effect['options'] = options
+            return effect
+    
     # Check for each-time triggers (たび)
     if EACH_TIME_MARKER in text:
         effect['trigger_type'] = 'each_time'
@@ -2126,17 +2316,16 @@ def parse_effect(text: str) -> Dict[str, Any]:
         choice_text = '自分か相手を選ぶ'
         remaining_text = text[len(choice_text):].strip()
         effect['action'] = 'sequential'
-        effect['actions'] = [
-            {
-                'action': 'choose_target',
-                'options': ['self', 'opponent'],
-                'text': choice_text
-            }
-        ]
-        # Parse the remaining text which should use the chosen target
+        # Skip choose_target for now - engine doesn't support it
+        # Just parse the remaining text with a default target
         if remaining_text:
             remaining_effect = parse_effect(remaining_text)
-            effect['actions'].append(remaining_effect)
+            # Set default target to self if not specified
+            if 'target' not in remaining_effect or not remaining_effect['target']:
+                remaining_effect['target'] = 'self'
+            effect['actions'] = [remaining_effect]
+        else:
+            effect['actions'] = []
         return effect
     
     # Check for opponent actions after conditional markers (e.g., "そうした場合、相手は～")
@@ -2171,6 +2360,42 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 if effect['actions']:
                     return effect
     
+    # Check for "これにより～の場合" pattern that checks card type with alternative
+    # Pattern: "これにより～の場合、～。～以外の場合、～"
+    # Check this BEFORE "その中から" to prevent incorrect parsing
+    if 'これにより' in text and 'の場合' in text and '以外の場合' in text:
+        # Split on "以外の場合" to get the two branches
+        parts = text.split('以外の場合', 1)
+        if len(parts) == 2:
+            first_branch = parts[0].strip()
+            second_branch = parts[1].strip()
+            
+            # Parse first branch: "これにより～の場合、～"
+            if '場合、' in first_branch:
+                condition_part, action_part = first_branch.split('場合、', 1)
+                # Remove "これにより" from condition_part if it's already there
+                condition_part = condition_part.replace('これにより', '').strip()
+                condition_text = 'これにより' + condition_part + '場合'
+                action_text = action_part.strip()
+                
+                # Strip trailing group names from action_text (e.g., "『μ's』のカード")
+                # This can appear at the end and interfere with parsing
+                action_text = re.sub(r'『.+』のカード$', '', action_text).strip()
+                
+                # Parse the conditional effect
+                first_effect = parse_effect(action_text)
+                
+                # Parse the alternative effect - strip leading comma/period
+                second_branch = second_branch.lstrip('、。').strip()
+                second_effect = parse_effect(second_branch)
+                
+                effect['action'] = 'conditional_alternative'
+                effect['condition'] = parse_condition(condition_text)
+                effect['if_true'] = first_effect
+                effect['if_false'] = second_effect
+                effect['text'] = text
+                return effect
+    
     # Check for "その中から" (from among them) pattern - indicates look_at + select + action
     # Check this BEFORE comma-separated sequential to prevent incorrect parsing
     if 'その中から' in text:
@@ -2185,11 +2410,12 @@ def parse_effect(text: str) -> Dict[str, Any]:
             select_text = action_match.group(1).strip()
             
             # Check for "X枚を手札に加え、残りを控え室に置く" pattern
-            # This should be parsed as sequential actions: reveal + add to hand, then discard rest
+            # This should be parsed as sequential actions: add to hand, then discard rest
+            # Support both comma and period separators
             if '手札に加え' in select_text and '残りを控え室に置く' in select_text:
-                # Split into two sequential actions
-                parts = select_text.split('、', SPLIT_LIMIT)
-                if len(parts) == 2:
+                # Split by comma or period
+                parts = re.split(r'[、。]', select_text)
+                if len(parts) >= 2:
                     # First action: reveal and add to hand
                     first_part = parts[0].strip()
                     # Check if it contains "公開して" (reveal)
@@ -2220,9 +2446,14 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     else:
                         # No explicit reveal, just add to hand then discard
                         first_action = parse_action(first_part)
+                        # Force destination to hand regardless of what parse_action returns
                         if first_action.get('action') == 'move_cards':
                             first_action['destination'] = 'hand'
+                            first_action['source'] = 'looked_at'  # From the looked-at cards
                         second_action = parse_action(parts[1].strip())
+                        if second_action.get('action') == 'move_cards':
+                            second_action['source'] = 'looked_at_remaining'
+                            second_action['destination'] = 'discard'
                         effect['select_action'] = {
                             'action': 'sequential',
                             'actions': [first_action, second_action],
@@ -2242,8 +2473,13 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     if first_action.get('action') == 'move_cards':
                         first_action['destination'] = 'deck_top'
                         first_action['any_number'] = True  # "好きな枚数"
+                        first_action['source'] = 'looked_at'  # From the looked-at cards
                     # Second action: discard rest
                     second_action = parse_action(parts[1].strip())
+                    # Mark that this is the remaining cards from the looked-at set
+                    if second_action.get('action') == 'move_cards':
+                        second_action['source'] = 'looked_at_remaining'
+                        second_action['destination'] = 'discard'
                     effect['select_action'] = {
                         'action': 'sequential',
                         'actions': [first_action, second_action],
@@ -2268,29 +2504,38 @@ def parse_effect(text: str) -> Dict[str, Any]:
     text_without_parens = strip_parenthetical(text) if parenthetical else text
     
     # Check for sequential conditional effects with "さらに" pattern
-    # Pattern: "～場合、～。～場合、さらに～"
+    # Pattern 1: "～場合、～。～場合、さらに～" (2 conditions)
+    # Pattern 2: "～。～場合、さらに～" (unconditional + conditional)
+    # Pattern 3: Multi-level "さらに" (3+ levels)
     # Check this BEFORE other conditional parsing to avoid incorrect parsing
-    if 'さらに' in text and text.count('場合') >= 2:
-        # Split by period to get separate conditional effects
+    if 'さらに' in text:
+        # Split by period to get separate effects
         parts = text.split('。')
         if len(parts) >= 2:
-            # Check if the second part contains "さらに"
-            if 'さらに' in parts[1]:
-                # Parse first conditional effect
-                first_effect = parse_effect(parts[0].strip())
-                # Parse second conditional effect (strip "さらに")
-                second_effect_text = parts[1].strip().replace('さらに', '', 1).strip()
-                second_effect = parse_effect(second_effect_text)
+            # Check if any part contains "さらに"
+            has_furthermore = any('さらに' in part for part in parts[1:])
+            if has_furthermore:
+                # Parse all parts recursively
+                actions = []
+                for i, part in enumerate(parts):
+                    part_text = part.strip()
+                    if not part_text:
+                        continue
+                    # Strip "さらに" from this part if present
+                    if 'さらに' in part_text:
+                        part_text = part_text.replace('さらに', '', 1).strip()
+                    # Parse this part
+                    parsed_part = parse_effect(part_text)
+                    # Fix nested "draw" actions
+                    if parsed_part.get('action') == 'draw':
+                        parsed_part['action'] = 'draw_card'
+                    actions.append(parsed_part)
                 
-                # Only set sequential if both effects have valid actions
-                if first_effect.get('action') or first_effect.get('actions') or second_effect.get('action') or second_effect.get('actions'):
+                # Only set sequential if we have valid actions
+                if actions and any(a.get('action') or a.get('actions') for a in actions):
                     effect['action'] = 'sequential'
-                    effect['actions'] = [first_effect, second_effect]
+                    effect['actions'] = actions
                     effect['text'] = text
-                    # Post-processing: fix nested "draw" actions
-                    for action in effect['actions']:
-                        if action.get('action') == 'draw':
-                            action['action'] = 'draw_card'
                     return effect
     
     # Check for sequential with duration condition ("その後、[condition]かぎり、[action]")
@@ -2351,17 +2596,111 @@ def parse_effect(text: str) -> Dict[str, Any]:
             # If no valid sequential actions were found, fall through to single action parsing
     
     # Check for conditional sequential actions ("そうした場合" - if so/then)
+    # This should be checked BEFORE implicit sequential to avoid misparsing
     if CONDITIONAL_SEQUENTIAL_MARKER in text:
         parts = text.split(CONDITIONAL_SEQUENTIAL_MARKER, SPLIT_LIMIT)
-        first_action = parse_action(parts[0].strip())
-        # Strip leading comma from second action if present
-        second_part = parts[1].strip().lstrip('、')
-        second_action = parse_action(second_part)
+        first_part = parts[0].strip()
+        second_part = parts[1].strip()
+        
+        # Check if first part contains a condition (e.g., "～場合、～")
+        first_condition, first_action_text = split_condition_action(first_part)
+        
+        if first_condition and first_action_text:
+            # Parse as conditional effect
+            first_action = parse_action(first_action_text)
+            first_action['text'] = first_action_text
+            effect['condition'] = parse_condition(first_condition)
+        else:
+            # Parse as simple action
+            first_action = parse_action(first_part)
+        
+        # The second part may contain multiple actions separated by periods
+        # Parse it as a sequence of actions
+        # First, remove the "そうした場合" marker since we've already handled the conditional aspect
+        clean_second_part = second_part.replace(CONDITIONAL_SEQUENTIAL_MARKER, '').strip()
+        # Also strip leading comma
+        clean_second_part = clean_second_part.lstrip('、')
+        
+        # Split by period for multiple actions
+        second_actions = []
+        second_parts = re.split(r'[。]', clean_second_part)
+        
+        for part in second_parts:
+            part = part.strip()
+            if not part:
+                continue
+            
+            # Check if this part is just a duration prefix (e.g., "ライブ終了時まで、")
+            # If so, skip it and let the next part handle the duration
+            if part in DURATION_PREFIXES or part.rstrip('、') in DURATION_PREFIXES:
+                continue
+            
+            # Parse this part as an action
+            parsed = parse_action(part)
+            # Only add if it's not an empty custom action
+            if not (parsed.get('action') == 'custom' and (not parsed.get('text') or parsed.get('text', '') == '')):
+                second_actions.append(parsed)
+        
+        # Filter out empty custom actions from the nested sequential
+        # This happens when "そうした場合" creates an empty first action
+        if len(second_actions) == 1:
+            # Only one action, don't create nested sequential
+            second_action = second_actions[0]
+        elif len(second_actions) > 1:
+            # Multiple actions, create nested sequential
+            # Filter out empty custom actions before creating the sequential
+            filtered_actions = [a for a in second_actions if not (a.get('action') == 'custom' and (not a.get('text') or a.get('text', '') == ''))]
+            if len(filtered_actions) == 1:
+                second_action = filtered_actions[0]
+            elif len(filtered_actions) > 1:
+                second_action = {
+                    'action': 'sequential',
+                    'actions': filtered_actions,
+                    'text': clean_second_part
+                }
+            else:
+                # All were empty custom actions, use fallback with cleaned text
+                second_action = parse_action(clean_second_part)
+        else:
+            # No valid actions, parse the whole clean_second_part as fallback
+            second_action = parse_action(clean_second_part)
+        
+        # Update the text field to not include the marker
+        if 'text' in second_action:
+            second_action['text'] = second_action['text'].replace(CONDITIONAL_SEQUENTIAL_MARKER, '').strip().lstrip('、')
+        
+        # Also update text in nested actions if present
+        if 'actions' in second_action:
+            for nested_action in second_action['actions']:
+                if 'text' in nested_action:
+                    nested_action['text'] = nested_action['text'].replace(CONDITIONAL_SEQUENTIAL_MARKER, '').strip().lstrip('、')
+        
+        # Filter out empty custom actions from the final second_action
+        if second_action.get('action') == 'sequential' and 'actions' in second_action:
+            second_action['actions'] = [a for a in second_action['actions'] if not (a.get('action') == 'custom' and (not a.get('text') or a.get('text', '') == ''))]
+            # If only one action remains after filtering, flatten it
+            if len(second_action['actions']) == 1:
+                second_action = second_action['actions'][0]
+        
+        # If first action is select, second action should reference selected cards
+        if first_action.get('action') == 'select':
+            if 'actions' in second_action:
+                # Handle nested sequential
+                for sub_action in second_action.get('actions', []):
+                    if sub_action.get('action') == 'move_cards':
+                        sub_action['source'] = 'selected_cards'
+            else:
+                second_action['source'] = 'selected_cards'
+        
         effect['action'] = 'sequential'
         effect['actions'] = [first_action, second_action]
         effect['conditional'] = True
         # Post-processing: fix nested "draw" actions
         for action in effect['actions']:
+            if 'actions' in action:
+                for sub_action in action['actions']:
+                    if sub_action.get('action') == 'draw':
+                        sub_action['action'] = 'draw_card'
             if action.get('action') == 'draw':
                 action['action'] = 'draw_card'
         return effect
@@ -2383,10 +2722,21 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 # Pattern: "X場合、Y。Z場合、代わりにW" -> primary: "X場合、Y", alt_condition: "Z"
                 last_case_index = first_part.rfind('場合、')
                 if last_case_index != -1:
-                    # Everything before the last "場合、" is the primary effect (including its condition)
-                    primary_text = first_part[:last_case_index + len('場合、')].strip()
-                    # Everything after "場合、" is the alternative condition
-                    condition_text = first_part[last_case_index + len('場合、'):].strip()
+                    # Find the period before the last "場合、" to properly separate
+                    # Pattern: "X場合、Y。Z場合、" -> split on the period before Z場合
+                    period_before_case = first_part.rfind('。', 0, last_case_index)
+                    if period_before_case != -1:
+                        # Everything before the period is the primary effect
+                        primary_text = first_part[:period_before_case].strip()
+                        # Everything between the period and "場合、" is the alternative condition
+                        condition_text = first_part[period_before_case + 1:last_case_index].strip()
+                    else:
+                        # No period found, use the last "場合、" split as fallback
+                        primary_text = first_part[:last_case_index + len('場合、')].strip()
+                        condition_text = first_part[last_case_index + len('場合、'):].strip()
+                    
+                    # Remove trailing period and comma from condition_text
+                    condition_text = condition_text.rstrip('。、').strip()
                     
                     # Parse the primary effect (it may contain its own condition)
                     primary_effect = parse_effect(primary_text)
@@ -2494,7 +2844,17 @@ def parse_effect(text: str) -> Dict[str, Any]:
             options = []
             for option_text in option_lines:
                 if option_text:
-                    parsed_option = parse_action(option_text)
+                    # Check if option has a condition (e.g., "～場合、～")
+                    option_condition, option_action = split_condition_action(option_text)
+                    if option_condition and option_action:
+                        # Parse as conditional effect
+                        parsed_option = parse_effect(option_action)
+                        parsed_option['condition'] = parse_condition(option_condition)
+                        parsed_option['text'] = option_text
+                    else:
+                        # Parse as simple action
+                        parsed_option = parse_action(option_text)
+                        parsed_option['text'] = option_text
                     options.append(parsed_option)
             
             if options:
@@ -2587,6 +2947,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
             return effect
     
     # Check for "これにより～した場合" (if done this way) pattern - ability invalidation follow-up
+    # Only match specific patterns to avoid false positives
     if 'これにより無効にした場合' in text or 'これにより控え室に置いた場合' in text:
         parts = text.split('これにより', 1)
         first_part = parts[0].strip()
@@ -2617,6 +2978,11 @@ def parse_effect(text: str) -> Dict[str, Any]:
             effect['conditional_action']['multiple_targets'] = True
         else:
             effect['conditional_action'] = parse_action(action_text)
+        
+        # If the first action is a select action, the conditional action should reference the selected cards
+        if effect['optional_action'].get('action') == 'select':
+            effect['conditional_action']['source'] = 'selected_cards'
+        
         return effect
     
     # Check for multiple actions joined by "し" (e.g., "スコアを＋2し、必要ハートは...になる")

@@ -28,14 +28,24 @@ pub enum Phase {
     // Pre-game phases (Rule 6.2)
     RockPaperScissors,
     ChooseFirstAttacker,  // Q16: RPS winner chooses turn order
-    Mulligan,
+    // Mulligan phase with explicit sub-states (no flags needed)
+    MulliganP1Turn,
+    MulliganP2Turn,
+    // Legacy aliases for backward compatibility
+    #[allow(dead_code)]
+    Mulligan,  // Alias for MulliganP1Turn (first player's turn)
     // Normal phase sub-phases (Rule 7.3.3)
     Active,
     Energy,
     Draw,
     Main,
     // Live phase sub-phases (Rule 8.1.2)
-    LiveCardSet,
+    // LiveCardSet with explicit sub-states (no flags needed)
+    LiveCardSetP1Turn,
+    LiveCardSetP2Turn,
+    // Legacy alias for backward compatibility
+    #[allow(dead_code)]
+    LiveCardSet,  // Alias for LiveCardSetP1Turn (first player's turn)
     FirstAttackerPerformance,
     SecondAttackerPerformance,
     LiveVictoryDetermination,
@@ -59,6 +69,7 @@ pub enum Duration {
     ThisTurn,
     ThisLive,
     Permanent,
+    AsLongAs,
 }
 
 #[derive(Debug, Clone)]
@@ -114,15 +125,14 @@ pub struct GameState {
     // Turn-limited ability usage tracking per card instance (card_id + zone)
     pub turn_limited_abilities_used: std::collections::HashSet<String>,
     // Mulligan tracking
-    pub mulligan_player1_done: bool,
-    pub mulligan_player2_done: bool,
-    pub current_mulligan_player: String, // "player1" or "player2"
+    pub current_mulligan_player_idx: usize, // 0 or 1, tracks whose mulligan turn it is
     pub mulligan_selected_indices: Vec<usize>, // Track selected card indices for mulligan
     // RPS tracking - Q16: "じゃんけんで勝ったプレイヤーが先攻か後攻を決めます"
     pub rps_winner: Option<u8>, // 1 = player1, 2 = player2
-    // Live card set tracking
-    pub live_card_set_player1_done: bool,
-    pub live_card_set_player2_done: bool,
+    pub player1_rps_choice: Option<i32>, // 0=Rock, 1=Paper, 2=Scissors
+    pub player2_rps_choice: Option<i32>, // 0=Rock, 1=Paper, 2=Scissors (set by AI engine)
+    // Live card set tracking - tracks which player is currently setting cards (0 = p1, 1 = p2, 2 = both done)
+    pub current_live_card_set_player: u8,
     // Undo/redo history
     pub history: Vec<GameState>,
     pub future: Vec<GameState>,
@@ -175,6 +185,8 @@ pub struct GameState {
     // Position/Formation change tracking for keyword validation
     pub position_change_occurred_this_turn: bool, // Whether position change occurred this turn
     pub formation_change_occurred_this_turn: bool, // Whether formation change occurred this turn
+    // Opponent choice tracking for optional action conditions
+    pub opponent_choice_declined: bool, // Whether opponent declined an optional action (for "そうしなかった" conditions)
     // Partial effect resolution tracking (Q55, Q92, Q93) - tracks whether partial resolution is allowed
     pub partial_resolution_allowed: bool, // Whether effects can be partially resolved
     // Cost payment validation tracking (Q56) - tracks whether full cost payment is required
@@ -240,14 +252,19 @@ pub struct PendingAutoAbility {
 impl GameState {
     /// Invariant check: turn phase and current phase must be consistent according to game rules
     pub fn phase_invariant(&self) -> bool {
+        // Pre-game phases don't have a turn phase constraint
+        if matches!(self.current_phase, Phase::RockPaperScissors | Phase::ChooseFirstAttacker | Phase::MulliganP1Turn | Phase::MulliganP2Turn) {
+            return true;
+        }
+        
         match self.current_turn_phase {
             TurnPhase::FirstAttackerNormal | TurnPhase::SecondAttackerNormal => {
                 // Normal phase sub-phases: Active, Energy, Draw, Main
                 matches!(self.current_phase, Phase::Active | Phase::Energy | Phase::Draw | Phase::Main)
             }
             TurnPhase::Live => {
-                // Live phase sub-phases: LiveCardSet, FirstAttackerPerformance, SecondAttackerPerformance, LiveVictoryDetermination
-                matches!(self.current_phase, Phase::LiveCardSet | Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination)
+                // Live phase sub-phases: LiveCardSetP1Turn, LiveCardSetP2Turn, FirstAttackerPerformance, SecondAttackerPerformance, LiveVictoryDetermination
+                matches!(self.current_phase, Phase::LiveCardSetP1Turn | Phase::LiveCardSetP2Turn | Phase::LiveCardSet | Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination)
             }
         }
     }
@@ -302,13 +319,12 @@ impl GameState {
             cheer_checks_done: 0,
             prohibition_effects: Vec::new(),
             turn_limited_abilities_used: std::collections::HashSet::new(),
-            mulligan_player1_done: false,
-            mulligan_player2_done: false,
-            current_mulligan_player: String::new(),
+            current_mulligan_player_idx: 0, // Start with player 1 (index 0)
             mulligan_selected_indices: Vec::new(),
             rps_winner: None,  // Q16: RPS winner chooses turn order
-            live_card_set_player1_done: false,
-            live_card_set_player2_done: false,
+            player1_rps_choice: None,
+            player2_rps_choice: None,
+            current_live_card_set_player: 0, // 0 = p1's turn, 1 = p2's turn, 2 = both done
             history: Vec::new(),
             future: Vec::new(),
             max_history_size: 50,
@@ -357,6 +373,7 @@ impl GameState {
             replacement_effects: Vec::new(),
             position_change_occurred_this_turn: false,
             formation_change_occurred_this_turn: false,
+            opponent_choice_declined: false,
             effect_creation_counter: 0,
             game_state_history: Vec::new(),
             max_state_history_size: DEFAULT_HISTORY_SIZE,
@@ -370,85 +387,105 @@ impl GameState {
     /// Helper method to determine active player during LiveCardSet phase
     /// This consolidates the logic for determining which player is currently setting live cards
     fn active_player_for_live_card_set(&self) -> &Player {
-        let p1_is_first = self.player1.is_first_attacker;
-        let p1_done = self.live_card_set_player1_done;
-        let p2_done = self.live_card_set_player2_done;
-
-        if !p1_done && p2_done {
-            // P1 is currently taking their turn (P2 already done)
-            &self.player1
-        } else if !p2_done && p1_done {
-            // P2 is currently taking their turn (P1 already done)
-            &self.player2
-        } else if !p1_done && !p2_done {
-            // Neither has finished yet - first attacker goes first
-            if p1_is_first {
+        match self.current_live_card_set_player {
+            0 => {
+                // P1's turn to set cards
                 &self.player1
-            } else {
+            }
+            1 => {
+                // P2's turn to set cards
                 &self.player2
             }
-        } else {
-            // Both done - shouldn't happen during live card set, default to first attacker
-            if p1_is_first {
-                &self.player1
-            } else {
-                &self.player2
+            _ => {
+                // Both done (2) - default to first attacker
+                if self.player1.is_first_attacker {
+                    &self.player1
+                } else {
+                    &self.player2
+                }
+            }
+        }
+    }
+
+    fn active_player_for_live_card_set_mut(&mut self) -> &mut Player {
+        match self.current_live_card_set_player {
+            0 => {
+                // P1's turn to set cards
+                &mut self.player1
+            }
+            1 => {
+                // P2's turn to set cards
+                &mut self.player2
+            }
+            _ => {
+                // Both done (2) - default to first attacker
+                if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
             }
         }
     }
 
     pub fn active_player(&self) -> &Player {
         // Rule 7.2: Determine active player based on turn phase
-        match self.current_turn_phase {
-            TurnPhase::FirstAttackerNormal => self.first_attacker(),
-            TurnPhase::SecondAttackerNormal => self.second_attacker(),
-            TurnPhase::Live => {
-                // During live card set phase, determine which player is currently setting cards
-                // based on completion flags
-                self.active_player_for_live_card_set()
+        match self.current_phase {
+            Phase::MulliganP1Turn => &self.player1,
+            Phase::MulliganP2Turn => &self.player2,
+            Phase::LiveCardSetP1Turn => &self.player1,
+            Phase::LiveCardSetP2Turn => &self.player2,
+            Phase::Mulligan => {
+                // Legacy phase - use flag for compatibility
+                if self.current_mulligan_player_idx == 0 {
+                    &self.player1
+                } else {
+                    &self.player2
+                }
+            }
+            _ => match self.current_turn_phase {
+                TurnPhase::FirstAttackerNormal => self.first_attacker(),
+                TurnPhase::SecondAttackerNormal => self.second_attacker(),
+                TurnPhase::Live => {
+                    // During live phase, determine active player based on phase
+                    match self.current_phase {
+                        Phase::LiveCardSet => {
+                            // Legacy phase - use flag for compatibility
+                            self.active_player_for_live_card_set()
+                        }
+                        _ => self.first_attacker(),
+                    }
+                }
             }
         }
     }
 
     pub fn active_player_mut(&mut self) -> &mut Player {
-        match self.current_turn_phase {
-            TurnPhase::FirstAttackerNormal => {
-                if self.player1.is_first_attacker {
+        match self.current_phase {
+            Phase::MulliganP1Turn => &mut self.player1,
+            Phase::MulliganP2Turn => &mut self.player2,
+            Phase::LiveCardSetP1Turn => &mut self.player1,
+            Phase::LiveCardSetP2Turn => &mut self.player2,
+            Phase::Mulligan => {
+                // Legacy phase - use flag for compatibility
+                if self.current_mulligan_player_idx == 0 {
                     &mut self.player1
                 } else {
                     &mut self.player2
                 }
             }
-            TurnPhase::SecondAttackerNormal => {
-                if self.player1.is_first_attacker {
-                    &mut self.player2
-                } else {
-                    &mut self.player1
+            _ => match self.current_turn_phase {
+                TurnPhase::FirstAttackerNormal => {
+                    if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
                 }
-            }
-            TurnPhase::Live => {
-                // During live card set phase, determine which player is currently setting cards
-                // based on completion flags - use the same logic as active_player()
-                let p1_is_first = self.player1.is_first_attacker;
-                let p1_done = self.live_card_set_player1_done;
-                let p2_done = self.live_card_set_player2_done;
-
-                if !p1_done && p2_done {
-                    &mut self.player1
-                } else if !p2_done && p1_done {
-                    &mut self.player2
-                } else if !p1_done && !p2_done {
-                    if p1_is_first {
-                        &mut self.player1
-                    } else {
-                        &mut self.player2
-                    }
-                } else {
-                    // Both done - default to first attacker
-                    if p1_is_first {
-                        &mut self.player1
-                    } else {
-                        &mut self.player2
+                TurnPhase::SecondAttackerNormal => {
+                    if self.player1.is_first_attacker { &mut self.player2 } else { &mut self.player1 }
+                }
+                TurnPhase::Live => {
+                    match self.current_phase {
+                        Phase::LiveCardSet => {
+                            // Legacy phase - use flag for compatibility
+                            self.active_player_for_live_card_set_mut()
+                        }
+                        _ => {
+                            if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
+                        }
                     }
                 }
             }
@@ -962,12 +999,22 @@ impl GameState {
         self.draw_state
     }
 
-    pub fn check_success_zone_draw_condition(&self, _player_id: &str) -> bool {
+    pub fn check_success_zone_draw_condition(&self, player_id: &str) -> bool {
         // Q54: Draw condition when 3+ success cards (2+ in half deck)
-        // This is a simplified check - actual implementation would depend on deck type
-        // Note: Player doesn't have a success_zone field, so this is a placeholder
-        // The actual implementation would need to track success cards separately
-        false // Placeholder - would need proper success zone tracking
+        // Get the player and check their success live card zone
+        let player = if player_id == self.player1.id {
+            &self.player1
+        } else if player_id == self.player2.id {
+            &self.player2
+        } else {
+            return false;
+        };
+        
+        // Count cards in success live card zone
+        // Full deck: 3+ cards = draw condition
+        // Half deck: 2+ cards = draw condition (not currently tracked, assume full deck)
+        let success_count = player.success_live_card_zone.cards.len();
+        success_count >= 3
     }
 
     // Effect precedence tracking methods (Q57)
@@ -1435,20 +1482,20 @@ impl GameState {
                 
                 // Simplified implementation - move cards from source to destination
                 match source {
-                    "deck" | "デッキ" => {
+                    "deck" => {
                         for _ in 0..count {
                             if let Some(card) = player.main_deck.draw() {
                                 match destination {
-                                    "hand" | "手札" => player.hand.add_card(card),
-                                    "discard" | "控え室" => player.waitroom.add_card(card),
+                                    "hand" => player.hand.add_card(card),
+                                    "discard" => player.waitroom.add_card(card),
                                     _ => {}
                                 }
                             }
                         }
                     }
-                    "hand" | "手札" => {
+                    "hand" => {
                         match destination {
-                            "discard" | "控え室" => {
+                            "discard" => {
                                 for _ in 0..count.min(player.hand.cards.len() as u32) {
                                     if let Some(card) = player.hand.remove_card(0) {
                                         player.waitroom.add_card(card);
@@ -1458,17 +1505,17 @@ impl GameState {
                             _ => {}
                         }
                     }
-                    "discard" | "控え室" => {
+                    "discard" => {
                         match destination {
-                            "hand" | "手札" => {
+                            "hand" => {
                                 // Move from waitroom to hand, filtering by card type if specified
                                 let card_ids_to_move: Vec<_> = player.waitroom.cards.iter()
                                     .filter(|c| {
                                         if let Some(ct) = card_type {
                                             if let Some(card) = self.card_database.get_card(**c) {
                                                 match ct {
-                                                    "live_card" | "ライブカード" => card.is_live(),
-                                                    "member_card" | "メンバーカード" => card.is_member(),
+                                                    "live_card" => card.is_live(),
+                                                    "member_card" => card.is_member(),
                                                     _ => true
                                                 }
                                             } else {
@@ -1487,18 +1534,17 @@ impl GameState {
                                         player.waitroom.cards.remove(pos);
                                     }
                                     player.hand.cards.push(card_id);
-                                    player.rebuild_hand_index_map();
                                 }
                             }
-                            "empty_area" | "メンバーのいないエリア" => {
+                            "empty_area" => {
                                 // Move from waitroom to empty stage area
                                 let card_ids_to_move: Vec<_> = player.waitroom.cards.iter()
                                     .filter(|c| {
                                         if let Some(ct) = card_type {
                                             if let Some(card) = self.card_database.get_card(**c) {
                                                 match ct {
-                                                    "live_card" | "ライブカード" => card.is_live(),
-                                                    "member_card" | "メンバーカード" => card.is_member(),
+                                                    "live_card" => card.is_live(),
+                                                    "member_card" => card.is_member(),
                                                     _ => true
                                                 }
                                             } else {
@@ -1563,7 +1609,7 @@ impl GameState {
 
                 for card_id in card_ids_to_modify {
                     match resource {
-                        "blade" | "ブレード" => {
+                        "blade" => {
                             self.add_blade_modifier(card_id, count as i32);
                         }
                         _ => {}
@@ -1606,7 +1652,7 @@ impl GameState {
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
                     }
-                    "discard" | "控え室" => {
+                    "discard" => {
                         let _cards_to_look: Vec<_> = player.waitroom.cards.iter()
                             .take(count as usize)
                             .filter_map(|c| self.card_database.get_card(*c))
@@ -1626,14 +1672,14 @@ impl GameState {
                     &mut self.player2
                 };
                 match source {
-                    "deck" | "デッキ" => {
+                    "deck" => {
                         let _cards_to_reveal: Vec<_> = player.main_deck.cards.iter()
                             .take(count as usize)
                             .filter_map(|c| self.card_database.get_card(*c))
                             .map(|c| format!("{} ({})", c.name, c.card_no))
                             .collect();
                     }
-                    "hand" | "手札" => {
+                    "hand" => {
                         let _cards_to_reveal: Vec<_> = player.hand.cards.iter()
                             .take(count as usize)
                             .filter_map(|c| self.card_database.get_card(*c))
@@ -2149,6 +2195,10 @@ impl GameState {
                     self.current_turn_phase != TurnPhase::Live
                 }
                 Duration::Permanent => false,
+                Duration::AsLongAs => {
+                    // As long as condition is met - for now, treat as ThisLive
+                    self.current_turn_phase != TurnPhase::Live
+                }
             };
 
             if is_expired {

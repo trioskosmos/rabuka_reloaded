@@ -8,7 +8,7 @@ use crate::zones::{
 
 use crate::card::CardDatabase;
 
-use std::collections::{VecDeque, HashMap};
+use std::collections::VecDeque;
 
 use rand::prelude::SliceRandom;
 
@@ -59,10 +59,6 @@ pub struct Player {
     // Track whether player has a valid live score (Q47, Q48)
 
     pub has_live_score: bool,
-
-    // Optimization: Map card_id to index in hand for O(1) lookups
-
-    pub hand_card_id_to_index: HashMap<i16, usize>,
 
     // Track blade count for blade abilities
 
@@ -142,8 +138,6 @@ impl Player {
 
             has_live_score: false,
 
-            hand_card_id_to_index: HashMap::new(),
-
             blade: 0,
 
             energy_wait: Vec::new(),
@@ -184,91 +178,28 @@ impl Player {
 
 
 
-    // Helper method to get card index by card_id using HashMap (O(1) lookup)
+    // Helper method to get card index by card_id using linear search
+    // Hands are small (5-10 cards), so O(n) is acceptable and simpler
 
     pub fn get_card_index_by_id(&self, card_id: i16) -> Option<usize> {
 
-        self.hand_card_id_to_index.get(&card_id).copied()
+        self.hand.cards.iter().position(|&c| c == card_id)
 
     }
 
 
 
-    // Helper method to update the index map when hand changes
-
-    pub fn rebuild_hand_index_map(&mut self) {
-
-        self.hand_card_id_to_index.clear();
-
-        for (index, card_id) in self.hand.cards.iter().enumerate() {
-
-            self.hand_card_id_to_index.insert(*card_id, index);
-
-        }
-
-        debug_assert!(self.hand_index_map_invariant(), "Hand index map invariant violated after rebuild");
-
-    }
-
-
-
-    /// Invariant check: hand index map must match actual hand cards
-
-    /// Note: Duplicate cards with same card_id are allowed, so map size may be less than hand size
-
-    pub fn hand_index_map_invariant(&self) -> bool {
-
-        // For duplicate cards, the HashMap will have fewer entries than the hand
-
-        // This is expected and acceptable - the map stores the first occurrence of each card_id
-
-        for (index, card_id) in self.hand.cards.iter().enumerate() {
-
-            if let Some(&mapped_index) = self.hand_card_id_to_index.get(card_id) {
-
-                // For duplicates, the mapped index should point to the first occurrence
-
-                // This is a relaxed invariant that allows duplicates
-
-            } else {
-
-                // At least the first occurrence should be in the map
-
-                let first_occurrence = self.hand.cards.iter().position(|&id| id == *card_id);
-
-                if first_occurrence == Some(index) {
-
-                    return false;
-
-                }
-
-            }
-
-        }
-
-        true
-
-    }
-
-
-
-    // Helper method to add a card to the hand and update index map
+    // Helper method to add a card to the hand
 
     pub fn add_card_to_hand(&mut self, card_id: i16) {
 
-        let index = self.hand.cards.len();
-
         self.hand.cards.push(card_id);
-
-        self.hand_card_id_to_index.insert(card_id, index);
-
-        debug_assert!(self.hand_index_map_invariant(), "Hand index map invariant violated after add");
 
     }
 
 
 
-    // Helper method to remove a card from hand by index and update index map
+    // Helper method to remove a card from hand by index
 
     pub fn remove_card_from_hand(&mut self, index: usize) -> Option<i16> {
 
@@ -278,15 +209,7 @@ impl Player {
 
         }
 
-        let card_id = self.hand.cards.remove(index);
-
-        self.hand_card_id_to_index.remove(&card_id);
-
-        // Rebuild map to update indices after removal
-
-        self.rebuild_hand_index_map();
-
-        Some(card_id)
+        Some(self.hand.cards.remove(index))
 
     }
 
@@ -306,12 +229,6 @@ impl Player {
 
         let card_id = self.hand.cards.remove(hand_index);
 
-        // Rebuild index map after removal
-
-        self.rebuild_hand_index_map();
-
-        // eprintln!("Card ID from hand: {}", card_id);
-
 
 
         if let Some(card) = card_db.get_card(card_id) {
@@ -321,8 +238,6 @@ impl Player {
             if !card.is_member() {
 
                 self.hand.cards.insert(hand_index, card_id);
-
-                self.rebuild_hand_index_map();
 
                 return Err("Only member cards can be placed on stage".to_string());
 
@@ -398,8 +313,6 @@ impl Player {
 
                     self.hand.cards.insert(hand_index, card_id);
 
-                    self.rebuild_hand_index_map();
-
                     return Err("Cannot baton touch - no member in target area".to_string());
 
                 }
@@ -421,8 +334,6 @@ impl Player {
             if let Err(e) = self.energy_zone.pay_energy(cost_to_pay as usize) {
 
                 self.hand.cards.insert(hand_index, card_id);
-
-                self.rebuild_hand_index_map();
 
                 return Err(e);
 
@@ -546,8 +457,6 @@ impl Player {
 
         self.hand.cards.insert(hand_index, card_id);
 
-        self.rebuild_hand_index_map();
-
         Err("Card not found in database".to_string())
 
     }
@@ -570,9 +479,6 @@ impl Player {
 
         let card_id = self.hand.cards.remove(hand_index);
 
-        // Rebuild index map after removal
-
-        self.rebuild_hand_index_map();
 
 
 
@@ -583,8 +489,6 @@ impl Player {
                 // Card is not an energy card, put it back
 
                 self.hand.cards.insert(hand_index, card_id);
-
-                self.rebuild_hand_index_map();
 
                 return Err("Card is not an energy card".to_string());
 
@@ -597,8 +501,6 @@ impl Player {
         } else {
 
             self.hand.cards.insert(hand_index, card_id);
-
-            self.rebuild_hand_index_map();
 
             Err("Card not found in database".to_string())
 
@@ -622,17 +524,12 @@ impl Player {
 
         let card_id = self.hand.cards.remove(hand_index);
 
-        // Rebuild index map after removal
-
-        self.rebuild_hand_index_map();
 
 
 
         if !self.live_card_zone.can_place_card(card_db, card_id) {
 
             self.hand.cards.insert(hand_index, card_id);
-
-            self.rebuild_hand_index_map();
 
             return Err("Card cannot be placed in live card zone".to_string());
 
@@ -806,7 +703,7 @@ impl Player {
 
         match zone {
 
-            "deck" | "main_deck" | "メインデッキ" => {
+            "deck" | "main_deck" => {
 
                 self.main_deck.shuffle();
 
@@ -814,7 +711,7 @@ impl Player {
 
             }
 
-            "energy_deck" | "エネルギーデッキ" => {
+            "energy_deck" => {
 
                 let mut cards: Vec<_> = self.energy_deck.cards.drain(..).collect();
 
@@ -826,7 +723,7 @@ impl Player {
 
             }
 
-            "waitroom" | "控え室" => {
+            "waitroom" | "discard" => {
 
                 self.waitroom.shuffle();
 
@@ -1150,11 +1047,11 @@ impl Player {
 
         match zone {
 
-            "deck" | "main_deck" | "メインデッキ" => !self.main_deck.is_empty(),
+            "deck" | "main_deck" => !self.main_deck.is_empty(),
 
-            "energy_deck" | "エネルギーデッキ" => !self.energy_deck.is_empty(),
+            "energy_deck" => !self.energy_deck.is_empty(),
 
-            "waitroom" | "控え室" => !self.waitroom.cards.is_empty(),
+            "waitroom" | "discard" => !self.waitroom.cards.is_empty(),
 
             _ => false,
 
@@ -1226,15 +1123,15 @@ impl Player {
 
         match zone {
 
-            "hand" | "手札" => self.hand.cards.len(),
+            "hand" => self.hand.cards.len(),
 
-            "deck" | "main_deck" | "メインデッキ" => self.main_deck.len(),
+            "deck" | "main_deck" => self.main_deck.len(),
 
-            "energy_deck" | "エネルギーデッキ" => self.energy_deck.cards.len(),
+            "energy_deck" => self.energy_deck.cards.len(),
 
-            "waitroom" | "discard" | "控え室" => self.waitroom.cards.len(),
+            "waitroom" | "discard" => self.waitroom.cards.len(),
 
-            "stage" | "ステージ" => {
+            "stage" => {
 
                 (if self.stage.stage[0] != -1 { 1 } else { 0 })
 
@@ -1244,13 +1141,13 @@ impl Player {
 
             }
 
-            "energy_zone" | "エネルギー置き場" => self.energy_zone.cards.len(),
+            "energy_zone" => self.energy_zone.cards.len(),
 
-            "live_card_zone" | "ライブカード置き場" => self.live_card_zone.len(),
+            "live_card_zone" => self.live_card_zone.len(),
 
-            "success_live_card_zone" | "成功ライブカード置き場" => self.success_live_card_zone.len(),
+            "success_live_card_zone" => self.success_live_card_zone.len(),
 
-            "exclusion_zone" | "除外領域" => self.exclusion_zone.cards.len(),
+            "exclusion_zone" => self.exclusion_zone.cards.len(),
 
             _ => 0,
 
@@ -1266,23 +1163,23 @@ impl Player {
 
         match zone {
 
-            "hand" | "手札" => {
+            "hand" => {
 
                 match card_type {
 
-                    "member" | "member_card" | "メンバー" => self.hand.cards.iter().filter(|&&card_id| {
+                    "member" | "member_card" => self.hand.cards.iter().filter(|&&card_id| {
 
                         card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false)
 
                     }).count(),
 
-                    "live" | "live_card" | "ライブ" => self.hand.cards.iter().filter(|&&card_id| {
+                    "live" | "live_card" => self.hand.cards.iter().filter(|&&card_id| {
 
                         card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false)
 
                     }).count(),
 
-                    "energy" | "energy_card" | "エネルギー" => self.hand.cards.iter().filter(|&&card_id| {
+                    "energy" | "energy_card" => self.hand.cards.iter().filter(|&&card_id| {
 
                         card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false)
 
@@ -1294,17 +1191,17 @@ impl Player {
 
             }
 
-            "waitroom" | "discard" | "控え室" => {
+            "waitroom" | "discard" => {
 
                 match card_type {
 
-                    "member" | "member_card" | "メンバー" => self.waitroom.cards.iter().filter(|&&card_id| {
+                    "member" | "member_card" => self.waitroom.cards.iter().filter(|&&card_id| {
 
                         card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false)
 
                     }).count(),
 
-                    "live" | "live_card" | "ライブ" => self.waitroom.cards.iter().filter(|&&card_id| {
+                    "live" | "live_card" => self.waitroom.cards.iter().filter(|&&card_id| {
 
                         card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false)
 
@@ -1316,11 +1213,11 @@ impl Player {
 
             }
 
-            "stage" | "ステージ" => {
+            "stage" => {
 
                 match card_type {
 
-                    "member" | "member_card" | "メンバー" => {
+                    "member" | "member_card" => {
 
                         (if self.stage.stage[0] != -1 { 1 } else { 0 })
 
@@ -1482,11 +1379,11 @@ impl Player {
 
         match zone {
 
-            "hand" | "手札" => self.hand.cards.iter().copied().collect(),
+            "hand" => self.hand.cards.iter().copied().collect(),
 
-            "waitroom" | "discard" | "控え室" => self.waitroom.cards.iter().copied().collect(),
+            "waitroom" | "discard" => self.waitroom.cards.iter().copied().collect(),
 
-            "stage" | "ステージ" => {
+            "stage" => {
 
                 let mut card_ids = Vec::new();
 

@@ -22,7 +22,6 @@ fn create_card_database(cards: Vec<Card>) -> Arc<CardDatabase> {
 
 fn setup_player_with_hand(player: &mut Player, card_ids: Vec<i16>) {
     player.hand.cards = card_ids.into_iter().collect();
-    player.rebuild_hand_index_map();
 }
 
 fn setup_player_with_energy(player: &mut Player, card_ids: Vec<i16>) {
@@ -1485,7 +1484,6 @@ fn test_ability_sequential_effects() {
     if !player1.hand.cards.is_empty() {
         let discarded = player1.hand.cards.remove(0);
         player1.waitroom.cards.push(discarded);
-        player1.rebuild_hand_index_map();
     }
     
     let after_discard_hand = player1.hand.cards.len();

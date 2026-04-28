@@ -1,7 +1,8 @@
 import { Phase } from './constants.js';
+import { isMulliganPhase } from './constants.js';
 
 function getSelectedIndices(state, uiState, perspectivePlayer) {
-    const isMulligan = state.phase === Phase.MULLIGAN;
+    const isMulligan = isMulliganPhase(state.phase);
     if (isMulligan) {
         const player = perspectivePlayer === 0 ? state.player1 : state.player2;
         const serverSelection = player.mulligan_selection;
@@ -60,7 +61,7 @@ export const ViewState = {
         const p0 = perspectivePlayer === 0 ? state.player1 : state.player2;
         const p1 = perspectivePlayer === 0 ? state.player2 : state.player1;
 
-        const isMulligan = state.phase === Phase.MULLIGAN;
+        const isMulligan = isMulliganPhase(state.phase);
         const selectedIndices = getSelectedIndices(state, uiState, perspectivePlayer);
         const handFilter = (_, idx) => !isMulligan || !selectedIndices.some(s => Number(s) === Number(idx));
         // Rust backend: hand is { cards: [...] }

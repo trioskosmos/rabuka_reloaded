@@ -536,7 +536,7 @@ pub struct AbilityEffect {
     pub target_member: Option<String>,
     // New fields from parser improvements
     pub choice_options: Option<Vec<String>>,
-    pub options: Option<Vec<serde_json::Value>>, // Can be strings (heart options) or AbilityEffect objects (choice effects)
+    pub options: Option<Vec<AbilityEffect>>, // For choice effects - changed from serde_json::Value
     pub group: Option<GroupInfo>,
     pub per_unit_count: Option<u32>,
     pub per_unit_type: Option<String>,
@@ -555,6 +555,13 @@ pub struct AbilityEffect {
     pub any_number: Option<bool>, // For look_and_select - allows selecting any number of cards
     pub unit: Option<String>,
     pub distinct: Option<String>,
+    pub choice_condition: Option<Condition>, // For conditional choice modifiers
+    pub choice_modifier: Option<String>, // For choice modifier text
+    // Card name matching constraints (Q236/Q237 - 日野下花帆 pattern)
+    #[serde(default)]
+    pub name_constraint: Option<String>, // e.g., "contains_all"
+    #[serde(default)]
+    pub name_constraint_source: Option<String>, // e.g., "revealed_card"
     pub target_player: Option<String>,
     pub target_location: Option<String>,
     pub target_scope: Option<String>,
@@ -703,6 +710,7 @@ pub struct Condition {
     pub options: Option<Vec<AbilityEffect>>, // Changed from Vec<serde_json::Value> to Vec<AbilityEffect> for choice effects
     #[serde(default)]
     pub condition: Option<Box<Condition>>, // For nested conditions (e.g., temporal_condition with not_moved)
+    pub card_property: Option<String>, // For filtering cards by property (e.g., has_blade_heart)
     // New fields from parser improvements
     pub all_areas: Option<bool>,
     pub no_excess_heart: Option<bool>,
@@ -769,6 +777,7 @@ impl Default for Condition {
             conditions: None,
             options: None,
             condition: None,
+            card_property: None,
             all_areas: None,
             no_excess_heart: None,
             exclude_this_member: None,
@@ -819,6 +828,10 @@ impl Card {
         } else {
             0
         }
+    }
+
+    pub fn has_blade_heart(&self) -> bool {
+        self.blade_heart.is_some() || self.blade > 0
     }
     
     pub fn satisfies_heart_requirement(&self, provided_hearts: &BaseHeart) -> bool {

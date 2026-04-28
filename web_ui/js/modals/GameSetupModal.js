@@ -222,13 +222,18 @@ export const GameSetupModal = {
             });
             const data = await res.json();
 
+            if (!res.ok) {
+                throw new Error(data?.error || `Failed to initialize game (${res.status})`);
+            }
+
             if (data) {
                 State.offlineMode = false;
-                State.roomCode = 'local'; // Use a dummy room code
+                State.roomCode = null;
                 State.gameHasStarted = true;
+                localStorage.removeItem('lovelive_room_code');
 
                 ModalManager.hide(DOM_IDS.MODAL_ROOM);
-                log(`Game started (${mode})`);
+                console.log(`[GameSetup] Game started (${mode})`);
 
                 // Fetch initial state
                 if (Network.fetchState) {

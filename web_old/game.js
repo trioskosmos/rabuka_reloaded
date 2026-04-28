@@ -658,23 +658,12 @@ class GameScene extends Phaser.Scene {
         const members = [stage.left_side, stage.center, stage.right_side];
         members.forEach(member => {
             if (member && member.card_no) {
-                // Look up card data to get heart information
-                // Try both as-is and as string
-                let cardData = this.cardData.get(member.card_no);
-                if (!cardData && typeof member.card_no === 'number') {
-                    // Try to find by numeric ID by searching all cards
-                    for (const [key, value] of this.cardData.entries()) {
-                        if (value.id === member.card_no) {
-                            cardData = value;
-                            break;
-                        }
-                    }
-                }
-                if (cardData && cardData.base_heart) {
+                // Use the card data directly from the stage member
+                if (member.base_heart && typeof member.base_heart === 'object') {
                     // heart is an object like { heart01: 1, heart03: 2, heart06: 1 }
                     // Handle all heart types dynamically, but exclude blade hearts (b_heart)
                     // Blade hearts only exist on cards revealed by エール, not on stage members
-                    for (const [heartType, count] of Object.entries(cardData.base_heart)) {
+                    for (const [heartType, count] of Object.entries(member.base_heart)) {
                         // Skip blade hearts (b_heart) - they are not on stage members
                         if (count && !heartType.startsWith('b_heart')) {
                             hearts[heartType] = (hearts[heartType] || 0) + count;
@@ -692,21 +681,10 @@ class GameScene extends Phaser.Scene {
         const members = [stage.left_side, stage.center, stage.right_side];
         members.forEach(member => {
             if (member && member.card_no) {
-                // Look up card data to get blade information
-                // Try both as-is and as string
-                let cardData = this.cardData.get(member.card_no);
-                if (!cardData && typeof member.card_no === 'number') {
-                    // Try to find by numeric ID by searching all cards
-                    for (const [key, value] of this.cardData.entries()) {
-                        if (value.id === member.card_no) {
-                            cardData = value;
-                            break;
-                        }
-                    }
-                }
-                if (cardData && cardData.blade) {
+                // Use the card data directly from the stage member
+                if (typeof member.blade === 'number') {
                     // blade is a number
-                    totalBlades += cardData.blade || 0;
+                    totalBlades += member.blade;
                 }
             }
         });

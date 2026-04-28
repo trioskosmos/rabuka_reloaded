@@ -166,6 +166,23 @@ export const GameService = {
                 body: JSON.stringify(requestBody)
             });
             const text = await res.text();
+
+            if (!res.ok) {
+                let message = `Action failed (${res.status})`;
+                if (text) {
+                    try {
+                        const errorData = JSON.parse(text);
+                        message = errorData.error || errorData.message || message;
+                        if (errorData.phase) {
+                            message += ` [phase: ${errorData.phase}]`;
+                        }
+                    } catch {
+                        message = text;
+                    }
+                }
+                throw new Error(message);
+            }
+
             State.lastStateJson = text;
             const data = text ? JSON.parse(text) : null;
 
@@ -223,12 +240,20 @@ export const GameService = {
                 headers: { 'Content-Type': 'application/json' }
             });
 
+            const text = await res.text();
             if (!res.ok) {
-                log(`Reset failed: ${res.status}`);
+                let message = `Reset failed (${res.status})`;
+                if (text) {
+                    try {
+                        const errorData = JSON.parse(text);
+                        message = errorData.error || errorData.message || message;
+                    } catch {
+                        message = text;
+                    }
+                }
+                log(message, 'error');
                 return;
             }
-
-            const text = await res.text();
             State.lastStateJson = text;
             const data = JSON.parse(text);
 

@@ -20,6 +20,8 @@ app.use(express.static(distPath));
 app.use('/assets', express.static(path.resolve(__dirname, '..', 'web_ui', 'dist', 'assets')));
 // Serve cards directory for static card database access
 app.use('/cards', express.static(path.resolve(__dirname, '..', 'cards')));
+// Serve engine assets that the frontend may fetch directly
+app.use('/engine', express.static(path.resolve(__dirname, '..', 'engine')));
 
 // Proxy requests to Rust backend
 app.get('/api/game-state', async (req, res) => {

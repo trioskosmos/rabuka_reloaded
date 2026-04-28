@@ -277,19 +277,36 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 }),
             });
         }
-        crate::game_state::Phase::Mulligan => {
+        crate::game_state::Phase::Mulligan |
+        crate::game_state::Phase::MulliganP1Turn |
+        crate::game_state::Phase::MulliganP2Turn => {
             // Rule 6.2.1.6: Mulligan - player chooses cards to mulligan
             // Generate actions for the current mulligan player only
-            let mulligan_player = if game_state.current_mulligan_player == "player1" {
-                &game_state.player1
-            } else {
-                &game_state.player2
+            let mulligan_player = match game_state.current_phase {
+                crate::game_state::Phase::MulliganP1Turn => &game_state.player1,
+                crate::game_state::Phase::MulliganP2Turn => &game_state.player2,
+                crate::game_state::Phase::Mulligan => {
+                    // Legacy phase - use flag for compatibility
+                    if game_state.current_mulligan_player_idx == 0 {
+                        &game_state.player1
+                    } else {
+                        &game_state.player2
+                    }
+                }
+                _ => &game_state.player1,
             };
-            
-            let player_name = if game_state.current_mulligan_player == "player1" {
-                "Player 1"
-            } else {
-                "Player 2"
+
+            let player_name = match game_state.current_phase {
+                crate::game_state::Phase::MulliganP1Turn => "Player 1",
+                crate::game_state::Phase::MulliganP2Turn => "Player 2",
+                crate::game_state::Phase::Mulligan => {
+                    if game_state.current_mulligan_player_idx == 0 {
+                        "Player 1"
+                    } else {
+                        "Player 2"
+                    }
+                }
+                _ => "Player 1",
             };
             
             // Add header action to show whose turn it is
@@ -558,8 +575,9 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 }
             }
         }
-        crate::game_state::Phase::LiveCardSet => {
-            // Rule 8.2: Live Card Set Phase - Can place up to 3 cards face-down
+        crate::game_state::Phase::LiveCardSet |
+        crate::game_state::Phase::LiveCardSetP1Turn |
+        crate::game_state::Phase::LiveCardSetP2Turn => {
             // Use the consolidated active_player() method to determine which player is currently setting cards
             let active_player = game_state.active_player();
 
@@ -604,13 +622,16 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 }
             }
 
-            // Add action to finish live card set
-            let player_name = if active_player.id == "player1" { "Player 1" } else { "Player 2" };
-            actions.push(Action {
-                description: format!("Finish {}'s live card set", player_name),
-                action_type: ActionType::FinishLiveCardSet,
-                parameters: None,
-            });
+            // Add Pass action so player can indicate they're done setting cards
+            // Always add Pass as long as the current player hasn't finished (counter < 2)
+            // This allows players to pass even if they have cards left in hand
+            if game_state.current_live_card_set_player < 2 {
+                actions.push(Action {
+                    description: "Pass - Finished setting live cards".to_string(),
+                    action_type: ActionType::Pass,
+                    parameters: None,
+                });
+            }
         }
         crate::game_state::Phase::FirstAttackerPerformance
         | crate::game_state::Phase::SecondAttackerPerformance

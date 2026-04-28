@@ -185,6 +185,34 @@ fn run_single_game(
         
         // Auto-advance automatic phases
         match game_state.current_phase {
+            crate::game_state::Phase::RockPaperScissors |
+            crate::game_state::Phase::ChooseFirstAttacker |
+            crate::game_state::Phase::MulliganP1Turn |
+            crate::game_state::Phase::MulliganP2Turn |
+            crate::game_state::Phase::Mulligan |
+            crate::game_state::Phase::LiveCardSetP1Turn |
+            crate::game_state::Phase::LiveCardSetP2Turn |
+            crate::game_state::Phase::LiveCardSet |
+            crate::game_state::Phase::Main => {
+                // Manual phases - stop
+                break;
+            }
+            crate::game_state::Phase::Active | 
+            crate::game_state::Phase::Energy | 
+            crate::game_state::Phase::Draw |
+            crate::game_state::Phase::FirstAttackerPerformance |
+            crate::game_state::Phase::SecondAttackerPerformance |
+            crate::game_state::Phase::LiveVictoryDetermination => {
+                turn::TurnEngine::advance_phase(&mut game_state);
+            }
+            crate::game_state::Phase::LiveStart | crate::game_state::Phase::LiveSuccess | crate::game_state::Phase::Cheer => {
+                // Handle new phases - skip for now
+                println!("Skipping new phase: {:?}", game_state.current_phase);
+            }
+        }
+        
+        // Handle manual phases with AI
+        match game_state.current_phase {
             crate::game_state::Phase::RockPaperScissors => {
                 // Q16: Play RPS to determine turn order
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
@@ -202,10 +230,6 @@ fn run_single_game(
                 if let Err(e) = result {
                     println!("RPS action failed: {}", e);
                 }
-            }
-            crate::game_state::Phase::LiveStart | crate::game_state::Phase::LiveSuccess | crate::game_state::Phase::Cheer => {
-                // Handle new phases - skip for now
-                println!("Skipping new phase: {:?}", game_state.current_phase);
             }
             crate::game_state::Phase::ChooseFirstAttacker => {
                 // Q16: RPS winner chooses turn order (simplified: always choose first)
@@ -225,6 +249,8 @@ fn run_single_game(
                     println!("ChooseFirstAttacker action failed: {}", e);
                 }
             }
+            crate::game_state::Phase::MulliganP1Turn |
+            crate::game_state::Phase::MulliganP2Turn |
             crate::game_state::Phase::Mulligan => {
                 // Mulligan phase - let the AI choose
                 let ai = ai::AIPlayer::new("TournamentAI".to_string());
@@ -244,11 +270,6 @@ fn run_single_game(
                 if let Err(e) = result {
                     println!("Mulligan action failed: {}", e);
                 }
-            }
-            crate::game_state::Phase::Active | 
-            crate::game_state::Phase::Energy | 
-            crate::game_state::Phase::Draw => {
-                turn::TurnEngine::advance_phase(&mut game_state);
             }
             crate::game_state::Phase::Main => {
                 let actions = game_setup::generate_possible_actions(&game_state);
@@ -295,28 +316,13 @@ fn run_single_game(
                         use_baton_touch,
                     );
                     
-                    // If action fails, try to pass instead to avoid getting stuck
                     if let Err(e) = result {
-                        println!("Action failed: {}, trying pass instead", e);
-                        let _ = turn::TurnEngine::execute_main_phase_action(&mut game_state, &game_setup::ActionType::Pass, None, None, None, None);
-                    } else {
-                        // Action succeeded - check timing after action
-                        turn::TurnEngine::check_timing(&mut game_state);
-                        // Auto-advance automatic phases
-                        loop {
-                            let current_phase = game_state.current_phase.clone();
-                            match current_phase {
-                                crate::game_state::Phase::Active | 
-                                crate::game_state::Phase::Energy | 
-                                crate::game_state::Phase::Draw => {
-                                    turn::TurnEngine::advance_phase(&mut game_state);
-                                }
-                                _ => break,
-                            }
-                        }
+                        println!("Main phase action failed: {}", e);
                     }
                 }
             }
+            crate::game_state::Phase::LiveCardSetP1Turn |
+            crate::game_state::Phase::LiveCardSetP2Turn |
             crate::game_state::Phase::LiveCardSet => {
                 // Rule 8.2: Both players set live cards (automatic)
                 let p1_cards = ai::AIPlayer::choose_live_cards_to_set(game_state.first_attacker());
@@ -326,42 +332,7 @@ fn run_single_game(
                 turn::TurnEngine::player_set_live_cards(game_state.second_attacker_mut(), p2_cards, &*card_db);
                 game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
             }
-            crate::game_state::Phase::FirstAttackerPerformance => {
-                // Rule 8.3: First attacker performs (automatic)
-                let blade_heart_count = {
-                    let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                    let player_id = if game_state.player1.is_first_attacker {
-                        game_state.player1.id.clone()
-                    } else {
-                        game_state.player2.id.clone()
-                    };
-                    let card_db = game_state.card_database.clone();
-                    let player = game_state.first_attacker_mut();
-                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
-                };
-                game_state.player1_cheer_blade_heart_count = blade_heart_count;
-                game_state.current_phase = crate::game_state::Phase::SecondAttackerPerformance;
-            }
-            crate::game_state::Phase::SecondAttackerPerformance => {
-                // Rule 8.3: Second attacker performs (automatic)
-                let blade_heart_count = {
-                    let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                    let player_id = if game_state.player1.is_first_attacker {
-                        game_state.player2.id.clone()
-                    } else {
-                        game_state.player1.id.clone()
-                    };
-                    let card_db = game_state.card_database.clone();
-                    let player = game_state.second_attacker_mut();
-                    turn::TurnEngine::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
-                };
-                game_state.player2_cheer_blade_heart_count = blade_heart_count;
-                game_state.current_phase = crate::game_state::Phase::LiveVictoryDetermination;
-            }
-            crate::game_state::Phase::LiveVictoryDetermination => {
-                // Rule 8.4: Determine live victory (automatic)
-                turn::TurnEngine::execute_live_victory_determination(&mut game_state);
-            }
+            _ => {}
         }
     }
     

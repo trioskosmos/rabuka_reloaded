@@ -2,6 +2,7 @@
  * Central State Management
  * Holds the current game state, configuration, and connectivity flags.
  */
+import { getAppBaseUrl, isMulliganPhase } from './constants.js';
 
 const _target = new EventTarget();
 
@@ -17,7 +18,7 @@ const stateInternal = {
     rawData: null, // The "original" state object from server (IDs only, for debugging/warping)
 
     // Identity & Session
-    roomCode: localStorage.getItem('lovelive_room_code'),
+    roomCode: localStorage.getItem('lovelive_room_code') || null,
     sessionToken: null,
     perspectivePlayer: 0, // 0 or 1 (Who are we viewing?)
     cardSet: 'compiled', // 'compiled' or 'vanilla'
@@ -139,8 +140,8 @@ const stateInternal = {
         State.emit('change-detected');
 
         // Detect Mulligan Finish
-        const isMulliganOld = State.lastPhase === 'Mulligan';
-        const isMulliganNew = newData.phase === 'Mulligan';
+        const isMulliganOld = isMulliganPhase(State.lastPhase);
+        const isMulliganNew = isMulliganPhase(newData.phase);
 
         // Clear local selection on phase change
         if (State.lastPhase !== newData.phase) {
@@ -282,37 +283,68 @@ const stateInternal = {
         if (State.staticCardDatabase && State.cardIdMapping) return; // Already loaded
 
         try {
+            const base = getAppBaseUrl();
+            const withBase = (path) => `${base}${path}`.replace(/\/{2,}/g, '/').replace(':/', '://');
+            const fetchOptionalJson = async (path, label) => {
+                const response = await fetch(withBase(path));
+                if (!response.ok) {
+                    console.warn(`[State] Failed to load ${label}:`, response.status);
+                    return null;
+                }
+
+                const contentType = response.headers.get('content-type') || '';
+                if (!contentType.toLowerCase().includes('json')) {
+                    console.warn(`[State] Skipping ${label}: expected JSON but got`, contentType || 'unknown content type');
+                    return null;
+                }
+
+                return response.json();
+            };
+
+            // Load cards.json first (most critical)
+            const cardsResponse = await fetch(withBase('cards/cards.json'));
+            if (!cardsResponse.ok) {
+                console.error('[State] Failed to load cards.json:', cardsResponse.status, cardsResponse.statusText);
+                // Try fallback path
+                const fallbackResponse = await fetch(withBase('./cards/cards.json'));
+                if (!fallbackResponse.ok) {
+                    console.error('[State] Failed to load fallback cards.json:', fallbackResponse.status);
+                    return;
+                }
+                const cardsData = await fallbackResponse.json();
+                State.staticCardDatabase = cardsData;
+                console.log('[State] Loaded static card database from fallback, total cards:', Object.keys(cardsData).length);
+            } else {
+                const cardsData = await cardsResponse.json();
+                State.staticCardDatabase = cardsData;
+                console.log('[State] Loaded static card database, total cards:', Object.keys(cardsData).length);
+            }
+
+            // Verify specific cards that were failing
+            const testCards = ['PL!S-bp2-022-L', 'PL!S-PR-025-PR'];
+            testCards.forEach(cardNo => {
+                if (State.staticCardDatabase[cardNo]) {
+                    console.log('[State] Verified card exists:', cardNo, '->', State.staticCardDatabase[cardNo].name);
+                } else {
+                    console.error('[State] Card still missing:', cardNo);
+                }
+            });
+
             // Load card_id_mapping.json
-            const mappingResponse = await fetch('/engine/card_id_mapping.json');
-            if (mappingResponse.ok) {
-                const mappingData = await mappingResponse.json();
+            const mappingData = await fetchOptionalJson('engine/card_id_mapping.json', 'card_id_mapping.json');
+            if (mappingData) {
                 State.cardIdMapping = mappingData;
                 console.log('[State] Loaded card ID mapping, total mappings:', Object.keys(mappingData).length);
-            } else {
-                console.warn('[State] Failed to load card_id_mapping.json:', mappingResponse.status);
             }
-
-            // Load cards.json
-            const cardsResponse = await fetch('/cards/cards.json');
-            if (!cardsResponse.ok) {
-                console.warn('[State] Failed to load cards.json:', cardsResponse.status);
-                return;
-            }
-            const cardsData = await cardsResponse.json();
-            State.staticCardDatabase = cardsData;
-            console.log('[State] Loaded static card database, total cards:', Object.keys(cardsData).length);
 
             // Load card_image_mapping.json
-            const imageMappingResponse = await fetch('/js/card_image_mapping.json');
-            if (imageMappingResponse.ok) {
-                const imageMappingData = await imageMappingResponse.json();
+            const imageMappingData = await fetchOptionalJson('js/card_image_mapping.json', 'card_image_mapping.json');
+            if (imageMappingData) {
                 State.cardImageMapping = imageMappingData;
                 console.log('[State] Loaded card image mapping, total mappings:', Object.keys(imageMappingData).length);
-            } else {
-                console.warn('[State] Failed to load card_image_mapping.json:', imageMappingResponse.status);
             }
         } catch (e) {
-            console.warn('[State] Failed to load static card database:', e);
+            console.error('[State] Failed to load static card database:', e);
         }
     },
 
@@ -346,13 +378,22 @@ const stateInternal = {
 
         // Handle string card_no lookups (e.g., "PL!-sd1-001-SD")
         if (typeof cid === 'string') {
-            if (State.cardIndex) {
+            // Try card index first (game-specific data)
+            if (State.cardIndex && State.cardIndex[cid]) {
                 return State.cardIndex[cid];
             }
+            
             // Fallback to static database
             if (State.staticCardDatabase && State.staticCardDatabase[cid]) {
                 return State.staticCardDatabase[cid];
             }
+            
+            // If database not loaded yet, trigger async load and return null
+            if (!State.staticCardDatabase) {
+                console.warn('[State] Card lookup attempted before database loaded:', cid);
+                State.loadStaticCardDatabase();
+            }
+            
             return null;
         }
 

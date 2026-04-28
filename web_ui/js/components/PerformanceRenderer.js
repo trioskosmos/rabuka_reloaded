@@ -4,7 +4,7 @@
  * snapshot emitted by the Rust engine.
  */
 import { State } from '../state.js';
-import { fixImg, Phase } from '../constants.js';
+import { fixImg, Phase, isMulliganPhase } from '../constants.js';
 import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { TextEnricher } from '../utils/TextEnricher.js';
@@ -924,7 +924,7 @@ export const PerformanceRenderer = {
     _getPhaseKey: (phase) => {
         const perspectivePlayer = State.perspectivePlayer;
         if (phase === Phase.ROCK_PAPER_SCISSORS) return 'rps';
-        if (phase === Phase.MULLIGAN) return 'mulligan';
+        if (isMulliganPhase(phase)) return 'mulligan';
         if (phase === Phase.ACTIVE) return 'active';
         if (phase === Phase.ENERGY) return 'energy';
         if (phase === Phase.DRAW) return 'draw';

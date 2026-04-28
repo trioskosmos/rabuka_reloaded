@@ -56,8 +56,6 @@ fn setup_player_with_hand(player: &mut rabuka_engine::player::Player, card_ids: 
 
     player.hand.cards = card_ids.into_iter().collect();
 
-    player.rebuild_hand_index_map();
-
 }
 
 
@@ -2576,9 +2574,7 @@ fn test_q45_all_blade_effects() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.live_card_set_player1_done = true;
-
-    game_state.live_card_set_player2_done = true;
+    game_state.current_live_card_set_player = 2; // Both done
 
     
 
@@ -2982,9 +2978,7 @@ fn test_q49_no_winner_turn_order_unchanged() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.live_card_set_player1_done = true;
-
-    game_state.live_card_set_player2_done = true;
+    game_state.current_live_card_set_player = 2; // Both done
 
     
 
@@ -3070,9 +3064,7 @@ fn test_q50_both_winners_turn_order_unchanged() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.live_card_set_player1_done = true;
-
-    game_state.live_card_set_player2_done = true;
+    game_state.current_live_card_set_player = 2; // Both done
 
     
 
@@ -3292,9 +3284,7 @@ fn test_q52_no_one_places_card_turn_order_unchanged() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.live_card_set_player1_done = true;
-
-    game_state.live_card_set_player2_done = true;
+    game_state.current_live_card_set_player = 2; // Both done
 
     
 
@@ -10112,8 +10102,6 @@ fn test_q229_draw_when_hand_at_or_below_three() {
 
     game_state.player1.hand.cards = final_hand.into_iter().collect();
 
-    game_state.player1.rebuild_hand_index_map();
-
     game_state.player1.main_deck.cards = deck_card_ids.into_iter().collect();
 
     
@@ -10808,13 +10796,7 @@ fn test_q226_deck_placement_when_low_cards() {
 
     game_state.player1.energy_zone.cards = energy_card_ids.into_iter().collect();
 
-    game_state.player1.energy_zone.active_energy_count = energy_count;
-
-    
-
-    // Rebuild hand index map after manually setting hand
-
-    game_state.player1.rebuild_hand_index_map();
+    game_state.player1.energy_zone.active_energy_count = energy_count;    
 
     
 

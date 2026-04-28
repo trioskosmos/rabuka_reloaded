@@ -212,10 +212,16 @@ pub fn run_test_mode() {
                     eprintln!("Auto-advancing {:?}...", current_phase);
                     turn::TurnEngine::advance_phase(&mut game_state);
                 }
-                crate::game_state::Phase::LiveCardSet => {
-                    eprintln!("Placing cards in LiveCardSet phase...");
-                    // Per Rule 8.2.2, place up to 3 cards from hand (any cards, not just live)
-                    // Then flip face-up later and non-live cards go to waitroom (Rule 8.3.4)
+                crate::game_state::Phase::RockPaperScissors |
+                crate::game_state::Phase::ChooseFirstAttacker |
+                crate::game_state::Phase::MulliganP1Turn |
+                crate::game_state::Phase::MulliganP2Turn |
+                crate::game_state::Phase::Mulligan |
+                crate::game_state::Phase::LiveCardSetP1Turn |
+                crate::game_state::Phase::LiveCardSetP2Turn |
+                crate::game_state::Phase::LiveCardSet |
+                crate::game_state::Phase::Main => {
+                    // Manual phases - let AI play
                     let player = game_state.active_player_mut();
                     let cards_to_place = std::cmp::min(3, player.hand.cards.len());
                     
@@ -247,44 +253,6 @@ pub fn run_test_mode() {
                 crate::game_state::Phase::LiveVictoryDetermination => {
                     eprintln!("Auto-advancing live phase...");
                     turn::TurnEngine::advance_phase(&mut game_state);
-                }
-                crate::game_state::Phase::RockPaperScissors => {
-                    eprintln!("Playing RPS...");
-                    let _ = turn::TurnEngine::execute_main_phase_action(
-                        &mut game_state,
-                        &crate::game_setup::ActionType::RockChoice,
-                        None,
-                        None,
-                        Some(crate::zones::MemberArea::LeftSide), // Rock
-                        None,
-                    );
-                }
-                crate::game_state::Phase::ChooseFirstAttacker => {
-                    eprintln!("RPS winner choosing turn order...");
-                    // Q16: RPS winner chooses to go first (simplified for test mode)
-                    let _ = turn::TurnEngine::execute_main_phase_action(
-                        &mut game_state,
-                        &crate::game_setup::ActionType::ChooseFirstAttacker,
-                        None,
-                        None,
-                        None,
-                        None,
-                    );
-                }
-                crate::game_state::Phase::Mulligan => {
-                    eprintln!("Skipping mulligan...");
-                    let _ = turn::TurnEngine::execute_main_phase_action(
-                        &mut game_state,
-                        &crate::game_setup::ActionType::SkipMulligan,
-                        None,
-                        None,
-                        None,
-                        None,
-                    );
-                }
-                crate::game_state::Phase::Main => {
-                    eprintln!("Reached Main phase");
-                    break;
                 }
             }
         }
