@@ -1,6 +1,6 @@
 use crate::game_state::{GameState, Phase, TurnPhase};
 use crate::card::CardDatabase;
-use crate::constants::{VICTORY_CARD_COUNT, MAX_LIVE_CARDS, INITIAL_DRAW_COUNT};
+use crate::constants::{VICTORY_CARD_COUNT, MAX_LIVE_CARDS};
 use std::vec::Vec;
 use std::string::String;
 
@@ -180,45 +180,35 @@ impl TurnEngine {
     }
 
     fn handle_mulligan_confirmation(game_state: &mut GameState) -> Result<(), String> {
-        // Rule 6.2.1.6: Mulligan - player has selected cards to mulligan
+        // Simple mulligan: return selected cards, draw new ones, shuffle
         let indices = game_state.mulligan_selected_indices.clone();
-
-        // Determine current player by phase
+        
         let current_player = match game_state.current_phase {
             Phase::MulliganP1Turn => &mut game_state.player1,
             Phase::MulliganP2Turn => &mut game_state.player2,
             _ => return Err("Not in mulligan phase".to_string()),
         };
 
-        // Perform mulligan for selected cards
+        // Return selected cards and draw new ones
         if !indices.is_empty() {
-            // Sort indices in descending order to remove without shifting
             let sorted_indices = {
                 let mut sorted = indices.clone();
                 sorted.sort_by(|a, b| b.cmp(a));
                 sorted
             };
 
-            let num_to_mulligan = sorted_indices.len();
-            let mut cards_to_set_aside = Vec::new();
-
             for idx in sorted_indices {
                 if idx < current_player.hand.cards.len() {
-                    cards_to_set_aside.push(current_player.hand.cards.remove(idx));
+                    let card = current_player.hand.cards.remove(idx);
+                    current_player.main_deck.cards.push(card);
                 }
             }
 
-            // Draw the same number from main deck
-            for _ in 0..num_to_mulligan {
+            for _ in 0..indices.len() {
                 let _ = current_player.draw_card();
             }
 
-            // Move set-aside cards to main deck
-            for card in cards_to_set_aside {
-                current_player.main_deck.cards.push(card);
-            }
-
-            // Shuffle main deck
+            // Shuffle deck
             use rand::seq::SliceRandom;
             let mut deck_vec: Vec<_> = current_player.main_deck.cards.drain(..).collect();
             deck_vec.shuffle(&mut rand::thread_rng());
@@ -227,89 +217,70 @@ impl TurnEngine {
             }
         }
 
-        // Clear selected indices and transition to the next mulligan turn.
-        // Mulligan order follows turn order, not player number.
+        // Clear selection and advance to next phase
         game_state.mulligan_selected_indices.clear();
-        let current_is_first_attacker = match game_state.current_phase {
-            Phase::MulliganP1Turn => game_state.player1.is_first_attacker,
-            Phase::MulliganP2Turn => game_state.player2.is_first_attacker,
-            Phase::Mulligan => game_state.current_mulligan_player_idx == 0,
-            _ => false,
-        };
-
+        
+        let p1_is_first = game_state.player1.is_first_attacker;
         match game_state.current_phase {
             Phase::MulliganP1Turn => {
-                if current_is_first_attacker {
+                if p1_is_first {
+                    // P1 first, go to P2 mulligan
                     game_state.current_phase = Phase::MulliganP2Turn;
                 } else {
+                    // P1 second, go to Active
                     Self::setup_initial_energy(game_state);
                     game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;
                 }
             }
             Phase::MulliganP2Turn => {
-                if current_is_first_attacker {
-                    game_state.current_phase = Phase::MulliganP1Turn;
+                if p1_is_first {
+                    // P2 second, go to Active
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
                 } else {
-                    Self::setup_initial_energy(game_state);
-                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
-                    game_state.current_phase = Phase::Active;
-                }
-            }
-            Phase::Mulligan => {
-                // Legacy phase - use flag for compatibility
-                game_state.current_mulligan_player_idx += 1;
-                if game_state.current_mulligan_player_idx >= 2 {
-                    Self::setup_initial_energy(game_state);
-                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
-                    game_state.current_phase = Phase::Active;
+                    // P2 first, go to P1 mulligan
+                    game_state.current_phase = Phase::MulliganP1Turn;
                 }
             }
             _ => {}
         }
+        
         Ok(())
     }
 
     fn handle_mulligan_skip(game_state: &mut GameState) -> Result<(), String> {
-        // Player chooses not to mulligan - transition to next player's phase
+        // Player chooses not to mulligan - advance to next phase
         game_state.mulligan_selected_indices.clear();
-        let current_is_first_attacker = match game_state.current_phase {
-            Phase::MulliganP1Turn => game_state.player1.is_first_attacker,
-            Phase::MulliganP2Turn => game_state.player2.is_first_attacker,
-            Phase::Mulligan => game_state.current_mulligan_player_idx == 0,
-            _ => false,
-        };
+        let p1_is_first = game_state.player1.is_first_attacker;
 
         match game_state.current_phase {
             Phase::MulliganP1Turn => {
-                if current_is_first_attacker {
+                if p1_is_first {
+                    // P1 first, go to P2 mulligan
                     game_state.current_phase = Phase::MulliganP2Turn;
                 } else {
+                    // P1 second, go to Active
                     Self::setup_initial_energy(game_state);
                     game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;
                 }
             }
             Phase::MulliganP2Turn => {
-                if current_is_first_attacker {
-                    game_state.current_phase = Phase::MulliganP1Turn;
+                if p1_is_first {
+                    // P2 second, go to Active
+                    Self::setup_initial_energy(game_state);
+                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+                    game_state.current_phase = Phase::Active;
                 } else {
-                    Self::setup_initial_energy(game_state);
-                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
-                    game_state.current_phase = Phase::Active;
-                }
-            }
-            Phase::Mulligan => {
-                // Legacy phase - use flag for compatibility
-                game_state.current_mulligan_player_idx += 1;
-                if game_state.current_mulligan_player_idx >= 2 {
-                    Self::setup_initial_energy(game_state);
-                    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
-                    game_state.current_phase = Phase::Active;
+                    // P2 first, go to P1 mulligan
+                    game_state.current_phase = Phase::MulliganP1Turn;
                 }
             }
             _ => {}
         }
+        
         Ok(())
     }
 
@@ -416,43 +387,7 @@ impl TurnEngine {
         Ok(())
     }
 
-    fn handle_attacker_choice(game_state: &mut GameState, choose_first: bool) -> Result<(), String> {
-        // Q16: RPS winner chooses turn order
-        let rps_winner = game_state.rps_winner.unwrap_or(1);
-        
-        // Only the RPS winner should be able to make this choice
-        // If player 2 wins, player 1 (human) shouldn't be able to choose
-        if rps_winner == 2 {
-            return Err("Player 2 won RPS, only they can choose turn order".to_string());
-        }
-
-        if choose_first {
-            // Choose to be first attacker
-            game_state.player1.is_first_attacker = true;
-            game_state.player2.is_first_attacker = false;
-        } else {
-            // Choose to be second attacker
-            game_state.player1.is_first_attacker = false;
-            game_state.player2.is_first_attacker = true;
-        }
-
-        // Rule 6.2.5: Initial draw - Each player draws INITIAL_DRAW_COUNT cards from main deck to hand
-        for _ in 0..INITIAL_DRAW_COUNT {
-            game_state.player1.draw_card();
-            game_state.player2.draw_card();
-        }
-
-        // Advance to Mulligan phase
-        game_state.current_mulligan_player_idx = 0;
-        game_state.current_phase = if game_state.player1.is_first_attacker {
-            crate::game_state::Phase::MulliganP1Turn
-        } else {
-            crate::game_state::Phase::MulliganP2Turn
-        };
-        game_state.mulligan_selected_indices.clear();
-        Ok(())
-    }
-
+    
     fn handle_play_member_to_stage(game_state: &mut GameState, card_id: Option<i16>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
         let card_db = game_state.card_database.clone();
         let player = game_state.active_player_mut();
@@ -534,20 +469,70 @@ impl TurnEngine {
                 // MulliganHeader is a display-only action, no execution needed
                 Ok(())
             }
-            crate::game_setup::ActionType::RockChoice => {
-                Self::handle_rps_choice(game_state, 0)
-            }
-            crate::game_setup::ActionType::PaperChoice => {
-                Self::handle_rps_choice(game_state, 1)
-            }
+            crate::game_setup::ActionType::RockChoice |
+            crate::game_setup::ActionType::PaperChoice |
             crate::game_setup::ActionType::ScissorsChoice => {
-                Self::handle_rps_choice(game_state, 2)
+                // Determine which player is choosing based on who has already chosen
+                let choice_value = match action {
+                    crate::game_setup::ActionType::RockChoice => 0,
+                    crate::game_setup::ActionType::PaperChoice => 1,
+                    crate::game_setup::ActionType::ScissorsChoice => 2,
+                    _ => unreachable!(),
+                };
+                
+                // If P1 hasn't chosen yet, this is P1's choice
+                // Otherwise, it's P2's choice
+                if game_state.player1_rps_choice.is_none() {
+                    Self::handle_rps_choice_p1(game_state, choice_value)
+                } else {
+                    Self::handle_rps_choice_p2(game_state, choice_value)
+                }
             }
             crate::game_setup::ActionType::ChooseFirstAttacker => {
-                Self::handle_attacker_choice(game_state, true)
+                // RPS winner chooses who goes first
+                // Check who won RPS and validate they can make this choice
+                let winner = game_state.rps_winner.ok_or("No RPS winner determined")?;
+                
+                println!("DEBUG: ChooseFirstAttacker action executed, RPS winner: {}", winner);
+                
+                game_state.player1.is_first_attacker = true;
+                game_state.player2.is_first_attacker = false;
+                
+                // Draw 6 cards to hand
+                for _ in 0..6 {
+                    game_state.player1.draw_card();
+                    game_state.player2.draw_card();
+                }
+                
+                // Go to mulligan phase (P1 goes first since they're first attacker)
+                game_state.current_phase = crate::game_state::Phase::MulliganP1Turn;
+                game_state.mulligan_selected_indices.clear();
+                
+                println!("DEBUG: Phase transitioned to MulliganP1Turn");
+                Ok(())
             }
             crate::game_setup::ActionType::ChooseSecondAttacker => {
-                Self::handle_attacker_choice(game_state, false)
+                // RPS winner chooses who goes first
+                // Check who won RPS and validate they can make this choice
+                let winner = game_state.rps_winner.ok_or("No RPS winner determined")?;
+                
+                println!("DEBUG: ChooseSecondAttacker action executed, RPS winner: {}", winner);
+                
+                game_state.player1.is_first_attacker = false;
+                game_state.player2.is_first_attacker = true;
+                
+                // Draw 6 cards to hand
+                for _ in 0..6 {
+                    game_state.player1.draw_card();
+                    game_state.player2.draw_card();
+                }
+                
+                // Go to mulligan phase (P2 goes first since they're first attacker)
+                game_state.current_phase = crate::game_state::Phase::MulliganP2Turn;
+                game_state.mulligan_selected_indices.clear();
+                
+                println!("DEBUG: Phase transitioned to MulliganP2Turn");
+                Ok(())
             }
             crate::game_setup::ActionType::SelectMulligan => {
                 Self::handle_mulligan_selection(game_state, card_id, _card_indices)
@@ -703,64 +688,48 @@ impl TurnEngine {
         }
     }
 
-    fn handle_rps_choice(game_state: &mut GameState, p1_choice: i32) -> Result<(), String> {
-        // Q16 from qa_data.json: Game preparation first/second attacker is determined by RPS
-        // Winner of RPS chooses whether to be first or second attacker
-
-        // Store P1's RPS choice in game state
-        game_state.player1_rps_choice = Some(p1_choice);
-
-        // Check if P2 has made their choice (from AI or other source)
-        // If not, generate random choice for AI/single-player mode
-        let p2_choice = if let Some(choice) = game_state.player2_rps_choice {
-            choice
-        } else {
-            use rand::Rng;
-            let mut rng = rand::thread_rng();
-            let choice = rng.gen_range(0..3);
-            game_state.player2_rps_choice = Some(choice);
-            choice
+    fn handle_rps_choice_p1(game_state: &mut GameState, choice: i32) -> Result<(), String> {
+        // Store P1's choice
+        game_state.player1_rps_choice = Some(choice);
+        
+        // Check if both players have chosen
+        Self::resolve_rps_if_both_chosen(game_state)
+    }
+    
+    fn handle_rps_choice_p2(game_state: &mut GameState, choice: i32) -> Result<(), String> {
+        // Store P2's choice
+        game_state.player2_rps_choice = Some(choice);
+        
+        // Check if both players have chosen
+        Self::resolve_rps_if_both_chosen(game_state)
+    }
+    
+    fn resolve_rps_if_both_chosen(game_state: &mut GameState) -> Result<(), String> {
+        // If either player hasn't chosen yet, stay in RPS phase
+        let p1_choice = match game_state.player1_rps_choice {
+            Some(c) => c,
+            None => return Ok(()),
         };
-
-        // Determine winner
+        let p2_choice = match game_state.player2_rps_choice {
+            Some(c) => c,
+            None => return Ok(()),
+        };
+        
+        // Both have chosen - determine winner
         let rps_winner = match (p1_choice, p2_choice) {
-            (0, 2) | (1, 0) | (2, 1) => 1, // Player 1 wins
+            (0, 2) | (1, 0) | (2, 1) => 1, // Rock beats Scissors, Paper beats Rock, Scissors beats Paper
             (2, 0) | (0, 1) | (1, 2) => 2, // Player 2 wins
             _ => {
-                // Tie - need to replay
-                // Reset choices and wait for both players to choose again
+                // Tie - reset and wait for both to choose again
                 game_state.player1_rps_choice = None;
                 game_state.player2_rps_choice = None;
-                return Ok(()); // Will be called again when both players make new choices
+                return Ok(());
             }
         };
         
-        // Store RPS winner in game state for the next phase (choosing turn order)
+        // Store winner and let them choose turn order
         game_state.rps_winner = Some(rps_winner);
-        
-        // If Player 2 wins, they automatically choose turn order (AI strategy: prefer first)
-        if rps_winner == 2 {
-            // Player 2 chooses to be first attacker
-            game_state.player1.is_first_attacker = false;
-            game_state.player2.is_first_attacker = true;
-            
-            // Rule 6.2.5: Initial draw - Each player draws INITIAL_DRAW_COUNT cards from main deck to hand
-            for _ in 0..INITIAL_DRAW_COUNT {
-                game_state.player1.draw_card();
-                game_state.player2.draw_card();
-            }
-            
-            // Advance to Mulligan phase
-            game_state.current_phase = if game_state.player1.is_first_attacker {
-                crate::game_state::Phase::MulliganP1Turn
-            } else {
-                crate::game_state::Phase::MulliganP2Turn
-            };
-            game_state.mulligan_selected_indices.clear();
-        } else {
-            // Player 1 won, let them choose turn order
-            game_state.current_phase = crate::game_state::Phase::ChooseFirstAttacker;
-        }
+        game_state.current_phase = crate::game_state::Phase::ChooseFirstAttacker;
         
         Ok(())
     }
@@ -768,8 +737,16 @@ impl TurnEngine {
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
         // Rule 8.4: Determine live victory
         // Rule 8.4.2.1: Add cheer blade heart count to score
-        let player1_score = game_state.player1.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player1_cheer_blade_heart_count);
-        let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count);
+        // Calculate stage hearts for heart satisfaction bonus
+        let player1_stage_hearts = game_state.player1.calculate_stage_hearts(&game_state.card_database);
+        let player2_stage_hearts = game_state.player2.calculate_stage_hearts(&game_state.card_database);
+        
+        // Store hearts temporarily to extend their lifetime
+        game_state.player1.stage_hearts = Some(player1_stage_hearts);
+        game_state.player2.stage_hearts = Some(player2_stage_hearts);
+        
+        let player1_score = game_state.player1.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player1_cheer_blade_heart_count, game_state.player1.stage_hearts.as_ref());
+        let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count, game_state.player2.stage_hearts.as_ref());
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
         

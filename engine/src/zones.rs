@@ -301,7 +301,7 @@ impl LiveCardZone {
         self.cards.len()
     }
 
-    pub fn calculate_live_score(&self, card_db: &CardDatabase, cheer_blade_heart_count: u32) -> u32 {
+    pub fn calculate_live_score(&self, card_db: &CardDatabase, cheer_blade_heart_count: u32, stage_hearts: Option<&crate::card::BaseHeart>) -> u32 {
         // Rule 8.4.2.1: Add 1 to score for each cheer blade heart icon
         // Rule 9.2.1: Calculate total live score from cards in Live Card Zone
         // Score = sum of card scores + bonus from heart satisfaction + cheer blade hearts
@@ -309,12 +309,21 @@ impl LiveCardZone {
         for card_id in &self.cards {
             if let Some(card) = card_db.get_card(*card_id) {
                 total_score += card.get_score();
+                
                 // Heart satisfaction bonus: if card's need_heart is satisfied, add bonus
-                // For now, add 1 bonus if card has need_heart and it's satisfied
-                // This is a simplified implementation - full implementation would check actual heart satisfaction
                 if let Some(ref need_heart) = card.need_heart {
                     if !need_heart.hearts.is_empty() {
-                        total_score += 1; // Simplified: add 1 bonus for any heart requirement
+                        // Check if hearts are actually satisfied
+                        let satisfied = if let Some(stage_hearts) = stage_hearts {
+                            card.satisfies_heart_requirement(stage_hearts)
+                        } else {
+                            // No stage hearts provided - use simplified check
+                            false
+                        };
+                        
+                        if satisfied {
+                            total_score += 1; // Bonus for satisfied heart requirement
+                        }
                     }
                 }
             }

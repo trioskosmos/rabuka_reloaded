@@ -10,6 +10,7 @@ use uuid::Uuid;
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::card_loader;
+use crate::card::CardDatabase;
 use crate::deck_parser;
 use crate::deck_builder;
 
@@ -58,7 +59,7 @@ pub struct GameStateDisplay {
     pub player2: PlayerDisplay,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ActionParameters {
     pub card_id: Option<i16>, // Database card ID - reliable identifier
     pub card_index: Option<usize>, // Array position - kept for backward compatibility
@@ -73,7 +74,7 @@ pub struct ActionParameters {
     pub available_areas: Option<Vec<WebAreaInfo>>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WebAreaInfo {
     pub area: String,
     pub available: bool,
@@ -82,11 +83,12 @@ pub struct WebAreaInfo {
     pub existing_member_name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Action {
     pub description: String,
     pub action_type: String,
     pub parameters: Option<ActionParameters>,
+    pub index: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -255,7 +257,38 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
 }
 
 async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
-    let game_state = match data.game_state.lock() {
+    // Check if there's an active room and use its game state
+    let rooms = data.rooms.lock().unwrap();
+    let game_state_to_use = if rooms.len() >= 1 {
+        // If there's at least one room, use the most recently created room
+        let mut latest_room = None;
+        let mut latest_time = 0u64;
+        
+        for room in rooms.values() {
+            if room.created_at > latest_time {
+                latest_time = room.created_at;
+                latest_room = Some(room);
+            }
+        }
+        
+        if let Some(room) = latest_room {
+            println!("DEBUG: Found latest room, has game_state: {}", room.game_state.is_some());
+            if let Some(room_game_state) = &room.game_state {
+                room_game_state.clone()
+            } else {
+                println!("DEBUG: Room has no game state, using global");
+                data.game_state.clone()
+            }
+        } else {
+            println!("DEBUG: No rooms found, using global");
+            data.game_state.clone()
+        }
+    } else {
+        println!("DEBUG: No rooms found ({} rooms), using global", rooms.len());
+        data.game_state.clone()
+    };
+    
+    let game_state = match game_state_to_use.lock() {
         Ok(guard) => guard,
         Err(e) => {
             eprintln!("Mutex poisoned in get_game_state: {}", e);
@@ -263,12 +296,40 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
         }
     };
 
+    println!("DEBUG: get_game_state returning phase: {:?}", game_state.current_phase);
     let display = game_state_to_display(&game_state);
     HttpResponse::Ok().json(display)
 }
 
 async fn get_actions(data: web::Data<AppState>) -> impl Responder {
-    let game_state = match data.game_state.lock() {
+    // Check if there's an active room and use its game state
+    let rooms = data.rooms.lock().unwrap();
+    let game_state_to_use = if rooms.len() >= 1 {
+        // If there's at least one room, use the most recently created room
+        let mut latest_room = None;
+        let mut latest_time = 0u64;
+        
+        for room in rooms.values() {
+            if room.created_at > latest_time {
+                latest_time = room.created_at;
+                latest_room = Some(room);
+            }
+        }
+        
+        if let Some(room) = latest_room {
+            if let Some(room_game_state) = &room.game_state {
+                room_game_state.clone()
+            } else {
+                data.game_state.clone()
+            }
+        } else {
+            data.game_state.clone()
+        }
+    } else {
+        data.game_state.clone()
+    };
+    
+    let game_state = match game_state_to_use.lock() {
         Ok(guard) => guard,
         Err(e) => {
             eprintln!("Mutex poisoned in get_actions: {}", e);
@@ -285,8 +346,8 @@ fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     // Use game_setup.rs generate_possible_actions function
     let setup_actions = crate::game_setup::generate_possible_actions(game_state);
     
-    // Convert game_setup Action to web_server Action
-    setup_actions.into_iter().map(|sa| Action {
+    // Convert game_setup Action to web_server Action with proper indexing
+    setup_actions.into_iter().enumerate().map(|(index, sa)| Action {
         description: sa.description,
         action_type: sa.action_type.to_string(),
         parameters: sa.parameters.map(|p| ActionParameters {
@@ -307,6 +368,7 @@ fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 existing_member_name: ai.existing_member_name,
             }).collect()),
         }),
+        index: index,
     }).collect()
 }
 
@@ -322,15 +384,33 @@ fn is_automatic_phase(game_state: &GameState) -> bool {
     )
 }
 
+fn is_live_card_set_phase(game_state: &GameState) -> bool {
+    matches!(
+        game_state.current_phase,
+        crate::game_state::Phase::LiveCardSetP1Turn
+            | crate::game_state::Phase::LiveCardSetP2Turn
+            | crate::game_state::Phase::LiveCardSet
+    )
+}
+
 fn is_human_decision_phase(game_state: &GameState) -> bool {
     match game_state.current_phase {
+        // All phases are human-controlled (both players controlled by human)
         crate::game_state::Phase::RockPaperScissors
         | crate::game_state::Phase::ChooseFirstAttacker
         | crate::game_state::Phase::MulliganP1Turn
-        | crate::game_state::Phase::LiveCardSetP1Turn => true,
-        crate::game_state::Phase::Mulligan => game_state.current_mulligan_player_idx == 0,
-        crate::game_state::Phase::LiveCardSet => game_state.current_live_card_set_player == 0,
-        crate::game_state::Phase::Main => game_state.active_player().id == game_state.player1.id,
+        | crate::game_state::Phase::MulliganP2Turn
+        | crate::game_state::Phase::LiveCardSetP1Turn
+        | crate::game_state::Phase::LiveCardSetP2Turn
+        | crate::game_state::Phase::Main => true,
+        crate::game_state::Phase::Mulligan => {
+            // Legacy phase: both players controlled by human
+            game_state.current_mulligan_player_idx == 0 || game_state.current_mulligan_player_idx == 1
+        },
+        crate::game_state::Phase::LiveCardSet => {
+            // Legacy phase: both players controlled by human
+            game_state.current_live_card_set_player == 0 || game_state.current_live_card_set_player == 1
+        },
         _ => false,
     }
 }
@@ -382,36 +462,58 @@ fn execute_player2_ai_action(game_state: &mut GameState) -> Result<bool, String>
 }
 
 fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> {
+    // Keep auto-advancing until we reach a human decision phase
     loop {
-        if is_human_decision_phase(game_state) {
-            return Ok(());
-        }
-
         if is_automatic_phase(game_state) {
+            let old_phase = game_state.current_phase.clone();
             crate::turn::TurnEngine::advance_phase(game_state);
-            continue;
+            println!("DEBUG: Auto-advanced from {:?} to {:?}", old_phase, game_state.current_phase);
+        } else if is_live_card_set_phase(game_state) {
+            // Live card set phases are manual - don't auto-advance
+            println!("DEBUG: Live card set phase reached, stopping auto-advance");
+            break;
+        } else {
+            // Reached a human decision phase, stop auto-advancing
+            break;
         }
-
-        if execute_player2_ai_action(game_state)? {
-            continue;
-        }
-
-        return Ok(());
     }
+    Ok(())
 }
 
 async fn execute_action(
     data: web::Data<AppState>,
     req: web::Json<ExecuteActionRequest>,
 ) -> impl Responder {
-    let _action_index = req.action_index;
-    let requested_stage_area = req.stage_area.as_ref()
-        .and_then(|s| s.parse::<crate::zones::MemberArea>().ok());
-    let _requested_action_type = req.action_type.clone();
-    let requested_card_id = req.card_id;
-    let _requested_card_index = req.card_index;
-    let _requested_card_no = req.card_no.clone();
-    let mut game_state = match data.game_state.lock() {
+    println!("DEBUG: execute_action called with action_type: {:?}", req.action_type);
+    
+    // Check if there's an active room and use its game state
+    let rooms = data.rooms.lock().unwrap();
+    let game_state_to_use = if rooms.len() >= 1 {
+        // If there's at least one room, use the most recently created room
+        let mut latest_room = None;
+        let mut latest_time = 0u64;
+        
+        for room in rooms.values() {
+            if room.created_at > latest_time {
+                latest_time = room.created_at;
+                latest_room = Some(room);
+            }
+        }
+        
+        if let Some(room) = latest_room {
+            if let Some(room_game_state) = &room.game_state {
+                room_game_state.clone()
+            } else {
+                data.game_state.clone()
+            }
+        } else {
+            data.game_state.clone()
+        }
+    } else {
+        data.game_state.clone()
+    };
+    
+    let mut game_state = match game_state_to_use.lock() {
         Ok(guard) => guard,
         Err(e) => {
             eprintln!("Mutex poisoned in execute_action: {}", e);
@@ -419,50 +521,56 @@ async fn execute_action(
         }
     };
     
-    // Save state before executing action for undo/redo support
-    game_state.save_state();
-    
     // Parse action type from request
     let action_type = req.action_type.as_ref()
         .and_then(|t| t.parse::<crate::game_setup::ActionType>().ok())
         .unwrap_or_else(|| crate::game_setup::ActionType::Pass);
     
-    // For SelectMulligan, convert card_index to card_indices to handle duplicate cards
-    let card_indices = if action_type == crate::game_setup::ActionType::SelectMulligan {
-        req.card_index.map(|idx| vec![idx])
-    } else {
-        req.card_indices.as_ref().cloned()
-    };
-
-    // Execute the action using turn engine with card_id directly
-    // Turn engine handles card_id to card_index lookup internally
+    println!("DEBUG: Parsed action_type: {:?}", action_type);
+    println!("DEBUG: Current phase before execution: {:?}", game_state.current_phase);
+    
+    // Execute the action
     let result = crate::turn::TurnEngine::execute_main_phase_action(
         &mut game_state,
         &action_type,
-        requested_card_id,
-        card_indices,
-        requested_stage_area,
+        req.card_id,
+        req.card_indices.as_ref().cloned(),
+        req.stage_area.as_ref()
+            .and_then(|s| s.parse::<crate::zones::MemberArea>().ok()),
         req.use_baton_touch,
     );
     
+    println!("DEBUG: Action execution result: {:?}", result);
+    println!("DEBUG: Current phase after execution: {:?}", game_state.current_phase);
+    
     match result {
         Ok(_) => {
+            // For human decision phases like ChooseFirstAttacker, the phase transition 
+            // happens in the action handler itself, not in settle_single_player_state
             if let Err(e) = settle_single_player_state(&mut game_state) {
-                eprintln!("Single-player settle error after action: {}", e);
                 return HttpResponse::BadRequest().json(serde_json::json!({
-                    "error": e,
-                    "phase": format!("{:?}", game_state.current_phase)
+                    "error": e
                 }));
             }
 
             let display = game_state_to_display(&game_state);
-            HttpResponse::Ok().json(display)
+            
+            // Include legal actions in the response
+            let actions = generate_possible_actions(&game_state);
+            println!("DEBUG: Generated {} actions:", actions.len());
+            for (i, action) in actions.iter().enumerate() {
+                println!("  Action {}: {}", i, action.description);
+            }
+            let mut response = serde_json::to_value(&display).unwrap_or_default();
+            response["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
+            
+            println!("DEBUG: Returning response with {} actions", actions.len());
+            HttpResponse::Ok().json(response)
         }
         Err(e) => {
-            eprintln!("Action execution error: {}", e);
+            println!("DEBUG: Action execution failed: {}", e);
             HttpResponse::BadRequest().json(serde_json::json!({
-                "error": e,
-                "phase": format!("{:?}", game_state.current_phase)
+                "error": e
             }))
         }
     }
@@ -661,6 +769,9 @@ async fn get_card_registry(data: web::Data<AppState>) -> impl Responder {
 }
 
 async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRequest>) -> impl Responder {
+    // Skip card database loading for now to avoid deserialization errors
+    println!("DEBUG: rooms_create called");
+    println!("DEBUG: rooms_create called");
     let room_id = Uuid::new_v4().to_string().to_uppercase();
     let mode = req.mode.clone().unwrap_or_else(|| "pve".to_string());
     let public = req.public.unwrap_or(false);
@@ -690,6 +801,22 @@ async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomReques
         custom_decks = Some(decks);
     }
     
+    // Initialize FRESH game state for the room with proper setup
+    // Get card database from app state
+    let card_database = {
+        let app_state = data.game_state.lock().unwrap();
+        app_state.card_database.clone()
+    };
+    
+    // Create default players
+    let player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    
+    let mut fresh_game_state = GameState::new(player1, player2, card_database);
+    crate::game_setup::setup_game(&mut fresh_game_state);
+    println!("DEBUG: Fresh room game state initialized with phase: {:?}", fresh_game_state.current_phase);
+    let room_game_state = Arc::new(Mutex::new(fresh_game_state));
+    
     let room = Room {
         room_id: room_id.clone(),
         mode: mode.clone(),
@@ -699,12 +826,17 @@ async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomReques
         sessions: HashMap::new(),
         usernames: HashMap::new(),
         custom_decks,
-        game_state: None,
+        game_state: Some(room_game_state),
     };
     
+    println!("DEBUG: Inserting room with ID: {}", room_id);
     {
         let mut rooms = data.rooms.lock().unwrap();
         rooms.insert(room_id.clone(), room);
+        println!("DEBUG: Room inserted, total rooms: {}", rooms.len());
+        // Explicitly drop the lock to ensure room is stored
+        drop(rooms);
+        println!("DEBUG: Room lock dropped, room should be stored");
     }
     
     // Auto-join creator
@@ -999,13 +1131,8 @@ async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -
     
     // Setup game (Rule 6.2)
     crate::game_setup::setup_game(&mut game_state);
-    if let Err(e) = settle_single_player_state(&mut game_state) {
-        eprintln!("Single-player settle error during init: {}", e);
-        return HttpResponse::InternalServerError().json(serde_json::json!({
-            "error": e,
-            "phase": format!("{:?}", game_state.current_phase)
-        }));
-    }
+    // Don't call settle_single_player_state here - game should start in RockPaperScissors phase
+    println!("DEBUG: init_game complete, phase: {:?}", game_state.current_phase);
     
     // Replace the game state in the mutex
     let mut state_guard = match data.game_state.lock() {
@@ -1021,9 +1148,39 @@ async fn init_game(data: web::Data<AppState>, req: web::Json<InitGameRequest>) -
     HttpResponse::Ok().json(display)
 }
 
-pub async fn run_web_server(game_state: Arc<Mutex<GameState>>) -> std::io::Result<()> {
+pub async fn run_web_server() -> std::io::Result<()> {
+    println!("DEBUG: Starting web server function...");
     let rooms = Arc::new(Mutex::new(HashMap::new()));
-    let app_state = web::Data::new(AppState { game_state, rooms });
+    
+    // Initialize card database
+    let cards_path = PathBuf::from("../cards/cards.json");
+    let _cards = match card_loader::CardLoader::load_cards_from_file(&cards_path) {
+        Ok(cards) => {
+            let mut card_map = std::collections::HashMap::new();
+            for card in cards {
+                card_map.insert(card.card_no.clone(), card);
+            }
+            card_map
+        }
+        Err(e) => {
+            eprintln!("Failed to load cards: {}", e);
+            std::collections::HashMap::new()
+        }
+    };
+    
+    let card_database = Arc::new(CardDatabase::new());
+    
+    // Create default players
+    let player1 = Player::new("0".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("1".to_string(), "Player 2".to_string(), false);
+    
+    let game_state = Arc::new(Mutex::new(GameState::new(player1.clone(), player2.clone(), card_database.clone())));
+    
+    let app_state = web::Data::new(AppState {
+        game_state: game_state.clone(),
+        rooms: rooms.clone(),
+    });
+    println!("DEBUG: App state created...");
 
     HttpServer::new(move || {
         let cors = Cors::permissive();
@@ -1051,7 +1208,7 @@ pub async fn run_web_server(game_state: Arc<Mutex<GameState>>) -> std::io::Resul
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
-            .route("/api/rooms/list", web::get().to(rooms_list))
+            .route("/api/debug/dump_state", web::get().to(debug_dump_state))
     })
     .bind("127.0.0.1:8080")?
     .run()

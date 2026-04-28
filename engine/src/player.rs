@@ -96,6 +96,9 @@ pub struct Player {
 
     pub cheer_revealed: Vec<i16>,
 
+    // Temporary storage for calculated stage hearts during live score calculation
+    pub stage_hearts: Option<crate::card::BaseHeart>,
+
 }
 
 
@@ -155,6 +158,8 @@ impl Player {
             invalidated_abilities: std::collections::HashSet::new(),
 
             cheer_revealed: Vec::new(),
+
+            stage_hearts: None,
 
         }
 
@@ -554,9 +559,34 @@ impl Player {
 
 
     pub fn total_live_score(&self, card_db: &CardDatabase, cheer_blade_heart_count: u32) -> u32 {
-
-        self.live_card_zone.calculate_live_score(card_db, cheer_blade_heart_count)
-
+        // Note: This doesn't include heart satisfaction bonus - use calculate_live_score with stage_hearts for full calculation
+        self.live_card_zone.calculate_live_score(card_db, cheer_blade_heart_count, None)
+    }
+    
+    /// Calculate the total hearts provided by all members on stage
+    /// Used for heart satisfaction bonus calculation during live
+    pub fn calculate_stage_hearts(&self, card_db: &CardDatabase) -> crate::card::BaseHeart {
+        use std::collections::HashMap;
+        use crate::card::HeartColor;
+        
+        let mut total_hearts: HashMap<HeartColor, u32> = HashMap::new();
+        
+        // Collect hearts from all members on stage
+        for &card_id in &self.stage.stage {
+            if card_id == crate::constants::EMPTY_SLOT {
+                continue;
+            }
+            if let Some(card) = card_db.get_card(card_id) {
+                // Add base hearts from the card
+                if let Some(ref base_heart) = card.base_heart {
+                    for (color, count) in &base_heart.hearts {
+                        *total_hearts.entry(*color).or_insert(0) += count;
+                    }
+                }
+            }
+        }
+        
+        crate::card::BaseHeart { hearts: total_hearts }
     }
 
 

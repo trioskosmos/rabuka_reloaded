@@ -105,6 +105,7 @@ pub fn setup_game(game_state: &mut GameState) {
     // Rule 6.2: Pre-Game Procedure
     // Start at RockPaperScissors phase - player will choose RPS option
     game_state.current_phase = crate::game_state::Phase::RockPaperScissors;
+    println!("DEBUG: Game setup complete, phase set to: {:?}", game_state.current_phase);
 }
 
 /// Rock-paper-scissors for determining first attacker
@@ -242,10 +243,10 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
         crate::game_state::Phase::ChooseFirstAttacker => {
             // Q16: RPS winner chooses whether to go first or second
             let rps_winner = game_state.rps_winner.unwrap_or(1);
-            let winner_name = if rps_winner == 1 { "Player 1" } else { "Player 2" };
+            println!("DEBUG: ChooseFirstAttacker phase, rps_winner: {:?}", game_state.rps_winner);
             
             actions.push(Action {
-                description: format!("{} goes first", winner_name),
+                description: "Go first".to_string(),
                 action_type: ActionType::ChooseFirstAttacker,
                 parameters: Some(ActionParameters {
                     card_id: None,
@@ -261,7 +262,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 }),
             });
             actions.push(Action {
-                description: format!("{} goes second", winner_name),
+                description: "Go second".to_string(),
                 action_type: ActionType::ChooseSecondAttacker,
                 parameters: Some(ActionParameters {
                     card_id: None,
@@ -276,6 +277,8 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     available_areas: None,
                 }),
             });
+            
+            println!("DEBUG: ChooseFirstAttacker actions generated: {} actions", actions.len());
         }
         crate::game_state::Phase::Mulligan |
         crate::game_state::Phase::MulliganP1Turn |
@@ -438,26 +441,24 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                                     // Area locked, not available
                                 } else {
                                     // Baton touch - replace existing member
-                                    // Rule 9.6.2.3.2: Baton touch requires 1+ active energy to trigger
-                                    if active_energy_count >= 1 {
-                                        let member_cost = if let Some(existing_card) = game_state.card_database.get_card(existing_member_id) {
-                                            existing_card.cost.unwrap_or(0)
-                                        } else {
-                                            0
-                                        };
-                                        let cost_to_pay = card_cost.saturating_sub(member_cost);
+                                    // Rule 9.6.2.3.2: Baton touch requires sufficient energy for the final cost
+                                    let member_cost = if let Some(existing_card) = game_state.card_database.get_card(existing_member_id) {
+                                        existing_card.cost.unwrap_or(0)
+                                    } else {
+                                        0
+                                    };
+                                    let cost_to_pay = card_cost.saturating_sub(member_cost);
 
-                                        if (active_energy_count as u32) >= cost_to_pay {
-                                            area_info.available = true;
-                                            area_info.cost = cost_to_pay;
-                                            area_info.is_baton_touch = true;
-                                            area_info.existing_member_name = if let Some(existing_card) = game_state.card_database.get_card(existing_member_id) {
-                                                Some(existing_card.name.clone())
-                                            } else {
-                                                Some(format!("Unknown card {}", existing_member_id))
-                                            };
-                                            has_any_available = true;
-                                        }
+                                    if (active_energy_count as u32) >= cost_to_pay {
+                                        area_info.available = true;
+                                        area_info.cost = cost_to_pay;
+                                        area_info.is_baton_touch = true;
+                                        area_info.existing_member_name = if let Some(existing_card) = game_state.card_database.get_card(existing_member_id) {
+                                            Some(existing_card.name.clone())
+                                        } else {
+                                            Some(format!("Unknown card {}", existing_member_id))
+                                        };
+                                        has_any_available = true;
                                     }
                                 }
                             } else {

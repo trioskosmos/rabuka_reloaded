@@ -4,3 +4,4 @@
 /target_new/
 __pycache__/
 *.pyc
+node_modules/

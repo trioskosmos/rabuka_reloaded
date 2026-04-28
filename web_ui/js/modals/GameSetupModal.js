@@ -67,10 +67,6 @@ export const GameSetupModal = {
 
     closeSetupModal: () => {
         ModalManager.hide(DOM_IDS.MODAL_SETUP);
-
-        if (!State.roomCode && !State.offlineMode && !State.replayMode) {
-            ModalManager.show(DOM_IDS.MODAL_ROOM);
-        }
     },
 
     getDeckConfig: (pid) => {

@@ -123,7 +123,7 @@ export const DebugService = {
     },
 
     fetchStandardizedState: async () => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return null;
         try {
             const res = await fetch('api/debug/dump_state', { headers: { 'X-Room-Id': roomCode } });
@@ -151,7 +151,7 @@ export const DebugService = {
     },
 
     applyState: async (jsonStr) => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return { ok: false, error: 'No room code' };
         try {
             const res = await fetch('/api/debug/apply_state', {
@@ -165,7 +165,7 @@ export const DebugService = {
     },
 
     fetchDebugSnapshot: async () => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return null;
         try {
             const res = await fetch('/api/debug/snapshot', { headers: { 'X-Room-Id': roomCode } });
@@ -174,7 +174,7 @@ export const DebugService = {
     },
 
     boardOverride: async (jsonStr) => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return false;
         try {
             const res = await fetch('/api/debug/board_override', {
@@ -187,7 +187,7 @@ export const DebugService = {
     },
 
     toggleDebugMode: async () => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return null;
         try {
             const res = await fetch('/api/debug/toggle', { method: 'POST', headers: { 'X-Room-ID': roomCode } });
@@ -197,7 +197,7 @@ export const DebugService = {
     },
 
     rewind: async (networkFacade) => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return false;
         try {
             const res = await fetch('/api/debug/rewind', { method: 'POST', headers: { 'X-Room-ID': roomCode } });
@@ -208,7 +208,7 @@ export const DebugService = {
     },
 
     redo: async (networkFacade) => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return false;
         try {
             const res = await fetch('/api/debug/redo', { method: 'POST', headers: { 'X-Room-ID': roomCode } });
@@ -219,7 +219,7 @@ export const DebugService = {
     },
 
     exportGame: async () => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return null;
         try {
             const res = await fetch('/api/export_game', { headers: { 'X-Room-ID': roomCode } });
@@ -229,7 +229,7 @@ export const DebugService = {
     },
 
     importGame: async (exportData, networkFacade) => {
-        const roomCode = localStorage.getItem("lovelive_room_code");
+        const roomCode = State.roomCode;
         if (!roomCode) return false;
         try {
             const res = await fetch('/api/import_game', {

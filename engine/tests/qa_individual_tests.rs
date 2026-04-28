@@ -61,6 +61,7 @@ mod qa_individual {
     pub mod q051_one_winner_turn_order;
     pub mod q052_both_full_turn_order;
     pub mod q053_deck_refresh;
+    pub mod q054_draw_condition_gameplay;
     pub mod q054_multiple_success_draw;
     pub mod q055_partial_effect_resolution;
     pub mod q056_full_cost_required;

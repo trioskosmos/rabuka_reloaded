@@ -5,7 +5,7 @@ fn main() {
     println!("Checking complex abilities...");
     
     // Use absolute path to cards directory
-    let cards_path = Path::new("../cards");
+    let cards_path = Path::new("c:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards");
     let cards = CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     
     println!("Loaded {} cards", cards.len());

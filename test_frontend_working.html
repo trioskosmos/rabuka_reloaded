@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Frontend Working Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        .phase { font-size: 24px; font-weight: bold; text-align: center; margin: 20px 0; padding: 15px; background: #e9ecef; border-radius: 5px; }
+        .actions { text-align: center; margin: 20px 0; }
+        .action-btn { margin: 5px; padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .action-btn:hover { background: #0056b3; }
+        .log { margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .status { padding: 5px 10px; border-radius: 3px; margin-left: 10px; font-weight: bold; }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        .pending { background: #fff3cd; color: #856404; }
+        .result { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; padding: 15px; }
+        .success { background: #d4edda; color: #155724; border-radius: 5px; }
+        .error { background: #f8d7da; color: #721c24; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Frontend Working Test</h1>
+        
+        <div class="phase" id="currentPhase">Loading...</div>
+        
+        <div class="actions" id="actionsContainer">
+            <h3>🎯 Available Actions</h3>
+            <div id="actionButtons">Loading actions...</div>
+        </div>
+        
+        <div class="log" id="log">
+            <h3>📝 Test Log</h3>
+            <div id="logContent">Starting test...</div>
+        </div>
+        
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="action-btn" onclick="runAutomatedTest()">🧪 Run Automated Test</button>
+            <button class="action-btn" onclick="clearLog()">🗑️ Clear Log</button>
+        </div>
+        
+        <div class="result" id="testResult">Ready to test</div>
+    </div>
+    
+    <script>
+        let gameState = null;
+        let actions = [];
+        const RUST_API_URL = 'http://127.0.0.1:8080';
+        
+        function log(message) {
+            const logContent = document.getElementById('logContent');
+            const time = new Date().toLocaleTimeString();
+            logContent.innerHTML += `[${time}] ${message}\n`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        function updatePhase() {
+            const phaseElement = document.getElementById('currentPhase');
+            if (gameState) {
+                phaseElement.textContent = `Current Phase: ${gameState.phase}`;
+                phaseElement.style.background = getPhaseColor(gameState.phase);
+            }
+        }
+        
+        function getPhaseColor(phase) {
+            const colors = {
+                'RockPaperScissors': '#e3f2fd',
+                'ChooseFirstAttacker': '#fff3cd',
+                'MulliganP1Turn': '#d1ecf1',
+                'MulliganP2Turn': '#d1ecf1',
+                'Active': '#d4edda'
+            };
+            return colors[phase] || '#f8f9fa';
+        }
+        
+        function updateActions() {
+            const container = document.getElementById('actionButtons');
+            if (actions.length === 0) {
+                container.innerHTML = '<p>No actions available</p>';
+                return;
+            }
+            
+            const buttons = actions.map(action => 
+                `<button class="action-btn" onclick="executeAction(${action.index}, '${action.action_type}')">${action.description}</button>`
+            ).join(' ');
+            
+            container.innerHTML = buttons;
+        }
+        
+        async function executeAction(index, actionType) {
+            try {
+                log(`🎯 Executing: ${actionType} (index ${index})`);
+                
+                const action = actions.find(a => a.index === index);
+                const res = await fetch(`${RUST_API_URL}/api/execute-action`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action_index: index,
+                        action_type: actionType,
+                        card_id: action.parameters?.card_id,
+                        card_index: action.parameters?.card_index,
+                        card_indices: action.parameters?.card_indices,
+                        card_no: action.parameters?.card_no,
+                        stage_area: action.parameters?.stage_area,
+                        use_baton_touch: action.parameters?.use_baton_touch
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    gameState = data;
+                    actions = data.legal_actions || [];
+                    updatePhase();
+                    updateActions();
+                    log(`✅ Action successful - Phase: ${data.phase}`);
+                } else {
+                    log(`❌ Action failed: ${res.status}`);
+                }
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+        
+        async function runAutomatedTest() {
+            const resultElement = document.getElementById('testResult');
+            resultElement.textContent = 'Running automated test...';
+            resultElement.className = 'result pending';
+            
+            log('🧪 Starting automated test...');
+            
+            try {
+                // Step 1: Create room
+                log('1. Creating room...');
+                const roomRes = await fetch(`${RUST_API_URL}/api/rooms/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mode: 'pve',
+                        card_set: 'compiled',
+                        p0_deck: [],
+                        p0_energy: [],
+                        public: true
+                    })
+                });
+                
+                if (!roomRes.ok) {
+                    throw new Error('Room creation failed');
+                }
+                
+                const roomData = await roomRes.json();
+                if (!roomData.success) {
+                    throw new Error('Room creation returned failure');
+                }
+                
+                log('✅ Room created successfully');
+                
+                // Step 2: Get initial state
+                log('2. Getting initial state...');
+                const [stateRes, actionsRes] = await Promise.all([
+                    fetch(`${RUST_API_URL}/api/game-state`),
+                    fetch(`${RUST_API_URL}/api/actions`)
+                ]);
+                
+                if (!stateRes.ok || !actionsRes.ok) {
+                    throw new Error('Failed to get state/actions');
+                }
+                
+                const state = await stateRes.json();
+                const actionsData = await actionsRes.json();
+                actions = actionsData.actions || [];
+                
+                if (state.phase !== 'RockPaperScissors') {
+                    throw new Error(`Wrong initial phase: ${state.phase}`);
+                }
+                
+                log(`✅ Initial phase correct: ${state.phase}`);
+                
+                // Step 3: Execute RPS (Rock)
+                log('3. Executing RPS (Rock)...');
+                const rockAction = actions.find(a => a.action_type === 'rock_choice');
+                if (!rockAction) {
+                    throw new Error('Rock action not found');
+                }
+                
+                await executeAction(rockAction.index, rockAction.action_type);
+                
+                // Step 4: Execute RPS (Paper)
+                log('4. Executing RPS (Paper)...');
+                const paperAction = actions.find(a => a.action_type === 'paper_choice');
+                if (!paperAction) {
+                    throw new Error('Paper action not found');
+                }
+                
+                await executeAction(paperAction.index, paperAction.action_type);
+                
+                // Step 5: Check turn choice phase
+                log('5. Checking turn choice phase...');
+                const turnStateRes = await fetch(`${RUST_API_URL}/api/game-state`);
+                if (!turnStateRes.ok) {
+                    throw new Error('Failed to get turn state');
+                }
+                
+                const turnState = await turnStateRes.json();
+                if (turnState.phase !== 'ChooseFirstAttacker') {
+                    throw new Error(`Wrong turn phase: ${turnState.phase}`);
+                }
+                
+                log(`✅ Turn choice phase: ${turnState.phase}`);
+                
+                // Step 6: Get turn choice actions
+                log('6. Getting turn choice actions...');
+                const turnActionsRes = await fetch(`${RUST_API_URL}/api/actions`);
+                if (!turnActionsRes.ok) {
+                    throw new Error('Failed to get turn actions');
+                }
+                
+                const turnActionsData = await turnActionsRes.json();
+                const turnActions = turnActionsData.actions || [];
+                const goFirstAction = turnActions.find(a => a.action_type === 'choose_first_attacker');
+                
+                if (!goFirstAction) {
+                    throw new Error('Turn choice actions not available');
+                }
+                
+                log(`✅ Turn choice actions available`);
+                
+                // Step 7: Execute turn choice
+                log('7. Executing turn choice (Go first)...');
+                await executeAction(goFirstAction.index, goFirstAction.action_type);
+                
+                // Step 8: Check mulligan phase
+                log('8. Checking mulligan phase...');
+                const mulliganStateRes = await fetch(`${RUST_API_URL}/api/game-state`);
+                if (!mulliganStateRes.ok) {
+                    throw new Error('Failed to get mulligan state');
+                }
+                
+                const mulliganState = await mulliganStateRes.json();
+                if (mulliganState.phase !== 'MulliganP1Turn' && mulliganState.phase !== 'MulliganP2Turn') {
+                    throw new Error(`Wrong mulligan phase: ${mulliganState.phase}`);
+                }
+                
+                log(`✅ Mulligan phase: ${mulliganState.phase}`);
+                
+                // Step 9: Check mulligan actions
+                log('9. Checking mulligan actions...');
+                const mulliganActionsRes = await fetch(`${RUST_API_URL}/api/actions`);
+                if (!mulliganActionsRes.ok) {
+                    throw new Error('Failed to get mulligan actions');
+                }
+                
+                const mulliganActionsData = await mulliganActionsRes.json();
+                const mulliganActions = mulliganActionsData.actions || [];
+                const hasMulliganActions = mulliganActions.some(a => 
+                    a.action_type === 'skip_mulligan' || 
+                    a.action_type === 'confirm_mulligan'
+                );
+                
+                if (!hasMulliganActions) {
+                    throw new Error('Mulligan actions not available');
+                }
+                
+                log(`✅ Mulligan actions available`);
+                log('🎉 AUTOMATED TEST COMPLETE - Turn choice works!');
+                
+                resultElement.textContent = '✅ AUTOMATED TEST PASSED';
+                resultElement.className = 'result success';
+                
+            } catch (error) {
+                log(`❌ Automated test failed: ${error.message}`);
+                resultElement.textContent = '❌ AUTOMATED TEST FAILED';
+                resultElement.className = 'result error';
+            }
+        }
+        
+        function clearLog() {
+            document.getElementById('logContent').innerHTML = 'Log cleared...';
+        }
+        
+        // Auto-start with refresh
+        window.addEventListener('load', () => {
+            setTimeout(async () => {
+                await refreshState();
+                log('🔄 Frontend loaded and ready');
+            }, 1000);
+        });
+        
+        async function refreshState() {
+            try {
+                const [stateRes, actionsRes] = await Promise.all([
+                    fetch(`${RUST_API_URL}/api/game-state`),
+                    fetch(`${RUST_API_URL}/api/actions`)
+                ]);
+                
+                if (stateRes.ok && actionsRes.ok) {
+                    gameState = await stateRes.json();
+                    const actionsData = await actionsRes.json();
+                    actions = actionsData.actions || [];
+                    updatePhase();
+                    updateActions();
+                }
+            } catch (error) {
+                log(`❌ Failed to refresh state: ${error.message}`);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -43,7 +43,6 @@ export const GameService = {
     },
 
     fetchState: async (networkFacade) => {
-        let receivedResponse = false;
         try {
             if (State.replayMode) return;
 
@@ -51,78 +50,44 @@ export const GameService = {
                 if (!State.wasmAdapter) return;
                 const res = await State.wasmAdapter.fetchState();
                 if (res.success) {
-                    State.lastStateJson = JSON.stringify(res.state);
                     updateStateData(res.state);
                     if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
                 }
                 return;
             }
 
-            // Simplified: no room/session logic for single-player
-            const perfModal = document.getElementById('performance-modal');
-            if (perfModal && (perfModal.style.display === 'flex' || perfModal.style.display === 'block')) {
-                return;
+            // Simple state machine: get current state and actions
+            const [stateRes, actionsRes] = await Promise.all([
+                fetch('api/game-state'),
+                fetch('api/actions')
+            ]);
+
+            if (!stateRes.ok) {
+                throw new Error(`State fetch failed: ${stateRes.status}`);
             }
 
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const data = await stateRes.json();
+            console.log('DEBUG: Frontend received state:', data.phase, data.legal_actions?.length || 0, 'actions');
 
-            // Updated endpoint to match current backend
-            const url = 'api/game-state';
-
-            const res = await fetch(url, {
-                signal: controller.signal
-            });
-            receivedResponse = true;
-            clearTimeout(timeoutId);
-
-            if (!res.ok) {
-                const errorBody = await res.text();
-                console.error(`[Network] Fetch state failed with status ${res.status}: ${errorBody}`);
-                log(`Server error: ${res.status}`, 'error');
-                return;
-            }
-
-            const raw = await res.text();
-            if (raw === State.lastStateJson) return;
-
-            State.lastStateJson = raw;
-            // Current backend returns state directly, not wrapped in {success: true, state: ...}
-            const data = JSON.parse(raw);
-
-            // Fetch legal actions separately
+            // Get actions if available
             let legalActions = [];
-            try {
-                const actionsRes = await fetch('api/actions');
-                if (actionsRes.ok) {
-                    const actionsData = await actionsRes.json();
-                    console.log('[GameService] Raw actions from API:', actionsData);
-                    legalActions = actionsData.actions.map((action, index) => ({
-                        ...action,
-                        index: action.index !== undefined ? action.index : index
-                    }));
-                    console.log('[GameService] Processed legal actions:', legalActions);
-                }
-            } catch (e) {
-                console.warn('Failed to fetch legal actions:', e);
+            if (actionsRes.ok) {
+                const actionsData = await actionsRes.json();
+                legalActions = actionsData.actions.map((action, index) => ({
+                    ...action,
+                    index: action.index !== undefined ? action.index : index
+                }));
+                console.log('DEBUG: Frontend received actions:', legalActions);
             }
 
-            // Add legal actions to state
             data.legal_actions = legalActions;
             updateStateData(data);
             State.gameHasStarted = true;
 
         } catch (e) {
-            console.error("Fetch Error:", e);
-            if (e.name === 'AbortError') {
-                console.warn("[Network] Fetch state timed out.");
-            } else {
-                console.error("[Network] Critical connection failure.");
-                State.resetForNewGame();
-                if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
-                updateStateData(null);
-                log("Connection lost or server unreachable.", 'error');
-            }
+            console.error("Game state fetch error:", e);
+            if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
+            updateStateData(null);
         }
     },
 
@@ -130,91 +95,39 @@ export const GameService = {
         const state = State.data;
         if (!state) return;
 
-        window.pendingAction = true;
-        document.body.classList.add('action-pending');
-        log(`Action: ${action.action_type}`, 'action');
+        console.log('DEBUG: Frontend sending action:', action.action_type);
 
         try {
-            if (State.offlineMode) {
-                const res = await State.wasmAdapter.doAction(action);
-                if (res.success) {
-                    updateStateData(res.state);
-                    if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
-                    State.lastStateJson = JSON.stringify(res.state);
-                    log('Action completed');
-                } else {
-                    alert(res.error);
-                }
-                return;
-            }
-
-            // Send action in Rust backend format
-            const requestBody = {
-                action_index: action.index || 0,
-                action_type: action.action_type,
-                card_id: action.parameters?.card_id,
-                card_index: action.parameters?.card_index,
-                card_indices: action.parameters?.card_indices,
-                card_no: action.parameters?.card_no,
-                stage_area: action.parameters?.stage_area,
-                use_baton_touch: action.parameters?.use_baton_touch
-            };
-
+            // Simple state machine: send action, get new state and actions
             const res = await fetch('api/execute-action', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify({
+                    action_index: action.index || 0,
+                    action_type: action.action_type,
+                    card_id: action.parameters?.card_id,
+                    card_index: action.parameters?.card_index,
+                    card_indices: action.parameters?.card_indices,
+                    card_no: action.parameters?.card_no,
+                    stage_area: action.parameters?.stage_area,
+                    use_baton_touch: action.parameters?.use_baton_touch
+                })
             });
-            const text = await res.text();
 
             if (!res.ok) {
-                let message = `Action failed (${res.status})`;
-                if (text) {
-                    try {
-                        const errorData = JSON.parse(text);
-                        message = errorData.error || errorData.message || message;
-                        if (errorData.phase) {
-                            message += ` [phase: ${errorData.phase}]`;
-                        }
-                    } catch {
-                        message = text;
-                    }
-                }
-                throw new Error(message);
+                const errorText = await res.text();
+                throw new Error(`Action failed: ${errorText}`);
             }
 
-            State.lastStateJson = text;
-            const data = text ? JSON.parse(text) : null;
-
-            if (!data) {
-                throw new Error(`Empty response from api/execute-action (status ${res.status})`);
-            }
-
-            // Fetch legal actions after action execution
-            let legalActions = [];
-            try {
-                const actionsRes = await fetch('api/actions');
-                if (actionsRes.ok) {
-                    const actionsData = await actionsRes.json();
-                    legalActions = (actionsData.actions || []).map((action, index) => ({
-                        ...action,
-                        index: action.index !== undefined ? action.index : index
-                    }));
-                }
-            } catch (e) {
-                console.warn('Failed to fetch legal actions:', e);
-            }
-            data.legal_actions = legalActions;
-
+            const data = await res.json();
+            console.log('DEBUG: Frontend received new state after action:', data.phase, data.legal_actions?.length || 0, 'actions');
+            console.log('DEBUG: Full response data:', JSON.stringify(data, null, 2));
             updateStateData(data);
             log('Action completed');
+
         } catch (e) {
-            const message = e instanceof Error ? e.message : String(e);
-            console.error("[Network] Action request failed:", e);
-            alert(message);
-        } finally {
-            window.pendingAction = false;
-            document.body.classList.remove('action-pending');
+            console.error("Action error:", e);
+            alert(e.message);
         }
     },
 

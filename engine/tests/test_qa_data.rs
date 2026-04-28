@@ -2500,9 +2500,9 @@ fn test_q44_score_icon_effects() {
 
     
 
-    let base_score = game_state.player1.live_card_zone.calculate_live_score(&card_database, 0);
+    let base_score = game_state.player1.live_card_zone.calculate_live_score(&card_database, 0, None);
 
-    let score_with_cheer = game_state.player1.live_card_zone.calculate_live_score(&card_database, 2);
+    let score_with_cheer = game_state.player1.live_card_zone.calculate_live_score(&card_database, 2, None);
 
     
 

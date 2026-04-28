@@ -21,12 +21,10 @@ echo Rust backend is ready!
 echo Building Rabuka Web UI...
 cd web_ui
 call npm run build
-cd ..
 
 echo Copying i18n files...
-xcopy "web_ui\js\i18n" "web_ui\dist\js\i18n\" /E /I /Y >nul
+xcopy "js\i18n" "dist\js\i18n\" /E /I /Y >nul
 
 echo Starting Rabuka Web Server...
-cd web_old
 node server.js
 pause

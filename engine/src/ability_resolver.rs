@@ -183,7 +183,7 @@ impl<'a> AbilityResolver<'a> {
                         match zone.as_str() {
                             "hand" => {
                                 // Move selected cards from hand to discard
-                                let player = &mut self.game_state.player1;
+                                let player = self.game_state.active_player_mut();
                                 // Collect cards to move (in reverse order to maintain indices)
                                 for &idx in indices.iter().rev() {
                                     if idx < player.hand.cards.len() {
@@ -194,8 +194,34 @@ impl<'a> AbilityResolver<'a> {
                                     }
                                 }
                             }
+                            "stage" => {
+                                // Move selected member cards from stage to waitroom
+                                let player = self.game_state.active_player_mut();
+                                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                                for &idx in indices.iter().rev() {
+                                    if idx < areas.len() {
+                                        let area = areas[idx];
+                                        if let Some(card_id) = player.stage.get_area(area) {
+                                            player.stage.clear_area(area);
+                                            player.waitroom.add_card(card_id);
+                                            eprintln!("Moved card {} from stage to waitroom for optional cost", card_id);
+                                        }
+                                    }
+                                }
+                            }
+                            "energy_zone" => {
+                                // Move selected energy cards from energy zone to waitroom
+                                let player = self.game_state.active_player_mut();
+                                for &idx in indices.iter().rev() {
+                                    if idx < player.energy_zone.cards.len() {
+                                        let card_id = player.energy_zone.cards.remove(idx);
+                                        player.waitroom.add_card(card_id);
+                                        eprintln!("Moved card {} from energy zone to waitroom for optional cost", card_id);
+                                    }
+                                }
+                            }
                             _ => {
-                                eprintln!("Optional cost payment from zone '{}' not implemented", zone);
+                                eprintln!("Optional cost payment from zone '{}' not supported - only hand, stage, and energy_zone are supported", zone);
                             }
                         }
                     } else {
@@ -1296,10 +1322,55 @@ impl<'a> AbilityResolver<'a> {
     fn evaluate_any_of_condition(&self, condition: &Condition) -> bool {
         // Check if any condition is met
         if let Some(ref any_of) = condition.any_of {
-            // any_of is a list of condition types that should be evaluated
-            // For now, this is a simplified implementation
-            // A full implementation would evaluate each condition type and return true if any match
-            !any_of.is_empty()
+            // any_of is a list of condition type strings that should be evaluated
+            // Evaluate each condition type and return true if any match
+            any_of.iter().any(|condition_type| {
+                match condition_type.as_str() {
+                    "has_member" => {
+                        // Check if player has at least one member on stage
+                        !self.game_state.player1.stage.stage.iter().all(|&id| id == crate::constants::EMPTY_SLOT)
+                    }
+                    "has_energy" => {
+                        // Check if player has energy in energy zone
+                        !self.game_state.player1.energy_zone.cards.is_empty()
+                    }
+                    "has_hand" => {
+                        // Check if player has cards in hand
+                        !self.game_state.player1.hand.cards.is_empty()
+                    }
+                    "has_blade_heart" => {
+                        // Check if any member on stage has blade heart
+                        self.game_state.player1.stage.stage.iter().any(|&id| {
+                            if id != crate::constants::EMPTY_SLOT {
+                                if let Some(card) = self.game_state.card_database.get_card(id) {
+                                    card.has_blade_heart()
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            }
+                        })
+                    }
+                    "has_live_card" => {
+                        // Check if player has live cards set
+                        !self.game_state.player1.live_card_zone.cards.is_empty()
+                    }
+                    "is_active_phase" => {
+                        // Check if current phase is Active
+                        matches!(self.game_state.current_phase, crate::game_state::Phase::Active)
+                    }
+                    "is_main_phase" => {
+                        // Check if current phase is Main
+                        matches!(self.game_state.current_phase, crate::game_state::Phase::Main)
+                    }
+                    _ => {
+                        // Unknown condition type, log and return false
+                        eprintln!("Unknown any_of condition type: {}", condition_type);
+                        false
+                    }
+                }
+            })
         } else {
             true
         }
@@ -5198,7 +5269,42 @@ impl<'a> AbilityResolver<'a> {
         // If lose_blade_hearts is true, remove blade hearts from the player
         if lose_blade_hearts {
             eprintln!("re_yell: losing blade hearts for {}", target);
-            // TODO: Implement blade heart removal logic
+            // Implement blade heart removal logic
+            // Get the target player's ID
+            let target_player_id = match target {
+                "self" => self.game_state.player1.id.clone(),
+                "opponent" => self.game_state.player2.id.clone(),
+                _ => self.game_state.player1.id.clone(),
+            };
+            
+            // Remove all blade modifiers from the target player's cards on stage
+            // This effectively removes the blade hearts they would have gained
+            let player = if target_player_id == self.game_state.player1.id {
+                &self.game_state.player1
+            } else {
+                &self.game_state.player2
+            };
+            
+            // Collect card IDs that need blade modifiers cleared
+            let mut cards_to_clear: Vec<i16> = Vec::new();
+            for &card_id in &player.stage.stage {
+                if card_id != crate::constants::EMPTY_SLOT {
+                    cards_to_clear.push(card_id);
+                }
+            }
+            
+            // Clear blade modifiers for those cards
+            for card_id in cards_to_clear {
+                self.game_state.blade_modifiers.remove(&card_id);
+                eprintln!("Cleared blade modifier for card {}", card_id);
+            }
+            
+            // Also reset the cheer blade heart count for this player
+            if target_player_id == self.game_state.player1.id {
+                self.game_state.player1_cheer_blade_heart_count = 0;
+            } else {
+                self.game_state.player2_cheer_blade_heart_count = 0;
+            }
         }
 
         Ok(())
@@ -5649,7 +5755,7 @@ impl<'a> AbilityResolver<'a> {
                 // Validate that the required cards are available in the source zone
                 let source = cost.source.as_deref().unwrap_or("");
                 let count = cost.count.unwrap_or(1) as usize;
-                let player = &self.game_state.player1; // Simplified - should use activating player
+                let player = self.game_state.active_player();
                 
                 let available = match source {
                     "hand" => player.hand.cards.len(),

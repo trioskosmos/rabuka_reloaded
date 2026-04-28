@@ -1,8 +1,8 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-04-28T22:27:43.050499",
+  "generated_at": "2026-04-29T04:34:33.180459",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
-  "source_file": "c:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
+  "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
     "total_cards": 1806,
     "cards_with_abilities": 1057,
@@ -213,7 +213,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -474,6 +475,7 @@
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -552,7 +554,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -613,7 +616,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 2,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -678,7 +682,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -1838,7 +1843,9 @@
             "destination": "discard",
             "count": 1,
             "optional": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "source": "hand",
+            "card_type": "card"
           },
           {
             "text": "自分の控え室から『μ's』のライブカードを1枚手札に加える",
@@ -2340,6 +2347,7 @@
             "card_type": "member_card",
             "multiple_targets": true,
             "action": "gain_resource",
+            "resource": "generic",
             "count": 2
           }
         ],
@@ -2519,6 +2527,7 @@
       "cost": null,
       "effect": {
         "text": "相手のステージにいるウェイト状態のメンバーの数まで、自分の控え室にある『虹ヶ咲』のメンバーカードを選ぶ。それらを好きな順番でデッキの上に置く",
+        "source": "discard",
         "destination": "deck_top",
         "placement_order": "any_order",
         "card_type": "member_card",
@@ -2601,6 +2610,7 @@
       "effect": {
         "text": "自分と相手はそれぞれ、自身のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -2629,6 +2639,7 @@
         "actions": [
           {
             "text": "自分の成功ライブカード置き場にある『虹ヶ咲』のライブカードを1枚控え室に置いてもよい。",
+            "source": "success_live_zone",
             "destination": "discard",
             "count": 1,
             "card_type": "live_card",
@@ -2644,7 +2655,8 @@
           },
           {
             "text": "自分の控え室にある『虹ヶ咲』のライブカードを1枚成功ライブカード置き場に置く",
-            "destination": "live_card_zone",
+            "source": "discard",
+            "destination": "success_live_zone",
             "count": 1,
             "card_type": "live_card",
             "target": "self",
@@ -2750,10 +2762,11 @@
           {
             "text": "自分のデッキの上からカードを5枚控え室に置く。",
             "source": "deck_top",
-            "destination": "discard",
             "count": 5,
+            "destination": "discard",
             "target": "self",
-            "action": "move_cards"
+            "action": "move_cards",
+            "card_type": "card"
           },
           {
             "text": "自分の控え室にカード名の異なる『虹ヶ咲』のライブカードが3枚以上ある場合、自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える",
@@ -2827,6 +2840,7 @@
           },
           {
             "text": "自分の控え室にあるコスト4以下の『Liella!』のメンバーカード1枚を自分のステージのメンバーのいないエリアに登場させる",
+            "source": "discard",
             "destination": "empty_area",
             "cost_limit": 4,
             "count": 1,
@@ -2838,7 +2852,8 @@
             "group_names": [
               "Liella!"
             ],
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -2866,6 +2881,7 @@
           "operator": ">="
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 2,
         "card_type": "energy_card",
@@ -2931,7 +2947,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -3050,6 +3067,7 @@
         "look_action": {
           "text": "自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。",
           "source": "deck_top",
+          "count": 1,
           "target": "self",
           "action": "look_at"
         },
@@ -3137,7 +3155,7 @@
           },
           "type": "group_condition"
         },
-        "if_true": {
+        "primary_effect": {
           "text": "自分のデッキの上からカードを4枚見る。その中からカードを2枚手札に加える。残りを控え室に置く",
           "action": "look_and_select",
           "look_action": {
@@ -3167,7 +3185,7 @@
             "text": "カードを2枚手札に加える。残りを控え室に置く"
           }
         },
-        "if_false": {
+        "alternative_effect": {
           "text": "自分の控え室からライブカードを1枚手札に加える",
           "source": "discard",
           "destination": "hand",
@@ -3386,7 +3404,8 @@
             },
             "action": "gain_resource",
             "count": 2,
-            "duration": "live_end"
+            "duration": "live_end",
+            "resource": "heart01"
           },
           {
             "text": "「{{jyouji.png|常時}}ライブの合計スコアを＋1する",
@@ -3405,7 +3424,8 @@
           {
             "text": "」を得る",
             "action": "gain_resource",
-            "count": 1
+            "count": 1,
+            "resource": "generic"
           }
         ]
       }
@@ -3525,7 +3545,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -3564,6 +3585,7 @@
           {
             "text": "{{heart_01.png|heart01}}を得る",
             "action": "gain_resource",
+            "resource": "heart01",
             "count": 2
           }
         ]
@@ -3594,6 +3616,7 @@
           "type": "comparison_condition"
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "card_type": "member_card",
         "target": "self",
@@ -3722,7 +3745,8 @@
                 "source": "hand",
                 "destination": "discard",
                 "count": 2,
-                "action": "move_cards"
+                "action": "move_cards",
+                "state_change": "wait"
               }
             ]
           },
@@ -3849,6 +3873,7 @@
           {
             "text": "{{heart_02.png|heart02}}を得る",
             "action": "gain_resource",
+            "resource": "heart02",
             "count": 2
           }
         ]
@@ -3912,9 +3937,15 @@
           },
           {
             "text": "それらのカードの中から1枚手札に加える",
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "destination": "hand",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "card_type": "card"
           }
         ],
         "conditional": true
@@ -4728,6 +4759,7 @@
           "type": "location_condition"
         },
         "source": "deck",
+        "destination": "energy_zone",
         "count": 1,
         "target": "self",
         "action": "move_cards"
@@ -5133,7 +5165,8 @@
             "group_names": [
               "SaintSnow"
             ],
-            "action": "move_cards"
+            "action": "move_cards",
+            "card_type": "card"
           },
           {
             "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -5174,7 +5207,9 @@
             "text": "手札を1枚デッキの一番下に置く",
             "destination": "deck_bottom",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "source": "hand",
+            "state_change": "wait"
           }
         ]
       }
@@ -5231,19 +5266,20 @@
         "actions": [
           {
             "text": "自分の控え室にあるライブカードを1枚選び、そのカードのスコアに等しい数の{{icon_energy.png|E}}を支払ってもよい。",
+            "source": "discard",
             "count": 1,
             "card_type": "live_card",
             "target": "self",
             "optional": true,
-            "action": "select",
-            "source": "discard"
+            "action": "select"
           },
           {
             "text": "そのライブカードを手札に加える",
             "destination": "hand",
             "card_type": "live_card",
             "action": "move_cards",
-            "source": "selected_cards"
+            "source": "selected_cards",
+            "count": 1
           }
         ],
         "conditional": true
@@ -5539,7 +5575,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -5724,10 +5761,13 @@
         "actions": [
           {
             "text": "自分のデッキの一番上のカードを控え室に置いてもよい",
+            "source": "deck_top",
+            "count": 1,
             "destination": "discard",
             "target": "self",
             "optional": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "card_type": "card"
           },
           {
             "text": "そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
@@ -6374,8 +6414,8 @@
       "effect": {
         "text": "デッキの上からカードを5枚控え室に置く",
         "source": "deck_top",
-        "destination": "discard",
         "count": 5,
+        "destination": "discard",
         "action": "move_cards"
       }
     },
@@ -6425,6 +6465,7 @@
       },
       "effect": {
         "text": "自分の控え室にあるメンバーカード2枚を好きな順番でデッキの一番上に置く",
+        "source": "discard",
         "destination": "deck_top",
         "placement_order": "any_order",
         "count": 2,
@@ -6596,10 +6637,11 @@
           {
             "text": "自分のデッキの上からカードを2枚控え室に置く。",
             "source": "deck_top",
-            "destination": "discard",
             "count": 2,
+            "destination": "discard",
             "target": "self",
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           },
           {
             "text": "自分の控え室からメンバーカードを1枚手札に加える",
@@ -6608,7 +6650,8 @@
             "count": 1,
             "card_type": "member_card",
             "target": "self",
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -6638,15 +6681,24 @@
         "actions": [
           {
             "text": "自分のデッキの一番上のカードを公開し続ける。そのライブカードを手札に加え",
+            "source": "deck_top",
+            "count": 1,
             "card_type": "live_card",
             "target": "self",
             "action": "move_cards",
-            "destination": "hand"
+            "destination": "hand",
+            "state_change": "wait"
           },
           {
             "text": "これにより公開されたほかのすべてのカードを控え室に置く",
+            "source": "revealed_remaining",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "destination": "discard",
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -6832,7 +6884,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -7263,6 +7316,7 @@
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -7310,6 +7364,7 @@
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -7532,7 +7587,9 @@
             "destination": "discard",
             "count": 1,
             "optional": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "source": "hand",
+            "card_type": "card"
           },
           {
             "text": "自分の控え室から『Aqours』のライブカードを1枚手札に加える",
@@ -7700,6 +7757,7 @@
           "movement_state": "has_moved"
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -7894,12 +7952,12 @@
         "actions": [
           {
             "text": "自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。",
+            "source": "discard",
             "distinct": "card_name",
             "count": 2,
             "card_type": "live_card",
             "target": "self",
-            "action": "select",
-            "source": "discard"
+            "action": "select"
           },
           {
             "action": "sequential",
@@ -7914,7 +7972,8 @@
                 "destination": "hand",
                 "target": "self",
                 "action": "move_cards",
-                "source": "selected_cards"
+                "source": "selected_cards",
+                "count": 1
               }
             ],
             "text": "相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える"
@@ -8310,6 +8369,7 @@
           "operator": ">="
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -8459,7 +8519,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -8658,9 +8719,12 @@
         "actions": [
           {
             "text": "このカードを手札に加えてもよい。この能力は",
+            "source": "revealed_card",
+            "count": 1,
             "destination": "hand",
             "optional": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           },
           {
             "text": "このカードが自分のエールによって公開されている場合のみ発動する",
@@ -8780,7 +8844,8 @@
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards"
+                "action": "move_cards",
+                "source": "deck"
               },
               {
                 "text": "自分はカードを1枚引く",
@@ -8972,6 +9037,7 @@
         "parenthetical": [
           "{{toujyou.png|登場}}能力がコストを持つ場合、支払って発動させる。"
         ],
+        "source": "discard",
         "cost_limit": 4,
         "count": 1,
         "card_type": "member_card",
@@ -8982,8 +9048,7 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "select",
-        "source": "discard"
+        "action": "select"
       }
     },
     {
@@ -9090,10 +9155,12 @@
           },
           {
             "text": "自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。",
+            "destination": "under_member",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
-            "action": "move_cards"
+            "action": "place_energy_under_member",
+            "energy_count": 1
           }
         ]
       }
@@ -9122,6 +9189,7 @@
             "card_type": "member_card",
             "max": true,
             "action": "move_cards",
+            "source": "deck",
             "target": "self"
           }
         ]
@@ -9232,8 +9300,8 @@
           {
             "text": "自分のデッキの上からカードを1枚見る。その中から1枚までをデッキの上に置き、残りを控え室に置く。",
             "source": "deck_top",
-            "destination": "discard",
             "count": 1,
+            "destination": "discard",
             "target": "self",
             "max": true,
             "action": "move_cards",
@@ -9243,6 +9311,7 @@
           },
           {
             "text": "、自分のデッキの一番上のカードを1枚公開する。これによりライブカードを公開した場合、このカードのスコアを＋1する",
+            "source": "deck_top",
             "count": 1,
             "card_type": "live_card",
             "target": "self",
@@ -9295,16 +9364,24 @@
           },
           {
             "text": "自分のデッキの一番上からカードを1枚ずつ公開する。そのカードを手札に加え",
+            "source": "deck_top",
             "count": 1,
             "target": "self",
             "multiple_targets": true,
             "action": "move_cards",
-            "destination": "hand"
+            "destination": "hand",
+            "state_change": "wait"
           },
           {
             "text": "これにより公開されたほかのすべてのカードを控え室に置く",
+            "source": "revealed_remaining",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "destination": "discard",
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -10214,6 +10291,7 @@
           "type": "comparison_condition"
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -10239,6 +10317,8 @@
         "actions": [
           {
             "text": "。自分は、そのプレイヤーのデッキの一番上のカードを見る。自分はそのカードを控え室に置いてもよい",
+            "source": "deck_top",
+            "count": 1,
             "destination": "discard",
             "optional": true,
             "action": "move_cards",
@@ -10375,7 +10455,9 @@
             "destination": "deck_top",
             "count": 1,
             "target": "self",
-            "action": "move_cards"
+            "action": "move_cards",
+            "source": "hand",
+            "state_change": "wait"
           }
         ]
       }
@@ -10431,6 +10513,7 @@
           "operator": ">="
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -10531,7 +10614,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 2,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -10677,6 +10761,7 @@
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -11051,6 +11136,7 @@
           {
             "text": "{{heart_03.png|heart03}}{{heart_05.png|heart05}}{{heart_06.png|heart06}}を得る",
             "action": "gain_resource",
+            "resource": "heart03",
             "count": 6
           }
         ]
@@ -11080,6 +11166,7 @@
           },
           {
             "text": "自分の控え室にある『虹ヶ咲』のライブカードを2枚まで好きな順番でデッキの上に置く",
+            "source": "discard",
             "destination": "deck_top",
             "placement_order": "any_order",
             "count": 2,
@@ -11177,6 +11264,7 @@
           "appearance": true
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -11278,7 +11366,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -11483,7 +11572,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 2,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -11524,7 +11614,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 2,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -11616,7 +11707,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -11994,6 +12086,7 @@
       },
       "effect": {
         "text": "自分の控え室にあるライブカードを1枚手札に加える",
+        "source": "discard",
         "destination": "hand",
         "count": 1,
         "card_type": "live_card",
@@ -12021,6 +12114,7 @@
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -12216,6 +12310,7 @@
         "actions": [
           {
             "text": "自分の成功ライブカード置き場にあるカードを1枚手札に加える。",
+            "source": "success_live_zone",
             "destination": "hand",
             "count": 1,
             "card_type": "live_card",
@@ -12224,7 +12319,12 @@
           },
           {
             "text": "これにより公開したカードを自分の成功ライブカード置き場に置く",
-            "destination": "live_card_zone",
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
+            "destination": "success_live_zone",
             "card_type": "live_card",
             "target": "self",
             "action": "move_cards"
@@ -12278,8 +12378,8 @@
       "effect": {
         "text": "自分のデッキの上からカードを10枚控え室に置く",
         "source": "deck_top",
-        "destination": "discard",
         "count": 10,
+        "destination": "discard",
         "target": "self",
         "action": "move_cards"
       }
@@ -12516,7 +12616,8 @@
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards"
+                "action": "move_cards",
+                "source": "deck"
               },
               {
                 "text": "自分はカードを1枚引く",
@@ -12614,6 +12715,7 @@
           "operator": ">="
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -13121,6 +13223,7 @@
           "card_type": "member_card"
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "target": "self",
@@ -13510,6 +13613,7 @@
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -13910,11 +14014,11 @@
       "cost": null,
       "effect": {
         "text": "このカードは成功ライブカード置き場に置くことができない",
-        "destination": "live_card_zone",
+        "destination": "success_live_zone",
         "card_type": "live_card",
         "action": "restriction",
         "restriction_type": "cannot_place",
-        "restricted_destination": "live_card_zone"
+        "restricted_destination": "success_live_zone"
       }
     },
     {
@@ -14232,7 +14336,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -14782,6 +14887,7 @@
           {
             "text": "エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く",
             "source": "deck",
+            "destination": "energy_zone",
             "state_change": "wait",
             "count": 1,
             "card_type": "energy_card",
@@ -14875,7 +14981,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 2,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -14930,6 +15037,11 @@
           },
           {
             "text": "、これにより公開したカードを控え室に置く",
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "destination": "discard",
             "action": "move_cards"
           }
@@ -15201,6 +15313,8 @@
         "actions": [
           {
             "text": "自分の控え室にあるメンバーカード1枚をデッキの一番上に置いてもよい。",
+            "source": "discard",
+            "destination": "deck_top",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -15466,6 +15580,7 @@
           "card_type": "member_card"
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "target": "self",
@@ -15534,6 +15649,7 @@
           "津島善子",
           "天王寺璃奈"
         ],
+        "source": "discard",
         "shuffle": true,
         "destination": "deck_bottom",
         "type": "move_cards",
@@ -15997,6 +16113,7 @@
           "card_type": "member_card"
         },
         "duration": "as_long_as",
+        "source": "success_live_zone",
         "card_type": "live_card",
         "target": "self",
         "action": "modify_score",
@@ -16224,7 +16341,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -16242,6 +16360,8 @@
       "cost": null,
       "effect": {
         "text": "自分の控え室にあるカード1枚をデッキの一番上に置いてもよい",
+        "source": "discard",
+        "destination": "deck_top",
         "count": 1,
         "target": "self",
         "optional": true,
@@ -16282,7 +16402,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -16357,6 +16478,7 @@
           {
             "text": "自分の手札からカード名が「DIVE!」のライブカード1枚を表向きでライブカード置き場に置いてもよい。",
             "source": "hand",
+            "destination": "live_card_zone",
             "count": 1,
             "card_type": "live_card",
             "target": "self",
@@ -16564,7 +16686,7 @@
             {
               "text": "エネルギーカードを1枚ウェイト状態で置く。\n・自分の控え室からメンバーカードを1枚手札に加える",
               "source": "discard",
-              "destination": "hand",
+              "destination": "energy_zone",
               "state_change": "wait",
               "count": 1,
               "card_type": "member_card",
@@ -16631,7 +16753,9 @@
             "placement_order": "any_order",
             "count": 3,
             "target": "self",
-            "action": "move_cards"
+            "action": "move_cards",
+            "source": "hand",
+            "state_change": "wait"
           }
         ]
       }
@@ -17053,7 +17177,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -17353,10 +17478,11 @@
           {
             "text": "自分のデッキの上からカードを3枚控え室に置く。",
             "source": "deck_top",
-            "destination": "discard",
             "count": 3,
+            "destination": "discard",
             "target": "self",
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           },
           {
             "text": "自分の控え室から『A-RISE』のメンバーカードを1枚手札に加える",
@@ -17371,7 +17497,8 @@
             "group_names": [
               "A-RISE"
             ],
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -17530,7 +17657,8 @@
                 "source": "hand",
                 "destination": "discard",
                 "count": 1,
-                "action": "move_cards"
+                "action": "move_cards",
+                "state_change": "wait"
               }
             ]
           },
@@ -17552,7 +17680,8 @@
               "μ's"
             ],
             "action": "gain_resource",
-            "count": 2
+            "count": 2,
+            "resource": "heart03"
           },
           {
             "text": "このカードのスコアを＋1する",
@@ -17724,8 +17853,8 @@
       "effect": {
         "text": "自分のデッキの上からカードを10枚控え室に置く",
         "source": "deck_top",
-        "destination": "discard",
         "count": 10,
+        "destination": "discard",
         "target": "self",
         "action": "move_cards"
       }
@@ -17906,10 +18035,11 @@
           {
             "text": "自分のデッキの上からカードを2枚控え室に置く。",
             "source": "deck_top",
-            "destination": "discard",
             "count": 2,
+            "destination": "discard",
             "target": "self",
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           },
           {
             "text": "自分の控え室からライブカード1枚を自分のデッキの一番上から4枚目に置いてもよい",
@@ -17922,7 +18052,8 @@
             "card_type": "live_card",
             "target": "self",
             "optional": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -17970,6 +18101,7 @@
           "comparison_type": "score",
           "type": "comparison_condition"
         },
+        "source": "discard",
         "destination": "hand",
         "count": 1,
         "target": "self",
@@ -18081,10 +18213,16 @@
           },
           {
             "text": "これにより選んだカードが持つ色のハートを1つずつ得る。公開したカードをすべて控え室に置く",
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "destination": "discard",
             "count": 1,
             "multiple_targets": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -18377,6 +18515,7 @@
           "operator": ">="
         },
         "source": "deck",
+        "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
         "card_type": "energy_card",
@@ -18888,6 +19027,7 @@
       "cost": null,
       "effect": {
         "text": "自分の控え室にある、自分のステージにいるすべてのメンバーと異なるグループ名を持つカード1枚を手札に加える",
+        "source": "discard",
         "destination": "hand",
         "count": 1,
         "card_type": "member_card",
@@ -19015,6 +19155,7 @@
           "location": "stage",
           "card_type": "member_card"
         },
+        "source": "discard",
         "placement_order": "any_order",
         "count": 4,
         "target": "self",
@@ -19048,11 +19189,13 @@
           {
             "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置いてもよい。",
             "source": "deck",
+            "destination": "energy_zone",
             "count": 1,
             "card_type": "energy_card",
             "target": "self",
             "optional": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           },
           {
             "text": "相手はカードを1枚引く",
@@ -19451,7 +19594,8 @@
             "source": "hand",
             "destination": "discard",
             "count": 1,
-            "action": "move_cards"
+            "action": "move_cards",
+            "state_change": "wait"
           }
         ]
       }
@@ -19656,14 +19800,18 @@
             "text": "カードを1枚引いてもよい。",
             "action": "draw_card",
             "count": 1,
-            "optional": true
+            "optional": true,
+            "source": "deck",
+            "destination": "hand"
           },
           {
             "text": "手札2枚を好きな順番でデッキの上に置く",
+            "source": "hand",
             "destination": "deck_top",
             "placement_order": "any_order",
             "count": 2,
-            "action": "move_cards"
+            "action": "move_cards",
+            "card_type": "card"
           }
         ],
         "conditional": true
@@ -19797,6 +19945,11 @@
         "actions": [
           {
             "text": "これにより公開したカードをデッキの一番上か一番下に置き",
+            "source": "revealed_cards",
+            "dynamic_count": {
+              "type": "revealed_cards",
+              "reference": "previous_reveal"
+            },
             "action": "reveal"
           },
           {
@@ -19822,8 +19975,8 @@
       "effect": {
         "text": "自分のデッキの上からカードを5枚控え室に置く",
         "source": "deck_top",
-        "destination": "discard",
         "count": 5,
+        "destination": "discard",
         "target": "self",
         "action": "move_cards"
       }
@@ -19883,6 +20036,10 @@
             "text": "、これにより引いた枚数と同じ枚数を手札から控え室に置く",
             "source": "hand",
             "destination": "discard",
+            "dynamic_count": {
+              "type": "drawn_cards",
+              "reference": "previous_draw"
+            },
             "action": "move_cards"
           }
         ]

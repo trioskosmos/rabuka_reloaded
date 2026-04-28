@@ -10,14 +10,15 @@ export const PlannerService = {
 
     getPlannerFetchKey: () => {
         const state = State.data;
-        if (!state || !State.roomCode) return null;
+        if (!state || (!State.roomCode && !State.gameHasStarted)) return null;
         const activePlayer = state.active_player ?? 0;
-        return `${State.roomCode}:${state.turn}:${activePlayer}:${state.phase}`;
+        const roomKey = State.roomCode || 'local';
+        return `${roomKey}:${state.turn}:${activePlayer}:${state.phase}`;
     },
 
     shouldAutoFetchPlanner: () => {
         const state = State.data;
-        if (!state || !State.roomCode || State.offlineMode || State.replayMode || State.hotseatMode) {
+        if (!state || (!State.roomCode && !State.gameHasStarted) || State.offlineMode || State.replayMode || State.hotseatMode) {
             return false;
         }
 
@@ -29,7 +30,7 @@ export const PlannerService = {
     },
 
     fetchPlannerData: async ({ score = false, silent = false } = {}, networkFacade) => {
-        if (State.offlineMode || State.replayMode || !State.roomCode) {
+        if (State.offlineMode || State.replayMode || (!State.roomCode && !State.gameHasStarted)) {
             PlannerService.clearPlannerData();
             return null;
         }

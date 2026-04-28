@@ -1,0 +1,8 @@
+[package]
+name = "test_sequential_execution"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rabuka_engine = { path = "../engine" }
+serde_json = "1.0"

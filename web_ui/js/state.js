@@ -18,7 +18,7 @@ const stateInternal = {
     rawData: null, // The "original" state object from server (IDs only, for debugging/warping)
 
     // Identity & Session
-    roomCode: localStorage.getItem('lovelive_room_code') || null,
+    roomCode: null,
     sessionToken: null,
     perspectivePlayer: 0, // 0 or 1 (Who are we viewing?)
     cardSet: 'compiled', // 'compiled' or 'vanilla'

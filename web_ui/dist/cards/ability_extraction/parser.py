@@ -190,11 +190,56 @@ def extract_source(text: str) -> Optional[str]:
     # Special case for Q226: "自分の控え室からライブカード" pattern
     if '控え室からライブカード' in text:
         return 'discard'
+    # Special case for "デッキの一番上のカードを" pattern
+    if 'デッキの一番上のカードを' in text:
+        # Set a global flag to indicate this pattern was matched
+        global _deck_top_card_pattern
+        _deck_top_card_pattern = True
+        return 'deck_top'
+    # Special case for "デッキの一番上からカードを" pattern
+    if 'デッキの一番上からカードを' in text:
+        return 'deck_top'
+    # Special case for "これにより公開されたほかのすべてのカードを" pattern
+    if 'これにより公開されたほかのすべてのカードを' in text:
+        return 'revealed_remaining'
+    # Special case for "これにより公開したカードを" pattern
+    if 'これにより公開したカードを' in text:
+        return 'revealed_cards'
+    # Special case for "それらのカードの中から" pattern
+    if 'それらのカードの中から' in text:
+        return 'revealed_cards'
+    # Special case for "このカードを" pattern (when referring to revealed card)
+    if 'このカードを手札に加えてもよい' in text:
+        return 'revealed_card'
+    # Special case for "自分の成功ライブカード置き場にある" pattern
+    if '自分の成功ライブカード置き場にある' in text:
+        return 'success_live_zone'
+    # Special case for "自分の控え室にある" pattern
+    if '自分の控え室にある' in text:
+        return 'discard'
+    # Special case for "公開したカードをすべて" pattern
+    if '公開したカードをすべて' in text:
+        return 'revealed_cards'
+    # Special case for "手札から" pattern
+    if '手札から' in text:
+        return 'hand'
+    # Special case for "手札2枚を" pattern (more specific for ability #593)
+    if '手札2枚を' in text:
+        return 'hand'
     return extract_by_pattern(text, SOURCE_PATTERNS)
 
 def extract_destination(text: str) -> Optional[str]:
     """Extract destination location (TO)."""
-    # First check for specific deck position patterns (Q226)
+    # Priority 1: Most specific patterns first
+    if 'デッキの一番上に置いてもよい' in text:
+        return 'deck_top'
+    if 'ウェイト状態で置く' in text:
+        return 'energy_zone'
+    # More specific pattern for ability #575
+    if 'エネルギーカードを1枚ウェイト状態で置いてもよい' in text:
+        return 'energy_zone'
+    
+    # Priority 2: Check for specific deck position patterns (Q226)
     deck_pos_match = re.search(r'デッキの一番上から(\d+)枚目に置く', text)
     if deck_pos_match:
         return 'deck'  # Return 'deck' as the destination, position will be extracted separately
@@ -202,6 +247,35 @@ def extract_destination(text: str) -> Optional[str]:
     deck_pos_match2 = re.search(r'デッキの一番上から(\d+)枚目に置いてもよい', text)
     if deck_pos_match2:
         return 'deck'
+    
+    # Special case for "そのメンバーの下に置く" pattern
+    if 'そのメンバーの下に置く' in text:
+        return 'under_member'
+    # Special case for "成功ライブカード置き場に置く" pattern
+    if '成功ライブカード置き場に置く' in text:
+        return 'success_live_zone'
+    # Special case for "メンバーのいないエリアに登場させる" pattern
+    if 'メンバーのいないエリアに登場させる' in text:
+        return 'empty_area'
+    # Special case for "デッキの一番上に置く" pattern
+    if 'デッキの一番上に置く' in text:
+        return 'deck_top'
+    # Special case for "ライブカード置き場に置いてもよい" pattern
+    if 'ライブカード置き場に置いてもよい' in text:
+        return 'live_card_zone'
+    # Special case for "表向きでライブカード置き場に置く" pattern
+    if '表向きでライブカード置き場に置く' in text:
+        return 'live_card_zone'
+    # Special case for "ウェイト状態で置く" pattern (energy cards)
+    if 'ウェイト状態で置く' in text:
+        return 'energy_zone'
+    # Special case for energy card placement without explicit destination
+    elif 'エネルギーカードを' in text and '置く' in text:
+        return 'energy_zone'
+    # Special case for "デッキの一番上に置く" pattern
+    elif 'デッキの一番上に置く' in text:
+        return 'deck_top'
+        
     return extract_by_pattern(text, DESTINATION_PATTERNS)
 
 def extract_location(text: str) -> Optional[str]:
@@ -1102,7 +1176,25 @@ def parse_action(text: str) -> Dict[str, Any]:
     source = extract_source(text)
     if source:
         action['source'] = source
-    
+        # Special case: if source is deck_top and no count was extracted, default to 1
+        if source == 'deck_top' and 'count' not in action:
+            action['count'] = 1
+        # Special case: if source is revealed_remaining, use dynamic_count
+        elif source == 'revealed_remaining' and 'count' not in action:
+            action['dynamic_count'] = {
+                'type': 'revealed_cards',
+                'reference': 'previous_reveal'
+            }
+        # Special case: if source is revealed_cards and no count was extracted, use dynamic_count
+        elif source == 'revealed_cards' and 'count' not in action:
+            action['dynamic_count'] = {
+                'type': 'revealed_cards',
+                'reference': 'previous_reveal'
+            }
+        # Special case: if source is revealed_card and no count was extracted, set to 1
+        elif source == 'revealed_card' and 'count' not in action:
+            action['count'] = 1
+            
     # Extract destination
     destination = extract_destination(text)
     if destination:
@@ -1143,6 +1235,82 @@ def parse_action(text: str) -> Dict[str, Any]:
     count = extract_count(text)
     if count:
         action['count'] = count
+    # Special case for variable count patterns
+    elif 'これにより引いた枚数と同じ枚数を' in text:
+        action['dynamic_count'] = {
+            'type': 'drawn_cards',
+            'reference': 'previous_draw'
+        }
+    # Post-processing for draw_card actions to ensure defaults
+    if action.get('action') == 'draw_card':
+        if 'source' not in action:
+            action['source'] = 'deck'
+        if 'destination' not in action:
+            action['destination'] = 'hand'
+    
+    # Post-processing for selected_cards actions to ensure count is set
+    if action.get('source') == 'selected_cards':
+        if 'count' not in action:
+            action['count'] = 1
+    
+    # Post-processing for state_change inference
+    if action.get('action') == 'move_cards':
+        action_text = action.get('text', '')
+        if 'state_change' not in action and 'ウェイト状態' in action_text:
+            action['state_change'] = 'wait'
+    
+    # Post-processing for missing resource field in gain_resource actions
+    if action.get('action') == 'gain_resource':
+        if 'resource' not in action:
+            action_text = action.get('text', '')
+            # Infer resource from icons in the text
+            if '{{heart_03.png|heart03}}' in action_text:
+                action['resource'] = 'heart03'
+            elif '{{heart_02.png|heart02}}' in action_text:
+                action['resource'] = 'heart02'
+            elif '{{heart_01.png|heart01}}' in action_text:
+                action['resource'] = 'heart01'
+            elif '{{icon_blade.png|ブレード}}' in action_text:
+                action['resource'] = 'blade'
+            elif '{{icon_energy.png|E}}' in action_text:
+                action['resource'] = 'energy'
+            # Fallback to generic if no specific resource found
+            elif 'resource' not in action:
+                action['resource'] = 'generic'
+    
+    # Post-processing for missing card_type field in move_cards actions
+    if action.get('action') == 'move_cards':
+        if 'card_type' not in action:
+            action_text = action.get('text', '')
+            # Infer card_type from text
+            if 'カード' in action_text:
+                action['card_type'] = 'card'
+            elif 'メンバーカード' in action_text:
+                action['card_type'] = 'member_card'
+            elif 'ライブカード' in action_text:
+                action['card_type'] = 'live_card'
+            elif 'エネルギーカード' in action_text:
+                action['card_type'] = 'energy_card'
+            # Fallback to generic if no specific card_type found
+            elif 'card_type' not in action:
+                action['card_type'] = 'card'
+    
+    # Post-processing for missing destinations and sources
+    if action.get('action') == 'move_cards':
+        action_text = action.get('text', '')
+        
+        # Fix missing destination
+        if 'destination' not in action:
+            if 'デッキの一番上に置く' in action_text:
+                action['destination'] = 'deck_top'
+            elif 'ウェイト状態で置く' in action_text:
+                action['destination'] = 'energy_zone'
+        
+        # Fix missing source
+        if 'source' not in action:
+            if '手札から' in action_text and 'デッキの上に置く' in action_text:
+                action['source'] = 'hand'
+    
     # Always count resource icons for blade/heart/energy (don't rely only on numeric count)
     icon_counts = {
         '{{icon_blade.png|ブレード}}': text.count('{{icon_blade.png|ブレード}}'),
@@ -1151,8 +1319,9 @@ def parse_action(text: str) -> Dict[str, Any]:
     }
     for icon, icon_count in icon_counts.items():
         if icon_count > 0:
-            # Always set count from icon counts for gain_resource effects
-            if action.get('action') == 'gain_resource' or 'count' not in action:
+            # Only set count from icon counts for gain_resource effects or if count is not already set
+            # Don't override count for move_cards actions that already have it set
+            if action.get('action') == 'gain_resource' or ('count' not in action and action.get('action') != 'move_cards'):
                 action['count'] = icon_count
             break
     
@@ -1402,8 +1571,37 @@ def parse_action(text: str) -> Dict[str, Any]:
         action['action'] = 'move_cards'
         if 'destination' not in action:
             action['destination'] = 'hand'
+        # Ensure source is extracted for add to hand actions
+        if 'source' not in action:
+            # Infer source from context for "add to hand" actions
+            if '控え室から' in text or '控え室にある' in text:
+                action['source'] = 'discard'
+            elif 'デッキの一番上のカードを' in text:
+                action['source'] = 'deck_top'
+                action['count'] = 1
+            elif 'デッキから' in text or 'デッキの上から' in text:
+                action['source'] = 'deck'
+            elif '手札から' in text:
+                action['source'] = 'hand'
+            elif 'ステージから' in text:
+                action['source'] = 'stage'
     elif 'destination' in action:
         action['action'] = 'move_cards'
+        # Ensure source is extracted when destination is known
+        if 'source' not in action:
+            # Infer source from context
+            if '手札を' in text and ('控え室に' in text or 'デッキの' in text):
+                if '控え室に' in text:
+                    action['source'] = 'hand'
+                elif 'デッキの' in text:
+                    action['source'] = 'hand'
+            elif '控え室を' in text and ('手札に' in text or 'ステージに' in text):
+                action['source'] = 'discard'
+            elif 'デッキの' in text and ('手札に' in text or '控え室に' in text or 'ステージに' in text):
+                if 'デッキの上から' in text:
+                    action['source'] = 'deck_top'
+                else:
+                    action['source'] = 'deck'
     elif 'ポジションチェンジ' in text:
         action['action'] = 'position_change'
     elif '移動させる' in text:
@@ -1467,9 +1665,42 @@ def parse_action(text: str) -> Dict[str, Any]:
                     destination = 'deck_top'
                 if destination:
                     action['destination'] = destination
+            
+            # Ensure source is extracted for "置く" actions
+            if 'source' not in action:
+                # Infer source from context for "置く" actions
+                if '手札を' in text:
+                    action['source'] = 'hand'
+                elif '控え室を' in text or '控え室にある' in text:
+                    action['source'] = 'discard'
+                elif 'デッキの上から' in text:
+                    action['source'] = 'deck_top'
+                elif 'デッキの一番上のカードを' in text:
+                    action['source'] = 'deck_top'
+                    # Default count to 1 for "一番上のカードを" pattern
+                    action['count'] = 1
+                elif 'デッキの' in text and '一番上のカードを' not in text:
+                    action['source'] = 'deck'
+                elif 'ステージから' in text:
+                    action['source'] = 'stage'
+                elif '成功ライブカード置き場から' in text:
+                    action['source'] = 'success_live_zone'
+                elif 'ライブカード置き場から' in text:
+                    action['source'] = 'live_card_zone'
+                elif 'エネルギー置き場から' in text:
+                    action['source'] = 'energy_zone'
+                # Special case for "これにより公開されたほかのすべてのカードを控え室に置く" pattern
+                elif 'これにより公開されたほかのすべてのカードを' in text:
+                    action['source'] = 'revealed_remaining'
+                    action['dynamic_count'] = {
+                        'type': 'revealed_cards',
+                        'reference': 'previous_reveal'
+                    }
     # Check for destination-only moves (inferred source)
     elif destination:
         action['action'] = 'move_cards'
+    elif '引いてもよい' in text:
+        action['action'] = 'draw_card'
     elif '引く' in text or '引き' in text:
         action['action'] = 'draw'
         action['source'] = 'deck'
@@ -1834,6 +2065,64 @@ def parse_action(text: str) -> Dict[str, Any]:
             action['identities'] = groups
     else:
         action['action'] = 'custom'
+    
+    return action
+
+def post_process_action_comprehensive(action: Dict[str, Any]) -> Dict[str, Any]:
+    """Comprehensive post-processing for all action types and nested levels."""
+    # Post-processing for missing resource field in gain_resource actions
+    if action.get('action') == 'gain_resource':
+        if 'resource' not in action:
+            action_text = action.get('text', '')
+            # Infer resource from icons in the text
+            if '{{heart_03.png|heart03}}' in action_text:
+                action['resource'] = 'heart03'
+            elif '{{heart_02.png|heart02}}' in action_text:
+                action['resource'] = 'heart02'
+            elif '{{heart_01.png|heart01}}' in action_text:
+                action['resource'] = 'heart01'
+            elif '{{icon_blade.png|ブレード}}' in action_text:
+                action['resource'] = 'blade'
+            elif '{{icon_energy.png|E}}' in action_text:
+                action['resource'] = 'energy'
+            elif 'resource' not in action:
+                action['resource'] = 'generic'
+    
+    # Post-processing for missing card_type field in move_cards actions
+    if action.get('action') == 'move_cards':
+        if 'card_type' not in action:
+            action_text = action.get('text', '')
+            source = action.get('source', '')
+            # Infer card_type from text with priority
+            if 'メンバーカード' in action_text:
+                action['card_type'] = 'member_card'
+            elif 'ライブカード' in action_text:
+                action['card_type'] = 'live_card'
+            elif 'エネルギーカード' in action_text:
+                action['card_type'] = 'energy_card'
+            elif 'カード' in action_text:
+                action['card_type'] = 'card'
+            # Infer from source if text doesn't specify
+            elif source == 'hand':
+                print(f"DEBUG: Setting card_type='card' for source='hand', text='{action_text[:30]}...'")
+                action['card_type'] = 'card'  # Hand cards are generic cards
+            elif source == 'deck' or source == 'deck_top':
+                action['card_type'] = 'card'  # Deck cards are generic
+            elif source == 'revealed_cards' or source == 'revealed_remaining':
+                action['card_type'] = 'card'  # Revealed cards are generic
+            elif source == 'stage':
+                action['card_type'] = 'member_card'  # Stage usually has members
+            elif source == 'discard':
+                action['card_type'] = 'card'  # Discard can have any card
+            elif 'card_type' not in action:
+                print(f"DEBUG: Default fallback for move_cards, text='{action_text[:30]}...', source='{source}'")
+                action['card_type'] = 'card'  # Default fallback
+    
+    # Post-processing for state_change inference
+    if action.get('action') == 'move_cards':
+        action_text = action.get('text', '')
+        if 'state_change' not in action and 'ウェイト状態' in action_text:
+            action['state_change'] = 'wait'
     
     return action
 
@@ -2391,8 +2680,8 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 
                 effect['action'] = 'conditional_alternative'
                 effect['condition'] = parse_condition(condition_text)
-                effect['if_true'] = first_effect
-                effect['if_false'] = second_effect
+                effect['primary_effect'] = first_effect
+                effect['alternative_effect'] = second_effect
                 effect['text'] = text
                 return effect
     
@@ -2536,6 +2825,13 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     effect['action'] = 'sequential'
                     effect['actions'] = actions
                     effect['text'] = text
+                    # Apply comprehensive post-processing to all actions
+                    for action in actions:
+                        if action.get('action'):
+                            post_process_action_comprehensive(action)
+                        elif action.get('actions'):
+                            for nested_action in action.get('actions', []):
+                                post_process_action_comprehensive(nested_action)
                     return effect
     
     # Check for sequential with duration condition ("その後、[condition]かぎり、[action]")
@@ -2588,10 +2884,56 @@ def parse_effect(text: str) -> Dict[str, Any]:
             if len(actions) >= 2:
                 effect['action'] = 'sequential'
                 effect['actions'] = actions
-                # Post-processing: fix nested "draw" actions
+                # Post-processing: fix nested "draw" actions and ensure selected_cards count
                 for action in effect['actions']:
                     if action.get('action') == 'draw':
                         action['action'] = 'draw_card'
+                    # Ensure draw_card actions have defaults
+                    if action.get('action') == 'draw_card':
+                        if 'source' not in action:
+                            action['source'] = 'deck'
+                        if 'destination' not in action:
+                            action['destination'] = 'hand'
+                    # Ensure selected_cards actions have count set
+                    if action.get('source') == 'selected_cards' and 'count' not in action:
+                        action['count'] = 1
+                    
+                    # Post-processing for missing resource field in gain_resource actions
+                    if action.get('action') == 'gain_resource':
+                        if 'resource' not in action:
+                            action_text = action.get('text', '')
+                            # Infer resource from icons in the text
+                            if '{{heart_03.png|heart03}}' in action_text:
+                                action['resource'] = 'heart03'
+                            elif '{{heart_02.png|heart02}}' in action_text:
+                                action['resource'] = 'heart02'
+                            elif '{{heart_01.png|heart01}}' in action_text:
+                                action['resource'] = 'heart01'
+                            elif '{{icon_blade.png|ブレード}}' in action_text:
+                                action['resource'] = 'blade'
+                            elif '{{icon_energy.png|E}}' in action_text:
+                                action['resource'] = 'energy'
+                            elif 'resource' not in action:
+                                action['resource'] = 'generic'
+                    
+                    # Post-processing for missing card_type field in move_cards actions
+                    if action.get('action') == 'move_cards':
+                            action['state_change'] = 'wait'
+                    # Post-processing for missing destinations and sources
+                    if action.get('action') == 'move_cards':
+                        action_text = action.get('text', '')
+                        
+                        # Fix missing destination
+                        if 'destination' not in action:
+                            if 'デッキの一番上に置く' in action_text:
+                                action['destination'] = 'deck_top'
+                            elif 'ウェイト状態で置く' in action_text:
+                                action['destination'] = 'energy_zone'
+                        
+                        # Fix missing source
+                        if 'source' not in action:
+                            if '手札から' in action_text and 'デッキの上に置く' in action_text:
+                                action['source'] = 'hand'
                 return effect
             # If no valid sequential actions were found, fall through to single action parsing
     
@@ -2695,14 +3037,87 @@ def parse_effect(text: str) -> Dict[str, Any]:
         effect['action'] = 'sequential'
         effect['actions'] = [first_action, second_action]
         effect['conditional'] = True
-        # Post-processing: fix nested "draw" actions
+        # Post-processing: fix nested "draw" actions and ensure selected_cards count
         for action in effect['actions']:
             if 'actions' in action:
                 for sub_action in action['actions']:
                     if sub_action.get('action') == 'draw':
                         sub_action['action'] = 'draw_card'
+                    # Ensure draw_card actions have defaults
+                    if sub_action.get('action') == 'draw_card':
+                        if 'source' not in sub_action:
+                            sub_action['source'] = 'deck'
+                        if 'destination' not in sub_action:
+                            sub_action['destination'] = 'hand'
+                    # Ensure selected_cards actions have count set
+                    if sub_action.get('source') == 'selected_cards' and 'count' not in sub_action:
+                        sub_action['count'] = 1
             if action.get('action') == 'draw':
                 action['action'] = 'draw_card'
+            # Ensure draw_card actions have defaults
+            if action.get('action') == 'draw_card':
+                if 'source' not in action:
+                    action['source'] = 'deck'
+                if 'destination' not in action:
+                    action['destination'] = 'hand'
+            # Ensure selected_cards actions have count set
+            if action.get('source') == 'selected_cards' and 'count' not in action:
+                action['count'] = 1
+            
+            # Post-processing for missing resource field in gain_resource actions
+            if action.get('action') == 'gain_resource':
+                if 'resource' not in action:
+                    action_text = action.get('text', '')
+                    # Infer resource from icons in the text
+                    if '{{heart_03.png|heart03}}' in action_text:
+                        action['resource'] = 'heart03'
+                    elif '{{heart_02.png|heart02}}' in action_text:
+                        action['resource'] = 'heart02'
+                    elif '{{heart_01.png|heart01}}' in action_text:
+                        action['resource'] = 'heart01'
+                    elif '{{icon_blade.png|ブレード}}' in action_text:
+                        action['resource'] = 'blade'
+                    elif '{{icon_energy.png|E}}' in action_text:
+                        action['resource'] = 'energy'
+                    elif 'resource' not in action:
+                        action['resource'] = 'generic'
+            
+            # Post-processing for missing card_type field in move_cards actions
+            if action.get('action') == 'move_cards':
+                if 'card_type' not in action:
+                    action_text = action.get('text', '')
+                    # Infer card_type from text
+                    if 'カード' in action_text:
+                        action['card_type'] = 'card'
+                    elif 'メンバーカード' in action_text:
+                        action['card_type'] = 'member_card'
+                    elif 'ライブカード' in action_text:
+                        action['card_type'] = 'live_card'
+                    elif 'エネルギーカード' in action_text:
+                        action['card_type'] = 'energy_card'
+                    elif 'card_type' not in action:
+                        action['card_type'] = 'card'
+            
+            # Post-processing for state_change inference
+            if action.get('action') == 'move_cards':
+                action_text = action.get('text', '')
+                if 'state_change' not in action and 'ウェイト状態' in action_text:
+                    action['state_change'] = 'wait'
+            # Post-processing for missing destinations and sources
+            if action.get('action') == 'move_cards':
+                action_text = action.get('text', '')
+                
+                # Fix missing destination
+                if 'destination' not in action:
+                    if 'デッキの一番上に置く' in action_text:
+                        action['destination'] = 'deck_top'
+                    elif 'ウェイト状態で置く' in action_text:
+                        action['destination'] = 'energy_zone'
+                
+                # Fix missing source
+                if 'source' not in action:
+                    if '手札から' in action_text and 'デッキの上に置く' in action_text:
+                        action['source'] = 'hand'
         return effect
     
     # Check for conditional alternative effects ("代わりに" - instead/otherwise)
@@ -2796,6 +3211,9 @@ def parse_effect(text: str) -> Dict[str, Any]:
         second_action = parse_action(second_part)
         effect['action'] = 'sequential'
         effect['actions'] = [first_action, second_action]
+        # Apply comprehensive post-processing to all actions
+        for action in effect['actions']:
+            post_process_action_comprehensive(action)
         return effect
     
     # Check for choice effects
@@ -2998,6 +3416,9 @@ def parse_effect(text: str) -> Dict[str, Any]:
             if len(actions) >= 2:
                 effect['action'] = 'sequential'
                 effect['actions'] = actions
+                # Apply comprehensive post-processing to all actions
+                for action in effect['actions']:
+                    post_process_action_comprehensive(action)
                 # Post-processing: fix nested "draw" actions
                 for action in effect['actions']:
                     if action.get('action') == 'draw':

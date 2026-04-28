@@ -52,7 +52,7 @@ function getPollingMode() {
 
 function getTargetPollDelay() {
     if (!isTabActive) return 10000;
-    if (State.replayMode || State.offlineMode || !State.roomCode) return POLL_DELAYS.idle;
+    if (State.replayMode || State.offlineMode || (!State.roomCode && !State.gameHasStarted)) return POLL_DELAYS.idle;
     if (State.data?.is_ai_thinking) return POLL_DELAYS.thinking;
     if (State.isLiveWatchOn) return POLL_DELAYS.liveWatch;
     return POLL_DELAYS.idle;
@@ -266,28 +266,8 @@ export const AppController = {
     },
 
     async pollOnce() {
-        if (pollingTimeout) { clearTimeout(pollingTimeout); pollingTimeout = null; }
-        heartbeat += 1;
-
-        try {
-            updateDebugOverlay();
-            const shouldFetch = isTabActive || (heartbeat % 20 === 0);
-
-            if (shouldFetch && !State.replayMode && !State.offlineMode && (State.roomCode || State.gameHasStarted)) {
-                await Network.fetchState();
-            }
-
-            // Adaptive backoff logic: Use burst if counter > 0, else slow target
-            let nextDelay = getTargetPollDelay();
-            if (isTabActive && burstCounter > 0) {
-                burstCounter--;
-                nextDelay = Math.min(nextDelay, POLL_DELAYS.burst);
-            }
-            
-            schedulePoll(nextDelay);
-        } catch (error) {
-            console.error('[Polling] Error:', error);
-            schedulePoll(POLL_DELAYS.error);
-        }
+        // Disabled polling for simple state machine game
+        // Game now works on event-driven updates only
+        return;
     },
 };

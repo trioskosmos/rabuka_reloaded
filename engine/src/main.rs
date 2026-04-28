@@ -552,5 +552,5 @@ fn run_web_server() {
     
     // This will block until the server is stopped
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    let _ = runtime.block_on(web_server::run_web_server(game_state));
+    let _ = runtime.block_on(web_server::run_web_server());
 }

@@ -27,10 +27,13 @@ app.use('/engine', express.static(path.resolve(__dirname, '..', 'engine')));
 app.get('/api/game-state', async (req, res) => {
     try {
         const response = await fetch(`${RUST_API_URL}/api/game-state`);
-        const data = await response.json();
+        const text = await response.text();
+        console.log('[Proxy] /api/game-state response status:', response.status);
+        console.log('[Proxy] /api/game-state response text:', text.substring(0, 200));
+        const data = JSON.parse(text);
         res.json(data);
     } catch (error) {
-        console.error('Error proxying to Rust API:', error);
+        console.error('Error proxying to Rust API (/api/game-state):', error);
         res.status(500).json({ error: 'Failed to get game state' });
     }
 });

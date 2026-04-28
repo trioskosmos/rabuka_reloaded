@@ -6,13 +6,5 @@ import { DOM_IDS } from './constants_dom.js';
 
 export async function initialize() {
     initializeGlobals({ restartPolling: AppController.restartPolling });
-    try {
-        await AppController.initialize();
-    } catch (error) {
-        console.error('[Init] Initialization Failed:', error);
-        // Simplified: Auto-start game instead of showing room modal
-        if (window.Actions && window.Actions.startGame) {
-            window.Actions.startGame('pve');
-        }
-    }
+    await AppController.initialize();
 }

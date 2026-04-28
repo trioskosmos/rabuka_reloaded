@@ -1,0 +1,135 @@
+[package]
+name = "test_sequential"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde_json = "1.0"
+
+[[bin]]
+name = "verification"
+path = "src/verification.rs"
+
+[[bin]]
+name = "find_issues"
+path = "src/find_issues.rs"
+
+[[bin]]
+name = "find_ability_156"
+path = "src/find_ability_156.rs"
+
+[[bin]]
+name = "find_ability_261"
+path = "src/find_ability_261.rs"
+
+[[bin]]
+name = "comprehensive_analysis"
+path = "src/comprehensive_analysis.rs"
+
+[[bin]]
+name = "find_conditional_87"
+path = "src/find_conditional_87.rs"
+
+[[bin]]
+name = "find_missing_sources"
+path = "src/find_missing_sources.rs"
+
+[[bin]]
+name = "find_remaining_issues"
+path = "src/find_remaining_issues.rs"
+
+[[bin]]
+name = "debug_ability_144"
+path = "src/debug_ability_144.rs"
+
+[[bin]]
+name = "debug_final_issues"
+path = "src/debug_final_issues.rs"
+
+[[bin]]
+name = "advanced_parser_analysis"
+path = "src/advanced_parser_analysis.rs"
+
+[[bin]]
+name = "analyze_long_effects"
+path = "src/analyze_long_effects.rs"
+
+[[bin]]
+name = "examine_complex_abilities"
+path = "src/examine_complex_abilities.rs"
+
+[[bin]]
+name = "deep_parser_analysis"
+path = "src/deep_parser_analysis.rs"
+
+[[bin]]
+name = "examine_subtle_issues"
+path = "src/examine_subtle_issues.rs"
+
+[[bin]]
+name = "examine_rule_abilities"
+path = "src/examine_rule_abilities.rs"
+
+[[bin]]
+name = "ultimate_parser_analysis"
+path = "src/ultimate_parser_analysis.rs"
+
+[[bin]]
+name = "manual_engine_compatibility"
+path = "src/manual_engine_compatibility.rs"
+
+[[bin]]
+name = "debug_523"
+path = "src/debug_523.rs"
+
+[[bin]]
+name = "prove_fixes"
+path = "src/prove_fixes.rs"
+
+[[bin]]
+name = "show_ability_593"
+path = "src/show_ability_593.rs"
+
+[[bin]]
+name = "deep_dive_analysis"
+path = "src/deep_dive_analysis.rs"
+
+[[bin]]
+name = "debug_critical_issues"
+path = "src/debug_critical_issues.rs"
+
+[[bin]]
+name = "verify_fix"
+path = "src/verify_fix.rs"
+
+[[bin]]
+name = "manual_review"
+path = "src/manual_review.rs"
+
+[[bin]]
+name = "examine_edge_cases"
+path = "src/examine_edge_cases.rs"
+
+[[bin]]
+name = "analyze_card_type_issues"
+path = "src/analyze_card_type_issues.rs"
+
+[[bin]]
+name = "verify_card_type_fix"
+path = "src/verify_card_type_fix.rs"
+
+[[bin]]
+name = "debug_ability_48"
+path = "src/debug_ability_48.rs"
+
+[[bin]]
+name = "check_ability_48"
+path = "src/check_ability_48.rs"
+
+[[bin]]
+name = "final_verification"
+path = "src/final_verification.rs"
+
+[[bin]]
+name = "comprehensive_manual_review"
+path = "src/comprehensive_manual_review.rs"

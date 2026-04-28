@@ -141,7 +141,7 @@ export const DeckSetupModal = {
             }
         }
         DeckSetupModal.closeDeckModal();
-        if (State.roomCode || State.offlineMode) {
+        if (State.roomCode || State.offlineMode || State.gameHasStarted) {
             await Network.fetchState();
         }
     },
@@ -177,7 +177,7 @@ export const DeckSetupModal = {
                 }
             }
             DeckSetupModal.closeDeckModal();
-            if (State.roomCode || State.offlineMode) {
+            if (State.roomCode || State.offlineMode || State.gameHasStarted) {
                 await Network.fetchState();
             }
         } catch (e) {
@@ -217,7 +217,7 @@ export const DeckSetupModal = {
                 }
             }
             DeckSetupModal.closeDeckModal();
-            if (State.roomCode || State.offlineMode) {
+            if (State.roomCode || State.offlineMode || State.gameHasStarted) {
                 await Network.fetchState();
             }
         } catch (e) {
