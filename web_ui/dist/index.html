@@ -12,8 +12,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     
     <!-- CSS Load Order managed by Vite via style.css -->
-  <script type="module" crossorigin src="./assets/main-DJOs18ng.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/main-DgFc3l0g.css">
+  <script type="module" crossorigin src="./assets/main-BLtV8Ljj.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/main-DwE5x2b7.css">
 </head>
 
 <body class="rabukasim-root">
@@ -316,6 +316,29 @@
                 </div>
             </div>
 
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">
+                    <h3>Cheats</h3>
+                </div>
+                <div class="cheat-container">
+                    <div class="cheat-input-group">
+                        <label>Add Energy:</label>
+                        <input type="number" id="cheat-energy-amount" value="1" min="1" max="10" style="width: 60px; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: white; border-radius: 4px;">
+                    </div>
+                    <div class="cheat-buttons-row">
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-add-energy" data-player="0">P1 +Energy</button>
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-add-energy" data-player="1">P2 +Energy</button>
+                    </div>
+                    <div class="cheat-input-group" style="margin-top: 10px;">
+                        <label>Add Card to Hand:</label>
+                        <input type="text" id="cheat-card-id" placeholder="PL!S-PR-026-PR" style="width: 140px; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: white; border-radius: 4px;">
+                    </div>
+                    <div class="cheat-buttons-row">
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="0">P1 +Card</button>
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="1">P2 +Card</button>
+                    </div>
+                </div>
+            </div>
 
         </div>
     </div>

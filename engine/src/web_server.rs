@@ -158,6 +158,11 @@ pub struct InitGameRequest {
     pub deck: Option<String>,
 }
 
+#[derive(Deserialize)]
+pub struct ExecCodeRequest {
+    pub code: String,
+}
+
 pub struct AppState {
     pub game_state: Arc<Mutex<GameState>>,
     pub rooms: Arc<Mutex<HashMap<String, Room>>>,
@@ -272,19 +277,15 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
         }
         
         if let Some(room) = latest_room {
-            println!("DEBUG: Found latest room, has game_state: {}", room.game_state.is_some());
             if let Some(room_game_state) = &room.game_state {
                 room_game_state.clone()
             } else {
-                println!("DEBUG: Room has no game state, using global");
                 data.game_state.clone()
             }
         } else {
-            println!("DEBUG: No rooms found, using global");
             data.game_state.clone()
         }
     } else {
-        println!("DEBUG: No rooms found ({} rooms), using global", rooms.len());
         data.game_state.clone()
     };
     
@@ -296,7 +297,6 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
         }
     };
 
-    println!("DEBUG: get_game_state returning phase: {:?}", game_state.current_phase);
     let display = game_state_to_display(&game_state);
     HttpResponse::Ok().json(display)
 }
@@ -484,8 +484,7 @@ async fn execute_action(
     data: web::Data<AppState>,
     req: web::Json<ExecuteActionRequest>,
 ) -> impl Responder {
-    println!("DEBUG: execute_action called with action_type: {:?}", req.action_type);
-    
+        
     // Check if there's an active room and use its game state
     let rooms = data.rooms.lock().unwrap();
     let game_state_to_use = if rooms.len() >= 1 {
@@ -526,9 +525,6 @@ async fn execute_action(
         .and_then(|t| t.parse::<crate::game_setup::ActionType>().ok())
         .unwrap_or_else(|| crate::game_setup::ActionType::Pass);
     
-    println!("DEBUG: Parsed action_type: {:?}", action_type);
-    println!("DEBUG: Current phase before execution: {:?}", game_state.current_phase);
-    
     // Execute the action
     let result = crate::turn::TurnEngine::execute_main_phase_action(
         &mut game_state,
@@ -540,9 +536,7 @@ async fn execute_action(
         req.use_baton_touch,
     );
     
-    println!("DEBUG: Action execution result: {:?}", result);
-    println!("DEBUG: Current phase after execution: {:?}", game_state.current_phase);
-    
+        
     match result {
         Ok(_) => {
             // For human decision phases like ChooseFirstAttacker, the phase transition 
@@ -557,19 +551,12 @@ async fn execute_action(
             
             // Include legal actions in the response
             let actions = generate_possible_actions(&game_state);
-            println!("DEBUG: Generated {} actions:", actions.len());
-            for (i, action) in actions.iter().enumerate() {
-                println!("  Action {}: {}", i, action.description);
-            }
             let mut response = serde_json::to_value(&display).unwrap_or_default();
             response["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
-            
-            println!("DEBUG: Returning response with {} actions", actions.len());
             HttpResponse::Ok().json(response)
         }
         Err(e) => {
-            println!("DEBUG: Action execution failed: {}", e);
-            HttpResponse::BadRequest().json(serde_json::json!({
+                        HttpResponse::BadRequest().json(serde_json::json!({
                 "error": e
             }))
         }
@@ -632,7 +619,7 @@ async fn redo(data: web::Data<AppState>) -> impl Responder {
             return HttpResponse::InternalServerError().json("Game state mutex poisoned");
         }
     };
-    
+
     match game_state.redo() {
         Ok(_) => {
             if let Err(e) = settle_single_player_state(&mut game_state) {
@@ -646,6 +633,85 @@ async fn redo(data: web::Data<AppState>) -> impl Responder {
             HttpResponse::BadRequest().json(e)
         }
     }
+}
+
+async fn exec_code(
+    data: web::Data<AppState>,
+    req: web::Json<ExecCodeRequest>,
+) -> impl Responder {
+    let mut game_state = match data.game_state.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in exec_code: {}", e);
+            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
+        }
+    };
+
+    // Parse and execute the code
+    let code = &req.code;
+
+    // Simple parsing for cheat commands
+    // Format: player_idx = N; operations...
+    if code.contains("draw_energy") {
+        // Extract player_idx
+        let player_idx = code.lines()
+            .find(|l| l.contains("player_idx"))
+            .and_then(|l| l.split('=').nth(1))
+            .and_then(|v| v.trim().split(';').next())
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0);
+
+        // Extract amount
+        let amount = code.lines()
+            .find(|l| l.contains("amount"))
+            .and_then(|l| l.split('=').nth(1))
+            .and_then(|v| v.trim().split(';').next())
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(1);
+
+        // Execute draw_energy amount times
+        let player = if player_idx == 0 {
+            &mut game_state.player1
+        } else {
+            &mut game_state.player2
+        };
+
+        for _ in 0..amount {
+            let _ = player.draw_energy();
+        }
+    } else if code.contains("add_card") && code.contains("card_no") {
+        // Extract player_idx
+        let player_idx = code.lines()
+            .find(|l| l.contains("player_idx"))
+            .and_then(|l| l.split('=').nth(1))
+            .and_then(|v| v.trim().split(';').next())
+            .and_then(|v| v.parse::<usize>().ok())
+            .unwrap_or(0);
+
+        // Extract card_no
+        let card_no = code.lines()
+            .find(|l| l.contains("card_no"))
+            .and_then(|l| l.split('=').nth(1))
+            .and_then(|v| v.trim().split(';').next())
+            .map(|v| v.trim().trim_matches('"'))
+            .unwrap_or("");
+
+        // Look up card and add to hand
+        if let Some(card_id) = game_state.card_database.get_card_id(card_no) {
+            let player = if player_idx == 0 {
+                &mut game_state.player1
+            } else {
+                &mut game_state.player2
+            };
+            player.hand.add_card(card_id);
+        }
+    }
+
+    let display = game_state_to_display(&game_state);
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "state": display
+    }))
 }
 
 async fn debug_rewind(data: web::Data<AppState>) -> impl Responder {
@@ -1196,6 +1262,7 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/set_ai", web::post().to(set_ai))
             .route("/api/undo", web::post().to(undo))
             .route("/api/redo", web::post().to(redo))
+            .route("/api/exec", web::post().to(exec_code))
             .route("/api/debug/rewind", web::post().to(debug_rewind))
             .route("/api/debug/redo", web::post().to(debug_redo))
             .route("/api/debug/snapshot", web::get().to(debug_snapshot))

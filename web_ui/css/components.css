@@ -98,6 +98,64 @@
 }
 
 .btn-accent-pink:hover {
+    background: rgba(255, 85, 170, 0.2);
+    box-shadow: 0 0 15px rgba(255, 85, 170, 0.4);
+}
+
+/* --- Cheat Section Styles --- */
+.cheat-container {
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: var(--radius-sm);
+    margin-top: 8px;
+}
+
+.cheat-input-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.cheat-input-group label {
+    font-size: 0.75rem;
+    color: #aaa;
+    white-space: nowrap;
+}
+
+.cheat-buttons-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.cheat-buttons-row .btn {
+    flex: 1;
+}
+
+.btn-accent-blue {
+    background: rgba(74, 158, 255, 0.15);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+}
+
+.btn-accent-blue:hover {
+    background: rgba(74, 158, 255, 0.25);
+    box-shadow: 0 0 15px rgba(74, 158, 255, 0.4);
+}
+
+.btn-accent-green {
+    background: rgba(85, 255, 85, 0.15);
+    border-color: #55ff55;
+    color: #55ff55;
+}
+
+.btn-accent-green:hover {
+    background: rgba(85, 255, 85, 0.25);
+    box-shadow: 0 0 15px rgba(85, 255, 85, 0.4);
+}
+
+.btn-accent-pink:hover {
     background: var(--accent-pink);
     color: white;
     box-shadow: var(--glow-pink);

@@ -162,6 +162,42 @@ const actionHandlers = {
     'show-performance-turn': ({ value }) => Modals.showPerformanceForTurn(Number(value)),
     'close-discard-modal': () => ModalManager.hide(DOM_IDS.MODAL_DISCARD),
     'reload-page': () => window.location.reload(),
+    'cheat-add-energy': ({ player }) => {
+        const amount = parseInt(document.getElementById('cheat-energy-amount')?.value || '1', 10);
+        const code = `
+            let player_idx = ${player};
+            let amount = ${amount};
+            if let Some(game) = &mut window.game {
+                if let Some(player) = game.players.get_mut(player_idx) {
+                    for _ in 0..amount {
+                        let _ = player.draw_energy();
+                    }
+                }
+            }
+        `;
+        window.Actions.execCode(code);
+    },
+    'cheat-add-card': ({ player }) => {
+        const cardId = document.getElementById('cheat-card-id')?.value || '';
+        if (!cardId) {
+            alert('Please enter a card ID');
+            return;
+        }
+        // Escape the card ID for Rust string literal
+        const escapedCardId = cardId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const code = `
+            let player_idx = ${player};
+            let card_no = "${escapedCardId}";
+            if let Some(game) = &mut window.game {
+                if let Some(card) = game.card_database.get_card_by_no(card_no) {
+                    if let Some(player) = game.players.get_mut(player_idx) {
+                        player.hand.add_card(card.id);
+                    }
+                }
+            }
+        `;
+        window.Actions.execCode(code);
+    },
 };
 
 function handleDelegatedClick(event) {
@@ -178,12 +214,13 @@ function handleDelegatedClick(event) {
     const handler = actionHandlers[action];
     if (handler) {
         const params = {
-            button, event, 
+            button, event,
             id: button.getAttribute('data-id'),
             value: button.getAttribute('data-value'),
             owner: button.getAttribute('data-owner'),
             targetId: button.getAttribute('data-target-id'),
             href: button.getAttribute('data-href'),
+            player: button.getAttribute('data-player'),
         };
         handler(params);
     }

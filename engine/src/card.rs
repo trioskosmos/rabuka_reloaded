@@ -640,8 +640,8 @@ pub struct GroupInfo {
 pub struct DynamicCount {
     #[serde(rename = "type")]
     pub count_type: String,
-    pub reference: String,
-    pub mode: String,
+    pub reference: Option<String>,
+    pub mode: Option<String>,
     pub base_reference: Option<String>,
     pub calculation: Option<String>,
     pub calculation_value: Option<u32>,

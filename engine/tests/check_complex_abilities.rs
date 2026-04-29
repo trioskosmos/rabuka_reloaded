@@ -17,14 +17,17 @@ struct Card {
     abilities: Vec<Ability>,
 }
 
-fn main() {
+#[test]
+fn check_all_ability_combinations() {
     // Load abilities.json
-    let abilities_path = "cards/abilities.json";
+    let abilities_path = "../cards/abilities.json";
     let content = fs::read_to_string(abilities_path).expect("Failed to read abilities.json");
     
     let abilities: serde_json::Value = serde_json::from_str(&content).expect("Failed to parse abilities.json");
     
-    let abilities_list = abilities.as_array().expect("Abilities should be an array");
+    let abilities_list = abilities.get("unique_abilities")
+        .and_then(|v| v.as_array())
+        .expect("Abilities should have 'unique_abilities' array");
     
     println!("Total abilities in database: {}", abilities_list.len());
     
