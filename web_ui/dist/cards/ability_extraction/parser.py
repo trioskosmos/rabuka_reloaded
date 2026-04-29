@@ -167,6 +167,17 @@ EITHER_CASE_MARKER = 'いずれかの場合'
 # ============== DURATION PREFIXES ==============
 DURATION_PREFIXES = ['ライブ終了時まで、', 'このターンの間、', 'このライブの間、', 'ライブ終了時まで 、', 'このターンの間 、', 'このライブの間 、']
 
+# ============== COST MODIFICATION PATTERNS ==============
+COST_MODIFICATION_PATTERNS = [
+    ('元々持つコストより(\d+)低い値に等しくなる', 'decrease_by'),
+    ('元々持つコストより(\d+)高い値に等しくなる', 'increase_by'),
+    ('コストが(\d+)以上になった場合', 'cost_threshold'),
+    ('コストが(\d+)以下になった場合', 'cost_threshold_below'),
+]
+
+# ============== COMPLEX CONDITION PATTERNS ==============
+COMPLEX_CONDITION_MARKERS = ['これにより', 'その結果']
+
 # ============== REGEX PATTERNS ==============
 REGEX_COUNT_CARDS = r'(\d+)枚'
 REGEX_COUNT_PERSONS = r'(\d+)人'
@@ -416,6 +427,44 @@ def categorize_quoted_text(quoted_text: List[str]) -> Dict[str, List[str]]:
             result['characters'].append(q)
     return result
 
+def extract_duration(text: str) -> Optional[str]:
+    """Extract duration from effect text."""
+    DURATION_MAP = {
+        'ライブ終了時まで': 'live_end',
+        'このターンの間': 'this_turn',
+        'このライブの間': 'this_live',
+    }
+    for pattern, code in DURATION_MAP.items():
+        if pattern in text:
+            return code
+    return None
+
+def extract_cost_modification(text: str) -> Optional[Dict[str, Any]]:
+    """Extract cost modification patterns from text."""
+    result = {}
+    
+    # Check for cost modification patterns
+    for pattern, mod_type in COST_MODIFICATION_PATTERNS:
+        match = re.search(pattern, text)
+        if match:
+            result['modification_type'] = mod_type
+            if match.groups():
+                result['value'] = int(match.group(1))
+            break
+    
+    # Check for cost threshold patterns
+    threshold_match = re.search(r'コストが(\d+)以上になった場合', text)
+    if threshold_match:
+        result['cost_threshold'] = int(threshold_match.group(1))
+        result['threshold_operator'] = '>='
+    
+    threshold_match_below = re.search(r'コストが(\d+)以下になった場合', text)
+    if threshold_match_below:
+        result['cost_threshold'] = int(threshold_match_below.group(1))
+        result['threshold_operator'] = '<='
+    
+    return result if result else None
+
 # ============== STRUCTURAL PARSING ==============
 
 def identify_structure(text: str) -> Dict[str, Any]:
@@ -494,12 +543,39 @@ def split_condition_action(text: str) -> Tuple[str, str]:
             return parts[0].strip(), parts[1].strip()
     return '', text
 
+def parse_complex_condition(text: str) -> Dict[str, Any]:
+    """Parse complex conditions with cause-effect relationships (e.g., これにより)."""
+    # Check for complex condition markers
+    for marker in COMPLEX_CONDITION_MARKERS:
+        if marker in text:
+            parts = text.split(marker, 1)
+            if len(parts) == 2:
+                # Parse the cause part (what triggers the effect)
+                cause_text = parts[0].strip()
+                # Parse the effect part (what happens as a result)
+                effect_text = parts[1].strip()
+                
+                return {
+                    'type': 'complex_condition',
+                    'cause': parse_condition(cause_text),
+                    'effect': parse_condition(effect_text),
+                    'text': text
+                }
+    
+    # If no complex markers found, return None
+    return None
+
 # ============== COMPONENT PARSING ==============
 
 def parse_condition(text: str) -> Dict[str, Any]:
     """Parse a condition text."""
     # Strip parenthetical notes first
     text = strip_parenthetical(text)
+    
+    # Check for complex conditions with cause-effect relationships FIRST
+    complex_cond = parse_complex_condition(text)
+    if complex_cond:
+        return complex_cond
     
     condition = {
         'text': text
@@ -602,6 +678,17 @@ def parse_condition(text: str) -> Dict[str, Any]:
         group_match = re.search(r'『([^』]+)』からバトンタッチ', text)
         if group_match:
             condition['baton_touch_group'] = group_match.group(1)
+        # Extract group for general group field (e.g., 『DOLLCHESTRA』のメンバー)
+        group = extract_group(text)
+        if group:
+            condition['group'] = group
+        # Extract cost comparison if present (e.g., "このメンバーよりコストが低い")
+        if 'コスト' in text and ('低い' in text or '高い' in text):
+            condition['comparison_type'] = 'cost'
+            if '低い' in text:
+                condition['operator'] = '<'
+            elif '高い' in text:
+                condition['operator'] = '>'
         # Extract exclude_self if present (e.g., "このメンバー以外からバトンタッチ")
         if 'このメンバー以外' in text or 'ほかのメンバー' in text:
             condition['exclude_self'] = True
@@ -1056,6 +1143,18 @@ def parse_condition(text: str) -> Dict[str, Any]:
     # Determine condition type
     if group or group_names:
         condition['type'] = 'group_condition'
+        # Check for cost comparison in group conditions
+        if 'コスト' in text and ('低い' in text or '高い' in text):
+            condition['comparison_type'] = 'cost'
+            # Extract operator
+            if '低い' in text:
+                condition['operator'] = '<'
+            elif '高い' in text:
+                condition['operator'] = '>'
+            # Extract cost modification details
+            cost_mod = extract_cost_modification(text)
+            if cost_mod:
+                condition.update(cost_mod)
     elif condition.get('resource_type'):
         condition['type'] = 'comparison_condition'
     elif location and card_type:
@@ -2087,6 +2186,13 @@ def post_process_action_comprehensive(action: Dict[str, Any]) -> Dict[str, Any]:
                 action['resource'] = 'energy'
             elif 'resource' not in action:
                 action['resource'] = 'generic'
+        
+        # Extract duration for gain_resource actions
+        if 'duration' not in action:
+            action_text = action.get('text', '')
+            duration = extract_duration(action_text)
+            if duration:
+                action['duration'] = duration
     
     # Post-processing for missing card_type field in move_cards actions
     if action.get('action') == 'move_cards':
@@ -3784,7 +3890,7 @@ if __name__ == '__main__':
                     existing_condition = effect.get('condition')
                     if existing_condition and isinstance(existing_condition, dict):
                         # Always add these specific condition fields
-                        always_add_cond_fields = {'baton_touch_source', 'baton_touch_group', 'movement_state', 'includes_pattern', 'no_excess_heart'}
+                        always_add_cond_fields = {'baton_touch_source', 'baton_touch_group', 'movement_state', 'includes_pattern', 'no_excess_heart', 'group', 'comparison_type', 'operator', 'modification_type', 'value'}
                         for cond_key, cond_value in value.items():
                             if cond_key in always_add_cond_fields or cond_key not in existing_condition:
                                 existing_condition[cond_key] = cond_value

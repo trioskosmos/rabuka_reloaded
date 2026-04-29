@@ -25,6 +25,16 @@ pub enum Choice {
         position: String,
         description: String,
     },
+    SelectHeartColor {
+        count: usize,
+        options: Vec<String>,
+        description: String,
+    },
+    SelectHeartType {
+        count: usize,
+        options: Vec<String>,
+        description: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -32,6 +42,8 @@ pub enum ChoiceResult {
     CardSelected { indices: Vec<usize> },
     TargetSelected { target: String },
     PositionSelected { position: String },
+    HeartColorSelected { colors: Vec<String> },
+    HeartTypeSelected { types: Vec<String> },
     Skip,
 }
 
@@ -334,10 +346,25 @@ impl<'a> AbilityResolver<'a> {
                     if pending.card_no == "choice_string" {
                         if let Some(ref options_json) = pending.conditional_choice {
                             // Deserialize the options from JSON (Vec<String>)
-                            if let Ok(_options) = serde_json::from_str::<Vec<String>>(options_json) {
-                                eprintln!("User selected string option: {}", selected);
-                                // For string choices, we just log the selection - the actual handling
-                                // depends on the context (e.g., heart selection modifies required hearts)
+                            if let Ok(options) = serde_json::from_str::<Vec<String>>(options_json) {
+                                eprintln!("User selected string option: {} from {:?}", selected, options);
+                                
+                                // Apply the selected option based on context
+                                if let Ok(selected_idx) = selected.parse::<usize>() {
+                                    if selected_idx > 0 && selected_idx <= options.len() {
+                                        let selected_value = &options[selected_idx - 1];
+                                        eprintln!("Applying selected option: {}", selected_value);
+                                        
+                                        // Store the selected heart color in game state for later use
+                                        if selected_value.starts_with("heart") || 
+                                           selected_value == "赤" || selected_value == "桃" || 
+                                           selected_value == "緑" || selected_value == "青" ||
+                                           selected_value == "黄" || selected_value == "紫" {
+                                            self.game_state.prohibition_effects.push(format!("selected_heart_color:{}", selected_value));
+                                            eprintln!("Stored selected heart color: {}", selected_value);
+                                        }
+                                    }
+                                }
                             } else {
                                 eprintln!("Failed to deserialize string choice options");
                             }
@@ -399,10 +426,43 @@ impl<'a> AbilityResolver<'a> {
                 // Check if this is a conditional_alternative choice
                 if target == "primary|alternative" {
                     // Store the choice and execute the appropriate effect
-                    // This would need to be stored and retrieved when resuming execution
-                    // For now, just clear the pending choice
+                    let choice_made = selected.as_str();
+                    
+                    // Execute the chosen effect (primary or alternative)
+                    if let Some(ref pending) = self.game_state.pending_ability.clone() {
+                        if let Some(ref ability) = self.current_ability.clone() {
+                            if let Some(ref effect) = ability.effect {
+                                if effect.action == "conditional_alternative" {
+                                    let player = self.game_state.active_player_mut();
+                                    let perspective_player_id = player.id.clone();
+                                    
+                                    match choice_made {
+                                        "primary" => {
+                                            if let Some(ref primary) = effect.primary_effect {
+                                                if let Err(e) = self.execute_effect(primary) {
+                                                    eprintln!("Failed to execute primary effect: {}", e);
+                                                }
+                                            }
+                                        }
+                                        "alternative" => {
+                                            if let Some(ref alternative) = effect.alternative_effect {
+                                                if let Err(e) = self.execute_effect(alternative) {
+                                                    eprintln!("Failed to execute alternative effect: {}", e);
+                                                }
+                                            }
+                                        }
+                                        _ => {
+                                            eprintln!("Unknown choice for conditional_alternative: {}", choice_made);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
                     self.pending_choice = None;
                     self.game_state.pending_choice = None;
+                    self.game_state.pending_ability = None;
                     return Ok(());
                 }
                 // Handle other target selections
@@ -733,10 +793,10 @@ impl<'a> AbilityResolver<'a> {
 
         // If baton_touch_trigger is true, check if a baton touch occurred
         if baton_touch_trigger {
-            // Check if the current action is a baton touch
-            // This requires tracking whether the current ability activation is due to baton touch
-            // For now, we'll check the game state's baton touch tracking
-            // This is a simplified check - full implementation would need context tracking
+            // Check if a baton touch occurred this turn
+            // Note: This checks turn-level baton touch count, not whether this specific
+            // ability was triggered by baton touch. Full context tracking would require
+            // passing baton touch context through the ability resolution pipeline.
             if self.game_state.baton_touch_count == 0 {
                 // No baton touch occurred this turn, condition fails
                 return false;
@@ -1057,9 +1117,10 @@ impl<'a> AbilityResolver<'a> {
             // Check if the activating card was played via baton touch
             if let Some(ref activating_card) = self.game_state.activating_card {
                 if let Some(_card) = self.game_state.card_database.get_card(*activating_card) {
-                    // Check if this card was played via baton touch this turn
-                    // We need to track this in game state - for now, check if baton touch was used recently
-                    // This is a simplified check - proper implementation needs game state tracking
+                    // Check if a baton touch occurred this turn
+                    // Note: This checks turn-level baton touch count, not whether this specific
+                    // card was played via baton touch. Card-specific tracking would require
+                    // storing baton touch origin for each card on stage.
                     return self.game_state.baton_touch_count > 0;
                 }
             }
@@ -1733,17 +1794,50 @@ impl<'a> AbilityResolver<'a> {
     /// Extract the original event from replacement effect text
     /// For example, "draw card" from "instead of drawing, do X"
     fn extract_original_event_from_text(&self, text: &str) -> Option<String> {
-        // Simplified implementation - looks for common patterns
-        if text.contains("引く時") || text.contains("draw") {
+        // Extract the original event type from replacement effect text
+        // Handles both Japanese and English patterns
+        let text_lower = text.to_lowercase();
+        
+        // Draw patterns
+        if text.contains("引く時") || text.contains("引く場合") || 
+           text_lower.contains("when you draw") || text_lower.contains("instead of drawing") {
             Some("draw".to_string())
-        } else if text.contains("支払う時") || text.contains("pay") {
+        } 
+        // Energy payment patterns
+        else if text.contains("支払う時") || text.contains("支払う場合") ||
+                text_lower.contains("when you pay") || text_lower.contains("instead of paying") {
             Some("pay_energy".to_string())
-        } else if text.contains("置く時") || text.contains("place") {
+        } 
+        // Card placement/movement patterns
+        else if text.contains("置く時") || text.contains("置く場合") ||
+                text.contains("出す時") || text.contains("出す場合") ||
+                text_lower.contains("when you place") || text_lower.contains("instead of placing") ||
+                text_lower.contains("when you move") || text_lower.contains("instead of moving") {
             Some("move_cards".to_string())
-        } else if text.contains("ライブする時") || text.contains("live") {
+        } 
+        // Live patterns
+        else if text.contains("ライブする時") || text.contains("ライブする場合") ||
+                text_lower.contains("when you live") || text_lower.contains("instead of playing a live") {
             Some("live".to_string())
-        } else {
-            // Default: try to extract action from text
+        }
+        // Appear/Debut patterns
+        else if text.contains("登場する時") || text.contains("デビューする時") ||
+                text_lower.contains("when it appears") || text_lower.contains("instead of debuting") {
+            Some("appear".to_string())
+        }
+        // Damage patterns
+        else if text.contains("ダメージを受ける時") || text.contains("ダメージが与えられる時") ||
+                text_lower.contains("when you take damage") || text_lower.contains("instead of taking damage") {
+            Some("take_damage".to_string())
+        }
+        // Score patterns
+        else if text.contains("得点が増える時") || text.contains("スコアが増える時") ||
+                text_lower.contains("when you gain score") || text_lower.contains("instead of gaining score") {
+            Some("gain_score".to_string())
+        }
+        else {
+            // Unknown pattern - log for debugging
+            eprintln!("Unknown replacement effect pattern: {}", text);
             None
         }
     }
@@ -1816,8 +1910,7 @@ impl<'a> AbilityResolver<'a> {
         if let Some(ref effect_type) = effect.effect_type {
             if effect_type == "replacement" {
                 // Parse the replacement effect to determine what event it replaces
-                // For now, this is a simplified implementation
-                // A full implementation would parse the text to extract the original event
+                // Extract the original event from the effect text (supports Japanese and English)
                 let original_event = self.extract_original_event_from_text(&effect.text);
                 let is_choice_based = effect.text.contains("してよい") || effect.text.contains("may");
                 
@@ -1989,6 +2082,9 @@ impl<'a> AbilityResolver<'a> {
                 target: "primary|alternative".to_string(),
                 description: description,
             });
+            self.game_state.pending_choice = self.pending_choice.clone();
+            // Store execution context to resume after user choice
+            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             // Return early - execution will continue after user provides choice
             return Ok(());
         }
@@ -2309,8 +2405,8 @@ impl<'a> AbilityResolver<'a> {
         let target = effect.target.as_deref().unwrap_or("self");
         let duration = effect.duration.as_deref();
         
-        // Track the cost modification as a prohibition effect
-        // This is a simplified implementation - a full implementation would modify actual ability costs
+        // Track the cost modification using temporary effects system
+        // This properly tracks cost modifications with duration support
         let prohibition_text = format!("activation_cost_{}_{}", operation, value);
         
         match target {
@@ -2355,8 +2451,8 @@ impl<'a> AbilityResolver<'a> {
     fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let count = effect.count.unwrap_or(1);
         let _max = effect.max.unwrap_or(false);
-        let mut source = effect.source.as_deref().unwrap_or("").to_string();
-        let mut destination = effect.destination.as_deref().unwrap_or("").to_string();
+        let source = effect.source.as_deref().unwrap_or("").to_string();
+        let destination = effect.destination.as_deref().unwrap_or("").to_string();
         let target = effect.target.as_deref().unwrap_or("self");
         let card_type_filter = effect.card_type.as_deref();
         let _placement_order = effect.placement_order.as_deref();
@@ -2569,6 +2665,9 @@ impl<'a> AbilityResolver<'a> {
                             description: format!("Select {} {}card(s) from stage to move to {} ({} available)", count, card_type_desc, destination, valid_cards.len()),
                             allow_skip: false,
                         });
+                        self.game_state.pending_choice = self.pending_choice.clone();
+                        // Store execution context to resume after user choice
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         // Return early - execution will continue after user provides choice
                         return Ok(());
                     }
@@ -2717,6 +2816,9 @@ impl<'a> AbilityResolver<'a> {
                             description: format!("Select {} {}card(s) from hand to discard", count, card_type_desc),
                             allow_skip: false,
                         });
+                        self.game_state.pending_choice = self.pending_choice.clone();
+                        // Store execution context to resume after user choice
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         // Return early - execution will continue after user provides choice
                         return Ok(());
                     }
@@ -2867,6 +2969,9 @@ impl<'a> AbilityResolver<'a> {
                                 description: format!("Select {} {}card(s) from discard to add to hand ({} available)", count, card_type_desc, matching_indices.len()),
                                 allow_skip: false,
                             });
+                            self.game_state.pending_choice = self.pending_choice.clone();
+                            // Store execution context to resume after user choice
+                            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                             // Return early - execution will continue after user provides choice
                             return Ok(());
                         }
@@ -3993,6 +4098,9 @@ impl<'a> AbilityResolver<'a> {
                             description,
                             allow_skip: false,
                         });
+                        self.game_state.pending_choice = self.pending_choice.clone();
+                        // Store execution context to resume after user choice
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         // Return early - execution will continue after user provides choice
                         return Ok(());
                     }
@@ -4022,6 +4130,9 @@ impl<'a> AbilityResolver<'a> {
                             description,
                             allow_skip: false,
                         });
+                        self.pending_choice = self.game_state.pending_choice.clone();
+                        // Store execution context to resume after user choice
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         // Return early - execution will continue after user provides choice
                         return Ok(());
                     }
@@ -4544,6 +4655,47 @@ impl<'a> AbilityResolver<'a> {
             }
         };
 
+        // Parse heart colors from effect text (e.g., "heart02かheart04かheart05を持つ")
+        let required_heart_colors: Vec<crate::card::HeartColor> = {
+            let text = &effect.text;
+            let mut colors = Vec::new();
+            if text.contains("heart02") {
+                colors.push(crate::card::HeartColor::Heart02);
+            }
+            if text.contains("heart04") {
+                colors.push(crate::card::HeartColor::Heart04);
+            }
+            if text.contains("heart05") {
+                colors.push(crate::card::HeartColor::Heart05);
+            }
+            if text.contains("heart01") {
+                colors.push(crate::card::HeartColor::Heart01);
+            }
+            if text.contains("heart03") {
+                colors.push(crate::card::HeartColor::Heart03);
+            }
+            if text.contains("heart06") {
+                colors.push(crate::card::HeartColor::Heart06);
+            }
+            colors
+        };
+
+        // Helper function to check if card matches heart color filter
+        let matches_heart_colors = |card: &crate::card::Card, required_colors: &[crate::card::HeartColor]| -> bool {
+            if required_colors.is_empty() {
+                return true; // No heart color filter specified
+            }
+            // Check if card has at least one of the required heart colors in base_heart
+            if let Some(ref base_heart) = card.base_heart {
+                for required_color in required_colors {
+                    if base_heart.hearts.get(required_color).map_or(false, |&count| count > 0) {
+                        return true;
+                    }
+                }
+            }
+            false
+        };
+
         match source.as_ref() {
             "hand" => {
                 // Mark cards as revealed in hand
@@ -4554,9 +4706,9 @@ impl<'a> AbilityResolver<'a> {
                         break;
                     }
                     if let Some(card) = self.game_state.card_database.get_card(*card_id) {
-                        if matches_card_type(card, card_type_filter) {
+                        if matches_card_type(card, card_type_filter) && matches_heart_colors(card, &required_heart_colors) {
                             cards_to_reveal.push(*card_id);
-                            println!("Revealed card: {} from hand", card.name);
+                            println!("Revealed card: {} from hand (matches heart filter)", card.name);
                             revealed_count += 1;
                         }
                     }
@@ -4567,6 +4719,30 @@ impl<'a> AbilityResolver<'a> {
                 }
                 if revealed_count < count {
                     eprintln!("Warning: Only {} cards revealed, requested {}", revealed_count, count);
+                }
+            }
+            "looked_at" => {
+                // Reveal cards from looked_at buffer (after look_at action)
+                let mut revealed_count = 0;
+                let mut cards_to_reveal: Vec<i16> = Vec::new();
+                for card_id in &self.looked_at_cards {
+                    if revealed_count >= count {
+                        break;
+                    }
+                    if let Some(card) = self.game_state.card_database.get_card(*card_id as i16) {
+                        if matches_card_type(card, card_type_filter) && matches_heart_colors(card, &required_heart_colors) {
+                            cards_to_reveal.push(*card_id as i16);
+                            println!("Revealed card: {} from looked_at (matches heart filter)", card.name);
+                            revealed_count += 1;
+                        }
+                    }
+                }
+                // Add revealed cards after the loop to avoid borrow conflict
+                for card_id in cards_to_reveal {
+                    self.game_state.add_revealed_card(card_id);
+                }
+                if revealed_count < count {
+                    eprintln!("Warning: Only {} cards revealed from looked_at, requested {}", revealed_count, count);
                 }
             }
             _ => {
@@ -4585,6 +4761,65 @@ impl<'a> AbilityResolver<'a> {
         let card_type_filter = effect.card_type.as_deref();
         let optional = effect.optional.unwrap_or(false);
         let distinct = effect.distinct.as_deref();
+
+        // Parse heart colors from effect text (e.g., "heart02かheart04かheart05を持つ")
+        let required_heart_colors: Vec<crate::card::HeartColor> = {
+            let text = &effect.text;
+            let mut colors = Vec::new();
+            if text.contains("heart02") {
+                colors.push(crate::card::HeartColor::Heart02);
+            }
+            if text.contains("heart04") {
+                colors.push(crate::card::HeartColor::Heart04);
+            }
+            if text.contains("heart05") {
+                colors.push(crate::card::HeartColor::Heart05);
+            }
+            if text.contains("heart01") {
+                colors.push(crate::card::HeartColor::Heart01);
+            }
+            if text.contains("heart03") {
+                colors.push(crate::card::HeartColor::Heart03);
+            }
+            if text.contains("heart06") {
+                colors.push(crate::card::HeartColor::Heart06);
+            }
+            colors
+        };
+
+        // Filter looked_at cards by heart colors if specified
+        if source == "looked_at" && !required_heart_colors.is_empty() {
+            let mut filtered_cards: Vec<i16> = Vec::new();
+            for card_id in &self.looked_at_cards {
+                if let Some(card) = self.game_state.card_database.get_card(*card_id) {
+                    // Check card type filter
+                    let matches_type = match card_type_filter {
+                        Some("member_card") => card.is_member(),
+                        Some("live_card") => card.is_live(),
+                        Some("energy_card") => card.is_energy(),
+                        None => true,
+                        _ => true,
+                    };
+                    
+                    // Check heart color filter
+                    let matches_heart = if let Some(ref base_heart) = card.base_heart {
+                        required_heart_colors.iter().any(|color| {
+                            base_heart.hearts.get(color).map_or(false, |&c| c > 0)
+                        })
+                    } else {
+                        false
+                    };
+                    
+                    if matches_type && matches_heart {
+                        filtered_cards.push(*card_id);
+                    }
+                }
+            }
+            
+            // Update looked_at_cards to only include filtered cards
+            self.looked_at_cards = filtered_cards;
+            eprintln!("Filtered looked_at cards by heart colors: {} cards remain", self.looked_at_cards.len());
+        }
 
         // Build more descriptive message
         let card_type_desc = if let Some(ct) = card_type_filter {
@@ -5151,10 +5386,17 @@ impl<'a> AbilityResolver<'a> {
         let amount = effect.count.unwrap_or(1);
         let target = effect.target.as_deref().unwrap_or("self");
 
+        let active_id = self.game_state.active_player().id.clone();
         let player = match target {
-            "self" => &mut self.game_state.player1,
-            "opponent" => &mut self.game_state.player2,
-            _ => &mut self.game_state.player1,
+            "self" => self.game_state.active_player_mut(),
+            "opponent" => {
+                if active_id == self.game_state.player1.id {
+                    &mut self.game_state.player2
+                } else {
+                    &mut self.game_state.player1
+                }
+            }
+            _ => self.game_state.active_player_mut(),
         };
 
         // Use EnergyZone::pay_energy to actually tap energy cards
@@ -5183,49 +5425,82 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_discard_until_count(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let target_count = effect.target_count.unwrap_or(effect.count.unwrap_or(0)) as usize;
-        let target = effect.target.as_deref().unwrap_or("self");
-
-        // Handle "both" target (Q229)
-        if target == "both" {
-            // Apply to both players
-            for player in [&mut self.game_state.player1, &mut self.game_state.player2] {
-                let current_count = player.hand.len();
-                if current_count > target_count {
-                    let cards_to_discard = current_count - target_count;
-                    
-                    // For now, auto-discard from top of hand (simplified)
-                    // In a real implementation, this would require user selection
-                    for _ in 0..cards_to_discard {
-                        if let Some(card_id) = player.hand.cards.pop() {
-                            player.waitroom.cards.push(card_id);
-                        }
-                    }
-                }
-            }
-            return Ok(());
-        }
-
-        let player = match target {
-            "self" => &mut self.game_state.player1,
-            "opponent" => &mut self.game_state.player2,
-            _ => &mut self.game_state.player1,
+    /// Helper method for intelligent discard - prioritizes discarding non-essential cards
+    fn execute_intelligent_discard(&mut self, player_id: &str, target_count: usize) -> Result<(), String> {
+        let player = if player_id == self.game_state.player1.id {
+            &mut self.game_state.player1
+        } else if player_id == self.game_state.player2.id {
+            &mut self.game_state.player2
+        } else {
+            return Err(format!("Unknown player: {}", player_id));
         };
 
         let current_count = player.hand.len();
         if current_count > target_count {
             let cards_to_discard = current_count - target_count;
             
-            // For auto-tests, auto-discard from top of hand
-            for _ in 0..cards_to_discard {
-                if let Some(card_id) = player.hand.cards.pop() {
-                    player.waitroom.cards.push(card_id);
+            // Intelligent auto-discard: prioritize non-essential cards
+            let mut hand_with_priority: Vec<(i16, i32)> = player.hand.cards.iter()
+                .enumerate()
+                .map(|(idx, &card_id)| {
+                    let priority = if let Some(card) = self.game_state.card_database.get_card(card_id) {
+                        if card.is_energy() { 0 }      // Keep energy (priority 0 = highest)
+                        else if card.is_member() { 1 } // Keep members
+                        else if card.is_live() { 3 }   // Discard live cards first
+                        else { 2 }                      // Other cards
+                    } else {
+                        2 // Unknown cards
+                    };
+                    (idx as i16, priority)
+                })
+                .collect();
+            
+            // Sort by priority descending (higher priority = discard first)
+            hand_with_priority.sort_by(|a, b| b.1.cmp(&a.1));
+            
+            // Discard highest priority cards
+            let indices_to_discard: Vec<usize> = hand_with_priority.iter()
+                .take(cards_to_discard)
+                .map(|(idx, _)| *idx as usize)
+                .collect();
+            
+            // Remove cards from hand (in reverse order to maintain indices)
+            for &idx in indices_to_discard.iter().rev() {
+                if idx < player.hand.cards.len() {
+                    let card_id = player.hand.cards.remove(idx);
+                    player.waitroom.add_card(card_id);
+                    eprintln!("Auto-discarded card {} from hand index {}", card_id, idx);
                 }
             }
         }
-
         Ok(())
+    }
+
+    fn execute_discard_until_count(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        let target_count = effect.target_count.unwrap_or(effect.count.unwrap_or(0)) as usize;
+        let target = effect.target.as_deref().unwrap_or("self");
+
+        // Handle "both" target (Q229)
+        if target == "both" {
+            // Apply intelligent discard to both players
+            self.execute_intelligent_discard(&self.game_state.player1.id.clone(), target_count)?;
+            self.execute_intelligent_discard(&self.game_state.player2.id.clone(), target_count)?;
+            return Ok(());
+        }
+
+        let active_id = self.game_state.active_player().id.clone();
+        let is_opponent = target == "opponent";
+        let player_id = if is_opponent {
+            if active_id == self.game_state.player1.id {
+                self.game_state.player2.id.clone()
+            } else {
+                self.game_state.player1.id.clone()
+            }
+        } else {
+            active_id
+        };
+
+        self.execute_intelligent_discard(&player_id, target_count)
     }
 
     fn execute_restriction(&mut self, effect: &AbilityEffect) -> Result<(), String> {

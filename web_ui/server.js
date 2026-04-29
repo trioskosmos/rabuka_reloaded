@@ -23,6 +23,8 @@ app.use('/assets', express.static(path.resolve(__dirname, 'dist', 'assets')));
 app.use('/cards', express.static(path.resolve(__dirname, '..', 'cards')));
 // Serve engine assets that the frontend may fetch directly
 app.use('/engine', express.static(path.resolve(__dirname, '..', 'engine')));
+// Serve img folder for card images and icons
+app.use('/img', express.static(path.resolve(__dirname, 'img')));
 
 // Proxy requests to Rust backend
 app.get('/api/game-state', async (req, res) => {

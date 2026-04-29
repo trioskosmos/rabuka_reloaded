@@ -1,0 +1,31 @@
+[package]
+name = "rabuka_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rabuka_engine = { path = "../engine" }
+
+[[test]]
+name = "look_and_select_tests"
+path = "test_look_and_select.rs"
+
+[[test]]
+name = "choice_abilities_tests"
+path = "test_choice_abilities.rs"
+
+[[test]]
+name = "dynamic_counts_tests"
+path = "test_dynamic_counts.rs"
+
+[[test]]
+name = "cheer_system_tests"
+path = "test_cheer_system.rs"
+
+[[test]]
+name = "check_timing_tests"
+path = "test_check_timing.rs"
+
+[[test]]
+name = "all_features_integration_test"
+path = "test_all_features.rs"

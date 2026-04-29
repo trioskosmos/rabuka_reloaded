@@ -423,10 +423,11 @@ impl TurnEngine {
         let player_id = player.id.clone();
         let use_baton_touch = use_baton_touch.unwrap_or(false);
 
-        let (cost_paid, baton_touch_used) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
+        let (cost_paid, baton_touch_used, replaced_member_cost) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
 
         game_state.record_card_movement(card_id);
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
+        game_state.baton_touch_replaced_member_cost = replaced_member_cost;
 
         Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid, baton_touch_used);
         game_state.process_pending_auto_abilities(&player_id);
@@ -612,7 +613,19 @@ impl TurnEngine {
                 if let Some(card) = card_db.get_card(stage_card_id) {
                     let player_id = player.id.clone();
                     for (ability_index, ability) in card.abilities.iter().enumerate() {
-                        if ability.triggers.as_ref().map_or(false, |t| t == "Debut") {
+                        if ability.triggers.as_ref().map_or(false, |t| {
+                            // Handle all manually activatable abilities according to rules
+                            // 起動 abilities are the primary manual activation abilities
+                            t == "起動" || 
+                            // 常時 abilities can have manually activatable effects
+                            t == "常時" || 
+                            // 自動 abilities can be manually activated if they have costs
+                            (t == "自動" && ability.cost.is_some()) ||
+                            // Handle any other abilities that should be player-activatable
+                            // based on rules and card data analysis
+                            t == "main" || t == "メイン" || // Main phase abilities
+                            t == "baton touch" // Special baton touch abilities
+                        }) {
                             if ability.use_limit.is_some() {
                                 let ability_key = format!("{}_{}_{}", stage_card_id, ability_index, turn_number);
                                 game_state.turn_limited_abilities_used.insert(ability_key);
@@ -656,13 +669,29 @@ impl TurnEngine {
                             }
 
                             if should_trigger_effect {
-                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                game_state.trigger_auto_ability(
-                                    ability_id,
-                                    crate::game_state::AbilityTrigger::Activation,
-                                    player_id.clone(),
-                                    Some(card.card_no.clone()),
-                                );
+                                // For activation abilities, execute immediately instead of queuing
+                                let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+                                if let Err(e) = resolver.resolve_ability(ability, Some(stage_card_id), ability_index) {
+                                    return Err(format!("Failed to resolve activation ability: {}", e));
+                                }
+                                
+                                // Check if there's a pending choice after execution
+                                if let Some(_choice) = resolver.get_pending_choice() {
+                                    // Store pending ability state with choice
+                                    if let Some(ref effect) = ability.effect {
+                                        game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+                                            card_no: card.card_no.clone(),
+                                            player_id: player_id.clone(),
+                                            ability_index,
+                                            effect: effect.clone(),
+                                            conditional_choice: None,
+                                            activating_card: Some(stage_card_id),
+                                            action_index: 0,
+                                            cost: None,
+                                            cost_choice: None,
+                                        });
+                                    }
+                                }
                             }
                         }
                     }
@@ -1336,8 +1365,18 @@ impl TurnEngine {
                                         if !baton_touch_used {
                                             continue;
                                         }
-                                        // Check if replaced member had lower cost (simplified - assumes baton touch was valid)
-                                        // In a full implementation, we'd track the replaced member's cost
+                                        // Check if replaced member had lower cost (Q229)
+                                        // Compare current member's cost with replaced member's cost
+                                        if let Some(replaced_cost) = game_state.baton_touch_replaced_member_cost {
+                                            // Get current member's cost
+                                            let current_cost = card.cost.unwrap_or(0);
+                                            if replaced_cost >= current_cost {
+                                                // Replaced member's cost was not lower, skip this ability
+                                                eprintln!("Debut via baton touch: replaced cost {} not lower than current cost {}, skipping ability",
+                                                         replaced_cost, current_cost);
+                                                continue;
+                                            }
+                                        }
                                     }
                                     
                                     let ability_id = format!("{}_{}", card_no_clone, ability.full_text);

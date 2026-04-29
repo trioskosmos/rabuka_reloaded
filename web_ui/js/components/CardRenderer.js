@@ -150,14 +150,8 @@ export const CardRenderer = {
         let imgPath = '';
 
         if (!isHidden) {
-            // Use card image mapping if available (maps card_no to actual webp filename)
-            if (resolvedCard.card_no && State.cardImageMapping && State.cardImageMapping[resolvedCard.card_no]) {
-                imgPath = State.cardImageMapping[resolvedCard.card_no];
-            }
-            // Fallback: construct webp path from card_no
-            else if (resolvedCard.card_no) {
-                imgPath = `img/cards_webp/${resolvedCard.card_no}.webp`;
-            }
+            // Use card.img field directly like temp_rabuka does
+            imgPath = resolvedCard.img || resolvedCard.img_path || '';
             displayName = resolvedCard.name || `[${resolvedCard.card_type}]` || 'Card';
         }
 
@@ -262,8 +256,9 @@ export const CardRenderer = {
             const existingImg = el.querySelector('img');
             
             if (existingImg) {
-                if (imgPath && existingImg.getAttribute('src') !== imgPath) {
+                if (imgPath && existingImg.dataset.originalPath !== imgPath) {
                     ImageLoader.loadImage(existingImg, imgPath);
+                    existingImg.dataset.originalPath = imgPath;
                     existingImg.style.display = '';
                 } else if (!imgPath) {
                     existingImg.style.display = 'none';
@@ -271,6 +266,7 @@ export const CardRenderer = {
             } else if (imgPath) {
                 const img = document.createElement('img');
                 img.draggable = false;
+                img.dataset.originalPath = imgPath;
                 ImageLoader.loadImage(img, imgPath);
                 el.prepend(img);
             }

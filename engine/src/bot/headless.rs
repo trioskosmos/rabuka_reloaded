@@ -469,18 +469,20 @@ pub fn run_headless_game() {
                 ).ok();
             }
             crate::game_state::Phase::ChooseFirstAttacker => {
-                // Q16: RPS winner chooses turn order (simplified: always choose first)
+                // Q16: RPS winner chooses turn order
+                let ai = ai::AIPlayer::new("HeadlessAI".to_string());
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
+                let chosen_index = ai.choose_action(&actions);
 
                 println!("RPS winner choosing turn order...");
                 
                 let _ = turn::TurnEngine::execute_main_phase_action(
                     &mut game_state,
-                    &actions[0].action_type,
-                    actions[0].parameters.as_ref().and_then(|p| p.card_id),
-                    actions[0].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
-                    actions[0].parameters.as_ref().and_then(|p| p.stage_area),
-                    actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
+                    &actions[chosen_index].action_type,
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
             crate::game_state::Phase::LiveCardSetP1Turn |
@@ -706,7 +708,7 @@ pub fn run_interactive_headless() {
         
         // Automated game loop
         let mut turn_count = 0;
-        let mut last_turn_number = 0;
+        let last_turn_number = 0;
         let mut stuck_counter = 0;
         
         loop {

@@ -454,7 +454,8 @@ fn execute_action(index: usize) {
                 state.player1.draw_card();
             }
             _ => {
-                eprintln!("Action execution not implemented for: {}", action.action_type);
+                // Handle unknown action types gracefully
+                eprintln!("Warning: Unknown action type '{}' - no specific handler implemented", action.action_type);
             }
         }
         

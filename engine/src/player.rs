@@ -220,7 +220,7 @@ impl Player {
 
     
 
-    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea, use_baton_touch: bool, card_db: &CardDatabase) -> Result<(u32, bool), String> {
+    pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea, use_baton_touch: bool, card_db: &CardDatabase) -> Result<(u32, bool, Option<u32>), String> {
 
         // Rule 8.2: Main Phase - Play member card from hand to stage
 
@@ -268,7 +268,15 @@ impl Player {
 
             // Note: Baton touch sends member from the TARGET area (where you're playing the new member)
 
-            let baton_touch_used = if use_baton_touch {
+            // Track baton touch state and replaced member cost
+            let mut baton_touch_replaced_cost: Option<u32> = None;
+            
+            // Determine if baton touch should be used:
+            // 1. If use_baton_touch parameter is explicitly set to true, OR
+            // 2. If the target area is occupied (auto-detect baton touch scenario)
+            let should_use_baton_touch = use_baton_touch || self.stage.get_area(stage_area).is_some();
+            
+            let baton_touch_used = if should_use_baton_touch {
 
                 if let Some(existing_member) = self.stage.get_area(stage_area) {
 
@@ -280,34 +288,24 @@ impl Player {
 
                     } else {
 
-                        // Check if player has 1+ active energy to pay (or if cost is 0 for equal/lower cost baton touch)
+                        // Get the member card ID and cost first
+                        let member_card_id = existing_member;
+                        let replaced_member_cost = card_db.get_card(member_card_id).map(|c| c.cost.unwrap_or(1)).unwrap_or(1);
 
+                        // Store the replaced member cost for later use
+                        baton_touch_replaced_cost = Some(replaced_member_cost);
+
+                        // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
+                        cost_to_pay = cost_to_pay.saturating_sub(replaced_member_cost);
+
+                        // Check if player has sufficient active energy to pay the reduced cost (or if cost is 0 for equal/lower cost baton touch)
                         let active_energy_count = self.energy_zone.active_count();
 
-
-
-                        // Allow baton touch if cost_to_pay is 0 (equal/lower cost) OR if there's energy to pay
-
-                        if cost_to_pay == 0 || (cost_to_pay > 0 && active_energy_count >= 1) {
-
-                            // Get the member card ID
-
-                            let member_card_id = existing_member;
-
-                            let cost = card_db.get_card(member_card_id).map(|c| c.cost.unwrap_or(1)).unwrap_or(1);
-
-
-
-                            // Rule 9.6.2.3.2: Reduce cost by member's cost (baton touch)
-
-                            cost_to_pay = cost_to_pay.saturating_sub(cost);
-
+                        // Allow baton touch if cost_to_pay is 0 (equal/lower cost) OR if there's sufficient energy to pay the reduced cost
+                        if cost_to_pay == 0 || (cost_to_pay > 0 && active_energy_count >= cost_to_pay as usize) {
                             true
-
                         } else {
-
                             false
-
                         }
 
                     }
@@ -456,7 +454,7 @@ impl Player {
 
 
 
-        Ok((cost_to_pay, baton_touch_used))
+        Ok((cost_to_pay, baton_touch_used, baton_touch_replaced_cost))
 
     } else {
 

@@ -23,6 +23,16 @@ pub enum TurnPhase {
     Live,                  // Rule 8.1
 }
 
+impl std::fmt::Display for TurnPhase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TurnPhase::FirstAttackerNormal => write!(f, "FirstAttackerNormal"),
+            TurnPhase::SecondAttackerNormal => write!(f, "SecondAttackerNormal"),
+            TurnPhase::Live => write!(f, "Live"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Phase {
     // Pre-game phases (Rule 6.2)
@@ -53,6 +63,31 @@ pub enum Phase {
     LiveStart,
     LiveSuccess,
     Cheer,
+}
+
+impl std::fmt::Display for Phase {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Phase::RockPaperScissors => write!(f, "RockPaperScissors"),
+            Phase::ChooseFirstAttacker => write!(f, "ChooseFirstAttacker"),
+            Phase::MulliganP1Turn => write!(f, "MulliganP1Turn"),
+            Phase::MulliganP2Turn => write!(f, "MulliganP2Turn"),
+            Phase::Mulligan => write!(f, "Mulligan"),
+            Phase::Active => write!(f, "Active"),
+            Phase::Energy => write!(f, "Energy"),
+            Phase::Draw => write!(f, "Draw"),
+            Phase::Main => write!(f, "Main"),
+            Phase::LiveCardSetP1Turn => write!(f, "LiveCardSetP1Turn"),
+            Phase::LiveCardSetP2Turn => write!(f, "LiveCardSetP2Turn"),
+            Phase::LiveCardSet => write!(f, "LiveCardSet"),
+            Phase::FirstAttackerPerformance => write!(f, "FirstAttackerPerformance"),
+            Phase::SecondAttackerPerformance => write!(f, "SecondAttackerPerformance"),
+            Phase::LiveVictoryDetermination => write!(f, "LiveVictoryDetermination"),
+            Phase::LiveStart => write!(f, "LiveStart"),
+            Phase::LiveSuccess => write!(f, "LiveSuccess"),
+            Phase::Cheer => write!(f, "Cheer"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,6 +145,9 @@ pub struct GameState {
     // Rule 8.4.2.1: Track cheer blade heart counts for victory determination
     pub player1_cheer_blade_heart_count: u32,
     pub player2_cheer_blade_heart_count: u32,
+    // Store actual heart icons extracted during cheer for live success validation (Rule 8.3.14)
+    // Using a generic representation to avoid circular import issues
+    pub live_owned_hearts: std::collections::HashMap<String, Vec<(String, u32)>>, // player_id -> (color, count)
     // Duration tracking for temporary effects
     pub temporary_effects: Vec<TemporaryEffect>,
     // Game result tracking
@@ -169,6 +207,8 @@ pub struct GameState {
     pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>, // card_id -> trigger count
     // Baton touch cost tracking - tracks if baton touch resulted in 0 cost (Q25)
     pub baton_touch_zero_cost: bool, // true if the most recent baton touch had 0 cost
+    // Baton touch replaced member cost tracking (Q229) - tracks cost of member being replaced
+    pub baton_touch_replaced_member_cost: Option<u32>, // Cost of member being replaced by baton touch
     // Turn limit tracking per card instance (Q58, Q59) - tracks how many times a card instance has used turn-limited abilities
     pub turn_limit_usage: std::collections::HashMap<String, u32>, // "player1:card_instance_id" -> usage count
     // Card identity tracking for zone movement (Q59) - tracks card instance IDs
@@ -311,6 +351,7 @@ impl GameState {
             turn2_abilities_played: std::collections::HashMap::new(),
             player1_cheer_blade_heart_count: 0,
             player2_cheer_blade_heart_count: 0,
+            live_owned_hearts: std::collections::HashMap::new(),
             temporary_effects: Vec::new(),
             game_result: GameResult::Ongoing,
             pending_auto_abilities: Vec::new(),
@@ -347,6 +388,7 @@ impl GameState {
             turn_order_changed: false,
             auto_ability_trigger_counts: std::collections::HashMap::new(),
             baton_touch_zero_cost: false,
+            baton_touch_replaced_member_cost: None,
             turn_limit_usage: std::collections::HashMap::new(),
             card_instance_counter: 0,
             card_instance_mapping: std::collections::HashMap::new(),
@@ -848,6 +890,7 @@ impl GameState {
 
     pub fn clear_baton_touch_tracking(&mut self) {
         self.baton_touch_count = 0;
+        self.baton_touch_replaced_member_cost = None;
     }
 
     // Card movement tracking methods (for not_moved/has_moved conditions)
@@ -1480,7 +1523,7 @@ impl GameState {
                     if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
                 };
                 
-                // Simplified implementation - move cards from source to destination
+                // Card movement implementation - supports various source/destination combinations
                 match source {
                     "deck" => {
                         for _ in 0..count {
@@ -1488,6 +1531,16 @@ impl GameState {
                                 match destination {
                                     "hand" => player.hand.add_card(card),
                                     "discard" => player.waitroom.add_card(card),
+                                    "stage" | "empty_area" => {
+                                        // Place to first empty stage area
+                                        let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                                        for area in areas {
+                                            if player.stage.get_area(area).is_none() {
+                                                player.stage.set_area(area, card);
+                                                break;
+                                            }
+                                        }
+                                    }
                                     _ => {}
                                 }
                             }
@@ -1499,6 +1552,28 @@ impl GameState {
                                 for _ in 0..count.min(player.hand.cards.len() as u32) {
                                     if let Some(card) = player.hand.remove_card(0) {
                                         player.waitroom.add_card(card);
+                                    }
+                                }
+                            }
+                            "stage" | "empty_area" => {
+                                // Play member from hand to stage
+                                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                                for _ in 0..count.min(player.hand.cards.len() as u32) {
+                                    if let Some(card_id) = player.hand.remove_card(0) {
+                                        // Check if it's a member card
+                                        if let Some(card) = self.card_database.get_card(card_id) {
+                                            if card.is_member() {
+                                                for area in &areas {
+                                                    if player.stage.get_area(*area).is_none() {
+                                                        player.stage.set_area(*area, card_id);
+                                                        break;
+                                                    }
+                                                }
+                                            } else {
+                                                // Not a member, put back in hand
+                                                player.hand.cards.insert(0, card_id);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1582,7 +1657,46 @@ impl GameState {
                             _ => {}
                         }
                     }
+                    "stage" => {
+                        // Move cards from stage to other zones
+                        let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                        let mut cards_moved = 0;
+                        for area in &areas {
+                            if cards_moved >= count {
+                                break;
+                            }
+                            if let Some(card_id) = player.stage.get_area(*area) {
+                                match destination {
+                                    "discard" => {
+                                        player.stage.clear_area(*area);
+                                        player.waitroom.add_card(card_id);
+                                        cards_moved += 1;
+                                    }
+                                    "hand" => {
+                                        player.stage.clear_area(*area);
+                                        player.hand.add_card(card_id);
+                                        cards_moved += 1;
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                    "energy_zone" => {
+                        // Move energy cards from energy zone
+                        match destination {
+                            "discard" => {
+                                for _ in 0..count.min(player.energy_zone.cards.len() as u32) {
+                                    if let Some(card_id) = player.energy_zone.cards.pop() {
+                                        player.waitroom.add_card(card_id);
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                     _ => {
+                        eprintln!("Card movement from '{}' to '{}' not fully implemented", source, destination);
                     }
                 }
             }
@@ -1731,20 +1845,23 @@ impl GameState {
                 // Collect card IDs first to avoid borrow issues
                 let card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
 
-                let modifier: i8 = match operation {
-                    "decrease" => -(value as i8),
-                    "increase" => value as i8,
-                    "set" => {
-                        // For set, we need to clear and set the heart
-                        // This is more complex, for now skip
-                        return;
-                    }
-                    _ => return,
-                };
-
                 for card_id in card_ids {
                     let color = crate::zones::parse_heart_color(heart_color);
-                    self.add_heart_modifier(card_id, color, modifier as i32);
+                    match operation {
+                        "decrease" => self.add_heart_modifier(card_id, color, -(value as i32)),
+                        "increase" => self.add_heart_modifier(card_id, color, value as i32),
+                        "set" => {
+                            // For set, clear all heart modifiers for this card and color, then set to value
+                            if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
+                                colors.insert(color, value as i32);
+                            } else {
+                                let mut colors = std::collections::HashMap::new();
+                                colors.insert(color, value as i32);
+                                self.heart_modifiers.insert(card_id, colors);
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
             "set_required_hearts" => {
@@ -1761,13 +1878,18 @@ impl GameState {
                 // Collect card IDs first to avoid borrow issues
                 let card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
 
-                // For set, we need to clear existing modifiers and set new ones
-                // This is complex, for now just add the modifier
-                let modifier = count as i8;
-
+                // For set_required_hearts, clear all heart modifiers for this card and set to the specified count
                 for card_id in card_ids {
                     let color = crate::zones::parse_heart_color(heart_color);
-                    self.add_heart_modifier(card_id, color, modifier as i32);
+                    // Clear all heart modifiers for this card
+                    if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
+                        colors.clear();
+                        colors.insert(color, count as i32);
+                    } else {
+                        let mut colors = std::collections::HashMap::new();
+                        colors.insert(color, count as i32);
+                        self.heart_modifiers.insert(card_id, colors);
+                    }
                 }
             }
             "modify_required_hearts_global" => {
@@ -1848,8 +1970,67 @@ impl GameState {
                 }
             }
             "position_change" => {
-                let _position = effect.position.as_ref().and_then(|p| p.get_position()).unwrap_or("");
-                // Position change requires user choice - simplified for now
+                let position = effect.position.as_ref().and_then(|p| p.get_position()).unwrap_or("");
+                let target = effect.target.as_deref().unwrap_or("self");
+                
+                let player = if target == "self" {
+                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
+                } else {
+                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
+                };
+                
+                // Position change: move a member to a different stage position
+                // Find a member to move and a destination position
+                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                
+                // Get current positions that have members
+                let occupied_areas: Vec<crate::zones::MemberArea> = areas.iter()
+                    .filter(|&&area| player.stage.get_area(area).is_some())
+                    .copied()
+                    .collect();
+                
+                // Get empty positions
+                let empty_areas: Vec<crate::zones::MemberArea> = areas.iter()
+                    .filter(|&&area| player.stage.get_area(area).is_none())
+                    .copied()
+                    .collect();
+                
+                // If there's a specific position requested, try to move a member there
+                if !position.is_empty() {
+                    let target_area = match position {
+                        "left" | "left_side" => Some(crate::zones::MemberArea::LeftSide),
+                        "center" => Some(crate::zones::MemberArea::Center),
+                        "right" | "right_side" => Some(crate::zones::MemberArea::RightSide),
+                        _ => None,
+                    };
+                    
+                    if let Some(target) = target_area {
+                        // If target is empty and we have a member to move
+                        if player.stage.get_area(target).is_none() && !occupied_areas.is_empty() {
+                            // Move first available member to target position
+                            let source_area = occupied_areas[0];
+                            if let Some(card_id) = player.stage.get_area(source_area) {
+                                player.stage.clear_area(source_area);
+                                player.stage.set_area(target, card_id);
+                                eprintln!("Position change: moved card {} from {:?} to {:?}", 
+                                         card_id, source_area, target);
+                            }
+                        }
+                    }
+                } else if !occupied_areas.is_empty() && !empty_areas.is_empty() {
+                    // No specific position - move first occupied to first empty
+                    let source_area = occupied_areas[0];
+                    let target_area = empty_areas[0];
+                    if let Some(card_id) = player.stage.get_area(source_area) {
+                        player.stage.clear_area(source_area);
+                        player.stage.set_area(target_area, card_id);
+                        eprintln!("Position change: moved card {} from {:?} to {:?}", 
+                                 card_id, source_area, target_area);
+                    }
+                }
+                
+                // Track that a position change occurred this turn
+                self.position_change_occurred_this_turn = true;
             }
             "place_energy_under_member" => {
                 let energy_count = effect.energy_count.unwrap_or(1);
@@ -1884,8 +2065,38 @@ impl GameState {
                 // Conditional alternative - requires condition evaluation
             }
             "modify_cost" => {
-                let _count = effect.count.unwrap_or(1);
-                // Modify card cost - would need to track cost modifiers
+                let operation = effect.operation.as_deref().unwrap_or("add");
+                let value = effect.value.unwrap_or(1) as i32;
+                let card_type_filter = effect.card_type.as_deref();
+                let target = effect.target.as_deref().unwrap_or("self");
+                
+                let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
+                
+                // Apply cost modification to all matching cards in hand
+                for &card_id in &player.hand.cards {
+                    if let Some(card) = self.card_database.get_card(card_id) {
+                        // Check card type filter
+                        let matches = match card_type_filter {
+                            Some("member_card") => card.is_member(),
+                            Some("live_card") => card.is_live(),
+                            Some("energy_card") => card.is_energy(),
+                            _ => true, // No filter = all cards
+                        };
+                        
+                        if matches {
+                            let current = self.cost_modifiers.get(&card_id).copied().unwrap_or(0);
+                            let new_value = match operation {
+                                "add" | "increase" => current + value,
+                                "subtract" | "decrease" => current - value,
+                                "set" => value,
+                                _ => current + value,
+                            };
+                            self.cost_modifiers.insert(card_id, new_value);
+                            eprintln!("Modified cost of card {}: {} -> {} ({} {})", 
+                                     card_id, current, new_value, operation, value);
+                        }
+                    }
+                }
             }
             "draw_until_count" => {
                 let count = effect.count.unwrap_or(5);
@@ -2360,18 +2571,29 @@ impl GameState {
 
     /// Generate a hash of the current game state for loop detection
     fn generate_state_hash(&self) -> String {
-        // Simplified state hash - include key game state elements
+        // Comprehensive state hash for accurate loop detection
+        // Include all major game state elements that could create loops
         format!(
-            "t{}_p1h{}_p1e{}_p1w{}_p2h{}_p2e{}_p2w{}_p1s{:?}_p2s{:?}",
+            "t{}_p{}_tp{}_p1h{}_p1e{}_p1w{}_p1l{}_p1su{}_p1st{:?}_p2h{}_p2e{}_p2w{}_p2l{}_p2su{}_p2st{:?}_oe{}_pro{}_tmp{}_rps{:?}",
             self.turn_number,
+            self.current_phase.to_string(),
+            self.current_turn_phase.to_string(),
             self.player1.hand.cards.len(),
             self.player1.energy_zone.cards.len(),
             self.player1.waitroom.cards.len(),
+            self.player1.live_card_zone.cards.len(),
+            self.player1.success_live_card_zone.cards.len(),
+            self.player1.stage.stage,
             self.player2.hand.cards.len(),
             self.player2.energy_zone.cards.len(),
             self.player2.waitroom.cards.len(),
-            self.player1.stage.stage,
-            self.player2.stage.stage
+            self.player2.live_card_zone.cards.len(),
+            self.player2.success_live_card_zone.cards.len(),
+            self.player2.stage.stage,
+            self.orientation_modifiers.len(),
+            self.prohibition_effects.len(),
+            self.temporary_effects.len(),
+            self.rps_winner
         )
     }
 

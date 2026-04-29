@@ -432,7 +432,7 @@ impl<'de> Deserialize<'de> for SpecialHeart {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Ability {
     #[serde(default = "default_empty_string")]
     pub full_text: String,
@@ -451,7 +451,7 @@ fn default_empty_string() -> String {
     String::new()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AbilityCost {
     #[serde(default = "default_empty_string")]
     pub text: String,

@@ -59,7 +59,7 @@ impl CardLoader {
                     if let Some(ref mut effect) = ability.effect {
                         if effect.action.is_empty() {
                             if let Some(effect_json) = ability_entry.get("effect") {
-                                let text = effect_json.get("text").and_then(|t| t.as_str()).unwrap_or("");
+                                let _text = effect_json.get("text").and_then(|t| t.as_str()).unwrap_or("");
                                 
                                 // Check if it has source/destination which indicates move_cards
                                 if effect_json.get("source").is_some() && effect_json.get("destination").is_some() {

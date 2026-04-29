@@ -20,8 +20,8 @@ export const BoardRenderer = {
         if (!p1?.success_live_card_zone?.cards) console.warn('[BoardRenderer] p1.success_live_card_zone.cards missing');
 
         // Rust backend format: stage is { left_side, center, right_side }, live_zone is { cards }
-        const myStage = p0.stage ? [p0.stage.left_side, p0.stage.center, p0.stage.right_side].filter(c => c) : [];
-        const oppStage = p1.stage ? [p1.stage.left_side, p1.stage.center, p1.stage.right_side].filter(c => c) : [];
+        const myStage = p0.stage ? [p0.stage.left_side, p0.stage.center, p0.stage.right_side] : [];
+        const oppStage = p1.stage ? [p1.stage.left_side, p1.stage.center, p1.stage.right_side] : [];
         
         CardRenderer.renderStage('my-stage', myStage, true, validTargets.myStage, validTargets.hasSelection);
         CardRenderer.renderStage('opp-stage', oppStage, true, validTargets.oppStage, validTargets.hasSelection);
