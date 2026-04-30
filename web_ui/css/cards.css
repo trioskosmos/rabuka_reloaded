@@ -118,35 +118,7 @@
     height: var(--card-h-compact) !important;
 }
 
-/* --- Inner Overlays --- */
-.card .cost {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    background: var(--accent-pink);
-    color: white;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.7rem;
-    font-weight: bold;
-    z-index: 2;
-}
 
-.card .name {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 2px;
-    font-size: 0.5rem;
-    text-align: center;
-    z-index: 2;
-}
 
 
 /* --- Hand Row Refined --- */
@@ -418,22 +390,6 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
-}
-
-.live-card-inner .cost {
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    background: var(--accent-pink);
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.65rem;
-    font-weight: bold;
-    z-index: 3;
 }
 
 .live-card-inner .perf-badge {

@@ -1,25 +1,13 @@
-#[derive(Debug, Clone)]
-pub struct CostCalculation {
-    pub payable: bool,
-    pub reason: Option<String>,
-    pub cost_description: String,
-}
+use crate::card::AbilityEffect;
 
-#[derive(Debug, Clone)]
-pub struct AbilityValidation {
-    pub can_execute: bool,
-    pub conditions_met: bool,
-    pub cost_payable: bool,
-    pub reason: String,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Choice {
     SelectCard {
         zone: String,
         card_type: Option<String>,
         count: usize,
         description: String,
+        allow_skip: bool,
     },
     SelectTarget {
         target: String,
@@ -48,4 +36,20 @@ pub enum ChoiceResult {
     PositionSelected { position: String },
     HeartColorSelected { colors: Vec<String> },
     HeartTypeSelected { types: Vec<String> },
+    Skip,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExecutionContext {
+    None,
+    SingleEffect { effect_index: usize },
+    SequentialEffects { current_index: usize, effects: Vec<AbilityEffect> },
+    LookAndSelect { step: LookAndSelectStep },
+}
+
+#[derive(Debug, Clone)]
+pub enum LookAndSelectStep {
+    LookAt { count: usize, source: String },
+    Select { count: usize },
+    Finalize { destination: String },
 }

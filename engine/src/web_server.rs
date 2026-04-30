@@ -254,16 +254,12 @@ pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::
 }
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
-    // Serialize pending_choice to JSON if it exists
-    let pending_choice_json = game_state.pending_choice.as_ref()
-        .and_then(|choice| serde_json::to_value(choice).ok());
-
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
         player1: player_to_display(&game_state.player1, &game_state.card_database),
         player2: player_to_display(&game_state.player2, &game_state.card_database),
-        pending_choice: pending_choice_json,
+        pending_choice: game_state.pending_choice.clone(),
     }
 }
 
@@ -349,6 +345,148 @@ async fn get_actions(data: web::Data<AppState>) -> impl Responder {
 }
 
 fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
+    // If there's a pending choice, generate choice-resolution actions instead of phase actions
+    if let Some(ref pending_choice_val) = game_state.pending_choice {
+        if let Ok(choice) = serde_json::from_value::<crate::ability_resolver::Choice>(pending_choice_val.clone()) {
+            let mut actions = Vec::new();
+            let mut idx = 0usize;
+            match &choice {
+                crate::ability_resolver::Choice::SelectTarget { target, description } => {
+                    if target == "pay_optional_cost:skip_optional_cost" {
+                        actions.push(Action {
+                            description: "Pay optional cost".to_string(),
+                            action_type: "pass".to_string(),
+                            parameters: Some(ActionParameters {
+                                card_id: Some(1), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("pay_optional_cost".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                            index: idx,
+                        });
+                        idx += 1;
+                        actions.push(Action {
+                            description: "Skip optional cost".to_string(),
+                            action_type: "pass".to_string(),
+                            parameters: Some(ActionParameters {
+                                card_id: Some(0), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("skip_optional_cost".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                            index: idx,
+                        });
+                        return actions;
+                    }
+                    if target == "primary|alternative" {
+                        actions.push(Action {
+                            description: format!("Primary: {}", description),
+                            action_type: "pass".to_string(),
+                            parameters: Some(ActionParameters {
+                                card_id: Some(0), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("primary".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                            index: idx,
+                        });
+                        idx += 1;
+                        actions.push(Action {
+                            description: format!("Alternative: {}", description),
+                            action_type: "pass".to_string(),
+                            parameters: Some(ActionParameters {
+                                card_id: Some(1), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("alternative".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                            index: idx,
+                        });
+                        return actions;
+                    }
+                    // Generic SelectTarget: create yes/no actions
+                    actions.push(Action {
+                        description: format!("Yes — {}", description),
+                        action_type: "pass".to_string(),
+                        parameters: Some(ActionParameters {
+                            card_id: Some(1), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("yes".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                        index: idx,
+                    });
+                    idx += 1;
+                    actions.push(Action {
+                        description: format!("No — {}", description),
+                        action_type: "pass".to_string(),
+                        parameters: Some(ActionParameters {
+                            card_id: Some(0), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("no".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                        index: idx,
+                    });
+                    return actions;
+                }
+                crate::ability_resolver::Choice::SelectCard { zone, card_type: _, count, description, allow_skip } => {
+                    actions.push(Action {
+                        description: format!("Select {} card(s): {}", count, description),
+                        action_type: "pass".to_string(),
+                        parameters: Some(ActionParameters {
+                            card_id: None, card_index: None, card_indices: Some(Vec::new()),
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("select".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                        index: idx,
+                    });
+                    idx += 1;
+                    if *allow_skip {
+                        actions.push(Action {
+                            description: "Skip selection".to_string(),
+                            action_type: "pass".to_string(),
+                            parameters: Some(ActionParameters {
+                                card_id: None, card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("skip".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                            index: idx,
+                        });
+                    }
+                    return actions;
+                }
+                crate::ability_resolver::Choice::SelectPosition { position, description } => {
+                    let areas: Vec<&str> = position.split(',').map(|s| s.trim()).collect();
+                    for area in areas {
+                        let stage_area_str = match area {
+                            "left" | "left_side" | "左サイドエリア" => Some("left".to_string()),
+                            "center" | "センターエリア" => Some("center".to_string()),
+                            "right" | "right_side" | "右サイドエリア" => Some("right".to_string()),
+                            _ => Some(area.to_string()),
+                        };
+                        actions.push(Action {
+                            description: format!("Place at {}: {}", area, description),
+                            action_type: "pass".to_string(),
+                            parameters: Some(ActionParameters {
+                                card_id: None, card_index: None, card_indices: None,
+                                stage_area: stage_area_str, use_baton_touch: None,
+                                card_name: None, card_no: Some("select".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                            index: idx,
+                        });
+                        idx += 1;
+                    }
+                    return actions;
+                }
+                _ => {}
+            }
+        }
+    }
+
     // Use game_setup.rs generate_possible_actions function
     let setup_actions = crate::game_setup::generate_possible_actions(game_state);
     

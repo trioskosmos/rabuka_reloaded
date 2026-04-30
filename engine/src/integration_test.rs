@@ -102,7 +102,7 @@ mod integration_tests {
                 card_type: Some("live_card".to_string()),
                 target: Some("self".to_string()),
             })),
-            triggers: Some("起動".to_string()),
+            triggers: Some(crate::triggers::ACTIVATION.to_string()),
             use_limit: None,
             ..Default::default()
         }

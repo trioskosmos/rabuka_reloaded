@@ -1,0 +1,92 @@
+use rabuka_engine::game_state::{GameState, Phase, TurnPhase};
+use rabuka_engine::game_setup::ActionType;
+use rabuka_engine::player::Player;
+use rabuka_engine::turn::TurnEngine;
+use rabuka_engine::zones::MemberArea;
+use crate::qa_individual::common::{load_all_cards, create_card_database, get_card_id, setup_player_with_hand, setup_player_with_energy};
+
+#[test]
+fn test_q028_debut_without_baton_touch() {
+    // Q28: Can you debut to area with member without baton touch?
+    // Answer: Yes, pay cost equal to new member's cost, old member goes to waitroom.
+
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+
+    // Find two different member cards with costs we can afford
+    let members: Vec<_> = cards.iter()
+        .filter(|c| c.is_member())
+        .filter(|c| c.cost.unwrap_or(0) <= 3)
+        .filter(|c| get_card_id(c, &card_database) != 0)
+        .take(2)
+        .collect();
+    assert!(members.len() >= 2, "Need at least 2 member cards for Q028");
+    let member1_id = get_card_id(members[0], &card_database);
+    let member2_id = get_card_id(members[1], &card_database);
+    let cost2 = members[1].cost.unwrap_or(0);
+
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+
+    setup_player_with_hand(&mut player1, vec![member1_id, member2_id]);
+
+    let energy_card_ids: Vec<_> = cards.iter()
+        .filter(|c| c.is_energy())
+        .filter(|c| get_card_id(c, &card_database) != 0)
+        .map(|c| get_card_id(c, &card_database))
+        .take(15)
+        .collect();
+    setup_player_with_energy(&mut player1, energy_card_ids.clone());
+    setup_player_with_energy(&mut player2, energy_card_ids.clone());
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    game_state.current_phase = Phase::Main;
+    game_state.turn_number = 1;
+    game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
+
+    let initial_hand = game_state.player1.hand.cards.len();
+    let initial_energy = game_state.player1.energy_zone.active_count();
+    let initial_waitroom = game_state.player1.waitroom.cards.len();
+    let initial_stage = game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count();
+
+    // Step 1: Play first member to stage
+    TurnEngine::execute_main_phase_action(
+        &mut game_state, &ActionType::PlayMemberToStage,
+        Some(member1_id), None, Some(MemberArea::Center), Some(false),
+    ).expect("First member should play to stage");
+    assert_eq!(game_state.player1.stage.get_area(MemberArea::Center), Some(member1_id));
+
+    // Step 2: Play second member to SAME area (without baton touch = debut replacement)
+    // This should succeed: new member pays full cost, old member goes to waitroom
+    let result = TurnEngine::execute_main_phase_action(
+        &mut game_state, &ActionType::PlayMemberToStage,
+        Some(member2_id), None, Some(MemberArea::Center), Some(false),
+    );
+
+    // Q&A says this IS allowed — assert it succeeds
+    assert!(result.is_ok(),
+        "Q028: Engine MUST allow debuting to occupied area without baton touch: {:?}", result);
+
+    // Verify: second member is now on stage
+    assert_eq!(game_state.player1.stage.get_area(MemberArea::Center), Some(member2_id),
+        "Second member should be in center stage");
+
+    // Verify: first member moved to waitroom
+    assert!(game_state.player1.waitroom.cards.contains(&member1_id),
+        "First member should be in waitroom after replacement");
+    assert_eq!(game_state.player1.waitroom.cards.len(), initial_waitroom + 1,
+        "Waitroom should have 1 more card");
+
+    // Verify: hand decreased by 2 (both members played)
+    assert_eq!(game_state.player1.hand.cards.len(), initial_hand - 2,
+        "Hand should have 2 fewer cards (both members played)");
+
+    // Verify: energy was consumed for the second member's full cost
+    let energy_used = initial_energy - game_state.player1.energy_zone.active_count();
+    assert_eq!(energy_used as u32, cost2,
+        "Energy consumed should equal second member's cost (no baton touch discount)");
+
+    // Verify: stage count stayed the same (replacement, not addition)
+    assert_eq!(game_state.player1.stage.stage.iter().filter(|&&id| id != -1).count(),
+        initial_stage + 1, "Stage should have 1 member (replacement, not addition)");
+}

@@ -79,7 +79,7 @@ fn test_q203_score_condition_active() {
     assert!(result_live.is_ok(), "Should be able to set live card: {:?}", result_live);
     
     // Step 3: Resolve any pending choice from live start ability
-    let pending_choice_clone = game_state.pending_choice.clone();
+    let pending_choice_clone = game_state.pending_ability.clone();
     if let Some(ref choice) = pending_choice_clone {
         println!("Q203: Pending choice presented: {:?}", choice);
         

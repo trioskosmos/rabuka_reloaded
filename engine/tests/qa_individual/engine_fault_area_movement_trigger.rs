@@ -60,7 +60,7 @@ fn test_q246_area_movement_trigger() {
         "Sakurakoji Kinako should be in center");
     
     // Process debut auto ability
-    game_state.process_pending_auto_abilities(&game_state.player1.id.clone());
+    let _ = game_state.ability_queue.start_next();
     
     // Step 2: Play opponent member to center
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::SecondAttackerNormal;
@@ -95,13 +95,13 @@ fn test_q246_area_movement_trigger() {
         if let Some(card_info) = card {
             game_state.trigger_auto_ability(
                 "area_movement".to_string(),
-                rabuka_engine::game_state::AbilityTrigger::AreaMovement,
+                rabuka_engine::game_state::AbilityTrigger::Auto,
                 "player1".to_string(),
                 Some(card_info.card_no.clone()),
             );
             
             // Process the triggered auto ability
-            game_state.process_pending_auto_abilities(&game_state.player1.id.clone());
+            let _ = game_state.ability_queue.start_next();
         }
     }
     

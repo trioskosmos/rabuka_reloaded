@@ -52,7 +52,7 @@ fn test_q247_live_end_duration_clearing() {
     
     // Step 2: Process debut auto ability (live_start ability)
     // The live_start ability is optional: pay 1 energy to gain 2 blades with live_end duration
-    game_state.process_pending_auto_abilities(&game_state.player1.id.clone());
+    let _ = game_state.ability_queue.start_next();
     
     // Step 3: Add a temporary effect with Duration::LiveEnd
     // For this test, we'll manually add a temporary effect to test expiration

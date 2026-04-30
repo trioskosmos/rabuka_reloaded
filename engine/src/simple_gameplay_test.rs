@@ -94,7 +94,7 @@ mod simple_gameplay_tests {
                 destination: Some("hand".to_string()),
                 count: Some(2),
             }),
-            triggers: Some("常時".to_string()),
+            triggers: Some(crate::triggers::CONSTANT.to_string()),
             ..Default::default()
         };
         
@@ -129,7 +129,7 @@ mod simple_gameplay_tests {
                 count: Some(2),
                 target: Some("self".to_string()),
             }),
-            triggers: Some("常時".to_string()),
+            triggers: Some(crate::triggers::CONSTANT.to_string()),
             ..Default::default()
         };
         
@@ -213,7 +213,7 @@ mod simple_gameplay_tests {
                 card_type: Some("live_card".to_string()),
                 target: Some("self".to_string()),
             }),
-            triggers: Some("起動".to_string()),
+            triggers: Some(crate::triggers::ACTIVATION.to_string()),
             use_limit: None,
             ..Default::default()
         }

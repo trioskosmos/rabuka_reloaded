@@ -682,7 +682,7 @@ fn test_execution_context_none_initially() {
 
     // Verify execution context is None initially
     match resolver.execution_context {
-        rabuka_engine::ability_resolver::ExecutionContext::None => {
+        rabuka_engine::ability::types::ExecutionContext::None => {
             // Expected
         }
         _ => panic!("Execution context should be None initially"),
@@ -823,7 +823,7 @@ fn test_stage_area_selection_single_available() {
     assert!(result.is_ok(), "Move effect should succeed");
 
     // Check that pending_choice is NOT set (automatic placement)
-    assert!(game_state.pending_choice.is_none(), "Should not have pending choice when only one area available");
+    assert!(game_state.pending_ability.is_none(), "Should not have pending choice when only one area available");
 
     // Verify card was placed in right side
     assert_eq!(game_state.player1.stage.stage[2], member_card_id, "Card should be in right side");

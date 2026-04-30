@@ -1,0 +1,1553 @@
+﻿cargo : warning: unused import: `crate::player::Player`
+発生場所 行:1 文字:64
++ ... e\Documents\rabuka_reloaded\engine"; cargo test --no-run 2>&1 | Out-F ...
++                                          ~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (warning: unused...player::Player`:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+ --> src\check_timing.rs:3:5
+  |
+3 | use crate::player::Player;
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `crate::game_state::GameState`
+ --> src\selection_system.rs:2:5
+  |
+2 | use crate::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused variable: `pending`
+   --> src\ability_resolver.rs:440:33
+    |
+440 |                     if let Some(ref pending) = self.game_state.pending_ability.clone() {
+    |                                 ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_pending
+`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `perspective_player_id`
+   --> src\ability_resolver.rs:445:41
+    |
+445 | ...                   let perspective_player_id = player.id.clone();
+    |                           ^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_per
+spective_player_id`
+
+warning: function `is_human_decision_phase` is never used
+   --> src\web_server.rs:398:4
+    |
+398 | fn is_human_decision_phase(game_state: &GameState) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `is_player2_decision_phase` is never used
+   --> src\web_server.rs:420:4
+    |
+420 | fn is_player2_decision_phase(game_state: &GameState) -> bool {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `execute_player2_ai_action` is never used
+   --> src\web_server.rs:431:4
+    |
+431 | fn execute_player2_ai_action(game_state: &mut GameState) -> Result<bool, String> {
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: function `rooms_list` is never used
+    --> src\web_server.rs:1103:10
+     |
+1103 | async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
+     |          ^^^^^^^^^^
+
+warning: `rabuka_engine` (lib) generated 8 warnings (run `cargo fix --lib -p rabuka_engine` to apply 4 suggestions)
+   Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
+warning: unused imports: `AbilityEffect`, `CardDatabase`, `CardType`, and `Card`
+ --> tests\engine_flaw_tests.rs:6:27
+  |
+6 | use rabuka_engine::card::{AbilityEffect, Card, CardType, CardDatabase};
+  |                           ^^^^^^^^^^^^^  ^^^^  ^^^^^^^^  ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\engine_flaw_tests.rs:7:5
+  |
+7 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::player::Player`
+ --> tests\engine_flaw_tests.rs:8:5
+  |
+8 | use rabuka_engine::player::Player;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> tests\engine_flaw_tests.rs:9:5
+  |
+9 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: `rabuka_engine` (test "engine_flaw_tests") generated 4 warnings (run `cargo fix --test "engine_flaw_tests" -p 
+rabuka_engine` to apply 4 suggestions)
+warning: `rabuka_engine` (lib test) generated 8 warnings (8 duplicates)
+warning: unused variable: `action`
+   --> tests\check_complex_abilities.rs:123:25
+    |
+123 |             if let Some(action) = effect.get("action") {
+    |                         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_action`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `Ability` is never constructed
+ --> tests\check_complex_abilities.rs:5:8
+  |
+5 | struct Ability {
+  |        ^^^^^^^
+  |
+  = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: struct `Card` is never constructed
+  --> tests\check_complex_abilities.rs:14:8
+   |
+14 | struct Card {
+   |        ^^^^
+
+warning: `rabuka_engine` (test "check_complex_abilities") generated 3 warnings (run `cargo fix --test "check_complex_ab
+ilities" -p rabuka_engine` to apply 1 suggestion)
+warning: unused imports: `AbilityCost`, `AbilityEffect`, `CardDatabase`, `CardType`, `Card`, and `GroupInfo`
+ --> tests\real_ability_tests.rs:7:27
+  |
+7 | use rabuka_engine::card::{AbilityCost, AbilityEffect, Card, CardType, CardDatabase, GroupInfo};
+  |                           ^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^  ^^^^^^^^  ^^^^^^^^^^^^  ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `rabuka_engine::game_state::GameState`
+ --> tests\real_ability_tests.rs:8:5
+  |
+8 | use rabuka_engine::game_state::GameState;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::player::Player`
+ --> tests\real_ability_tests.rs:9:5
+  |
+9 | use rabuka_engine::player::Player;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+  --> tests\real_ability_tests.rs:10:5
+   |
+10 | use std::sync::Arc;
+   |     ^^^^^^^^^^^^^^
+
+warning: function `get_card_id` is never used
+  --> tests\test_complex_abilities.rs:23:4
+   |
+23 | fn get_card_id(card: &rabuka_engine::card::Card, card_database: &CardDatabase) -> i16 {
+   |    ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\run_qa_tests.rs:1528:40
+     |
+1528 |             .map(|t| t.contains(crate::triggers::ACTIVATION))
+     |                                        ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1528 |             .map(|t| t.contains(crate::rabuka_engine::triggers::ACTIVATION))
+     |                                        +++++++++++++++
+help: consider importing this module
+     |
+   4 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1528 -             .map(|t| t.contains(crate::triggers::ACTIVATION))
+1528 +             .map(|t| t.contains(triggers::ACTIVATION))
+     |
+
+error[E0609]: no field `pending_choice` on type `GameState`
+   --> tests\test_parser_engine_alignment.rs:826:24
+    |
+826 |     assert!(game_state.pending_choice.is_none(), "Should not have pending choice when only one area available");
+    |                        ^^^^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63
+ others
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+    --> src\run_qa_tests.rs:1189:16
+     |
+1189 |     game_state.pending_auto_abilities.clear();
+     |                ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 6
+3 others
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+    --> src\run_qa_tests.rs:1244:27
+     |
+1244 |     assert_eq!(game_state.pending_auto_abilities.len(), 2,
+     |                           ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 6
+3 others
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+    --> src\run_qa_tests.rs:1251:27
+     |
+1251 |     assert_eq!(game_state.pending_auto_abilities.len(), 0,
+     |                           ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 6
+3 others
+
+error[E0583]: file not found for module `engine_fault_debut_look_and_select_optional_cost`
+   --> tests\qa_individual_tests.rs:205:5
+    |
+205 |     pub mod engine_fault_debut_look_and_select_optional_cost;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: to create the module `engine_fault_debut_look_and_select_optional_cost`, create file "tests\qa_individual\e
+ngine_fault_debut_look_and_select_optional_cost.rs" or "tests\qa_individual\engine_fault_debut_look_and_select_optional
+_cost\mod.rs"
+    = note: if there is a `mod engine_fault_debut_look_and_select_optional_cost` elsewhere in the crate already, import
+ it with `use crate::...` instead
+
+For more information about this error, try `rustc --explain E0609`.
+error[E0583]: file not found for module `engine_fault_sequential_draw_discard`
+   --> tests\qa_individual_tests.rs:207:5
+    |
+207 |     pub mod engine_fault_sequential_draw_discard;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: to create the module `engine_fault_sequential_draw_discard`, create file "tests\qa_individual\engine_fault_
+sequential_draw_discard.rs" or "tests\qa_individual\engine_fault_sequential_draw_discard\mod.rs"
+    = note: if there is a `mod engine_fault_sequential_draw_discard` elsewhere in the crate already, import it with `us
+e crate::...` instead
+
+error[E0583]: file not found for module `engine_fault_debut_optional_look_select_full`
+   --> tests\qa_individual_tests.rs:208:5
+    |
+208 |     pub mod engine_fault_debut_optional_look_select_full;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: to create the module `engine_fault_debut_optional_look_select_full`, create file "tests\qa_individual\engin
+e_fault_debut_optional_look_select_full.rs" or "tests\qa_individual\engine_fault_debut_optional_look_select_full\mod.rs
+"
+    = note: if there is a `mod engine_fault_debut_optional_look_select_full` elsewhere in the crate already, import it 
+with `use crate::...` instead
+
+error: could not compile `rabuka_engine` (test "test_parser_engine_alignment") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+    --> tests\test_qa_data.rs:1969:27
+     |
+1969 |     assert_eq!(game_state.pending_auto_abilities.len(), 2,
+     |                           ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 6
+3 others
+
+Some errors have detailed explanations: E0433, E0609.
+For more information about an error, try `rustc --explain E0433`.
+warning: `rabuka_engine` (test "real_ability_tests") generated 4 warnings (run `cargo fix --test "real_ability_tests" -
+p rabuka_engine` to apply 4 suggestions)
+error: could not compile `rabuka_engine` (bin "run_qa_tests") due to 4 previous errors
+error: could not compile `rabuka_engine` (bin "run_qa_tests" test) due to 4 previous errors
+error: comparison operators cannot be chained
+   --> tests\qa_individual\stress_test_multiple_copies.rs:119:67
+    |
+119 |             game_state.player1.stage.stage.iter().filter(|&id| id !=  id == member_card_id).count() < 3,
+    |                                                                   ^^     ^^
+
+error[E0432]: unresolved import `crate::ability_queue`
+ --> src\game_state.rs:5:12
+  |
+5 | use crate::ability_queue::AbilityQueue;
+  |            ^^^^^^^^^^^^^ unresolved import
+  |
+help: a similar path exists
+  |
+5 | use crate::rabuka_engine::ability_queue::AbilityQueue;
+  |            +++++++++++++++
+
+error[E0432]: unresolved import `crate::ability_queue`
+    --> src\game_state.rs:1196:20
+     |
+1196 |         use crate::ability_queue::{AbilityQueueEntry, AbilityId};
+     |                    ^^^^^^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1196 |         use crate::rabuka_engine::ability_queue::{AbilityQueueEntry, AbilityId};
+     |                    +++++++++++++++
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_ability_chains.rs:39:26
+   |
+39 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_ability_chains.rs:110:26
+    |
+110 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+    |                          ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_ability_chains.rs:180:26
+    |
+180 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+    |                          ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_aggressive.rs:39:26
+   |
+39 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_aggressive.rs:124:26
+    |
+124 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+    |                          ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_baton_touch_complex.rs:50:26
+   |
+50 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_boundary_conditions.rs:42:26
+   |
+42 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_boundary_conditions.rs:126:26
+    |
+126 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+    |                          ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_boundary_conditions.rs:176:26
+    |
+176 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+    |                          ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_deck_refresh.rs:39:26
+   |
+39 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_energy_edge_cases.rs:39:26
+   |
+39 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_energy_edge_cases.rs:104:26
+    |
+104 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+    |                          ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_extreme.rs:46:26
+   |
+46 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0425]: cannot find function `min` in this scope
+  --> tests\qa_individual\stress_test_extreme.rs:61:17
+   |
+61 |     for i in 0..min(5, member_ids.len()) {
+   |                 ^^^ not found in this scope
+   |
+help: consider importing this function
+   |
+ 4 + use std::cmp::min;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_extreme.rs:131:26
+    |
+131 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+    |                          ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+   --> tests\qa_individual\stress_test_extreme.rs:178:22
+    |
+178 |     let game_state = GameState::new(player1, player2, card_database.clone());
+    |                      ^^^^^^^^^ use of undeclared type `GameState`
+    |
+help: consider importing this struct
+    |
+  4 + use rabuka_engine::game_state::GameState;
+    |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_live_card_interactions.rs:38:26
+   |
+38 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_live_card_interactions.rs:96:26
+   |
+96 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+error[E0433]: cannot find type `GameState` in this scope
+  --> tests\qa_individual\stress_test_multiple_copies.rs:45:26
+   |
+45 |     let mut game_state = GameState::new(player1, player2, card_database.clone());
+   |                          ^^^^^^^^^ use of undeclared type `GameState`
+   |
+help: consider importing this struct
+   |
+ 4 + use rabuka_engine::game_state::GameState;
+   |
+
+warning: unused import: `Phase`
+ --> tests\qa_individual\engine_fault_zone_remove_top.rs:6:44
+  |
+6 | use rabuka_engine::game_state::{GameState, Phase};
+  |                                            ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `rabuka_engine::zones::LiveCardZone`
+ --> tests\qa_individual\engine_fault_zone_remove_top.rs:7:5
+  |
+7 | use rabuka_engine::zones::LiveCardZone;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused import: `rabuka_engine::zones::MemberArea`
+ --> tests\qa_individual\engine_fault_live_start_gain_resource_duration.rs:7:5
+  |
+7 | use rabuka_engine::zones::MemberArea;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+  --> tests\qa_individual\q073_refresh_during_effect.rs:74:42
+   |
+74 |         let debut_triggered = game_state.pending_auto_abilities.iter()
+   |                                          ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error: could not compile `rabuka_engine` (test "test_qa_data") due to 1 previous error
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2092:76
+     |
+2092 |                 if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT) {
+     |                                                                            ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+2092 |                 if ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers::CONSTANT) {
+     |                                                                            +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2092 -                 if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT) {
+2092 +                 if ability.triggers.as_ref().map_or(false, |t| t == triggers::CONSTANT) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2156:97
+     |
+2156 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVA
+TION);
+     |                                                                                                 ^^^^^^^^ unresol
+ved import
+     |
+help: a similar path exists
+     |
+2156 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::t
+riggers::ACTIVATION);
+     |                                                                                                 +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2156 -                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVA
+TION);
+2156 +                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == triggers::ACTIVATION);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2162:97
+     |
+2162 | ...   let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t == crate:
+:triggers::DEBUT_EN);
+     |                                                                                   ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+2162 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::t
+riggers::DEBUT || t == crate::triggers::DEBUT_EN);
+     |                                                                                                 +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2162 -                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT 
+|| t == crate::triggers::DEBUT_EN);
+2162 +                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == triggers::DEBUT || t ==
+ crate::triggers::DEBUT_EN);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2162:128
+     |
+2162 | ...e, |t| t == crate::triggers::DEBUT || t == crate::triggers::DEBUT_EN);
+     |                                                      ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+2162 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT 
+|| t == crate::rabuka_engine::triggers::DEBUT_EN);
+     |                                                                                                                 
+               +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2162 -                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT 
+|| t == crate::triggers::DEBUT_EN);
+2162 +                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT 
+|| t == triggers::DEBUT_EN);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2170:97
+     |
+2170 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_S
+TART);
+     |                                                                                                 ^^^^^^^^ unresol
+ved import
+     |
+help: a similar path exists
+     |
+2170 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::t
+riggers::LIVE_START);
+     |                                                                                                 +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2170 -                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_S
+TART);
+2170 +                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == triggers::LIVE_START);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2177:97
+     |
+2177 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_S
+UCCESS);
+     |                                                                                                 ^^^^^^^^ unresol
+ved import
+     |
+help: a similar path exists
+     |
+2177 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::t
+riggers::LIVE_SUCCESS);
+     |                                                                                                 +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2177 -                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_S
+UCCESS);
+2177 +                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == triggers::LIVE_SUCCESS)
+;
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2185:97
+     |
+2185 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTA
+NT);
+     |                                                                                                 ^^^^^^^^ unresol
+ved import
+     |
+help: a similar path exists
+     |
+2185 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::t
+riggers::CONSTANT);
+     |                                                                                                 +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2185 -                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTA
+NT);
+2185 +                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == triggers::CONSTANT);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\game_state.rs:2192:97
+     |
+2192 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::AUTO);
+     |                                                                                                 ^^^^^^^^ unresol
+ved import
+     |
+help: a similar path exists
+     |
+2192 |                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::t
+riggers::AUTO);
+     |                                                                                                 +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+2192 -                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::AUTO);
+2192 +                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == triggers::AUTO);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\turn.rs:443:103
+    |
+443 | ...                   .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::BATON_T
+OUCH))
+    |                                                                                                 ^^^^^^^^ unresolv
+ed import
+    |
+help: a similar path exists
+    |
+443 |                             .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engi
+ne::triggers::BATON_TOUCH))
+    |                                                                                                       +++++++++++
+++++
+help: consider importing this module
+    |
+  1 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+443 -                             .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::B
+ATON_TOUCH))
+443 +                             .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == triggers::BATON_TO
+UCH))
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\turn.rs:631:41
+    |
+631 | ...                   t == crate::triggers::ACTIVATION || 
+    |                                   ^^^^^^^^ unresolved import
+    |
+help: a similar path exists
+    |
+631 |                             t == crate::rabuka_engine::triggers::ACTIVATION || 
+    |                                         +++++++++++++++
+help: consider importing this module
+    |
+  1 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+631 -                             t == crate::triggers::ACTIVATION || 
+631 +                             t == triggers::ACTIVATION || 
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\turn.rs:632:41
+    |
+632 | ...                   t == crate::triggers::CONSTANT || 
+    |                                   ^^^^^^^^ unresolved import
+    |
+help: a similar path exists
+    |
+632 |                             t == crate::rabuka_engine::triggers::CONSTANT || 
+    |                                         +++++++++++++++
+help: consider importing this module
+    |
+  1 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+632 -                             t == crate::triggers::CONSTANT || 
+632 +                             t == triggers::CONSTANT || 
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\turn.rs:633:42
+    |
+633 | ...                   (t == crate::triggers::AUTO && ability.cost.is_some()) ||
+    |                                    ^^^^^^^^ unresolved import
+    |
+help: a similar path exists
+    |
+633 |                             (t == crate::rabuka_engine::triggers::AUTO && ability.cost.is_some()) ||
+    |                                          +++++++++++++++
+help: consider importing this module
+    |
+  1 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+633 -                             (t == crate::triggers::AUTO && ability.cost.is_some()) ||
+633 +                             (t == triggers::AUTO && ability.cost.is_some()) ||
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\turn.rs:634:56
+    |
+634 | ...                   t == "main" || t == crate::triggers::MAIN ||
+    |                                                  ^^^^^^^^ unresolved import
+    |
+help: a similar path exists
+    |
+634 |                             t == "main" || t == crate::rabuka_engine::triggers::MAIN ||
+    |                                                        +++++++++++++++
+help: consider importing this module
+    |
+  1 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+634 -                             t == "main" || t == crate::triggers::MAIN ||
+634 +                             t == "main" || t == triggers::MAIN ||
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\turn.rs:635:41
+    |
+635 | ...                   t == crate::triggers::BATON_TOUCH
+    |                                   ^^^^^^^^ unresolved import
+    |
+help: a similar path exists
+    |
+635 |                             t == crate::rabuka_engine::triggers::BATON_TOUCH
+    |                                         +++++++++++++++
+help: consider importing this module
+    |
+  1 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+635 -                             t == crate::triggers::BATON_TOUCH
+635 +                             t == triggers::BATON_TOUCH
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\turn.rs:883:88
+    |
+883 | ...                   && ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT)
+    |                                                                                  ^^^^^^^^ unresolved import
+    |
+help: a similar path exists
+    |
+883 |                             && ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers::C
+ONSTANT)
+    |                                                                                        +++++++++++++++
+help: consider importing this module
+    |
+  1 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+883 -                             && ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT)
+883 +                             && ability.triggers.as_ref().map_or(false, |t| t == triggers::CONSTANT)
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1378:92
+     |
+1378 | ...                   if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t == crate::
+triggers::DEBUT_EN) {
+     |                                                                                  ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1378 |                                 if ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::trigge
+rs::DEBUT || t == crate::triggers::DEBUT_EN) {
+     |                                                                                            +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1378 -                                 if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t 
+== crate::triggers::DEBUT_EN) {
+1378 +                                 if ability.triggers.as_ref().map_or(false, |t| t == triggers::DEBUT || t == crat
+e::triggers::DEBUT_EN) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1378:123
+     |
+1378 | ...                   if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t == crate::
+triggers::DEBUT_EN) {
+     |                                                                                                                 
+^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1378 |                                 if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t 
+== crate::rabuka_engine::triggers::DEBUT_EN) {
+     |                                                                                                                 
+          +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1378 -                                 if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t 
+== crate::triggers::DEBUT_EN) {
+1378 +                                 if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t 
+== triggers::DEBUT_EN) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1381:98
+     |
+1381 | ...   let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON_TOUCH) && ability.full_text.c
+ontains(crate::tri...
+     |                                                                    ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1381 |                                     let requires_baton_touch = ability.full_text.contains(crate::rabuka_engine::
+triggers::BATON_TOUCH) && ability.full_text.contains(crate::triggers::DEBUT_EN);
+     |                                                                                                  +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1381 -                                     let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON
+_TOUCH) && ability.full_text.contains(crate::triggers::DEBUT_EN);
+1381 +                                     let requires_baton_touch = ability.full_text.contains(triggers::BATON_TOUCH)
+ && ability.full_text.contains(crate::triggers::DEBUT_EN);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1381:158
+     |
+1381 | ...BATON_TOUCH) && ability.full_text.contains(crate::triggers::DEBUT_EN);
+     |                                                      ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1381 |                                     let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON
+_TOUCH) && ability.full_text.contains(crate::rabuka_engine::triggers::DEBUT_EN);
+     |                                                                                                                 
+                                             +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1381 -                                     let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON
+_TOUCH) && ability.full_text.contains(crate::triggers::DEBUT_EN);
+1381 +                                     let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON
+_TOUCH) && ability.full_text.contains(triggers::DEBUT_EN);
+     |
+
+warning: `rabuka_engine` (test "test_complex_abilities") generated 1 warning
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1450:88
+     |
+1450 | ...                   if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
+     |                                                                                  ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1450 |                             if ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers::
+LIVE_START) {
+     |                                                                                        +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1450 -                             if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
+1450 +                             if ability.triggers.as_ref().map_or(false, |t| t == triggers::LIVE_START) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1491:88
+     |
+1491 | ...                   if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
+     |                                                                                  ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1491 |                             if ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers::
+LIVE_START) {
+     |                                                                                        +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1491 -                             if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
+1491 +                             if ability.triggers.as_ref().map_or(false, |t| t == triggers::LIVE_START) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1540:88
+     |
+1540 | ...                   if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS) {
+     |                                                                                  ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1540 |                             if ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers::
+LIVE_SUCCESS) {
+     |                                                                                        +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1540 -                             if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS) {
+1540 +                             if ability.triggers.as_ref().map_or(false, |t| t == triggers::LIVE_SUCCESS) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1563:84
+     |
+1563 | ...   if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.contains(crate::tri
+ggers::LIVE_SUCCES...
+     |                                                                  ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1563 |                         if ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers::LIVE
+_SUCCESS || t.contains(crate::triggers::LIVE_SUCCESS_EN)) {
+     |                                                                                    +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1563 -                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.c
+ontains(crate::triggers::LIVE_SUCCESS_EN)) {
+1563 +                         if ability.triggers.as_ref().map_or(false, |t| t == triggers::LIVE_SUCCESS || t.contains
+(crate::triggers::LIVE_SUCCESS_EN)) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\turn.rs:1563:128
+     |
+1563 | ...rate::triggers::LIVE_SUCCESS || t.contains(crate::triggers::LIVE_SUCCESS_EN)) {
+     |                                                      ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+1563 |                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.c
+ontains(crate::rabuka_engine::triggers::LIVE_SUCCESS_EN)) {
+     |                                                                                                                 
+               +++++++++++++++
+help: consider importing this module
+     |
+   1 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+1563 -                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.c
+ontains(crate::triggers::LIVE_SUCCESS_EN)) {
+1563 +                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.c
+ontains(triggers::LIVE_SUCCESS_EN)) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\bot\ability_test.rs:101:90
+    |
+101 |             c.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT))
+    |                                                                                          ^^^^^^^^ unresolved impo
+rt
+    |
+help: a similar path exists
+    |
+101 |             c.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers:
+:DEBUT))
+    |                                                                                          +++++++++++++++
+help: consider importing this module
+    |
+  4 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+101 -             c.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT))
+101 +             c.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == triggers::DEBUT))
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\bot\ability_test.rs:120:93
+    |
+120 |             card.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT))
+    |                                                                                             ^^^^^^^^ unresolved i
+mport
+    |
+help: a similar path exists
+    |
+120 |             card.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::trigge
+rs::DEBUT))
+    |                                                                                             +++++++++++++++
+help: consider importing this module
+    |
+  4 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+120 -             card.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT))
+120 +             card.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == triggers::DEBUT))
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\game_setup.rs:538:73
+    |
+538 | ...                   t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::triggers::ACTI
+VATION)
+    |                                                               ^^^^^^^^ unresolved import
+    |
+help: a similar path exists
+    |
+538 |                                 t.contains("main") || t.contains(crate::rabuka_engine::triggers::MAIN) || t.conta
+ins(crate::triggers::ACTIVATION)
+    |                                                                         +++++++++++++++
+help: consider importing this module
+    |
+  4 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+538 -                                 t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::trig
+gers::ACTIVATION)
+538 +                                 t.contains("main") || t.contains(triggers::MAIN) || t.contains(crate::triggers::A
+CTIVATION)
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+   --> src\game_setup.rs:538:110
+    |
+538 | ...                   t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::triggers::ACTI
+VATION)
+    |                                                                                                    ^^^^^^^^ unres
+olved import
+    |
+help: a similar path exists
+    |
+538 |                                 t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::rabu
+ka_engine::triggers::ACTIVATION)
+    |                                                                                                              ++++
++++++++++++
+help: consider importing this module
+    |
+  4 + use rabuka_engine::triggers;
+    |
+help: if you import `triggers`, refer to it directly
+    |
+538 -                                 t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::trig
+gers::ACTIVATION)
+538 +                                 t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(triggers::A
+CTIVATION)
+    |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\ability_resolver.rs:4054:84
+     |
+4054 |                 if current_ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION) {
+     |                                                                                    ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+4054 |                 if current_ability.triggers.as_ref().map_or(false, |t| t == crate::rabuka_engine::triggers::ACTI
+VATION) {
+     |                                                                                    +++++++++++++++
+help: consider importing this module
+     |
+   3 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+4054 -                 if current_ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION) {
+4054 +                 if current_ability.triggers.as_ref().map_or(false, |t| t == triggers::ACTIVATION) {
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\ability_resolver.rs:6281:52
+     |
+6281 |                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
+     |                                                    ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+6281 |                     .map_or(false, |t| t == crate::rabuka_engine::triggers::ACTIVATION);
+     |                                                    +++++++++++++++
+help: consider importing this module
+     |
+   3 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+6281 -                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
+6281 +                     .map_or(false, |t| t == triggers::ACTIVATION);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\ability_resolver.rs:6424:52
+     |
+6424 |                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
+     |                                                    ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+6424 |                     .map_or(false, |t| t == crate::rabuka_engine::triggers::ACTIVATION);
+     |                                                    +++++++++++++++
+help: consider importing this module
+     |
+   3 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+6424 -                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
+6424 +                     .map_or(false, |t| t == triggers::ACTIVATION);
+     |
+
+error[E0433]: cannot find `triggers` in `crate`
+    --> src\ability_resolver.rs:6494:52
+     |
+6494 |                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
+     |                                                    ^^^^^^^^ unresolved import
+     |
+help: a similar path exists
+     |
+6494 |                     .map_or(false, |t| t == crate::rabuka_engine::triggers::ACTIVATION);
+     |                                                    +++++++++++++++
+help: consider importing this module
+     |
+   3 + use rabuka_engine::triggers;
+     |
+help: if you import `triggers`, refer to it directly
+     |
+6494 -                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
+6494 +                     .map_or(false, |t| t == triggers::ACTIVATION);
+     |
+
+error[E0609]: no field `pending_choice` on type `GameState`
+  --> tests\qa_individual\q200_debut_ability_usable.rs:64:43
+   |
+64 |     let pending_choice_clone = game_state.pending_choice.clone();
+   |                                           ^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+  --> tests\qa_individual\q200_debut_ability_usable.rs:91:38
+   |
+91 |     let debut_triggered = game_state.pending_auto_abilities.iter()
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_choice` on type `GameState`
+  --> tests\qa_individual\q201_debut_ability_usable2.rs:64:43
+   |
+64 |     let pending_choice_clone = game_state.pending_choice.clone();
+   |                                           ^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+  --> tests\qa_individual\q201_debut_ability_usable2.rs:90:38
+   |
+90 |     let debut_triggered = game_state.pending_auto_abilities.iter()
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_choice` on type `GameState`
+  --> tests\qa_individual\q202_debut_ability_usable3.rs:64:43
+   |
+64 |     let pending_choice_clone = game_state.pending_choice.clone();
+   |                                           ^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+  --> tests\qa_individual\q202_debut_ability_usable3.rs:90:38
+   |
+90 |     let debut_triggered = game_state.pending_auto_abilities.iter()
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_choice` on type `GameState`
+  --> tests\qa_individual\q203_score_condition_active.rs:82:43
+   |
+82 |     let pending_choice_clone = game_state.pending_choice.clone();
+   |                                           ^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_choice` on type `GameState`
+  --> tests\qa_individual\q204_combined_member_condition.rs:95:43
+   |
+95 |     let pending_choice_clone = game_state.pending_choice.clone();
+   |                                           ^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0609]: no field `pending_auto_abilities` on type `GameState`
+  --> tests\qa_individual\engine_fault_pending_auto_abilities_choice.rs:31:44
+   |
+31 |     let initial_pending_count = game_state.pending_auto_abilities.len();
+   |                                            ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0599]: no variant or associated item named `AreaMovement` found for enum `AbilityTrigger` in the current scope
+  --> tests\qa_individual\engine_fault_area_movement_trigger.rs:98:60
+   |
+98 |                 rabuka_engine::game_state::AbilityTrigger::AreaMovement,
+   |                                                            ^^^^^^^^^^^^ variant or associated item not found in `A
+bilityTrigger`
+
+error[E0609]: no field `pending_choice` on type `GameState`
+  --> tests\qa_individual\engine_fault_live_start_gain_resource_duration.rs:67:46
+   |
+67 |         if let Some(ref choice) = game_state.pending_choice {
+   |                                              ^^^^^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 63 
+others
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+  --> tests\qa_individual\stress_test_ability_chains.rs:68:34
+   |
+68 |                     &ActionType::BatonTouch,
+   |                                  ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+   --> tests\qa_individual\stress_test_ability_chains.rs:207:34
+    |
+207 |                     &ActionType::BatonTouch,
+    |                                  ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `LeftSupport` found for enum `MemberArea` in the current scope
+  --> tests\qa_individual\stress_test_aggressive.rs:44:95
+   |
+44 |     let areas = [MemberArea::LeftSide, MemberArea::Center, MemberArea::RightSide, MemberArea::LeftSupport, MemberA
+rea::RightSupport];
+   |                                                                                               ^^^^^^^^^^^ variant 
+or associated item not found in `MemberArea`
+
+error[E0599]: no variant or associated item named `RightSupport` found for enum `MemberArea` in the current scope
+  --> tests\qa_individual\stress_test_aggressive.rs:44:120
+   |
+44 |     let areas = [MemberArea::LeftSide, MemberArea::Center, MemberArea::RightSide, MemberArea::LeftSupport, MemberA
+rea::RightSupport];
+   |                                                                                                                   
+     ^^^^^^^^^^^^ variant or associated item not found in `MemberArea`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+   --> tests\qa_individual\stress_test_aggressive.rs:152:26
+    |
+152 |             &ActionType::BatonTouch,
+    |                          ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+   --> tests\qa_individual\stress_test_baton_touch_complex.rs:114:22
+    |
+114 |         &ActionType::BatonTouch,
+    |                      ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+  --> tests\qa_individual\stress_test_boundary_conditions.rs:62:22
+   |
+62 |         &ActionType::BatonTouch,
+   |                      ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+  --> tests\qa_individual\stress_test_boundary_conditions.rs:82:22
+   |
+82 |         &ActionType::BatonTouch,
+   |                      ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+   --> tests\qa_individual\stress_test_boundary_conditions.rs:183:22
+    |
+183 |         &ActionType::BatonTouch,
+    |                      ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+  --> tests\qa_individual\stress_test_extreme.rs:84:34
+   |
+84 |                     &ActionType::BatonTouch,
+   |                                  ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0599]: no variant or associated item named `BatonTouch` found for enum `ActionType` in the current scope
+   --> tests\qa_individual\stress_test_multiple_copies.rs:105:22
+    |
+105 |         &ActionType::BatonTouch,
+    |                      ^^^^^^^^^^ variant or associated item not found in `ActionType`
+
+error[E0308]: mismatched types
+   --> tests\qa_individual\stress_test_multiple_copies.rs:119:77
+    |
+119 |             game_state.player1.stage.stage.iter().filter(|&id| id !=  id == member_card_id).count() < 3,
+    |                                                                             ^^^^^^^^^^^^^^ expected `bool`, found
+ `i16`
+
+error[E0277]: can't compare `bool` with `i16`
+   --> tests\qa_individual\stress_test_multiple_copies.rs:119:74
+    |
+119 |             game_state.player1.stage.stage.iter().filter(|&id| id !=  id == member_card_id).count() < 3,
+    |                                                                          ^^ no implementation for `bool == i16`
+    |
+    = help: the trait `PartialEq<i16>` is not implemented for `bool`
+help: `bool` implements trait `PartialEq<Rhs>`
+   --> /rustc/fda6d37bb88ee12fd50fa54d15859f1f91b74f55/library\core\src\cmp.rs:1877:12
+    |
+    = note: `PartialEq`
+   ::: /rustc/fda6d37bb88ee12fd50fa54d15859f1f91b74f55/library\core\src\cmp.rs:1901:5
+    |
+    = note: in this macro invocation
+    |
+   ::: C:\Users\trios\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\serde_json-1.0.149\src\value\partial_eq.rs:7
+6:13
+    |
+ 76 |               impl PartialEq<Value> for $ty {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `PartialEq<serde_json::value::Value>`
+...
+ 97 | / partialeq_numeric! {
+ 98 | |     eq_i64[i8 i16 i32 i64 isize]
+ 99 | |     eq_u64[u8 u16 u32 u64 usize]
+100 | |     eq_f32[f32]
+101 | |     eq_f64[f64]
+102 | |     eq_bool[bool]
+103 | | }
+    | |_- in this macro invocation
+    = note: this error originates in the macro `partial_eq_impl` which comes from the expansion of the macro `partialeq
+_numeric` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0596]: cannot borrow `player2` as mutable, as it is not declared as mutable
+  --> tests\qa_individual\q028_debut_without_baton_touch.rs:40:30
+   |
+40 |     setup_player_with_energy(&mut player2, energy_card_ids.clone());
+   |                              ^^^^^^^^^^^^ cannot borrow as mutable
+   |
+help: consider changing this to be mutable
+   |
+29 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         +++
+
+error[E0502]: cannot borrow `game_state.player1.id` as immutable because it is also borrowed as mutable
+  --> tests\qa_individual\q039_cheer_confirmation_required.rs:85:9
+   |
+82 |     let cheer_result = TurnEngine::player_perform_live(
+   |                        ------------------------------- mutable borrow later used by call
+83 |         &mut game_state.player1,
+   |         ----------------------- mutable borrow occurs here
+84 |         &mut game_state.resolution_zone,
+85 |         &game_state.player1.id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^ immutable borrow occurs here
+
+error[E0502]: cannot borrow `game_state.player1.id` as immutable because it is also borrowed as mutable
+  --> tests\qa_individual\q040_cheer_check_completion.rs:88:9
+   |
+85 |     let cheer_result = TurnEngine::player_perform_live(
+   |                        ------------------------------- mutable borrow later used by call
+86 |         &mut game_state.player1,
+   |         ----------------------- mutable borrow occurs here
+87 |         &mut game_state.resolution_zone,
+88 |         &game_state.player1.id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^ immutable borrow occurs here
+
+error[E0502]: cannot borrow `game_state.player1.id` as immutable because it is also borrowed as mutable
+  --> tests\qa_individual\q041_cheer_card_timing.rs:86:9
+   |
+83 |     TurnEngine::player_perform_live(
+   |     ------------------------------- mutable borrow later used by call
+84 |         &mut game_state.player1,
+   |         ----------------------- mutable borrow occurs here
+85 |         &mut game_state.resolution_zone,
+86 |         &game_state.player1.id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^ immutable borrow occurs here
+
+error[E0502]: cannot borrow `game_state.player1.id` as immutable because it is also borrowed as mutable
+  --> tests\qa_individual\q042_cheer_ability_timing.rs:85:9
+   |
+82 |     let cheer_result = TurnEngine::player_perform_live(
+   |                        ------------------------------- mutable borrow later used by call
+83 |         &mut game_state.player1,
+   |         ----------------------- mutable borrow occurs here
+84 |         &mut game_state.resolution_zone,
+85 |         &game_state.player1.id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^ immutable borrow occurs here
+
+error[E0502]: cannot borrow `game_state.player1.id` as immutable because it is also borrowed as mutable
+  --> tests\qa_individual\q043_draw_icon_effect.rs:95:9
+   |
+92 |     let cheer_result = TurnEngine::player_perform_live(
+   |                        ------------------------------- mutable borrow later used by call
+93 |         &mut game_state.player1,
+   |         ----------------------- mutable borrow occurs here
+94 |         &mut game_state.resolution_zone,
+95 |         &game_state.player1.id,
+   |         ^^^^^^^^^^^^^^^^^^^^^^ immutable borrow occurs here
+
+warning: unused variable: `deck_after_live_before`
+  --> tests\qa_individual\q043_draw_icon_effect.rs:91:9
+   |
+91 |     let deck_after_live_before = game_state.player1.main_deck.cards.len();
+   |         ^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_deck_after_live_befor
+e`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+  --> tests\qa_individual\q215_wait_energy_cost.rs:17:9
+   |
+17 |     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+   |         ----^^^^^^^
+   |         |
+   |         help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0277, E0308, E0425, E0433, E0502, E0583, E0596, E0599, E0609.
+For more information about an error, try `rustc --explain E0277`.
+warning: `rabuka_engine` (test "qa_individual_tests") generated 5 warnings
+error: could not compile `rabuka_engine` (test "qa_individual_tests") due to 54 previous errors; 5 warnings emitted
+warning: unused variable: `game_state`
+   --> src\main.rs:550:9
+    |
+550 |     let game_state = Arc::new(Mutex::new(game_state));
+    |         ^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_game_state`
+
+Some errors have detailed explanations: E0432, E0433.
+For more information about an error, try `rustc --explain E0432`.
+warning: `rabuka_engine` (bin "rabuka_engine" test) generated 3 warnings (2 duplicates)
+error: could not compile `rabuka_engine` (bin "rabuka_engine" test) due to 34 previous errors; 3 warnings emitted
+warning: `rabuka_engine` (bin "rabuka_engine") generated 3 warnings (3 duplicates)
+error: could not compile `rabuka_engine` (bin "rabuka_engine") due to 34 previous errors; 3 warnings emitted

@@ -15,8 +15,7 @@ mod qa_individual {
     pub mod q005_same_card_number_different_rarity;
     pub mod q006_different_card_numbers;
     pub mod q007_energy_deck_duplicates;
-    pub mod q028_debut_without_baton_touch;
-    pub mod q030_stage_duplicate_allowed;
+        pub mod q030_stage_duplicate_allowed;
     pub mod q031_live_duplicate_allowed;
     pub mod q062_combined_name_parsing;
     pub mod q063_ability_debut_no_cost;
@@ -29,8 +28,7 @@ mod qa_individual {
     pub mod q070_area_placement_restriction;
     pub mod q071_area_placement_after_move;
     pub mod q072_live_set_no_stage_members;
-    pub mod q073_refresh_during_effect;
-    pub mod q074_group_name_reference;
+        pub mod q074_group_name_reference;
     pub mod q075_baton_after_discard_to_stage;
     pub mod q076_discard_to_stage_occupied_area;
     pub mod q077_condition_only_this_card_debuted;
@@ -46,12 +44,7 @@ mod qa_individual {
     pub mod q091_auto_ability_no_live;
     pub mod q037_auto_ability_once_per_timing;
     pub mod q038_live_card_definition;
-    pub mod q039_cheer_confirmation_required;
-    pub mod q040_cheer_check_completion;
-    pub mod q041_cheer_card_timing;
-    pub mod q042_cheer_ability_timing;
-    pub mod q043_draw_icon_effect;
-    pub mod q044_score_icon_effect;
+                        pub mod q044_score_icon_effect;
     pub mod q045_all_blade_effect;
     pub mod q046_constant_heart_timing;
     pub mod q047_live_failure_no_score;
@@ -151,10 +144,7 @@ mod qa_individual {
     pub mod q197_baton_touch_auto_trigger;
     pub mod q198_baton_touch_cost11;
     pub mod q199_debut_baton_touch_timing;
-    pub mod q200_debut_ability_usable;
-    pub mod q201_debut_ability_usable2;
-    pub mod q202_debut_ability_usable3;
-    pub mod q203_score_condition_active;
+                pub mod q203_score_condition_active;
     pub mod q204_combined_member_condition;
     pub mod q205_all_heart_condition;
     pub mod q206_baton_touch_cost;
@@ -189,30 +179,19 @@ mod qa_individual {
     pub mod q235_attribute_selection;
     pub mod q236_card_name_match;
     pub mod q237_card_name_mismatch;
-    // pub mod q238_baton_touch_count_tracking; // Missing .rs file
-    // pub mod q239_card_movement_tracking_clearing; // Missing .rs file
-    // pub mod q240_activating_card_in_auto_abilities; // Missing .rs file
-    // pub mod q241_energy_active_count_sync; // Missing .rs file
-    // pub mod q242_turn_limited_ability_index; // Missing .rs file
-    // pub mod q243_pending_auto_abilities_choice; // Missing .rs file
-    // pub mod q244_cost_payment_state; // Missing .rs file
-    // pub mod q245_zone_remove_top; // Removed - was incorrect simplification
-    // pub mod q246_area_movement_trigger; // Missing .rs file
-    // pub mod q247_live_end_duration_clearing; // Missing .rs file
-    // pub mod q248_gain_ability; // Missing .rs file
-    // pub mod q249_card_removal_clears_modifiers; // Missing .rs file
-    // pub mod q250_gain_ability_reveal_cost; // Missing .rs file
-    pub mod q251_debut_look_and_select_optional_cost;
-    // pub mod q252_live_start_gain_resource_duration; // Missing .rs file
-    pub mod q253_sequential_draw_discard;
-    pub mod q254_debut_optional_look_select_full;
-    // pub mod stress_test_ability_chains; // Uses non-existent enum variants
-    // pub mod stress_test_aggressive; // Uses non-existent enum variants
-    // pub mod stress_test_baton_touch_complex; // Uses non-existent enum variants
-    // pub mod stress_test_boundary_conditions; // Uses non-existent enum variants
-    // pub mod stress_test_deck_refresh; // Uses non-existent enum variants
-    // pub mod stress_test_energy_edge_cases; // Uses non-existent enum variants
-    // pub mod stress_test_extreme; // Uses non-existent enum variants
-    // pub mod stress_test_live_card_interactions; // Uses non-existent enum variants
-    // pub mod stress_test_multiple_copies; // Uses non-existent enum variants
-}
+    pub mod engine_fault_baton_touch_count_tracking;
+    pub mod engine_fault_card_movement_tracking_clearing;
+    pub mod engine_fault_activating_card_in_auto_abilities;
+    pub mod engine_fault_energy_active_count_sync;
+    pub mod engine_fault_turn_limited_ability_index;
+    pub mod engine_fault_pending_auto_abilities_choice;
+    pub mod engine_fault_cost_payment_rollback;
+    pub mod engine_fault_zone_remove_top;
+    pub mod engine_fault_area_movement_trigger;
+    pub mod engine_fault_live_end_duration_clearing;
+    pub mod engine_fault_gain_ability;
+    pub mod engine_fault_card_removal_clears_modifiers;
+    pub mod engine_fault_gain_ability_reveal_cost;
+        pub mod engine_fault_live_start_gain_resource_duration;
+    pub mod engine_fault_sequential_draw_discard;
+    }

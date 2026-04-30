@@ -92,7 +92,7 @@ fn test_q204_combined_member_condition() {
     assert!(result3.is_ok(), "Should be able to set live card: {:?}", result3);
     
     // Step 4: Resolve any pending choice from live start ability
-    let pending_choice_clone = game_state.pending_choice.clone();
+    let pending_choice_clone = game_state.pending_ability.clone();
     if let Some(ref choice) = pending_choice_clone {
         println!("Q204: Pending choice presented: {:?}", choice);
         

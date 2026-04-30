@@ -242,7 +242,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
         }
         crate::game_state::Phase::ChooseFirstAttacker => {
             // Q16: RPS winner chooses whether to go first or second
-            let rps_winner = game_state.rps_winner.unwrap_or(1);
+            let _rps_winner = game_state.rps_winner.unwrap_or(1);
             println!("DEBUG: ChooseFirstAttacker phase, rps_winner: {:?}", game_state.rps_winner);
             
             actions.push(Action {
@@ -439,6 +439,8 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                                 // Rule 9.6.2.1.2.1: Cannot baton touch to an area that had a card moved from non-stage to stage this turn
                                 if active_player.areas_locked_this_turn.contains(area) {
                                     // Area locked, not available
+                                } else if game_state.baton_touch_count >= 1 {
+                                    // Baton touch already used this turn - only allowed once per turn
                                 } else {
                                     // Baton touch - replace existing member
                                     // Rule 9.6.2.3.2: Baton touch requires sufficient energy for the final cost
@@ -533,7 +535,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                             // Check if ability can be activated (has activation trigger or main phase trigger)
                             // triggers is a String field, check if it contains "main", "メイン", or "起動" (activation)
                             let can_activate = ability.triggers.as_ref().map_or(false, |t| {
-                                t.contains("main") || t.contains("メイン") || t.contains("起動")
+                                t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::triggers::ACTIVATION)
                             });
 
                             // Check use_limit (e.g., once per turn)

@@ -2,6 +2,7 @@ use crate::card::CardDatabase;
 use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::player::Player;
 use crate::zones::ResolutionZone;
+use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -128,6 +129,43 @@ pub struct ReplacementEffect {
 }
 
 #[derive(Debug, Clone)]
+pub struct RuleConfig {
+    pub partial_resolution_allowed: bool,
+    pub full_cost_payment_required: bool,
+    pub auto_abilities_mandatory: bool,
+    pub search_count_adjustment_enabled: bool,
+    pub allow_replacement_placement: bool,
+    pub allow_live_without_stage_members: bool,
+    pub prohibition_precedence_enabled: bool,
+    pub card_set_search_enabled: bool,
+    pub multi_victory_selection_enabled: bool,
+    pub turn_player_priority_enabled: bool,
+    pub arbitrary_actions_restricted: bool,
+    pub optional_cost_behavior: String,
+    pub effect_resumption_state: String,
+}
+
+impl Default for RuleConfig {
+    fn default() -> Self {
+        Self {
+            partial_resolution_allowed: true,
+            full_cost_payment_required: true,
+            auto_abilities_mandatory: true,
+            search_count_adjustment_enabled: true,
+            allow_replacement_placement: true,
+            allow_live_without_stage_members: true,
+            prohibition_precedence_enabled: true,
+            card_set_search_enabled: true,
+            multi_victory_selection_enabled: true,
+            turn_player_priority_enabled: true,
+            arbitrary_actions_restricted: true,
+            optional_cost_behavior: "always_pay".to_string(),
+            effect_resumption_state: "none".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct GameState {
     pub player1: Player,
     pub player2: Player,
@@ -150,8 +188,6 @@ pub struct GameState {
     pub temporary_effects: Vec<TemporaryEffect>,
     // Game result tracking
     pub game_result: GameResult,
-    // Automatic ability triggering - Rule 9.7
-    pub pending_auto_abilities: Vec<PendingAutoAbility>,
     // Cheer check state - must complete before checking required hearts
     pub cheer_check_completed: bool,
     pub cheer_checks_required: u32,
@@ -183,15 +219,18 @@ pub struct GameState {
     pub cost_modifiers: std::collections::HashMap<i16, i32>, // card_id -> cost delta
     // Reveal tracking - tracks which cards have been revealed to opponent
     pub revealed_cards: std::collections::HashSet<i16>, // card_ids that are currently revealed
-    // Optional cost behavior: "always_pay", "never_pay", "auto" (pay if beneficial)
-    pub optional_cost_behavior: String,
+    pub config: RuleConfig,
+    // Unified ability queue
+    pub ability_queue: AbilityQueue,
+    // Event bus for trigger handling
+    pub event_bus: crate::events::EventBus,
+    // Pending ability execution state for user choice during resolution
+    pub pending_ability: Option<PendingAbilityExecution>,
+    // Pending choice from ability resolution — JSON for the web client
+    pub pending_choice: Option<serde_json::Value>,
     // Activating card tracking - for self-cost abilities where the card itself is the cost
     pub activating_card: Option<i16>, // card_id of the card currently activating an ability
-    // Pending ability for resumption after optional cost payment
-    pub pending_current_ability: Option<crate::card::Ability>, // Full ability object for resumption
-    // Pending ability execution context
-    pub pending_ability: Option<PendingAbilityExecution>,
-    pub pending_choice: Option<crate::ability_resolver::Choice>,
+    // Legacy pending fields - deprecated but kept for compatibility during transition
     pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
     pub score_modifiers: std::collections::HashMap<i16, i32>, // card_id -> score delta
     pub need_heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> need_heart delta
@@ -225,37 +264,11 @@ pub struct GameState {
     pub formation_change_occurred_this_turn: bool, // Whether formation change occurred this turn
     // Opponent choice tracking for optional action conditions
     pub opponent_choice_declined: bool, // Whether opponent declined an optional action (for "そうしなかった" conditions)
-    // Partial effect resolution tracking (Q55, Q92, Q93) - tracks whether partial resolution is allowed
-    pub partial_resolution_allowed: bool, // Whether effects can be partially resolved
-    // Cost payment validation tracking (Q56) - tracks whether full cost payment is required
-    pub full_cost_payment_required: bool, // Whether full cost must be paid (no partial payment)
-    // Mandatory auto ability tracking (Q60) - tracks whether auto abilities are mandatory
-    pub auto_abilities_mandatory: bool, // Whether non-turn-limited auto abilities must be used when triggered
-    // Deck size-aware search tracking (Q85, Q86) - tracks search count adjustments
-    pub search_count_adjustment_enabled: bool, // Whether search effects adjust to deck size
-    // Area occupation rules tracking (Q28) - tracks whether replacement placement is allowed
-    pub allow_replacement_placement: bool, // Whether placement to occupied area with cost payment is allowed
-    // Live card placement tracking (Q72) - tracks whether live cards can be set without stage members
-    pub allow_live_without_stage_members: bool, // Whether live cards can be set with empty stage
-    // Live execution tracking (Q91) - tracks whether a live is being performed
-    pub live_being_performed: bool, // Whether a live is currently being performed
-    // Win condition tracking (Q54) - tracks game end state
-    pub game_ended: bool, // Whether the game has ended
-    pub draw_state: bool, // Whether the game is in a draw state
-    // Effect precedence tracking (Q57) - tracks effect precedence rules
-    pub prohibition_precedence_enabled: bool, // Whether prohibition effects take precedence over enabling effects
-    // Effect interruption tracking (Q73) - tracks effect resumption state
-    pub effect_resumption_state: String, // "none", "interrupted_for_refresh", "resumed"
+    pub live_being_performed: bool,
+    pub game_ended: bool,
+    pub draw_state: bool,
     // Ability source tracking (Q78) - tracks whether abilities are inherent or gained
     pub gained_abilities: std::collections::HashMap<i16, Vec<String>>, // Card ID -> list of gained ability types
-    // Card set search tracking (Q82) - tracks whether search includes all card types in a set
-    pub card_set_search_enabled: bool, // Whether search effects include all card types in a set (e.g., live cards for group search)
-    // Multi-card victory selection tracking (Q83) - tracks whether player must select one card for success zone
-    pub multi_victory_selection_enabled: bool, // Whether player must select one card when multiple live cards win
-    // Auto ability ordering tracking (Q84) - tracks whether turn player chooses order first
-    pub turn_player_priority_enabled: bool, // Whether turn player chooses auto ability order first
-    // Action validation tracking (Q88) - tracks whether arbitrary player actions are restricted
-    pub arbitrary_actions_restricted: bool, // Whether players can only perform actions allowed by game rules
     // Replacement effects tracking (Rule 9.10)
     pub replacement_effects: Vec<ReplacementEffect>, // Active replacement effects
     // Effect creation order counter for layering (Rule 9.9.1.7)
@@ -279,13 +292,13 @@ pub struct PendingAbilityExecution {
     pub ability_index: usize, // Track which ability index is being executed
 }
 
-#[derive(Debug, Clone)]
-pub struct PendingAutoAbility {
-    pub ability_id: String,
-    pub trigger_type: AbilityTrigger,
-    pub player_id: String,
-    pub source_card_id: Option<String>,
+impl PendingAbilityExecution {
+    /// Get compact debug string
+    pub fn compact_debug(&self) -> String {
+        format!("PendingAbility {{ card_no: {}, effect: {} }}", self.card_no, self.effect.compact_debug())
+    }
 }
+
 
 impl GameState {
     /// Invariant check: turn phase and current phase must be consistent according to game rules
@@ -352,7 +365,6 @@ impl GameState {
             live_owned_hearts: std::collections::HashMap::new(),
             temporary_effects: Vec::new(),
             game_result: GameResult::Ongoing,
-            pending_auto_abilities: Vec::new(),
             cheer_check_completed: false,
             cheer_checks_required: 0,
             cheer_checks_done: 0,
@@ -374,8 +386,9 @@ impl GameState {
             orientation_modifiers: std::collections::HashMap::new(),
             cost_modifiers: std::collections::HashMap::new(),
             revealed_cards: std::collections::HashSet::new(),
-            optional_cost_behavior: "always_pay".to_string(), // Default to always pay for bot/test mode
-            pending_current_ability: None,
+            config: RuleConfig::default(),
+            ability_queue: AbilityQueue::new(),
+            event_bus: crate::events::EventBus::new(),
             pending_ability: None,
             pending_choice: None,
             pending_sequential_actions: None,
@@ -394,22 +407,10 @@ impl GameState {
             cards_moved_this_turn: std::collections::HashSet::new(),
             heart_color_decision_phase: "none".to_string(),
             deck_refresh_pending: false,
-            partial_resolution_allowed: true,
-            full_cost_payment_required: true,
-            auto_abilities_mandatory: true,
-            search_count_adjustment_enabled: true,
-            allow_replacement_placement: true,
-            allow_live_without_stage_members: true,
             live_being_performed: false,
             game_ended: false,
             draw_state: false,
-            prohibition_precedence_enabled: true,
-            effect_resumption_state: "none".to_string(),
             gained_abilities: std::collections::HashMap::new(),
-            card_set_search_enabled: true,
-            multi_victory_selection_enabled: true,
-            turn_player_priority_enabled: true,
-            arbitrary_actions_restricted: true,
             replacement_effects: Vec::new(),
             position_change_occurred_this_turn: false,
             formation_change_occurred_this_turn: false,
@@ -422,6 +423,19 @@ impl GameState {
         debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
         debug_assert!(state.modifier_invariant(), "GameState modifier invariant violated after creation");
         state
+    }
+
+    /// Publish a game event to the event bus (queues for later delivery).
+    pub fn publish_event(&mut self, event: crate::events::GameEvent) {
+        self.event_bus.publish(event);
+    }
+
+    /// Flush all pending events, delivering them to global listeners.
+    pub fn flush_events(&mut self) {
+        let mut bus = crate::events::EventBus::new();
+        std::mem::swap(&mut bus, &mut self.event_bus);
+        bus.flush(self);
+        std::mem::swap(&mut bus, &mut self.event_bus);
     }
 
     /// Helper method to determine active player during LiveCardSet phase
@@ -954,42 +968,42 @@ impl GameState {
 
     // Partial effect resolution tracking methods (Q55, Q92, Q93)
     pub fn set_partial_resolution_allowed(&mut self, allowed: bool) {
-        self.partial_resolution_allowed = allowed;
+        self.config.partial_resolution_allowed = allowed;
     }
 
     pub fn is_partial_resolution_allowed(&self) -> bool {
-        self.partial_resolution_allowed
+        self.config.partial_resolution_allowed
     }
 
     // Cost payment validation tracking methods (Q56)
     pub fn set_full_cost_payment_required(&mut self, required: bool) {
-        self.full_cost_payment_required = required;
+        self.config.full_cost_payment_required = required;
     }
 
     pub fn is_full_cost_payment_required(&self) -> bool {
-        self.full_cost_payment_required
+        self.config.full_cost_payment_required
     }
 
     // Mandatory auto ability tracking methods (Q60)
     pub fn set_auto_abilities_mandatory(&mut self, mandatory: bool) {
-        self.auto_abilities_mandatory = mandatory;
+        self.config.auto_abilities_mandatory = mandatory;
     }
 
     pub fn are_auto_abilities_mandatory(&self) -> bool {
-        self.auto_abilities_mandatory
+        self.config.auto_abilities_mandatory
     }
 
     // Deck size-aware search tracking methods (Q85, Q86)
     pub fn set_search_count_adjustment_enabled(&mut self, enabled: bool) {
-        self.search_count_adjustment_enabled = enabled;
+        self.config.search_count_adjustment_enabled = enabled;
     }
 
     pub fn is_search_count_adjustment_enabled(&self) -> bool {
-        self.search_count_adjustment_enabled
+        self.config.search_count_adjustment_enabled
     }
 
     pub fn adjust_search_count(&self, requested_count: usize, deck_size: usize) -> usize {
-        if self.search_count_adjustment_enabled {
+        if self.config.search_count_adjustment_enabled {
             std::cmp::min(requested_count, deck_size)
         } else {
             requested_count
@@ -998,20 +1012,20 @@ impl GameState {
 
     // Area occupation rules tracking methods (Q28)
     pub fn set_allow_replacement_placement(&mut self, allowed: bool) {
-        self.allow_replacement_placement = allowed;
+        self.config.allow_replacement_placement = allowed;
     }
 
     pub fn is_replacement_placement_allowed(&self) -> bool {
-        self.allow_replacement_placement
+        self.config.allow_replacement_placement
     }
 
     // Live card placement tracking methods (Q72)
     pub fn set_allow_live_without_stage_members(&mut self, allowed: bool) {
-        self.allow_live_without_stage_members = allowed;
+        self.config.allow_live_without_stage_members = allowed;
     }
 
     pub fn is_live_without_stage_members_allowed(&self) -> bool {
-        self.allow_live_without_stage_members
+        self.config.allow_live_without_stage_members
     }
 
     // Live execution tracking methods (Q91)
@@ -1060,20 +1074,20 @@ impl GameState {
 
     // Effect precedence tracking methods (Q57)
     pub fn set_prohibition_precedence_enabled(&mut self, enabled: bool) {
-        self.prohibition_precedence_enabled = enabled;
+        self.config.prohibition_precedence_enabled = enabled;
     }
 
     pub fn is_prohibition_precedence_enabled(&self) -> bool {
-        self.prohibition_precedence_enabled
+        self.config.prohibition_precedence_enabled
     }
 
     // Effect interruption tracking methods (Q73)
     pub fn set_effect_resumption_state(&mut self, state: String) {
-        self.effect_resumption_state = state;
+        self.config.effect_resumption_state = state;
     }
 
     pub fn get_effect_resumption_state(&self) -> &str {
-        &self.effect_resumption_state
+        &self.config.effect_resumption_state
     }
 
     pub fn add_revealed_card(&mut self, card_id: i16) {
@@ -1115,38 +1129,38 @@ impl GameState {
 
     // Card set search tracking methods (Q82)
     pub fn set_card_set_search_enabled(&mut self, enabled: bool) {
-        self.card_set_search_enabled = enabled;
+        self.config.card_set_search_enabled = enabled;
     }
 
     pub fn is_card_set_search_enabled(&self) -> bool {
-        self.card_set_search_enabled
+        self.config.card_set_search_enabled
     }
 
     // Multi-card victory selection tracking methods (Q83)
     pub fn set_multi_victory_selection_enabled(&mut self, enabled: bool) {
-        self.multi_victory_selection_enabled = enabled;
+        self.config.multi_victory_selection_enabled = enabled;
     }
 
     pub fn is_multi_victory_selection_enabled(&self) -> bool {
-        self.multi_victory_selection_enabled
+        self.config.multi_victory_selection_enabled
     }
 
     // Auto ability ordering tracking methods (Q84)
     pub fn set_turn_player_priority_enabled(&mut self, enabled: bool) {
-        self.turn_player_priority_enabled = enabled;
+        self.config.turn_player_priority_enabled = enabled;
     }
 
     pub fn is_turn_player_priority_enabled(&self) -> bool {
-        self.turn_player_priority_enabled
+        self.config.turn_player_priority_enabled
     }
 
     // Action validation tracking methods (Q88)
     pub fn set_arbitrary_actions_restricted(&mut self, restricted: bool) {
-        self.arbitrary_actions_restricted = restricted;
+        self.config.arbitrary_actions_restricted = restricted;
     }
 
     pub fn are_arbitrary_actions_restricted(&self) -> bool {
-        self.arbitrary_actions_restricted
+        self.config.arbitrary_actions_restricted
     }
 
     pub fn set_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, value: i32) {
@@ -1198,298 +1212,143 @@ impl GameState {
     }
 
     pub fn trigger_auto_ability(&mut self, ability_id: String, trigger_type: AbilityTrigger, player_id: String, source_card_id: Option<String>) {
-        // Rule 9.7.2: When automatic ability trigger condition is met, it enters waiting state
-        self.pending_auto_abilities.push(PendingAutoAbility {
-            ability_id,
-            trigger_type,
-            player_id,
-            source_card_id,
-        });
-    }
-
-    pub fn process_pending_auto_abilities(&mut self, active_player_id: &str) {
-        // Rule 9.5.1: After rule processing, play and resolve automatic abilities
-        // Rule 9.5.3.2: Active player chooses which of their waiting abilities to play first
-        // Rule 9.5.3.3: Non-active player then plays their waiting abilities
+        use crate::ability_queue::{AbilityQueueEntry, AbilityId};
         
-        use std::collections::HashSet;
-        
-        let non_active_id = if active_player_id == self.player1.id { self.player2.id.as_str() } else { self.player1.id.as_str() };
-        
-        let mut processed = HashSet::new();
-        let mut abilities_to_execute = Vec::with_capacity(self.pending_auto_abilities.len());
-        
-        // Single pass: collect abilities for both active and non-active players
-        for (i, pending) in self.pending_auto_abilities.iter().enumerate() {
-            if pending.player_id == active_player_id || pending.player_id == non_active_id {
-                processed.insert(i);
-                if let Some(ref card_no) = pending.source_card_id {
-                    abilities_to_execute.push((card_no.clone(), pending.player_id.clone()));
+        if let Some(ref card_no) = source_card_id {
+            let (card, card_id) = self.find_card_by_number(card_no);
+            if let Some(card) = card {
+                for (ability_index, ability) in card.abilities.iter().enumerate() {
+                    if ability_id.contains(&ability.full_text) {
+                        let entry = AbilityQueueEntry {
+                            id: AbilityId::new(card_no, ability_index, &format!("{:?}", trigger_type)),
+                            card_no: card_no.clone(),
+                            player_id,
+                            ability: ability.clone(),
+                            ability_index,
+                            card_id,
+                            trigger_type,
+                            started: false,
+                            completed: false,
+                            pending_choice_result: None,
+                        };
+                        
+                        self.ability_queue.enqueue(entry);
+                        break;
+                    }
                 }
-            }
-        }
-        
-        // Remove processed abilities (in reverse order to maintain indices)
-        let mut sorted_indices: Vec<_> = processed.iter().copied().collect();
-        sorted_indices.sort_by(|a, b| b.cmp(a));
-        for i in sorted_indices {
-            self.pending_auto_abilities.remove(i);
-        }
-        
-        // Execute collected abilities
-        for (card_no, player_id) in abilities_to_execute {
-            self.execute_card_ability(&card_no, &player_id);
-            
-            // If execution resulted in a pending choice, stop processing further abilities
-            // until the choice is resolved
-            if self.pending_ability.is_some() {
-                break;
             }
         }
     }
     
-    pub fn execute_card_ability(&mut self, card_no: &str, player_id: &str) {
-        // Find the card by card_no and get its card_id
-        let (card, card_id) = {
-            let player = if player_id == self.player1.id {
-                &self.player1
-            } else {
-                &self.player2
-            };
-            
-            let mut found_card = None;
-            let mut found_card_id = None;
-            
+    fn find_card_by_number(&self, card_no: &str) -> (Option<crate::card::Card>, Option<i16>) {
+        // Search both players' zones for the card
+        for player in [&self.player1, &self.player2] {
             // Check hand
             for id in &player.hand.cards {
                 if let Some(card) = self.card_database.get_card(*id) {
                     if card.card_no == card_no {
-                        found_card = Some(card);
-                        found_card_id = Some(*id);
-                        break;
+                        return (Some(card.clone()), Some(*id));
                     }
                 }
             }
             
             // Check stage
-            if found_card.is_none() {
-                for stage_card_id in &player.stage.stage {
-                    if *stage_card_id != -1 {
-                        if let Some(card) = self.card_database.get_card(*stage_card_id) {
-                            if card.card_no == card_no {
-                                found_card = Some(card);
-                                found_card_id = Some(*stage_card_id);
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Check waitroom (card may be there after cost payment)
-            if found_card.is_none() {
-                for waitroom_card_id in &player.waitroom.cards {
-                    if let Some(card) = self.card_database.get_card(*waitroom_card_id) {
+            for stage_card_id in &player.stage.stage {
+                if *stage_card_id != -1 {
+                    if let Some(card) = self.card_database.get_card(*stage_card_id) {
                         if card.card_no == card_no {
-                            found_card = Some(card);
-                            found_card_id = Some(*waitroom_card_id);
-                            break;
+                            return (Some(card.clone()), Some(*stage_card_id));
                         }
                     }
                 }
             }
             
-            (found_card, found_card_id)
-        };
-        
-        if let Some(card) = card {
-            let abilities = card.abilities.clone();
-            for (ability_index, ability) in abilities.iter().enumerate() {
-                // Check if there's a pending ability execution
-                let pending = self.pending_ability.clone();
-                if let Some(ref pending) = pending {
-                    // Resume from pending execution
-                    if pending.card_no == card_no && pending.player_id == player_id {
-                        // Restore activating card from pending state
-                        self.activating_card = pending.activating_card;
-                        
-                        if let Some(ref effect) = ability.effect {
-                            let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-
-                            // Handle conditional_alternative choice
-                            if effect.action == "conditional_alternative" {
-                                if let Some(ref choice) = pending.conditional_choice {
-                                    if choice == "alternative" {
-                                        if let Some(ref alt_effect) = effect.alternative_effect {
-                                            if let Err(e) = resolver.execute_effect(alt_effect) {
-                                                eprintln!("Failed to execute alternative effect: {}", e);
-                                            }
-                                        }
-                                    } else {
-                                        if let Err(e) = resolver.execute_effect(effect) {
-                                            eprintln!("Failed to execute primary effect: {}", e);
-                                        }
-                                    }
-                                }
-                            } else {
-                                if let Err(e) = resolver.execute_effect(effect) {
-                                    eprintln!("Failed to execute effect: {}", e);
-                                }
-                            }
-
-                            // Clear pending ability after execution
-                            self.pending_ability = None;
-                            self.activating_card = None;
-                        }
-                    }
-                } else {
-                    // Start new ability execution
-                    // Set activating_card before resolving the ability
-                    self.activating_card = card_id;
-                    
-                    let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-                    if let Err(e) = resolver.resolve_ability(ability, card_id, ability_index) {
-                        eprintln!("Failed to resolve ability: {}", e);
-                    }
-                    // Check if there's a pending choice after execution
-                    eprintln!("After resolve_ability, pending_choice: {:?}", resolver.get_pending_choice());
-                    if let Some(_choice) = resolver.get_pending_choice() {
-                        // Store pending ability state with the choice
-                        if let Some(ref effect) = ability.effect {
-                            self.pending_ability = Some(PendingAbilityExecution {
-                                card_no: card_no.to_string(),
-                                player_id: player_id.to_string(),
-                                ability_index, // Use actual ability_index
-                                effect: effect.clone(),
-                                conditional_choice: None,
-                                activating_card: card_id, // Store activating card for resume
-                                action_index: 0,
-                                cost: None,
-                                cost_choice: None,
-                            });
-                        }
-                    } else {
-                        // Clear activating_card if no pending choice (ability completed)
-                        self.activating_card = None;
+            // Check waitroom
+            for waitroom_card_id in &player.waitroom.cards {
+                if let Some(card) = self.card_database.get_card(*waitroom_card_id) {
+                    if card.card_no == card_no {
+                        return (Some(card.clone()), Some(*waitroom_card_id));
                     }
                 }
             }
-        } else {
-            eprintln!("Card not found: {}", card_no);
         }
+        
+        (None, None)
     }
 
+    pub fn process_pending_auto_abilities(&mut self, _active_player_id: &str) {
+        // Process ability queue - unified state management
+        // Start next ability if queue is idle
+        if self.ability_queue.is_idle() {
+            if self.ability_queue.start_next() {
+                self.process_current_ability();
+            }
+        }
+    }
+    
+    /// Process the current ability from the queue
+    fn process_current_ability(&mut self) {
+        if let Some(entry) = self.ability_queue.current_entry().cloned() {
+            // Set activating card before resolving the ability
+            self.activating_card = entry.card_id;
+            
+            let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+            if let Err(e) = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index) {
+                eprintln!("Failed to resolve ability: {}", e);
+                self.ability_queue.complete_current();
+                return;
+            }
+            
+            // Check if resolver paused for choice
+            if let Some(choice) = resolver.get_pending_choice().cloned() {
+                self.ability_queue.pause_for_choice(choice);
+            } else {
+                // Ability completed successfully
+                self.ability_queue.complete_current();
+                self.activating_card = None;
+            }
+        }
+    }
+    
+    /// Provide choice result to resume ability execution
     pub fn provide_ability_choice_result(&mut self, result: crate::ability_resolver::ChoiceResult) -> Result<(), String> {
-        // Check if this is a conditional_alternative choice
-        if let Some(ref mut pending) = self.pending_ability {
-            if let crate::ability_resolver::ChoiceResult::TargetSelected { target } = &result {
-                if target == "primary" || target == "alternative" {
-                    pending.conditional_choice = Some(target.clone());
-                }
+        // Resume queue with choice result
+        self.ability_queue.resume_with_choice(result);
+        
+        // Continue processing the current ability
+        if let Some(entry) = self.ability_queue.current_entry().cloned() {
+            let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+            
+            if let Some(choice_result) = &entry.pending_choice_result {
+                resolver.provide_choice_result(choice_result.clone())?;
             }
-        }
-        
-        // Check if this is an optional cost choice (pay or skip)
-        if let Some(ref pending) = self.pending_ability.clone() {
-            if pending.card_no == "optional_cost" {
-                if let crate::ability_resolver::ChoiceResult::TargetSelected { target } = &result {
-                    if target == "pay_optional_cost" {
-                        // Pay the optional cost
-                        if let Some(ref cost) = pending.cost {
-                            let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-                            if let Err(e) = resolver.pay_cost(cost) {
-                                return Err(format!("Failed to pay optional cost: {}", e));
-                            }
-                        }
-                        
-                        // After paying cost, execute the effect
-                        eprintln!("Executing effect after optional cost: {:?}", pending.effect);
-                        let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-                        if let Err(e) = resolver.execute_effect(&pending.effect) {
-                            eprintln!("Failed to execute effect after optional cost: {}", e);
-                        }
-                    }
-                    // If skip_optional_cost, just skip the cost payment
-                    
-                    // Clear the optional cost pending ability
-                    self.pending_ability = None;
-                    return Ok(());
-                }
+            
+            if let Err(e) = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index) {
+                eprintln!("Failed to execute ability after choice: {}", e);
+                self.ability_queue.complete_current();
+                return Err(e);
             }
-        }
-        
-        // Check if this is a cost selection for manual ability activation
-        if let Some(ref mut pending) = self.pending_ability {
-            if pending.cost.is_some() && pending.cost_choice.is_none() {
-                // This is a cost selection - store the choice and execute the cost
-                if let crate::ability_resolver::ChoiceResult::TargetSelected { target } = &result {
-                    // Store the user's cost choice (the index of the selected option)
-                    pending.cost_choice = Some(target.clone());
-                    
-                    // Clone necessary data before mutable borrow
-                    let card_no = pending.card_no.clone();
-                    let player_id = pending.player_id.clone();
-                    let cost = pending.cost.clone();
-                    
-                    // Execute the selected cost payment
-                    if let Some(ref cost) = cost {
-                        if let Some(ref cost_options) = cost.options {
-                            // Parse the selected index
-                            if let Ok(selected_index) = target.parse::<usize>() {
-                                if selected_index < cost_options.len() {
-                                    let selected_cost = &cost_options[selected_index];
-                                    eprintln!("Executing selected cost option {}: {:?}", selected_index, selected_cost);
-                                    
-                                    // Pay the selected cost
-                                    let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-                                    if let Err(e) = resolver.pay_cost(selected_cost) {
-                                        return Err(format!("Failed to pay cost: {}", e));
-                                    }
-                                    
-                                    // Now trigger the ability effect after cost is paid
-                                    let ability_id = format!("{}_activation", card_no);
-                                    self.trigger_auto_ability(
-                                        ability_id,
-                                        crate::game_state::AbilityTrigger::Activation,
-                                        player_id.clone(),
-                                        Some(card_no),
-                                    );
-                                    
-                                    // Process the triggered ability to execute the effect
-                                    self.process_pending_auto_abilities(&player_id.clone());
-                                    
-                                    // Clear the pending ability after execution
-                                    self.pending_ability = None;
-                                    return Ok(());
-                                }
-                            }
-                        }
-                    }
-                }
+            
+            // Check if still paused for another choice
+            if let Some(choice) = resolver.get_pending_choice().cloned() {
+                self.ability_queue.pause_for_choice(choice);
+            } else {
+                // Ability completed
+                self.ability_queue.complete_current();
+                self.activating_card = None;
             }
-        }
-        
-        // Execute the choice result using the resolver
-        // Clone pending_choice before creating resolver to avoid borrow issues
-        let pending_choice_clone = self.pending_choice.clone();
-        
-        let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-        
-        // Restore pending choice from GameState if it exists
-        if let Some(choice) = pending_choice_clone {
-            resolver.pending_choice = Some(choice);
-        }
-        
-        resolver.provide_choice_result(result)?;
-        
-        // Resume ability execution after choice
-        if let Some(pending) = self.pending_ability.clone() {
-            self.execute_card_ability(&pending.card_no, &pending.player_id);
         }
         
         Ok(())
     }
     
+    /// Get current pending choice for web server
+    pub fn get_pending_choice(&self) -> Option<&crate::ability_resolver::Choice> {
+        self.ability_queue.is_waiting_for_choice()
+    }
+    
+    
+        
     #[allow(dead_code)]
     fn execute_ability_effect(&mut self, effect: &crate::card::AbilityEffect, player_id: &str) {
         // Execute ability effects directly on game state
@@ -2249,7 +2108,7 @@ impl GameState {
         if let Some(card) = self.card_database.get_card(card_id) {
             // Check all constant abilities (常時) for restrictions
             for ability in &card.abilities {
-                if ability.triggers.as_ref().map_or(false, |t| t == "常時") {
+                if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT) {
                     if let Some(ref effect) = ability.effect {
                         if effect.action == "restriction" 
                             && effect.restriction_type.as_deref() == Some("cannot_place")
@@ -2313,13 +2172,13 @@ impl GameState {
             match trigger {
                 AbilityTrigger::Activation => {
                     // Activation abilities can always be triggered (subject to conditions)
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "起動");
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION);
                     eprintln!("DEBUG: Activation ability check - triggers: {:?}, match: {}", 
                         ability.triggers, trigger_match);
                     trigger_match
                 }
                 AbilityTrigger::Debut => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "登場" || t == "Debut");
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t == crate::triggers::DEBUT_EN);
                     let should_trigger = trigger_match && self.should_trigger_debut(player, card);
                     eprintln!("DEBUG: Debut ability check - triggers: {:?}, match: {}, should_trigger: {}, card: {}", 
                         ability.triggers, trigger_match, should_trigger, 
@@ -2327,14 +2186,14 @@ impl GameState {
                     should_trigger
                 }
                 AbilityTrigger::LiveStart => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時");
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START);
                     let should_trigger = trigger_match && self.should_trigger_live_start(player);
                     eprintln!("DEBUG: LiveStart ability check - triggers: {:?}, match: {}, should_trigger: {}", 
                         ability.triggers, trigger_match, should_trigger);
                     should_trigger
                 }
                 AbilityTrigger::LiveSuccess => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時");
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS);
                     let should_trigger = trigger_match && self.should_trigger_live_success(player);
                     eprintln!("DEBUG: LiveSuccess ability check - triggers: {:?}, match: {}, should_trigger: {}", 
                         ability.triggers, trigger_match, should_trigger);
@@ -2342,14 +2201,14 @@ impl GameState {
                 }
                 AbilityTrigger::Constant => {
                     // Constant abilities are always active, but need to be evaluated continuously
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "常時");
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT);
                     eprintln!("DEBUG: Constant ability check - triggers: {:?}, match: {}", 
                         ability.triggers, trigger_match);
                     trigger_match
                 }
                 AbilityTrigger::Auto => {
                     // Generic auto abilities (not tied to specific timing)
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "自動");
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::AUTO);
                     eprintln!("DEBUG: Auto ability check - triggers: {:?}, match: {}", 
                         ability.triggers, trigger_match);
                     trigger_match

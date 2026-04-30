@@ -54,7 +54,7 @@ mod comprehensive_ability_tests {
                 destination: Some("hand".to_string()),
                 count: Some(2),
             })),
-            triggers: Some("常時".to_string()),
+            triggers: Some(crate::triggers::CONSTANT.to_string()),
             ..Default::default()
         };
         
@@ -93,7 +93,7 @@ mod comprehensive_ability_tests {
                 destination: Some("hand".to_string()),
                 count: Some(1),
             })),
-            triggers: Some("常時".to_string()),
+            triggers: Some(crate::triggers::CONSTANT.to_string()),
             ..Default::default()
         };
         
@@ -129,7 +129,7 @@ mod comprehensive_ability_tests {
                 count: Some(2),
                 target: Some("self".to_string()),
             })),
-            triggers: Some("常時".to_string()),
+            triggers: Some(crate::triggers::CONSTANT.to_string()),
             ..Default::default()
         };
         
@@ -161,7 +161,7 @@ mod comprehensive_ability_tests {
                     aggregate: Some("total".to_string()),
                 }),
             })),
-            triggers: Some("常時".to_string()),
+            triggers: Some(crate::triggers::CONSTANT.to_string()),
             ..Default::default()
         };
         
@@ -195,7 +195,7 @@ mod comprehensive_ability_tests {
                 duration: Some("live_end".to_string()),
                 target: Some("self".to_string()),
             })),
-            triggers: Some("常時".to_string()),
+            triggers: Some(crate::triggers::CONSTANT.to_string()),
             ..Default::default()
         };
         

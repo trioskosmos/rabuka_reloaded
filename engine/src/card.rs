@@ -481,7 +481,7 @@ pub struct AbilityCost {
     pub characters: Option<Vec<String>>, // Card names that must match for cost payment (e.g., "上原歩夢", "澁谷かのん")
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
     pub text: String,
@@ -531,6 +531,7 @@ pub struct AbilityEffect {
     pub comparison_type: Option<String>,
     // Subvariable fields for ability effects
     pub heart_color: Option<String>,
+    pub heart_colors: Option<Vec<String>>, // For effects that reference multiple heart colors
     pub blade_type: Option<String>,
     pub energy_count: Option<u32>,
     pub target_member: Option<String>,
@@ -551,6 +552,8 @@ pub struct AbilityEffect {
     pub dynamic_count: Option<DynamicCount>,
     pub placement_order: Option<String>,
     pub cost_limit: Option<u32>,
+    pub cost_comparison: Option<String>, // "max" (≤), "min" (≥), "exact" (=), defaults to "max" if not specified
+    pub total_cost_limit: Option<u32>, // For tracking total cost of selected cards (e.g., "total cost ≤ 4")
     #[serde(default)]
     pub any_number: Option<bool>, // For look_and_select - allows selecting any number of cards
     pub unit: Option<String>,
@@ -591,6 +594,11 @@ pub struct AbilityEffect {
     pub timing: Option<String>, // Timing for effect (e.g., "check_required_hearts")
     #[serde(default)]
     pub treat_as: Option<String>, // What to treat resource as (e.g., "any_heart_color")
+    // Replacement effect metadata (pre-computed by parser to avoid runtime text matching)
+    #[serde(default)]
+    pub replaces_event: Option<String>, // Event being replaced (e.g., "draw", "move_cards")
+    #[serde(default)]
+    pub choice_based: Option<bool>, // Whether this replacement effect is choice-based
     // New fields for card identity
     #[serde(default)]
     pub identities: Option<Vec<String>>, // Group identities for card
@@ -610,6 +618,49 @@ pub struct AbilityEffect {
     pub heart_type: Option<String>, // For set_heart_type - the heart type to set
     #[serde(default)]
     pub values: Option<Vec<u32>>, // For comparison conditions - list of valid values
+}
+
+impl AbilityEffect {
+    /// Get compact debug string showing only non-None fields
+    pub fn compact_debug(&self) -> String {
+        let mut fields = vec![
+            format!("action: {}", self.action),
+        ];
+        
+        if !self.text.is_empty() {
+            fields.push(format!("text: {}", self.text));
+        }
+        if let Some(ref src) = self.source {
+            fields.push(format!("src: {}", src));
+        }
+        if let Some(ref dst) = self.destination {
+            fields.push(format!("dst: {}", dst));
+        }
+        if let Some(cnt) = self.count {
+            fields.push(format!("count: {}", cnt));
+        }
+        if let Some(ref ct) = self.card_type {
+            fields.push(format!("card_type: {}", ct));
+        }
+        if let Some(ref tgt) = self.target {
+            fields.push(format!("target: {}", tgt));
+        }
+        if self.max.unwrap_or(false) {
+            fields.push("max: true".to_string());
+        }
+        if let Some(limit) = self.cost_limit {
+            let comparison = self.cost_comparison.as_deref().unwrap_or("max");
+            fields.push(format!("cost_limit: {} ({})", limit, comparison));
+        }
+        if let Some(limit) = self.total_cost_limit {
+            fields.push(format!("total_cost_limit: {}", limit));
+        }
+        if let Some(ref grp) = self.group {
+            fields.push(format!("group: {}", grp.name));
+        }
+        
+        format!("AbilityEffect {{ {} }}", fields.join(", "))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

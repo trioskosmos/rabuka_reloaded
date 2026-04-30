@@ -10,7 +10,16 @@ mod deck_parser;
 mod web_server;
 mod bot;
 mod game_setup;
+mod ability;
 mod ability_resolver;
+mod ability_queue;
+mod cheer_system;
+mod selection_system;
+mod card_matching;
+mod triggers;
+mod transaction;
+mod events;
+mod ir;
 
 use player::Player;
 use game_state::GameState;

@@ -28,7 +28,7 @@ fn test_q243_pending_auto_abilities_with_choice() {
         Some("test_card".to_string()),
     );
     
-    let initial_pending_count = game_state.pending_auto_abilities.len();
+    let initial_pending_count = game_state.ability_queue.len();
     assert_eq!(initial_pending_count, 1, "Should have 1 pending auto ability");
     
     // ENGINE FAULT: process_pending_auto_abilities removes abilities from the pending list

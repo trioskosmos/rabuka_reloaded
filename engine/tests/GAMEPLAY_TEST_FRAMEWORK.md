@@ -170,6 +170,150 @@ if let Some(member) = member_card {
 }
 ```
 
+### Tautological Assertions (Always-Pass "Tests")
+**WRONG:** These are not tests at all — they assert hardcoded true values that have no connection to engine state:
+```rust
+// Q038: Sets a boolean to true and asserts it — tests NOTHING
+let is_in_live_card_zone = true;
+assert!(is_in_live_card_zone);
+
+let is_face_up = true;
+assert!(is_face_up);
+
+// Q046: Same pattern — completely disconnected from the engine
+let timing_is_performance_phase = true;
+assert!(timing_is_performance_phase);
+```
+
+**RIGHT:** Assert actual engine state that proves the behavior:
+```rust
+// Verify card actually moved from hand to live card zone
+assert!(game_state.player1.live_card_zone.cards.contains(&live_id),
+    "Live card should be in live card zone");
+assert!(!game_state.player1.hand.cards.contains(&live_id),
+    "Live card should NOT be in hand");
+
+// Verify engine state reflects the phase
+assert_eq!(game_state.current_phase, Phase::FirstAttackerPerformance,
+    "Should be in performance phase");
+```
+
+### Push-to-Zone Without Gameplay
+**WRONG:** Pushing directly to zones skips all of the engine's validation, cost payment, ability triggering, and state tracking:
+```rust
+player1.live_card_zone.cards.push(live_id);
+// Card is "in" the zone but the engine never processed it
+// No triggers fired, no phases validated, nothing tested
+```
+
+**RIGHT:** Use the engine's action system to move cards through proper channels:
+```rust
+// Play to stage via TurnEngine
+TurnEngine::execute_main_phase_action(
+    &mut game_state,
+    &ActionType::PlayMemberToStage,
+    Some(member_id),
+    None,
+    Some(MemberArea::Center),
+    Some(false),
+).expect("Member should play to stage");
+
+// Set live card via TurnEngine  
+TurnEngine::execute_main_phase_action(
+    &mut game_state,
+    &ActionType::SetLiveCard,
+    Some(live_id),
+    None,
+    None,
+    None,
+).expect("Live card should be set");
+```
+
+### Observational Testing (Passes Regardless of Outcome)
+**WRONG:** Tests that document engine behavior without failing when it's wrong:
+```rust
+let result = TurnEngine::execute_main_phase_action(...);
+if result.is_ok() {
+    println!("Q028: Engine allows placing without baton touch");
+} else {
+    println!("Q028: Engine PREVENTS placing without baton touch");
+    // Test passes either way — useless
+}
+```
+
+**RIGHT:** Assert the expected behavior per the Q&A answer:
+```rust
+let result = TurnEngine::execute_main_phase_action(...);
+assert!(result.is_ok(),
+    "Q028: Engine MUST allow debuting to occupied area without baton touch: {:?}", result);
+
+// Verify concrete effects
+assert_eq!(game_state.player1.stage.get_area(MemberArea::Center), Some(member2_id),
+    "Second member should be in center stage");
+assert!(game_state.player1.waitroom.cards.contains(&member1_id),
+    "First member should be in waitroom");
+```
+
+### Passing Without Testing Anything
+**WRONG:** Tests that print a message and pass with zero assertions on engine behavior:
+```rust
+#[test]
+fn test_q043_draw_icon_effect() {
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+    let live_card = cards.iter().find(|c| c.is_live());
+    
+    if let Some(_live) = live_card {
+        // No gameplay actions, no assertions
+        println!("Q043: Draw icon effect - documented but not fully testable yet");
+        // Test passes without doing anything meaningful
+    }
+}
+```
+
+**RIGHT:** Even if testing is limited, verify concrete outcomes:
+```rust
+#[test]
+fn test_q043_draw_icon_effect() {
+    // ... setup ...
+    
+    // Record state before
+    let deck_before = game_state.player1.main_deck.cards.len();
+    
+    // Execute live (which processes draw icons from cheer)
+    let cheer_result = TurnEngine::player_perform_live(
+        &mut game_state.player1,
+        &mut game_state.resolution_zone,
+        &game_state.player1.id,
+        &card_database,
+    );
+    
+    // Verify deck changed (cards were drawn/moved)
+    let deck_after = game_state.player1.main_deck.cards.len();
+    assert_ne!(deck_after, deck_before,
+        "Deck should change when live is performed with blades");
+    
+    // Verify resolution zone was cleared (cards processed)
+    assert!(game_state.resolution_zone.cards.is_empty(),
+        "Resolution zone should be cleared after live");
+}
+```
+
+### Testing Internal Engine State Instead of Observable Game State
+**WRONG:** Checking fields that shouldn't be part of the test's concern:
+```rust
+assert!(game_state.cards_moved_this_turn.contains(&card_id));
+assert_eq!(game_state.pending_auto_abilities.len(), 1);
+```
+
+**RIGHT:** Check what a player would observe:
+```rust
+// Player observes: card in hand decreased, card appeared on stage, energy was consumed
+assert_eq!(game_state.player1.hand.cards.len(), initial_hand_size - 1);
+assert!(game_state.player1.stage.get_area(MemberArea::Center).is_some());
+assert_eq!(game_state.player1.energy_zone.active_count(), initial_energy - card_cost);
+```
+
 ## Enforcement
 
 All new qa_individual tests will be rejected if they:

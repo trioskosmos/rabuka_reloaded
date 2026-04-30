@@ -98,7 +98,7 @@ pub fn run_ability_test() {
     let debut_card_from_all = cards_vec.iter()
         .find(|c| {
             c.card_type == crate::card::CardType::Member &&
-            c.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == "登場"))
+            c.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT))
         });
 
     if let Some(debut_card) = debut_card_from_all {
@@ -117,7 +117,7 @@ pub fn run_ability_test() {
     let debut_card = game_state.player1.hand.cards.iter().enumerate().find(|(_, card_id)| {
         if let Some(card) = card_database.get_card(**card_id) {
             card.card_type == crate::card::CardType::Member &&
-            card.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == "登場"))
+            card.abilities.iter().any(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT))
         } else {
             false
         }

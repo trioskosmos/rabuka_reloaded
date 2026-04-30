@@ -102,7 +102,7 @@ mod working_gameplay_tests {
     fn create_ruby_ability() -> crate::card::Ability {
         crate::card::Ability {
             full_text: "起動このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。".to_string(),
-            triggers: Some("起動".to_string()),
+            triggers: Some(crate::triggers::ACTIVATION.to_string()),
             cost: Some(crate::card::AbilityCost {
                 text: "このメンバーをステージから控え室に置く".to_string(),
                 cost_type: Some("move_cards".to_string()),

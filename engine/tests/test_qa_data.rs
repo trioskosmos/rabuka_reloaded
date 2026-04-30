@@ -1966,7 +1966,7 @@ fn test_q37_auto_abilities_multiple_uses() {
 
     
 
-    assert_eq!(game_state.pending_auto_abilities.len(), 2,
+    assert_eq!(game_state.ability_queue.len(), 2,
 
         "Auto ability should enter waiting state twice when triggered twice");
 

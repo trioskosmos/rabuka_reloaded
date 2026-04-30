@@ -1,0 +1,471 @@
+﻿
+   --> src\selection_system.rs:2:5
+    |
+  2 | use crate::game_state::GameState;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  System.Management.Automation.RemoteException
+> error[E0308]: mismatched types
+      --> src\game_state.rs:1228:38
+       |
+  1228 |                         return (Some(card), Some(*id));
+  help: consider using clone here
+       |
+  1228 |                         return (Some(card.clone()), Some(*id));
+       |                                          ++++++++
+  System.Management.Automation.RemoteException
+> error[E0308]: mismatched types
+      --> src\game_state.rs:1238:42
+       |
+  1238 | ...                   return (Some(card), Some(*stage_card_id));
+  help: consider using clone here
+       |
+  1238 |                             return (Some(card.clone()), Some(*stage_card_id));
+       |                                              ++++++++
+  System.Management.Automation.RemoteException
+> error[E0308]: mismatched types
+      --> src\game_state.rs:1248:38
+       |
+  1248 |                         return (Some(card), Some(*waitroom_card_id));
+  help: consider using clone here
+       |
+  1248 |                         return (Some(card.clone()), Some(*waitroom_card_id));
+       |                                          ++++++++
+  System.Management.Automation.RemoteException
+> error[E0599]: no method named `apply_choice_result` found for struct `AbilityResolver<'a>` in the current scope
+      --> src\game_state.rs:1302:26
+       |
+  1302 |                 resolver.apply_choice_result(choice_result)?;
+       |
+  1302 -                 resolver.apply_choice_result(choice_result)?;
+  1302 +                 resolver.provide_choice_result(choice_result)?;
+       |
+  System.Management.Automation.RemoteException
+> error[E0599]: no method named `execute_ability` found for struct `AbilityResolver<'a>` in the current scope
+      --> src\game_state.rs:1306:38
+       |
+  1306 |             if let Err(e) = resolver.execute_ability(&entry.ability, entry.card_id, entry.ability_index) {
+      ::: src\ability_resolver.rs:73:1
+       |
+    73 | pub struct AbilityResolver<'a> {
+       | ------------------------------ method `execute_ability` not found for this struct
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&mut GameState`
+     --> src\turn.rs:690:52
+      |
+  690 | ...                   game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+      |                                  ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_auto_abilities` on type `&mut GameState`
+     --> src\turn.rs:947:47
+      |
+  947 |             let abilities_before = game_state.pending_auto_abilities.len();
+      |                                               ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_auto_abilities` on type `&mut GameState`
+     --> src\turn.rs:956:46
+      |
+  956 |             let abilities_after = game_state.pending_auto_abilities.len();
+      |                                              ^^^^^^^^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&GameState`
+     --> src\web_server.rs:258:42
+      |
+  258 |     let pending_choice_json = game_state.pending_choice.as_ref()
+      |                                          ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+    --> src\ability_resolver.rs:93:41
+     |
+  93 |         let pending_choice = game_state.pending_choice.clone();
+     |                                         ^^^^^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 6
+2 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:109:25
+      |
+  109 |         self.game_state.pending_choice.as_ref()
+      |                         ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:243:37
+      |
+  243 |                     self.game_state.pending_choice = None;
+      |                                     ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:244:37
+      |
+  244 |                     self.game_state.pending_ability = None;
+      |                                     ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_current_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:247:64
+      |
+  247 |                     if let Some(ref ability) = self.game_state.pending_current_ability {
+      |                                                                ^^^^^^^^^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:289:33
+      |
+  289 |                 self.game_state.pending_choice = None;
+      |                                 ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:306:33
+      |
+  306 |                 self.game_state.pending_choice = None;
+      |                                 ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:312:60
+      |
+  312 |                 if let Some(ref pending) = self.game_state.pending_ability.clone() {
+      |                                                            ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0277]: the size for values of type `str` cannot be known at compilation time
+     --> src\ability_resolver.rs:314:32
+      |
+  314 |                         if let Some(ref options_json) = pending.conditional_choice {
+      |
+      = help: the trait `std::marker::Sized` is not implemented for `str`
+  note: required by a bound in `Some`
+     --> /rustc/fda6d37bb88ee12fd50fa54d15859f1f91b74f55/library\core\src\option.rs:608:4
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:340:41
+      |
+  340 |                         self.game_state.pending_choice = None;
+      |                                         ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:341:41
+      |
+  341 |                         self.game_state.pending_ability = None;
+      |                                         ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0277]: the size for values of type `str` cannot be known at compilation time
+     --> src\ability_resolver.rs:347:32
+      |
+  347 |                         if let Some(ref options_json) = pending.conditional_choice {
+      |
+      = help: the trait `std::marker::Sized` is not implemented for `str`
+  note: required by a bound in `Some`
+     --> /rustc/fda6d37bb88ee12fd50fa54d15859f1f91b74f55/library\core\src\option.rs:608:4
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:374:41
+      |
+  374 |                         self.game_state.pending_choice = None;
+      |                                         ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:375:41
+      |
+  375 |                         self.game_state.pending_ability = None;
+      |                                         ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:381:60
+      |
+  381 |                 if let Some(ref pending) = self.game_state.pending_ability.clone() {
+      |                                                            ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:396:41
+      |
+  396 |                         self.game_state.pending_choice = None;
+      |                                         ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:397:41
+      |
+  397 |                         self.game_state.pending_ability = None;
+      |                                         ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:409:41
+      |
+  409 |                         self.game_state.pending_choice = None;
+      |                                         ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:414:64
+      |
+  414 |                         if let Some(pending) = self.game_state.pending_ability.clone() {
+      |                                                                ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:441:45
+      |
+  441 | ...                   self.game_state.pending_choice = None;
+      |                                       ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:452:64
+      |
+  452 |                     if let Some(ref pending) = self.game_state.pending_ability.clone() {
+      |                                                                ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:484:37
+      |
+  484 |                     self.game_state.pending_choice = None;
+      |                                     ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:485:37
+      |
+  485 |                     self.game_state.pending_ability = None;
+      |                                     ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:490:33
+      |
+  490 |                 self.game_state.pending_choice = None;
+      |                                 ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:525:33
+      |
+  525 |                 self.game_state.pending_choice = None;
+      |                                 ^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+     --> src\ability_resolver.rs:539:48
+      |
+  539 |         let character_filter = self.game_state.pending_ability.as_ref()
+      |                                                ^^^^^^^^^^^^^^^ unknown field
+      |
+      = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and 
+62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:2337:29
+       |
+  2337 |             self.game_state.pending_choice = Some(choice);
+       |                             ^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:3375:49
+       |
+  3375 | ...                   self.game_state.pending_choice = Some(Choice::SelectPosition {
+       |                                       ^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:4130:37
+       |
+  4130 |                     self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                     ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:4162:37
+       |
+  4162 |                     self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                     ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:4301:41
+       |
+  4301 |                         self.game_state.pending_choice = Some(Choice::SelectCard {
+       |                                         ^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_choice` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:4308:63
+       |
+  4308 |                         self.pending_choice = self.game_state.pending_choice.clone();
+       |                                                               ^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:5262:29
+       |
+  5262 |             self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                             ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:5479:33
+       |
+  5479 |                 self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                 ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:5516:33
+       |
+  5516 |                 self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                 ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:5556:29
+       |
+  5556 |             self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                             ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:5800:29
+       |
+  5800 |             self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                             ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:6268:37
+       |
+  6268 |                     self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                     ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:6310:37
+       |
+  6310 |                     self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                     ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:6462:37
+       |
+  6462 |                     self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                     ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0609]: no field `pending_ability` on type `&'a mut GameState`
+      --> src\ability_resolver.rs:6528:37
+       |
+  6528 |                     self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+       |                                     ^^^^^^^^^^^^^^^ unknown field
+       |
+       = note: available fields are: `player1`, `player2`, `current_turn_phase`, `current_phase`, `turn_number` ... and
+ 62 others
+  System.Management.Automation.RemoteException
+> error[E0063]: missing fields `cost_comparison` and `total_cost_limit` in initializer of `AbilityEffect`
+      --> src\ability_resolver.rs:6577:9
+       |
+  6577 |         AbilityEffect {
+       |         ^^^^^^^^^^^^^ missing `cost_comparison` and `total_cost_limit`
+  System.Management.Automation.RemoteException
+  Some errors have detailed explanations: E0063, E0277, E0308, E0599, E0609.
+  For more information about an error, try `rustc --explain E0063`.
+  warning: `rabuka_engine` (lib) generated 2 warnings
+> error: could not compile `rabuka_engine` (lib) due to 51 previous errors; 2 warnings emitted
+  warning: build failed, waiting for other jobs to finish...
+  warning: `rabuka_engine` (lib test) generated 2 warnings (2 duplicates)
+> error: could not compile `rabuka_engine` (lib test) due to 51 previous errors; 2 warnings emitted
+
+

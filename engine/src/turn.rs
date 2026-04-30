@@ -26,30 +26,35 @@ impl TurnEngine {
                     // Activate BOTH players' energy, not just active player
                     game_state.player1.activate_all_energy();
                     game_state.player2.activate_all_energy();
-                    // eprintln!("After Active phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
-                    // Orientation tracking moved to GameState modifiers
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
+                    let active_id = game_state.active_player().id.clone();
+                    game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Energy".into() });
                 }
                 Phase::Energy => {
                     // Rule 7.5: Draw energy card (automatic)
                     Self::check_timing(game_state);
                     let drawn_card = game_state.active_player_mut().draw_energy();
-                    // If energy deck is empty, nothing happens - this is expected behavior
                     if drawn_card.is_none() {
                         // Energy deck was empty, but phase continues normally
                     }
-                    // eprintln!("After Energy phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Draw;
+                    game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Draw".into() });
                 }
                 Phase::Draw => {
                     // Rule 7.6: Draw card (automatic)
                     Self::check_timing(game_state);
-                    let _ = game_state.active_player_mut().draw_card();
-                    // eprintln!("After Draw phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
+                    let drawn = game_state.active_player_mut().draw_card();
+                    if let Some(card_id) = drawn {
+                        let pid = game_state.active_player().id.clone();
+                        game_state.publish_event(crate::events::GameEvent::CardDrawn {
+                            card_id, player_id: pid, source: "main_deck".into()
+                        });
+                    }
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Main;
+                    game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Main".into() });
                 }
                 Phase::Main => {
                     // Rule 7.7: Main phase complete, advance to next turn phase
@@ -57,6 +62,7 @@ impl TurnEngine {
                     if game_state.current_turn_phase == TurnPhase::FirstAttackerNormal {
                         game_state.current_turn_phase = TurnPhase::SecondAttackerNormal;
                         game_state.current_phase = Phase::Active;
+                        game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Active".into() });
                     } else {
                         // Set current_turn_phase to Live BEFORE setting current_phase to LiveCardSet
                         // This ensures active_player() works correctly during LiveCardSet
@@ -89,6 +95,7 @@ impl TurnEngine {
                         game_state.player2.id.clone()
                     };
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
+                    game_state.publish_event(crate::events::GameEvent::LiveStarted { player_id: first_attacker_id });
                     return;
                 }
                 Phase::LiveCardSet => {
@@ -106,7 +113,7 @@ impl TurnEngine {
                 }
                 Phase::FirstAttackerPerformance => {
                     // Rule 8.3: First attacker performs (automatic)
-                    let blade_heart_count = {
+                    let (blade_heart_count, player_id) = {
                         // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = if game_state.player1.is_first_attacker {
@@ -116,15 +123,19 @@ impl TurnEngine {
                         };
                         let card_db = game_state.card_database.clone();
                         let player = game_state.first_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
+                        (Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db), player_id)
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
+                    // Publish live success if score > 0
+                    if blade_heart_count > 0 {
+                        game_state.publish_event(crate::events::GameEvent::LiveSucceeded { player_id, score: blade_heart_count });
+                    }
 
                     game_state.current_phase = Phase::SecondAttackerPerformance;
                 }
                 Phase::SecondAttackerPerformance => {
                     // Rule 8.3: Second attacker performs (automatic)
-                    let blade_heart_count = {
+                    let (blade_heart_count, player_id) = {
                         // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = if game_state.player1.is_first_attacker {
@@ -134,9 +145,12 @@ impl TurnEngine {
                         };
                         let card_db = game_state.card_database.clone();
                         let player = game_state.second_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
+                        (Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db), player_id)
                     };
-                    game_state.player2_cheer_blade_heart_count = blade_heart_count; // This is actually total blades for cheer bonus
+                    game_state.player2_cheer_blade_heart_count = blade_heart_count;
+                    if blade_heart_count > 0 {
+                        game_state.publish_event(crate::events::GameEvent::LiveSucceeded { player_id, score: blade_heart_count });
+                    }
 
                     game_state.current_phase = Phase::LiveVictoryDetermination;
                 }
@@ -145,11 +159,13 @@ impl TurnEngine {
                     Self::execute_live_victory_determination(game_state);
                     
                     // After Live phase completes, start a new turn
-                    // Rule 7.1.2: Each turn consists of FirstAttackerNormal, SecondAttackerNormal, Live phases
-                    // After Live completes, increment turn number and start new FirstAttackerNormal phase
                     game_state.turn_number += 1;
                     game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;
+                    game_state.publish_event(crate::events::GameEvent::TurnStarted {
+                        turn_number: game_state.turn_number,
+                        player_id: game_state.active_player().id.clone(),
+                    });
                 }
                 _ => {}
             }
@@ -440,7 +456,7 @@ impl TurnEngine {
                 let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         card.abilities.iter()
-                            .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == "baton touch"))
+                            .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::BATON_TOUCH))
                             .map(|ability| (format!("{}_{}", card.card_no, ability.full_text), card.card_no.clone()))
                             .collect::<Vec<(String, String)>>()
                     } else {
@@ -450,6 +466,7 @@ impl TurnEngine {
                     Vec::new()
                 };
 
+                // Queue system handles state management automatically
                 for (ability_id, card_no) in card_no {
                     game_state.trigger_auto_ability(
                         ability_id,
@@ -464,7 +481,67 @@ impl TurnEngine {
         Ok(())
     }
 
-    pub fn execute_main_phase_action(game_state: &mut GameState, action: &crate::game_setup::ActionType, card_id: Option<i16>, _card_indices: Option<Vec<usize>>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
+    /// Resume an ability that was paused waiting for user choice.
+    /// Called when the web server receives a choice submission.
+    pub fn resume_with_choice(game_state: &mut GameState, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<(), String> {
+        // Take the stored pending ability and choice
+        let pending = game_state.pending_ability.take();
+        let pending_choice_json = game_state.pending_choice.take();
+
+        if pending.is_none() || pending_choice_json.is_none() {
+            return Err("No pending choice to resume".into());
+        }
+
+        let pending = pending.unwrap();
+        let choice_json = pending_choice_json.unwrap();
+
+        // Reconstruct the choice from JSON
+        let choice: crate::ability_resolver::Choice = serde_json::from_value(choice_json)
+            .map_err(|e| format!("Failed to deserialize pending choice: {}", e))?;
+
+        // Build the choice result from the client's input
+        let result = match &choice {
+            crate::ability_resolver::Choice::SelectCard { .. } => {
+                let indices = card_indices.unwrap_or_default();
+                crate::ability_resolver::ChoiceResult::CardSelected { indices }
+            }
+            crate::ability_resolver::Choice::SelectTarget { target, .. } => {
+                let selected = match target.as_str() {
+                    "pay_optional_cost:skip_optional_cost" => {
+                        if card_id == Some(1) { "pay_optional_cost".to_string() }
+                        else { "skip_optional_cost".to_string() }
+                    }
+                    "primary|alternative" => {
+                        if card_id == Some(1) { "alternative".to_string() }
+                        else { "primary".to_string() }
+                    }
+                    "choice" | "choice_string" => {
+                        card_id.map(|id| id.to_string()).unwrap_or_else(|| "0".into())
+                    }
+                    _ => {
+                        card_id.map(|id| id.to_string()).unwrap_or_else(|| "0".into())
+                    }
+                };
+                crate::ability_resolver::ChoiceResult::TargetSelected { target: selected }
+            }
+            crate::ability_resolver::Choice::SelectPosition { .. } => {
+                let pos = card_id.map(|id| match id { 0 => "left".into(), 1 => "center".into(), 2 => "right".into(), _ => "center".into() }).unwrap_or_else(|| "center".into());
+                crate::ability_resolver::ChoiceResult::PositionSelected { position: pos }
+            }
+            _ => return Err("Unsupported choice type for resumption".into()),
+        };
+
+        // Create a resolver and provide the choice result
+        let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+        resolver.provide_choice_result(result)
+    }
+
+    pub fn execute_main_phase_action(game_state: &mut GameState, action: &crate::game_setup::ActionType, card_id: Option<i16>, card_indices: Option<Vec<usize>>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
+        // Check if there's a pending choice — if so, this action is a choice resolution
+        if game_state.pending_choice.is_some() {
+            return Self::resume_with_choice(game_state, card_id, card_indices);
+        }
+
         // Execute player choice action during various phases
         match action {
             crate::game_setup::ActionType::Pass => {
@@ -580,7 +657,7 @@ impl TurnEngine {
                 Ok(())
             }
             crate::game_setup::ActionType::SelectMulligan => {
-                Self::handle_mulligan_selection(game_state, card_id, _card_indices)
+                Self::handle_mulligan_selection(game_state, card_id, card_indices.clone())
             }
             crate::game_setup::ActionType::ConfirmMulligan => {
                 Self::handle_mulligan_confirmation(game_state)
@@ -627,15 +704,11 @@ impl TurnEngine {
                         if ability.triggers.as_ref().map_or(false, |t| {
                             // Handle all manually activatable abilities according to rules
                             // 起動 abilities are the primary manual activation abilities
-                            t == "起動" || 
-                            // 常時 abilities can have manually activatable effects
-                            t == "常時" || 
-                            // 自動 abilities can be manually activated if they have costs
-                            (t == "自動" && ability.cost.is_some()) ||
-                            // Handle any other abilities that should be player-activatable
-                            // based on rules and card data analysis
-                            t == "main" || t == "メイン" || // Main phase abilities
-                            t == "baton touch" // Special baton touch abilities
+                            t == crate::triggers::ACTIVATION || 
+                            t == crate::triggers::CONSTANT || 
+                            (t == crate::triggers::AUTO && ability.cost.is_some()) ||
+                            t == "main" || t == crate::triggers::MAIN ||
+                            t == crate::triggers::BATON_TOUCH
                         }) {
                             if ability.use_limit.is_some() {
                                 let ability_key = format!("{}_{}_{}", stage_card_id, ability_index, turn_number);
@@ -883,7 +956,7 @@ impl TurnEngine {
                 !card_data.abilities.iter().any(|ability| {
                     if let Some(ref effect) = ability.effect {
                         effect.action == "restriction" 
-                            && ability.triggers.as_ref().map_or(false, |t| t == "常時")
+                            && ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT)
                             && effect.restriction_type.as_deref() == Some("cannot_place")
                             && (effect.restricted_destination.as_deref() == Some("success_live_zone")
                                 || effect.restricted_destination.as_deref() == Some("live_card_zone"))
@@ -945,18 +1018,13 @@ impl TurnEngine {
             // Rule 8.4.9: Check timing
             Self::check_timing(game_state);
             
-            // Rule 8.4.10: Trigger 'turn end' abilities that haven't triggered yet
-            // Track abilities triggered this turn to prevent re-triggering
-            let abilities_before = game_state.pending_auto_abilities.len();
+            let abilities_before = game_state.ability_queue.pending_entries().len();
             
-            // Rule 8.4.11: Check timing again
             Self::check_timing(game_state);
             
-            // Rule 8.4.11: End 'until end of turn' and 'during this turn' effects
             game_state.check_expired_effects();
             
-            // Rule 8.4.12: Loop back to 8.4.9 if new abilities triggered
-            let abilities_after = game_state.pending_auto_abilities.len();
+            let abilities_after = game_state.ability_queue.pending_entries().len();
             if abilities_after > abilities_before {
                 // New abilities triggered, loop back
                 continue;
@@ -984,14 +1052,29 @@ impl TurnEngine {
 
     pub fn check_timing(game_state: &mut GameState) {
         // Rule 9.5: Check timing - process rule processing per rules 10.2-10.6
-        
+        // Flush any pending events first so auto-triggers are enqueued
+        game_state.flush_events();
+
         // Rule 10.2: Refresh (already handled in player.refresh())
         game_state.player1.refresh();
         game_state.player2.refresh();
-        
+
+        // Deck refresh: if deck is empty and player needs to draw, refresh from waitroom
+        let p1_needs_refresh = game_state.player1.main_deck.cards.is_empty() && !game_state.player1.waitroom.cards.is_empty();
+        let p2_needs_refresh = game_state.player2.main_deck.cards.is_empty() && !game_state.player2.waitroom.cards.is_empty();
+        if p1_needs_refresh {
+            let pid = game_state.player1.id.clone();
+            game_state.perform_deck_refresh(&pid);
+            eprintln!("Deck refresh performed for player 1");
+        }
+        if p2_needs_refresh {
+            let pid = game_state.player2.id.clone();
+            game_state.perform_deck_refresh(&pid);
+            eprintln!("Deck refresh performed for player 2");
+        }
+
         // Rule 10.3: Victory processing - check for 3+ successful live cards
         Self::check_victory_condition(game_state);
-        
         
         // Rule 10.5: Check for invalid cards
         Self::check_invalid_cards(&mut game_state.player1, &game_state.card_database);
@@ -1383,10 +1466,10 @@ impl TurnEngine {
                             // Check if card has Debut abilities
                             for ability in &card.abilities {
                                 // Check if ability has Debut trigger (check both English and Japanese)
-                                if ability.triggers.as_ref().map_or(false, |t| t == "登場" || t == "Debut") {
+                                if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t == crate::triggers::DEBUT_EN) {
                                     // Q229: Check if ability requires baton touch from lower-cost member
                                     // The ability text contains "debut via baton touch from lower-cost member"
-                                    let requires_baton_touch = ability.full_text.contains("baton touch") && ability.full_text.contains("debut");
+                                    let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON_TOUCH) && ability.full_text.contains(crate::triggers::DEBUT_EN);
                                     
                                     if requires_baton_touch {
                                         // Only trigger if played via baton touch
@@ -1419,6 +1502,7 @@ impl TurnEngine {
         }
         
         // Trigger collected abilities
+        // Queue system handles state management automatically
         for (ability_id, card_no) in abilities_to_trigger {
             game_state.trigger_auto_ability(
                 ability_id,
@@ -1454,7 +1538,7 @@ impl TurnEngine {
                         // Check if card has LiveStart abilities
                         for ability in &card.abilities {
                             // Check if ability has LiveStart trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
+                            if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
                                 // Collect ability to trigger
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
@@ -1466,6 +1550,7 @@ impl TurnEngine {
         }
         
         // Trigger collected abilities
+        // Queue system handles state management automatically
         for (ability_id, card_no) in abilities_to_trigger {
             game_state.trigger_auto_ability(
                 ability_id,
@@ -1478,31 +1563,23 @@ impl TurnEngine {
 
     /// Trigger live start abilities for a specific live card when it is set
     fn trigger_live_start_abilities_for_card(game_state: &mut GameState, player_id: &str, card_no: &str) {
-        // Rule 11.5: Trigger LiveStart automatic abilities for live cards
-        // Live cards can have live start abilities that trigger when the live card is set
-        
         let player_id_clone = player_id.to_string();
         let card_no_clone = card_no.to_string();
-        
-        // Collect abilities to trigger first to avoid borrow conflicts
+
         let mut abilities_to_trigger = Vec::new();
-        
+
         {
             let player = if player_id_clone == game_state.player1.id {
                 &game_state.player1
             } else {
                 &game_state.player2
             };
-            
-            // Check the live card zone for the set live card
+
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
                     if card.card_no == card_no_clone {
-                        // Check if card has LiveStart abilities
                         for ability in &card.abilities {
-                            // Check if ability has LiveStart trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
-                                // Collect ability to trigger
+                            if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
                             }
@@ -1511,8 +1588,7 @@ impl TurnEngine {
                 }
             }
         }
-        
-        // Trigger collected abilities
+
         for (ability_id, card_no) in abilities_to_trigger {
             game_state.trigger_auto_ability(
                 ability_id,
@@ -1552,7 +1628,7 @@ impl TurnEngine {
                         for (ability_idx, ability) in card.abilities.iter().enumerate() {
                             eprintln!("DEBUG: Ability {}: triggers = {:?}", ability_idx, ability.triggers);
                             // Check if ability has LiveSuccess trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時") {
+                            if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS) {
                                 eprintln!("DEBUG: Found LiveSuccess ability on card {} ({})", card_id, card.card_no);
                                 // Collect ability to trigger
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
@@ -1575,7 +1651,7 @@ impl TurnEngine {
                     for (ability_idx, ability) in card.abilities.iter().enumerate() {
                         eprintln!("DEBUG: Live card ability {}: triggers = {:?}", ability_idx, ability.triggers);
                         // Check for both Japanese and English triggers
-                        if ability.triggers.as_ref().map_or(false, |t| t == "¥é¥¤¥ÖÀ®¸ì" || t.contains("live_success")) {
+                        if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.contains(crate::triggers::LIVE_SUCCESS_EN)) {
                             eprintln!("DEBUG: Found LiveSuccess ability on live card {} ({})", card_id, card.card_no);
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card.card_no.clone()));
@@ -1588,6 +1664,7 @@ impl TurnEngine {
         }
         
         // Trigger collected abilities
+        // Queue system handles state management automatically
         for (ability_id, card_no) in abilities_to_trigger {
             game_state.trigger_auto_ability(
                 ability_id,

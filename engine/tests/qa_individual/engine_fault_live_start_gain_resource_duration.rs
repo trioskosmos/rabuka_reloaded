@@ -64,7 +64,7 @@ fn test_q252_live_start_gain_resource_duration() {
         println!("Q252: Live card set successfully");
         
         // Check if pending choice exists (optional energy cost)
-        if let Some(ref choice) = game_state.pending_choice {
+        if let Some(ref choice) = game_state.pending_ability {
             println!("Q252: Pending choice presented: {:?}", choice);
             println!("Q252: This is expected - optional energy cost for gain_resource");
         } else {

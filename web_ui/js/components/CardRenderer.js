@@ -184,26 +184,6 @@ export const CardRenderer = {
                 ImageLoader.loadImage(img, viewModel.imgPath);
                 div.appendChild(img);
             }
-
-            if (viewModel.cost !== undefined) {
-                const costSpan = document.createElement('span');
-                costSpan.className = 'cost';
-                costSpan.textContent = String(viewModel.cost);
-                div.appendChild(costSpan);
-            }
-
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'name';
-            nameDiv.textContent = viewModel.displayName;
-
-            if (cardData.card_no) {
-                const cardNoDiv = document.createElement('div');
-                cardNoDiv.className = 'card-no';
-                cardNoDiv.textContent = cardData.card_no;
-                nameDiv.appendChild(cardNoDiv);
-            }
-
-            div.appendChild(nameDiv);
         }
 
         if (onClick) {
@@ -271,29 +251,7 @@ export const CardRenderer = {
                 el.prepend(img);
             }
 
-            const existingCost = el.querySelector('.cost');
-            const costText = viewModel.cost !== undefined ? String(viewModel.cost) : '';
-            if (existingCost) {
-                if (existingCost.textContent !== costText) existingCost.textContent = costText;
-            } else if (costText !== '') {
-                const costSpan = document.createElement('span');
-                costSpan.className = 'cost';
-                costSpan.textContent = costText;
-                el.appendChild(costSpan);
-            }
 
-            const existingName = el.querySelector('.name');
-            if (existingName) {
-                const cardNoHtml = cardData.card_no ? `<div class="card-no">${cardData.card_no}</div>` : '';
-                const expectedNameHtml = `${viewModel.displayName}${cardNoHtml}`;
-                if (existingName.innerHTML !== expectedNameHtml) existingName.innerHTML = expectedNameHtml;
-            } else {
-                const nameDiv = document.createElement('div');
-                nameDiv.className = 'name';
-                const cardNoHtml = cardData.card_no ? `<div class="card-no">${cardData.card_no}</div>` : '';
-                nameDiv.innerHTML = `${viewModel.displayName}${cardNoHtml}`;
-                el.appendChild(nameDiv);
-            }
         }
 
         el.style.cursor = onClick ? 'pointer' : '';
@@ -544,16 +502,6 @@ export const CardRenderer = {
                     const inner = document.createElement('div');
                     inner.className = 'live-card-inner';
                     inner.appendChild(img);
-
-                    const costDiv = document.createElement('div');
-                    costDiv.className = 'cost';
-                    costDiv.textContent = '0';
-                    inner.appendChild(costDiv);
-
-                    const cardNoDiv = document.createElement('div');
-                    cardNoDiv.className = 'card-no';
-                    cardNoDiv.textContent = card.card_no;
-                    inner.appendChild(cardNoDiv);
 
                     slot.innerHTML = '';
                     slot.appendChild(inner);
