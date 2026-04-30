@@ -57,6 +57,7 @@ pub struct GameStateDisplay {
     pub phase: String,
     pub player1: PlayerDisplay,
     pub player2: PlayerDisplay,
+    pub pending_choice: Option<serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -253,11 +254,16 @@ pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::
 }
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
+    // Serialize pending_choice to JSON if it exists
+    let pending_choice_json = game_state.pending_choice.as_ref()
+        .and_then(|choice| serde_json::to_value(choice).ok());
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
         player1: player_to_display(&game_state.player1, &game_state.card_database),
         player2: player_to_display(&game_state.player2, &game_state.card_database),
+        pending_choice: pending_choice_json,
     }
 }
 
@@ -708,9 +714,12 @@ async fn exec_code(
     }
 
     let display = game_state_to_display(&game_state);
+    let actions = generate_possible_actions(&game_state);
+    let mut response = serde_json::to_value(&display).unwrap_or_default();
+    response["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
-        "state": display
+        "state": response
     }))
 }
 
@@ -831,7 +840,35 @@ async fn get_card_registry(data: web::Data<AppState>) -> impl Responder {
     };
     
     let members = game_state.card_database.cards.len();
-    HttpResponse::Ok().json(serde_json::json!({"success": true, "count": members}))
+    
+    // Create a vector of card data with abilities
+    let mut cards_with_abilities = Vec::new();
+    
+    for (card_id, card) in game_state.card_database.cards.iter() {
+        let card_data = serde_json::json!({
+            "id": card_id,
+            "name": card.name,
+            "card_no": card.card_no,
+            "card_type": format!("{:?}", card.card_type),
+            "blade": card.blade,
+            "abilities": card.abilities.iter().map(|ability| {
+                serde_json::json!({
+                    "text": ability.full_text,
+                    "trigger": format!("{:?}", ability.triggers),
+                    "triggers": ability.triggers,
+                    "use_limit": ability.use_limit,
+                    "is_null": ability.is_null
+                })
+            }).collect::<Vec<_>>()
+        });
+        cards_with_abilities.push(card_data);
+    }
+    
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true, 
+        "count": members,
+        "cards": cards_with_abilities
+    }))
 }
 
 async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRequest>) -> impl Responder {
@@ -1277,7 +1314,11 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/rooms/leave", web::post().to(rooms_leave))
             .route("/api/debug/dump_state", web::get().to(debug_dump_state))
     })
-    .bind("127.0.0.1:8080")?
+    .bind("127.0.0.1:8080")
+    .map_err(|e| {
+        eprintln!("Failed to bind to address: {}", e);
+        std::io::Error::new(std::io::ErrorKind::AddrInUse, e)
+    })?
     .run()
     .await
 }

@@ -10,10 +10,8 @@ pub enum AbilityTrigger {
     Debut,               // 登場
     LiveStart,           // ライブ開始時
     LiveSuccess,         // ライブ成功時
-    PerformancePhaseStart, // パフォーマンスフェイズの始めに (8.3.3)
     Constant,            // 常時
     Auto,                // 自動 (generic auto ability)
-    AreaMovement,        // エリア移動 (Rule 9.7.4 - area movement trigger)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -2068,7 +2066,7 @@ impl GameState {
                 let operation = effect.operation.as_deref().unwrap_or("add");
                 let value = effect.value.unwrap_or(1) as i32;
                 let card_type_filter = effect.card_type.as_deref();
-                let target = effect.target.as_deref().unwrap_or("self");
+                let _target = effect.target.as_deref().unwrap_or("self");
                 
                 let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
                 
@@ -2315,46 +2313,52 @@ impl GameState {
             match trigger {
                 AbilityTrigger::Activation => {
                     // Activation abilities can always be triggered (subject to conditions)
-                    ability.triggers.as_ref().map_or(false, |t| t == "起動")
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "起動");
+                    eprintln!("DEBUG: Activation ability check - triggers: {:?}, match: {}", 
+                        ability.triggers, trigger_match);
+                    trigger_match
                 }
                 AbilityTrigger::Debut => {
-                    ability.triggers.as_ref().map_or(false, |t| t == "登場" || t == "Debut")
-                        && self.should_trigger_debut(player, card)
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "登場" || t == "Debut");
+                    let should_trigger = trigger_match && self.should_trigger_debut(player, card);
+                    eprintln!("DEBUG: Debut ability check - triggers: {:?}, match: {}, should_trigger: {}, card: {}", 
+                        ability.triggers, trigger_match, should_trigger, 
+                        format!("{}({})", card.card_no, card.name));
+                    should_trigger
                 }
                 AbilityTrigger::LiveStart => {
-                    ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時")
-                        && self.should_trigger_live_start(player)
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時");
+                    let should_trigger = trigger_match && self.should_trigger_live_start(player);
+                    eprintln!("DEBUG: LiveStart ability check - triggers: {:?}, match: {}, should_trigger: {}", 
+                        ability.triggers, trigger_match, should_trigger);
+                    should_trigger
                 }
                 AbilityTrigger::LiveSuccess => {
-                    ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時")
-                        && self.should_trigger_live_success(player)
-                }
-                AbilityTrigger::PerformancePhaseStart => {
-                    ability.triggers.as_ref().map_or(false, |t| t == "パフォーマンスフェイズの始めに")
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時");
+                    let should_trigger = trigger_match && self.should_trigger_live_success(player);
+                    eprintln!("DEBUG: LiveSuccess ability check - triggers: {:?}, match: {}, should_trigger: {}", 
+                        ability.triggers, trigger_match, should_trigger);
+                    should_trigger
                 }
                 AbilityTrigger::Constant => {
                     // Constant abilities are always active, but need to be evaluated continuously
-                    ability.triggers.as_ref().map_or(false, |t| t == "常時")
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "常時");
+                    eprintln!("DEBUG: Constant ability check - triggers: {:?}, match: {}", 
+                        ability.triggers, trigger_match);
+                    trigger_match
                 }
                 AbilityTrigger::Auto => {
                     // Generic auto abilities (not tied to specific timing)
-                    ability.triggers.as_ref().map_or(false, |t| t == "自動")
-                }
-                AbilityTrigger::AreaMovement => {
-                    // Area movement triggers (Rule 9.7.4)
-                    // Matches abilities that trigger when a card moves areas
-                    // Check triggers field and full_text for area movement indicators
-                    let triggers_match = ability.triggers.as_ref().map_or(false, |t| {
-                        t.contains("エリアを移動") || t.contains("area_movement")
-                    });
-                    let text_match = ability.full_text.contains("エリアを移動") || 
-                                   ability.full_text.contains("area_movement");
-                    triggers_match || text_match
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == "自動");
+                    eprintln!("DEBUG: Auto ability check - triggers: {:?}, match: {}", 
+                        ability.triggers, trigger_match);
+                    trigger_match
                 }
             }
         }).collect()
     }
 
+// ... (rest of the code remains the same)
     // ============== DURATION MANAGEMENT ==============
 
     /// Add a temporary effect with duration

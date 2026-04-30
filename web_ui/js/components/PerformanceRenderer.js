@@ -9,11 +9,9 @@ import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { TextEnricher } from '../utils/TextEnricher.js';
 
-const HEART_LABELS = ['Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple', 'Any'];
+const HEART_LABELS = ['Any', 'Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple'];
 
-const HEART_ICONS = HEART_LABELS.map((_, index) => (
-    index === 6 ? 'img/texticon/icon_all.png' : `img/texticon/heart_0${index + 1}.png`
-));
+const HEART_ICONS = HEART_LABELS.map((_, index) => `img/texticon/heart_0${index}.png`);
 
 function tr(key, params) {
     return i18n.t(key, params);
@@ -138,7 +136,7 @@ function renderHeartsCompact(hearts) {
     return `<div class="hearts-compact">${hearts.map((count, index) => {
         if (!count) return '';
         return `
-            <div class="heart-tag ${index === 6 ? 'color-any' : `color-${index}`}" title="${escapeHtml(HEART_LABELS[index])}">
+            <div class="heart-tag ${index === 0 ? 'color-any' : `color-${index}`}" title="${escapeHtml(HEART_LABELS[index])}">
                 <img src="${HEART_ICONS[index]}" class="heart-mini-icon" alt="${escapeHtml(HEART_LABELS[index])}">
                 <span>${count}</span>
             </div>
@@ -182,10 +180,10 @@ function renderSuccessEquation(have, need) {
     const totalNeed = sumHearts(needValues);
 
     let satisfied = 0;
-    let wildcards = haveValues[6] || 0;
+    let wildcards = haveValues[0] || 0;
     let requiredTotal = 0;
 
-    for (let color = 0; color < 6; color += 1) {
+    for (let color = 1; color < 7; color += 1) {
         const colorNeed = needValues[color] || 0;
         const colorHave = haveValues[color] || 0;
         requiredTotal += colorNeed;
@@ -435,7 +433,7 @@ function renderLiveCards(result) {
                                 <div class="perf-pill-list">
                                     ${adjustments.map((adjustment) => {
                                         const isTransform = adjustment?.type === 'transform' || adjustment?.type === 'override';
-                                        const value = adjustment?.desc || `${adjustment?.value > 0 ? '+' : ''}${adjustment?.value || 0} ${HEART_LABELS[adjustment?.color ?? 6] || 'heart'}`;
+                                        const value = adjustment?.desc || `${adjustment?.value > 0 ? '+' : ''}${adjustment?.value || 0} ${HEART_LABELS[adjustment?.color ?? 0] || 'heart'}`;
                                         return `<div class="perf-adjustment-pill ${isTransform ? 'transform' : 'requirement'}">${escapeHtml(adjustment?.source || 'Effect')}: ${escapeHtml(value)}</div>`;
                                     }).join('')}
                                 </div>
@@ -495,7 +493,7 @@ function renderAllocationSection(result) {
                                             <span class="perf-route-source-meta">${row?.source_type === 'yell' ? 'Yell card' : `Stage slot ${Number(row?.source_slot ?? -1) + 1}`}</span>
                                         </div>
                                         <div class="perf-route-payment">
-                                            <img src="${HEART_ICONS[row?.wildcard ? 6 : (row?.color ?? 6)]}" class="heart-mini-icon" alt="">
+                                            <img src="${HEART_ICONS[row?.wildcard ? 0 : (row?.color ?? 0)]}" class="heart-mini-icon" alt="">
                                             <strong>${row?.amount || 0}</strong>
                                             ${row?.is_bonus ? '<span class="perf-badge bonus">bonus</span>' : '<span class="perf-badge base">printed</span>'}
                                             ${row?.wildcard ? '<span class="perf-badge wildcard">wildcard</span>' : ''}
@@ -577,7 +575,7 @@ function renderContributionSection(result) {
                                 <div class="perf-bonus-block">
                                     ${heartBonuses.map((bonus) => `
                                         <div class="perf-bonus-item">
-                                            <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 6] || 'heart')}</div>
+                                            <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 0] || 'heart')}</div>
                                             ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
                                         </div>
                                     `).join('')}

@@ -8,7 +8,7 @@ use crate::zones::MemberArea;
 use std::vec::Vec;
 use std::string::String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum Choice {
     SelectCard {
         zone: String,
@@ -409,9 +409,29 @@ impl<'a> AbilityResolver<'a> {
                         self.game_state.pending_choice = None;
                         return Ok(());
                     } else if selected == "pay_optional_cost" {
-                        eprintln!("User chose to pay optional cost - continuing with effect");
-                        // Retrieve the pending ability and continue execution
+                        eprintln!("User chose to pay optional cost - paying energy and continuing with effect");
+                        // Retrieve the pending ability and pay the cost first
                         if let Some(pending) = self.game_state.pending_ability.clone() {
+                            // Pay the energy cost first
+                            if let Some(ref cost) = pending.cost {
+                                if let Some(energy) = cost.energy {
+                                    if energy > 0 {
+                                        let target = cost.target.as_deref().unwrap_or("self");
+                                        let player = match target {
+                                            "self" => &mut self.game_state.player1,
+                                            "opponent" => &mut self.game_state.player2,
+                                            _ => &mut self.game_state.player1,
+                                        };
+                                        
+                                        if let Err(e) = player.energy_zone.pay_energy(energy as usize) {
+                                            eprintln!("Failed to pay energy cost: {}", e);
+                                            return Err(e);
+                                        }
+                                        eprintln!("Paid {} energy for optional cost", energy);
+                                    }
+                                }
+                            }
+                            
                             eprintln!("Executing effect from pending ability: {:?}", pending.effect);
                             // Execute the effect
                             if let Err(e) = self.execute_effect(&pending.effect) {
@@ -1844,22 +1864,32 @@ impl<'a> AbilityResolver<'a> {
 
     /// Execute an ability effect
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        eprintln!("DEBUG: EXECUTING EFFECT - action: {}, text: {}, target: {:?}", 
+            effect.action, effect.text, effect.target);
+        
         // First, check activation conditions (gates whether ability can be used)
         if !self.can_activate_effect(effect) {
+            eprintln!("DEBUG: Activation condition not met, skipping effect");
             return Ok(()); // Activation condition not met, skip effect
         }
 
         // Then, check if there's a condition for the effect itself
         if let Some(ref condition) = effect.condition {
+            eprintln!("DEBUG: Checking effect condition: {:?}", condition);
             if !self.evaluate_condition(condition) {
+                eprintln!("DEBUG: Effect condition not met, skipping effect");
                 return Ok(()); // Condition not met, skip effect
             }
+            eprintln!("DEBUG: Effect condition met");
+        } else {
+            eprintln!("DEBUG: No effect condition to check");
         }
 
         // Check for opponent action (action_by field)
         if effect.action_by.as_deref() == Some("opponent") {
+            eprintln!("DEBUG: Opponent action detected");
             if let Some(ref opponent_action) = effect.opponent_action {
-                eprintln!("Executing opponent action: {:?}", opponent_action);
+                eprintln!("DEBUG: Executing opponent action: {:?}", opponent_action);
                 // Execute the opponent action on the opponent's game state
                 // For now, execute it directly - full implementation would need proper opponent state management
                 self.execute_effect(opponent_action)?;
@@ -1879,11 +1909,13 @@ impl<'a> AbilityResolver<'a> {
             .map(|r| (*r).clone())
             .collect();
         if !replacement_effects.is_empty() {
+            eprintln!("DEBUG: Found {} replacement effects for action '{}'", replacement_effects.len(), action_to_use);
             // Rule 9.10.2: If multiple replacement effects, affected player decides order
             // Apply all replacement effects in order
             for replacement in &replacement_effects {
                 // Rule 9.10.3: Choice-based replacement effects require the choice to be executable
                 if replacement.is_choice_based {
+                    eprintln!("DEBUG: Choice-based replacement effect found, prompting user");
                     // Create a choice for the player to decide whether to apply the replacement
                     let description = format!("Apply replacement effect for action '{}'?", action_to_use);
                     self.pending_choice = Some(Choice::SelectTarget {
@@ -1891,7 +1923,6 @@ impl<'a> AbilityResolver<'a> {
                         description,
                     });
                     self.game_state.pending_choice = self.pending_choice.clone();
-                    eprintln!("Choice-based replacement effect found, prompting user");
                     return Err("Pending choice required: apply replacement effect".to_string());
                 } else {
                     // Apply the replacement effects instead of the original action
@@ -1937,62 +1968,208 @@ impl<'a> AbilityResolver<'a> {
             }
         }
 
+        eprintln!("DEBUG: Executing effect action: '{}'", action_to_use);
         match action_to_use.as_str() {
-            "sequential" => self.execute_sequential_effect(effect),
-            "conditional_alternative" => self.execute_conditional_alternative(effect),
-            "look_and_select" => self.execute_look_and_select(effect),
-            "draw" | "draw_card" => self.execute_draw(effect),
-            "draw_until_count" => self.execute_draw_until_count(effect),
-            "move_cards" => self.execute_move_cards(effect),
-            "gain_resource" => self.execute_gain_resource(effect),
-            "change_state" => self.execute_change_state(effect),
-            "modify_score" => self.execute_modify_score(effect),
-            "modify_required_hearts" => self.execute_modify_required_hearts(effect),
-            "set_cost" => self.execute_set_cost(effect),
-            "set_blade_type" => self.execute_set_blade_type(effect),
-            "set_heart_type" => self.execute_set_heart_type(effect),
-            "activate_ability" => self.execute_activate_ability(effect),
-            "invalidate_ability" => self.execute_invalidate_ability(effect),
-            "gain_ability" => self.execute_gain_ability(effect),
-            "play_baton_touch" => self.execute_play_baton_touch(effect),
-            "reveal" => self.execute_reveal(effect),
-            "select" => self.execute_select(effect),
-            "look_at" => self.execute_look_at(effect),
-            "modify_required_hearts_global" => self.execute_modify_required_hearts_global(effect),
-            "modify_yell_count" => self.execute_modify_yell_count(effect),
-            "place_energy_under_member" => self.execute_place_energy_under_member(effect),
-            "activation_cost" => self.execute_activation_cost(effect),
-            "position_change" => self.execute_position_change(effect),
-            "appear" => self.execute_appear(effect),
-            "choice" => self.execute_choice(effect),
-            "pay_energy" => self.execute_pay_energy(effect),
-            "set_card_identity" => self.execute_set_card_identity(effect),
-            "discard_until_count" => self.execute_discard_until_count(effect),
-            "restriction" => self.execute_restriction(effect),
-            "re_yell" => self.execute_re_yell(effect),
-            "modify_cost" => self.execute_modify_cost(effect),
-            "activation_restriction" => self.execute_activation_restriction(effect),
-            "choose_required_hearts" => self.execute_choose_required_hearts(effect),
-            "modify_limit" => self.execute_modify_limit(effect),
-            "set_blade_count" => self.execute_set_blade_count(effect),
-            "set_required_hearts" => self.execute_set_required_hearts(effect),
-            "set_score" => self.execute_set_score(effect),
-            "specify_heart_color" => self.execute_specify_heart_color(effect),
-            "modify_required_hearts_success" => self.execute_modify_required_hearts_success(effect),
-            "set_cost_to_use" => self.execute_set_cost_to_use(effect),
-            "all_blade_timing" => self.execute_all_blade_timing(effect),
-            "set_card_identity_all_regions" => self.execute_set_card_identity_all_regions(effect),
-            "shuffle" => self.execute_shuffle(effect),
-            "reveal_per_group" => self.execute_reveal_per_group(effect),
-            "conditional_on_result" => self.execute_conditional_on_result(effect),
-            "conditional_on_optional" => self.execute_conditional_on_optional(effect),
+            "sequential" => {
+                eprintln!("DEBUG: Executing sequential effect");
+                self.execute_sequential_effect(effect)
+            },
+            "conditional_alternative" => {
+                eprintln!("DEBUG: Executing conditional_alternative effect");
+                self.execute_conditional_alternative(effect)
+            },
+            "look_and_select" => {
+                eprintln!("DEBUG: Executing look_and_select effect");
+                self.execute_look_and_select(effect)
+            },
+            "draw" | "draw_card" => {
+                eprintln!("DEBUG: Executing draw effect");
+                self.execute_draw(effect)
+            },
+            "draw_until_count" => {
+                eprintln!("DEBUG: Executing draw_until_count effect");
+                self.execute_draw_until_count(effect)
+            },
+            "move_cards" => {
+                eprintln!("DEBUG: Executing move_cards effect");
+                self.execute_move_cards(effect)
+            },
+            "gain_resource" => {
+                eprintln!("DEBUG: Executing gain_resource effect");
+                self.execute_gain_resource(effect)
+            },
+            "change_state" => {
+                eprintln!("DEBUG: Executing change_state effect");
+                self.execute_change_state(effect)
+            },
+            "modify_score" => {
+                eprintln!("DEBUG: Executing modify_score effect");
+                self.execute_modify_score(effect)
+            },
+            "modify_required_hearts" => {
+                eprintln!("DEBUG: Executing modify_required_hearts effect");
+                self.execute_modify_required_hearts(effect)
+            },
+            "set_cost" => {
+                eprintln!("DEBUG: Executing set_cost effect");
+                self.execute_set_cost(effect)
+            },
+            "set_blade_type" => {
+                eprintln!("DEBUG: Executing set_blade_type effect");
+                self.execute_set_blade_type(effect)
+            },
+            "set_heart_type" => {
+                eprintln!("DEBUG: Executing set_heart_type effect");
+                self.execute_set_heart_type(effect)
+            },
+            "activate_ability" => {
+                eprintln!("DEBUG: Executing activate_ability effect");
+                self.execute_activate_ability(effect)
+            },
+            "invalidate_ability" => {
+                eprintln!("DEBUG: Executing invalidate_ability effect");
+                self.execute_invalidate_ability(effect)
+            },
+            "gain_ability" => {
+                eprintln!("DEBUG: Executing gain_ability effect");
+                self.execute_gain_ability(effect)
+            },
+            "play_baton_touch" => {
+                eprintln!("DEBUG: Executing play_baton_touch effect");
+                self.execute_play_baton_touch(effect)
+            },
+            "reveal" => {
+                eprintln!("DEBUG: Executing reveal effect");
+                self.execute_reveal(effect)
+            },
+            "select" => {
+                eprintln!("DEBUG: Executing select effect");
+                self.execute_select(effect)
+            },
+            "look_at" => {
+                eprintln!("DEBUG: Executing look_at effect");
+                self.execute_look_at(effect)
+            },
+            "modify_required_hearts_global" => {
+                eprintln!("DEBUG: Executing modify_required_hearts_global effect");
+                self.execute_modify_required_hearts_global(effect)
+            },
+            "modify_yell_count" => {
+                eprintln!("DEBUG: Executing modify_yell_count effect");
+                self.execute_modify_yell_count(effect)
+            },
+            "place_energy_under_member" => {
+                eprintln!("DEBUG: Executing place_energy_under_member effect");
+                self.execute_place_energy_under_member(effect)
+            },
+            "activation_cost" => {
+                eprintln!("DEBUG: Executing activation_cost effect");
+                self.execute_activation_cost(effect)
+            },
+            "position_change" => {
+                eprintln!("DEBUG: Executing position_change effect");
+                self.execute_position_change(effect)
+            },
+            "appear" => {
+                eprintln!("DEBUG: Executing appear effect");
+                self.execute_appear(effect)
+            },
+            "choice" => {
+                eprintln!("DEBUG: Executing choice effect");
+                self.execute_choice(effect)
+            },
+            "pay_energy" => {
+                eprintln!("DEBUG: Executing pay_energy effect");
+                self.execute_pay_energy(effect)
+            },
+            "set_card_identity" => {
+                eprintln!("DEBUG: Executing set_card_identity effect");
+                self.execute_set_card_identity(effect)
+            },
+            "discard_until_count" => {
+                eprintln!("DEBUG: Executing discard_until_count effect");
+                self.execute_discard_until_count(effect)
+            },
+            "restriction" => {
+                eprintln!("DEBUG: Executing restriction effect");
+                self.execute_restriction(effect)
+            },
+            "re_yell" => {
+                eprintln!("DEBUG: Executing re_yell effect");
+                self.execute_re_yell(effect)
+            },
+            "modify_cost" => {
+                eprintln!("DEBUG: Executing modify_cost effect");
+                self.execute_modify_cost(effect)
+            },
+            "activation_restriction" => {
+                eprintln!("DEBUG: Executing activation_restriction effect");
+                self.execute_activation_restriction(effect)
+            },
+            "choose_required_hearts" => {
+                eprintln!("DEBUG: Executing choose_required_hearts effect");
+                self.execute_choose_required_hearts(effect)
+            },
+            "modify_limit" => {
+                eprintln!("DEBUG: Executing modify_limit effect");
+                self.execute_modify_limit(effect)
+            },
+            "set_blade_count" => {
+                eprintln!("DEBUG: Executing set_blade_count effect");
+                self.execute_set_blade_count(effect)
+            },
+            "set_required_hearts" => {
+                eprintln!("DEBUG: Executing set_required_hearts effect");
+                self.execute_set_required_hearts(effect)
+            },
+            "set_score" => {
+                eprintln!("DEBUG: Executing set_score effect");
+                self.execute_set_score(effect)
+            },
+            "specify_heart_color" => {
+                eprintln!("DEBUG: Executing specify_heart_color effect");
+                self.execute_specify_heart_color(effect)
+            },
+            "modify_required_hearts_success" => {
+                eprintln!("DEBUG: Executing modify_required_hearts_success effect");
+                self.execute_modify_required_hearts_success(effect)
+            },
+            "set_cost_to_use" => {
+                eprintln!("DEBUG: Executing set_cost_to_use effect");
+                self.execute_set_cost_to_use(effect)
+            },
+            "all_blade_timing" => {
+                eprintln!("DEBUG: Executing all_blade_timing effect");
+                self.execute_all_blade_timing(effect)
+            },
+            "set_card_identity_all_regions" => {
+                eprintln!("DEBUG: Executing set_card_identity_all_regions effect");
+                self.execute_set_card_identity_all_regions(effect)
+            },
+            "shuffle" => {
+                eprintln!("DEBUG: Executing shuffle effect");
+                self.execute_shuffle(effect)
+            },
+            "reveal_per_group" => {
+                eprintln!("DEBUG: Executing reveal_per_group effect");
+                self.execute_reveal_per_group(effect)
+            },
+            "conditional_on_result" => {
+                eprintln!("DEBUG: Executing conditional_on_result effect");
+                self.execute_conditional_on_result(effect)
+            },
+            "conditional_on_optional" => {
+                eprintln!("DEBUG: Executing conditional_on_optional effect");
+                self.execute_conditional_on_optional(effect)
+            },
             "custom" => {
+                eprintln!("DEBUG: Executing custom effect (not implemented)");
                 // Custom actions are card-specific effects not yet implemented
                 // For now, skip them without error
                 Ok(())
             }
-            _ => {
-                eprintln!("Unknown action type: {}", effect.action);
+            unknown_action => {
+                eprintln!("DEBUG: Unknown action type: '{}', skipping", unknown_action);
                 Ok(())
             }
         }
@@ -4084,6 +4261,15 @@ impl<'a> AbilityResolver<'a> {
                         .copied()
                         .collect();
                     
+                    eprintln!("change_state (wait): Found {} valid targets (count limit: {}, cost_limit: {:?}, card_type: {:?}, group: {:?})",
+                        valid_targets.len(), count_usize, cost_limit, card_type_filter, group_filter);
+                    
+                    // For "up to" (まで) effects, having 0 valid targets is valid - effect simply does nothing
+                    if valid_targets.is_empty() {
+                        eprintln!("change_state (wait): No valid targets found. Effect does nothing (expected for 'up to' effects).");
+                        return Ok(());
+                    }
+                    
                     // If multiple valid targets and count < valid_targets.len(), need user choice
                     if valid_targets.len() > count_usize && count_usize > 0 {
                         let description = format!("Select {} member(s) to set to wait state from {} valid targets", count_usize, valid_targets.len());
@@ -4115,6 +4301,15 @@ impl<'a> AbilityResolver<'a> {
                         .filter(|&card_id| matches_card_type(*card_id, card_type_filter) && matches_group(*card_id, group_filter) && matches_cost_limit(*card_id, cost_limit))
                         .copied()
                         .collect();
+                    
+                    eprintln!("change_state (wait) for energy: Found {} valid targets (count limit: {}, cost_limit: {:?}, card_type: {:?}, group: {:?})",
+                        valid_targets.len(), count_usize, cost_limit, card_type_filter, group_filter);
+                    
+                    // For "up to" (まで) effects, having 0 valid targets is valid - effect simply does nothing
+                    if valid_targets.is_empty() {
+                        eprintln!("change_state (wait) for energy: No valid targets found. Effect does nothing (expected for 'up to' effects).");
+                        return Ok(());
+                    }
                     
                     // If multiple valid targets and count < valid_targets.len(), need user choice
                     if valid_targets.len() > count_usize && count_usize > 0 {
@@ -4949,16 +5144,20 @@ impl<'a> AbilityResolver<'a> {
 
     /// Resolve a complete ability
     pub fn resolve_ability(&mut self, ability: &Ability, activating_card: Option<i16>, ability_index: usize) -> Result<(), String> {
+        eprintln!("DEBUG: RESOLVING ABILITY - triggers: {:?}, full_text: {}, activating_card: {:?}", 
+            ability.triggers, ability.full_text, activating_card);
+        
         // Check use_limit before executing ability
         if let Some(use_limit) = ability.use_limit {
             if let Some(card_id) = activating_card {
                 let ability_key = format!("{}_{}_{}", card_id, ability_index, self.game_state.turn_number);
                 if self.game_state.turn_limited_abilities_used.contains(&ability_key) {
+                    eprintln!("DEBUG: Ability already used this turn (use_limit: {})", use_limit);
                     return Err(format!("Ability has already been used this turn (use_limit: {})", use_limit));
                 }
                 // Mark ability as used
                 self.game_state.turn_limited_abilities_used.insert(ability_key);
-                eprintln!("Marked ability as used this turn (use_limit: {})", use_limit);
+                eprintln!("DEBUG: Marked ability as used this turn (use_limit: {})", use_limit);
             }
         }
         
@@ -4968,15 +5167,19 @@ impl<'a> AbilityResolver<'a> {
         // Set activating card in game state for self-cost handling
         self.game_state.activating_card = activating_card;
         
+        eprintln!("DEBUG: About to pay cost - cost: {:?}", ability.cost);
         // First, pay the cost if there is one
         if let Some(ref cost) = ability.cost {
             self.pay_cost(cost)?;
+            eprintln!("DEBUG: Cost payment completed");
+        } else {
+            eprintln!("DEBUG: No cost to pay");
         }
 
         // Check if there's a pending choice from cost payment (e.g., optional cost)
         // If so, don't execute the effect yet - wait for user choice
         if self.pending_choice.is_some() {
-            eprintln!("Pending choice from cost payment, pausing ability execution");
+            eprintln!("DEBUG: Pending choice from cost payment, pausing ability execution");
             // Store current_ability in game_state for resumption after user pays cost
             self.game_state.pending_current_ability = self.current_ability.clone();
             // Don't clear activating_card yet - we need it when resuming
@@ -4985,14 +5188,19 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
 
+        eprintln!("DEBUG: About to execute effect - effect: {:?}", ability.effect);
         // Then execute the effect
         if let Some(ref effect) = ability.effect {
             self.execute_effect(effect)?;
+            eprintln!("DEBUG: Effect execution completed successfully");
+        } else {
+            eprintln!("DEBUG: No effect to execute");
         }
 
         // Clear activating card after successful execution
         self.game_state.activating_card = None;
         self.current_ability = None;
+        eprintln!("DEBUG: Ability resolution completed successfully");
         Ok(())
     }
 
@@ -5425,8 +5633,8 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    /// Helper method for intelligent discard - prioritizes discarding non-essential cards
-    fn execute_intelligent_discard(&mut self, player_id: &str, target_count: usize) -> Result<(), String> {
+    /// Helper method for discard - requires user choice when hand has cards
+    fn execute_discard(&mut self, player_id: &str, target_count: usize) -> Result<(), String> {
         let player = if player_id == self.game_state.player1.id {
             &mut self.game_state.player1
         } else if player_id == self.game_state.player2.id {
@@ -5436,42 +5644,32 @@ impl<'a> AbilityResolver<'a> {
         };
 
         let current_count = player.hand.len();
+        eprintln!("DEBUG: Discard check - current hand size: {}, target: {}", current_count, target_count);
+        
         if current_count > target_count {
             let cards_to_discard = current_count - target_count;
+            eprintln!("DEBUG: Need to discard {} cards from hand", cards_to_discard);
             
-            // Intelligent auto-discard: prioritize non-essential cards
-            let mut hand_with_priority: Vec<(i16, i32)> = player.hand.cards.iter()
-                .enumerate()
-                .map(|(idx, &card_id)| {
-                    let priority = if let Some(card) = self.game_state.card_database.get_card(card_id) {
-                        if card.is_energy() { 0 }      // Keep energy (priority 0 = highest)
-                        else if card.is_member() { 1 } // Keep members
-                        else if card.is_live() { 3 }   // Discard live cards first
-                        else { 2 }                      // Other cards
-                    } else {
-                        2 // Unknown cards
-                    };
-                    (idx as i16, priority)
-                })
-                .collect();
-            
-            // Sort by priority descending (higher priority = discard first)
-            hand_with_priority.sort_by(|a, b| b.1.cmp(&a.1));
-            
-            // Discard highest priority cards
-            let indices_to_discard: Vec<usize> = hand_with_priority.iter()
-                .take(cards_to_discard)
-                .map(|(idx, _)| *idx as usize)
-                .collect();
-            
-            // Remove cards from hand (in reverse order to maintain indices)
-            for &idx in indices_to_discard.iter().rev() {
-                if idx < player.hand.cards.len() {
-                    let card_id = player.hand.cards.remove(idx);
-                    player.waitroom.add_card(card_id);
-                    eprintln!("Auto-discarded card {} from hand index {}", card_id, idx);
-                }
+            // If hand has cards, require user choice instead of auto-discard
+            if current_count > 0 {
+                eprintln!("DEBUG: Creating discard choice prompt for {} cards", cards_to_discard);
+                
+                // Create pending choice for user to select cards to discard
+                self.pending_choice = Some(crate::ability_resolver::Choice::SelectCard {
+                    zone: "hand".to_string(),
+                    card_type: None,
+                    count: cards_to_discard,
+                    description: format!("Select {} card(s) to discard from hand ({} available)", cards_to_discard, current_count),
+                    allow_skip: false,
+                });
+                self.game_state.pending_choice = self.pending_choice.clone();
+                
+                return Err("Pending choice required: select cards to discard from hand".to_string());
+            } else {
+                eprintln!("DEBUG: Hand is empty, nothing to discard");
             }
+        } else {
+            eprintln!("DEBUG: Hand size {} is already at or below target {}", current_count, target_count);
         }
         Ok(())
     }
@@ -5482,9 +5680,9 @@ impl<'a> AbilityResolver<'a> {
 
         // Handle "both" target (Q229)
         if target == "both" {
-            // Apply intelligent discard to both players
-            self.execute_intelligent_discard(&self.game_state.player1.id.clone(), target_count)?;
-            self.execute_intelligent_discard(&self.game_state.player2.id.clone(), target_count)?;
+            // Apply discard to both players
+            self.execute_discard(&self.game_state.player1.id.clone(), target_count)?;
+            self.execute_discard(&self.game_state.player2.id.clone(), target_count)?;
             return Ok(());
         }
 
@@ -5500,7 +5698,7 @@ impl<'a> AbilityResolver<'a> {
             active_id
         };
 
-        self.execute_intelligent_discard(&player_id, target_count)
+        self.execute_discard(&player_id, target_count)
     }
 
     fn execute_restriction(&mut self, effect: &AbilityEffect) -> Result<(), String> {
@@ -6337,22 +6535,29 @@ impl<'a> AbilityResolver<'a> {
                         description: format!("Pay {} energy (or skip)?", energy),
                     });
 
+                    // Store the actual ability effect (from current_ability) for resuming after choice
+                    let actual_effect = if let Some(ref ability) = self.current_ability {
+                        eprintln!("Retrieving effect from current_ability for pay_energy: {:?}", ability.effect);
+                        ability.effect.clone()
+                    } else {
+                        eprintln!("No current_ability found for pay_energy!");
+                        None
+                    };
+
                     // Store effect for resuming after choice
                     self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
                         card_no: "optional_cost".to_string(),
                         player_id: "self".to_string(),
                         action_index: 0,
-                        effect: AbilityEffect {
-                            text: cost.text.clone(),
-                            action: "pay_energy".to_string(),
-                            ..Default::default()
-                        },
+                        effect: actual_effect.unwrap_or_default(),
                         conditional_choice: None,
                         activating_card: None,
                         ability_index: 0,
                         cost: Some(cost.clone()),
                         cost_choice: None,
                     });
+
+                    eprintln!("Stored pending_ability with effect: {:?}", self.game_state.pending_ability);
 
                     return Ok(());
                 }

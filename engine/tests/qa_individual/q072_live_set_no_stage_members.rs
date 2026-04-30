@@ -57,11 +57,31 @@ fn test_q072_live_set_no_stage_members() {
         assert_eq!(game_state.player1.stage.stage[1], -1, "Center area should still be empty");
         assert_eq!(game_state.player1.stage.stage[2], -1, "Right area should still be empty");
         
+        // Test the fix: verify that cards are drawn when passing during live set phase
+        let hand_size_before_pass = game_state.player1.hand.cards.len();
+        
+        // Pass to trigger card drawing (this should draw 1 card to replace the live card)
+        let result = TurnEngine::execute_main_phase_action(
+            &mut game_state,
+            &ActionType::Pass,
+            None,
+            None,
+            None,
+            None,
+        );
+        
+        assert!(result.is_ok(), "Pass action should succeed: {:?}", result);
+        
+        // Verify that a card was drawn to replace the live card
+        assert_eq!(game_state.player1.hand.cards.len(), hand_size_before_pass + 1, 
+            "Should have drawn 1 card to replace the live card");
+        
         // The key assertion: can place live cards even with no members on stage
         // This tests the live set with no stage members rule
         
         println!("Q072 verified: Can place live cards in live card zone even with no members on stage");
         println!("Stage is empty, live card placed successfully");
+        println!("Card drawing verified: Drew {} cards after passing", game_state.player1.hand.cards.len() - hand_size_before_pass);
     } else {
         panic!("Required live card not found for Q072 test");
     }

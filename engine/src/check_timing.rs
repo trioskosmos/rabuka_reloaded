@@ -138,7 +138,7 @@ impl CheckTimingSystem {
             for &card_id in &player.stage.stage {
                 if card_id != crate::constants::EMPTY_SLOT {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for (idx, ability) in card.abilities.iter().enumerate() {
+                        for (_idx, ability) in card.abilities.iter().enumerate() {
                             if let Some(ref triggers) = ability.triggers {
                                 if triggers.contains("ターンの始めに") || triggers.contains("turn_start") {
                                     self.add_pending_trigger(PendingTrigger {
@@ -163,7 +163,7 @@ impl CheckTimingSystem {
             for &card_id in &player.stage.stage {
                 if card_id != crate::constants::EMPTY_SLOT {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for (idx, ability) in card.abilities.iter().enumerate() {
+                        for (_idx, ability) in card.abilities.iter().enumerate() {
                             if let Some(ref triggers) = ability.triggers {
                                 if triggers.contains("ライブ開始時") || triggers.contains("live_start") {
                                     self.add_pending_trigger(PendingTrigger {
@@ -188,7 +188,7 @@ impl CheckTimingSystem {
             for &card_id in &player.stage.stage {
                 if card_id != crate::constants::EMPTY_SLOT {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        for (idx, ability) in card.abilities.iter().enumerate() {
+                        for (_idx, ability) in card.abilities.iter().enumerate() {
                             if let Some(ref triggers) = ability.triggers {
                                 if triggers.contains("ライブ成功時") || triggers.contains("live_success") {
                                     self.add_pending_trigger(PendingTrigger {

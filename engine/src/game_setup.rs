@@ -9,6 +9,7 @@ use std::vec::Vec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ActionType {
+    Pass,
     RockChoice,        // Q16: RPS - choose Rock
     PaperChoice,       // Q16: RPS - choose Paper
     ScissorsChoice,    // Q16: RPS - choose Scissors
@@ -22,12 +23,12 @@ pub enum ActionType {
     UseAbility,
     SetLiveCard,
     FinishLiveCardSet,
-    Pass,
 }
 
 impl std::fmt::Display for ActionType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            ActionType::Pass => write!(f, "pass"),
             ActionType::RockChoice => write!(f, "rock_choice"),
             ActionType::PaperChoice => write!(f, "paper_choice"),
             ActionType::ScissorsChoice => write!(f, "scissors_choice"),
@@ -41,7 +42,6 @@ impl std::fmt::Display for ActionType {
             ActionType::UseAbility => write!(f, "use_ability"),
             ActionType::SetLiveCard => write!(f, "set_live_card"),
             ActionType::FinishLiveCardSet => write!(f, "finish_live_card_set"),
-            ActionType::Pass => write!(f, "pass"),
         }
     }
 }
@@ -51,6 +51,7 @@ impl std::str::FromStr for ActionType {
     
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "pass" => Ok(ActionType::Pass),
             "rock_choice" => Ok(ActionType::RockChoice),
             "paper_choice" => Ok(ActionType::PaperChoice),
             "scissors_choice" => Ok(ActionType::ScissorsChoice),
@@ -64,7 +65,6 @@ impl std::str::FromStr for ActionType {
             "use_ability" => Ok(ActionType::UseAbility),
             "set_live_card" => Ok(ActionType::SetLiveCard),
             "finish_live_card_set" => Ok(ActionType::FinishLiveCardSet),
-            "pass" => Ok(ActionType::Pass),
             _ => Err(format!("Invalid action type: {}", s)),
         }
     }
@@ -579,6 +579,17 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
         crate::game_state::Phase::LiveCardSet |
         crate::game_state::Phase::LiveCardSetP1Turn |
         crate::game_state::Phase::LiveCardSetP2Turn => {
+            // Add Pass action so player can indicate they're done setting cards
+            // Always add Pass as long as the current player hasn't finished (counter < 2)
+            // This allows players to pass even if they have cards left in hand
+            if game_state.current_live_card_set_player < 2 {
+                actions.push(Action {
+                    description: "Pass - Finished setting live cards".to_string(),
+                    action_type: ActionType::Pass,
+                    parameters: None,
+                });
+            }
+
             // Use the consolidated active_player() method to determine which player is currently setting cards
             let active_player = game_state.active_player();
 
@@ -621,17 +632,6 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         }),
                     });
                 }
-            }
-
-            // Add Pass action so player can indicate they're done setting cards
-            // Always add Pass as long as the current player hasn't finished (counter < 2)
-            // This allows players to pass even if they have cards left in hand
-            if game_state.current_live_card_set_player < 2 {
-                actions.push(Action {
-                    description: "Pass - Finished setting live cards".to_string(),
-                    action_type: ActionType::Pass,
-                    parameters: None,
-                });
             }
         }
         crate::game_state::Phase::FirstAttackerPerformance

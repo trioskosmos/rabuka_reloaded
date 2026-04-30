@@ -193,6 +193,23 @@ app.post('/api/set_ai', async (req, res) => {
     }
 });
 
+app.post('/api/exec', async (req, res) => {
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/exec`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(req.body)
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to execute code' });
+    }
+});
+
 app.post('/api/rooms/leave', async (req, res) => {
     res.json({ success: true });
 });

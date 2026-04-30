@@ -34,7 +34,11 @@ impl TurnEngine {
                 Phase::Energy => {
                     // Rule 7.5: Draw energy card (automatic)
                     Self::check_timing(game_state);
-                    let _ = game_state.active_player_mut().draw_energy();
+                    let drawn_card = game_state.active_player_mut().draw_energy();
+                    // If energy deck is empty, nothing happens - this is expected behavior
+                    if drawn_card.is_none() {
+                        // Energy deck was empty, but phase continues normally
+                    }
                     // eprintln!("After Energy phase: p1 active={}, p2 active={}", game_state.player1.energy_zone.active_count(), game_state.player2.energy_zone.active_count());
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Draw;
@@ -85,7 +89,6 @@ impl TurnEngine {
                         game_state.player2.id.clone()
                     };
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
-                    Self::trigger_performance_phase_start_abilities(game_state, &first_attacker_id);
                     return;
                 }
                 Phase::LiveCardSet => {
@@ -99,7 +102,6 @@ impl TurnEngine {
                         game_state.player2.id.clone()
                     };
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
-                    Self::trigger_performance_phase_start_abilities(game_state, &first_attacker_id);
                     return;
                 }
                 Phase::FirstAttackerPerformance => {
@@ -377,7 +379,6 @@ impl TurnEngine {
                     game_state.player2.id.clone()
                 };
                 Self::trigger_live_start_abilities(game_state, &first_attacker_id);
-                Self::trigger_performance_phase_start_abilities(game_state, &first_attacker_id);
             }
         } else {
             // Not in Live phase - this is an error condition, but don't regress phases
@@ -466,6 +467,49 @@ impl TurnEngine {
     pub fn execute_main_phase_action(game_state: &mut GameState, action: &crate::game_setup::ActionType, card_id: Option<i16>, _card_indices: Option<Vec<usize>>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
         // Execute player choice action during various phases
         match action {
+            crate::game_setup::ActionType::Pass => {
+                // Handle Pass differently based on current phase
+                match game_state.current_phase {
+                    Phase::LiveCardSetP1Turn => {
+                        // P1 passes, draw cards to replace live set cards, then transition to P2
+                        let player = game_state.active_player_mut();
+                        let cards_placed = player.live_card_zone.cards.len();
+                        for _ in 0..cards_placed {
+                            let _ = player.draw_card();
+                        }
+                        game_state.current_phase = Phase::LiveCardSetP2Turn;
+                        Ok(())
+                    }
+                    Phase::LiveCardSetP2Turn => {
+                        // P2 passes, draw cards to replace live set cards, then advance to Performance
+                        let player = game_state.active_player_mut();
+                        let cards_placed = player.live_card_zone.cards.len();
+                        for _ in 0..cards_placed {
+                            let _ = player.draw_card();
+                        }
+                        Self::advance_phase(game_state);
+                        Ok(())
+                    }
+                    Phase::LiveCardSet => {
+                        // Legacy phase - use flag-based transition for compatibility
+                        if game_state.current_live_card_set_player == 0 {
+                            game_state.current_live_card_set_player = 1;
+                        } else {
+                            game_state.current_live_card_set_player = 2;
+                        }
+                        if game_state.current_live_card_set_player == 2 {
+                            Self::check_timing(game_state);
+                            Self::advance_phase(game_state);
+                        }
+                        Ok(())
+                    }
+                    _ => {
+                        // In other phases, Pass advances the phase
+                        Self::advance_phase(game_state);
+                        Ok(())
+                    }
+                }
+            }
             crate::game_setup::ActionType::MulliganHeader => {
                 // MulliganHeader is a display-only action, no execution needed
                 Ok(())
@@ -552,39 +596,6 @@ impl TurnEngine {
             }
             crate::game_setup::ActionType::FinishLiveCardSet => {
                 Self::handle_finish_live_card_set(game_state)
-            }
-            crate::game_setup::ActionType::Pass => {
-                // Handle Pass differently based on current phase
-                match game_state.current_phase {
-                    Phase::LiveCardSetP1Turn => {
-                        // P1 passes, transition to P2
-                        game_state.current_phase = Phase::LiveCardSetP2Turn;
-                        Ok(())
-                    }
-                    Phase::LiveCardSetP2Turn => {
-                        // P2 passes, advance to Performance
-                        Self::advance_phase(game_state);
-                        Ok(())
-                    }
-                    Phase::LiveCardSet => {
-                        // Legacy phase - use flag-based transition for compatibility
-                        if game_state.current_live_card_set_player == 0 {
-                            game_state.current_live_card_set_player = 1;
-                        } else {
-                            game_state.current_live_card_set_player = 2;
-                        }
-                        if game_state.current_live_card_set_player == 2 {
-                            Self::check_timing(game_state);
-                            Self::advance_phase(game_state);
-                        }
-                        Ok(())
-                    }
-                    _ => {
-                        // In other phases, Pass advances the phase
-                        Self::advance_phase(game_state);
-                        Ok(())
-                    }
-                }
             }
             crate::game_setup::ActionType::UseAbility => {
                 Self::handle_use_ability(game_state, card_id)
@@ -803,12 +814,29 @@ impl TurnEngine {
             }
         }
         
+        // Rule 8.4.24: Players with live cards have "live succeeded" event - trigger live success abilities
+        eprintln!("DEBUG: Triggering live success abilities - P1 won: {}, P2 won: {}", player1_won, player2_won);
+        
+        // Collect player IDs first to avoid borrow checker issues
+        let player1_id = game_state.player1.id.clone();
+        let player2_id = game_state.player2.id.clone();
+        
+        if player1_won {
+            eprintln!("DEBUG: Player 1 live succeeded - triggering abilities");
+            Self::trigger_live_success_abilities(game_state, &player1_id);
+        }
+        if player2_won {
+            eprintln!("DEBUG: Player 2 live succeeded - triggering abilities");
+            Self::trigger_live_success_abilities(game_state, &player2_id);
+        }
+        
         // Rule 8.4.7: Move winning live card to success zone
         // First, send cards with "cannot_place" restriction straight to discard
         let card_db = game_state.card_database.clone();
         Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);
         Self::move_restricted_cards_to_discard(&mut game_state.player2, &card_db);
         
+        eprintln!("DEBUG: About to call move_live_to_success_and_handle_wins - P1 won: {}, P2 won: {}", player1_won, player2_won);
         Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
     }
 
@@ -855,7 +883,7 @@ impl TurnEngine {
                 !card_data.abilities.iter().any(|ability| {
                     if let Some(ref effect) = ability.effect {
                         effect.action == "restriction" 
-                            && ability.triggers.as_ref().map_or(false, |t| t == "constant")
+                            && ability.triggers.as_ref().map_or(false, |t| t == "常時")
                             && effect.restriction_type.as_deref() == Some("cannot_place")
                             && (effect.restricted_destination.as_deref() == Some("success_live_zone")
                                 || effect.restricted_destination.as_deref() == Some("live_card_zone"))
@@ -1355,7 +1383,7 @@ impl TurnEngine {
                             // Check if card has Debut abilities
                             for ability in &card.abilities {
                                 // Check if ability has Debut trigger (check both English and Japanese)
-                                if ability.triggers.as_ref().map_or(false, |t| t == "Debut") {
+                                if ability.triggers.as_ref().map_or(false, |t| t == "登場" || t == "Debut") {
                                     // Q229: Check if ability requires baton touch from lower-cost member
                                     // The ability text contains "debut via baton touch from lower-cost member"
                                     let requires_baton_touch = ability.full_text.contains("baton touch") && ability.full_text.contains("debut");
@@ -1402,52 +1430,6 @@ impl TurnEngine {
     }
 
     #[allow(dead_code)]
-    fn trigger_performance_phase_start_abilities(game_state: &mut GameState, player_id: &str) {
-        // Rule 8.3.3: Trigger 'performance phase start' automatic abilities
-        
-        let player_id_clone = player_id.to_string();
-        
-        // Collect abilities to trigger first to avoid borrow conflicts
-        let mut abilities_to_trigger = Vec::new();
-        
-        {
-            let player = if player_id_clone == game_state.player1.id {
-                &game_state.player1
-            } else {
-                &game_state.player2
-            };
-            
-            // Check all members on stage for performance phase start abilities
-            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-            for area in areas {
-                if let Some(card_id) = player.stage.get_area(area) {
-                    if let Some(card) = game_state.card_database.get_card(card_id) {
-                        // Check if card has performance phase start abilities
-                        for ability in &card.abilities {
-                            // Check if ability has performance phase start trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "performance_phase_start") {
-                                // Collect ability to trigger
-                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                abilities_to_trigger.push((ability_id, card.card_no.clone()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Trigger collected abilities
-        for (ability_id, card_no) in abilities_to_trigger {
-            game_state.trigger_auto_ability(
-                ability_id,
-                crate::game_state::AbilityTrigger::PerformancePhaseStart,
-                player_id_clone.clone(),
-                Some(card_no),
-            );
-        }
-    }
-
-    #[allow(dead_code)]
     fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
         // Rule 11.5: Trigger LiveStart automatic abilities
         // Rule 11.5.2: Trigger when live card is set
@@ -1472,7 +1454,7 @@ impl TurnEngine {
                         // Check if card has LiveStart abilities
                         for ability in &card.abilities {
                             // Check if ability has LiveStart trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "LiveStart") {
+                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
                                 // Collect ability to trigger
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
@@ -1519,7 +1501,7 @@ impl TurnEngine {
                         // Check if card has LiveStart abilities
                         for ability in &card.abilities {
                             // Check if ability has LiveStart trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "LiveStart") {
+                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ開始時") {
                                 // Collect ability to trigger
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
@@ -1545,6 +1527,7 @@ impl TurnEngine {
     fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {
         // Rule 11.6: Trigger LiveSuccess automatic abilities
         // Rule 11.6.2: Trigger when live succeeds
+        eprintln!("DEBUG: trigger_live_success_abilities called for player: {}", player_id);
         
         let player_id_clone = player_id.to_string();
         
@@ -1564,28 +1547,42 @@ impl TurnEngine {
                 let card_id = player.stage.stage[index];
                 if card_id != -1 {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
+                        eprintln!("DEBUG: Checking member card {} ({}) for LiveSuccess abilities", card_id, card.card_no);
                         // Check if card has LiveSuccess abilities
-                        for ability in &card.abilities {
+                        for (ability_idx, ability) in card.abilities.iter().enumerate() {
+                            eprintln!("DEBUG: Ability {}: triggers = {:?}", ability_idx, ability.triggers);
                             // Check if ability has LiveSuccess trigger
-                            if ability.triggers.as_ref().map_or(false, |t| t == "LiveSuccess") {
+                            if ability.triggers.as_ref().map_or(false, |t| t == "ライブ成功時") {
+                                eprintln!("DEBUG: Found LiveSuccess ability on card {} ({})", card_id, card.card_no);
                                 // Collect ability to trigger
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
                             }
                         }
+                    } else {
+                        eprintln!("DEBUG: Member card {} not found in database", card_id);
                     }
+                } else {
+                    eprintln!("DEBUG: No card in stage position {}", index);
                 }
             }
 
             // Also check live cards in live card zone
+            eprintln!("DEBUG: Checking {} live cards for LiveSuccess abilities", player.live_card_zone.cards.len());
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    for ability in &card.abilities {
-                        if ability.full_text.contains("LiveSuccess") {
+                    eprintln!("DEBUG: Checking live card {} ({}) for LiveSuccess abilities", card_id, card.card_no);
+                    for (ability_idx, ability) in card.abilities.iter().enumerate() {
+                        eprintln!("DEBUG: Live card ability {}: triggers = {:?}", ability_idx, ability.triggers);
+                        // Check for both Japanese and English triggers
+                        if ability.triggers.as_ref().map_or(false, |t| t == "¥é¥¤¥ÖÀ®¸ì" || t.contains("live_success")) {
+                            eprintln!("DEBUG: Found LiveSuccess ability on live card {} ({})", card_id, card.card_no);
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card.card_no.clone()));
                         }
                     }
+                } else {
+                    eprintln!("DEBUG: Live card {} not found in database", card_id);
                 }
             }
         }

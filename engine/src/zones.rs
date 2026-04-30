@@ -306,9 +306,14 @@ impl LiveCardZone {
         // Rule 9.2.1: Calculate total live score from cards in Live Card Zone
         // Score = sum of card scores + bonus from heart satisfaction + cheer blade hearts
         let mut total_score = 0;
+        eprintln!("DEBUG: Calculating live score for {} cards", self.cards.len());
+        
         for card_id in &self.cards {
             if let Some(card) = card_db.get_card(*card_id) {
-                total_score += card.get_score();
+                let card_score = card.get_score();
+                total_score += card_score;
+                eprintln!("DEBUG: Card {} ({}) - base score: {}, running total: {}", 
+                    card_id, card.card_no, card_score, total_score);
                 
                 // Heart satisfaction bonus: if card's need_heart is satisfied, add bonus
                 if let Some(ref need_heart) = card.need_heart {
@@ -323,11 +328,22 @@ impl LiveCardZone {
                         
                         if satisfied {
                             total_score += 1; // Bonus for satisfied heart requirement
+                            eprintln!("DEBUG: Card {} ({}) - heart requirement satisfied, +1 bonus, new total: {}", 
+                                card_id, card.card_no, total_score);
+                        } else {
+                            eprintln!("DEBUG: Card {} ({}) - heart requirement not satisfied", 
+                                card_id, card.card_no);
                         }
                     }
                 }
+            } else {
+                eprintln!("DEBUG: Card {} not found in database", card_id);
             }
         }
+        
+        eprintln!("DEBUG: Final card score: {}, cheer blade hearts: {}, total: {}", 
+            total_score, cheer_blade_heart_count, total_score + cheer_blade_heart_count);
+        
         total_score + cheer_blade_heart_count
     }
 

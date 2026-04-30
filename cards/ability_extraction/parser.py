@@ -329,11 +329,33 @@ def extract_group(text: str) -> Optional[Dict[str, Any]]:
 
 def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
     """Extract cost limit."""
-    # Match patterns like "4コスト以下" or "コスト4以下"
+    # Match patterns like "4コスト以上" or "コスト4以上"
     match = re.search(r'(\d+)コスト(?:以上|以下|未満|超)', text)
     if match:
         return int(match.group(1))
     match = re.search(r'コスト(\d+)(?:以上|以下|未満|超)', text)
+    if match:
+        return int(match.group(1))
+    # Match patterns like "4 below" or "below 4"
+    match = re.search(r'(\d+) below(?:above|below|below|above)', text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'below(\d+)(?:above|below|below|above)', text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'(\d+) below', text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'below (\d+)', text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'(\d+) 以下', text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'以下 (\d+)', text)
+    if match:
+        return int(match.group(1))
+    match = re.search(r'(\d+) 合計', text)
     if match:
         return int(match.group(1))
     return None

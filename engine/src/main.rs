@@ -552,6 +552,13 @@ fn run_web_server() {
     println!("Web server starting on http://127.0.0.1:8080");
     
     // This will block until the server is stopped
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let _ = runtime.block_on(web_server::run_web_server());
+    match tokio::runtime::Runtime::new() {
+        Ok(runtime) => {
+            match runtime.block_on(web_server::run_web_server()) {
+                Ok(_) => println!("Server shutdown gracefully"),
+                Err(e) => eprintln!("Server error: {}", e),
+            }
+        }
+        Err(e) => eprintln!("Failed to create runtime: {}", e),
+    }
 }
