@@ -391,32 +391,10 @@ impl TurnEngine {
     /// Resume an ability that was paused waiting for user choice.
     /// Called when the web server receives a choice submission.
     pub fn resume_with_choice(game_state: &mut GameState, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<(), String> {
-        // First check if the ability queue is waiting for a choice
-        if let Some(choice) = game_state.ability_queue.is_waiting_for_choice().cloned() {
-            let result = Self::build_choice_result(&choice, card_id, card_indices)?;
-            return Self::resume_queue_with_choice(game_state, choice, result);
-        }
-
-        // Take the stored pending ability and choice (old system / direct activation)
-        let pending = game_state.pending_ability.take();
-        let pending_choice_json = game_state.pending_choice.take();
-
-        if pending.is_none() || pending_choice_json.is_none() {
-            return Err("No pending choice to resume".into());
-        }
-
-        let _ = pending;
-        let choice_json = pending_choice_json.unwrap();
-
-        let choice: crate::ability_resolver::Choice = serde_json::from_value(choice_json)
-            .map_err(|e| format!("Failed to deserialize pending choice: {}", e))?;
-
+        let choice = game_state.ability_queue.is_waiting_for_choice().cloned()
+            .ok_or("No pending choice to resume")?;
         let result = Self::build_choice_result(&choice, card_id, card_indices)?;
-
-        // Create a resolver and provide the choice result
-        let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
-        resolver.pending_choice = Some(choice);
-        resolver.provide_choice_result(result)
+        Self::resume_queue_with_choice(game_state, choice, result)
     }
 
     fn build_choice_result(choice: &crate::ability_resolver::Choice, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<crate::ability_resolver::ChoiceResult, String> {
@@ -455,25 +433,31 @@ impl TurnEngine {
     fn resume_queue_with_choice(game_state: &mut GameState, choice: crate::ability_resolver::Choice, result: crate::ability_resolver::ChoiceResult) -> Result<(), String> {
         game_state.ability_queue.resume_with_choice(result.clone());
 
-        let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
-        resolver.pending_choice = Some(choice);
+        let (new_choice, looked_at, res) = {
+            let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+            resolver.pending_choice = Some(choice);
 
-        if let Err(e) = resolver.provide_choice_result(result) {
+            let res = resolver.provide_choice_result(result);
+            let new_choice = resolver.get_pending_choice().cloned();
+            let looked_at = resolver.take_looked_at();
+            (new_choice, looked_at, res)
+        };
+        game_state.looked_at_cards = looked_at;
+
+        if let Err(e) = res {
             game_state.ability_queue.complete_current();
             game_state.pending_choice = None;
-            game_state.pending_ability = None;
             return Err(e);
         }
 
-        if let Some(new_choice) = resolver.get_pending_choice().cloned() {
-            if let Ok(json) = serde_json::to_value(&new_choice) {
+        if let Some(c) = new_choice {
+            if let Ok(json) = serde_json::to_value(&c) {
                 game_state.pending_choice = Some(json);
             }
-            game_state.ability_queue.pause_for_choice(new_choice);
+            game_state.ability_queue.pause_for_choice(c);
         } else {
             game_state.ability_queue.complete_current();
             game_state.pending_choice = None;
-            game_state.pending_ability = None;
             game_state.activating_card = None;
         }
 
@@ -606,111 +590,35 @@ impl TurnEngine {
     }
 
     fn handle_use_ability(game_state: &mut GameState, card_id: Option<i16>) -> Result<(), String> {
-        if let Some(card_id) = card_id {
-            let card_db = game_state.card_database.clone();
-            let turn_number = game_state.turn_number;
-            let player = game_state.active_player_mut();
+        let card_id = card_id.ok_or("No card specified for ability activation")?;
+        let card_db = game_state.card_database.clone();
+        let player = game_state.active_player_mut();
 
-            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-            let mut found_card = None;
-            for area in areas {
-                if let Some(stage_card_id) = player.stage.get_area(area) {
-                    if stage_card_id == card_id {
-                        found_card = Some((area, stage_card_id));
-                        break;
-                    }
-                }
-            }
+        let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+        let stage_card_id = areas.iter().find_map(|a| player.stage.get_area(*a).filter(|&id| id == card_id))
+            .ok_or("Card not found on stage")?;
 
-            if let Some((_area, stage_card_id)) = found_card {
-                if let Some(card) = card_db.get_card(stage_card_id) {
-                    let player_id = player.id.clone();
-                    for (ability_index, ability) in card.abilities.iter().enumerate() {
-                        if ability.triggers.as_ref().map_or(false, |t| {
-                            // Handle all manually activatable abilities according to rules
-                            // 起動 abilities are the primary manual activation abilities
-                            // Use contains() to match position-restricted triggers like "起動, 左サイド"
-                            t.contains(crate::triggers::ACTIVATION) || 
-                            t.contains(crate::triggers::CONSTANT) || 
-                            (t.contains(crate::triggers::AUTO) && ability.cost.is_some()) ||
-                            t.contains("main") || t.contains(crate::triggers::MAIN) ||
-                            t.contains(crate::triggers::BATON_TOUCH)
-                        }) {
-                            if ability.use_limit.is_some() {
-                                let ability_key = format!("{}_{}_{}", stage_card_id, ability_index, turn_number);
-                                game_state.turn_limited_abilities_used.insert(ability_key);
-                            }
+        let card = card_db.get_card(stage_card_id).ok_or("Card not in database")?;
+        let player_id = player.id.clone();
 
-                            let should_trigger_effect = true;
-                            if let Some(ref cost) = ability.cost {
-                                if cost.cost_type.as_deref() == Some("choice_condition") {
-                                    let cost_text = &cost.text;
+        for (_ability_index, ability) in card.abilities.iter().enumerate() {
+            let is_activatable = ability.triggers.as_ref().map_or(false, |t| {
+                t.contains(crate::triggers::ACTIVATION) ||
+                t.contains(crate::triggers::CONSTANT) ||
+                (t.contains(crate::triggers::AUTO) && ability.cost.is_some()) ||
+                t.contains("main") || t.contains(crate::triggers::MAIN) ||
+                t.contains(crate::triggers::BATON_TOUCH)
+            });
+            if !is_activatable { continue; }
 
-                                    if let Some(ref cost_options) = cost.options {
-                                        let option_texts: Vec<&str> = cost_options.iter()
-                                            .map(|opt| opt.text.as_str())
-                                            .collect();
-
-                                        let option_indices: Vec<String> = cost_options.iter()
-                                            .enumerate()
-                                            .map(|(i, _)| i.to_string())
-                                            .collect();
-
-                                        let options_display = option_texts.iter()
-                                            .enumerate()
-                                            .map(|(i, text)| format!("{}. {}", i + 1, text))
-                                            .collect::<Vec<_>>()
-                                            .join("\n");
-
-                                        let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
-                                        resolver.pending_choice = Some(crate::ability_resolver::Choice::SelectTarget {
-                                            target: option_indices.join("|"),
-                                            description: format!("Pay cost to activate ability:\n{}\n{}\nSelect option:", cost_text, options_display),
-                                        });
-                                    }
-                                }
-
-                                if should_trigger_effect {
-                                    let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
-                                    if let Err(e) = resolver.pay_cost(cost) {
-                                        return Err(format!("Failed to pay cost: {}", e));
-                                    }
-                                }
-                            }
-
-                            if should_trigger_effect {
-                                // For activation abilities, execute immediately instead of queuing
-                                let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
-                                if let Err(e) = resolver.resolve_ability(ability, Some(stage_card_id), ability_index) {
-                                    return Err(format!("Failed to resolve activation ability: {}", e));
-                                }
-                                
-                                // Check if there's a pending choice after execution
-                                if let Some(_choice) = resolver.get_pending_choice() {
-                                    // Store pending ability state with choice
-                                    if let Some(ref effect) = ability.effect {
-                                        game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                                            card_no: card.card_no.clone(),
-                                            player_id: player_id.clone(),
-                                            ability_index,
-                                            effect: effect.clone(),
-                                            conditional_choice: None,
-                                            activating_card: Some(stage_card_id),
-                                            action_index: 0,
-                                            cost: None,
-                                            cost_choice: None,
-                                        });
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                return Err("Card not found on stage".to_string());
-            }
-        } else {
-            return Err("No card specified for ability activation".to_string());
+            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+            game_state.trigger_auto_ability(
+                ability_id,
+                crate::game_state::AbilityTrigger::Activation,
+                player_id.clone(),
+                Some(card.card_no.clone()),
+            );
+            game_state.process_pending_auto_abilities(&player_id);
         }
         Ok(())
     }
@@ -971,6 +879,7 @@ impl TurnEngine {
         game_state.player1.areas_locked_this_turn.clear();
         game_state.player2.areas_locked_this_turn.clear();
         game_state.turn_limited_abilities_used.clear();
+        game_state.clear_baton_touch_tracking();
         game_state.clear_card_movement_tracking();
         game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         game_state.current_phase = Phase::Active;

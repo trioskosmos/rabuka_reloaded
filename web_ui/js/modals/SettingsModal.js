@@ -41,16 +41,15 @@ export const SettingsModal = {
     },
 
     toggleLang: async () => {
-        State.currentLang = State.currentLang === 'jp' ? 'en' : 'jp';
-        localStorage.setItem('lovelive_lang', State.currentLang);
+        const newLang = State.currentLang === 'jp' ? 'en' : 'jp';
+        await State.updateUiConfig({ current_lang: newLang });
 
-        await i18n.loadTranslations(State.currentLang);
+        await i18n.loadTranslations(newLang);
         SettingsModal.updateLanguage();
     },
 
     toggleFriendlyAbilities: () => {
-        State.showFriendlyAbilities = !State.showFriendlyAbilities;
-        localStorage.setItem('lovelive_friendly_abilities', String(State.showFriendlyAbilities));
+        State.updateUiConfig({ show_friendly_abilities: !State.showFriendlyAbilities });
         SettingsModal.updateLanguage();
         window.render?.();
     },

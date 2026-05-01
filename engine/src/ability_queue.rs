@@ -37,12 +37,14 @@ pub struct AbilityQueueEntry {
     pub ability_index: usize,
     pub card_id: Option<i16>,
     pub trigger_type: AbilityTrigger,
-    /// Whether this ability has been started (cost paid)
-    pub started: bool,
     /// Whether this ability has been completed
     pub completed: bool,
     /// Stored choice result for resumption
     pub pending_choice_result: Option<crate::ability_resolver::ChoiceResult>,
+    /// Discriminator for choice handlers ("choice", "choice_string", "optional_cost", "position_change")
+    pub choice_card_no: Option<String>,
+    /// JSON-serialized options for choice/choice_string discriminators
+    pub conditional_choice: Option<String>,
 }
 
 /// Unified ability queue with proper state management
@@ -84,6 +86,17 @@ impl AbilityQueue {
             | QueueState::Completed { entry_index } => self.entries.get(*entry_index),
             QueueState::Idle => None,
         }
+    }
+
+    pub fn current_entry_mut(&mut self) -> Option<&mut AbilityQueueEntry> {
+        let idx = match &self.state {
+            QueueState::PayingCost { entry_index }
+            | QueueState::WaitingForChoice { entry_index, .. }
+            | QueueState::ExecutingEffect { entry_index }
+            | QueueState::Completed { entry_index } => *entry_index,
+            QueueState::Idle => return None,
+        };
+        self.entries.get_mut(idx)
     }
 
     /// Number of entries pending or completed
@@ -169,14 +182,6 @@ impl AbilityQueue {
     }
 
     /// Skip remaining abilities for a specific card (e.g., after optional cost skip)
-    pub fn skip_card_abilities(&mut self, card_no: &str) {
-        for entry in self.entries.iter_mut() {
-            if entry.card_no == card_no && !entry.started {
-                entry.completed = true;
-            }
-        }
-    }
-
     /// Clear completed entries to free memory
     pub fn clear_completed(&mut self) {
         self.entries.retain(|e| !e.completed);
@@ -193,19 +198,6 @@ impl AbilityQueue {
     /// Get all pending entries
     pub fn pending_entries(&self) -> Vec<&AbilityQueueEntry> {
         self.entries.iter().filter(|e| !e.completed).collect()
-    }
-
-    /// Transition from paying cost to executing effect
-    pub fn transition_to_executing(&mut self) {
-        match &self.state {
-            QueueState::PayingCost { entry_index } => {
-                if let Some(entry) = self.entries.get_mut(*entry_index) {
-                    entry.started = true;
-                }
-                self.state = QueueState::ExecutingEffect { entry_index: *entry_index };
-            }
-            _ => {}
-        }
     }
 }
 

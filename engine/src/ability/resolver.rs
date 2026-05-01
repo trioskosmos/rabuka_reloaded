@@ -20,10 +20,11 @@ pub struct AbilityResolver<'a> {
 impl<'a> AbilityResolver<'a> {
     pub fn new(game_state: &'a mut GameState) -> Self {
         let activating_card_id = game_state.activating_card;
+        let looked_at_cards = std::mem::take(&mut game_state.looked_at_cards);
         AbilityResolver {
             game_state,
             pending_choice: None,
-            looked_at_cards: Vec::new(),
+            looked_at_cards,
             duration_effects: Vec::new(),
             current_ability: None,
             activating_card_id,
@@ -31,6 +32,10 @@ impl<'a> AbilityResolver<'a> {
             current_effect: None,
             pre_resolution_snapshot: None,
         }
+    }
+
+    pub fn take_looked_at(&mut self) -> Vec<i16> {
+        std::mem::take(&mut self.looked_at_cards)
     }
 
     pub fn capture_snapshot(&mut self) {

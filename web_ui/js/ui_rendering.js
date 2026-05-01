@@ -128,7 +128,7 @@ export const Rendering = {
         const viewState = ViewState.buildRenderModel(state, State, validTargets);
 
         if (State.hotseatMode && State.perspectivePlayer !== viewState.perspectivePlayer) {
-            State.perspectivePlayer = viewState.perspectivePlayer;
+            State.updateUiConfig({ perspective_player: viewState.perspectivePlayer });
         }
 
         const { p0, p1 } = viewState;

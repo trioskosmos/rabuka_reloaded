@@ -7580,9 +7580,26 @@
         "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
           "text": "自分の成功ライブカード置き場のカードが0枚で、かつ相手の成功ライブカード置き場にカードが1枚以上ある",
-          "type": "card_count_condition",
-          "count": 1,
-          "operator": ">="
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分の成功ライブカード置き場のカードが0枚",
+              "type": "location_condition",
+              "location": "success_live_zone",
+              "target": "self",
+              "count": 0,
+              "operator": "=="
+            },
+            {
+              "text": "相手の成功ライブカード置き場にカードが1枚以上ある",
+              "type": "location_condition",
+              "location": "success_live_zone",
+              "target": "opponent",
+              "count": 1,
+              "operator": ">="
+            }
+          ]
         },
         "count": 3,
         "action": "gain_resource",

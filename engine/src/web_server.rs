@@ -217,6 +217,17 @@ pub struct JoinRoomRequest {
 
 
 #[derive(Deserialize)]
+pub struct SetUiConfigRequest {
+    pub current_lang: Option<String>,
+    pub perspective_player: Option<i32>,
+    pub selected_turn: Option<i32>,
+    pub selected_perf_turn: Option<i32>,
+    pub show_friendly_abilities: Option<bool>,
+    pub hotseat_mode: Option<bool>,
+    pub replay_mode: Option<bool>,
+}
+
+#[derive(Deserialize)]
 
 pub struct InitGameRequest {
 
@@ -236,11 +247,38 @@ pub struct ExecCodeRequest {
 
 
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct UiConfig {
+    pub current_lang: String,          // "jp" or "en"
+    pub perspective_player: i32,       // 0 or 1
+    pub selected_turn: i32,            // -1 means all
+    pub selected_perf_turn: i32,       // -1 means latest
+    pub show_friendly_abilities: bool, // Display friendly ability names
+    pub hotseat_mode: bool,
+    pub replay_mode: bool,
+}
+
+impl Default for UiConfig {
+    fn default() -> Self {
+        Self {
+            current_lang: "jp".to_string(),
+            perspective_player: 0,
+            selected_turn: -1,
+            selected_perf_turn: -1,
+            show_friendly_abilities: false,
+            hotseat_mode: false,
+            replay_mode: false,
+        }
+    }
+}
+
 pub struct AppState {
 
     pub game_state: Arc<Mutex<GameState>>,
 
     pub rooms: Arc<Mutex<HashMap<String, Room>>>,
+
+    pub ui_config: Arc<Mutex<UiConfig>>,
 
 }
 
@@ -270,6 +308,12 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         player2: player_to_display(&game_state.player2, &game_state.card_database),
         pending_choice: game_state.pending_choice.clone(),
     }
+}
+
+fn display_with_ui_state(display: GameStateDisplay, ui_config: &UiConfig) -> serde_json::Value {
+    let mut json = serde_json::to_value(display).unwrap();
+    json["ui_config"] = serde_json::to_value(ui_config).unwrap();
+    json
 }
 
 async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
@@ -345,8 +389,12 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
 
 
     let display = game_state_to_display(&game_state);
+    drop(game_state);
 
-    HttpResponse::Ok().json(display)
+    let ui_config = data.ui_config.lock().unwrap();
+    let response = display_with_ui_state(display, &ui_config);
+
+    HttpResponse::Ok().json(response)
 
 }
 
@@ -868,6 +916,40 @@ async fn get_status(data: web::Data<AppState>) -> impl Responder {
 
 
 
+async fn set_ui_config(data: web::Data<AppState>, req: web::Json<SetUiConfigRequest>) -> impl Responder {
+    let mut ui_config = match data.ui_config.lock() {
+        Ok(guard) => guard,
+        Err(e) => {
+            eprintln!("Mutex poisoned in set_ui_config: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({"error": "Mutex poisoned"}));
+        }
+    };
+
+    if let Some(lang) = &req.current_lang {
+        ui_config.current_lang = lang.clone();
+    }
+    if let Some(perspective) = req.perspective_player {
+        ui_config.perspective_player = perspective;
+    }
+    if let Some(turn) = req.selected_turn {
+        ui_config.selected_turn = turn;
+    }
+    if let Some(perf) = req.selected_perf_turn {
+        ui_config.selected_perf_turn = perf;
+    }
+    if let Some(abilities) = req.show_friendly_abilities {
+        ui_config.show_friendly_abilities = abilities;
+    }
+    if let Some(hotseat) = req.hotseat_mode {
+        ui_config.hotseat_mode = hotseat;
+    }
+    if let Some(replay) = req.replay_mode {
+        ui_config.replay_mode = replay;
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "ui_config": &*ui_config}))
+}
+
 async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) -> impl Responder {
 
     // Placeholder for AI mode setting
@@ -913,20 +995,25 @@ async fn undo(data: web::Data<AppState>) -> impl Responder {
             }
 
             let display = game_state_to_display(&game_state);
-
-            HttpResponse::Ok().json(display)
-
+            drop(game_state);
+            
+            let ui_config = data.ui_config.lock().unwrap();
+            let response = display_with_ui_state(display, &ui_config);
+            
+            HttpResponse::Ok().json(response)
+            
         }
-
+        
         Err(e) => {
-
+            
             HttpResponse::BadRequest().json(e)
-
+            
         }
-
+        
     }
-
+    
 }
+
 
 
 
@@ -961,20 +1048,25 @@ async fn redo(data: web::Data<AppState>) -> impl Responder {
             }
 
             let display = game_state_to_display(&game_state);
-
-            HttpResponse::Ok().json(display)
-
+            drop(game_state);
+            
+            let ui_config = data.ui_config.lock().unwrap();
+            let response = display_with_ui_state(display, &ui_config);
+            
+            HttpResponse::Ok().json(response)
+            
         }
-
+        
         Err(e) => {
-
+            
             HttpResponse::BadRequest().json(e)
-
+            
         }
-
+        
     }
-
+    
 }
+
 
 
 
@@ -2193,8 +2285,12 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
     
 
     let display = game_state_to_display(&state_guard);
+    drop(state_guard);
 
-    HttpResponse::Ok().json(display)
+    let ui_config = data.ui_config.lock().unwrap();
+    let response = display_with_ui_state(display, &ui_config);
+
+    HttpResponse::Ok().json(response)
 
 }
 
@@ -2244,6 +2340,8 @@ pub async fn run_web_server() -> std::io::Result<()> {
 
         rooms: rooms.clone(),
 
+        ui_config: Arc::new(Mutex::new(UiConfig::default())),
+
     });
 
     println!("Game UI: http://127.0.0.1:8080");
@@ -2263,6 +2361,7 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/init", web::post().to(init_game))
             .route("/api/status", web::get().to(get_status))
             .route("/api/set_ai", web::post().to(set_ai))
+            .route("/api/ui/config", web::post().to(set_ui_config))
             .route("/api/undo", web::post().to(undo))
             .route("/api/redo", web::post().to(redo))
             .route("/api/exec", web::post().to(exec_code))

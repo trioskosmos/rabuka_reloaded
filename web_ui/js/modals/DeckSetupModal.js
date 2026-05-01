@@ -1,31 +1,12 @@
 import { State } from '../state.js';
 import { Network } from '../network.js';
 import { Modals } from '../ui_modals.js';
-import { validator } from '../components/DeckValidator.js';
 import { ModalManager } from '../utils/ModalManager.js';
-
-let deckModalInputBound = false;
 
 export const DeckSetupModal = {
     openDeckModal: () => {
         ModalManager.show('deck-modal');
-        validator.init();
         Modals.fetchAndPopulateDecks();
-
-        const input = document.getElementById('deck-html-input');
-        if (input && !deckModalInputBound) {
-            input.addEventListener('input', () => DeckSetupModal.validateInline());
-            deckModalInputBound = true;
-        }
-    },
-
-    validateInline: () => {
-        const input = document.getElementById('deck-html-input');
-        const preview = document.getElementById('deck-preview');
-        if (!input || !preview) return;
-
-        const results = validator.validateDeckString(input.value);
-        validator.renderPreview(results, preview);
     },
 
     closeDeckModal: () => {
@@ -100,22 +81,6 @@ export const DeckSetupModal = {
             return;
         }
 
-        const results = validator.validateDeckString(content);
-        if (results.parsed.length === 0 && results.parsedEnergy.length === 0) {
-            alert("No cards found in the provided content.");
-            return;
-        }
-
-        let mainDeck = [];
-        let energyDeck = [];
-
-        results.parsed.forEach(p => {
-            for (let i = 0; i < p.count; i++) mainDeck.push(p.code);
-        });
-        results.parsedEnergy.forEach(p => {
-            for (let i = 0; i < p.count; i++) energyDeck.push(p.code);
-        });
-
         const playerIds = (playerVal === 'both') ? [0, 1] : [parseInt(playerVal)];
 
         for (const pid of playerIds) {
@@ -125,8 +90,7 @@ export const DeckSetupModal = {
                     headers: Network.getHeaders(),
                     body: JSON.stringify({
                         player: pid,
-                        deck: mainDeck,
-                        energy_deck: energyDeck
+                        deck: content
                     })
                 });
                 const result = await resp.json();

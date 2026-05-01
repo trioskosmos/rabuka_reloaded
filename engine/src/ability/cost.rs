@@ -68,17 +68,9 @@ impl<'a> AbilityResolver<'a> {
                         target: "choice_condition".to_string(),
                         description: format!("Choose cost option: {}", option_texts.join(" OR ")),
                     });
-                    self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                        card_no: "choice_cost".to_string(),
-                        player_id: "self".to_string(),
-                        action_index: 0,
-                        effect: AbilityEffect { text: cost.text.clone(), action: "choice_condition".into(), ..Default::default() },
-                        conditional_choice: None,
-                        activating_card: None,
-                        ability_index: 0,
-                        cost: Some(cost.clone()),
-                        cost_choice: None,
-                    });
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.choice_card_no = Some("choice_cost".to_string());
+                    }
                     return Ok(());
                 } else {
                     return Err("Choice condition cost has no options".to_string());
@@ -98,19 +90,6 @@ impl<'a> AbilityResolver<'a> {
                         count: count as usize,
                         description: format!("Select card(s) to pay optional cost (or skip): {}", cost.text),
                         allow_skip: true,
-                    });
-                    self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                        card_no: "optional_cost".to_string(),
-                        player_id: "self".to_string(),
-                        action_index: 0,
-                        effect: AbilityEffect {
-                            text: cost.text.clone(), action: cost.cost_type.clone().unwrap_or_default(),
-                            source: cost.source.clone(), destination: cost.destination.clone(),
-                            count: cost.count, card_type: cost.card_type.clone(), target: cost.target.clone(),
-                            effect_type: None, ..Default::default()
-                        },
-                        conditional_choice: None, activating_card: None, ability_index: 0,
-                        cost: Some(cost.clone()), cost_choice: None,
                     });
                     return Ok(());
                 }
@@ -193,13 +172,9 @@ impl<'a> AbilityResolver<'a> {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay optional cost: {}? (pay or skip)", cost_description),
                     });
-                    let actual_effect = self.current_ability.as_ref().and_then(|a| a.effect.clone());
-                    self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                        card_no: "optional_cost".to_string(), player_id: "self".to_string(),
-                        action_index: 0, effect: actual_effect.unwrap_or_default(),
-                        conditional_choice: None, activating_card: None, ability_index: 0,
-                        cost: Some(cost.clone()), cost_choice: None,
-                    });
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.choice_card_no = Some("optional_cost".to_string());
+                    }
                     return Ok(());
                 }
 
@@ -224,13 +199,9 @@ impl<'a> AbilityResolver<'a> {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),
                     });
-                    let actual_effect = self.current_ability.as_ref().and_then(|a| a.effect.clone());
-                    self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
-                        card_no: "optional_cost".to_string(), player_id: "self".to_string(),
-                        action_index: 0, effect: actual_effect.unwrap_or_default(),
-                        conditional_choice: None, activating_card: None, ability_index: 0,
-                        cost: Some(cost.clone()), cost_choice: None,
-                    });
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.choice_card_no = Some("optional_cost".to_string());
+                    }
                     return Ok(());
                 }
 

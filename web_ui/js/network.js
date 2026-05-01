@@ -51,7 +51,7 @@ export const Network = {
     fetchState: () => GameService.fetchState(Network),
     sendAction: (action) => GameService.sendAction(action, Network),
     resetGame: () => GameService.resetGame(Network),
-    startOffline: (userInitiated) => GameService.startOffline(userInitiated, Network),
+    startOffline: null,
     changeAI: (aiMode) => GameService.changeAI(aiMode, Network),
 
     // --- Debug Service (Delegated to DebugService) ---

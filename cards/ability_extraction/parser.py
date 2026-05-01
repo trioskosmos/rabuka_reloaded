@@ -339,35 +339,11 @@ def extract_group(text: str) -> Optional[Dict[str, Any]]:
 
 def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
     """Extract cost limit."""
-    # Match patterns like "4コスト以上" or "コスト4以上"
-    match = re.search(r'(\d+)コスト(?:以上|以下|未満|超)', text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r'コスト(\d+)(?:以上|以下|未満|超)', text)
-    if match:
-        return int(match.group(1))
-
-    match = re.search(r'(\d+) 以下', text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r'以下 (\d+)', text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r'(\d+) 合計', text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r'(\d+) 以下', text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r'(\d+) 以下', text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r'(\d+) 合計以下', text)
-    if match:
-        return int(match.group(1))
-    match = re.search(r'(\d+) 以下', text)
-    if match:
-        return int(match.group(1))
+    for pat in [r'(\d+)コスト(?:以上|以下|未満|超)', r'コスト(\d+)(?:以上|以下|未満|超)',
+                r'(\d+)\s*以下', r'以下\s*(\d+)', r'(\d+)\s*合計']:
+        m = re.search(pat, text)
+        if m:
+            return int(m.group(1))
     return None
 
 def extract_deck_position(text: str) -> Optional[int]:
@@ -639,6 +615,31 @@ def parse_condition(text: str) -> Dict[str, Any]:
         'text': text
     }
     
+    # Check for compound conditions (かつ or あり、) - MUST CHECK EARLY before count patterns
+    # that would match on part of the compound text (e.g. "1枚以上ある" matching in a "かつ" text)
+    if COMPOUND_OPERATOR in text or COMPOUND_OPERATOR_ALT in text:
+        operator = COMPOUND_OPERATOR if COMPOUND_OPERATOR in text else COMPOUND_OPERATOR_ALT
+        parts = [p.strip() for p in text.split(operator) if p.strip()]
+        if len(parts) >= 2:
+            parsed_conditions = [parse_condition(p) for p in parts]
+            if len(parsed_conditions) >= 2:
+                compound = {
+                    'type': 'compound',
+                    'operator': 'and',
+                    'conditions': parsed_conditions,
+                    'text': text
+                }
+                target = extract_target(text)
+                if target:
+                    compound['target'] = target
+                location = extract_location(text)
+                if location:
+                    compound['location'] = location
+                card_type = extract_card_type(text)
+                if card_type:
+                    compound['card_type'] = card_type
+                return compound
+    
     # Check for distinct conditions (名前が異なる) - MUST CHECK EARLY before count conditions
     if '名前が異なる' in text or 'ユニット名がそれぞれ異なる' in text:
         # Use location_condition with distinct field instead of distinct_condition
@@ -822,6 +823,14 @@ def parse_condition(text: str) -> Dict[str, Any]:
                     condition['type'] = 'location_condition'
                     condition['location'] = loc_code
                     condition['target'] = 'either'  # either self or opponent
+                    # Extract cost limit from text (e.g., "コスト13以上")
+                    cost_limit = extract_cost_limit(text)
+                    if cost_limit:
+                        condition['cost_limit'] = cost_limit
+                    # Extract operator (e.g., "以上" -> ">=")
+                    operator = extract_operator(text)
+                    if operator:
+                        condition['operator'] = operator
                     return condition
     
     # Check for movement conditions
@@ -956,37 +965,8 @@ def parse_condition(text: str) -> Dict[str, Any]:
         condition['location'] = 'stage'
         return condition
     
-    # Check for compound conditions (かつ or あり、) - MUST CHECK AFTER distinct conditions
-    if COMPOUND_OPERATOR in text or COMPOUND_OPERATOR_ALT in text:
-        # Use whichever operator is present
-        operator = COMPOUND_OPERATOR if COMPOUND_OPERATOR in text else COMPOUND_OPERATOR_ALT
-        parts = [p.strip() for p in text.split(operator) if p.strip()]
-        if len(parts) >= 2:
-            parsed_conditions = [parse_condition(p) for p in parts]
-            # Don't filter out custom conditions - keep structure even if unparsed
-            if len(parsed_conditions) >= 2:
-                compound = {
-                    'type': 'compound',
-                    'operator': 'and',
-                    'conditions': parsed_conditions,
-                    'text': text
-                }
-                # Extract common fields that apply to the whole compound
-                # Check for target
-                target = extract_target(text)
-                if target:
-                    compound['target'] = target
-                # Check for location
-                location = extract_location(text)
-                if location:
-                    compound['location'] = location
-                # Check for card type
-                card_type = extract_card_type(text)
-                if card_type:
-                    compound['card_type'] = card_type
-                return compound
-    
-    
+
+
     
     # Extract target
     target = extract_target(text)
@@ -1324,15 +1304,6 @@ def parse_action(text: str) -> Dict[str, Any]:
     card_type = extract_card_type(text)
     state_change = extract_state_change(text)
     
-    # Apply per_unit_info if it was set
-    if 'per_unit_info' in locals():
-        action.update(per_unit_info)
-    else:
-        action = {
-            'text': text,
-        }
-    
-    # Apply per_unit_info if it was set
     if 'per_unit_info' in locals():
         action.update(per_unit_info)
     
@@ -1718,9 +1689,9 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: '置く' in t or '置いて' in t, 'move_cards',
       lambda t, a: a.update({'destination': _infer_dest(t)}) if 'destination' not in a else None)
     R(lambda t: 'ブレードを得る' in t or '選んだブレード' in t, 'gain_resource',
-      lambda t, a: a.update({'resource': 'blade', 'count': _ic(t, '{{icon_blade.png|ブレード}')}))
-    R(lambda t: '{{icon_blade.png|ブレード' in t and '得る' in t, 'gain_resource',
-      lambda t, a: a.update({'resource': 'blade', 'count': t.count('{{icon_blade.png|ブレード}') or None}))
+      lambda t, a: a.update({'resource': 'blade', 'count': _ic(t, '{{icon_blade.png|ブレード}}')}))
+    R(lambda t: '{{icon_blade.png|ブレード}}' in t and '得る' in t, 'gain_resource',
+      lambda t, a: a.update({'resource': 'blade', 'count': t.count('{{icon_blade.png|ブレード}}') or None}))
     R(lambda t: ('{{heart' in t and '得る' in t) or 'ハートを得る' in t or '選んだハート' in t, 'gain_resource',
       lambda t, a: a.update({'resource': 'heart', 'count': len(__import__('re').findall(r'{{heart_\d+\.png|heart\d+}}', t)) or None}))
     R(lambda t: 'もう1度ヤル' in t or 'レヤル' in t, 're_yell',
@@ -1850,11 +1821,6 @@ def _infer_dest(text):
 
 def post_process_action_comprehensive(action: Dict[str, Any]) -> Dict[str, Any]:
     """Comprehensive post-processing for all action types and nested levels."""
-    # Debug: Show we're processing this action
-    action_type = action.get('action', 'no_action')
-    action_text = action.get('text', '')[:30]
-    print(f"DEBUG: post_process_action_comprehensive called for {action_type}: {action_text}...")
-    
     # Post-processing for missing resource field in gain_resource actions
     if action.get('action') == 'gain_resource':
         if 'resource' not in action:
@@ -1896,8 +1862,7 @@ def post_process_action_comprehensive(action: Dict[str, Any]) -> Dict[str, Any]:
                 action['card_type'] = 'card'
             # Infer from source if text doesn't specify
             elif source == 'hand':
-                print(f"DEBUG: Setting card_type='card' for source='hand', text='{action_text[:30]}...'")
-                action['card_type'] = 'card'  # Hand cards are generic cards
+                action['card_type'] = 'card'
             elif source == 'deck' or source == 'deck_top':
                 action['card_type'] = 'card'  # Deck cards are generic
             elif source == 'revealed_cards' or source == 'revealed_remaining':
@@ -1907,8 +1872,7 @@ def post_process_action_comprehensive(action: Dict[str, Any]) -> Dict[str, Any]:
             elif source == 'discard':
                 action['card_type'] = 'card'  # Discard can have any card
             elif 'card_type' not in action:
-                print(f"DEBUG: Default fallback for move_cards, text='{action_text[:30]}...', source='{source}'")
-                action['card_type'] = 'card'  # Default fallback
+                action['card_type'] = 'card'
     
     # Post-processing for state_change inference
     if action.get('action') == 'move_cards':
@@ -1921,15 +1885,8 @@ def post_process_action_comprehensive(action: Dict[str, Any]) -> Dict[str, Any]:
     has_count = 'count' in action and action['count'] is not None
     has_dynamic_count = 'dynamic_count' in action and action['dynamic_count'] is not None
     
-    # Debug for ability 13
-    if 'heart_01' in action_text and 'heart_03' in action_text:
-        print(f"DEBUG: Ability 13 action - per_unit={action.get('per_unit')}, has_count={has_count}, has_dynamic_count={has_dynamic_count}, count={action.get('count')}")
-    
     # Handle per_unit case: convert count=None to dynamic_count
     if action.get('per_unit') and not has_dynamic_count:
-        action_text_debug = action.get('text', '')[:50]
-        print(f"DEBUG: Adding dynamic_count for per_unit action: {action_text_debug}...")
-        print(f"DEBUG: per_unit={action.get('per_unit')}, has_count={has_count}, count={action.get('count')}")
         action['dynamic_count'] = {'type': 'per_unit', 'reference': 'unit_count'}
         # Remove count if it's None
         if 'count' in action and action['count'] is None:
@@ -2154,10 +2111,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
     """Parse an effect text."""
     text = normalize_fullwidth_digits(text).strip()
     text = strip_suffix_period(text)
-    
-    # Debug: Track ability 13
-    if 'heart_01' in text and 'heart_03' in text and 'heart_06' in text:
-        print(f"DEBUG: Parsing ability 13: {text[:50]}...")
     
     # Check for per-unit scaling (check this FIRST before other parsing splits the text)
     # Exclude '各グループ名につき' pattern as it's handled differently
@@ -2529,8 +2482,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 elif 'カード' in per_unit_text:
                     effect['per_unit_type'] = 'card'
                 # Infer action from text
-    # Post-processing: if we have a cost modification pattern that wasn't caught, handle it here
-    # This catches cases where the per-unit check was skipped but the effect still has custom action
     if ('action' not in effect or effect.get('action') == 'custom') and 'コストは' in text and '減る' in text and 'につき' in text:
         # This is a cost modification pattern, handle it
         parts = text.split('。', 1)
@@ -3864,9 +3815,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
                     # Default to 1 if not specified
                     effect['count'] = 1
     
-    # Final post-processing for count/dynamic_count on the main effect
-    if 'heart_01' in text and 'heart_03' in text and 'heart_06' in text:
-        print(f"DEBUG: End of parse_effect for ability 13, calling post_process")
     post_process_action_comprehensive(effect)
     
     return effect
@@ -3964,17 +3912,21 @@ if __name__ == '__main__':
                             existing_actions.append(parsed_action)
                     effect['actions'] = existing_actions
                 elif key == 'condition' and isinstance(value, dict):
-                    # Merge condition fields
                     existing_condition = effect.get('condition')
                     if existing_condition and isinstance(existing_condition, dict):
-                        # Always add these specific condition fields
-                        always_add_cond_fields = {'baton_touch_source', 'baton_touch_group', 'movement_state', 'includes_pattern', 'no_excess_heart', 'group', 'comparison_type', 'operator', 'modification_type', 'value'}
+                        always_add_cond_fields = {'baton_touch_source', 'baton_touch_group', 'movement_state', 'includes_pattern', 'no_excess_heart', 'group', 'comparison_type', 'operator', 'modification_type', 'value', 'cost_limit'}
                         for cond_key, cond_value in value.items():
                             if cond_key in always_add_cond_fields or cond_key not in existing_condition:
                                 existing_condition[cond_key] = cond_value
+                        # Clean up stale scalar keys in existing_condition that aren't in parsed
+                        parsed_keys = set(value.keys())
+                        for stale_key in list(existing_condition.keys()):
+                            if stale_key == 'text':
+                                continue
+                            if stale_key not in parsed_keys and not isinstance(existing_condition[stale_key], (list, dict)):
+                                del existing_condition[stale_key]
                         effect['condition'] = existing_condition
                     else:
-                        # If no existing condition or not a dict, use the parsed one
                         effect['condition'] = value
                 elif key in always_add_effect_fields or key not in effect:
                     effect[key] = value
@@ -4001,6 +3953,8 @@ if __name__ == '__main__':
             if full_text.startswith('(') or full_text.startswith('（'):
                 effect_type = 'continuous'
             elif ability.get('is_null') == True:
+                effect_type = 'continuous'
+            elif isinstance(triggers, str) and '常時' in triggers:
                 effect_type = 'continuous'
 
         # Replacement effects: contain 代わりに (instead of)
@@ -4057,13 +4011,4 @@ if __name__ == '__main__':
     with open(abilities_file, 'w', encoding='utf-8') as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
     
-    print("Processed abilities.json with parser.py")
-    print("Processed abilities.json with parser.py")
-
-    with open(abilities_file, 'w', encoding='utf-8') as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-    
-    print("Processed abilities.json with parser.py")
-    print("Processed abilities.json with parser.py")
-    print("Processed abilities.json with parser.py")
     print("Processed abilities.json with parser.py")

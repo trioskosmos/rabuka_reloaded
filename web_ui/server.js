@@ -210,20 +210,66 @@ app.post('/api/exec', async (req, res) => {
     }
 });
 
-app.post('/api/rooms/leave', async (req, res) => {
-    res.json({ success: true });
-});
-
 app.post('/api/rooms/create', async (req, res) => {
-    res.json({ success: true, room_id: 'local', session: {} });
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/rooms/create`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(req.body)
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to create room' });
+    }
 });
 
 app.post('/api/rooms/join', async (req, res) => {
-    res.json({ success: true, room_id: 'local', session: {} });
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/rooms/join`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(req.body)
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to join room' });
+    }
+});
+
+app.post('/api/rooms/leave', async (req, res) => {
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/rooms/leave`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(req.body)
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to leave room' });
+    }
 });
 
 app.get('/api/rooms/list', async (req, res) => {
-    res.json({ success: true, rooms: [] });
+    try {
+        const response = await fetch(`${RUST_API_URL}/api/rooms/list`);
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Error proxying to Rust API:', error);
+        res.status(500).json({ error: 'Failed to list rooms' });
+    }
 });
 
 app.get('/api/get_card_registry', async (req, res) => {

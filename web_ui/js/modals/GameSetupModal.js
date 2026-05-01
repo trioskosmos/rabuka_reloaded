@@ -1,25 +1,8 @@
 import { State } from '../state.js';
 import { Network } from '../network.js';
 import { Modals } from '../ui_modals.js';
-import { validator } from '../components/DeckValidator.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS, DISPLAY_VALUES } from '../constants_dom.js';
-
-const inlineValidationBound = new Set();
-
-function bindInlineValidation(playerId) {
-    if (inlineValidationBound.has(playerId)) {
-        return;
-    }
-
-    const input = document.getElementById(`p${playerId}-deck-paste`);
-    if (!input) {
-        return;
-    }
-
-    input.addEventListener('input', () => GameSetupModal.validateInline(playerId));
-    inlineValidationBound.add(playerId);
-}
 
 export const GameSetupModal = {
     openSetupModal: (mode) => {
@@ -27,15 +10,10 @@ export const GameSetupModal = {
         ModalManager.show(DOM_IDS.MODAL_SETUP);
         ModalManager.hide(DOM_IDS.MODAL_ROOM);
 
-        validator.init();
-
         Modals.fetchAndPopulateDecks().then(() => {
             Modals.populateDeckSelect('p0-deck-select', Modals.deckPresets);
             Modals.populateDeckSelect('p1-deck-select', Modals.deckPresets);
         });
-
-        bindInlineValidation(0);
-        bindInlineValidation(1);
 
         const p0Col = document.getElementById('setup-p0-col');
         const p1Col = document.getElementById('setup-p1-col');
@@ -54,15 +32,6 @@ export const GameSetupModal = {
                 if (p1Title) p1Title.textContent = (mode === 'pve') ? '[AI] Player 2 (AI)' : '[P2] Player 2 (Opponent)';
             }
         }
-    },
-
-    validateInline: (pid) => {
-        const input = document.getElementById(`p${pid}-deck-paste`);
-        const preview = document.getElementById(`p${pid}-deck-preview`);
-        if (!input || !preview) return;
-
-        const results = validator.validateDeckString(input.value);
-        validator.renderPreview(results, preview);
     },
 
     closeSetupModal: () => {
@@ -107,28 +76,7 @@ export const GameSetupModal = {
                 energy: data.energy || []
             };
         } else if (config.type === 'manual') {
-            const content = config.content || "";
-            const validation = validator.validateDeckString(content);
-
-            const main = [];
-            for (const item of validation.parsed) {
-                if (item.valid) {
-                    for (let i = 0; i < item.count; i++) {
-                        main.push(item.code);
-                    }
-                }
-            }
-
-            const energy = [];
-            for (const item of validation.parsedEnergy) {
-                if (item.valid) {
-                    for (let i = 0; i < item.count; i++) {
-                        energy.push(item.code);
-                    }
-                }
-            }
-
-            return { main, energy };
+            return { main: [], energy: [] };
         }
         return null;
     },

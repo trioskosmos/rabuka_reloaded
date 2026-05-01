@@ -1,8 +1,6 @@
 import { State, updateStateData } from '../state.js';
 import { log } from '../logger.js';
-import { Phase, getAppBaseUrl } from '../constants.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
-import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS, COLORS } from '../constants_dom.js';
 
 export const GameService = {
@@ -45,16 +43,6 @@ export const GameService = {
     fetchState: async (networkFacade) => {
         try {
             if (State.replayMode) return;
-
-            if (State.offlineMode) {
-                if (!State.wasmAdapter) return;
-                const res = await State.wasmAdapter.fetchState();
-                if (res.success) {
-                    updateStateData(res.state);
-                    if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
-                }
-                return;
-            }
 
             // Simple state machine: get current state and actions
             const [stateRes, actionsRes] = await Promise.all([
@@ -136,16 +124,6 @@ export const GameService = {
         State.resetForNewGame();
         if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
 
-        if (State.offlineMode) {
-            const res = await State.wasmAdapter.resetGame();
-            if (res.success) {
-                updateStateData(res.state);
-                window.lastShownPerformanceHash = "";
-                log('New game started');
-            }
-            return;
-        }
-
         try {
             // Updated endpoint to match current backend
             const res = await fetch('api/init', {
@@ -192,51 +170,6 @@ export const GameService = {
             if (networkFacade?.fetchState) await networkFacade.fetchState();
         } catch (e) {
             log(`Reset error: ${e.message}`);
-        }
-    },
-
-    startOffline: async (userInitiated = true, networkFacade) => {
-        if (userInitiated) {
-            const confirmMsg = "Offline mode runs entirely in your browser using WebAssembly.\n\n" +
-                "It may take a moment to load the engine.";
-            if (!confirm(confirmMsg)) return;
-        }
-
-        try {
-            if (!State.wasmAdapter) {
-                try {
-                    const base = getAppBaseUrl();
-                    const mod = await import(`${base}js/wasm_adapter.js`);
-                    State.wasmAdapter = mod.wasmAdapter;
-                    await State.wasmAdapter.init();
-                } catch (e) {
-                    console.error("Failed to load WASM:", e);
-                    alert("Failed to load Offline Engine: " + e.message);
-                    return;
-                }
-            }
-
-            State.offlineMode = true;
-            State.roomCode = null;
-            State.sessionToken = null;
-            if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
-            updateStateData(null);
-
-            ModalManager.hide(DOM_IDS.MODAL_ROOM);
-            DOMUtils.setText(DOM_IDS.HEADER_DEBUG_INFO, "Offline (WASM)");
-
-            if (networkFacade?.triggerRoomUpdate) networkFacade.triggerRoomUpdate();
-
-            const res = await State.wasmAdapter.resetGame();
-            if (res.success) {
-                updateStateData(res.state);
-                log("Offline Game Started!");
-            } else {
-                alert("Failed to start offline game: " + res.error);
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Offline mode error: " + e.message);
         }
     },
 

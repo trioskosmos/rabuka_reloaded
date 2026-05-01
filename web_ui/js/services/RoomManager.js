@@ -27,7 +27,7 @@ export const RoomManager = {
         const key = `lovelive_session_${room}`;
         localStorage.setItem(key, JSON.stringify(normalized));
         State.sessionToken = normalized.token;
-        if (normalized.playerId !== undefined) State.perspectivePlayer = normalized.playerId;
+        if (normalized.playerId !== undefined) State.updateUiConfig({ perspective_player: normalized.playerId });
     },
 
     loadSession: (room) => {
@@ -40,7 +40,7 @@ export const RoomManager = {
                 const normalized = RoomManager.normalizeSession(data);
                 if (normalized?.token) {
                     State.sessionToken = normalized.token;
-                    if (normalized.playerId !== undefined) State.perspectivePlayer = normalized.playerId;
+                    if (normalized.playerId !== undefined) State.updateUiConfig({ perspective_player: normalized.playerId });
                     return normalized;
                 }
             } catch (e) {

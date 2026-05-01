@@ -427,7 +427,10 @@ impl EnergyZone {
 
 #[derive(Debug, Clone)]
 pub struct MainDeck {
-    pub cards: SmallVec<[i16; 60]>,  // Card IDs - stack-allocated for up to 60 cards
+    /// Card IDs. **Index 0 = top of deck.** Drawing/peeking reads from index 0.
+    /// Pushing to the end (`cards.push()`) adds to the bottom.
+    /// To put a card on top, use `cards.insert(0, id)`.
+    pub cards: SmallVec<[i16; 60]>,
 }
 
 impl MainDeck {
@@ -442,6 +445,7 @@ impl MainDeck {
         self.cards.shuffle(&mut rand::thread_rng());
     }
 
+    /// Draw the top card (index 0). Returns None if deck is empty.
     pub fn draw(&mut self) -> Option<i16> {
         if self.cards.is_empty() {
             None
@@ -454,6 +458,7 @@ impl MainDeck {
         (0..count).filter_map(|_| self.draw()).collect()
     }
 
+    /// Peek at the top `count` cards (indices 0..count). Does not remove them.
     pub fn peek_top(&self, count: usize) -> Vec<i16> {
         self.cards.iter().take(count).copied().collect()
     }

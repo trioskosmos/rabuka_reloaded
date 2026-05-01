@@ -138,7 +138,7 @@ const actionHandlers = {
     'submit-game-setup': Modals.submitGameSetup,
     'open-setup-modal': ({ value }) => Modals.openSetupModal(value),
     'join-room': () => Network.joinRoom(document.getElementById('room-code-input')?.value || ''),
-    'start-offline': Network.startOffline,
+    'start-offline': () => { console.warn('Offline mode removed. Use Rust backend via Express proxy.'); },
     'force-reset': () => window.App.forceReset(),
     'set-perspective': ({ value }) => window.Actions.setPerspective(value),
     'close-log-viewer': LogViewerModal.close,

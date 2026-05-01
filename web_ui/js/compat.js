@@ -80,13 +80,14 @@ export function initializeGlobals(controller = {}) {
     window.Actions = {
         sendAction: (actionId, target = null) => Network.sendAction(actionId, target),
         doAction: (actionId, target = null) => Network.sendAction(actionId, target),
-        toggleHotseat: () => { State.hotseatMode = !State.hotseatMode; window.render(); },
+        toggleHotseat: () => { State.updateUiConfig({ hotseat_mode: !State.hotseatMode }); window.render(); },
         toggleLiveWatch: () => { State.isLiveWatchOn = !State.isLiveWatchOn; controller.restartPolling?.(); window.render(); },
-        togglePerspective: () => { State.perspectivePlayer = 1 - State.perspectivePlayer; window.render(); },
+        togglePerspective: () => { State.updateUiConfig({ perspective_player: 1 - State.perspectivePlayer }); window.render(); },
         setPerspective: (id) => {
-            State.perspectivePlayer = parseInt(id, 10);
+            const pid = parseInt(id, 10);
+            State.updateUiConfig({ perspective_player: pid });
             ModalManager.hide(DOM_IDS.MODAL_PERSPECTIVE);
-            DOMUtils.setText(DOM_IDS.SWITCH_BTN, `View: P${State.perspectivePlayer + 1}`);
+            DOMUtils.setText(DOM_IDS.SWITCH_BTN, `View: P${pid + 1}`);
             Network.fetchState();
         },
         leaveRoom: () => Network.leaveRoom(),
@@ -97,7 +98,7 @@ export function initializeGlobals(controller = {}) {
         changeAI: (m) => Network.changeAI(m),
         forceAction: (id) => Network.forceAction(id),
         execCode: (c) => Network.execCode(c),
-        startOffline: (u) => Network.startOffline(u)
+        startOffline: null
     };
 
     // ============================================================
@@ -124,7 +125,6 @@ export function initializeGlobals(controller = {}) {
     window.changeAI = window.Actions.changeAI;
     window.forceAction = window.Actions.forceAction;
     window.execCode = window.Actions.execCode;
-    window.startOffline = window.Actions.startOffline;
 
     // ============================================================
     // Modals Object & Methods

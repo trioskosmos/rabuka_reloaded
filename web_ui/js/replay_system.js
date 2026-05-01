@@ -15,10 +15,10 @@ export const Replay = {
     setRenderCallback: (cb) => { onRender = cb; },
 
     toggleReplayMode: () => {
-        State.replayMode = !State.replayMode;
+        State.updateUiConfig({ replay_mode: !State.replayMode });
         const controls = document.getElementById(DOM_IDS.REPLAY_CONTROLS);
-        if (controls) controls.style.display = State.replayMode ? DISPLAY_VALUES.FLEX : DISPLAY_VALUES.NONE;
-        if (!State.replayMode && State.playInterval) Replay.stopPlay();
+        if (controls) controls.style.display = !State.replayMode ? DISPLAY_VALUES.FLEX : DISPLAY_VALUES.NONE;
+        if (State.replayMode && State.playInterval) Replay.stopPlay();
     },
 
     loadReplay: async () => {

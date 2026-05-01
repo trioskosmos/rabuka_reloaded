@@ -1,4 +1,4 @@
-use crate::card::CardDatabase;
+use crate::card::{BladeColor, CardDatabase};
 use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::player::Player;
 use crate::zones::ResolutionZone;
@@ -6,177 +6,9 @@ use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
-pub struct ModMap<T: Clone> {
-    inner: HashMap<i16, T>,
-}
-
-impl<T: Clone> ModMap<T> {
-    pub fn new() -> Self { Self { inner: HashMap::new() } }
-    pub fn get(&self, k: i16) -> Option<&T> { self.inner.get(&k) }
-    pub fn set(&mut self, k: i16, v: T) { self.inner.insert(k, v); }
-    pub fn remove(&mut self, k: i16) { self.inner.remove(&k); }
-    pub fn clear(&mut self) { self.inner.clear(); }
-    pub fn contains(&self, k: i16) -> bool { self.inner.contains_key(&k) }
-    pub fn keys(&self) -> impl Iterator<Item = &i16> { self.inner.keys() }
-    pub fn values(&self) -> impl Iterator<Item = &T> { self.inner.values() }
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&i16, &mut T)> { self.inner.iter_mut() }
-    pub fn len(&self) -> usize { self.inner.len() }
-    pub fn is_empty(&self) -> bool { self.inner.is_empty() }
-    pub fn entry(&mut self, k: i16) -> std::collections::hash_map::Entry<'_, i16, T> { self.inner.entry(k) }
-}
-
-impl<T: Clone> Default for ModMap<T> {
-    fn default() -> Self { Self::new() }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AbilityTrigger {
-    Activation,           // 起動
-    Debut,               // 登場
-    LiveStart,           // ライブ開始時
-    LiveSuccess,         // ライブ成功時
-    Constant,            // 常時
-    Auto,                // 自動 (generic auto ability)
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TurnPhase {
-    FirstAttackerNormal,   // Rule 7.3.2.1
-    SecondAttackerNormal,  // Rule 7.3.2.1
-    Live,                  // Rule 8.1
-}
-
-impl std::fmt::Display for TurnPhase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TurnPhase::FirstAttackerNormal => write!(f, "FirstAttackerNormal"),
-            TurnPhase::SecondAttackerNormal => write!(f, "SecondAttackerNormal"),
-            TurnPhase::Live => write!(f, "Live"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Phase {
-    // Pre-game phases (Rule 6.2)
-    RockPaperScissors,
-    ChooseFirstAttacker,  // Q16: RPS winner chooses turn order
-    MulliganP1Turn,
-    MulliganP2Turn,
-    Active,
-    Energy,
-    Draw,
-    Main,
-    LiveCardSetP1Turn,
-    LiveCardSetP2Turn,
-    FirstAttackerPerformance,
-    SecondAttackerPerformance,
-    LiveVictoryDetermination,
-    // Additional phases for bot compatibility
-    LiveStart,
-    LiveSuccess,
-    Cheer,
-}
-
-impl std::fmt::Display for Phase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Phase::RockPaperScissors => write!(f, "RockPaperScissors"),
-            Phase::ChooseFirstAttacker => write!(f, "ChooseFirstAttacker"),
-            Phase::MulliganP1Turn => write!(f, "MulliganP1Turn"),
-            Phase::MulliganP2Turn => write!(f, "MulliganP2Turn"),
-            Phase::Active => write!(f, "Active"),
-            Phase::Energy => write!(f, "Energy"),
-            Phase::Draw => write!(f, "Draw"),
-            Phase::Main => write!(f, "Main"),
-            Phase::LiveCardSetP1Turn => write!(f, "LiveCardSetP1Turn"),
-            Phase::LiveCardSetP2Turn => write!(f, "LiveCardSetP2Turn"),
-            Phase::FirstAttackerPerformance => write!(f, "FirstAttackerPerformance"),
-            Phase::SecondAttackerPerformance => write!(f, "SecondAttackerPerformance"),
-            Phase::LiveVictoryDetermination => write!(f, "LiveVictoryDetermination"),
-            Phase::LiveStart => write!(f, "LiveStart"),
-            Phase::LiveSuccess => write!(f, "LiveSuccess"),
-            Phase::Cheer => write!(f, "Cheer"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum GameResult {
-    FirstAttackerWins,
-    SecondAttackerWins,
-    Draw,
-    Ongoing,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Duration {
-    LiveEnd,
-    ThisTurn,
-    ThisLive,
-    Permanent,
-    AsLongAs,
-}
-
-#[derive(Debug, Clone)]
-pub struct TemporaryEffect {
-    pub effect_type: String,
-    pub duration: Duration,
-    pub created_turn: u32,
-    pub created_phase: Phase,
-    pub target_player_id: String,
-    pub description: String,
-    pub creation_order: u32, // For effect layering - order in which effects were generated
-    pub effect_data: Option<serde_json::Value>, // Store effect-specific data for reverting (e.g., which cards got how many blades)
-}
-
-#[derive(Debug, Clone)]
-pub struct ReplacementEffect {
-    pub card_id: i16,
-    pub player_id: String,
-    pub original_event: String, // The event being replaced (e.g., "draw_card", "pay_energy")
-    pub replacement_effects: Vec<crate::card::AbilityEffect>, // The replacement action(s)
-    pub is_choice_based: bool, // Whether this is a choice-based replacement (Rule 9.10.3)
-    pub applied_this_event: bool, // Track if already applied to current event (Rule 9.10.2.3)
-}
-
-#[derive(Debug, Clone)]
-pub struct RuleConfig {
-    pub partial_resolution_allowed: bool,
-    pub full_cost_payment_required: bool,
-    pub auto_abilities_mandatory: bool,
-    pub search_count_adjustment_enabled: bool,
-    pub allow_replacement_placement: bool,
-    pub allow_live_without_stage_members: bool,
-    pub prohibition_precedence_enabled: bool,
-    pub card_set_search_enabled: bool,
-    pub multi_victory_selection_enabled: bool,
-    pub turn_player_priority_enabled: bool,
-    pub arbitrary_actions_restricted: bool,
-    pub optional_cost_behavior: String,
-    pub effect_resumption_state: String,
-}
-
-impl Default for RuleConfig {
-    fn default() -> Self {
-        Self {
-            partial_resolution_allowed: true,
-            full_cost_payment_required: true,
-            auto_abilities_mandatory: true,
-            search_count_adjustment_enabled: true,
-            allow_replacement_placement: true,
-            allow_live_without_stage_members: true,
-            prohibition_precedence_enabled: true,
-            card_set_search_enabled: true,
-            multi_victory_selection_enabled: true,
-            turn_player_priority_enabled: true,
-            arbitrary_actions_restricted: true,
-            optional_cost_behavior: "always_pay".to_string(),
-            effect_resumption_state: "none".to_string(),
-        }
-    }
-}
+pub use crate::config::RuleConfig;
+pub use crate::mod_map::ModMap;
+pub use crate::types::{AbilityTrigger, Duration, GameResult, Phase, ReplacementEffect, TemporaryEffect, TurnPhase};
 
 #[derive(Debug, Clone)]
 pub struct GameState {
@@ -209,14 +41,13 @@ pub struct GameState {
     pub max_history_size: usize,
     pub card_database: Arc<CardDatabase>,
     pub blade_modifiers: ModMap<i32>,
-    pub blade_type_modifiers: ModMap<crate::card::BladeColor>,
+    pub blade_type_modifiers: ModMap<BladeColor>,
     pub heart_modifiers: HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
     pub orientation_modifiers: ModMap<String>,
     pub cost_modifiers: ModMap<i32>,
     pub revealed_cards: std::collections::HashSet<i16>,
     pub config: RuleConfig,
     pub ability_queue: AbilityQueue,
-    pub pending_ability: Option<PendingAbilityExecution>,
     pub pending_choice: Option<serde_json::Value>,
     pub activating_card: Option<i16>,
     pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
@@ -243,35 +74,14 @@ pub struct GameState {
     pub draw_state: bool,
     pub gained_abilities: std::collections::HashMap<i16, Vec<String>>,
     pub replacement_effects: Vec<ReplacementEffect>,
+    pub looked_at_cards: Vec<i16>,
     pub effect_creation_counter: u32,
     pub game_state_history: Vec<String>,
     pub max_state_history_size: usize,
     pub loop_detected: bool,
 }
 
-#[derive(Debug, Clone)]
-pub struct PendingAbilityExecution {
-    pub card_no: String,
-    pub player_id: String,
-    pub action_index: usize,
-    pub effect: crate::card::AbilityEffect,
-    pub conditional_choice: Option<String>, // Track choice for conditional_alternative
-    pub cost: Option<crate::card::AbilityCost>, // Track cost for manual ability activation
-    pub cost_choice: Option<String>, // Track user's cost selection (e.g., "wait" or "discard")
-    pub activating_card: Option<i16>, // Track which card is activating the ability (for self-cost)
-    pub ability_index: usize, // Track which ability index is being executed
-}
-
-impl PendingAbilityExecution {
-    /// Get compact debug string
-    pub fn compact_debug(&self) -> String {
-        format!("PendingAbility {{ card_no: {}, effect: {} }}", self.card_no, self.effect.compact_debug())
-    }
-}
-
-
 impl GameState {
-    /// Invariant check: turn phase and current phase must be consistent according to game rules
     pub fn phase_invariant(&self) -> bool {
         if matches!(self.current_phase, Phase::RockPaperScissors | Phase::ChooseFirstAttacker | Phase::MulliganP1Turn | Phase::MulliganP2Turn) {
             return true;
@@ -325,7 +135,6 @@ impl GameState {
             revealed_cards: std::collections::HashSet::new(),
             config: RuleConfig::default(),
             ability_queue: AbilityQueue::new(),
-            pending_ability: None,
             pending_choice: None,
             pending_sequential_actions: None,
             score_modifiers: ModMap::new(),
@@ -351,6 +160,7 @@ impl GameState {
             position_change_occurred_this_turn: false,
             formation_change_occurred_this_turn: false,
             opponent_choice_declined: false,
+            looked_at_cards: Vec::new(),
             effect_creation_counter: 0,
             game_state_history: Vec::new(),
             max_state_history_size: DEFAULT_HISTORY_SIZE,
@@ -443,12 +253,10 @@ impl GameState {
     }
 
     pub fn can_play_turn1_ability(&self, ability_id: &str) -> bool {
-        // Rule 11.2: Turn1 - ability can only be played once per turn
         !self.turn1_abilities_played.contains(ability_id)
     }
 
     pub fn can_play_turn2_ability(&self, ability_id: &str) -> bool {
-        // Rule 11.3: Turn2 - ability can only be played twice per turn
         let count = self.turn2_abilities_played.get(ability_id).unwrap_or(&0);
         *count < 2
     }
@@ -462,7 +270,6 @@ impl GameState {
     }
 
     pub fn can_activate_area_ability(&self, player_id: &str, card_no: &str, area: crate::zones::MemberArea) -> bool {
-        // Rule 11.7.2, 11.8.2, 11.9.2: Area-specific ability can only activate if member is in that area
         let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
         if let Some(card_in_zone) = player.stage.get_area(area) {
             if let Some(card) = self.card_database.get_card(card_in_zone) {
@@ -475,7 +282,6 @@ impl GameState {
         }
     }
 
-    // Convenience wrappers for backward compatibility
     pub fn can_activate_center_ability(&self, player_id: &str, card_no: &str) -> bool {
         self.can_activate_area_ability(player_id, card_no, crate::zones::MemberArea::Center)
     }
@@ -489,29 +295,22 @@ impl GameState {
     }
 
     pub fn reset_keyword_tracking(&mut self) {
-        // Reset keyword tracking at start of new turn
         self.turn1_abilities_played.clear();
         self.turn2_abilities_played.clear();
-        // Reset cheer blade heart counts at start of new turn
         self.player1_cheer_blade_heart_count = 0;
         self.player2_cheer_blade_heart_count = 0;
-        // Reset position/formation change flags at start of new turn
         self.reset_change_flags();
-        // Reset cheer check state
         self.cheer_check_completed = false;
-        // Reset loop detection at start of new turn
         self.reset_loop_detection();
     }
 
     pub fn perform_cheer_check(&mut self, player_id: &str, blade_count: u32) -> Result<(), String> {
-        // Rule: Execute cheer - move top cards from main deck to resolution zone
         let player = if player_id == self.player1.id {
             &mut self.player1
         } else {
             &mut self.player2
         };
 
-        // Set required count on first call
         if self.cheer_checks_required == 0 {
             self.cheer_checks_required = blade_count;
         }
@@ -523,7 +322,6 @@ impl GameState {
             }
         }
 
-        // Mark as completed only when all required checks are done
         if self.cheer_checks_done >= self.cheer_checks_required {
             self.cheer_check_completed = true;
         }
@@ -531,26 +329,25 @@ impl GameState {
     }
 
     pub fn check_required_hearts(&self) -> Result<bool, String> {
-        // Rule: Can only check required hearts after all cheer checks are completed
         if self.cheer_checks_done < self.cheer_checks_required {
-            return Err(format!("Cannot check required hearts: {} of {} cheer checks completed", 
+            return Err(format!("Cannot check required hearts: {} of {} cheer checks completed",
                 self.cheer_checks_done, self.cheer_checks_required));
         }
         Ok(true)
     }
-    
+
     pub fn add_prohibition_effect(&mut self, effect: String) {
         self.prohibition_effects.push(effect);
     }
-    
+
     pub fn is_action_prohibited(&self, action: &str) -> bool {
         self.prohibition_effects.iter().any(|e| e.contains(action))
     }
-    
+
     pub fn record_turn_limited_ability_use(&mut self, card_id: String) {
         self.turn_limited_abilities_used.insert(card_id);
     }
-    
+
     pub fn has_turn_limited_ability_been_used(&self, card_id: &str) -> bool {
         self.turn_limited_abilities_used.contains(card_id)
     }
@@ -571,11 +368,11 @@ impl GameState {
         self.blade_modifiers.get(card_id).copied().unwrap_or(0)
     }
 
-    pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: crate::card::BladeColor) {
+    pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: BladeColor) {
         self.blade_type_modifiers.set(card_id, blade_color);
     }
 
-    pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<crate::card::BladeColor> {
+    pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<BladeColor> {
         self.blade_type_modifiers.get(card_id).copied()
     }
 
@@ -633,7 +430,6 @@ impl GameState {
             .unwrap_or(0)
     }
 
-    // Area placement tracking methods (Q70, Q71, Q75, Q76, Q79, Q80)
     pub fn record_area_placement(&mut self, player_id: &str, area: &str) {
         let key = format!("{}:{}", player_id, area);
         self.areas_placed_this_turn.insert(key);
@@ -648,7 +444,6 @@ impl GameState {
         self.areas_placed_this_turn.clear();
     }
 
-    // Card appearance tracking methods (Q77)
     pub fn record_card_appearance(&mut self, card_id: i16) {
         self.cards_appeared_this_turn.insert(card_id);
     }
@@ -661,7 +456,6 @@ impl GameState {
         self.cards_appeared_this_turn.clear();
     }
 
-    // Live score state tracking (Q47, Q48) - tracks whether a player has a valid live score
     pub fn set_player_has_live_score(&mut self, player_id: &str, has_score: bool) {
         if player_id == "player1" {
             self.player1.has_live_score = has_score;
@@ -678,7 +472,6 @@ impl GameState {
         }
     }
 
-    // Turn order change tracking (Q49, Q50, Q51)
     pub fn set_turn_order_changed(&mut self, changed: bool) {
         self.turn_order_changed = changed;
     }
@@ -687,7 +480,6 @@ impl GameState {
         self.turn_order_changed
     }
 
-    // Ability trigger tracking methods (Q94)
     pub fn record_auto_ability_trigger(&mut self, card_id: &str) {
         *self.auto_ability_trigger_counts.entry(card_id.to_string()).or_insert(0) += 1;
     }
@@ -700,7 +492,6 @@ impl GameState {
         self.auto_ability_trigger_counts.clear();
     }
 
-    // Turn limit tracking methods (Q58, Q59)
     pub fn record_turn_limit_usage(&mut self, player_id: &str, card_instance_id: u32) {
         let key = format!("{}:{}", player_id, card_instance_id);
         *self.turn_limit_usage.entry(key).or_insert(0) += 1;
@@ -715,7 +506,6 @@ impl GameState {
         self.turn_limit_usage.clear();
     }
 
-    // Card identity tracking methods (Q59)
     pub fn assign_card_instance_id(&mut self, card_id: i16) -> u32 {
         self.card_instance_counter += 1;
         let instance_id = self.card_instance_counter;
@@ -736,7 +526,6 @@ impl GameState {
         self.card_instance_counter = 0;
     }
 
-    // Baton touch tracking methods (Q87)
     pub fn record_baton_touch(&mut self) {
         self.baton_touch_count += 1;
     }
@@ -747,10 +536,10 @@ impl GameState {
 
     pub fn clear_baton_touch_tracking(&mut self) {
         self.baton_touch_count = 0;
+        self.baton_touch_zero_cost = false;
         self.baton_touch_replaced_member_cost = None;
     }
 
-    // Card movement tracking methods (for not_moved/has_moved conditions)
     pub fn record_card_movement(&mut self, card_id: i16) {
         self.cards_moved_this_turn.insert(card_id);
     }
@@ -763,7 +552,6 @@ impl GameState {
         self.cards_moved_this_turn.clear();
     }
 
-    // Heart color decision tracking methods (Q46, Q67)
     pub fn set_heart_color_decision_phase(&mut self, phase: &str) {
         self.heart_color_decision_phase = phase.to_string();
     }
@@ -780,7 +568,6 @@ impl GameState {
         self.heart_color_decision_phase == "live_start"
     }
 
-    // Deck refresh tracking methods (Q53)
     pub fn set_deck_refresh_pending(&mut self, pending: bool) {
         self.deck_refresh_pending = pending;
     }
@@ -790,90 +577,24 @@ impl GameState {
     }
 
     pub fn perform_deck_refresh(&mut self, player_id: &str) {
-        // Move all cards from waitroom to main deck and shuffle
         let player = if player_id == "player1" {
             &mut self.player1
         } else {
             &mut self.player2
         };
 
-        // Move all waitroom cards to main deck
         let waitroom_cards: Vec<i16> = player.waitroom.cards.iter().copied().collect();
         player.waitroom.cards.clear();
         for card_id in waitroom_cards {
             player.main_deck.cards.push(card_id);
         }
 
-        // Shuffle the main deck
         player.main_deck.shuffle();
-
-        // Clear the pending flag
         self.deck_refresh_pending = false;
     }
 
-    // Partial effect resolution tracking methods (Q55, Q92, Q93)
-    pub fn set_partial_resolution_allowed(&mut self, allowed: bool) {
-        self.config.partial_resolution_allowed = allowed;
-    }
 
-    pub fn is_partial_resolution_allowed(&self) -> bool {
-        self.config.partial_resolution_allowed
-    }
 
-    // Cost payment validation tracking methods (Q56)
-    pub fn set_full_cost_payment_required(&mut self, required: bool) {
-        self.config.full_cost_payment_required = required;
-    }
-
-    pub fn is_full_cost_payment_required(&self) -> bool {
-        self.config.full_cost_payment_required
-    }
-
-    // Mandatory auto ability tracking methods (Q60)
-    pub fn set_auto_abilities_mandatory(&mut self, mandatory: bool) {
-        self.config.auto_abilities_mandatory = mandatory;
-    }
-
-    pub fn are_auto_abilities_mandatory(&self) -> bool {
-        self.config.auto_abilities_mandatory
-    }
-
-    // Deck size-aware search tracking methods (Q85, Q86)
-    pub fn set_search_count_adjustment_enabled(&mut self, enabled: bool) {
-        self.config.search_count_adjustment_enabled = enabled;
-    }
-
-    pub fn is_search_count_adjustment_enabled(&self) -> bool {
-        self.config.search_count_adjustment_enabled
-    }
-
-    pub fn adjust_search_count(&self, requested_count: usize, deck_size: usize) -> usize {
-        if self.config.search_count_adjustment_enabled {
-            std::cmp::min(requested_count, deck_size)
-        } else {
-            requested_count
-        }
-    }
-
-    // Area occupation rules tracking methods (Q28)
-    pub fn set_allow_replacement_placement(&mut self, allowed: bool) {
-        self.config.allow_replacement_placement = allowed;
-    }
-
-    pub fn is_replacement_placement_allowed(&self) -> bool {
-        self.config.allow_replacement_placement
-    }
-
-    // Live card placement tracking methods (Q72)
-    pub fn set_allow_live_without_stage_members(&mut self, allowed: bool) {
-        self.config.allow_live_without_stage_members = allowed;
-    }
-
-    pub fn is_live_without_stage_members_allowed(&self) -> bool {
-        self.config.allow_live_without_stage_members
-    }
-
-    // Live execution tracking methods (Q91)
     pub fn set_live_being_performed(&mut self, performed: bool) {
         self.live_being_performed = performed;
     }
@@ -882,7 +603,6 @@ impl GameState {
         self.live_being_performed
     }
 
-    // Win condition tracking methods (Q54)
     pub fn set_game_ended(&mut self, ended: bool) {
         self.game_ended = ended;
     }
@@ -900,8 +620,6 @@ impl GameState {
     }
 
     pub fn check_success_zone_draw_condition(&self, player_id: &str) -> bool {
-        // Q54: Draw condition when 3+ success cards (2+ in half deck)
-        // Get the player and check their success live card zone
         let player = if player_id == self.player1.id {
             &self.player1
         } else if player_id == self.player2.id {
@@ -909,30 +627,9 @@ impl GameState {
         } else {
             return false;
         };
-        
-        // Count cards in success live card zone
-        // Full deck: 3+ cards = draw condition
-        // Half deck: 2+ cards = draw condition (not currently tracked, assume full deck)
+
         let success_count = player.success_live_card_zone.cards.len();
         success_count >= 3
-    }
-
-    // Effect precedence tracking methods (Q57)
-    pub fn set_prohibition_precedence_enabled(&mut self, enabled: bool) {
-        self.config.prohibition_precedence_enabled = enabled;
-    }
-
-    pub fn is_prohibition_precedence_enabled(&self) -> bool {
-        self.config.prohibition_precedence_enabled
-    }
-
-    // Effect interruption tracking methods (Q73)
-    pub fn set_effect_resumption_state(&mut self, state: String) {
-        self.config.effect_resumption_state = state;
-    }
-
-    pub fn get_effect_resumption_state(&self) -> &str {
-        &self.config.effect_resumption_state
     }
 
     pub fn add_revealed_card(&mut self, card_id: i16) {
@@ -951,7 +648,6 @@ impl GameState {
         self.revealed_cards.clear();
     }
 
-    // Ability source tracking methods (Q78)
     pub fn add_gained_ability(&mut self, card_id: i16, ability_type: String) {
         self.gained_abilities.entry(card_id).or_insert_with(Vec::new).push(ability_type);
     }
@@ -970,42 +666,6 @@ impl GameState {
 
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {
         self.gained_abilities.remove(&card_id);
-    }
-
-    // Card set search tracking methods (Q82)
-    pub fn set_card_set_search_enabled(&mut self, enabled: bool) {
-        self.config.card_set_search_enabled = enabled;
-    }
-
-    pub fn is_card_set_search_enabled(&self) -> bool {
-        self.config.card_set_search_enabled
-    }
-
-    // Multi-card victory selection tracking methods (Q83)
-    pub fn set_multi_victory_selection_enabled(&mut self, enabled: bool) {
-        self.config.multi_victory_selection_enabled = enabled;
-    }
-
-    pub fn is_multi_victory_selection_enabled(&self) -> bool {
-        self.config.multi_victory_selection_enabled
-    }
-
-    // Auto ability ordering tracking methods (Q84)
-    pub fn set_turn_player_priority_enabled(&mut self, enabled: bool) {
-        self.config.turn_player_priority_enabled = enabled;
-    }
-
-    pub fn is_turn_player_priority_enabled(&self) -> bool {
-        self.config.turn_player_priority_enabled
-    }
-
-    // Action validation tracking methods (Q88)
-    pub fn set_arbitrary_actions_restricted(&mut self, restricted: bool) {
-        self.config.arbitrary_actions_restricted = restricted;
-    }
-
-    pub fn are_arbitrary_actions_restricted(&self) -> bool {
-        self.config.arbitrary_actions_restricted
     }
 
     pub fn set_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, value: i32) {
@@ -1042,8 +702,6 @@ impl GameState {
     }
 
     pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {
-        // Rule: In live victory determination phase, after winner places cards in success zone
-        // Remaining cards in resolution zone go to waitroom
         let player = if player_id == self.player1.id {
             &mut self.player1
         } else {
@@ -1057,7 +715,7 @@ impl GameState {
 
     pub fn trigger_auto_ability(&mut self, ability_id: String, trigger_type: AbilityTrigger, player_id: String, source_card_id: Option<String>) {
         use crate::ability_queue::{AbilityQueueEntry, AbilityId};
-        
+
         if let Some(ref card_no) = source_card_id {
             let (card, card_id) = self.find_card_by_number(card_no);
             if let Some(card) = card {
@@ -1071,11 +729,12 @@ impl GameState {
                             ability_index,
                             card_id,
                             trigger_type,
-                            started: false,
                             completed: false,
                             pending_choice_result: None,
+                            choice_card_no: None,
+                            conditional_choice: None,
                         };
-                        
+
                         self.ability_queue.enqueue(entry);
                         break;
                     }
@@ -1083,11 +742,9 @@ impl GameState {
             }
         }
     }
-    
+
     fn find_card_by_number(&self, card_no: &str) -> (Option<crate::card::Card>, Option<i16>) {
-        // Search both players' zones for the card
         for player in [&self.player1, &self.player2] {
-            // Check hand
             for id in &player.hand.cards {
                 if let Some(card) = self.card_database.get_card(*id) {
                     if card.card_no == card_no {
@@ -1095,8 +752,7 @@ impl GameState {
                     }
                 }
             }
-            
-            // Check stage
+
             for stage_card_id in &player.stage.stage {
                 if *stage_card_id != -1 {
                     if let Some(card) = self.card_database.get_card(*stage_card_id) {
@@ -1106,8 +762,7 @@ impl GameState {
                     }
                 }
             }
-            
-            // Check waitroom
+
             for waitroom_card_id in &player.waitroom.cards {
                 if let Some(card) = self.card_database.get_card(*waitroom_card_id) {
                     if card.card_no == card_no {
@@ -1116,726 +771,81 @@ impl GameState {
                 }
             }
         }
-        
+
         (None, None)
     }
 
     pub fn process_pending_auto_abilities(&mut self, _active_player_id: &str) {
-        // Process ability queue - unified state management
-        // Start next ability if queue is idle
         if self.ability_queue.is_idle() {
             if self.ability_queue.start_next() {
                 self.process_current_ability();
             }
         }
     }
-    
-    /// Process the current ability from the queue
+
     fn process_current_ability(&mut self) {
         if let Some(entry) = self.ability_queue.current_entry().cloned() {
-            // Set activating card before resolving the ability
             self.activating_card = entry.card_id;
-            
-            let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-            if let Err(e) = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index) {
+
+            let (choice, looked_at, result) = {
+                let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+                let result = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index);
+                let choice = resolver.get_pending_choice().cloned();
+                let looked_at = resolver.take_looked_at();
+                (choice, looked_at, result)
+            };
+            self.looked_at_cards = looked_at;
+
+            if let Err(e) = result {
                 eprintln!("Failed to resolve ability: {}", e);
                 self.ability_queue.complete_current();
                 return;
             }
-            
-            // Check if resolver paused for choice
-            if let Some(choice) = resolver.get_pending_choice().cloned() {
-                self.ability_queue.pause_for_choice(choice);
+
+            if let Some(c) = choice {
+                self.ability_queue.pause_for_choice(c);
             } else {
-                // Ability completed successfully
                 self.ability_queue.complete_current();
                 self.activating_card = None;
             }
         }
     }
-    
-    /// Provide choice result to resume ability execution
-    pub fn provide_ability_choice_result(&mut self, result: crate::ability_resolver::ChoiceResult) -> Result<(), String> {
-        // Resume queue with choice result
-        self.ability_queue.resume_with_choice(result);
-        
-        // Continue processing the current ability
-        if let Some(entry) = self.ability_queue.current_entry().cloned() {
-            let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
-            
-            if let Some(choice_result) = &entry.pending_choice_result {
-                resolver.provide_choice_result(choice_result.clone())?;
-            }
-            
-            if let Err(e) = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index) {
-                eprintln!("Failed to execute ability after choice: {}", e);
-                self.ability_queue.complete_current();
-                return Err(e);
-            }
-            
-            // Check if still paused for another choice
-            if let Some(choice) = resolver.get_pending_choice().cloned() {
-                self.ability_queue.pause_for_choice(choice);
-            } else {
-                // Ability completed
-                self.ability_queue.complete_current();
-                self.activating_card = None;
-            }
-        }
-        
-        Ok(())
-    }
-    
-    /// Get current pending choice for web server
+
     pub fn get_pending_choice(&self) -> Option<&crate::ability_resolver::Choice> {
         self.ability_queue.is_waiting_for_choice()
     }
-    
-    
-        
-    #[allow(dead_code)]
-    fn execute_ability_effect(&mut self, effect: &crate::card::AbilityEffect, player_id: &str) {
-        // Execute ability effects directly on game state
-        
-        match effect.action.as_str() {
-            "draw" => {
-                let count = effect.count.unwrap_or(1);
-                let player = if player_id == self.player1.id {
-                    &mut self.player1
-                } else {
-                    &mut self.player2
-                };
-                for _ in 0..count {
-                    let _ = player.draw_card();
-                }
-            }
-            "move_cards" => {
-                let count = effect.count.unwrap_or(1);
-                let source = effect.source.as_deref().unwrap_or("");
-                let destination = effect.destination.as_deref().unwrap_or("");
-                let card_type = effect.card_type.as_deref();
-                let target = effect.target.as_deref().unwrap_or("self");
-                let _destination_choice = effect.destination_choice.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
 
+    pub fn entry_effect(&self) -> Option<&crate::card::AbilityEffect> {
+        self.ability_queue.current_entry().and_then(|e| e.ability.effect.as_ref())
+    }
 
-                let player = if target == "self" {
-                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
-                } else {
-                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
-                };
-                
-                // Card movement implementation - supports various source/destination combinations
-                match source {
-                    "deck" => {
-                        for _ in 0..count {
-                            if let Some(card) = player.main_deck.draw() {
-                                match destination {
-                                    "hand" => player.hand.add_card(card),
-                                    "discard" => player.waitroom.add_card(card),
-                                    "stage" | "empty_area" => {
-                                        // Place to first empty stage area
-                                        let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                                        for area in areas {
-                                            if player.stage.get_area(area).is_none() {
-                                                player.stage.set_area(area, card);
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    "hand" => {
-                        match destination {
-                            "discard" => {
-                                for _ in 0..count.min(player.hand.cards.len() as u32) {
-                                    if let Some(card) = player.hand.remove_card(0) {
-                                        player.waitroom.add_card(card);
-                                    }
-                                }
-                            }
-                            "stage" | "empty_area" => {
-                                // Play member from hand to stage
-                                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                                for _ in 0..count.min(player.hand.cards.len() as u32) {
-                                    if let Some(card_id) = player.hand.remove_card(0) {
-                                        // Check if it's a member card
-                                        if let Some(card) = self.card_database.get_card(card_id) {
-                                            if card.is_member() {
-                                                for area in &areas {
-                                                    if player.stage.get_area(*area).is_none() {
-                                                        player.stage.set_area(*area, card_id);
-                                                        break;
-                                                    }
-                                                }
-                                            } else {
-                                                // Not a member, put back in hand
-                                                player.hand.cards.insert(0, card_id);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    "discard" => {
-                        match destination {
-                            "hand" => {
-                                // Move from waitroom to hand, filtering by card type if specified
-                                let card_ids_to_move: Vec<_> = player.waitroom.cards.iter()
-                                    .filter(|c| {
-                                        if let Some(ct) = card_type {
-                                            if let Some(card) = self.card_database.get_card(**c) {
-                                                match ct {
-                                                    "live_card" => card.is_live(),
-                                                    "member_card" => card.is_member(),
-                                                    _ => true
-                                                }
-                                            } else {
-                                                false
-                                            }
-                                        } else {
-                                            true
-                                        }
-                                    })
-                                    .take(count as usize)
-                                    .copied()
-                                    .collect();
+    pub fn entry_cost(&self) -> Option<&crate::card::AbilityCost> {
+        self.ability_queue.current_entry().and_then(|e| e.ability.cost.as_ref())
+    }
 
-                                for card_id in card_ids_to_move {
-                                    if let Some(pos) = player.waitroom.cards.iter().position(|&c| c == card_id) {
-                                        player.waitroom.cards.remove(pos);
-                                    }
-                                    player.hand.cards.push(card_id);
-                                }
-                            }
-                            "empty_area" => {
-                                // Move from waitroom to empty stage area
-                                let card_ids_to_move: Vec<_> = player.waitroom.cards.iter()
-                                    .filter(|c| {
-                                        if let Some(ct) = card_type {
-                                            if let Some(card) = self.card_database.get_card(**c) {
-                                                match ct {
-                                                    "live_card" => card.is_live(),
-                                                    "member_card" => card.is_member(),
-                                                    _ => true
-                                                }
-                                            } else {
-                                                false
-                                            }
-                                        } else {
-                                            true
-                                        }
-                                    })
-                                    .take(count as usize)
-                                    .copied()
-                                    .collect();
+    pub fn entry_characters(&self) -> Option<&Vec<String>> {
+        self.entry_cost().and_then(|c| c.characters.as_ref())
+    }
 
-                                for card_id in card_ids_to_move {
-                                    // Find first empty stage area
-                                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                                    let mut placed = false;
-                                    for area in areas {
-                                        if player.stage.get_area(area).is_none() {
-                                            // Found empty area, place card
-                                            if let Some(pos) = player.waitroom.cards.iter().position(|&c| c == card_id) {
-                                                player.waitroom.cards.remove(pos);
-                                                player.stage.set_area(area, card_id);
-                                                placed = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                    if !placed {
-                                        // No empty area available, card stays in waitroom
-                                        break;
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    "stage" => {
-                        // Move cards from stage to other zones
-                        let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                        let mut cards_moved = 0;
-                        for area in &areas {
-                            if cards_moved >= count {
-                                break;
-                            }
-                            if let Some(card_id) = player.stage.get_area(*area) {
-                                match destination {
-                                    "discard" => {
-                                        player.stage.clear_area(*area);
-                                        player.waitroom.add_card(card_id);
-                                        cards_moved += 1;
-                                    }
-                                    "hand" => {
-                                        player.stage.clear_area(*area);
-                                        player.hand.add_card(card_id);
-                                        cards_moved += 1;
-                                    }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    "energy_zone" => {
-                        // Move energy cards from energy zone
-                        match destination {
-                            "discard" => {
-                                for _ in 0..count.min(player.energy_zone.cards.len() as u32) {
-                                    if let Some(card_id) = player.energy_zone.cards.pop() {
-                                        player.waitroom.add_card(card_id);
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                    _ => {
-                        eprintln!("Card movement from '{}' to '{}' not fully implemented", source, destination);
-                    }
-                }
-            }
-            "gain_resource" => {
-                let resource = effect.resource.as_deref().unwrap_or("");
-                let count = effect.count.unwrap_or(1);
-                let target = effect.target.as_deref().unwrap_or("self");
-                
-                
-                let player = if target == "self" {
-                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
-                } else {
-                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
-                };
-                
-                // Add resource to members on stage using modifier tracking
-                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                let mut card_ids_to_modify: Vec<i16> = Vec::new();
-                for area in areas {
-                    if let Some(card_in_zone) = player.stage.get_area(area) {
-                        card_ids_to_modify.push(card_in_zone);
-                    }
-                }
+    pub fn entry_destination(&self) -> Option<&str> {
+        self.entry_effect().and_then(|e| e.destination.as_deref())
+    }
 
-                for card_id in card_ids_to_modify {
-                    match resource {
-                        "blade" => {
-                            self.add_blade_modifier(card_id, count as i32);
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            "sequential" => {
-                if let Some(ref actions) = effect.actions {
-                    for action in actions {
-                        self.execute_ability_effect(action, player_id);
-                    }
-                }
-            }
-            "choice" => {
-                // Choice effects require player input - for automated testing, skip or default
-            }
-            "look_and_select" => {
-                // Look and select effects require player input - for automated testing, skip or default
-            }
-            "look_at" => {
-                let count = effect.count.unwrap_or(1);
-                let source = effect.source.as_deref().unwrap_or("");
-                let player = if player_id == self.player1.id {
-                    &mut self.player1
-                } else {
-                    &mut self.player2
-                };
-                match source {
-                    "deck_top" => {
-                        let _cards_to_look: Vec<_> = player.main_deck.cards.iter()
-                            .take(count as usize)
-                            .filter_map(|c| self.card_database.get_card(*c))
-                            .map(|c| format!("{} ({})", c.name, c.card_no))
-                            .collect();
-                    }
-                    "hand" => {
-                        let _cards_to_look: Vec<_> = player.hand.cards.iter()
-                            .take(count as usize)
-                            .filter_map(|c| self.card_database.get_card(*c))
-                            .map(|c| format!("{} ({})", c.name, c.card_no))
-                            .collect();
-                    }
-                    "discard" => {
-                        let _cards_to_look: Vec<_> = player.waitroom.cards.iter()
-                            .take(count as usize)
-                            .filter_map(|c| self.card_database.get_card(*c))
-                            .map(|c| format!("{} ({})", c.name, c.card_no))
-                            .collect();
-                    }
-                    _ => {
-                    }
-                }
-            }
-            "reveal" => {
-                let count = effect.count.unwrap_or(1);
-                let source = effect.source.as_deref().unwrap_or("");
-                let player = if player_id == self.player1.id {
-                    &mut self.player1
-                } else {
-                    &mut self.player2
-                };
-                match source {
-                    "deck" => {
-                        let _cards_to_reveal: Vec<_> = player.main_deck.cards.iter()
-                            .take(count as usize)
-                            .filter_map(|c| self.card_database.get_card(*c))
-                            .map(|c| format!("{} ({})", c.name, c.card_no))
-                            .collect();
-                    }
-                    "hand" => {
-                        let _cards_to_reveal: Vec<_> = player.hand.cards.iter()
-                            .take(count as usize)
-                            .filter_map(|c| self.card_database.get_card(*c))
-                            .map(|c| format!("{} ({})", c.name, c.card_no))
-                            .collect();
-                    }
-                    _ => {
-                    }
-                }
-            }
-            "modify_score" => {
-                let operation = effect.operation.as_deref().unwrap_or("add");
-                let value = effect.value.unwrap_or(effect.count.unwrap_or(0));
-                let target = effect.target.as_deref().unwrap_or("self");
-                
-                let player = if target == "self" {
-                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
-                } else {
-                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
-                };
+    pub fn entry_choice_card_no(&self) -> Option<String> {
+        self.ability_queue.current_entry().and_then(|e| e.choice_card_no.clone())
+    }
 
-                // Use modifier tracking instead of direct card mutation
-                let card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
-                for card_id in card_ids {
-                    match operation {
-                        "add" => self.add_score_modifier(card_id, value as i32),
-                        "remove" => self.add_score_modifier(card_id, -(value as i32)),
-                        "set" => self.set_score_modifier(card_id, value as i32),
-                        _ => {}
-                    }
-                }
-            }
-            "change_state" => {
-                let _state_change = effect.state_change.as_deref().unwrap_or("");
-                // Change card state to active/wait
-            }
-            "modify_required_hearts" => {
-                let operation = effect.operation.as_deref().unwrap_or("decrease");
-                let value = effect.value.unwrap_or(0);
-                let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
-                let target = effect.target.as_deref().unwrap_or("self");
-
-                let player = if target == "self" {
-                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
-                } else {
-                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
-                };
-
-                // Collect card IDs first to avoid borrow issues
-                let card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
-
-                for card_id in card_ids {
-                    let color = crate::zones::parse_heart_color(heart_color);
-                    match operation {
-                        "decrease" => self.add_heart_modifier(card_id, color, -(value as i32)),
-                        "increase" => self.add_heart_modifier(card_id, color, value as i32),
-                        "set" => {
-                            // For set, clear all heart modifiers for this card and color, then set to value
-                            if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
-                                colors.insert(color, value as i32);
-                            } else {
-                                let mut colors = std::collections::HashMap::new();
-                                colors.insert(color, value as i32);
-                                self.heart_modifiers.insert(card_id, colors);
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            "set_required_hearts" => {
-                let count = effect.count.unwrap_or(0);
-                let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
-                let target = effect.target.as_deref().unwrap_or("self");
-
-                let player = if target == "self" {
-                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
-                } else {
-                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
-                };
-
-                // Collect card IDs first to avoid borrow issues
-                let card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
-
-                // For set_required_hearts, clear all heart modifiers for this card and set to the specified count
-                for card_id in card_ids {
-                    let color = crate::zones::parse_heart_color(heart_color);
-                    // Clear all heart modifiers for this card
-                    if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
-                        colors.clear();
-                        colors.insert(color, count as i32);
-                    } else {
-                        let mut colors = std::collections::HashMap::new();
-                        colors.insert(color, count as i32);
-                        self.heart_modifiers.insert(card_id, colors);
-                    }
-                }
-            }
-            "modify_required_hearts_global" => {
-                let operation = effect.operation.as_deref().unwrap_or("increase");
-                let value = effect.value.unwrap_or(1);
-                let heart_color = effect.heart_color.as_deref().unwrap_or("heart00");
-                let target = effect.target.as_deref().unwrap_or("opponent");
-
-                let player = if target == "opponent" {
-                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
-                } else {
-                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
-                };
-
-                // Collect card IDs first to avoid borrow issues
-                let card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
-
-                let color = crate::zones::parse_heart_color(heart_color);
-                let modifier: i32 = match operation {
-                    "increase" => value as i32,
-                    "decrease" => -(value as i32),
-                    _ => return,
-                };
-
-                for card_id in card_ids {
-                    self.add_need_heart_modifier(card_id, color, modifier);
-                }
-            }
-            "set_blade_type" => {
-                let blade_type = effect.blade_type.as_deref().unwrap_or("");
-                let target = effect.target.as_deref().unwrap_or("self");
-                let duration = effect.duration.as_deref();
-                // Track as temporary effect
-                let duration_enum = match duration {
-                    Some("live_end") => Duration::LiveEnd,
-                    Some("this_turn") => Duration::ThisTurn,
-                    Some("this_live") => Duration::ThisLive,
-                    Some("permanent") => Duration::Permanent,
-                    _ => Duration::ThisLive,
-                };
-                let temp_effect = TemporaryEffect {
-                    effect_type: format!("set_blade_type_{}", blade_type),
-                    duration: duration_enum,
-                    created_turn: self.turn_number,
-                    created_phase: self.current_phase.clone(),
-                    target_player_id: if target == "self" { player_id.to_string() } else {
-                        if player_id == self.player1.id { self.player2.id.clone() } else { self.player1.id.clone() }
-                    },
-                    description: format!("Set blade type to {}", blade_type),
-                    creation_order: 0,
-                    effect_data: None,
-                };
-                self.temporary_effects.push(temp_effect);
-            }
-            "set_heart_type" => {
-                let heart_type = effect.heart_color.as_deref().unwrap_or("heart00");
-                let count = effect.count.unwrap_or(1);
-                let target = effect.target.as_deref().unwrap_or("self");
-                let color = crate::zones::parse_heart_color(heart_type);
-                
-                // Collect card IDs first to avoid borrow conflicts
-                let card_ids_to_modify: Vec<i16> = {
-                    let player = if target == "self" {
-                        if player_id == self.player1.id { &self.player1 } else { &self.player2 }
-                    } else {
-                        if player_id == self.player1.id { &self.player2 } else { &self.player1 }
-                    };
-                    
-                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                    areas.iter().filter_map(|&area| {
-                        player.stage.get_area(area)
-                    }).collect()
-                };
-                
-                // Now apply modifiers after the borrow is released
-                for card_id in card_ids_to_modify {
-                    self.add_heart_modifier(card_id, color, count as i32);
-                }
-            }
-            "position_change" => {
-                let position = effect.position.as_ref().and_then(|p| p.get_position()).unwrap_or("");
-                let target = effect.target.as_deref().unwrap_or("self");
-                
-                let player = if target == "self" {
-                    if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 }
-                } else {
-                    if player_id == self.player1.id { &mut self.player2 } else { &mut self.player1 }
-                };
-                
-                // Position change: move a member to a different stage position
-                // Find a member to move and a destination position
-                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                
-                // Get current positions that have members
-                let occupied_areas: Vec<crate::zones::MemberArea> = areas.iter()
-                    .filter(|&&area| player.stage.get_area(area).is_some())
-                    .copied()
-                    .collect();
-                
-                // Get empty positions
-                let empty_areas: Vec<crate::zones::MemberArea> = areas.iter()
-                    .filter(|&&area| player.stage.get_area(area).is_none())
-                    .copied()
-                    .collect();
-                
-                // If there's a specific position requested, try to move a member there
-                if !position.is_empty() {
-                    let target_area = match position {
-                        "left" | "left_side" => Some(crate::zones::MemberArea::LeftSide),
-                        "center" => Some(crate::zones::MemberArea::Center),
-                        "right" | "right_side" => Some(crate::zones::MemberArea::RightSide),
-                        _ => None,
-                    };
-                    
-                    if let Some(target) = target_area {
-                        // If target is empty and we have a member to move
-                        if player.stage.get_area(target).is_none() && !occupied_areas.is_empty() {
-                            // Move first available member to target position
-                            let source_area = occupied_areas[0];
-                            if let Some(card_id) = player.stage.get_area(source_area) {
-                                player.stage.clear_area(source_area);
-                                player.stage.set_area(target, card_id);
-                                eprintln!("Position change: moved card {} from {:?} to {:?}", 
-                                         card_id, source_area, target);
-                            }
-                        }
-                    }
-                } else if !occupied_areas.is_empty() && !empty_areas.is_empty() {
-                    // No specific position - move first occupied to first empty
-                    let source_area = occupied_areas[0];
-                    let target_area = empty_areas[0];
-                    if let Some(card_id) = player.stage.get_area(source_area) {
-                        player.stage.clear_area(source_area);
-                        player.stage.set_area(target_area, card_id);
-                        eprintln!("Position change: moved card {} from {:?} to {:?}", 
-                                 card_id, source_area, target_area);
-                    }
-                }
-                
-                // Track that a position change occurred this turn
-                self.position_change_occurred_this_turn = true;
-            }
-            "place_energy_under_member" => {
-                let energy_count = effect.energy_count.unwrap_or(1);
-                let _target_member = effect.target_member.as_deref().unwrap_or("this_member");
-                
-                let player = if player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
-                
-                for _ in 0..energy_count {
-                    if let Some(energy_card) = player.energy_deck.draw() {
-                        player.energy_zone.cards.push(energy_card);
-                    }
-                }
-            }
-            "modify_yell_count" => {
-                let operation = effect.operation.as_deref().unwrap_or("subtract");
-                let count = effect.count.unwrap_or(0);
-                
-                match operation {
-                    "add" => {
-                        self.cheer_checks_required += count;
-                    }
-                    "subtract" => {
-                        self.cheer_checks_required = self.cheer_checks_required.saturating_sub(count);
-                    }
-                    "set" => {
-                        self.cheer_checks_required = count;
-                    }
-                    _ => {}
-                }
-            }
-            "conditional_alternative" => {
-                // Conditional alternative - requires condition evaluation
-            }
-            "modify_cost" => {
-                let operation = effect.operation.as_deref().unwrap_or("add");
-                let value = effect.value.unwrap_or(1) as i32;
-                let card_type_filter = effect.card_type.as_deref();
-                let _target = effect.target.as_deref().unwrap_or("self");
-                
-                let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
-                
-                // Apply cost modification to all matching cards in hand
-                for &card_id in &player.hand.cards {
-                    if let Some(card) = self.card_database.get_card(card_id) {
-                        // Check card type filter
-                        let matches = match card_type_filter {
-                            Some("member_card") => card.is_member(),
-                            Some("live_card") => card.is_live(),
-                            Some("energy_card") => card.is_energy(),
-                            _ => true, // No filter = all cards
-                        };
-                        
-                        if matches {
-                            let current = self.cost_modifiers.get(card_id).copied().unwrap_or(0);
-                            let new_value = match operation {
-                                "add" | "increase" => current + value,
-                                "subtract" | "decrease" => current - value,
-                                "set" => value,
-                                _ => current + value,
-                            };
-                            self.cost_modifiers.set(card_id, new_value);
-                            eprintln!("Modified cost of card {}: {} -> {} ({} {})", 
-                                     card_id, current, new_value, operation, value);
-                        }
-                    }
-                }
-            }
-            "draw_until_count" => {
-                let count = effect.count.unwrap_or(5);
-                let player = if player_id == self.player1.id {
-                    &mut self.player1
-                } else {
-                    &mut self.player2
-                };
-                while player.hand.cards.len() < count as usize {
-                    let _ = player.draw_card();
-                }
-            }
-            "play_baton_touch" => {
-                // Play baton touch - replace a member on stage with another from hand
-                // This is a complex effect that requires player choice
-            }
-            "activation_cost" => {
-                let _count = effect.count.unwrap_or(0);
-                // Activation cost is handled separately in cost payment
-            }
-            "custom" => {
-                // Custom effect - game-specific handling
-            }
-            _ => {
-            }
-        }
+    pub fn entry_conditional_choice(&self) -> Option<String> {
+        self.ability_queue.current_entry().and_then(|e| e.conditional_choice.clone())
     }
 
     pub fn check_victory(&self) -> GameResult {
-        // Rule 1.2.1.1: Victory condition
-        // Player wins if they have 3+ success live cards AND opponent has 2 or fewer
         let p1_success = self.player1.success_live_card_zone.len();
         let p2_success = self.player2.success_live_card_zone.len();
 
         let p1_wins = p1_success >= 3 && p2_success <= 2;
         let p2_wins = p2_success >= 3 && p1_success <= 2;
 
-        // Rule 1.2.1.2: If both have 3+ simultaneously, it's a draw
         if p1_success >= 3 && p2_success >= 3 {
             GameResult::Draw
         } else if p1_wins && !p2_wins {
@@ -1847,13 +857,6 @@ impl GameState {
         }
     }
 
-    // ============== TARGET RESOLUTION ==============
-
-    /// Resolve target string to player reference(s)
-    /// Returns a vector of player references (0-2 players)
-    /// For "self" or "opponent", returns single player
-    /// For "both", returns both players
-    /// For "either", returns both players (caller must choose)
     pub fn resolve_target<'a>(&'a self, target: &str, perspective_player: &'a Player) -> Vec<&'a Player> {
         match target {
             "self" | "自分" => {
@@ -1876,7 +879,6 @@ impl GameState {
         }
     }
 
-    /// Resolve target string to mutable player reference(s)
     pub fn resolve_target_mut(&mut self, target: &str, perspective_player_id: &str) -> Vec<&mut Player> {
         match target {
             "self" | "自分" => {
@@ -1903,7 +905,6 @@ impl GameState {
         }
     }
 
-    /// Get player by ID
     pub fn get_player(&self, player_id: &str) -> Option<&Player> {
         if self.player1.id == player_id {
             Some(&self.player1)
@@ -1914,7 +915,6 @@ impl GameState {
         }
     }
 
-    /// Get mutable player by ID
     pub fn get_player_mut(&mut self, player_id: &str) -> Option<&mut Player> {
         if self.player1.id == player_id {
             Some(&mut self.player1)
@@ -1925,36 +925,25 @@ impl GameState {
         }
     }
 
-    // ============== TRIGGER DETECTION ==============
-
-    /// Check if debut trigger should occur (member placed on stage from non-stage zone)
     pub fn should_trigger_debut(&self, _player: &Player, card: &crate::card::Card) -> bool {
-        // Rule 11.4: Debut - member placed on stage from non-stage zone
         card.is_member()
     }
 
-    /// Check if live start trigger should occur
     pub fn should_trigger_live_start(&self, _player: &Player) -> bool {
-        // Rule 11.5: Live Start - at start of performance phase when active player
         self.current_phase == Phase::FirstAttackerPerformance
             || self.current_phase == Phase::SecondAttackerPerformance
     }
 
-    /// Check if live success trigger should occur
     pub fn should_trigger_live_success(&self, _player: &Player) -> bool {
-        // Rule 11.6: Live Success - when player's live is successful
-        // This is determined by comparing live scores during LiveVictoryDetermination phase
         self.current_phase == Phase::LiveVictoryDetermination
     }
 
-    /// Check if a card can be placed in a zone based on constant ability restrictions
     pub fn can_place_card_in_zone(&self, card_id: i16, zone: &str, _player_id: &str) -> bool {
         if let Some(card) = self.card_database.get_card(card_id) {
-            // Check all constant abilities (常時) for restrictions
             for ability in &card.abilities {
                 if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
                     if let Some(ref effect) = ability.effect {
-                        if effect.action == "restriction" 
+                        if effect.action == "restriction"
                             && effect.restriction_type.as_deref() == Some("cannot_place")
                             && (effect.restricted_destination.as_deref() == Some(zone)
                                 || effect.restricted_destination.as_deref() == Some("live_card_zone") && zone == "success_live_zone"
@@ -1970,18 +959,12 @@ impl GameState {
         true
     }
 
-    /// Enforce constant ability restrictions for all cards in play
     pub fn enforce_constant_ability_restrictions(&mut self) {
-        // Check all cards in all zones for constant ability restrictions
-        // This should be called before any action that could violate a restriction
-        
-        // Collect player IDs and card data first (to avoid borrow checker issues)
         let p1_id = self.player1.id.clone();
         let p2_id = self.player2.id.clone();
         let p1_cards: Vec<(usize, i16)> = self.player1.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect();
         let p2_cards: Vec<(usize, i16)> = self.player2.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect();
-        
-        // Check which cards need to be removed
+
         let mut cards_to_remove: Vec<(&str, usize)> = Vec::new();
         for (index, card_id) in p1_cards {
             if !self.can_place_card_in_zone(card_id, "live_card_zone", &p1_id) {
@@ -1993,8 +976,7 @@ impl GameState {
                 cards_to_remove.push((&p2_id, index));
             }
         }
-        
-        // Remove cards that violate restrictions
+
         for (player_id, index) in cards_to_remove {
             let player = if *player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
             let card = player.live_card_zone.cards.remove(index);
@@ -2005,7 +987,6 @@ impl GameState {
         }
     }
 
-    /// Get all triggerable abilities for a card given current game state
     pub fn get_triggerable_abilities<'a>(
         &self,
         card: &'a crate::card::Card,
@@ -2045,10 +1026,6 @@ impl GameState {
         }).collect()
     }
 
-// ... (rest of the code remains the same)
-    // ============== DURATION MANAGEMENT ==============
-
-    /// Add a temporary effect with duration
     pub fn add_temporary_effect(
         &mut self,
         effect_type: String,
@@ -2070,35 +1047,28 @@ impl GameState {
         });
     }
 
-    /// Get temporary effects in proper layering order (Rule 9.9.1.7)
-    /// Effects are applied in the order they were generated
     pub fn get_temporary_effects_in_order(&self) -> Vec<&TemporaryEffect> {
         let mut effects = self.temporary_effects.iter().collect::<Vec<_>>();
         effects.sort_by_key(|e| e.creation_order);
         effects
     }
 
-    /// Check and remove expired effects based on current game state
     pub fn check_expired_effects(&mut self) {
         let mut expired_indices = Vec::new();
 
         for (i, effect) in self.temporary_effects.iter().enumerate() {
             let is_expired = match effect.duration {
                 Duration::LiveEnd => {
-                    // Expire when leaving Live phase
                     self.current_turn_phase != TurnPhase::Live
                 }
                 Duration::ThisTurn => {
-                    // Expire when turn number changes
                     self.turn_number > effect.created_turn
                 }
                 Duration::ThisLive => {
-                    // Expire when leaving Live phase
                     self.current_turn_phase != TurnPhase::Live
                 }
                 Duration::Permanent => false,
                 Duration::AsLongAs => {
-                    // As long as condition is met - for now, treat as ThisLive
                     self.current_turn_phase != TurnPhase::Live
                 }
             };
@@ -2108,21 +1078,16 @@ impl GameState {
             }
         }
 
-        // Remove expired effects (in reverse order to maintain indices)
         for i in expired_indices.into_iter().rev() {
             let effect = self.temporary_effects.remove(i);
-            // Revert the effect based on effect type
             match effect.effect_type.as_str() {
                 "activation_cost_increase" => {
-                    // Remove cost increase from prohibition effects
                     self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
                 }
                 "activation_cost_decrease" => {
-                    // Remove cost decrease from prohibition effects
                     self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
                 }
                 "gain_resource_blade" => {
-                    // Revert blade gains
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {
                             for card_data in cards {
@@ -2144,7 +1109,6 @@ impl GameState {
                     }
                 }
                 "gain_resource_heart" => {
-                    // Revert heart gains
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {
                             for card_data in cards {
@@ -2159,14 +1123,12 @@ impl GameState {
                     }
                 }
                 _ => {
-                    // Log other effect expirations
                     eprintln!("Expired effect: {}", effect.description);
                 }
             }
         }
     }
 
-    /// Get active temporary effects for a specific player
     pub fn get_active_effects_for_player(&self, player_id: &str) -> Vec<&TemporaryEffect> {
         self.temporary_effects
             .iter()
@@ -2174,9 +1136,6 @@ impl GameState {
             .collect()
     }
 
-    // ============== REPLACEMENT EFFECT MANAGEMENT (Rule 9.10) ==============
-
-    /// Add a replacement effect (Rule 9.10)
     pub fn add_replacement_effect(
         &mut self,
         card_id: i16,
@@ -2195,12 +1154,10 @@ impl GameState {
         });
     }
 
-    /// Remove all replacement effects for a specific card
     pub fn remove_replacement_effects_for_card(&mut self, card_id: i16) {
         self.replacement_effects.retain(|e| e.card_id != card_id);
     }
 
-    /// Get replacement effects for a specific event
     pub fn get_replacement_effects_for_event(&self, event: &str) -> Vec<&ReplacementEffect> {
         self.replacement_effects
             .iter()
@@ -2208,51 +1165,37 @@ impl GameState {
             .collect()
     }
 
-    /// Reset the applied_this_event flags for all replacement effects (call before new event)
     pub fn reset_replacement_effect_flags(&mut self) {
         for effect in &mut self.replacement_effects {
             effect.applied_this_event = false;
         }
     }
 
-    /// Mark a replacement effect as applied for the current event
     pub fn mark_replacement_effect_applied(&mut self, card_id: i16) {
         if let Some(effect) = self.replacement_effects.iter_mut().find(|e| e.card_id == card_id) {
             effect.applied_this_event = true;
         }
     }
 
-    /// Mark that a formation change occurred this turn (for keyword validation)
     pub fn set_formation_change_occurred(&mut self) {
         self.formation_change_occurred_this_turn = true;
     }
 
-    /// Reset position/formation change flags at start of new turn
     pub fn reset_change_flags(&mut self) {
         self.position_change_occurred_this_turn = false;
         self.formation_change_occurred_this_turn = false;
     }
 
-    // ============== PERMANENT LOOP DETECTION (Rule 12.1) ==============
-
-    /// Check for permanent loop (Rule 12.1)
-    /// Rule 12.1.1: If a permanent loop is detected, active player declares the loop action and count
-    /// Rule 12.1.1.2: If the same game state occurs twice in a turn, it's a loop
-    /// Rule 12.1.1.3: If neither player can stop the loop, game ends in draw
     pub fn check_permanent_loop(&mut self) -> bool {
-        // Generate a hash of the current game state
         let state_hash = self.generate_state_hash();
 
-        // Check if this state has been seen before
         if self.game_state_history.contains(&state_hash) {
             self.loop_detected = true;
             return true;
         }
 
-        // Add current state to history
         self.game_state_history.push(state_hash);
 
-        // Limit history size
         if self.game_state_history.len() > self.max_state_history_size {
             self.game_state_history.remove(0);
         }
@@ -2260,10 +1203,7 @@ impl GameState {
         false
     }
 
-    /// Generate a hash of the current game state for loop detection
     fn generate_state_hash(&self) -> String {
-        // Comprehensive state hash for accurate loop detection
-        // Include all major game state elements that could create loops
         format!(
             "t{}_p{}_tp{}_p1h{}_p1e{}_p1w{}_p1l{}_p1su{}_p1st{:?}_p2h{}_p2e{}_p2w{}_p2l{}_p2su{}_p2st{:?}_oe{}_pro{}_tmp{}_rps{:?}",
             self.turn_number,
@@ -2288,69 +1228,54 @@ impl GameState {
         )
     }
 
-    /// Reset loop detection at start of new turn
     pub fn reset_loop_detection(&mut self) {
         self.game_state_history.clear();
         self.loop_detected = false;
     }
 
-    /// Check if a permanent loop has been detected
     pub fn is_loop_detected(&self) -> bool {
         self.loop_detected
     }
 
-    /// Save current state to history before making a change
     pub fn save_state(&mut self) {
-        // Clear future when making a new change
         self.future.clear();
-        
-        // Add current state to history
         self.history.push(self.clone());
-        
-        // Limit history size
+
         if self.history.len() > self.max_history_size {
             self.history.drain(..1);
         }
     }
 
-    /// Undo to previous state
     pub fn undo(&mut self) -> Result<(), String> {
         if self.history.is_empty() {
             return Err("No history to undo".to_string());
         }
-        
-        // Save current state to future
+
         self.future.push(self.clone());
-        
-        // Restore previous state
+
         let previous = self.history.pop().unwrap();
         *self = previous;
-        
+
         Ok(())
     }
 
-    /// Redo to next state
     pub fn redo(&mut self) -> Result<(), String> {
         if self.future.is_empty() {
             return Err("No future to redo".to_string());
         }
-        
-        // Save current state to history
+
         self.history.push(self.clone());
-        
-        // Restore next state
+
         let next = self.future.pop().unwrap();
         *self = next;
-        
+
         Ok(())
     }
 
-    /// Check if undo is available
     pub fn can_undo(&self) -> bool {
         !self.history.is_empty()
     }
 
-    /// Check if redo is available
     pub fn can_redo(&self) -> bool {
         !self.future.is_empty()
     }

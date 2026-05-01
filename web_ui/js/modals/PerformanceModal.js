@@ -10,14 +10,14 @@ export const PerformanceModal = {
             const latestTurn = State.performanceHistoryTurns && State.performanceHistoryTurns.length > 0
                 ? Math.max(...State.performanceHistoryTurns)
                 : -1;
-            State.selectedPerfTurn = latestTurn;
+            State.updateUiConfig({ selected_perf_turn: latestTurn });
             const dataToUse = latestTurn !== -1 ? State.performanceHistory[latestTurn] : State.lastPerformanceData;
             Rendering.renderPerformanceResult(dataToUse);
         }
     },
 
     showPerformanceForTurn: (turn) => {
-        State.selectedPerfTurn = turn;
+        State.updateUiConfig({ selected_perf_turn: turn });
         const data = State.performanceHistory[turn];
         if (data && Rendering && Rendering.renderPerformanceResult) {
             Rendering.renderPerformanceResult(data);

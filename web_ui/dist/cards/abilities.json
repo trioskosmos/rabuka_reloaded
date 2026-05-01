@@ -61,7 +61,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -106,7 +107,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -176,7 +178,8 @@
           ],
           "text": "1枚を手札に加え、残りを控え室に置く"
         },
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -224,7 +227,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -260,7 +264,8 @@
         "duration": "live_end",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -345,7 +350,8 @@
         "dynamic_count": {
           "type": "any_number",
           "reference": "player_choice"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -374,7 +380,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -446,7 +453,8 @@
         "dynamic_count": {
           "type": "any_number",
           "reference": "player_choice"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -482,7 +490,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -516,7 +525,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -555,7 +565,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -594,7 +605,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -620,7 +632,16 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06",
+          "heart01",
+          "heart03",
+          "heart06"
+        ]
       }
     },
     {
@@ -658,7 +679,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -687,7 +709,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -725,7 +748,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -761,7 +785,8 @@
         "card_type": "member_card",
         "target": "opponent",
         "max": true,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -792,7 +817,8 @@
         "destination": "stage",
         "action": "move_cards",
         "card_type": "card",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -820,7 +846,8 @@
         "count": 1,
         "action": "gain_resource",
         "resource": "heart",
-        "heart_selection": true
+        "heart_selection": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -855,7 +882,8 @@
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -903,7 +931,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -935,7 +964,8 @@
         "count": 2,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -975,7 +1005,8 @@
           "type": "comparison_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1005,7 +1036,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1026,7 +1058,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1050,11 +1083,27 @@
           "type": "location_condition",
           "location": "stage",
           "target": "self",
-          "distinct": true,
-          "all_areas": true
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、",
+              "type": "appearance_condition",
+              "appearance": true,
+              "all_areas": true
+            },
+            {
+              "text": "名前が異なる",
+              "type": "location_condition",
+              "location": "stage",
+              "target": "self",
+              "distinct": true
+            }
+          ],
+          "card_type": "member_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1089,7 +1138,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1123,7 +1173,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1152,7 +1203,8 @@
         "resource": "blade",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1190,7 +1242,8 @@
         "count": 1,
         "action": "gain_resource",
         "resource": "heart",
-        "heart_selection": true
+        "heart_selection": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1249,7 +1302,16 @@
           ],
           "text": "{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 7
+        "count": 7,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart04",
+          "heart05",
+          "heart02",
+          "heart04",
+          "heart05"
+        ]
       }
     },
     {
@@ -1277,7 +1339,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1357,7 +1420,8 @@
         "dynamic_count": {
           "type": "any_number",
           "reference": "player_choice"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1382,7 +1446,8 @@
         "card_type": "live_card",
         "target": "self",
         "max": true,
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1421,7 +1486,9 @@
           "text": "合計スコアを＋2する。」を得る",
           "action": "modify_score",
           "operation": null
-        }
+        },
+        "effect_type": "replacement",
+        "replaces_event": "live"
       }
     },
     {
@@ -1473,7 +1540,8 @@
           "Liella!"
         ],
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1509,7 +1577,8 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1541,7 +1610,8 @@
           "appearance": true
         },
         "action": "activate_ability",
-        "activation_type": "pay_to_activate"
+        "activation_type": "pay_to_activate",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1565,7 +1635,8 @@
         "resource": "blade",
         "per_unit": true,
         "per_unit_count": 2,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1587,7 +1658,12 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
-        "target": "相手のライブカード置き場にあるすべてのライブカード"
+        "target": "相手のライブカード置き場にあるすべてのライブカード",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -1616,7 +1692,8 @@
         },
         "action": "modify_yell_count",
         "operation": "subtract",
-        "count": 8
+        "count": 8,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1642,7 +1719,8 @@
         "card_type": "member_card",
         "target": "self",
         "max": true,
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1673,7 +1751,8 @@
         },
         "count": 3,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1717,7 +1796,8 @@
         "group_names": [
           "みらくらぱーく！"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1750,7 +1830,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1792,7 +1873,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1827,7 +1909,12 @@
         },
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -1866,7 +1953,8 @@
             "count": 1,
             "action": "move_cards"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1919,7 +2007,8 @@
             "action": "move_cards"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1955,7 +2044,8 @@
         "group_names": [
           "μ's"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -1984,7 +2074,14 @@
         "duration": "live_end",
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03",
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -2016,7 +2113,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2044,7 +2142,16 @@
         "duration": "live_end",
         "count": 6,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06",
+          "heart01",
+          "heart03",
+          "heart06"
+        ]
       }
     },
     {
@@ -2077,7 +2184,8 @@
         "activation_position": "center",
         "card_type": "member_card",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2107,7 +2215,8 @@
         "count": 3,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2138,7 +2247,8 @@
         "resource": "blade",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2215,7 +2325,8 @@
             "action": "move_cards"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2260,7 +2371,8 @@
             "destination": "hand"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2292,7 +2404,8 @@
         "action": "draw_until_count",
         "source": "deck",
         "destination": "hand",
-        "target_count": 5
+        "target_count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2322,7 +2435,8 @@
           "target": "self"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2351,7 +2465,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2398,7 +2513,12 @@
             "resource": "heart"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -2431,7 +2551,8 @@
           "type": "score_threshold_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2457,7 +2578,14 @@
         "duration": "as_long_as",
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06",
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -2482,7 +2610,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2503,7 +2632,8 @@
         "text": "{{center.png|センター}}ライブの合計スコアを＋1する",
         "position": "center",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2529,7 +2659,8 @@
           "optional": false,
           "exclude_position": "center"
         },
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2556,7 +2687,8 @@
         "max": true,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2592,7 +2724,8 @@
           "虹ヶ咲"
         ],
         "action": "move_cards",
-        "state_change": "wait"
+        "state_change": "wait",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2617,7 +2750,8 @@
         "card_type": "live_card",
         "target": "both",
         "multiple_targets": true,
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2645,7 +2779,14 @@
         "duration": "as_long_as",
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -2671,7 +2812,8 @@
         "card_type": "energy_card",
         "target": "both",
         "multiple_targets": true,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2724,7 +2866,8 @@
             "action": "move_cards"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2753,7 +2896,12 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -2784,7 +2932,8 @@
         "count": 1,
         "action": "gain_resource",
         "resource": "heart",
-        "heart_selection": true
+        "heart_selection": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2831,7 +2980,8 @@
             ],
             "action": "move_cards"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2851,7 +3001,8 @@
       "effect": {
         "text": "このカードのプレイに際し、2人のメンバーとバトンタッチしてもよい",
         "action": "play_baton_touch",
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2901,7 +3052,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2923,8 +3075,22 @@
         "condition": {
           "text": "『Liella!』のメンバーからバトンタッチして登場しており、かつ自分のエネルギーが7枚以上ある",
           "type": "card_count_condition",
-          "count": 7,
-          "operator": ">="
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "『Liella!』のメンバーからバトンタッチして登場しており、",
+              "type": "appearance_condition",
+              "appearance": true
+            },
+            {
+              "text": "自分のエネルギーが7枚以上ある",
+              "type": "card_count_condition",
+              "count": 7,
+              "operator": ">="
+            }
+          ],
+          "target": "self",
+          "card_type": "member_card"
         },
         "source": "deck",
         "destination": "energy_zone",
@@ -2932,7 +3098,8 @@
         "count": 2,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2960,7 +3127,8 @@
         "duration": "as_long_as",
         "count": 3,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -2997,7 +3165,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3018,7 +3187,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3044,7 +3214,8 @@
           "optional": true
         },
         "card_type": "member_card",
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3084,7 +3255,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3151,7 +3323,8 @@
           ],
           "text": "カードを1枚手札に加える。残りを控え室に置く"
         },
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3183,7 +3356,12 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -3264,7 +3442,8 @@
           "target": "self",
           "action": "move_cards"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3311,7 +3490,8 @@
         "dynamic_count": {
           "type": "per_unit",
           "reference": "unit_count"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3338,7 +3518,8 @@
           "operator": ">="
         },
         "count": 1,
-        "action": "gain_ability"
+        "action": "gain_ability",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3367,7 +3548,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3389,7 +3571,8 @@
         "source": "hand",
         "card_type": "member_card",
         "target": "self",
-        "action": "appear"
+        "action": "appear",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3416,7 +3599,8 @@
         "count": 3,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3466,7 +3650,16 @@
             "resource": "heart"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart03",
+          "heart04",
+          "heart05"
+        ]
       }
     },
     {
@@ -3517,6 +3710,23 @@
             "text": "」を得る",
             "action": "gain_ability"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart01",
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart01"
         ]
       }
     },
@@ -3566,7 +3776,8 @@
             "destination": "hand"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3597,7 +3808,14 @@
         },
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -3640,7 +3858,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3682,7 +3901,12 @@
             "resource": "heart"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -3715,7 +3939,8 @@
         "card_type": "member_card",
         "target": "self",
         "action": "change_state",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3757,7 +3982,8 @@
             "source": "deck",
             "destination": "hand"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3797,7 +4023,8 @@
         "text": "エネルギーを1枚アクティブにする",
         "state_change": "active",
         "count": 1,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3873,7 +4100,8 @@
             "resource": "blade"
           }
         ],
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3901,7 +4129,8 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "appear"
+        "action": "appear",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3931,7 +4160,8 @@
           "Liella!"
         ],
         "action": "change_state",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -3975,6 +4205,11 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02"
         ]
       }
     },
@@ -4008,7 +4243,8 @@
         "per_unit_type": "枚",
         "group": {
           "name": "Liella!"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4050,7 +4286,8 @@
           }
         ],
         "conditional": true,
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4080,7 +4317,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4113,7 +4351,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4149,7 +4388,12 @@
             "resource": "blade"
           }
         ],
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -4178,7 +4422,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4206,7 +4451,8 @@
         "count": 1,
         "optional": true,
         "action": "position_change",
-        "target": null
+        "target": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4236,7 +4482,12 @@
         "count": 2,
         "card_type": "member_card",
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -4268,7 +4519,8 @@
           "SaintSnow"
         ],
         "action": "position_change",
-        "target": null
+        "target": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4295,7 +4547,8 @@
         },
         "duration": "as_long_as",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4330,7 +4583,8 @@
             "target": "opponent",
             "action": "change_state"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4370,7 +4624,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4391,7 +4646,8 @@
         "duration": "live_end",
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4417,7 +4673,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4474,7 +4731,8 @@
           ],
           "text": "ライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4512,10 +4770,12 @@
             "count": 1,
             "card_type": "live_card",
             "action": "move_cards",
-            "state_change": "wait"
+            "state_change": "wait",
+            "cost_limit": 2
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4542,7 +4802,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4590,7 +4851,8 @@
             "destination": "hand"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4616,7 +4878,8 @@
         "duration": "live_end",
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4672,7 +4935,8 @@
           ],
           "text": "1枚を手札に加え、残りを控え室に置く"
         },
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4711,7 +4975,8 @@
         "target": "self",
         "max": true,
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4743,7 +5008,8 @@
           "DOLLCHESTRA",
           "みらくらぱーく！"
         ],
-        "all_regions": true
+        "all_regions": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4789,7 +5055,8 @@
           "comparison_type": "score",
           "aggregate": "total",
           "type": "location_condition"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4866,7 +5133,8 @@
           ],
           "text": "コスト9以上の『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4898,7 +5166,8 @@
         "destination": "energy_zone",
         "count": 1,
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4925,7 +5194,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4962,7 +5232,8 @@
             "source": "deck",
             "destination": "hand"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -4993,7 +5264,14 @@
         "duration": "as_long_as",
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03",
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -5022,7 +5300,12 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -5059,7 +5342,8 @@
           "Aqours"
         ],
         "action": "move_cards",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5111,7 +5395,8 @@
               "type": "group_condition"
             }
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5188,7 +5473,8 @@
           ],
           "text": "コスト9以上の『Aqours』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5238,7 +5524,12 @@
           ],
           "text": "ハートに{{heart_04.png|heart04}}を2つ以上持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -5267,7 +5558,8 @@
         "duration": "as_long_as",
         "target": "self",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5315,7 +5607,8 @@
             "resource": "blade"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5351,7 +5644,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5377,7 +5671,8 @@
         },
         "duration": "as_long_as",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5419,7 +5714,8 @@
             "action": "move_cards"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5451,7 +5747,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5472,7 +5769,8 @@
         "card_type": "member_card",
         "target": "self",
         "action": "restriction",
-        "restriction_type": "cannot_activate"
+        "restriction_type": "cannot_activate",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5500,7 +5798,8 @@
         },
         "state_change": "wait",
         "action": "change_state",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5526,7 +5825,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5603,7 +5903,8 @@
           ],
           "text": "コスト9以上の『虹ヶ咲』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5632,7 +5933,8 @@
         },
         "effect_constraint": "minimum_value:0",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5682,7 +5984,8 @@
               "operator": ">="
             }
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5718,7 +6021,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5749,7 +6053,8 @@
           "optional": false
         },
         "card_type": "member_card",
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5817,7 +6122,8 @@
         "dynamic_count": {
           "type": "per_unit",
           "reference": "unit_count"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5894,7 +6200,8 @@
           ],
           "text": "コスト9以上の『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5960,7 +6267,8 @@
             "action": "repeat_procedure",
             "max_repeats": 4
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -5987,7 +6295,8 @@
         },
         "card_type": "member_card",
         "position": "center",
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6007,7 +6316,16 @@
         "text": "{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
         "count": 6,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -6028,7 +6346,16 @@
         "count": 6,
         "position": "center",
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03",
+          "heart03",
+          "heart03",
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -6048,7 +6375,16 @@
         "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_05.png|heart05}}を得る",
         "count": 6,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05",
+          "heart05",
+          "heart05",
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -6075,7 +6411,8 @@
         "group": {
           "name": "スリーズブーケ"
         },
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6128,7 +6465,12 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -6156,7 +6498,14 @@
         "duration": "live_end",
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01",
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -6192,7 +6541,8 @@
         "group_names": [
           "EdelNote"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6224,7 +6574,8 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6301,7 +6652,8 @@
           ],
           "text": "コスト9以上の『蓮ノ空』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6357,7 +6709,8 @@
           ],
           "text": "メンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6383,7 +6736,8 @@
         "count": 1,
         "optional": true,
         "action": "change_state",
-        "state_change": "active"
+        "state_change": "active",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6415,7 +6769,8 @@
         "card_type": "member_card",
         "target": "self",
         "optional": true,
-        "action": "appear"
+        "action": "appear",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6473,7 +6828,8 @@
           ],
           "text": "1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
         },
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6502,7 +6858,12 @@
         "duration": "as_long_as",
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -6528,7 +6889,8 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6554,7 +6916,14 @@
         },
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart04",
+          "heart01",
+          "heart04"
+        ]
       }
     },
     {
@@ -6588,7 +6957,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6609,7 +6979,8 @@
         "count": 5,
         "destination": "discard",
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6637,7 +7008,14 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04",
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -6665,7 +7043,8 @@
         "count": 2,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6693,7 +7072,14 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01",
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -6718,7 +7104,8 @@
         "duration": "live_end",
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6747,7 +7134,8 @@
         },
         "state_change": "active",
         "count": 1,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6774,7 +7162,8 @@
         "duration": "live_end",
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6803,7 +7192,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6849,7 +7239,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6896,7 +7287,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6923,7 +7315,8 @@
           "type": "location_condition"
         },
         "action": "restriction",
-        "restriction_type": "cannot_live"
+        "restriction_type": "cannot_live",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -6946,7 +7339,8 @@
         },
         "count": 5,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7008,7 +7402,8 @@
           ],
           "text": "『Liella!』のカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7048,7 +7443,8 @@
             "destination": "hand"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7087,7 +7483,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7148,7 +7545,8 @@
           ],
           "text": "『Liella!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7184,7 +7582,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "appear"
+        "action": "appear",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7211,7 +7610,8 @@
         "action": "draw_card",
         "source": "deck",
         "destination": "hand",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7239,7 +7639,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7300,7 +7701,8 @@
           ],
           "text": "『みらくらぱーく！』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7356,7 +7758,8 @@
           ],
           "text": "ライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7391,7 +7794,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7421,7 +7825,8 @@
         "destination": "discard",
         "count": 2,
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7444,7 +7849,8 @@
       "effect": {
         "text": "ライブの合計スコアを＋1する",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7468,7 +7874,8 @@
           "operator": ">="
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7497,7 +7904,8 @@
         },
         "position": "center",
         "multiple_targets": true,
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7525,7 +7933,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7550,7 +7959,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7573,7 +7983,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7605,7 +8016,8 @@
             "action": "gain_resource",
             "resource": "blade"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7624,7 +8036,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7657,7 +8070,8 @@
             "target": "self",
             "action": "position_change"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7687,7 +8101,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7711,7 +8126,8 @@
           "operator": ">="
         },
         "card_type": "member_card",
-        "action": "modify_cost"
+        "action": "modify_cost",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7745,7 +8161,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7764,13 +8181,34 @@
         "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
           "text": "自分の成功ライブカード置き場のカードが0枚で、かつ相手の成功ライブカード置き場にカードが1枚以上ある",
-          "type": "card_count_condition",
-          "count": 1,
-          "operator": ">="
+          "type": "compound",
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分の成功ライブカード置き場のカードが0枚",
+              "type": "location_condition",
+              "location": "success_live_zone",
+              "target": "self",
+              "count": 0,
+              "operator": "=="
+            },
+            {
+              "text": "相手の成功ライブカード置き場にカードが1枚以上ある",
+              "type": "location_condition",
+              "location": "success_live_zone",
+              "target": "opponent",
+              "count": 1,
+              "operator": ">="
+            }
+          ],
+          "target": "both",
+          "location": "success_live_card_zone",
+          "card_type": "live_card"
         },
         "count": 3,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7820,7 +8258,8 @@
             "action": "move_cards"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7844,7 +8283,8 @@
           "count": 1,
           "operator": ">="
         },
-        "action": "gain_ability"
+        "action": "gain_ability",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7889,7 +8329,8 @@
             "text": "もう一度エールを行う",
             "action": "modify_yell_count"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7917,7 +8358,9 @@
         "card_type": "member_card",
         "target": "self",
         "max": true,
-        "action": "move_cards"
+        "action": "move_cards",
+        "cost_limit": 4,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7966,7 +8409,8 @@
           ],
           "text": "コスト11以上のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -7995,7 +8439,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8018,7 +8463,12 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -8077,7 +8527,8 @@
           ],
           "text": "『Liella!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 7
+        "count": 7,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8139,7 +8590,8 @@
           ],
           "text": "『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8169,7 +8621,8 @@
           "movement_condition": "moves",
           "type": "card_count_condition"
         },
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8217,7 +8670,8 @@
             "text": "相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8243,7 +8697,8 @@
           "type": "position_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8275,7 +8730,9 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "cost_limit": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8340,7 +8797,8 @@
         "dynamic_count": {
           "type": "any_number",
           "reference": "player_choice"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8361,7 +8819,8 @@
         "target": "self",
         "optional": true,
         "multiple_targets": true,
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8387,7 +8846,8 @@
         "group": {
           "name": "みらくらぱーく！"
         },
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8419,7 +8879,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8456,7 +8917,14 @@
         },
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01",
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -8487,7 +8955,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8517,7 +8986,8 @@
           "destination": "discard"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8558,7 +9028,12 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -8584,7 +9059,8 @@
         },
         "count": 3,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8622,7 +9098,8 @@
         },
         "count": 4,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8651,7 +9128,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8719,7 +9197,8 @@
         "dynamic_count": {
           "type": "any_number",
           "reference": "player_choice"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8744,7 +9223,8 @@
         },
         "count": 3,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8774,7 +9254,8 @@
         },
         "card_type": "live_card",
         "action": "restriction",
-        "restriction_type": "cannot_place"
+        "restriction_type": "cannot_place",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8818,7 +9299,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8840,7 +9322,8 @@
         "card_type": "member_card",
         "target": "self",
         "max": true,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8864,7 +9347,8 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "state": "wait",
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8902,7 +9386,8 @@
         "group_names": [
           "μ's"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8923,7 +9408,8 @@
         "card_type": "member_card",
         "target": "self",
         "action": "change_state",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8953,7 +9439,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -8992,7 +9479,8 @@
           "action": "move_cards",
           "source": "deck"
         },
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9034,7 +9522,8 @@
             "action": "activation_restriction",
             "restriction_type": "only"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9090,7 +9579,8 @@
           ],
           "text": "メンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9116,7 +9606,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9163,7 +9654,8 @@
             "target": "self"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9202,7 +9694,8 @@
         },
         "state_change": "active",
         "count": 4,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9264,7 +9757,8 @@
           ],
           "text": "『Aqours』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 6
+        "count": 6,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9286,7 +9780,8 @@
         "card_type": "member_card",
         "target": "self",
         "max": true,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9335,7 +9830,8 @@
             "action": "gain_ability"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9366,7 +9862,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "select"
+        "action": "select",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9413,7 +9910,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9436,7 +9934,8 @@
         "state_change": "wait",
         "card_type": "member_card",
         "action": "change_state",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9481,7 +9980,8 @@
             "energy_count": 1
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9512,7 +10012,8 @@
             "target": "self"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9539,7 +10040,8 @@
         },
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9600,7 +10102,8 @@
           ],
           "text": "『虹ヶ咲』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9643,7 +10146,8 @@
             "target": "self",
             "action": "reveal"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9710,7 +10214,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9747,7 +10252,8 @@
         "state_change": "wait",
         "count": 1,
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9771,7 +10277,12 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "state": "wait",
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -9804,7 +10315,8 @@
         "group": {
           "name": "Printemps"
         },
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9842,7 +10354,9 @@
           "text": "「{{jyouji.png|常時}}ライブの合計スコアを＋2する。」を得る。",
           "action": "modify_score",
           "operation": null
-        }
+        },
+        "effect_type": "replacement",
+        "replaces_event": "gain_score"
       }
     },
     {
@@ -9869,7 +10383,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9913,7 +10428,8 @@
             "source": "deck",
             "destination": "hand"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9968,7 +10484,8 @@
         "dynamic_count": {
           "type": "per_unit",
           "reference": "unit_count"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -9999,7 +10516,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
-        "state": "wait"
+        "state": "wait",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10020,7 +10538,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10041,7 +10560,8 @@
         "restriction_type": "cannot_activate_by_effect",
         "target": "both",
         "duration": "this_turn",
-        "card_type": "member_card"
+        "card_type": "member_card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10071,7 +10591,8 @@
         "target": "self",
         "exclude_self": true,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10100,7 +10621,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10128,7 +10650,8 @@
           "Printemps"
         ],
         "max": true,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10168,7 +10691,8 @@
         },
         "card_type": "member_card",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10197,7 +10721,8 @@
         },
         "action": "modify_cost",
         "operation": "decrease",
-        "value": 2
+        "value": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10234,7 +10759,8 @@
           "card_type": "member_card",
           "action": "change_state"
         },
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10259,7 +10785,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10320,7 +10847,8 @@
           ],
           "text": "『lilywhite』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10366,7 +10894,8 @@
             },
             "duration": "unless"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10394,7 +10923,8 @@
         "card_type": "member_card",
         "target": "both",
         "multiple_targets": true,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10425,7 +10955,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10454,7 +10985,8 @@
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10510,7 +11042,8 @@
           ],
           "text": "『μ's』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10555,7 +11088,8 @@
           "card_type": "live_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10584,7 +11118,8 @@
         },
         "duration": "as_long_as",
         "card_type": "member_card",
-        "action": "modify_cost"
+        "action": "modify_cost",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10604,7 +11139,8 @@
         "state_change": "wait",
         "count": 1,
         "card_type": "member_card",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10634,7 +11170,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10664,7 +11201,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10693,7 +11231,8 @@
             "card_type": "card",
             "target": "self"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10721,7 +11260,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10760,7 +11300,8 @@
         "state_change": "wait",
         "card_type": "member_card",
         "action": "change_state",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10792,7 +11333,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10838,7 +11380,8 @@
             "source": "hand",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10867,7 +11410,8 @@
         },
         "duration": "as_long_as",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10887,8 +11431,28 @@
         "condition": {
           "text": "自分のステージにいるメンバーが『Liella!』のみで、かつ自分のエネルギーが7枚以上ある",
           "type": "card_count_condition",
-          "count": 7,
-          "operator": ">="
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分のステージにいるメンバーが『Liella!』のみで、",
+              "target": "self",
+              "location": "stage",
+              "card_type": "member_card",
+              "group": {
+                "name": "Liella!"
+              },
+              "type": "group_condition"
+            },
+            {
+              "text": "自分のエネルギーが7枚以上ある",
+              "type": "card_count_condition",
+              "count": 7,
+              "operator": ">="
+            }
+          ],
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card"
         },
         "source": "deck",
         "destination": "energy_zone",
@@ -10896,7 +11460,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10958,7 +11523,8 @@
           ],
           "text": "必要ハートの合計が8以上の『Liella!』のライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -10998,7 +11564,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11018,7 +11585,8 @@
         "count": 2,
         "position": "center",
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11052,7 +11620,8 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11086,7 +11655,9 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "cost_limit": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11117,7 +11688,8 @@
         "duration": "as_long_as",
         "count": 3,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11147,7 +11719,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11190,7 +11763,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11216,7 +11790,8 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11239,7 +11814,8 @@
         "target": "self",
         "optional": true,
         "action": "place_energy_under_member",
-        "energy_count": 2
+        "energy_count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11270,7 +11846,8 @@
         "source": "under_member",
         "action": "place_energy_under_member",
         "energy_count": 1,
-        "target_member": "this_member"
+        "target_member": "this_member",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11305,7 +11882,8 @@
         ],
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11334,7 +11912,8 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11359,7 +11938,8 @@
         },
         "destination": "discard",
         "action": "move_cards",
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11384,7 +11964,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11409,7 +11990,8 @@
         "text": "エネルギーを1枚アクティブにする",
         "state_change": "active",
         "count": 1,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11441,6 +12023,21 @@
             "count": 1,
             "action": "gain_ability"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
         ]
       }
     },
@@ -11467,7 +12064,8 @@
         "card_type": "member_card",
         "action": "modify_cost",
         "operation": "decrease",
-        "value": 2
+        "value": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11488,7 +12086,8 @@
         "count": 2,
         "card_type": "member_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11528,6 +12127,15 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart05",
+          "heart06",
+          "heart03",
+          "heart05",
+          "heart06"
         ]
       }
     },
@@ -11570,7 +12178,8 @@
             "max": true,
             "action": "move_cards"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11592,7 +12201,8 @@
         "resource": "blade",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11630,7 +12240,8 @@
         "source": "under_member",
         "action": "place_energy_under_member",
         "energy_count": 1,
-        "target_member": "this_member"
+        "target_member": "this_member",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11658,7 +12269,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11697,7 +12309,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11728,7 +12341,8 @@
           "text": "上原歩夢",
           "quoted_type": "character"
         },
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11770,7 +12384,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11801,7 +12416,8 @@
           "text": "桜坂しずく",
           "quoted_type": "character"
         },
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11854,7 +12470,8 @@
           ],
           "text": "「朝香果林」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11885,7 +12502,8 @@
           "text": "宮下愛",
           "quoted_type": "character"
         },
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11938,7 +12556,8 @@
           ],
           "text": "「近江彼方」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -11980,7 +12599,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12022,7 +12642,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12075,7 +12696,8 @@
           ],
           "text": "「天王寺璃奈」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12117,7 +12739,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12148,7 +12771,8 @@
           "text": "ミア・テイラー",
           "quoted_type": "character"
         },
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12201,7 +12825,8 @@
           ],
           "text": "「鐘嵐珠」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12258,7 +12883,8 @@
           ],
           "text": "1枚を手札に加え、残りを控え室に置く"
         },
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12284,7 +12910,12 @@
         "group": {
           "name": "A-RISE"
         },
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -12328,7 +12959,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12398,7 +13030,8 @@
           ],
           "text": "1枚を手札に加える。残りを控え室に置く"
         },
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12427,7 +13060,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12452,7 +13086,12 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -12479,7 +13118,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12504,7 +13144,8 @@
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12531,7 +13172,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12559,7 +13201,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12586,7 +13229,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12608,7 +13252,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12636,7 +13281,8 @@
         "group_names": [
           "μ's"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12662,7 +13308,16 @@
         "duration": "live_end",
         "count": 6,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06",
+          "heart01",
+          "heart03",
+          "heart06"
+        ]
       }
     },
     {
@@ -12716,7 +13371,8 @@
           ],
           "text": "『μ's』のライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12763,7 +13419,8 @@
             "action": "move_cards"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12790,7 +13447,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12815,7 +13473,8 @@
         "destination": "discard",
         "target": "self",
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12839,7 +13498,8 @@
           "operator": ">="
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12896,7 +13556,8 @@
         "dynamic_count": {
           "type": "any_number",
           "reference": "player_choice"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -12918,7 +13579,14 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -12945,7 +13613,12 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -12972,7 +13645,12 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -13009,7 +13687,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13048,7 +13727,8 @@
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13090,7 +13770,8 @@
             "target": "self"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13126,7 +13807,8 @@
             "text": "何もしない",
             "action": "do_nothing"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13153,7 +13835,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13181,7 +13864,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13207,7 +13891,14 @@
         "duration": "live_end",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04",
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -13233,7 +13924,14 @@
         "duration": "live_end",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05",
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -13258,7 +13956,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13282,7 +13981,12 @@
         "duration": "live_end",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -13334,7 +14038,8 @@
             "resource": "blade"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13355,7 +14060,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13388,7 +14094,8 @@
           "手札のこのカードもこの効果で控え室に置ける。"
         ],
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13436,7 +14143,8 @@
             "text": "エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
             "action": "modify_yell_count"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13462,7 +14170,22 @@
         "group": {
           "name": "虹ヶ咲"
         },
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart02",
+          "heart03",
+          "heart06",
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart02",
+          "heart03",
+          "heart06"
+        ]
       }
     },
     {
@@ -13489,7 +14212,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13511,7 +14235,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13530,7 +14255,8 @@
         "action": "custom",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13558,6 +14284,13 @@
             "count": 1,
             "resources": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart01",
+          "heart05",
+          "heart01"
         ]
       }
     },
@@ -13593,7 +14326,8 @@
             "text": "エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
             "action": "modify_yell_count"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13628,6 +14362,21 @@
             "text": "エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
             "action": "modify_yell_count"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02",
+          "heart03",
+          "heart03",
+          "heart06",
+          "heart06",
+          "heart02",
+          "heart02",
+          "heart03",
+          "heart03",
+          "heart06",
+          "heart06"
         ]
       }
     },
@@ -13650,7 +14399,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13692,7 +14442,8 @@
             "action": "modify_yell_count"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13714,7 +14465,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13771,7 +14523,8 @@
             "text": "エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)",
             "action": "modify_yell_count"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13826,7 +14579,8 @@
           ],
           "text": "『虹ヶ咲』のライブカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13858,7 +14612,8 @@
           "虹ヶ咲"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13884,7 +14639,8 @@
         "duration": "live_end",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13917,7 +14673,8 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13941,7 +14698,12 @@
         "duration": "live_end",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -13963,7 +14725,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -13985,7 +14748,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 6,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14015,7 +14779,8 @@
           "Liella!"
         ],
         "optional": true,
-        "action": "appear"
+        "action": "appear",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14041,7 +14806,8 @@
         "duration": "live_end",
         "count": 5,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14059,7 +14825,8 @@
         "text": "「{{jyouji.png|常時}}ライブの合計スコアを＋1する。」を得る",
         "duration": "live_end",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14091,7 +14858,8 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14145,7 +14913,8 @@
           ],
           "text": "1枚を手札に加え、残りを控え室に置く"
         },
-        "count": 9
+        "count": 9,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14171,7 +14940,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14193,7 +14963,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14253,7 +15024,8 @@
           ],
           "text": "『CatChu!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14313,7 +15085,8 @@
           ],
           "text": "『KALEIDOSCORE』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14373,7 +15146,8 @@
           ],
           "text": "『5yncri5e!』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14405,7 +15179,8 @@
             "destination": "hand"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14444,7 +15219,8 @@
             "action": "modify_score",
             "operation": null
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14468,7 +15244,8 @@
           "unit": "人"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14494,7 +15271,12 @@
           "name": "5yncri5e!"
         },
         "timing_condition": "appeared_or_moved_this_turn",
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -14528,7 +15310,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14553,7 +15336,8 @@
           "type": "position_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14583,7 +15367,8 @@
         "count": 1,
         "target": "self",
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14602,7 +15387,8 @@
         "destination": "success_live_zone",
         "card_type": "live_card",
         "action": "restriction",
-        "restriction_type": "cannot_place"
+        "restriction_type": "cannot_place",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14629,7 +15415,8 @@
         "card_type": "member_card",
         "target": "self",
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14656,7 +15443,12 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -14683,7 +15475,12 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -14710,7 +15507,12 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -14736,7 +15538,8 @@
           "type": "location_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14773,7 +15576,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14822,7 +15626,8 @@
           ],
           "text": "メンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14871,7 +15676,8 @@
           ],
           "text": "ライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14891,7 +15697,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14930,7 +15737,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -14987,7 +15795,8 @@
         "dynamic_count": {
           "type": "any_number",
           "reference": "player_choice"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15012,7 +15821,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15039,7 +15849,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15078,6 +15889,27 @@
             "optional": true,
             "action": "select"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01",
+          "heart00",
+          "heart04",
+          "heart04",
+          "heart00",
+          "heart05",
+          "heart05",
+          "heart00",
+          "heart01",
+          "heart01",
+          "heart00",
+          "heart04",
+          "heart04",
+          "heart00",
+          "heart05",
+          "heart05",
+          "heart00"
         ]
       }
     },
@@ -15103,7 +15935,8 @@
           "name": "蓮ノ空"
         },
         "distinct": "card_name",
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15128,7 +15961,12 @@
         },
         "count": 1,
         "action": "restriction",
-        "restriction_type": "modify_required_hearts"
+        "restriction_type": "modify_required_hearts",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -15151,7 +15989,8 @@
           "operator": ">="
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15176,7 +16015,12 @@
         },
         "count": 1,
         "action": "restriction",
-        "restriction_type": "modify_required_hearts"
+        "restriction_type": "modify_required_hearts",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -15195,11 +16039,34 @@
         "condition": {
           "text": "自分のステージに「徒町小鈴」が登場しており、かつ「徒町小鈴」よりコストの大きい「村野さやか」が登場している",
           "type": "appearance_condition",
-          "appearance": true
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分のステージに「徒町小鈴」が登場しており、",
+              "type": "appearance_condition",
+              "appearance": true
+            },
+            {
+              "text": "「徒町小鈴」よりコストの大きい「村野さやか」が登場している",
+              "type": "appearance_condition",
+              "appearance": true
+            }
+          ],
+          "target": "self",
+          "location": "stage"
         },
         "count": 3,
         "action": "restriction",
-        "restriction_type": "modify_required_hearts"
+        "restriction_type": "modify_required_hearts",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -15224,7 +16091,12 @@
         },
         "count": 1,
         "action": "restriction",
-        "restriction_type": "modify_required_hearts"
+        "restriction_type": "modify_required_hearts",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -15246,7 +16118,8 @@
           "appearance": true
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15266,7 +16139,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "hand"
+        "location": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15284,7 +16158,8 @@
         "text": "このメンバーはバトンタッチで控え室に置けない",
         "card_type": "member_card",
         "action": "restriction",
-        "restriction_type": "cannot_baton_touch"
+        "restriction_type": "cannot_baton_touch",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15316,7 +16191,8 @@
         "resource": "blade",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15372,7 +16248,14 @@
           ],
           "text": "ハートに{{heart_04.png|heart04}}を2個以上持つメンバーカードか、必要ハートに{{heart_04.png|heart04}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04",
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -15428,7 +16311,14 @@
           ],
           "text": "ハートに{{heart_02.png|heart02}}を2個以上持つメンバーカードか、必要ハートに{{heart_02.png|heart02}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -15484,7 +16374,14 @@
           ],
           "text": "ハートに{{heart_05.png|heart05}}を2個以上持つメンバーカードか、必要ハートに{{heart_05.png|heart05}}を2以上含むライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05",
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -15527,6 +16424,11 @@
             "card_type": "energy_card",
             "action": "change_state"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02"
         ]
       }
     },
@@ -15556,7 +16458,12 @@
           "type": "group_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -15575,15 +16482,41 @@
         "condition": {
           "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_05.png|heart05}}が合計4個以上あり、このターン、相手が余剰のハートを持たずにライブを成功させていた",
           "type": "temporal_condition",
-          "temporal": "this_turn",
-          "condition": {
-            "type": "opponent_live_success",
-            "no_excess_heart": true
-          },
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_05.png|heart05}}が合計4個以上",
+              "target": "self",
+              "location": "stage",
+              "card_type": "member_card",
+              "operator": ">=",
+              "aggregate": "total",
+              "group": {
+                "name": "Aqours"
+              },
+              "type": "group_condition"
+            },
+            {
+              "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた",
+              "type": "temporal_condition",
+              "temporal": "this_turn",
+              "condition": {
+                "type": "opponent_live_success",
+                "no_excess_heart": true
+              }
+            }
+          ],
+          "target": "self",
+          "location": "stage"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -15617,7 +16550,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15640,7 +16574,8 @@
           "operator": ">="
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15677,7 +16612,8 @@
             "destination": "discard",
             "action": "move_cards"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15704,7 +16640,14 @@
         },
         "count": 2,
         "action": "restriction",
-        "restriction_type": "modify_required_hearts"
+        "restriction_type": "modify_required_hearts",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -15749,6 +16692,15 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06",
+          "heart01",
+          "heart03",
+          "heart06"
         ]
       }
     },
@@ -15772,7 +16724,8 @@
           "operator": ">="
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15796,7 +16749,8 @@
           "location": "stage"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15824,7 +16778,8 @@
         "card_type": "member_card",
         "target": "self",
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15849,7 +16804,8 @@
           "type": "location_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15870,7 +16826,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15907,7 +16864,8 @@
           "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている"
         },
         "action": "set_score",
-        "value": 4
+        "value": 4,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15942,7 +16900,8 @@
             "text": "もう一度エールを行う",
             "action": "modify_yell_count"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -15980,7 +16939,8 @@
             "resource": "blade"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16016,7 +16976,8 @@
             "target": "opponent",
             "action": "change_state"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16045,7 +17006,8 @@
           "type": "group_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16084,7 +17046,8 @@
             "destination": "hand"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16104,7 +17067,16 @@
         "count": 6,
         "card_type": "member_card",
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart04",
+          "heart01",
+          "heart03",
+          "heart04"
+        ]
       }
     },
     {
@@ -16124,7 +17096,16 @@
         "count": 6,
         "card_type": "member_card",
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart05",
+          "heart06",
+          "heart02",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -16144,7 +17125,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16172,7 +17154,9 @@
           "text": "スコアを＋2する",
           "action": "modify_score",
           "operation": null
-        }
+        },
+        "effect_type": "replacement",
+        "replaces_event": "gain_score"
       }
     },
     {
@@ -16222,7 +17206,12 @@
         "state_change": "wait",
         "count": 1,
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -16245,7 +17234,8 @@
           "operator": ">="
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16267,7 +17257,8 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "state": "wait",
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16298,7 +17289,8 @@
         "state_change": "active",
         "count": 6,
         "max": true,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16322,7 +17314,8 @@
         "duration": "live_end",
         "count": 3,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16358,7 +17351,8 @@
           "text": "自分のステージにいる『Printemps』のメンバーをアクティブにする。これによりウェイト状態のメンバーが3人以上アクティブ状態になった"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16402,7 +17396,8 @@
           "card_type": "member_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16425,7 +17420,14 @@
         },
         "count": 2,
         "action": "restriction",
-        "restriction_type": "modify_required_hearts"
+        "restriction_type": "modify_required_hearts",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -16459,7 +17461,8 @@
         "group_names": [
           "BiBi"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16504,7 +17507,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16533,7 +17537,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16577,7 +17582,8 @@
           "comparison_type": "score",
           "aggregate": "total",
           "type": "location_condition"
-        }
+        },
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16612,7 +17618,8 @@
           "μ's"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16641,7 +17648,12 @@
         "target": "self",
         "exclude_self": true,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -16667,7 +17679,8 @@
         "target": "self",
         "exclude_self": true,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16702,7 +17715,8 @@
           "μ's"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16732,7 +17746,8 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16780,7 +17795,8 @@
         "card_type": "live_card",
         "target": "self",
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16809,7 +17825,8 @@
         "count": 1,
         "target": "self",
         "optional": true,
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16844,7 +17861,8 @@
           "μ's"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16890,6 +17908,11 @@
             "action": "modify_score",
             "operation": null
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00"
         ]
       }
     },
@@ -16911,7 +17934,8 @@
           "type": "position_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -16937,7 +17961,12 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -16964,7 +17993,8 @@
           "μ's"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17004,7 +18034,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17026,7 +18057,8 @@
         "target": "self",
         "optional": true,
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17067,7 +18099,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17085,7 +18118,8 @@
         "text": "エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[紫ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[青ブレード]になる",
         "duration": "live_end",
         "target": "self",
-        "action": "modify_yell_count"
+        "action": "modify_yell_count",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17111,7 +18145,22 @@
           "type": "group_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -17156,7 +18205,8 @@
             "action": "set_card_identity"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17188,7 +18238,8 @@
           "虹ヶ咲"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17223,6 +18274,15 @@
             "per_unit_count": 1,
             "per_unit_type": "枚"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00"
         ]
       }
     },
@@ -17260,7 +18320,9 @@
           "text": "スコアを＋2する",
           "action": "modify_score",
           "operation": null
-        }
+        },
+        "effect_type": "replacement",
+        "replaces_event": "gain_score"
       }
     },
     {
@@ -17295,7 +18357,8 @@
             "action": "gain_resource",
             "resource": "blade"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17334,7 +18397,9 @@
           "card_type": "member_card",
           "target": "self",
           "action": "change_state"
-        }
+        },
+        "effect_type": "replacement",
+        "replaces_event": "move_cards"
       }
     },
     {
@@ -17397,7 +18462,8 @@
             "source": "hand",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17421,7 +18487,12 @@
         "duration": "live_end",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -17444,7 +18515,8 @@
           "optional": true
         },
         "card_type": "member_card",
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17475,6 +18547,11 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06"
         ]
       }
     },
@@ -17508,7 +18585,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17542,7 +18620,8 @@
           "Liella!"
         ],
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17575,7 +18654,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17601,7 +18681,12 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -17626,7 +18711,8 @@
         "count": 1,
         "action": "gain_resource",
         "resource": "blade",
-        "per_unit": true
+        "per_unit": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17664,7 +18750,8 @@
             "resource": "blade"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17682,7 +18769,8 @@
         "text": "エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる",
         "duration": "live_end",
         "target": "self",
-        "action": "modify_yell_count"
+        "action": "modify_yell_count",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17703,7 +18791,8 @@
           "type": "position_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17727,7 +18816,12 @@
         "count": 2,
         "card_type": "member_card",
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -17754,7 +18848,8 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "set_blade_count"
+        "action": "set_blade_count",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17780,7 +18875,8 @@
           "card_type": "member_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17804,7 +18900,8 @@
           "distinct": true
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17843,7 +18940,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17873,7 +18971,8 @@
         "target": "self",
         "optional": true,
         "multiple_targets": true,
-        "action": "position_change"
+        "action": "position_change",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17895,7 +18994,8 @@
           "state": "active"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17943,7 +19043,8 @@
           ],
           "text": "「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -17963,7 +19064,16 @@
         "count": 6,
         "card_type": "member_card",
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart03",
+          "heart04",
+          "heart05"
+        ]
       }
     },
     {
@@ -17983,7 +19093,16 @@
         "count": 6,
         "card_type": "member_card",
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart06",
+          "heart01",
+          "heart02",
+          "heart06"
+        ]
       }
     },
     {
@@ -18018,7 +19137,9 @@
           "text": "スコアを＋2する",
           "action": "modify_score",
           "operation": null
-        }
+        },
+        "effect_type": "replacement",
+        "replaces_event": "gain_score"
       }
     },
     {
@@ -18042,7 +19163,12 @@
           "temporal": "during_live"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -18076,7 +19202,22 @@
           "虹ヶ咲"
         ],
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart06",
+          "heart06",
+          "heart06",
+          "heart06",
+          "heart06",
+          "heart01",
+          "heart06",
+          "heart06",
+          "heart06",
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -18101,7 +19242,16 @@
         },
         "count": 3,
         "action": "restriction",
-        "restriction_type": "modify_required_hearts"
+        "restriction_type": "modify_required_hearts",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -18152,7 +19302,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 3
+        "count": 3,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18174,7 +19325,16 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -18195,7 +19355,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18250,7 +19411,14 @@
           ],
           "text": "ハートに{{heart_05.png|heart05}}か{{heart_06.png|heart06}}を持つメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 4
+        "count": 4,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart06",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -18274,7 +19442,16 @@
         "per_unit_type": "つ",
         "group": {
           "name": "μ's"
-        }
+        },
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart00",
+          "heart00",
+          "heart03",
+          "heart00",
+          "heart00"
+        ]
       }
     },
     {
@@ -18356,7 +19533,12 @@
             "operation": null
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03"
+        ]
       }
     },
     {
@@ -18391,6 +19573,17 @@
             "per_unit_count": 1,
             "per_unit_type": "枚"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06",
+          "heart00",
+          "heart01",
+          "heart03",
+          "heart06",
+          "heart00"
         ]
       }
     },
@@ -18413,7 +19606,16 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
-        "location": "stage"
+        "location": "stage",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart06",
+          "heart00",
+          "heart01",
+          "heart06",
+          "heart00"
+        ]
       }
     },
     {
@@ -18442,7 +19644,14 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
-        "target": "相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚"
+        "target": "相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart00",
+          "heart02",
+          "heart00"
+        ]
       }
     },
     {
@@ -18471,7 +19680,14 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
-        "target": "相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚"
+        "target": "相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart00",
+          "heart05",
+          "heart00"
+        ]
       }
     },
     {
@@ -18499,7 +19715,14 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04",
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -18520,7 +19743,8 @@
         "destination": "discard",
         "target": "self",
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18548,7 +19772,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18576,7 +19801,14 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05",
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -18614,7 +19846,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18638,7 +19871,8 @@
           "type": "comparison_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18664,7 +19898,12 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -18690,7 +19929,22 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -18732,7 +19986,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 2
+        "count": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18756,7 +20011,22 @@
           "type": "location_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -18788,7 +20058,8 @@
           "虹ヶ咲"
         ],
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18807,12 +20078,29 @@
         "condition": {
           "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる",
           "type": "card_count_condition",
-          "count": 3,
-          "operator": ">=",
-          "unit": "人"
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、",
+              "type": "location_condition",
+              "location": "success_live_zone",
+              "target": "either"
+            },
+            {
+              "text": "自分のステージに名前の異なるメンバーが3人以上いる",
+              "type": "card_count_condition",
+              "count": 3,
+              "operator": ">=",
+              "unit": "人"
+            }
+          ],
+          "target": "both",
+          "location": "success_live_card_zone",
+          "card_type": "member_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18851,6 +20139,21 @@
             "action": "restriction",
             "restriction_type": "modify_required_hearts"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02"
         ]
       }
     },
@@ -18896,7 +20199,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18923,7 +20227,8 @@
           "location": "stage"
         },
         "count": 1,
-        "action": "gain_ability"
+        "action": "gain_ability",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18954,7 +20259,8 @@
             "destination": "hand"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -18991,6 +20297,11 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart03",
+          "heart03"
         ]
       }
     },
@@ -19053,7 +20364,8 @@
           ],
           "text": "『SunnyPassion』のメンバーカードかブレードハートを持つ『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19081,7 +20393,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19101,7 +20414,8 @@
         "count": 2,
         "position": "center",
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19126,7 +20440,14 @@
         "duration": "as_long_as",
         "count": 4,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06",
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -19155,7 +20476,8 @@
         "card_type": "member_card",
         "action": "modify_cost",
         "operation": "decrease",
-        "value": 2
+        "value": 2,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19179,7 +20501,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19214,7 +20537,8 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19233,11 +20557,28 @@
         "condition": {
           "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつエールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある",
           "type": "card_count_condition",
-          "count": 1,
-          "operator": ">="
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、",
+              "type": "location_condition",
+              "location": "success_live_zone",
+              "target": "either"
+            },
+            {
+              "text": "エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある",
+              "type": "card_count_condition",
+              "count": 1,
+              "operator": ">="
+            }
+          ],
+          "target": "both",
+          "location": "success_live_card_zone",
+          "card_type": "live_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19269,7 +20610,16 @@
             "resource": "heart"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart06",
+          "heart01",
+          "heart02",
+          "heart06"
+        ]
       }
     },
     {
@@ -19294,7 +20644,8 @@
         "operation": null,
         "per_unit": true,
         "per_unit_count": 4,
-        "per_unit_type": "つ"
+        "per_unit_type": "つ",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19322,7 +20673,8 @@
           "type": "group_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19357,7 +20709,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "appear"
+        "action": "appear",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19376,7 +20729,8 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19403,7 +20757,8 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19428,7 +20783,8 @@
         },
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19454,7 +20810,12 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06"
+        ]
       }
     },
     {
@@ -19480,10 +20841,33 @@
           "type": "location_condition",
           "location": "stage",
           "target": "self",
-          "distinct": true
+          "operator": "and",
+          "conditions": [
+            {
+              "text": "自分のステージに『蓮ノ空』のメンバー1人を含むメンバーが2人以上おり、",
+              "target": "self",
+              "location": "stage",
+              "card_type": "member_card",
+              "count": 1,
+              "operator": ">=",
+              "group": {
+                "name": "蓮ノ空"
+              },
+              "type": "group_condition"
+            },
+            {
+              "text": "それらのメンバーのユニット名がそれぞれ異なる",
+              "type": "location_condition",
+              "location": "stage",
+              "target": "self",
+              "distinct": true
+            }
+          ],
+          "card_type": "member_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19507,7 +20891,8 @@
           "unit": "人"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19532,7 +20917,14 @@
         "group": {
           "name": "蓮ノ空"
         },
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04",
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -19556,7 +20948,8 @@
           "unit": "人"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19584,7 +20977,12 @@
         ],
         "action": "gain_resource",
         "resource": "heart",
-        "heart_selection": true
+        "heart_selection": true,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -19608,7 +21006,8 @@
           "unit": "人"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19653,6 +21052,11 @@
             "action": "restriction",
             "restriction_type": "modify_required_hearts"
           }
+        ],
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart06",
+          "heart06"
         ]
       }
     },
@@ -19676,7 +21080,22 @@
           "operator": ">="
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart02",
+          "heart03",
+          "heart06",
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart02",
+          "heart03",
+          "heart06"
+        ]
       }
     },
     {
@@ -19704,7 +21123,8 @@
         "card_type": "member_card",
         "target": "self",
         "position": "center",
-        "action": "gain_ability"
+        "action": "gain_ability",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19725,7 +21145,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19759,7 +21180,8 @@
             "target": "opponent",
             "action": "change_state"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19780,7 +21202,8 @@
         "card_type": "member_card",
         "target": "self",
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19804,7 +21227,8 @@
           "type": "comparison_condition"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19862,7 +21286,8 @@
         "optional": true,
         "max": true,
         "action": "move_cards",
-        "destination": null
+        "destination": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19899,7 +21324,8 @@
             "destination": "hand"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19929,7 +21355,8 @@
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -19985,7 +21412,12 @@
           ],
           "text": "メンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。これにより『蓮ノ空』のカードを手札に加えた場合、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -20018,7 +21450,12 @@
           "蓮ノ空"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart01"
+        ]
       }
     },
     {
@@ -20046,7 +21483,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20071,7 +21509,12 @@
         "duration": "as_long_as",
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart04",
+          "heart04"
+        ]
       }
     },
     {
@@ -20102,7 +21545,8 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20127,7 +21571,8 @@
         "duration": "as_long_as",
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20160,7 +21605,8 @@
         "group_names": [
           "蓮ノ空"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20207,7 +21653,18 @@
             "resource": "heart"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart06",
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -20234,7 +21691,14 @@
         },
         "count": 2,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart05",
+          "heart05",
+          "heart05",
+          "heart05"
+        ]
       }
     },
     {
@@ -20268,7 +21732,8 @@
           "蓮ノ空"
         ],
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20311,7 +21776,8 @@
             "action": "move_cards",
             "state_change": "wait"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20357,7 +21823,8 @@
           "card_type": "member_card"
         },
         "action": "modify_score",
-        "operation": null
+        "operation": null,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20386,7 +21853,8 @@
         "resource": "blade",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20407,7 +21875,14 @@
         "resource": "heart",
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "effect_type": "one_shot",
+        "heart_colors": [
+          "heart02",
+          "heart02",
+          "heart02",
+          "heart02"
+        ]
       }
     },
     {
@@ -20441,7 +21916,8 @@
           "Aqours"
         ],
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20495,7 +21971,8 @@
           ],
           "text": "『Aqours』のライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く"
         },
-        "count": 5
+        "count": 5,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20531,7 +22008,8 @@
             "card_type": "card"
           }
         ],
-        "conditional": true
+        "conditional": true,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20565,7 +22043,8 @@
         "group_names": [
           "Aqours"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20603,7 +22082,8 @@
         "group_names": [
           "Aqours"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20636,7 +22116,8 @@
         "group_names": [
           "Aqours"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20666,7 +22147,8 @@
         },
         "count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20687,7 +22169,8 @@
         "destination": "discard",
         "target": "self",
         "action": "move_cards",
-        "card_type": "card"
+        "card_type": "card",
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20725,7 +22208,8 @@
             "state_change": "wait"
           }
         ],
-        "count": 1
+        "count": 1,
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20767,7 +22251,8 @@
             },
             "action": "move_cards"
           }
-        ]
+        ],
+        "effect_type": "one_shot"
       }
     },
     {
@@ -20794,7 +22279,8 @@
           "Aqours"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "effect_type": "one_shot"
       }
     }
   ]

@@ -203,43 +203,46 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     return actions;
                 }
                 Choice::SelectCard { zone, card_type, count: _, description, allow_skip } => {
-                    match zone.as_str() {
-                        "hand" => {
-                            let hand_player = game_state.active_player();
-                            for (hand_index, card_id) in hand_player.hand.cards.iter().enumerate() {
-                                let card_matches = match card_type.as_deref() {
-                                    Some("member_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false),
-                                    Some("live_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_live()).unwrap_or(false),
-                                    Some("energy_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false),
-                                    None => true,
-                                    _ => true,
-                                };
-                                if !card_matches { continue; }
-                                let card_name = game_state.card_database.get_card(*card_id).map(|c| c.name.as_str()).unwrap_or("Unknown");
-                                actions.push(Action {
-                                    description: format!("Select {} ({})", card_name, hand_index),
-                                    action_type: ActionType::ChoiceSelect,
-                                    parameters: Some(ActionParameters {
-                                        card_id: Some(*card_id), card_index: Some(hand_index), card_indices: Some(vec![hand_index]),
-                                        stage_area: None, use_baton_touch: None,
-                                        card_name: Some(card_name.to_string()), card_no: Some("select".to_string()),
-                                        base_cost: None, final_cost: None, available_areas: None,
-                                    }),
-                                });
-                            }
-                        }
-                        _ => {
+                    let active = game_state.active_player();
+                    let card_ids: Vec<(usize, i16)> = match zone.as_str() {
+                        "hand" => active.hand.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
+                        "discard" => active.waitroom.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
+                        "stage" => active.stage.stage.iter().copied().enumerate().filter(|&(_, id)| id != -1).map(|(i, id)| (i, id)).collect(),
+                        _ => Vec::new(),
+                    };
+                    if !card_ids.is_empty() {
+                        for (zone_index, card_id) in &card_ids {
+                            let card_matches = match card_type.as_deref() {
+                                Some("member_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false),
+                                Some("live_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_live()).unwrap_or(false),
+                                Some("energy_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false),
+                                None => true,
+                                _ => true,
+                            };
+                            if !card_matches { continue; }
+                            let card_name = game_state.card_database.get_card(*card_id).map(|c| c.name.as_str()).unwrap_or("Unknown");
                             actions.push(Action {
-                                description: format!("Select card(s): {}", description),
+                                description: format!("{} ({})", card_name, zone_index),
                                 action_type: ActionType::ChoiceSelect,
                                 parameters: Some(ActionParameters {
-                                    card_id: None, card_index: None, card_indices: Some(Vec::new()),
+                                    card_id: Some(*card_id), card_index: Some(*zone_index), card_indices: Some(vec![*zone_index]),
                                     stage_area: None, use_baton_touch: None,
-                                    card_name: None, card_no: Some("select".to_string()),
+                                    card_name: Some(card_name.to_string()), card_no: Some("select".to_string()),
                                     base_cost: None, final_cost: None, available_areas: None,
                                 }),
                             });
                         }
+                    } else {
+                        actions.push(Action {
+                            description: format!("Select card(s): {}", description),
+                            action_type: ActionType::ChoiceSelect,
+                            parameters: Some(ActionParameters {
+                                card_id: None, card_index: None, card_indices: Some(Vec::new()),
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("select".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
                     }
                     if *allow_skip {
                         actions.push(Action {
