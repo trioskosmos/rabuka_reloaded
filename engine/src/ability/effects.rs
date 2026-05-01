@@ -1,154 +1,16 @@
 use crate::card::AbilityEffect;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::resolver::AbilityResolver;
-use super::cost::ae_from_ir;
 
-#[allow(dead_code)]
 impl<'a> AbilityResolver<'a> {
-    pub fn execute_effect_ir(&mut self, effect: &crate::ir::effect::Effect) -> Result<(), String> {
-        use crate::ir::effect::{Effect as E, Count as C, Target as T, Resource as R, StateChange as SC};
-
-        let variant_tag = match effect {
-            E::MoveCards { .. } => "move_cards",
-            E::DrawCards { .. } => "draw_card",
-            E::GainResource { .. } => "gain_resource",
-            E::ChangeState { .. } => "change_state",
-            E::Reveal { .. } => "reveal",
-            E::Appear { .. } => "appear",
-            E::ModifyScore { .. } => "modify_score",
-            E::Sequential(_) | E::Choice { .. } | E::ConditionalAlternative { .. } => "",
-            _ => "",
-        };
-
-        if !variant_tag.is_empty() {
-            self.game_state.reset_replacement_effect_flags();
-            let replacements: Vec<crate::game_state::ReplacementEffect> = self.game_state.get_replacement_effects_for_event(variant_tag)
-                .iter().map(|r| (*r).clone()).collect();
-            if !replacements.is_empty() {
-                for replacement in &replacements {
-                    if replacement.is_choice_based {
-                        self.pending_choice = Some(Choice::SelectTarget {
-                            target: "apply_replacement".to_string(),
-                            description: format!("Apply replacement effect for '{}'?", variant_tag),
-                        });
-                        return Err("Pending choice required: apply replacement effect".to_string());
-                    }
-                    for re in &replacement.replacement_effects {
-                        self.execute_effect(re)?;
-                    }
-                    self.game_state.mark_replacement_effect_applied(replacement.card_id);
-                }
-                return Ok(());
-            }
-        }
-
-        match effect {
-            E::Custom { text } => {
-                eprintln!("Custom effect (unparseable): {}", text);
-                Ok(())
-            }
-            E::Sequential(actions) => {
-                for action in actions {
-                    if let Err(e) = self.execute_effect_ir(action) {
-                        if e.contains("Pending choice required") { return Ok(()); }
-                        return Err(e);
-                    }
-                    if self.pending_choice.is_some() { return Ok(()); }
-                }
-                Ok(())
-            }
-            E::Choice { options, choice_type, target: _ } => {
-                let flat_options: Vec<AbilityEffect> = options.iter().map(|opt| {
-                    AbilityEffect {
-                        text: format!("{:?}", opt), action: "custom".into(), ..Default::default()
-                    }
-                }).collect();
-                let ae = AbilityEffect {
-                    action: "choice".into(), options: Some(flat_options),
-                    choice_type: choice_type.clone(), ..Default::default()
-                };
-                self.execute_effect(&ae)
-            }
-            E::ConditionalAlternative { condition, primary, alternative, alternative_condition } => {
-                let mut ae = AbilityEffect {
-                    action: "conditional_alternative".into(),
-                    condition: Some(condition.clone().into()),
-                    primary_effect: Some(Box::new(ae_from_ir(primary))),
-                    ..Default::default()
-                };
-                if let Some(alt) = alternative {
-                    ae.alternative_effect = Some(Box::new(ae_from_ir(alt)));
-                }
-                if let Some(altc) = alternative_condition {
-                    ae.alternative_condition = Some(altc.clone().into());
-                }
-                self.execute_effect(&ae)
-            }
-            E::MoveCards { source, destination, count, card_type, target, group, cost_limit, total_cost_limit, placement_order, state_change, shuffle, optional, distinct, self_cost, exclude_self } => {
-                let source_str = format!("{:?}", source).to_lowercase();
-                let dst_str = format!("{:?}", destination).to_lowercase();
-                let count_val = match count { C::Fixed(n) => *n, C::UpTo(n) => *n, _ => 1 };
-                let target_str = match target { T::Self_ => "self", T::Opponent => "opponent", T::Both => "both", T::Either => "either", T::Player(p) => p.as_str() };
-                let ae = AbilityEffect {
-                    action: "move_cards".into(), source: Some(source_str), destination: Some(dst_str),
-                    count: Some(count_val), card_type: card_type.as_ref().map(|ct| format!("{:?}", ct)),
-                    target: Some(target_str.into()), group: group.as_ref().map(|g| crate::card::GroupInfo { name: g.clone() }),
-                    cost_limit: *cost_limit, total_cost_limit: *total_cost_limit, placement_order: placement_order.clone(),
-                    state_change: state_change.as_ref().map(|s| match s { SC::Wait => "wait", SC::Active => "active" }.into()),
-                    shuffle_target: if *shuffle { Some("deck".into()) } else { None },
-                    optional: Some(*optional), distinct: distinct.clone(), self_cost: Some(*self_cost), exclude_self: Some(*exclude_self),
-                    max: matches!(count, C::UpTo(_)).then_some(true), ..Default::default()
-                };
-                self.execute_effect(&ae)
-            }
-            E::DrawCards { count, target, optional } => {
-                let count_val = match count { C::Fixed(n) => *n, _ => 1 };
-                let target_str = match target { T::Self_ => "self", T::Opponent => "opponent", _ => "self" };
-                let ae = AbilityEffect { action: "draw_card".into(), count: Some(count_val), target: Some(target_str.into()), source: Some("deck".into()), destination: Some("hand".into()), optional: Some(*optional), ..Default::default() };
-                self.execute_effect(&ae)
-            }
-            E::GainResource { resource, count, target, duration, group, per_unit } => {
-                let count_val = match count { C::Fixed(n) => *n, _ => 1 };
-                let target_str = match target { T::Self_ => "self", T::Opponent => "opponent", _ => "self" };
-                let mut ae = AbilityEffect {
-                    action: "gain_resource".into(), count: Some(count_val), target: Some(target_str.into()),
-                    resource: Some(match resource { R::Blade => "blade", R::Energy => "energy", R::Score => "score", R::Draw => "draw", _ => "blade" }.into()),
-                    duration: duration.as_ref().map(|d| match d { crate::ir::effect::Duration::ThisTurn => "this_turn", crate::ir::effect::Duration::ThisLive => "this_live", crate::ir::effect::Duration::LiveEnd => "live_end", _ => "permanent" }.into()),
-                    group: group.as_ref().map(|g| crate::card::GroupInfo { name: g.clone() }),
-                    per_unit: Some(per_unit.is_some()), ..Default::default()
-                };
-                if let R::Heart(hc) = resource {
-                    ae.resource = Some(format!("{:?}", hc));
-                    ae.heart_color = Some(format!("{:?}", hc));
-                }
-                self.execute_effect(&ae)
-            }
-            E::ChangeState { state_change, count, target, card_type, cost_limit, group, optional } => {
-                let count_val = match count { C::Fixed(n) => *n, _ => 1 };
-                let target_str = match target { T::Self_ => "self", T::Opponent => "opponent", _ => "self" };
-                let ae = AbilityEffect { action: "change_state".into(), state_change: Some(match state_change { SC::Wait => "wait", SC::Active => "active" }.into()), count: Some(count_val), target: Some(target_str.into()), card_type: card_type.as_ref().map(|ct| format!("{:?}", ct)), cost_limit: *cost_limit, group: group.as_ref().map(|g| crate::card::GroupInfo { name: g.clone() }), optional: Some(*optional), ..Default::default() };
-                self.execute_effect(&ae)
-            }
-            other => {
-                let ae = ae_from_ir(other);
-                self.execute_effect(&ae)
-            }
-        }
-    }
-
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        eprintln!("DEBUG: EXECUTING EFFECT - action: {}, text: {}, target: {:?}",
-            effect.action, effect.text, effect.target);
 
         if !self.can_activate_effect(effect) {
-            eprintln!("DEBUG: Activation condition not met, skipping effect");
             return Ok(());
         }
 
         if let Some(ref condition) = effect.condition {
-            eprintln!("DEBUG: Checking effect condition: {:?}", condition);
             if !self.evaluate_condition(condition) {
-                eprintln!("DEBUG: Effect condition not met, skipping effect");
                 return Ok(());
             }
         }
@@ -197,7 +59,6 @@ impl<'a> AbilityResolver<'a> {
             }
         }
 
-        eprintln!("DEBUG: Executing effect action: '{}'", action_to_use);
         match action_to_use.as_str() {
             "sequential" => self.execute_sequential_effect(effect),
             "conditional_alternative" => self.execute_conditional_alternative(effect),
@@ -247,8 +108,8 @@ impl<'a> AbilityResolver<'a> {
             "reveal_per_group" => self.execute_reveal_per_group(effect),
             "conditional_on_result" => self.execute_conditional_on_result(effect),
             "conditional_on_optional" => self.execute_conditional_on_optional(effect),
-            "custom" => { eprintln!("DEBUG: Executing custom effect (not implemented)"); Ok(()) }
-            unknown_action => { eprintln!("DEBUG: Unknown action type: '{}', skipping", unknown_action); Ok(()) }
+            "custom" => Ok(()),
+            unknown_action => { eprintln!("Unknown action type: '{}', skipping", unknown_action); Ok(()) }
         }
     }
 
@@ -280,7 +141,15 @@ impl<'a> AbilityResolver<'a> {
                 }
 
                 match self.execute_effect(&action_to_execute) {
-                    Ok(_) => {},
+                    Ok(_) => {
+                        if self.pending_choice.is_some() {
+                            let remaining_actions: Vec<AbilityEffect> = actions[i + 1..].to_vec();
+                            if !remaining_actions.is_empty() {
+                                self.game_state.pending_sequential_actions = Some(remaining_actions);
+                            }
+                            return Ok(());
+                        }
+                    },
                     Err(e) if e.contains("Pending choice required") => {
                         let remaining_actions: Vec<AbilityEffect> = actions[i + 1..].to_vec();
                         if !remaining_actions.is_empty() {
@@ -618,13 +487,6 @@ impl<'a> AbilityResolver<'a> {
             });
         }
 
-        let pid = self.game_state.active_player().id.clone();
-        let card_id = activating_card_id.unwrap_or(-1);
-        match resource.as_str() {
-            "blade" | "ブレード" => self.game_state.publish_event(crate::events::GameEvent::BladeGained { card_id, player_id: pid, amount: final_count }),
-            "heart" | "ハート" => self.game_state.publish_event(crate::events::GameEvent::HeartGained { card_id, player_id: pid, color: heart_color.unwrap_or_default(), amount: final_count }),
-            _ => {}
-        }
         Ok(())
     }
 
@@ -682,7 +544,7 @@ impl<'a> AbilityResolver<'a> {
                 }
             };
 
-            let card_type_for_state = card_type_filter.as_deref().or(Some("energy_card"));
+            let _card_type_for_state = card_type_filter.as_deref().or(Some("energy_card"));
 
             let mut valid_indices: Vec<usize> = Vec::new();
             for i in 0..player.energy_zone.cards.len() {
@@ -819,7 +681,7 @@ impl<'a> AbilityResolver<'a> {
                     _ => {}
                 }
             }
-            if operation == "set" { self.game_state.score_modifiers.insert(*card_id, *delta); }
+            if operation == "set" { self.game_state.set_score_modifier(*card_id, *delta); }
             else { self.game_state.add_score_modifier(*card_id, *delta); }
             count_applied += 1;
         }
@@ -978,7 +840,7 @@ impl<'a> AbilityResolver<'a> {
         let source = effect.source.as_deref().unwrap_or("hand");
         let count = effect.count.unwrap_or(1);
         let target = effect.target.as_deref().unwrap_or("self");
-        let heart_colors = effect.heart_colors.as_ref();
+        let _heart_colors = effect.heart_colors.as_ref();
 
         let player = match target {
             "self" => &mut self.game_state.player1,
@@ -1005,7 +867,7 @@ impl<'a> AbilityResolver<'a> {
         let target = effect.target.as_deref().unwrap_or("self");
         let card_type_filter = effect.card_type.as_deref();
         let distinct = effect.distinct.as_deref();
-        let heart_colors = effect.heart_colors.as_ref();
+        let _heart_colors = effect.heart_colors.as_ref();
 
         let player = match target {
             "self" => &mut self.game_state.player1,
@@ -1185,11 +1047,6 @@ impl<'a> AbilityResolver<'a> {
                         player.stage.stage[target_index] = card_id;
                         player.stage.stage[current_idx] = -1;
                     }
-                    let pid = self.game_state.active_player().id.clone();
-                    self.game_state.publish_event(crate::events::GameEvent::MemberPositionChanged {
-                        card_id: activating_card_id, player_id: pid,
-                        from_area: format!("position_{}", current_idx), to_area: format!("position_{}", target_index),
-                    });
                 } else { return Err(format!("Activating card {} not found on stage", activating_card_id)); }
             } else { return Err("No activating card for position change".to_string()); }
         }
@@ -1303,8 +1160,6 @@ impl<'a> AbilityResolver<'a> {
         let target = effect.target.as_deref().unwrap_or("self");
         let player = match target { "self" => &mut self.game_state.player1, "opponent" => &mut self.game_state.player2, _ => &mut self.game_state.player1 };
         if energy > 0 { if let Err(e) = player.energy_zone.pay_energy(energy as usize) { return Err(e); } }
-        let pid = self.game_state.active_player().id.clone();
-        self.game_state.publish_event(crate::events::GameEvent::EnergyPaid { player_id: pid, amount: energy });
         Ok(())
     }
 
@@ -1314,16 +1169,6 @@ impl<'a> AbilityResolver<'a> {
         if let Some(identities) = identities {
             self.game_state.prohibition_effects.push(format!("card_identity:{}", identities.join(",")));
         }
-        Ok(())
-    }
-
-    fn execute_discard(&mut self, player_id: &str, target_count: usize) -> Result<(), String> {
-        let player = if player_id == "self" { &mut self.game_state.player1 } else { &mut self.game_state.player2 };
-        if player.hand.cards.len() > target_count {
-            return Err("Pending choice required: select cards to discard from hand".to_string());
-        }
-        let cards_to_remove: Vec<_> = player.hand.cards.drain(..).collect();
-        for card_id in cards_to_remove { player.waitroom.add_card(card_id); }
         Ok(())
     }
 
@@ -1446,7 +1291,7 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_set_card_identity_all_regions(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let target = effect.target.as_deref().unwrap_or("self");
+        let _target = effect.target.as_deref().unwrap_or("self");
         let identities = effect.identities.as_ref();
         let card_id = self.activating_card_id.or_else(|| self.game_state.activating_card);
         if let Some(card_id) = card_id {
@@ -1485,12 +1330,17 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_shuffle(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let target = effect.target.as_deref().unwrap_or("deck");
-        let player = &mut self.game_state.player1;
-        match target {
+        let target_player = effect.target.as_deref().unwrap_or("self");
+        let zone = effect.source.as_deref().unwrap_or("deck");
+        let player = match target_player {
+            "self" => &mut self.game_state.player1,
+            "opponent" => &mut self.game_state.player2,
+            _ => &mut self.game_state.player1,
+        };
+        match zone {
             "deck" => { use rand::seq::SliceRandom; player.main_deck.cards.shuffle(&mut rand::thread_rng()); }
             "energy_deck" => { use rand::seq::SliceRandom; player.energy_deck.cards.shuffle(&mut rand::thread_rng()); }
-            _ => { eprintln!("Unknown shuffle target: {}", target); }
+            _ => { eprintln!("Unknown shuffle zone: {}", zone); }
         }
         Ok(())
     }
@@ -1513,16 +1363,47 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_conditional_on_result(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let primary_action = effect.primary_effect.as_ref();
-        let _result_condition = effect.result_condition.as_ref();
+        let result_condition = effect.result_condition.as_ref();
         let followup_action = effect.followup_action.as_ref();
-        if let Some(ref primary) = primary_action { self.execute_effect(primary)?; }
-        if let Some(ref followup) = followup_action { self.execute_effect(followup)?; }
+
+        if let Some(ref primary) = primary_action {
+            if let Err(e) = self.execute_effect(primary) {
+                eprintln!("Primary action failed in conditional_on_result: {}", e);
+                return Err(e);
+            }
+        }
+
+        let condition_met = result_condition.map(|c| self.evaluate_condition(c)).unwrap_or(true);
+
+        if condition_met {
+            if let Some(ref followup) = followup_action {
+                self.execute_effect(followup)?;
+            }
+        } else {
+            eprintln!("Result condition not met, skipping followup action");
+        }
         Ok(())
     }
 
     fn execute_conditional_on_optional(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let optional_action = effect.optional_action.as_ref();
         let conditional_action = effect.conditional_action.as_ref();
+
+        if optional_action.is_some() && conditional_action.is_some() {
+            let desc = optional_action.as_ref().map(|a| a.text.as_str()).unwrap_or("Perform optional action");
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "conditional_optional".to_string(),
+                description: format!("{}?", desc),
+            });
+            self.game_state.pending_ability = Some(crate::game_state::PendingAbilityExecution {
+                card_no: "conditional_optional".to_string(), player_id: "self".to_string(),
+                action_index: 0, effect: effect.clone(),
+                conditional_choice: None, activating_card: None, ability_index: 0,
+                cost: None, cost_choice: None,
+            });
+            return Ok(());
+        }
+
         if let Some(ref optional) = optional_action { self.execute_effect(optional)?; }
         if let Some(ref conditional) = conditional_action { self.execute_effect(conditional)?; }
         Ok(())

@@ -3,7 +3,7 @@
  * Handles all board, card, and performance result rendering.
  */
 import { State } from './state.js';
-import { CardRenderer } from './components/CardRenderer.js';
+import { CardRenderer, ImageLoader, resolveCardImagePath } from './components/CardRenderer.js';
 import { BoardRenderer } from './components/BoardRenderer.js';
 import { ActionMenu } from './components/ActionMenu.js';
 
@@ -104,19 +104,15 @@ export const Rendering = {
             const handCards = p.hand.cards;
             handCards.forEach(c => {
                 if (c?.card_no) {
-                    const imgPath = (State.cardImageMapping && State.cardImageMapping[c.card_no])
-                        ? State.cardImageMapping[c.card_no]
-                        : `img/cards_webp/${c.card_no}.webp`;
-                    if (imgPath) assetsToLoad.push(imgPath);
+                    const path = resolveCardImagePath(c.card_no);
+                    if (path) assetsToLoad.push(path);
                 }
             });
             if (p?.stage) {
                 [p.stage.left_side, p.stage.center, p.stage.right_side].forEach(slot => {
                     if (slot?.card_no) {
-                        const imgPath = (State.cardImageMapping && State.cardImageMapping[slot.card_no])
-                            ? State.cardImageMapping[slot.card_no]
-                            : `img/cards_webp/${slot.card_no}.webp`;
-                        if (imgPath) assetsToLoad.push(imgPath);
+                        const path = resolveCardImagePath(slot.card_no);
+                        if (path) assetsToLoad.push(path);
                     }
                 });
             }
@@ -347,6 +343,18 @@ if (typeof window !== 'undefined') {
     State.on('change', () => Rendering.render());
 }
 
+// Image preloading — eagerly start downloads so cards show instantly
+window.preloadAssets = (assets) => {
+    if (!assets || !assets.length) return;
+    assets.forEach(src => {
+        if (!src || ImageLoader.loadedImages.has(src)) return;
+        const img = new Image();
+        img.onload = () => { ImageLoader.loadedImages.add(src); };
+        img.onerror = () => {};
+        img.src = src;
+    });
+};
+
 // Global Highlighting Logic for Bidirectional Linkage
 window.highlightActionBtn = (actionId, active) => {
     if (actionId === undefined) return;
@@ -372,8 +380,6 @@ window.highlightActionBtn = (actionId, active) => {
         else el.classList.remove('hover-highlight');
     });
 };
-
-window.highlightActionTarget = window.highlightActionBtn;
 
 window.highlightActionTarget = window.highlightActionBtn;
 

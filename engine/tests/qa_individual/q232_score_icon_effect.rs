@@ -33,7 +33,7 @@ fn test_q232_score_icon_effect() {
         setup_player_with_energy(&mut player1, energy_card_ids);
         
         let mut game_state = GameState::new(player1, player2, card_database.clone());
-        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSet;
+        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSetP1Turn;
         game_state.turn_number = 1;
         
         // Simulate: only this live card is lived, score is revealed

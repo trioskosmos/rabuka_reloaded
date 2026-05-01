@@ -1,75 +1,9 @@
-mod card;
-mod constants;
-mod zones;
-mod player;
-mod game_state;
-mod turn;
-mod card_loader;
-mod deck_builder;
-mod deck_parser;
-mod web_server;
-mod bot;
-mod game_setup;
-mod ability;
-mod ability_resolver;
-mod ability_queue;
-mod cheer_system;
-mod selection_system;
-mod card_matching;
-mod triggers;
-mod transaction;
-mod events;
-mod ir;
-
-use player::Player;
-use game_state::GameState;
-use card::CardDatabase;
+use rabuka_engine::*;
+use rabuka_engine::game_setup::{ActionParameters, AreaInfo};
+use rabuka_engine::player::Player;
+use rabuka_engine::game_state::GameState;
 use std::sync::{Arc, Mutex};
 use serde::{Serialize, Deserialize};
-use serde_json;
-use game_setup::{ActionParameters, AreaInfo};
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ActionsResponse {
-    pub actions: Vec<Action>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct CardDisplay {
-    pub card_no: String,
-    pub name: String,
-    #[serde(rename = "type")]
-    pub card_type: String,
-    pub orientation: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct ZoneDisplay {
-    pub cards: Vec<CardDisplay>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PlayerDisplay {
-    pub hand: ZoneDisplay,
-    pub energy: ZoneDisplay,
-    pub stage: StageDisplay,
-    pub live_zone: ZoneDisplay,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct StageDisplay {
-    pub left_side: Option<CardDisplay>,
-    pub center: Option<CardDisplay>,
-    pub right_side: Option<CardDisplay>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GameStateDisplay {
-    pub turn: u32,
-    pub phase: String,
-    pub player1: PlayerDisplay,
-    pub player2: PlayerDisplay,
-}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Action {
@@ -78,74 +12,16 @@ pub struct Action {
     pub parameters: Option<ActionParameters>,
 }
 
-pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>) -> Option<CardDisplay> {
-    if let Some(card) = card_db.get_card(card_id) {
-        Some(CardDisplay {
-            card_no: card.card_no.clone(),
-            name: card.name.clone(),
-            card_type: format!("{:?}", card.card_type),
-            orientation: orientation.map(|o| format!("{:?}", o)),
-        })
-    } else {
-        None
-    }
+#[derive(Serialize, Deserialize, Clone)]
+struct ActionsResponse {
+    actions: Vec<Action>,
 }
 
-pub fn zone_to_display(card_ids: &[i16], card_db: &crate::card::CardDatabase) -> ZoneDisplay {
-    ZoneDisplay {
-        cards: card_ids.iter().filter_map(|&id| card_to_display(id, card_db, None)).collect(),
-    }
+pub fn game_state_to_display(game_state: &game_state::GameState) -> display::GameStateDisplay {
+    display::game_state_to_display(game_state)
 }
 
-pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardDatabase) -> StageDisplay {
-    StageDisplay {
-        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, None) } else { None },
-        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, None) } else { None },
-        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, None) } else { None },
-    }
-}
-
-pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase) -> PlayerDisplay {
-    let energy_cards: Vec<(i16, Option<crate::zones::Orientation>)> = player.energy_zone.cards.iter()
-        .enumerate()
-        .map(|(i, &card_id)| {
-            // Simplified: first active_energy_count cards are active, rest are wait
-            let orientation = if i < player.energy_zone.active_energy_count {
-                Some(crate::zones::Orientation::Active)
-            } else {
-                Some(crate::zones::Orientation::Wait)
-            };
-            (card_id, orientation)
-        })
-        .collect();
-    
-    let energy_display = ZoneDisplay {
-        cards: energy_cards.iter()
-            .filter_map(|(card_id, orientation)| {
-                card_to_display(*card_id, card_db, *orientation)
-            })
-            .collect(),
-    };
-    
-    PlayerDisplay {
-        energy: energy_display,
-        hand: zone_to_display(&player.hand.cards, card_db),
-        stage: stage_to_display(&player.stage, card_db),
-        live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
-    }
-}
-
-pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
-    GameStateDisplay {
-        turn: game_state.turn_number,
-        phase: format!("{:?} - {:?}", game_state.current_turn_phase, game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database),
-        player2: player_to_display(&game_state.player2, &game_state.card_database),
-    }
-}
-
-// Global game state for CLI commands
-static GAME_STATE: Mutex<Option<GameState>> = Mutex::new(None);
+static GAME_STATE: Mutex<Option<game_state::GameState>> = Mutex::new(None);
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -177,20 +53,8 @@ fn main() {
             "interactive" => {
                 bot::interactive_headless::run_interactive_headless();
             }
-            "test" => {
-                bot::test_mode::run_test_mode();
-            }
-            "ability" => {
-                bot::ability_test::run_ability_test();
-            }
             "tournament" => {
                 bot::tournament::run_tournament();
-            }
-            "mulligan-test" => {
-                bot::mulligan_test::test_mulligan_flow();
-            }
-            "full-game-test" => {
-                bot::full_game_test::test_full_game();
             }
             "automated" => {
                 bot::headless::run_interactive_headless();
@@ -296,7 +160,7 @@ fn run_game() {
     player2.set_energy_deck(player2_deck.energy_deck);
     
     // Initialize game state
-    let card_database = Arc::new(CardDatabase::load_or_create(
+    let card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(
         cards.values().cloned().collect()
     ));
     let mut game_state = GameState::new(player1, player2, card_database);
@@ -337,7 +201,7 @@ fn initialize_game() {
     };
 
     // Create CardDatabase from loaded cards
-    let card_database = Arc::new(CardDatabase::load_or_create(cards));
+    let card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
     // Load sample decks from game/decks
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
@@ -482,7 +346,7 @@ fn choose_deck(deck_lists: &[deck_parser::DeckList], player_name: &str) -> deck_
 }
 
 fn run_web_server() {
-    println!("Starting web server...");
+    println!("Game server starting...");
     
     // Load cards and initialize game state
     let cards_path = std::path::Path::new("../cards/cards.json");
@@ -540,8 +404,8 @@ fn run_web_server() {
     };
 
     // Create CardDatabase from loaded cards - convert HashMap values to Vec
-    let card_vec: Vec<crate::card::Card> = cards.into_values().collect();
-    let card_database = std::sync::Arc::new(crate::card::CardDatabase::load_or_create(card_vec));
+    let card_vec: Vec<rabuka_engine::card::Card> = cards.into_values().collect();
+    let card_database = std::sync::Arc::new(rabuka_engine::card::CardDatabase::load_or_create(card_vec));
     
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
@@ -556,7 +420,7 @@ fn run_web_server() {
     game_setup::setup_game(&mut game_state);
     
     // Start web server with game state
-    let game_state = Arc::new(Mutex::new(game_state));
+    let _game_state = Arc::new(Mutex::new(game_state));
     
     println!("Web server starting on http://127.0.0.1:8080");
     

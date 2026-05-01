@@ -16,11 +16,5 @@ pub const MAX_LIVE_CARDS: usize = 3;
 /// Default maximum size for game state history (for loop detection)
 pub const DEFAULT_HISTORY_SIZE: usize = 100;
 
-/// Maximum size for undo/redo history
-// pub const MAX_UNDO_REDO_HISTORY: usize = 50; // Currently unused
-
-/// Initial number of cards drawn (Rule 6.2.1.5)
-pub const INITIAL_DRAW_COUNT: usize = 6;
-
 /// Victory condition: number of cards in success live card zone to win
 pub const VICTORY_CARD_COUNT: usize = 3;

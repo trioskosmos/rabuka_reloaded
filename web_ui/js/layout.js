@@ -1,5 +1,6 @@
 import { DOMUtils } from './utils/DOMUtils.js';
 import { CSS_CLASSES, DOM_IDS } from './constants_dom.js';
+import { State } from './state.js';
 
 function setSidebarButtonState(button, isActive) {
     if (!button) return;
@@ -30,9 +31,7 @@ let mobileSidebarOverlayHandler = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     // Pre-load static card database
-    import('./state.js').then(({ State }) => {
-        State.loadStaticCardDatabase();
-    });
+    State.loadStaticCardDatabase();
 
     // Elements
     const leftSidebar = DOMUtils.getElement(DOM_IDS.SIDEBAR_LEFT);

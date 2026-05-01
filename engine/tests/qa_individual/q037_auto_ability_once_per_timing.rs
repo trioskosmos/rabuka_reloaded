@@ -37,7 +37,7 @@ fn test_q037_auto_ability_once_per_timing() {
     setup_player_with_energy(&mut player2, energy_card_ids);
     
     let mut game_state = GameState::new(player1, player2, card_database.clone());
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
     game_state.turn_number = 1;
     game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
     

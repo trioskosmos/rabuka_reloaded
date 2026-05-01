@@ -40,7 +40,6 @@ impl<'a> AbilityResolver<'a> {
     pub fn rollback(&mut self) {
         if let Some(snapshot) = self.pre_resolution_snapshot.take() {
             *self.game_state = snapshot;
-            eprintln!("DEBUG: Rolled back game state due to resolution failure");
         }
     }
 
@@ -107,7 +106,7 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 Keyword::LiveStart => {
-                    if !matches!(self.game_state.current_phase, Phase::LiveCardSet) {
+                    if !matches!(self.game_state.current_phase, Phase::LiveCardSetP1Turn | Phase::LiveCardSetP2Turn) {
                         return false;
                     }
                 }
@@ -128,21 +127,11 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn resolve_ability(&mut self, ability: &Ability, activating_card: Option<i16>, ability_index: usize) -> Result<(), String> {
-        eprintln!("DEBUG: RESOLVING ABILITY - triggers: {:?}, full_text: {}, activating_card: {:?}",
-            ability.triggers, ability.full_text, activating_card);
-
-        if let Some(card_id) = activating_card {
-            let pid = self.game_state.active_player().id.clone();
-            self.game_state.publish_event(crate::events::GameEvent::AbilityActivated {
-                card_id, player_id: pid, ability_index,
-            });
-        }
 
         if let Some(use_limit) = ability.use_limit {
             if let Some(card_id) = activating_card {
                 let ability_key = format!("{}_{}_{}", card_id, ability_index, self.game_state.turn_number);
                 if self.game_state.turn_limited_abilities_used.contains(&ability_key) {
-                    eprintln!("DEBUG: Ability already used this turn (use_limit: {})", use_limit);
                     return Err(format!("Ability has already been used this turn (use_limit: {})", use_limit));
                 }
                 self.game_state.turn_limited_abilities_used.insert(ability_key);
@@ -161,7 +150,6 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if self.pending_choice.is_some() {
-            eprintln!("DEBUG: Pending choice from cost payment, pausing ability execution");
             if let Ok(json) = serde_json::to_value(&self.pending_choice) {
                 self.game_state.pending_choice = Some(json);
             }
@@ -169,8 +157,7 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if let Some(ref effect) = ability.effect {
-            let ir_effect = crate::ir::effect::Effect::from_ability_effect(effect);
-            if let Err(e) = self.execute_effect_ir(&ir_effect) {
+            if let Err(e) = self.execute_effect(effect) {
                 self.rollback();
                 return Err(e);
             }
@@ -185,14 +172,6 @@ impl<'a> AbilityResolver<'a> {
 
         self.clear_snapshot();
 
-        if let Some(card_id) = self.game_state.activating_card {
-            let pid = self.game_state.active_player().id.clone();
-            self.game_state.publish_event(crate::events::GameEvent::AbilityResolved {
-                card_id, player_id: pid, ability_index,
-            });
-        }
-
-        self.game_state.flush_events();
         self.game_state.activating_card = None;
         self.current_ability = None;
         Ok(())

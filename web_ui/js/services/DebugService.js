@@ -1,4 +1,4 @@
-import { State } from '../state.js';
+import { State, updateStateData } from '../state.js';
 import { log } from '../logger.js';
 
 export const DebugService = {
@@ -296,7 +296,7 @@ export const DebugService = {
             State.lastStateJson = text;
             const data = JSON.parse(text);
             if (data.success) {
-                import('../state.js').then(m => m.updateStateData(data.state));
+                updateStateData(data.state);
                 if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
                 return true;
             }
@@ -322,7 +322,7 @@ export const DebugService = {
             State.lastStateJson = text;
             const data = JSON.parse(text);
             if (data.success) {
-                import('../state.js').then(m => m.updateStateData(data.state));
+                updateStateData(data.state);
                 if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
                 log('Code executed');
             } else {

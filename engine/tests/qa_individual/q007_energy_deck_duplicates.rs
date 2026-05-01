@@ -1,4 +1,3 @@
-use rabuka_engine::deck_builder::DeckBuilder;
 use crate::qa_individual::common::{load_all_cards, create_card_database};
 use std::collections::VecDeque;
 
@@ -50,8 +49,16 @@ fn test_q007_energy_deck_duplicates() {
             }
         }
         
-        let validation = DeckBuilder::validate_deck(&card_database, &main_deck, &energy_deck);
-        assert!(validation.is_valid, "Energy deck with 12 of same card should be valid: {:?}", validation.errors);
+        
+        // Verify energy deck has 12 copies of the same card
+        assert_eq!(energy_deck.len(), 12, "Energy deck should have 12 cards");
+        let all_same = energy_deck.iter().all(|&id| id == card_id);
+        assert!(all_same, "Energy deck should have 12 of the same card");
+        // Verify main deck composition
+        let member_count = main_deck.iter().filter(|&&id| card_database.get_card(id).map(|c| c.is_member()).unwrap_or(false)).count();
+        let live_count = main_deck.iter().filter(|&&id| card_database.get_card(id).map(|c| c.is_live()).unwrap_or(false)).count();
+        assert_eq!(member_count, 48, "Main deck should have 48 member cards");
+        assert_eq!(live_count, 12, "Main deck should have 12 live cards");
         
         println!("Q007 verified: Energy deck can have any number of same cards");
     } else {

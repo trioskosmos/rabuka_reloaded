@@ -224,17 +224,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                     }
                                 }
                             }
+                            let old_choice = self.pending_choice.clone();
                             if let Err(e) = self.execute_effect(&pending.effect) {
                                 eprintln!("Failed to execute effect after optional cost: {}", e);
                             }
-                            self.pending_choice = None;
+                            if self.pending_choice == old_choice {
+                                self.pending_choice = None;
+                            }
                             return Ok(());
                         }
                     }
                 }
 
                 if target == "primary|alternative" {
-                    if let Some(ref pending) = self.game_state.pending_ability.clone() {
+                    if let Some(_pending) = self.game_state.pending_ability.clone() {
                         if let Some(ref ability) = self.current_ability.clone() {
                             if let Some(ref effect) = ability.effect {
                                 if effect.action == "conditional_alternative" {
@@ -315,6 +318,28 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 }
                             }
                         }
+                    }
+                    self.pending_choice = None;
+                    self.game_state.pending_ability = None;
+                    return Ok(());
+                }
+
+                if target == "conditional_optional" {
+                    if selected == "1" || selected == "yes" {
+                        if let Some(ref pending) = self.game_state.pending_ability.clone() {
+                            if let Some(ref optional) = pending.effect.optional_action {
+                                if let Err(e) = self.execute_effect(optional) {
+                                    eprintln!("Failed to execute optional action: {}", e);
+                                }
+                            }
+                            if let Some(ref conditional) = pending.effect.conditional_action {
+                                if let Err(e) = self.execute_effect(conditional) {
+                                    eprintln!("Failed to execute conditional action: {}", e);
+                                }
+                            }
+                        }
+                    } else {
+                        eprintln!("User declined optional action");
                     }
                     self.pending_choice = None;
                     self.game_state.pending_ability = None;
@@ -430,13 +455,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "discard" => {
+                let destination = self.game_state.pending_ability.as_ref()
+                    .and_then(|p| p.effect.destination.as_deref())
+                    .unwrap_or("hand");
                 let mut indices_to_remove: Vec<usize> = indices.iter().copied().collect();
                 indices_to_remove.sort_by(|a, b| b.cmp(a));
                 for i in indices_to_remove {
                     if i < player.waitroom.cards.len() {
                         let card_id = player.waitroom.cards.remove(i);
                         if matches_card_type(card_id, card_type_filter) && matches_character_names(card_id, character_filter) {
-                            player.hand.add_card(card_id);
+                            match destination {
+                                "stage" => {
+                                    if player.stage.stage[1] == -1 { player.stage.stage[1] = card_id; }
+                                    else if player.stage.stage[0] == -1 { player.stage.stage[0] = card_id; }
+                                    else if player.stage.stage[2] == -1 { player.stage.stage[2] = card_id; }
+                                    else { player.hand.add_card(card_id); }
+                                }
+                                _ => player.hand.add_card(card_id),
+                            }
                         } else {
                             player.waitroom.cards.insert(i, card_id);
                         }

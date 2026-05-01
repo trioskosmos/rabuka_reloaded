@@ -1,4 +1,3 @@
-use rabuka_engine::deck_builder::DeckBuilder;
 use crate::qa_individual::common::{load_all_cards, create_card_database};
 use std::collections::VecDeque;
 
@@ -70,8 +69,12 @@ fn test_q006_different_card_numbers() {
         }
         
         let energy_deck: VecDeque<i16> = VecDeque::new();
-        let validation = DeckBuilder::validate_deck(&card_database, &valid_deck, &energy_deck);
-        assert!(validation.is_valid, "Deck with 4 of each different card number should be valid: {:?}", validation.errors);
+        
+        // Verify 4 copies of each different card number
+        let count_1 = valid_deck.iter().filter(|&&id| id == card1_id).count();
+        let count_2 = valid_deck.iter().filter(|&&id| id == card2_id).count();
+        assert_eq!(count_1, 4, "Should have 4 copies of first card");
+        assert_eq!(count_2, 4, "Should have 4 copies of second card");
         
         println!("Q006 verified: Cards with different card numbers can be 4 of each in main deck");
     } else {

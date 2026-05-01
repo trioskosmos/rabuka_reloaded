@@ -26,7 +26,7 @@ export const InteractionAdapter = {
 
         if (!state.legal_actions) return valid;
 
-        state.legal_actions.forEach((action, index) => {
+        state.legal_actions.forEach((action) => {
             // Support both parameters and params field names
             const params = action.parameters || action.params || {};
             const cardIndex = params.card_index;
@@ -35,13 +35,16 @@ export const InteractionAdapter = {
             const cardId = params.card_id;
             const cardNo = params.card_no;
 
-            // Hand card actions
+            // Hand card actions — each card gets its own action copy
             if (cardIndex !== undefined) {
-                valid.myHand[cardIndex] = { ...action, index };
+                valid.myHand[cardIndex] = action;
             }
             if (cardIndices && cardIndices.length > 0) {
                 cardIndices.forEach(idx => {
-                    valid.myHand[idx] = { ...action, index };
+                    // Clone action per index so each card has its own card_index
+                    const perCard = { ...action, parameters: { ...action.parameters, card_index: idx } };
+                    delete perCard.parameters.card_indices;
+                    valid.myHand[idx] = perCard;
                 });
             }
 
@@ -52,7 +55,7 @@ export const InteractionAdapter = {
                 const areaMap = { 'left': 0, 'left_side': 0, 'center': 1, 'right': 2, 'right_side': 2 };
                 const stageIdx = areaMap[stageArea.toLowerCase()];
                 if (stageIdx !== undefined) {
-                    valid.myStage[stageIdx] = { ...action, index };
+                    valid.myStage[stageIdx] = action;
                 }
             }
 
@@ -62,7 +65,7 @@ export const InteractionAdapter = {
                 const liveCards = state.player1 ? state.player1.live_zone.cards : [];
                 if (liveCards.length > 0) {
                     liveCards.forEach((_, idx) => {
-                        valid.myLive[idx] = { ...action, index };
+                        valid.myLive[idx] = action;
                     });
                 }
             }
@@ -72,7 +75,7 @@ export const InteractionAdapter = {
                 const energyCards = state.player1 ? state.player1.energy.cards : [];
                 if (energyCards.length > 0) {
                     energyCards.forEach((_, idx) => {
-                        valid.myEnergy[idx] = { ...action, index };
+                        valid.myEnergy[idx] = action;
                     });
                 }
             }

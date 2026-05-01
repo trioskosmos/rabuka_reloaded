@@ -1,109 +1,99 @@
 Total abilities to scan: 602
 ================================================================================
 
-=== ISSUES FOUND: 178 ===
-  [ERROR] Ability 2 effect.select_action.actions[1]: count is None but no dynamic_count
-  [ERROR] Ability 6 effect.select_action.actions[0]: count is None but no dynamic_count
-  [ERROR] Ability 6 effect.select_action.actions[1]: count is None but no dynamic_count
-  [ERROR] Ability 8 effect.select_action.actions[0]: count is None but no dynamic_count
-  [ERROR] Ability 8 effect.select_action.actions[1]: count is None but no dynamic_count
-  [ERROR] Ability 18 effect: count is None but no dynamic_count
-  [ERROR] Ability 19 effect.actions[0]: INVALID action "specify_heart_color"
-  [ERROR] Ability 23 effect: INVALID action "gain_ability"
-  [ERROR] Ability 26 effect: INVALID action "gain_ability"
-  [ERROR] Ability 30 effect.actions[0]: INVALID action "specify_heart_color"
+=== ISSUES FOUND: 86 ===
+  [ERROR] Ability 13 effect: count is None but no dynamic_count
   [ERROR] Ability 31 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 31 effect.select_action.actions[2]: count is None but no dynamic_count
-  [ERROR] Ability 33 effect.select_action.actions[0]: count is None but no dynamic_count
-  [ERROR] Ability 33 effect.select_action.actions[1]: count is None but no dynamic_count
-  [ERROR] Ability 38 effect: INVALID action "activation_cost"
-  [ERROR] Ability 40 effect: INVALID action "modify_required_hearts_global"
-  [ERROR] Ability 54 effect: INVALID action "gain_ability"
-  [ERROR] Ability 59 effect: INVALID action "draw_until_count"
-  [ERROR] Ability 60 effect: INVALID action "gain_ability"
-  [ERROR] Ability 63 effect: INVALID action "gain_ability"
-  [ERROR] Ability 63: cost move_cards missing source
-  [ERROR] Ability 69 effect: count is None but no dynamic_count
-  [ERROR] Ability 75 effect.actions[0]: INVALID action "specify_heart_color"
-  [ERROR] Ability 77 effect: INVALID action "play_baton_touch"
-  [ERROR] Ability 85 effect.select_action.actions[1]: count is None but no dynamic_count
-  [ERROR] Ability 99 effect: count is None but no dynamic_count
-  [ERROR] Ability 102 effect.actions[1]: count is None but no dynamic_count
-  [ERROR] Ability 104 effect: count is None but no dynamic_count
-  [ERROR] Ability 107 effect.actions[0]: INVALID action "pay_energy"
+  [ERROR] Ability 93 effect.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 120 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 120 effect.select_action.actions[2]: count is None but no dynamic_count
-  [ERROR] Ability 125 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 130 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 130 effect.select_action.actions[2]: count is None but no dynamic_count
-  [ERROR] Ability 133 effect.actions[0]: INVALID action "discard_until_count"
-  [ERROR] Ability 136 effect: count is None but no dynamic_count
   [ERROR] Ability 138 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 138 effect.select_action.actions[2]: count is None but no dynamic_count
   [ERROR] Ability 139 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 139 effect.select_action.actions[2]: count is None but no dynamic_count
-  [ERROR] Ability 146 effect: INVALID action "restriction"
-  [ERROR] Ability 147 effect: count is None but no dynamic_count
+  [ERROR] Ability 144 effect.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 149 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 149 effect.select_action.actions[2]: count is None but no dynamic_count
   [ERROR] Ability 155 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 155 effect.select_action.actions[2]: count is None but no dynamic_count
-  [ERROR] Ability 156 effect.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 156 effect.actions[3]: INVALID action "repeat_procedure"
   [ERROR] Ability 166 effect.select_action.actions[1]: count is None but no dynamic_count
   [ERROR] Ability 166 effect.select_action.actions[2]: count is None but no dynamic_count
   [ERROR] Ability 167 effect.select_action.actions[1]: count is None but no dynamic_count
-  ... and 128 more errors
+  [ERROR] Ability 167 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 187 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 187 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 190 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 190 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 194 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 194 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 195 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 195 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 215 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 215 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 218 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 218 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 219 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 219 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 246 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 246 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 250 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 250 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 259 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 259 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 277 effect: MISSING action type
+  [ERROR] Ability 279 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 279 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 284 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 284 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 297 effect.select_action.actions[1]: count is None but no dynamic_count
+  [ERROR] Ability 297 effect.select_action.actions[2]: count is None but no dynamic_count
+  [ERROR] Ability 325 effect.select_action.actions[1]: count is None but no dynamic_count
+  ... and 36 more errors
 
 === WARNINGS: 0 ===
 
-=== ACTION TYPES (41) ===
+=== ACTION TYPES (30) ===
   [INVALID] 
-  [INVALID] activation_cost
-  [INVALID] activation_restriction
+  [OK] activate_ability
+  [OK] activation_restriction
   [OK] appear
   [OK] change_state
   [OK] choice
-  [INVALID] choose_required_hearts
   [OK] conditional_alternative
   [OK] custom
-  [INVALID] discard_until_count
   [OK] draw_card
-  [INVALID] draw_until_count
-  [INVALID] gain_ability
+  [OK] draw_until_count
+  [OK] gain_ability
   [OK] gain_resource
-  [INVALID] invalidate_ability
+  [OK] invalidate_ability
   [OK] look_and_select
   [OK] look_at
-  [INVALID] modify_cost
-  [INVALID] modify_limit
-  [INVALID] modify_required_hearts
-  [INVALID] modify_required_hearts_global
+  [OK] modify_cost
   [OK] modify_score
   [OK] modify_yell_count
   [OK] move_cards
-  [INVALID] pay_energy
   [OK] place_energy_under_member
-  [INVALID] play_baton_touch
+  [OK] play_baton_touch
   [OK] position_change
-  [INVALID] re_yell
-  [INVALID] restriction
+  [INVALID] repeat_procedure
+  [OK] restriction
   [OK] reveal
   [OK] select
   [OK] sequential
-  [INVALID] set_blade_count
-  [INVALID] set_blade_type
+  [OK] set_blade_count
   [OK] set_card_identity
-  [INVALID] set_cost
-  [INVALID] set_heart_type
-  [INVALID] set_required_hearts
-  [INVALID] set_score
-  [INVALID] specify_heart_color
+  [OK] set_score
 
-=== CONDITION TYPES (17) ===
+=== CONDITION TYPES (18) ===
   ability_negation_condition
   appearance_condition
   card_count_condition
   comparison_condition
+  complex_condition
   compound
   energy_state_condition
   group_condition

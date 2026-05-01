@@ -1365,7 +1365,7 @@ fn test_q33_live_start_timing() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -1588,7 +1588,7 @@ fn test_q34_live_card_remains_when_heart_met() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -1710,7 +1710,7 @@ fn test_q35_live_card_to_waitroom_when_heart_not_met() {
 
     // Set up for live phase with heart requirements NOT met
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -1838,7 +1838,7 @@ fn test_q36_live_success_timing() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -2074,7 +2074,7 @@ fn test_q39_cannot_skip_cheer_checks() {
 
     let mut game_state = GameState::new(player1, player2, card_database);
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -2566,7 +2566,7 @@ fn test_q45_all_blade_effects() {
 
     // Set up for live phase with ALL blade simulation
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -2574,7 +2574,7 @@ fn test_q45_all_blade_effects() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.current_live_card_set_player = 2; // Both done
+    // game_state.current_live_card_set_player = 2; // Both done
 
     
 
@@ -2744,7 +2744,7 @@ fn test_q47_failed_live_no_score_state() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -2868,7 +2868,7 @@ fn test_q48_zero_score_can_win_live() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -2970,7 +2970,7 @@ fn test_q49_no_winner_turn_order_unchanged() {
 
     // Set up for live phase with no live cards
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -2978,7 +2978,7 @@ fn test_q49_no_winner_turn_order_unchanged() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.current_live_card_set_player = 2; // Both done
+    // game_state.current_live_card_set_player = 2; // Both done
 
     
 
@@ -3056,7 +3056,7 @@ fn test_q50_both_winners_turn_order_unchanged() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -3064,7 +3064,7 @@ fn test_q50_both_winners_turn_order_unchanged() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.current_live_card_set_player = 2; // Both done
+    // game_state.current_live_card_set_player = 2; // Both done
 
     
 
@@ -3150,7 +3150,7 @@ fn test_q51_one_winner_turn_order_changes() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -3276,7 +3276,7 @@ fn test_q52_no_one_places_card_turn_order_unchanged() {
 
     // Set up for live phase
 
-    game_state.current_phase = Phase::LiveCardSet;
+    game_state.current_phase = Phase::LiveCardSetP1Turn;
 
     game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
 
@@ -3284,7 +3284,7 @@ fn test_q52_no_one_places_card_turn_order_unchanged() {
 
     game_state.player2.is_first_attacker = false;
 
-    game_state.current_live_card_set_player = 2; // Both done
+    // game_state.current_live_card_set_player = 2; // Both done
 
     
 

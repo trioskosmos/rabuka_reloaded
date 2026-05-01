@@ -3,6 +3,7 @@
  * Handles loading, playback, and navigation of game replays.
  */
 import { State, updateStateData } from './state.js';
+import { Network } from './network.js';
 import { log } from './logger.js';
 import { fixImg } from './constants.js';
 import { DOM_IDS, DISPLAY_VALUES } from './constants_dom.js';
@@ -209,7 +210,6 @@ export const Replay = {
 export const GameExport = {
     exportCurrentGame: async () => {
         try {
-            const { Network } = await import('./network.js');
             const data = await Network.exportGame();
             if (!data) {
                 log('Failed to export game');
@@ -271,7 +271,6 @@ export const GameExport = {
                 throw new Error('Invalid export format: missing state');
             }
             
-            const { Network } = await import('./network.js');
             const success = await Network.importGame(data);
             if (success) {
                 log('Game imported successfully');

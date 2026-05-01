@@ -33,7 +33,7 @@ fn test_q061_once_per_turn_optional() {
         setup_player_with_energy(&mut player1, energy_card_ids);
         
         let mut game_state = GameState::new(player1, player2, card_database.clone());
-        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSet;
+        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSetP1Turn;
         game_state.turn_number = 1;
         
         // Simulate: Once per turn auto ability triggers, player chooses not to use

@@ -681,7 +681,7 @@ fn test_execution_context_none_initially() {
     let resolver = rabuka_engine::ability_resolver::AbilityResolver::new(&mut game_state);
 
     // Verify execution context is None initially
-    match resolver.execution_context {
+    match &resolver.execution_context {
         rabuka_engine::ability::types::ExecutionContext::None => {
             // Expected
         }
@@ -749,10 +749,10 @@ fn test_stage_area_selection_multiple_available() {
     assert!(resolver.pending_choice.is_some(), "Should have pending choice for position selection");
 
     // Check that execution context is set
-    match resolver.execution_context.clone() {
-        rabuka_engine::ability_resolver::ExecutionContext::LookAndSelect { step } => {
+    match &resolver.execution_context {
+        rabuka_engine::ability::types::ExecutionContext::LookAndSelect { step } => {
             match step {
-                rabuka_engine::ability_resolver::LookAndSelectStep::Finalize { destination } => {
+                rabuka_engine::ability::types::LookAndSelectStep::Finalize { destination } => {
                     assert_eq!(destination, "stage", "Destination should be stage");
                 }
                 _ => panic!("Should be in Finalize step"),

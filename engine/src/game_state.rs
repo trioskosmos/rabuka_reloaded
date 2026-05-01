@@ -4,6 +4,31 @@ use crate::player::Player;
 use crate::zones::ResolutionZone;
 use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
+use std::collections::HashMap;
+
+#[derive(Debug, Clone)]
+pub struct ModMap<T: Clone> {
+    inner: HashMap<i16, T>,
+}
+
+impl<T: Clone> ModMap<T> {
+    pub fn new() -> Self { Self { inner: HashMap::new() } }
+    pub fn get(&self, k: i16) -> Option<&T> { self.inner.get(&k) }
+    pub fn set(&mut self, k: i16, v: T) { self.inner.insert(k, v); }
+    pub fn remove(&mut self, k: i16) { self.inner.remove(&k); }
+    pub fn clear(&mut self) { self.inner.clear(); }
+    pub fn contains(&self, k: i16) -> bool { self.inner.contains_key(&k) }
+    pub fn keys(&self) -> impl Iterator<Item = &i16> { self.inner.keys() }
+    pub fn values(&self) -> impl Iterator<Item = &T> { self.inner.values() }
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&i16, &mut T)> { self.inner.iter_mut() }
+    pub fn len(&self) -> usize { self.inner.len() }
+    pub fn is_empty(&self) -> bool { self.inner.is_empty() }
+    pub fn entry(&mut self, k: i16) -> std::collections::hash_map::Entry<'_, i16, T> { self.inner.entry(k) }
+}
+
+impl<T: Clone> Default for ModMap<T> {
+    fn default() -> Self { Self::new() }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbilityTrigger {
@@ -37,24 +62,14 @@ pub enum Phase {
     // Pre-game phases (Rule 6.2)
     RockPaperScissors,
     ChooseFirstAttacker,  // Q16: RPS winner chooses turn order
-    // Mulligan phase with explicit sub-states (no flags needed)
     MulliganP1Turn,
     MulliganP2Turn,
-    // Legacy aliases for backward compatibility
-    #[allow(dead_code)]
-    Mulligan,  // Alias for MulliganP1Turn (first player's turn)
-    // Normal phase sub-phases (Rule 7.3.3)
     Active,
     Energy,
     Draw,
     Main,
-    // Live phase sub-phases (Rule 8.1.2)
-    // LiveCardSet with explicit sub-states (no flags needed)
     LiveCardSetP1Turn,
     LiveCardSetP2Turn,
-    // Legacy alias for backward compatibility
-    #[allow(dead_code)]
-    LiveCardSet,  // Alias for LiveCardSetP1Turn (first player's turn)
     FirstAttackerPerformance,
     SecondAttackerPerformance,
     LiveVictoryDetermination,
@@ -71,14 +86,12 @@ impl std::fmt::Display for Phase {
             Phase::ChooseFirstAttacker => write!(f, "ChooseFirstAttacker"),
             Phase::MulliganP1Turn => write!(f, "MulliganP1Turn"),
             Phase::MulliganP2Turn => write!(f, "MulliganP2Turn"),
-            Phase::Mulligan => write!(f, "Mulligan"),
             Phase::Active => write!(f, "Active"),
             Phase::Energy => write!(f, "Energy"),
             Phase::Draw => write!(f, "Draw"),
             Phase::Main => write!(f, "Main"),
             Phase::LiveCardSetP1Turn => write!(f, "LiveCardSetP1Turn"),
             Phase::LiveCardSetP2Turn => write!(f, "LiveCardSetP2Turn"),
-            Phase::LiveCardSet => write!(f, "LiveCardSet"),
             Phase::FirstAttackerPerformance => write!(f, "FirstAttackerPerformance"),
             Phase::SecondAttackerPerformance => write!(f, "SecondAttackerPerformance"),
             Phase::LiveVictoryDetermination => write!(f, "LiveVictoryDetermination"),
@@ -175,108 +188,65 @@ pub struct GameState {
     pub resolution_zone: ResolutionZone,
     pub is_first_turn: bool,
     pub live_cheer_count: u32,
-    // Keyword tracking
-    pub turn1_abilities_played: std::collections::HashSet<String>, // Track Turn1 abilities played this turn
-    pub turn2_abilities_played: std::collections::HashMap<String, u32>, // Track Turn2 abilities played this turn
-    // Rule 8.4.2.1: Track cheer blade heart counts for victory determination
+    pub turn1_abilities_played: std::collections::HashSet<String>,
+    pub turn2_abilities_played: std::collections::HashMap<String, u32>,
     pub player1_cheer_blade_heart_count: u32,
     pub player2_cheer_blade_heart_count: u32,
-    // Store actual heart icons extracted during cheer for live success validation (Rule 8.3.14)
-    // Using a generic representation to avoid circular import issues
-    pub live_owned_hearts: std::collections::HashMap<String, Vec<(String, u32)>>, // player_id -> (color, count)
-    // Duration tracking for temporary effects
+    pub live_owned_hearts: std::collections::HashMap<String, Vec<(String, u32)>>,
     pub temporary_effects: Vec<TemporaryEffect>,
-    // Game result tracking
     pub game_result: GameResult,
-    // Cheer check state - must complete before checking required hearts
     pub cheer_check_completed: bool,
     pub cheer_checks_required: u32,
     pub cheer_checks_done: u32,
-    // Prohibition effects tracking - e.g., "cannot play member cards"
     pub prohibition_effects: Vec<String>,
-    // Turn-limited ability usage tracking per card instance (card_id + zone)
     pub turn_limited_abilities_used: std::collections::HashSet<String>,
-    // Mulligan tracking
-    pub current_mulligan_player_idx: usize, // 0 or 1, tracks whose mulligan turn it is
-    pub mulligan_selected_indices: Vec<usize>, // Track selected card indices for mulligan
-    // RPS tracking - Q16: "じゃんけんで勝ったプレイヤーが先攻か後攻を決めます"
-    pub rps_winner: Option<u8>, // 1 = player1, 2 = player2
-    pub player1_rps_choice: Option<i32>, // 0=Rock, 1=Paper, 2=Scissors
-    pub player2_rps_choice: Option<i32>, // 0=Rock, 1=Paper, 2=Scissors (set by AI engine)
-    // Live card set tracking - tracks which player is currently setting cards (0 = p1, 1 = p2, 2 = both done)
-    pub current_live_card_set_player: u8,
-    // Undo/redo history
+    pub mulligan_selected_indices: Vec<usize>,
+    pub rps_winner: Option<u8>,
+    pub player1_rps_choice: Option<i32>,
+    pub player2_rps_choice: Option<i32>,
     pub history: Vec<GameState>,
     pub future: Vec<GameState>,
     pub max_history_size: usize,
-    // Card database - shared across all game states
     pub card_database: Arc<CardDatabase>,
-    // Card modifier tracking - tracks blade/heart/score changes instead of mutating Card objects
-    pub blade_modifiers: std::collections::HashMap<i16, i32>, // card_id -> blade delta
-    pub blade_type_modifiers: std::collections::HashMap<i16, crate::card::BladeColor>, // card_id -> blade type override
-    pub heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> heart delta
-    pub orientation_modifiers: std::collections::HashMap<i16, String>, // card_id -> "active" or "wait"
-    pub cost_modifiers: std::collections::HashMap<i16, i32>, // card_id -> cost delta
-    // Reveal tracking - tracks which cards have been revealed to opponent
-    pub revealed_cards: std::collections::HashSet<i16>, // card_ids that are currently revealed
+    pub blade_modifiers: ModMap<i32>,
+    pub blade_type_modifiers: ModMap<crate::card::BladeColor>,
+    pub heart_modifiers: HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub orientation_modifiers: ModMap<String>,
+    pub cost_modifiers: ModMap<i32>,
+    pub revealed_cards: std::collections::HashSet<i16>,
     pub config: RuleConfig,
-    // Unified ability queue
     pub ability_queue: AbilityQueue,
-    // Event bus for trigger handling
-    pub event_bus: crate::events::EventBus,
-    // Pending ability execution state for user choice during resolution
     pub pending_ability: Option<PendingAbilityExecution>,
-    // Pending choice from ability resolution — JSON for the web client
     pub pending_choice: Option<serde_json::Value>,
-    // Activating card tracking - for self-cost abilities where the card itself is the cost
-    pub activating_card: Option<i16>, // card_id of the card currently activating an ability
-    // Legacy pending fields - deprecated but kept for compatibility during transition
+    pub activating_card: Option<i16>,
     pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
-    pub score_modifiers: std::collections::HashMap<i16, i32>, // card_id -> score delta
-    pub need_heart_modifiers: std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, // card_id -> color -> need_heart delta
-    // Area placement tracking - tracks which areas had cards placed this turn (Q70, Q71, Q75, Q76, Q79, Q80)
-    pub areas_placed_this_turn: std::collections::HashSet<String>, // "player1:center", "player1:left", etc.
-    // Card appearance tracking - tracks which cards appeared this turn (Q77)
+    pub score_modifiers: ModMap<i32>,
+    pub need_heart_modifiers: HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub areas_placed_this_turn: std::collections::HashSet<String>,
     pub cards_appeared_this_turn: std::collections::HashSet<i16>,
-    // Turn order change tracking (Q49, Q50, Q51)
     pub turn_order_changed: bool,
-    // Ability trigger tracking (Q94) - tracks how many times an auto ability has triggered this turn
-    pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>, // card_id -> trigger count
-    // Baton touch cost tracking - tracks if baton touch resulted in 0 cost (Q25)
-    pub baton_touch_zero_cost: bool, // true if the most recent baton touch had 0 cost
-    // Baton touch replaced member cost tracking (Q229) - tracks cost of member being replaced
-    pub baton_touch_replaced_member_cost: Option<u32>, // Cost of member being replaced by baton touch
-    // Turn limit tracking per card instance (Q58, Q59) - tracks how many times a card instance has used turn-limited abilities
-    pub turn_limit_usage: std::collections::HashMap<String, u32>, // "player1:card_instance_id" -> usage count
-    // Card identity tracking for zone movement (Q59) - tracks card instance IDs
-    pub card_instance_counter: u32, // Counter for generating unique card instance IDs
-    pub card_instance_mapping: std::collections::HashMap<i16, u32>, // card_id -> instance_id
-    // Baton touch tracking per turn (Q87) - tracks how many times baton touch has been used this turn
-    pub baton_touch_count: u32, // Number of baton touches performed this turn
-    // Card movement tracking - tracks which cards have moved this turn (for not_moved/has_moved conditions)
-    pub cards_moved_this_turn: std::collections::HashSet<i16>, // card_ids that have moved this turn
-    // Heart color decision tracking (Q46, Q67) - tracks when heart color decisions are made
-    pub heart_color_decision_phase: String, // "live_start" or "required_hearts_check"
-    // Deck refresh tracking (Q53) - tracks whether a deck refresh is pending
-    pub deck_refresh_pending: bool, // Whether a deck refresh needs to be performed
-    // Position/Formation change tracking for keyword validation
-    pub position_change_occurred_this_turn: bool, // Whether position change occurred this turn
-    pub formation_change_occurred_this_turn: bool, // Whether formation change occurred this turn
-    // Opponent choice tracking for optional action conditions
-    pub opponent_choice_declined: bool, // Whether opponent declined an optional action (for "そうしなかった" conditions)
+    pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>,
+    pub baton_touch_zero_cost: bool,
+    pub baton_touch_replaced_member_cost: Option<u32>,
+    pub turn_limit_usage: std::collections::HashMap<String, u32>,
+    pub card_instance_counter: u32,
+    pub card_instance_mapping: std::collections::HashMap<i16, u32>,
+    pub baton_touch_count: u32,
+    pub cards_moved_this_turn: std::collections::HashSet<i16>,
+    pub heart_color_decision_phase: String,
+    pub deck_refresh_pending: bool,
+    pub position_change_occurred_this_turn: bool,
+    pub formation_change_occurred_this_turn: bool,
+    pub opponent_choice_declined: bool,
     pub live_being_performed: bool,
     pub game_ended: bool,
     pub draw_state: bool,
-    // Ability source tracking (Q78) - tracks whether abilities are inherent or gained
-    pub gained_abilities: std::collections::HashMap<i16, Vec<String>>, // Card ID -> list of gained ability types
-    // Replacement effects tracking (Rule 9.10)
-    pub replacement_effects: Vec<ReplacementEffect>, // Active replacement effects
-    // Effect creation order counter for layering (Rule 9.9.1.7)
-    pub effect_creation_counter: u32, // Counter for tracking order of effect creation
-    // Permanent loop detection (Rule 12.1)
-    pub game_state_history: Vec<String>, // Track game states for loop detection
-    pub max_state_history_size: usize, // Limit history size for loop detection
-    pub loop_detected: bool, // Whether a permanent loop has been detected
+    pub gained_abilities: std::collections::HashMap<i16, Vec<String>>,
+    pub replacement_effects: Vec<ReplacementEffect>,
+    pub effect_creation_counter: u32,
+    pub game_state_history: Vec<String>,
+    pub max_state_history_size: usize,
+    pub loop_detected: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -303,51 +273,20 @@ impl PendingAbilityExecution {
 impl GameState {
     /// Invariant check: turn phase and current phase must be consistent according to game rules
     pub fn phase_invariant(&self) -> bool {
-        // Pre-game phases don't have a turn phase constraint
         if matches!(self.current_phase, Phase::RockPaperScissors | Phase::ChooseFirstAttacker | Phase::MulliganP1Turn | Phase::MulliganP2Turn) {
             return true;
         }
-        
         match self.current_turn_phase {
             TurnPhase::FirstAttackerNormal | TurnPhase::SecondAttackerNormal => {
-                // Normal phase sub-phases: Active, Energy, Draw, Main
                 matches!(self.current_phase, Phase::Active | Phase::Energy | Phase::Draw | Phase::Main)
             }
             TurnPhase::Live => {
-                // Live phase sub-phases: LiveCardSetP1Turn, LiveCardSetP2Turn, FirstAttackerPerformance, SecondAttackerPerformance, LiveVictoryDetermination
-                matches!(self.current_phase, Phase::LiveCardSetP1Turn | Phase::LiveCardSetP2Turn | Phase::LiveCardSet | Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination)
+                matches!(self.current_phase, Phase::LiveCardSetP1Turn | Phase::LiveCardSetP2Turn | Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination)
             }
         }
-    }
-
-    /// Invariant check: modifier HashMaps should not contain invalid card IDs
-    pub fn modifier_invariant(&self) -> bool {
-        // Check that all card IDs in modifier HashMaps exist in the card database
-        for &card_id in self.blade_modifiers.keys() {
-            if self.card_database.get_card(card_id).is_none() {
-                return false;
-            }
-        }
-        for &card_id in self.heart_modifiers.keys() {
-            if self.card_database.get_card(card_id).is_none() {
-                return false;
-            }
-        }
-        for &card_id in self.cost_modifiers.keys() {
-            if self.card_database.get_card(card_id).is_none() {
-                return false;
-            }
-        }
-        for &card_id in self.score_modifiers.keys() {
-            if self.card_database.get_card(card_id).is_none() {
-                return false;
-            }
-        }
-        true
     }
 
     pub fn new(player1: Player, player2: Player, card_database: Arc<CardDatabase>) -> Self {
-        let is_first_turn = true;
         let state = GameState {
             player1,
             player2,
@@ -356,7 +295,7 @@ impl GameState {
             turn_number: 1,
             activating_card: None,
             resolution_zone: ResolutionZone::new(),
-            is_first_turn,
+            is_first_turn: true,
             live_cheer_count: 0,
             turn1_abilities_played: std::collections::HashSet::new(),
             turn2_abilities_played: std::collections::HashMap::new(),
@@ -370,30 +309,27 @@ impl GameState {
             cheer_checks_done: 0,
             prohibition_effects: Vec::new(),
             turn_limited_abilities_used: std::collections::HashSet::new(),
-            current_mulligan_player_idx: 0, // Start with player 1 (index 0)
             mulligan_selected_indices: Vec::new(),
-            rps_winner: None,  // Q16: RPS winner chooses turn order
+            rps_winner: None,
             player1_rps_choice: None,
             player2_rps_choice: None,
-            current_live_card_set_player: 0, // 0 = p1's turn, 1 = p2's turn, 2 = both done
             history: Vec::new(),
             future: Vec::new(),
             max_history_size: 50,
             card_database,
-            blade_modifiers: std::collections::HashMap::new(),
-            blade_type_modifiers: std::collections::HashMap::new(),
-            heart_modifiers: std::collections::HashMap::new(),
-            orientation_modifiers: std::collections::HashMap::new(),
-            cost_modifiers: std::collections::HashMap::new(),
+            blade_modifiers: ModMap::new(),
+            blade_type_modifiers: ModMap::new(),
+            heart_modifiers: HashMap::new(),
+            orientation_modifiers: ModMap::new(),
+            cost_modifiers: ModMap::new(),
             revealed_cards: std::collections::HashSet::new(),
             config: RuleConfig::default(),
             ability_queue: AbilityQueue::new(),
-            event_bus: crate::events::EventBus::new(),
             pending_ability: None,
             pending_choice: None,
             pending_sequential_actions: None,
-            score_modifiers: std::collections::HashMap::new(),
-            need_heart_modifiers: std::collections::HashMap::new(),
+            score_modifiers: ModMap::new(),
+            need_heart_modifiers: HashMap::new(),
             areas_placed_this_turn: std::collections::HashSet::new(),
             cards_appeared_this_turn: std::collections::HashSet::new(),
             turn_order_changed: false,
@@ -421,91 +357,19 @@ impl GameState {
             loop_detected: false,
         };
         debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
-        debug_assert!(state.modifier_invariant(), "GameState modifier invariant violated after creation");
         state
     }
 
-    /// Publish a game event to the event bus (queues for later delivery).
-    pub fn publish_event(&mut self, event: crate::events::GameEvent) {
-        self.event_bus.publish(event);
-    }
-
-    /// Flush all pending events, delivering them to global listeners.
-    pub fn flush_events(&mut self) {
-        let mut bus = crate::events::EventBus::new();
-        std::mem::swap(&mut bus, &mut self.event_bus);
-        bus.flush(self);
-        std::mem::swap(&mut bus, &mut self.event_bus);
-    }
-
-    /// Helper method to determine active player during LiveCardSet phase
-    /// This consolidates the logic for determining which player is currently setting live cards
-    fn active_player_for_live_card_set(&self) -> &Player {
-        match self.current_live_card_set_player {
-            0 => {
-                // P1's turn to set cards
-                &self.player1
-            }
-            1 => {
-                // P2's turn to set cards
-                &self.player2
-            }
-            _ => {
-                // Both done (2) - default to first attacker
-                if self.player1.is_first_attacker {
-                    &self.player1
-                } else {
-                    &self.player2
-                }
-            }
-        }
-    }
-
-    fn active_player_for_live_card_set_mut(&mut self) -> &mut Player {
-        match self.current_live_card_set_player {
-            0 => {
-                // P1's turn to set cards
-                &mut self.player1
-            }
-            1 => {
-                // P2's turn to set cards
-                &mut self.player2
-            }
-            _ => {
-                // Both done (2) - default to first attacker
-                if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
-            }
-        }
-    }
-
     pub fn active_player(&self) -> &Player {
-        // Rule 7.2: Determine active player based on turn phase
         match self.current_phase {
             Phase::MulliganP1Turn => &self.player1,
             Phase::MulliganP2Turn => &self.player2,
             Phase::LiveCardSetP1Turn => &self.player1,
             Phase::LiveCardSetP2Turn => &self.player2,
-            Phase::Mulligan => {
-                // Legacy phase - use flag for compatibility
-                if self.current_mulligan_player_idx == 0 {
-                    &self.player1
-                } else {
-                    &self.player2
-                }
-            }
             _ => match self.current_turn_phase {
                 TurnPhase::FirstAttackerNormal => self.first_attacker(),
                 TurnPhase::SecondAttackerNormal => self.second_attacker(),
-                TurnPhase::Live => {
-                    // During live phase, determine active player based on phase
-                    match self.current_phase {
-                        Phase::LiveCardSet => {
-                            // Legacy phase - use flag for compatibility
-                            self.active_player_for_live_card_set()
-                        }
-                        _ => self.first_attacker(),
-                    }
-                }
+                TurnPhase::Live => self.first_attacker(),
             }
         }
     }
@@ -516,14 +380,6 @@ impl GameState {
             Phase::MulliganP2Turn => &mut self.player2,
             Phase::LiveCardSetP1Turn => &mut self.player1,
             Phase::LiveCardSetP2Turn => &mut self.player2,
-            Phase::Mulligan => {
-                // Legacy phase - use flag for compatibility
-                if self.current_mulligan_player_idx == 0 {
-                    &mut self.player1
-                } else {
-                    &mut self.player2
-                }
-            }
             _ => match self.current_turn_phase {
                 TurnPhase::FirstAttackerNormal => {
                     if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
@@ -532,15 +388,7 @@ impl GameState {
                     if self.player1.is_first_attacker { &mut self.player2 } else { &mut self.player1 }
                 }
                 TurnPhase::Live => {
-                    match self.current_phase {
-                        Phase::LiveCardSet => {
-                            // Legacy phase - use flag for compatibility
-                            self.active_player_for_live_card_set_mut()
-                        }
-                        _ => {
-                            if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
-                        }
-                    }
+                    if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
                 }
             }
         }
@@ -707,34 +555,32 @@ impl GameState {
         self.turn_limited_abilities_used.contains(card_id)
     }
 
-    // Modifier management methods for blade/heart/score tracking
     pub fn add_blade_modifier(&mut self, card_id: i16, delta: i32) {
         *self.blade_modifiers.entry(card_id).or_insert(0) += delta;
     }
 
     pub fn remove_blade_modifier(&mut self, card_id: i16, delta: i32) {
-        if let Some(modifier) = self.blade_modifiers.get_mut(&card_id) {
-            *modifier -= delta;
-            if *modifier == 0 {
-                self.blade_modifiers.remove(&card_id);
-            }
+        let val = self.blade_modifiers.entry(card_id).or_insert(0);
+        *val -= delta;
+        if *val == 0 {
+            self.blade_modifiers.remove(card_id);
         }
     }
 
     pub fn get_blade_modifier(&self, card_id: i16) -> i32 {
-        *self.blade_modifiers.get(&card_id).unwrap_or(&0)
+        self.blade_modifiers.get(card_id).copied().unwrap_or(0)
     }
 
     pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: crate::card::BladeColor) {
-        self.blade_type_modifiers.insert(card_id, blade_color);
+        self.blade_type_modifiers.set(card_id, blade_color);
     }
 
     pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<crate::card::BladeColor> {
-        self.blade_type_modifiers.get(&card_id).copied()
+        self.blade_type_modifiers.get(card_id).copied()
     }
 
     pub fn clear_blade_type_modifier(&mut self, card_id: i16) {
-        self.blade_type_modifiers.remove(&card_id);
+        self.blade_type_modifiers.remove(card_id);
     }
 
     pub fn add_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
@@ -764,16 +610,15 @@ impl GameState {
     }
 
     pub fn add_score_modifier(&mut self, card_id: i16, delta: i32) {
-        let current = self.score_modifiers.entry(card_id).or_insert(0);
-        *current += delta;
+        *self.score_modifiers.entry(card_id).or_insert(0) += delta;
     }
 
     pub fn get_score_modifier(&self, card_id: i16) -> i32 {
-        *self.score_modifiers.get(&card_id).unwrap_or(&0)
+        self.score_modifiers.get(card_id).copied().unwrap_or(0)
     }
 
     pub fn set_score_modifier(&mut self, card_id: i16, value: i32) {
-        self.score_modifiers.insert(card_id, value);
+        self.score_modifiers.set(card_id, value);
     }
 
     pub fn add_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
@@ -1164,12 +1009,11 @@ impl GameState {
     }
 
     pub fn set_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, value: i32) {
-        let colors = self.need_heart_modifiers.entry(card_id).or_insert_with(std::collections::HashMap::new);
-        colors.insert(color, value);
+        self.need_heart_modifiers.entry(card_id).or_default().insert(color, value);
     }
 
     pub fn add_orientation_modifier(&mut self, card_id: i16, orientation: &str) {
-        self.orientation_modifiers.insert(card_id, orientation.to_string());
+        self.orientation_modifiers.set(card_id, orientation.to_string());
     }
 
     pub fn add_cost_modifier(&mut self, card_id: i16, delta: i32) {
@@ -1177,24 +1021,24 @@ impl GameState {
     }
 
     pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
-        self.cost_modifiers.insert(card_id, value);
+        self.cost_modifiers.set(card_id, value);
     }
 
     pub fn get_cost_modifier(&self, card_id: i16) -> i32 {
-        *self.cost_modifiers.get(&card_id).unwrap_or(&0)
+        self.cost_modifiers.get(card_id).copied().unwrap_or(0)
     }
 
     pub fn get_orientation_modifier(&self, card_id: i16) -> Option<&String> {
-        self.orientation_modifiers.get(&card_id)
+        self.orientation_modifiers.get(card_id)
     }
 
     pub fn clear_modifiers_for_card(&mut self, card_id: i16) {
-        self.blade_modifiers.remove(&card_id);
+        self.blade_modifiers.remove(card_id);
         self.heart_modifiers.remove(&card_id);
-        self.score_modifiers.remove(&card_id);
+        self.score_modifiers.remove(card_id);
         self.need_heart_modifiers.remove(&card_id);
-        self.orientation_modifiers.remove(&card_id);
-        self.cost_modifiers.remove(&card_id);
+        self.orientation_modifiers.remove(card_id);
+        self.cost_modifiers.remove(card_id);
     }
 
     pub fn move_resolution_zone_to_waitroom(&mut self, player_id: &str) {
@@ -1941,14 +1785,14 @@ impl GameState {
                         };
                         
                         if matches {
-                            let current = self.cost_modifiers.get(&card_id).copied().unwrap_or(0);
+                            let current = self.cost_modifiers.get(card_id).copied().unwrap_or(0);
                             let new_value = match operation {
                                 "add" | "increase" => current + value,
                                 "subtract" | "decrease" => current - value,
                                 "set" => value,
                                 _ => current + value,
                             };
-                            self.cost_modifiers.insert(card_id, new_value);
+                            self.cost_modifiers.set(card_id, new_value);
                             eprintln!("Modified cost of card {}: {} -> {} ({} {})", 
                                      card_id, current, new_value, operation, value);
                         }
@@ -2108,7 +1952,7 @@ impl GameState {
         if let Some(card) = self.card_database.get_card(card_id) {
             // Check all constant abilities (常時) for restrictions
             for ability in &card.abilities {
-                if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT) {
+                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
                     if let Some(ref effect) = ability.effect {
                         if effect.action == "restriction" 
                             && effect.restriction_type.as_deref() == Some("cannot_place")
@@ -2171,46 +2015,30 @@ impl GameState {
         card.abilities.iter().filter(|ability| {
             match trigger {
                 AbilityTrigger::Activation => {
-                    // Activation abilities can always be triggered (subject to conditions)
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION);
-                    eprintln!("DEBUG: Activation ability check - triggers: {:?}, match: {}", 
-                        ability.triggers, trigger_match);
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::ACTIVATION));
                     trigger_match
                 }
                 AbilityTrigger::Debut => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t == crate::triggers::DEBUT_EN);
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN));
                     let should_trigger = trigger_match && self.should_trigger_debut(player, card);
-                    eprintln!("DEBUG: Debut ability check - triggers: {:?}, match: {}, should_trigger: {}, card: {}", 
-                        ability.triggers, trigger_match, should_trigger, 
-                        format!("{}({})", card.card_no, card.name));
                     should_trigger
                 }
                 AbilityTrigger::LiveStart => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START);
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::LIVE_START));
                     let should_trigger = trigger_match && self.should_trigger_live_start(player);
-                    eprintln!("DEBUG: LiveStart ability check - triggers: {:?}, match: {}, should_trigger: {}", 
-                        ability.triggers, trigger_match, should_trigger);
                     should_trigger
                 }
                 AbilityTrigger::LiveSuccess => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS);
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::LIVE_SUCCESS));
                     let should_trigger = trigger_match && self.should_trigger_live_success(player);
-                    eprintln!("DEBUG: LiveSuccess ability check - triggers: {:?}, match: {}, should_trigger: {}", 
-                        ability.triggers, trigger_match, should_trigger);
                     should_trigger
                 }
                 AbilityTrigger::Constant => {
-                    // Constant abilities are always active, but need to be evaluated continuously
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT);
-                    eprintln!("DEBUG: Constant ability check - triggers: {:?}, match: {}", 
-                        ability.triggers, trigger_match);
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT));
                     trigger_match
                 }
                 AbilityTrigger::Auto => {
-                    // Generic auto abilities (not tied to specific timing)
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::AUTO);
-                    eprintln!("DEBUG: Auto ability check - triggers: {:?}, match: {}", 
-                        ability.triggers, trigger_match);
+                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::AUTO));
                     trigger_match
                 }
             }

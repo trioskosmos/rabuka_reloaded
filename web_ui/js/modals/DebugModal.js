@@ -1,5 +1,6 @@
 import { State } from '../state.js';
 import { Network } from '../network.js';
+import { GameExport } from '../replay_system.js';
 import {
     ChoiceTypes,
     ConditionTypes,
@@ -1311,7 +1312,6 @@ export const DebugModal = {
 
     exportGameWithHistory: async () => {
         try {
-            const { GameExport } = await import('../replay_system.js');
             await GameExport.downloadGameAsJSON();
             DebugModal._setStatus('success', 'Game exported to file');
         } catch (e) {
@@ -1324,7 +1324,6 @@ export const DebugModal = {
         try {
             const text = prompt('Paste exported game JSON:', '');
             if (!text || !text.trim()) return;
-            const { GameExport } = await import('../replay_system.js');
             const success = await GameExport.importGameFromPaste(text);
             if (success) {
                 DebugModal._clearStatus();

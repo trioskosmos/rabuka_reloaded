@@ -2,8 +2,9 @@
 // This module contains shared game setup logic used by both the web server and bot modules
 
 use crate::game_state::GameState;
-use crate::player::Player;
 use crate::zones::MemberArea;
+
+use crate::ability_resolver::Choice;
 use serde::{Serialize, Deserialize};
 use std::vec::Vec;
 
@@ -23,6 +24,12 @@ pub enum ActionType {
     UseAbility,
     SetLiveCard,
     FinishLiveCardSet,
+    // Choice action types for ability cost/effect prompts
+    ChoiceDecision,
+    ChoiceSelect,
+    ChoiceSkip,
+    ChoiceOption,
+    ChoicePosition,
 }
 
 impl std::fmt::Display for ActionType {
@@ -42,6 +49,11 @@ impl std::fmt::Display for ActionType {
             ActionType::UseAbility => write!(f, "use_ability"),
             ActionType::SetLiveCard => write!(f, "set_live_card"),
             ActionType::FinishLiveCardSet => write!(f, "finish_live_card_set"),
+            ActionType::ChoiceDecision => write!(f, "decision"),
+            ActionType::ChoiceSelect => write!(f, "select_card"),
+            ActionType::ChoiceSkip => write!(f, "select_skip"),
+            ActionType::ChoiceOption => write!(f, "choose_option"),
+            ActionType::ChoicePosition => write!(f, "select_position"),
         }
     }
 }
@@ -65,6 +77,11 @@ impl std::str::FromStr for ActionType {
             "use_ability" => Ok(ActionType::UseAbility),
             "set_live_card" => Ok(ActionType::SetLiveCard),
             "finish_live_card_set" => Ok(ActionType::FinishLiveCardSet),
+            "decision" => Ok(ActionType::ChoiceDecision),
+            "select_card" => Ok(ActionType::ChoiceSelect),
+            "select_skip" => Ok(ActionType::ChoiceSkip),
+            "choose_option" => Ok(ActionType::ChoiceOption),
+            "select_position" => Ok(ActionType::ChoicePosition),
             _ => Err(format!("Invalid action type: {}", s)),
         }
     }
@@ -105,112 +122,169 @@ pub fn setup_game(game_state: &mut GameState) {
     // Rule 6.2: Pre-Game Procedure
     // Start at RockPaperScissors phase - player will choose RPS option
     game_state.current_phase = crate::game_state::Phase::RockPaperScissors;
-    println!("DEBUG: Game setup complete, phase set to: {:?}", game_state.current_phase);
-}
-
-/// Rock-paper-scissors for determining first attacker
-/// Returns 1 if player 1 wins, 2 if player 2 wins
-#[allow(dead_code)]
-pub fn play_rock_paper_scissors() -> u8 {
-    use rand::Rng;
-    let mut rng = rand::thread_rng();
-    
-    let choices = [RockPaperScissorsChoice::Rock, RockPaperScissorsChoice::Paper, RockPaperScissorsChoice::Scissors];
-    
-    let p1_choice = choices[rng.gen_range(0..3)];
-    let p2_choice = choices[rng.gen_range(0..3)];
-    
-    match (p1_choice, p2_choice) {
-        (RockPaperScissorsChoice::Rock, RockPaperScissorsChoice::Scissors) => 1,
-        (RockPaperScissorsChoice::Paper, RockPaperScissorsChoice::Rock) => 1,
-        (RockPaperScissorsChoice::Scissors, RockPaperScissorsChoice::Paper) => 1,
-        (RockPaperScissorsChoice::Scissors, RockPaperScissorsChoice::Rock) => 2,
-        (RockPaperScissorsChoice::Rock, RockPaperScissorsChoice::Paper) => 2,
-        (RockPaperScissorsChoice::Paper, RockPaperScissorsChoice::Scissors) => 2,
-        _ => {
-            // Tie - play again
-            play_rock_paper_scissors()
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
-enum RockPaperScissorsChoice {
-    Rock,
-    Paper,
-    Scissors,
-}
-
-#[allow(dead_code)]
-fn perform_mulligan(game_state: &mut GameState) {
-    // Rule 6.2.1.6: Mulligan phase
-    // Starting from first attacker, each player may return cards to deck and draw new ones
-    // NOTE: This is a simplified implementation. In a real game, players would choose which cards to mulligan.
-    // For automated play, this uses a simple rule-based strategy.
-    
-    // Determine order: first attacker goes first
-    let (first_player, second_player) = if game_state.player1.is_first_attacker {
-        (&mut game_state.player1, &mut game_state.player2)
-    } else {
-        (&mut game_state.player2, &mut game_state.player1)
-    };
-    
-    // Simple rule-based strategy: mulligan if hand has no member cards
-    perform_player_mulligan(first_player, &game_state.card_database);
-    perform_player_mulligan(second_player, &game_state.card_database);
-}
-
-#[allow(dead_code)]
-fn perform_player_mulligan(player: &mut Player, card_db: &crate::card::CardDatabase) {
-    use rand::seq::SliceRandom;
-    
-    // Rule 6.2.1.6: Starting from first attacker, each player chooses any number of cards from hand
-    // Simple rule-based strategy: mulligan if hand has no member cards
-    let has_member = player.hand.cards.iter().any(|&id| {
-        if let Some(card) = card_db.get_card(id) {
-            !card.is_energy() && !card.is_live()
-        } else {
-            false
-        }
-    });
-    
-    if !has_member && !player.hand.cards.is_empty() {
-        // Mulligan all cards
-        let num_to_mulligan = player.hand.cards.len();
-        let cards_to_set_aside: Vec<_> = player.hand.cards.drain(..).collect();
-        
-        // Rule 6.2.1.6: Place cards face-down to the side (waitroom temporarily)
-        // We'll hold them in a temporary vector
-        
-        // Rule 6.2.1.6: Draw the same number of cards from main deck to hand
-        for _ in 0..num_to_mulligan {
-            let _ = player.draw_card();
-        }
-        
-        // Rule 6.2.1.6: Move set-aside cards to main deck
-        for card in cards_to_set_aside {
-            player.main_deck.cards.push(card);
-        }
-        
-        // Rule 6.2.1.6: Shuffle if 1+ cards were moved
-        let mut deck_vec: Vec<_> = player.main_deck.cards.drain(..).collect();
-        deck_vec.shuffle(&mut rand::thread_rng());
-        for card in deck_vec {
-            player.main_deck.cards.push(card);
-        }
-        
-        println!("Player mulliganed {} cards", num_to_mulligan);
-    } else {
-        println!("Player kept their hand");
-    }
 }
 
 pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     let _start = std::time::Instant::now();
     let mut actions = Vec::new();
-    let active_player = game_state.active_player();
     
+    // If there's a pending choice, generate choice-resolution actions instead of phase actions
+    if let Some(ref pending_choice_val) = game_state.pending_choice {
+        if let Ok(choice) = serde_json::from_value::<Choice>(pending_choice_val.clone()) {
+            match &choice {
+                Choice::SelectTarget { target, description } => {
+                    if target == "pay_optional_cost:skip_optional_cost" {
+                        actions.push(Action {
+                            description: "Pay optional cost".to_string(),
+                            action_type: ActionType::ChoiceDecision,
+                            parameters: Some(ActionParameters {
+                                card_id: Some(1), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("pay_optional_cost".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                        actions.push(Action {
+                            description: "Skip optional cost".to_string(),
+                            action_type: ActionType::ChoiceDecision,
+                            parameters: Some(ActionParameters {
+                                card_id: Some(0), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("skip_optional_cost".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                        return actions;
+                    }
+                    if target == "primary|alternative" {
+                        actions.push(Action {
+                            description: format!("Primary: {}", description),
+                            action_type: ActionType::ChoiceOption,
+                            parameters: Some(ActionParameters {
+                                card_id: Some(0), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("primary".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                        actions.push(Action {
+                            description: format!("Alternative: {}", description),
+                            action_type: ActionType::ChoiceOption,
+                            parameters: Some(ActionParameters {
+                                card_id: Some(1), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("alternative".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                        return actions;
+                    }
+                    // Generic SelectTarget: yes/no
+                    actions.push(Action {
+                        description: format!("Yes — {}", description),
+                        action_type: ActionType::ChoiceDecision,
+                        parameters: Some(ActionParameters {
+                            card_id: Some(1), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("yes".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
+                    actions.push(Action {
+                        description: format!("No — {}", description),
+                        action_type: ActionType::ChoiceDecision,
+                        parameters: Some(ActionParameters {
+                            card_id: Some(0), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("no".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
+                    return actions;
+                }
+                Choice::SelectCard { zone, card_type, count: _, description, allow_skip } => {
+                    match zone.as_str() {
+                        "hand" => {
+                            let hand_player = game_state.active_player();
+                            for (hand_index, card_id) in hand_player.hand.cards.iter().enumerate() {
+                                let card_matches = match card_type.as_deref() {
+                                    Some("member_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false),
+                                    Some("live_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_live()).unwrap_or(false),
+                                    Some("energy_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false),
+                                    None => true,
+                                    _ => true,
+                                };
+                                if !card_matches { continue; }
+                                let card_name = game_state.card_database.get_card(*card_id).map(|c| c.name.as_str()).unwrap_or("Unknown");
+                                actions.push(Action {
+                                    description: format!("Select {} ({})", card_name, hand_index),
+                                    action_type: ActionType::ChoiceSelect,
+                                    parameters: Some(ActionParameters {
+                                        card_id: Some(*card_id), card_index: Some(hand_index), card_indices: Some(vec![hand_index]),
+                                        stage_area: None, use_baton_touch: None,
+                                        card_name: Some(card_name.to_string()), card_no: Some("select".to_string()),
+                                        base_cost: None, final_cost: None, available_areas: None,
+                                    }),
+                                });
+                            }
+                        }
+                        _ => {
+                            actions.push(Action {
+                                description: format!("Select card(s): {}", description),
+                                action_type: ActionType::ChoiceSelect,
+                                parameters: Some(ActionParameters {
+                                    card_id: None, card_index: None, card_indices: Some(Vec::new()),
+                                    stage_area: None, use_baton_touch: None,
+                                    card_name: None, card_no: Some("select".to_string()),
+                                    base_cost: None, final_cost: None, available_areas: None,
+                                }),
+                            });
+                        }
+                    }
+                    if *allow_skip {
+                        actions.push(Action {
+                            description: "Skip".to_string(),
+                            action_type: ActionType::ChoiceSkip,
+                            parameters: Some(ActionParameters {
+                                card_id: None, card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some("skip".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                    }
+                    return actions;
+                }
+                Choice::SelectPosition { position, description } => {
+                    let areas: Vec<&str> = position.split(',').map(|s| s.trim()).collect();
+                    for area in areas {
+                        let stage_area_str = match area {
+                            "left" | "left_side" | "左サイドエリア" => Some("left".to_string()),
+                            "center" | "センターエリア" => Some("center".to_string()),
+                            "right" | "right_side" | "右サイドエリア" => Some("right".to_string()),
+                            _ => Some(area.to_string()),
+                        };
+                        let area_parsed = stage_area_str.as_deref().and_then(|s| s.parse::<MemberArea>().ok());
+                        actions.push(Action {
+                            description: format!("Place at {}: {}", area, description),
+                            action_type: ActionType::ChoicePosition,
+                            parameters: Some(ActionParameters {
+                                card_id: None, card_index: None, card_indices: None,
+                                stage_area: area_parsed, use_baton_touch: None,
+                                card_name: None, card_no: Some("select".to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                    }
+                    return actions;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    let active_player = game_state.active_player();
+
     match game_state.current_phase {
         crate::game_state::Phase::RockPaperScissors => {
             // Q16 from qa_data.json: "じゃんけんで勝ったプレイヤーが先攻か後攻を決めます"
@@ -280,35 +354,17 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             
             println!("DEBUG: ChooseFirstAttacker actions generated: {} actions", actions.len());
         }
-        crate::game_state::Phase::Mulligan |
         crate::game_state::Phase::MulliganP1Turn |
         crate::game_state::Phase::MulliganP2Turn => {
-            // Rule 6.2.1.6: Mulligan - player chooses cards to mulligan
-            // Generate actions for the current mulligan player only
             let mulligan_player = match game_state.current_phase {
                 crate::game_state::Phase::MulliganP1Turn => &game_state.player1,
                 crate::game_state::Phase::MulliganP2Turn => &game_state.player2,
-                crate::game_state::Phase::Mulligan => {
-                    // Legacy phase - use flag for compatibility
-                    if game_state.current_mulligan_player_idx == 0 {
-                        &game_state.player1
-                    } else {
-                        &game_state.player2
-                    }
-                }
                 _ => &game_state.player1,
             };
 
             let player_name = match game_state.current_phase {
                 crate::game_state::Phase::MulliganP1Turn => "Player 1",
                 crate::game_state::Phase::MulliganP2Turn => "Player 2",
-                crate::game_state::Phase::Mulligan => {
-                    if game_state.current_mulligan_player_idx == 0 {
-                        "Player 1"
-                    } else {
-                        "Player 2"
-                    }
-                }
                 _ => "Player 1",
             };
             
@@ -534,8 +590,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         for (ability_index, ability) in card.abilities.iter().enumerate() {
                             // Check if ability can be activated (has activation trigger or main phase trigger)
                             // triggers is a String field, check if it contains "main", "メイン", or "起動" (activation)
+                            // Also include 常時 (constant), 自動 with cost, and baton touch per handle_use_ability
                             let can_activate = ability.triggers.as_ref().map_or(false, |t| {
                                 t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::triggers::ACTIVATION)
+                                || t.contains(crate::triggers::CONSTANT)
+                                || (t.contains(crate::triggers::AUTO) && ability.cost.is_some())
+                                || t.contains(crate::triggers::BATON_TOUCH)
                             });
 
                             // Check use_limit (e.g., once per turn)
@@ -578,19 +638,13 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 }
             }
         }
-        crate::game_state::Phase::LiveCardSet |
         crate::game_state::Phase::LiveCardSetP1Turn |
         crate::game_state::Phase::LiveCardSetP2Turn => {
-            // Add Pass action so player can indicate they're done setting cards
-            // Always add Pass as long as the current player hasn't finished (counter < 2)
-            // This allows players to pass even if they have cards left in hand
-            if game_state.current_live_card_set_player < 2 {
-                actions.push(Action {
-                    description: "Pass - Finished setting live cards".to_string(),
-                    action_type: ActionType::Pass,
-                    parameters: None,
-                });
-            }
+            actions.push(Action {
+                description: "Pass - Finished setting live cards".to_string(),
+                action_type: ActionType::Pass,
+                parameters: None,
+            });
 
             // Use the consolidated active_player() method to determine which player is currently setting cards
             let active_player = game_state.active_player();

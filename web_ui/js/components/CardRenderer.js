@@ -79,6 +79,16 @@ export const ImageLoader = {
     }
 };
 
+// Consistent image path resolution across all card displays
+export function resolveCardImagePath(cardNo) {
+    if (!cardNo) return '';
+    const resolved = State.resolveCardData(cardNo);
+    if (resolved?.img) return fixImgPath(resolved.img);
+    const mapped = State.cardImageMapping?.[cardNo];
+    if (mapped) return fixImgPath(mapped);
+    return fixImgPath(`img/cards_webp/${cardNo}.webp`);
+}
+
 export const CardRenderer = {
     /**
      * Maps engine card data to UI-specific properties (CSS classes, labels, etc.)
@@ -241,7 +251,7 @@ export const CardRenderer = {
                     existingImg.dataset.originalPath = imgPath;
                     existingImg.style.display = '';
                 } else if (!imgPath) {
-                    existingImg.style.display = 'none';
+                    existingImg.remove();
                 }
             } else if (imgPath) {
                 const img = document.createElement('img');
@@ -382,10 +392,7 @@ export const CardRenderer = {
             slotDiv.id = `${containerId}-slot-${i}`;
 
             if (slot && slot.card_no) {
-                const imgPath = (State.cardImageMapping && State.cardImageMapping[slot.card_no])
-                    ? State.cardImageMapping[slot.card_no]
-                    : `img/cards_webp/${slot.card_no}.webp`;
-                const fixedPath = fixImgPath(imgPath);
+                const fixedPath = resolveCardImagePath(slot.card_no);
                 const existingImg = slotDiv.querySelector('img');
                 if (existingImg) {
                     if (existingImg.src !== fixedPath) {
@@ -483,10 +490,7 @@ export const CardRenderer = {
             slot.id = `${containerId}-slot-${i}`;
 
             if (card && card.card_no) {
-                const imgPath = (State.cardImageMapping && State.cardImageMapping[card.card_no])
-                    ? State.cardImageMapping[card.card_no]
-                    : `img/cards_webp/${card.card_no}.webp`;
-                const fixedPath = fixImgPath(imgPath);
+                const fixedPath = viewModel?.imgPath || resolveCardImagePath(card.card_no);
                 const existingImg = slot.querySelector('img');
                 const existingInner = slot.querySelector('.live-card-inner');
 
@@ -557,10 +561,10 @@ export const CardRenderer = {
                 const card = discard[discard.length - 1 - i];
                 const div = document.createElement('div');
                 div.className = 'card card-mini';
-                const imgPath = card.card_no ? (State.cardImageMapping && State.cardImageMapping[card.card_no]
-                    ? State.cardImageMapping[card.card_no]
-                    : `img/cards_webp/${card.card_no}.webp`) : '';
-                div.innerHTML = `<img src="${fixImgPath(imgPath)}">`;
+                const img = document.createElement('img');
+                img.draggable = false;
+                ImageLoader.loadImage(img, resolveCardImagePath(card.card_no));
+                div.appendChild(img);
                 div.style.transform = `translate(${i * 2}px, ${i * 2}px)`;
                 div.style.zIndex = 10 - i;
 

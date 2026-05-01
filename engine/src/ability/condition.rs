@@ -1,5 +1,6 @@
 use crate::card::Condition;
 use crate::game_state::Phase;
+use super::util::compare_counts;
 
 #[allow(dead_code)]
 impl<'a> super::resolver::AbilityResolver<'a> {
@@ -66,15 +67,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             condition.count.unwrap_or(0)
         };
 
-        match condition.operator.as_deref() {
-            Some(">=") => count >= target_count,
-            Some(">") => count > target_count,
-            Some("<=") => count <= target_count,
-            Some("<") => count < target_count,
-            Some("==") | Some("=") => count == target_count,
-            Some("!=") => count != target_count,
-            _ => true,
-        }
+        compare_counts(condition.operator.as_deref(), count, target_count)
     }
 
     fn evaluate_location_condition(&self, condition: &Condition) -> bool {
@@ -289,15 +282,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     fn evaluate_group_condition(&self, condition: &Condition) -> bool {
         let count = self.get_group_card_count(condition);
         let target_count = condition.count.unwrap_or(0);
-        match condition.operator.as_deref() {
-            Some(">=") => count >= target_count,
-            Some(">") => count > target_count,
-            Some("<=") => count <= target_count,
-            Some("<") => count < target_count,
-            Some("==") | Some("=") => count == target_count,
-            Some("!=") => count != target_count,
-            _ => true,
-        }
+        compare_counts(condition.operator.as_deref(), count, target_count)
     }
 
     fn evaluate_card_count_condition(&self, condition: &Condition) -> bool {
@@ -315,15 +300,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             "energy_card" => player.energy_zone.cards.len(),
             _ => 0,
         };
-        match condition.operator.as_deref() {
-            Some(">=") => actual_count as u32 >= count,
-            Some(">") => actual_count as u32 > count,
-            Some("<=") => actual_count as u32 <= count,
-            Some("<") => (actual_count as u32) < count,
-            Some("==") | Some("=") => actual_count as u32 == count,
-            Some("!=") => actual_count as u32 != count,
-            _ => true,
-        }
+        compare_counts(condition.operator.as_deref(), actual_count as u32, count)
     }
 
     fn evaluate_appearance_condition(&self, condition: &Condition) -> bool {
@@ -389,13 +366,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             "live_end" => matches!(self.game_state.current_phase, crate::game_state::Phase::LiveVictoryDetermination),
             "this_live" => {
-                matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSet) ||
+                matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSetP1Turn) ||
+                matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSetP2Turn) ||
                 matches!(self.game_state.current_phase, crate::game_state::Phase::FirstAttackerPerformance) ||
                 matches!(self.game_state.current_phase, crate::game_state::Phase::SecondAttackerPerformance) ||
                 matches!(self.game_state.current_phase, crate::game_state::Phase::LiveVictoryDetermination)
             }
             "before_live" => {
-                !matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSet) &&
+                !matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSetP1Turn) &&
+                !matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSetP2Turn) &&
                 !matches!(self.game_state.current_phase, crate::game_state::Phase::FirstAttackerPerformance) &&
                 !matches!(self.game_state.current_phase, crate::game_state::Phase::SecondAttackerPerformance) &&
                 !matches!(self.game_state.current_phase, crate::game_state::Phase::LiveVictoryDetermination)
@@ -405,7 +384,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if let Some(phase_str) = phase {
                     match phase_str {
                         "active" => matches!(self.game_state.current_phase, crate::game_state::Phase::Active),
-                        "live_card_set" => matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSet),
+                        "live_card_set" => matches!(self.game_state.current_phase, crate::game_state::Phase::LiveCardSetP1Turn | crate::game_state::Phase::LiveCardSetP2Turn),
                         "live_performance" => matches!(self.game_state.current_phase, crate::game_state::Phase::FirstAttackerPerformance) ||
                                                matches!(self.game_state.current_phase, crate::game_state::Phase::SecondAttackerPerformance),
                         "live_victory" => matches!(self.game_state.current_phase, crate::game_state::Phase::LiveVictoryDetermination),
@@ -520,15 +499,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             "opponent" => self.game_state.player2_cheer_blade_heart_count,
             _ => self.game_state.player1_cheer_blade_heart_count,
         };
-        match operator {
-            Some(">=") => cheer_count >= count,
-            Some(">") => cheer_count > count,
-            Some("<=") => cheer_count <= count,
-            Some("<") => cheer_count < count,
-            Some("==") | Some("=") => cheer_count == count,
-            Some("!=") => cheer_count != count,
-            _ => true,
-        }
+        compare_counts(operator, cheer_count, count)
     }
 
     fn evaluate_choice_condition(&self, _condition: &Condition) -> bool {
@@ -562,14 +533,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         if negation { opponent_declined } else { !opponent_declined }
     }
 
-    fn get_count_for_condition(&self, condition: &Condition) -> u32 {
-        let location = condition.location.as_deref().unwrap_or("");
-        let target = condition.target.as_deref().unwrap_or("self");
-        let player = match target {
-            "self" => &self.game_state.player1,
-            "opponent" => &self.game_state.player2,
-            _ => &self.game_state.player1,
-        };
+    fn zone_len(&self, player: &crate::player::Player, location: &str) -> u32 {
         match location {
             "stage" => player.stage.total_blades(&self.game_state.card_database),
             "hand" => player.hand.len() as u32,
@@ -580,6 +544,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             "success_live_zone" => player.success_live_card_zone.len() as u32,
             _ => 0,
         }
+    }
+
+    fn get_count_for_condition(&self, condition: &Condition) -> u32 {
+        let location = condition.location.as_deref().unwrap_or("");
+        let target = condition.target.as_deref().unwrap_or("self");
+        let player = match target {
+            "self" => &self.game_state.player1,
+            "opponent" => &self.game_state.player2,
+            _ => &self.game_state.player1,
+        };
+        self.zone_len(player, location)
     }
 
     fn get_count_for_target(&self, condition: &Condition, target: &str) -> u32 {
@@ -614,30 +589,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     total_cost
                 }
                 "energy" => player.energy_zone.cards.len() as u32,
-                _ => {
-                    match location {
-                        "stage" => player.stage.total_blades(&self.game_state.card_database),
-                        "hand" => player.hand.len() as u32,
-                        "deck" => player.main_deck.len() as u32,
-                        "discard" => player.waitroom.len() as u32,
-                        "energy_zone" => player.energy_zone.cards.len() as u32,
-                        "live_card_zone" => player.live_card_zone.len() as u32,
-                        "success_live_zone" => player.success_live_card_zone.len() as u32,
-                        _ => 0,
-                    }
-                }
+                _ => self.zone_len(player, location),
             }
         } else {
-            match location {
-                "stage" => player.stage.total_blades(&self.game_state.card_database),
-                "hand" => player.hand.len() as u32,
-                "deck" => player.main_deck.len() as u32,
-                "discard" => player.waitroom.len() as u32,
-                "energy_zone" => player.energy_zone.cards.len() as u32,
-                "live_card_zone" => player.live_card_zone.len() as u32,
-                "success_live_zone" => player.success_live_card_zone.len() as u32,
-                _ => 0,
-            }
+            self.zone_len(player, location)
         }
     }
 

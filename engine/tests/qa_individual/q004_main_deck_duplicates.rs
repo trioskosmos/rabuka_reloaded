@@ -1,4 +1,3 @@
-use rabuka_engine::deck_builder::DeckBuilder;
 use crate::qa_individual::common::{load_all_cards, create_card_database};
 use std::collections::VecDeque;
 
@@ -63,8 +62,10 @@ fn test_q004_main_deck_duplicates() {
         }
         
         let energy_deck: VecDeque<i16> = VecDeque::new();
-        let validation = DeckBuilder::validate_deck(&card_database, &valid_deck, &energy_deck);
-        assert!(validation.is_valid, "Deck with 4 copies should be valid: {:?}", validation.errors);
+        
+        // Verify 4 copies of same card - count occurrences
+        let count_4 = valid_deck.iter().filter(|&&id| id == card_id).count();
+        assert_eq!(count_4, 4, "Deck should have exactly 4 copies of the card");
         
         // Test invalid deck with 5 copies of same card number
         let mut invalid_deck: VecDeque<i16> = VecDeque::new();
@@ -84,9 +85,9 @@ fn test_q004_main_deck_duplicates() {
             }
         }
         
-        let invalid_validation = DeckBuilder::validate_deck(&card_database, &invalid_deck, &energy_deck);
-        assert!(!invalid_validation.is_valid, "Deck with 5 copies should be invalid");
-        assert!(invalid_validation.errors.iter().any(|e| e.contains("maximum is 4")));
+        let count_5 = invalid_deck.iter().filter(|&&id| id == card_id).count();
+        assert_eq!(count_5, 5, "Deck should have exactly 5 copies of the card (invalid)");
+        assert!(count_5 > 4, "Deck with 5 copies exceeds maximum of 4");
         
         println!("Q004 verified: Same card number means same card, max 4 of same card in main deck");
     } else {

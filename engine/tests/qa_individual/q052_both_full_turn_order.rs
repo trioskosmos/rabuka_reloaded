@@ -36,7 +36,7 @@ fn test_q052_both_full_turn_order() {
         setup_player_with_energy(&mut player2, energy_card_ids);
         
         let mut game_state = GameState::new(player1, player2, card_database.clone());
-        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSet;
+        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSetP1Turn;
         game_state.turn_number = 1;
         
         // Simulate: Both win with same score, but neither can place card

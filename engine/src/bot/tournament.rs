@@ -189,10 +189,8 @@ fn run_single_game(
             crate::game_state::Phase::ChooseFirstAttacker |
             crate::game_state::Phase::MulliganP1Turn |
             crate::game_state::Phase::MulliganP2Turn |
-            crate::game_state::Phase::Mulligan |
             crate::game_state::Phase::LiveCardSetP1Turn |
             crate::game_state::Phase::LiveCardSetP2Turn |
-            crate::game_state::Phase::LiveCardSet |
             crate::game_state::Phase::Main => {
                 // Manual phases - stop
                 break;
@@ -252,8 +250,7 @@ fn run_single_game(
                 }
             }
             crate::game_state::Phase::MulliganP1Turn |
-            crate::game_state::Phase::MulliganP2Turn |
-            crate::game_state::Phase::Mulligan => {
+            crate::game_state::Phase::MulliganP2Turn => {
                 // Mulligan phase - let the AI choose
                 let ai = ai::AIPlayer::new("TournamentAI".to_string());
                 let actions = crate::game_setup::generate_possible_actions(&game_state);
@@ -324,8 +321,7 @@ fn run_single_game(
                 }
             }
             crate::game_state::Phase::LiveCardSetP1Turn |
-            crate::game_state::Phase::LiveCardSetP2Turn |
-            crate::game_state::Phase::LiveCardSet => {
+            crate::game_state::Phase::LiveCardSetP2Turn => {
                 // Rule 8.2: Both players set live cards (automatic)
                 let p1_cards = ai::AIPlayer::choose_live_cards_to_set(game_state.first_attacker());
                 let p2_cards = ai::AIPlayer::choose_live_cards_to_set(game_state.second_attacker());

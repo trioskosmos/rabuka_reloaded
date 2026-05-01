@@ -33,7 +33,7 @@ fn test_q072_live_set_no_stage_members() {
         assert_eq!(player1.stage.stage[2], -1, "Right area should be empty");
         
         let mut game_state = GameState::new(player1, player2, card_database.clone());
-        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSet;
+        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSetP1Turn;
         game_state.turn_number = 1;
         
         // Place live card in live card zone using real engine function

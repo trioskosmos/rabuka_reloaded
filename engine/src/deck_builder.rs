@@ -1,6 +1,5 @@
 use crate::card::{Card, CardDatabase};
-use std::collections::HashMap;
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::vec::Vec;
 use std::sync::Arc;
 
@@ -10,57 +9,11 @@ pub struct Deck {
     pub energy_deck: VecDeque<i16>,  // Card IDs
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
-pub struct DeckValidationResult {
-    pub is_valid: bool,
-    pub errors: Vec<String>,
-    pub warnings: Vec<String>,
-}
-
-impl DeckValidationResult {
-    #[allow(dead_code)]
-    pub fn new() -> Self {
-        DeckValidationResult {
-            is_valid: true,
-            errors: Vec::new(),
-            warnings: Vec::new(),
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn add_error(&mut self, error: String) {
-        self.is_valid = false;
-        self.errors.push(error);
-    }
-
-    #[allow(dead_code)]
-    pub fn add_warning(&mut self, warning: String) {
-        self.warnings.push(warning);
-    }
-}
-
 impl Deck {
-    #[allow(dead_code)]
-    pub fn new() -> Self {
-        Deck {
-            main_deck: VecDeque::new(),
-            energy_deck: VecDeque::new(),
-        }
-    }
-
     pub fn shuffle_main_deck(&mut self) {
         use rand::seq::SliceRandom;
         let mut cards: Vec<i16> = self.main_deck.drain(..).collect();
         cards.shuffle(&mut rand::thread_rng());
-        self.main_deck = cards.into();
-    }
-
-    #[allow(dead_code)]
-    pub fn shuffle_main_deck_with_rng<R: rand::Rng>(&mut self, rng: &mut R) {
-        use rand::seq::SliceRandom;
-        let mut cards: Vec<i16> = self.main_deck.drain(..).collect();
-        cards.shuffle(rng);
         self.main_deck = cards.into();
     }
 
@@ -70,110 +23,11 @@ impl Deck {
         cards.shuffle(&mut rand::thread_rng());
         self.energy_deck = cards.into();
     }
-
-    #[allow(dead_code)]
-    pub fn shuffle_energy_deck_with_rng<R: rand::Rng>(&mut self, rng: &mut R) {
-        use rand::seq::SliceRandom;
-        let mut cards: Vec<i16> = self.energy_deck.drain(..).collect();
-        cards.shuffle(rng);
-        self.energy_deck = cards.into();
-    }
 }
 
 pub struct DeckBuilder;
 
 impl DeckBuilder {
-    // Q3: Main deck composition validation (48 member + 12 live = 60 total, half deck: 24 + 6 = 30)
-    // Q4: Main deck duplicates validation (max 4 of same card number)
-    // Q5: Same card number different rarity validation (max 4 total regardless of rarity)
-    // Q6: Different card numbers validation (can use 4 of each if card numbers differ)
-    // Q7: Energy deck duplicates validation (any number of same cards allowed)
-    #[allow(dead_code)]
-    pub fn validate_deck(card_db: &Arc<CardDatabase>, main_deck: &VecDeque<i16>, energy_deck: &VecDeque<i16>) -> DeckValidationResult {
-        let mut result = DeckValidationResult::new();
-
-        // Count card types in main deck
-        let mut member_count = 0;
-        let mut live_count = 0;
-        let mut card_number_counts: HashMap<String, u32> = HashMap::new();
-
-        for &card_id in main_deck {
-            if let Some(card) = card_db.get_card(card_id) {
-                match card.card_type {
-                    crate::card::CardType::Member => {
-                        member_count += 1;
-                    }
-                    crate::card::CardType::Live => {
-                        live_count += 1;
-                    }
-                    _ => {}
-                }
-
-                // Extract card number (excluding rarity symbol)
-                let card_number = Self::extract_card_number(&card.card_no);
-                *card_number_counts.entry(card_number).or_insert(0) += 1;
-            }
-        }
-
-        // Q3: Validate main deck composition
-        let total_main = member_count + live_count;
-        if total_main == 60 {
-            if member_count != 48 || live_count != 12 {
-                result.add_error(format!(
-                    "Main deck must be exactly 48 member + 12 live = 60 total, found {} member + {} live",
-                    member_count, live_count
-                ));
-            }
-        } else if total_main == 30 {
-            if member_count != 24 || live_count != 6 {
-                result.add_error(format!(
-                    "Half deck must be exactly 24 member + 6 live = 30 total, found {} member + {} live",
-                    member_count, live_count
-                ));
-            }
-        } else {
-            result.add_error(format!(
-                "Main deck must be 60 cards (48 member + 12 live) or 30 cards for half deck (24 member + 6 live), found {} total",
-                total_main
-            ));
-        }
-
-        // Q4, Q5, Q6: Validate main deck duplicates (max 4 of same card number)
-        for (card_number, count) in &card_number_counts {
-            if *count > 4 {
-                result.add_error(format!(
-                    "Card number {} appears {} times in main deck, maximum is 4",
-                    card_number, count
-                ));
-            }
-        }
-
-        // Q7: Energy deck can have any number of same cards (no validation needed)
-        // Energy deck size validation (should be 12)
-        if energy_deck.len() != 12 {
-            result.add_warning(format!(
-                "Energy deck has {} cards, expected 12",
-                energy_deck.len()
-            ));
-        }
-
-        result
-    }
-
-    // Extract card number excluding rarity symbol (e.g., "PL!N-bp1-001-R+" -> "PL!N-bp1-001")
-    #[allow(dead_code)]
-    fn extract_card_number(card_no: &str) -> String {
-        // Card number format: SERIES-bp#-###-RARITY
-        // We want to extract up to the card number (excluding rarity)
-        let parts: Vec<&str> = card_no.split('-').collect();
-        if parts.len() >= 3 {
-            // Reconstruct without the last part (rarity)
-            format!("{}-{}-{}", parts[0], parts[1], parts[2])
-        } else {
-            card_no.to_string()
-        }
-    }
-
     pub fn build_deck_from_database(card_db: &Arc<CardDatabase>, card_numbers: Vec<String>) -> Result<Deck, String> {
         let mut main_deck: VecDeque<i16> = VecDeque::new();
         let mut energy_deck: VecDeque<i16> = VecDeque::new();

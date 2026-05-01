@@ -40,6 +40,7 @@ pub enum ChoiceResult {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum ExecutionContext {
     None,
     SingleEffect { effect_index: usize },
@@ -48,6 +49,7 @@ pub enum ExecutionContext {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum LookAndSelectStep {
     LookAt { count: usize, source: String },
     Select { count: usize },

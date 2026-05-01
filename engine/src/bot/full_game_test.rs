@@ -110,12 +110,11 @@ pub fn test_full_game() {
         }
 
         // Log every action with details
-        println!("Turn {}: Phase = {:?}, TurnPhase = {:?}, ActivePlayer = {}, LiveCardSetPlayer = {}", 
+        println!("Turn {}: Phase = {:?}, TurnPhase = {:?}, ActivePlayer = {}", 
             turn_count, 
             game_state.current_phase, 
             game_state.current_turn_phase,
             game_state.active_player().id,
-            game_state.current_live_card_set_player
         );
 
         // Detect phase stuck (potential infinite loop)
@@ -141,13 +140,11 @@ pub fn test_full_game() {
                 // Manual phases - AI will play (don't auto-advance)
             }
             crate::game_state::Phase::MulliganP1Turn |
-            crate::game_state::Phase::MulliganP2Turn |
-            crate::game_state::Phase::Mulligan => {
+            crate::game_state::Phase::MulliganP2Turn => {
                 // Mulligan is manual - AI will play (don't auto-advance)
             }
             crate::game_state::Phase::LiveCardSetP1Turn |
-            crate::game_state::Phase::LiveCardSetP2Turn |
-            crate::game_state::Phase::LiveCardSet => {
+            crate::game_state::Phase::LiveCardSetP2Turn => {
                 // LiveCardSet is manual - AI will play (don't auto-advance)
             }
             crate::game_state::Phase::Main => {

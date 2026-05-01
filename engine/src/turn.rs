@@ -14,7 +14,7 @@ impl TurnEngine {
 
         // Mulligan phases are manual - don't auto-advance them
         // Players must explicitly choose SkipMulligan or ConfirmMulligan actions
-        if matches!(game_state.current_phase, Phase::MulliganP1Turn | Phase::MulliganP2Turn | Phase::Mulligan) {
+        if matches!(game_state.current_phase, Phase::MulliganP1Turn | Phase::MulliganP2Turn) {
             return;
         }
 
@@ -28,8 +28,6 @@ impl TurnEngine {
                     game_state.player2.activate_all_energy();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
-                    let active_id = game_state.active_player().id.clone();
-                    game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Energy".into() });
                 }
                 Phase::Energy => {
                     // Rule 7.5: Draw energy card (automatic)
@@ -40,21 +38,13 @@ impl TurnEngine {
                     }
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Draw;
-                    game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Draw".into() });
                 }
                 Phase::Draw => {
                     // Rule 7.6: Draw card (automatic)
                     Self::check_timing(game_state);
-                    let drawn = game_state.active_player_mut().draw_card();
-                    if let Some(card_id) = drawn {
-                        let pid = game_state.active_player().id.clone();
-                        game_state.publish_event(crate::events::GameEvent::CardDrawn {
-                            card_id, player_id: pid, source: "main_deck".into()
-                        });
-                    }
+                    let _drawn = game_state.active_player_mut().draw_card();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Main;
-                    game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Main".into() });
                 }
                 Phase::Main => {
                     // Rule 7.7: Main phase complete, advance to next turn phase
@@ -62,7 +52,6 @@ impl TurnEngine {
                     if game_state.current_turn_phase == TurnPhase::FirstAttackerNormal {
                         game_state.current_turn_phase = TurnPhase::SecondAttackerNormal;
                         game_state.current_phase = Phase::Active;
-                        game_state.publish_event(crate::events::GameEvent::PhaseStarted { phase: "Active".into() });
                     } else {
                         // Set current_turn_phase to Live BEFORE setting current_phase to LiveCardSet
                         // This ensures active_player() works correctly during LiveCardSet
@@ -95,25 +84,11 @@ impl TurnEngine {
                         game_state.player2.id.clone()
                     };
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
-                    game_state.publish_event(crate::events::GameEvent::LiveStarted { player_id: first_attacker_id });
-                    return;
-                }
-                Phase::LiveCardSet => {
-                    // Legacy phase - should not be used anymore, but handle for compatibility
-                    // Transition to FirstAttackerPerformance
-                    Self::check_timing(game_state);
-                    game_state.current_phase = Phase::FirstAttackerPerformance;
-                    let first_attacker_id = if game_state.player1.is_first_attacker {
-                        game_state.player1.id.clone()
-                    } else {
-                        game_state.player2.id.clone()
-                    };
-                    Self::trigger_live_start_abilities(game_state, &first_attacker_id);
                     return;
                 }
                 Phase::FirstAttackerPerformance => {
                     // Rule 8.3: First attacker performs (automatic)
-                    let (blade_heart_count, player_id) = {
+                    let blade_heart_count = {
                         // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = if game_state.player1.is_first_attacker {
@@ -123,19 +98,14 @@ impl TurnEngine {
                         };
                         let card_db = game_state.card_database.clone();
                         let player = game_state.first_attacker_mut();
-                        (Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db), player_id)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
-                    // Publish live success if score > 0
-                    if blade_heart_count > 0 {
-                        game_state.publish_event(crate::events::GameEvent::LiveSucceeded { player_id, score: blade_heart_count });
-                    }
-
                     game_state.current_phase = Phase::SecondAttackerPerformance;
                 }
                 Phase::SecondAttackerPerformance => {
                     // Rule 8.3: Second attacker performs (automatic)
-                    let (blade_heart_count, player_id) = {
+                    let blade_heart_count = {
                         // Take resolution_zone first to avoid borrow conflicts
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = if game_state.player1.is_first_attacker {
@@ -145,13 +115,9 @@ impl TurnEngine {
                         };
                         let card_db = game_state.card_database.clone();
                         let player = game_state.second_attacker_mut();
-                        (Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db), player_id)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
                     };
                     game_state.player2_cheer_blade_heart_count = blade_heart_count;
-                    if blade_heart_count > 0 {
-                        game_state.publish_event(crate::events::GameEvent::LiveSucceeded { player_id, score: blade_heart_count });
-                    }
-
                     game_state.current_phase = Phase::LiveVictoryDetermination;
                 }
                 Phase::LiveVictoryDetermination => {
@@ -162,10 +128,6 @@ impl TurnEngine {
                     game_state.turn_number += 1;
                     game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;
-                    game_state.publish_event(crate::events::GameEvent::TurnStarted {
-                        turn_number: game_state.turn_number,
-                        player_id: game_state.active_player().id.clone(),
-                    });
                 }
                 _ => {}
             }
@@ -330,26 +292,13 @@ impl TurnEngine {
             }
         } else {
             // No card selected, finish this player's live card set
-            // Transition to next player's phase
             if game_state.current_turn_phase == crate::game_state::TurnPhase::Live {
                 match game_state.current_phase {
                     Phase::LiveCardSetP1Turn => {
                         game_state.current_phase = Phase::LiveCardSetP2Turn;
                     }
                     Phase::LiveCardSetP2Turn => {
-                        // Both done - advance via advance_phase
                         Self::advance_phase(game_state);
-                    }
-                    Phase::LiveCardSet => {
-                        // Legacy phase - use flag-based transition for compatibility
-                        if game_state.current_live_card_set_player == 0 {
-                            game_state.current_live_card_set_player = 1;
-                        } else {
-                            game_state.current_live_card_set_player = 2;
-                        }
-                        if game_state.current_live_card_set_player == 2 {
-                            Self::advance_phase(game_state);
-                        }
                     }
                     _ => {
                         Self::advance_phase(game_state);
@@ -358,48 +307,6 @@ impl TurnEngine {
             } else {
                 Self::advance_phase(game_state);
             }
-        }
-        Ok(())
-    }
-
-    fn handle_finish_live_card_set(game_state: &mut GameState) -> Result<(), String> {
-        // Rule 8.2: Live Card Set Phase - Finish live card set and advance phase
-        // This should only be called during the Live phase
-        if game_state.current_turn_phase == crate::game_state::TurnPhase::Live &&
-           game_state.current_phase == crate::game_state::Phase::LiveCardSet {
-
-            // Use the consolidated active_player() method to determine current player
-            let current_player = game_state.active_player_mut();
-            let active_player_id = current_player.id.clone();
-
-            // Draw cards equal to number of cards placed in live zone
-            let cards_placed = current_player.live_card_zone.cards.len();
-            for _ in 0..cards_placed {
-                let _ = current_player.draw_card();
-            }
-
-            // Mark current player as finished based on who is currently active
-            if active_player_id == "player1" {
-                game_state.current_live_card_set_player = 1; // P1 done, advance to P2
-            } else {
-                game_state.current_live_card_set_player = 2; // P2 done, mark both done
-            }
-
-            // Check if both players finished
-            if game_state.current_live_card_set_player == 2 {
-                Self::check_timing(game_state);
-                game_state.current_phase = crate::game_state::Phase::FirstAttackerPerformance;
-                let first_attacker_id = if game_state.player1.is_first_attacker {
-                    game_state.player1.id.clone()
-                } else {
-                    game_state.player2.id.clone()
-                };
-                Self::trigger_live_start_abilities(game_state, &first_attacker_id);
-            }
-        } else {
-            // Not in Live phase - this is an error condition, but don't regress phases
-            // Just return an error instead of calling advance_phase which could regress
-            return Err("Cannot finish live card set outside of Live phase".to_string());
         }
         Ok(())
     }
@@ -456,7 +363,7 @@ impl TurnEngine {
                 let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         card.abilities.iter()
-                            .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::BATON_TOUCH))
+                            .filter(|ability| ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::BATON_TOUCH)))
                             .map(|ability| (format!("{}_{}", card.card_no, ability.full_text), card.card_no.clone()))
                             .collect::<Vec<(String, String)>>()
                     } else {
@@ -484,7 +391,13 @@ impl TurnEngine {
     /// Resume an ability that was paused waiting for user choice.
     /// Called when the web server receives a choice submission.
     pub fn resume_with_choice(game_state: &mut GameState, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<(), String> {
-        // Take the stored pending ability and choice
+        // First check if the ability queue is waiting for a choice
+        if let Some(choice) = game_state.ability_queue.is_waiting_for_choice().cloned() {
+            let result = Self::build_choice_result(&choice, card_id, card_indices)?;
+            return Self::resume_queue_with_choice(game_state, choice, result);
+        }
+
+        // Take the stored pending ability and choice (old system / direct activation)
         let pending = game_state.pending_ability.take();
         let pending_choice_json = game_state.pending_choice.take();
 
@@ -492,18 +405,25 @@ impl TurnEngine {
             return Err("No pending choice to resume".into());
         }
 
-        let pending = pending.unwrap();
+        let _ = pending;
         let choice_json = pending_choice_json.unwrap();
 
-        // Reconstruct the choice from JSON
         let choice: crate::ability_resolver::Choice = serde_json::from_value(choice_json)
             .map_err(|e| format!("Failed to deserialize pending choice: {}", e))?;
 
-        // Build the choice result from the client's input
-        let result = match &choice {
+        let result = Self::build_choice_result(&choice, card_id, card_indices)?;
+
+        // Create a resolver and provide the choice result
+        let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+        resolver.pending_choice = Some(choice);
+        resolver.provide_choice_result(result)
+    }
+
+    fn build_choice_result(choice: &crate::ability_resolver::Choice, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<crate::ability_resolver::ChoiceResult, String> {
+        match choice {
             crate::ability_resolver::Choice::SelectCard { .. } => {
                 let indices = card_indices.unwrap_or_default();
-                crate::ability_resolver::ChoiceResult::CardSelected { indices }
+                Ok(crate::ability_resolver::ChoiceResult::CardSelected { indices })
             }
             crate::ability_resolver::Choice::SelectTarget { target, .. } => {
                 let selected = match target.as_str() {
@@ -515,25 +435,49 @@ impl TurnEngine {
                         if card_id == Some(1) { "alternative".to_string() }
                         else { "primary".to_string() }
                     }
-                    "choice" | "choice_string" => {
+                    "choice" | "choice_string" | "conditional_optional" => {
                         card_id.map(|id| id.to_string()).unwrap_or_else(|| "0".into())
                     }
                     _ => {
                         card_id.map(|id| id.to_string()).unwrap_or_else(|| "0".into())
                     }
                 };
-                crate::ability_resolver::ChoiceResult::TargetSelected { target: selected }
+                Ok(crate::ability_resolver::ChoiceResult::TargetSelected { target: selected })
             }
             crate::ability_resolver::Choice::SelectPosition { .. } => {
                 let pos = card_id.map(|id| match id { 0 => "left".into(), 1 => "center".into(), 2 => "right".into(), _ => "center".into() }).unwrap_or_else(|| "center".into());
-                crate::ability_resolver::ChoiceResult::PositionSelected { position: pos }
+                Ok(crate::ability_resolver::ChoiceResult::PositionSelected { position: pos })
             }
-            _ => return Err("Unsupported choice type for resumption".into()),
-        };
+            _ => Err("Unsupported choice type for resumption".into()),
+        }
+    }
 
-        // Create a resolver and provide the choice result
+    fn resume_queue_with_choice(game_state: &mut GameState, choice: crate::ability_resolver::Choice, result: crate::ability_resolver::ChoiceResult) -> Result<(), String> {
+        game_state.ability_queue.resume_with_choice(result.clone());
+
         let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
-        resolver.provide_choice_result(result)
+        resolver.pending_choice = Some(choice);
+
+        if let Err(e) = resolver.provide_choice_result(result) {
+            game_state.ability_queue.complete_current();
+            game_state.pending_choice = None;
+            game_state.pending_ability = None;
+            return Err(e);
+        }
+
+        if let Some(new_choice) = resolver.get_pending_choice().cloned() {
+            if let Ok(json) = serde_json::to_value(&new_choice) {
+                game_state.pending_choice = Some(json);
+            }
+            game_state.ability_queue.pause_for_choice(new_choice);
+        } else {
+            game_state.ability_queue.complete_current();
+            game_state.pending_choice = None;
+            game_state.pending_ability = None;
+            game_state.activating_card = None;
+        }
+
+        Ok(())
     }
 
     pub fn execute_main_phase_action(game_state: &mut GameState, action: &crate::game_setup::ActionType, card_id: Option<i16>, card_indices: Option<Vec<usize>>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
@@ -565,19 +509,6 @@ impl TurnEngine {
                             let _ = player.draw_card();
                         }
                         Self::advance_phase(game_state);
-                        Ok(())
-                    }
-                    Phase::LiveCardSet => {
-                        // Legacy phase - use flag-based transition for compatibility
-                        if game_state.current_live_card_set_player == 0 {
-                            game_state.current_live_card_set_player = 1;
-                        } else {
-                            game_state.current_live_card_set_player = 2;
-                        }
-                        if game_state.current_live_card_set_player == 2 {
-                            Self::check_timing(game_state);
-                            Self::advance_phase(game_state);
-                        }
                         Ok(())
                     }
                     _ => {
@@ -613,10 +544,7 @@ impl TurnEngine {
             crate::game_setup::ActionType::ChooseFirstAttacker => {
                 // RPS winner chooses who goes first
                 // Check who won RPS and validate they can make this choice
-                let winner = game_state.rps_winner.ok_or("No RPS winner determined")?;
-                
-                println!("DEBUG: ChooseFirstAttacker action executed, RPS winner: {}", winner);
-                
+                let _winner = game_state.rps_winner.ok_or("No RPS winner determined")?;
                 game_state.player1.is_first_attacker = true;
                 game_state.player2.is_first_attacker = false;
                 
@@ -630,16 +558,12 @@ impl TurnEngine {
                 game_state.current_phase = crate::game_state::Phase::MulliganP1Turn;
                 game_state.mulligan_selected_indices.clear();
                 
-                println!("DEBUG: Phase transitioned to MulliganP1Turn");
                 Ok(())
             }
             crate::game_setup::ActionType::ChooseSecondAttacker => {
                 // RPS winner chooses who goes first
                 // Check who won RPS and validate they can make this choice
-                let winner = game_state.rps_winner.ok_or("No RPS winner determined")?;
-                
-                println!("DEBUG: ChooseSecondAttacker action executed, RPS winner: {}", winner);
-                
+                let _winner = game_state.rps_winner.ok_or("No RPS winner determined")?;
                 game_state.player1.is_first_attacker = false;
                 game_state.player2.is_first_attacker = true;
                 
@@ -653,7 +577,6 @@ impl TurnEngine {
                 game_state.current_phase = crate::game_state::Phase::MulliganP2Turn;
                 game_state.mulligan_selected_indices.clear();
                 
-                println!("DEBUG: Phase transitioned to MulliganP2Turn");
                 Ok(())
             }
             crate::game_setup::ActionType::SelectMulligan => {
@@ -672,11 +595,13 @@ impl TurnEngine {
                 Self::handle_set_live_card(game_state, card_id)
             }
             crate::game_setup::ActionType::FinishLiveCardSet => {
-                Self::handle_finish_live_card_set(game_state)
+                Err("FinishLiveCardSet action is obsolete - use Pass instead".into())
             }
             crate::game_setup::ActionType::UseAbility => {
                 Self::handle_use_ability(game_state, card_id)
             }
+            // Choice action types should be handled by the pending_choice redirect above
+            _ => Ok(()),
         }
     }
 
@@ -704,11 +629,12 @@ impl TurnEngine {
                         if ability.triggers.as_ref().map_or(false, |t| {
                             // Handle all manually activatable abilities according to rules
                             // 起動 abilities are the primary manual activation abilities
-                            t == crate::triggers::ACTIVATION || 
-                            t == crate::triggers::CONSTANT || 
-                            (t == crate::triggers::AUTO && ability.cost.is_some()) ||
-                            t == "main" || t == crate::triggers::MAIN ||
-                            t == crate::triggers::BATON_TOUCH
+                            // Use contains() to match position-restricted triggers like "起動, 左サイド"
+                            t.contains(crate::triggers::ACTIVATION) || 
+                            t.contains(crate::triggers::CONSTANT) || 
+                            (t.contains(crate::triggers::AUTO) && ability.cost.is_some()) ||
+                            t.contains("main") || t.contains(crate::triggers::MAIN) ||
+                            t.contains(crate::triggers::BATON_TOUCH)
                         }) {
                             if ability.use_limit.is_some() {
                                 let ability_key = format!("{}_{}_{}", stage_card_id, ability_index, turn_number);
@@ -888,18 +814,15 @@ impl TurnEngine {
         }
         
         // Rule 8.4.24: Players with live cards have "live succeeded" event - trigger live success abilities
-        eprintln!("DEBUG: Triggering live success abilities - P1 won: {}, P2 won: {}", player1_won, player2_won);
         
         // Collect player IDs first to avoid borrow checker issues
         let player1_id = game_state.player1.id.clone();
         let player2_id = game_state.player2.id.clone();
         
         if player1_won {
-            eprintln!("DEBUG: Player 1 live succeeded - triggering abilities");
             Self::trigger_live_success_abilities(game_state, &player1_id);
         }
         if player2_won {
-            eprintln!("DEBUG: Player 2 live succeeded - triggering abilities");
             Self::trigger_live_success_abilities(game_state, &player2_id);
         }
         
@@ -909,7 +832,6 @@ impl TurnEngine {
         Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);
         Self::move_restricted_cards_to_discard(&mut game_state.player2, &card_db);
         
-        eprintln!("DEBUG: About to call move_live_to_success_and_handle_wins - P1 won: {}, P2 won: {}", player1_won, player2_won);
         Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
     }
 
@@ -922,10 +844,12 @@ impl TurnEngine {
             if let Some(card) = card_db.get_card(*card_id) {
                 let has_restriction = card.abilities.iter().any(|ability| {
                     if let Some(ref effect) = ability.effect {
+                        let restricted_dest = effect.restricted_destination.as_deref()
+                            .or_else(|| effect.destination.as_deref());
                         effect.action == "restriction" 
                             && effect.restriction_type.as_deref() == Some("cannot_place")
-                            && (effect.restricted_destination.as_deref() == Some("success_live_zone")
-                                || effect.restricted_destination.as_deref() == Some("live_card_zone"))
+                            && (restricted_dest == Some("success_live_zone")
+                                || restricted_dest == Some("live_card_zone"))
                     } else {
                         false
                     }
@@ -955,11 +879,13 @@ impl TurnEngine {
             let can_place = if let Some(card_data) = card_db.get_card(card) {
                 !card_data.abilities.iter().any(|ability| {
                     if let Some(ref effect) = ability.effect {
+                        let restricted_dest = effect.restricted_destination.as_deref()
+                            .or_else(|| effect.destination.as_deref());
                         effect.action == "restriction" 
-                            && ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::CONSTANT)
+                            && ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT))
                             && effect.restriction_type.as_deref() == Some("cannot_place")
-                            && (effect.restricted_destination.as_deref() == Some("success_live_zone")
-                                || effect.restricted_destination.as_deref() == Some("live_card_zone"))
+                            && (restricted_dest == Some("success_live_zone")
+                                || restricted_dest == Some("live_card_zone"))
                     } else {
                         false
                     }
@@ -1052,9 +978,6 @@ impl TurnEngine {
 
     pub fn check_timing(game_state: &mut GameState) {
         // Rule 9.5: Check timing - process rule processing per rules 10.2-10.6
-        // Flush any pending events first so auto-triggers are enqueued
-        game_state.flush_events();
-
         // Rule 10.2: Refresh (already handled in player.refresh())
         game_state.player1.refresh();
         game_state.player2.refresh();
@@ -1466,7 +1389,7 @@ impl TurnEngine {
                             // Check if card has Debut abilities
                             for ability in &card.abilities {
                                 // Check if ability has Debut trigger (check both English and Japanese)
-                                if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::DEBUT || t == crate::triggers::DEBUT_EN) {
+                                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN)) {
                                     // Q229: Check if ability requires baton touch from lower-cost member
                                     // The ability text contains "debut via baton touch from lower-cost member"
                                     let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON_TOUCH) && ability.full_text.contains(crate::triggers::DEBUT_EN);
@@ -1603,7 +1526,6 @@ impl TurnEngine {
     fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {
         // Rule 11.6: Trigger LiveSuccess automatic abilities
         // Rule 11.6.2: Trigger when live succeeds
-        eprintln!("DEBUG: trigger_live_success_abilities called for player: {}", player_id);
         
         let player_id_clone = player_id.to_string();
         
@@ -1623,42 +1545,30 @@ impl TurnEngine {
                 let card_id = player.stage.stage[index];
                 if card_id != -1 {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        eprintln!("DEBUG: Checking member card {} ({}) for LiveSuccess abilities", card_id, card.card_no);
                         // Check if card has LiveSuccess abilities
-                        for (ability_idx, ability) in card.abilities.iter().enumerate() {
-                            eprintln!("DEBUG: Ability {}: triggers = {:?}", ability_idx, ability.triggers);
-                            // Check if ability has LiveSuccess trigger
+                        for (_ability_idx, ability) in card.abilities.iter().enumerate() {
                             if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS) {
-                                eprintln!("DEBUG: Found LiveSuccess ability on card {} ({})", card_id, card.card_no);
                                 // Collect ability to trigger
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
                             }
                         }
                     } else {
-                        eprintln!("DEBUG: Member card {} not found in database", card_id);
                     }
                 } else {
-                    eprintln!("DEBUG: No card in stage position {}", index);
                 }
             }
 
             // Also check live cards in live card zone
-            eprintln!("DEBUG: Checking {} live cards for LiveSuccess abilities", player.live_card_zone.cards.len());
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    eprintln!("DEBUG: Checking live card {} ({}) for LiveSuccess abilities", card_id, card.card_no);
-                    for (ability_idx, ability) in card.abilities.iter().enumerate() {
-                        eprintln!("DEBUG: Live card ability {}: triggers = {:?}", ability_idx, ability.triggers);
-                        // Check for both Japanese and English triggers
+                    for (_ability_idx, ability) in card.abilities.iter().enumerate() {
                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.contains(crate::triggers::LIVE_SUCCESS_EN)) {
-                            eprintln!("DEBUG: Found LiveSuccess ability on live card {} ({})", card_id, card.card_no);
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card.card_no.clone()));
                         }
                     }
                 } else {
-                    eprintln!("DEBUG: Live card {} not found in database", card_id);
                 }
             }
         }

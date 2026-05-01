@@ -8,7 +8,7 @@ import { Tooltips } from '../ui_tooltips.js';
 import { State } from '../state.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOM_IDS } from '../constants_dom.js';
-import { ImageLoader } from './CardRenderer.js';
+import { resolveCardImagePath, ImageLoader } from './CardRenderer.js';
 
 export const ZoneViewer = {
     cache: {
@@ -119,16 +119,15 @@ export const ZoneViewer = {
         
         // Resolve card data if card_no is present but no image path
         let imgPath = card.img || card.img_path || card.image || '';
-        if (!imgPath && card.card_no) {
-            const resolved = State.resolveCardData(card.card_no);
-            imgPath = (State.cardImageMapping && State.cardImageMapping[card.card_no])
-                ? State.cardImageMapping[card.card_no]
-                : (card.card_no ? `img/cards_webp/${card.card_no}.webp` : '');
+        if (imgPath) {
+            imgPath = fixImg(imgPath);
+        } else if (card.card_no) {
+            imgPath = resolveCardImagePath(card.card_no);
         }
         
         const img = document.createElement('img');
         img.draggable = false;
-        ImageLoader.loadImage(img, fixImg(imgPath));
+        ImageLoader.loadImage(img, imgPath);
         div.appendChild(img);
         
         const rawText = Tooltips.getEffectiveRawText(card);

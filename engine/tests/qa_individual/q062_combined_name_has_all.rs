@@ -35,7 +35,7 @@ fn test_q062_combined_name_has_all() {
         setup_player_with_energy(&mut player1, energy_card_ids);
         
         let mut game_state = GameState::new(player1, player2, card_database.clone());
-        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSet;
+        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSetP1Turn;
         game_state.turn_number = 1;
         
         // Simulate: Card with combined name has all individual names

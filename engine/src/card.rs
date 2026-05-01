@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-#[allow(dead_code)]
 pub enum CardType {
     #[serde(rename = "メンバー")]
     // Rule 4.1: Member cards are placed on the stage and used for performance
@@ -57,24 +56,6 @@ pub enum BladeColor {
     All,  // All blade types
 }
 
-// Rule 9.1: Ability Types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum AbilityType {
-    Activation,  // 起動能力
-    Automatic,   // 自動能力
-    Continuous,  // 常時能力
-}
-
-// Rule 9.2: Effect Types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[allow(dead_code)]
-pub enum EffectType {
-    OneShot,        // 単発効果
-    ContinuousEffect,  // 継続効果
-    Replacement,   // 置換効果
-}
-
 // Rule 11: Keywords
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Keyword {
@@ -92,13 +73,6 @@ pub enum Keyword {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeartIcon {
-    pub color: HeartColor,
-    pub count: u32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
-pub struct RequiredHeart {
     pub color: HeartColor,
     pub count: u32,
 }

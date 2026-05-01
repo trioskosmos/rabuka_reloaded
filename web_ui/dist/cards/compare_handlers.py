@@ -52,9 +52,12 @@ engine_handlers = {
     'place_energy_under_member': True,
     'modify_yell_count': True,
     'look_at': True,
+    'look_and_select': True,
     'sequential': True,
     'discard_until_count': True,
     'conditional_alternative': True,
+    'pay_energy': True,
+    'change_state': True,
     
     # Placeholder only (not implemented)
     'specify_heart_color': False,
@@ -82,6 +85,8 @@ engine_handlers = {
     'restriction': False,
     'activation_restriction': False,
     'set_card_identity': False,
+    'activate_ability': False,
+    'play_baton_touch': False,
 }
 
 print("="*80)

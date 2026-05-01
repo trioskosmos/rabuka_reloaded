@@ -77,7 +77,7 @@ fn test_q031_live_duplicate_allowed() {
         }
         
         // Set live cards using proper SetLiveCard action
-        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSet;
+        game_state.current_phase = rabuka_engine::game_state::Phase::LiveCardSetP1Turn;
         game_state.current_turn_phase = rabuka_engine::game_state::TurnPhase::Live;
         
         // Set first live card

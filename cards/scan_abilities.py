@@ -32,7 +32,11 @@ valid_actions = {'move_cards', 'draw_card', 'gain_resource', 'look_and_select',
                 'reveal', 'select', 'appear', 'choice', 'sequential', 'modify_score',
                 'look', 'change_state', 'place_energy_under_member', 'set_card_identity',
                 'custom', 'conditional_alternative', 'modify_yell_count', 'null',
-                'draw', 'position_change', 'temporal', 'energy_active', 'look_at'}
+                'draw', 'position_change', 'temporal', 'energy_active', 'look_at',
+                'pay_energy', 'modify_cost', 'set_score', 'set_blade_count',
+                'gain_ability', 'activate_ability', 'play_baton_touch', 're_yell',
+                'restriction', 'activation_restriction', 'invalidate_ability',
+                'shuffle', 'draw_until_count', 'discard_until_count'}
 
 def check_action(act, ability_idx, path='effect'):
     action = act.get('action', '')
