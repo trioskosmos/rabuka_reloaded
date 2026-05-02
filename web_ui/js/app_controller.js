@@ -147,18 +147,6 @@ const actionHandlers = {
     'debug-redo': DebugModal.redo,
     'debug-render-all': DebugModal.renderAll,
     'close-debug-modal': DebugModal.closeDebugModal,
-    'debug-switch-tab': ({ value }) => DebugModal.switchTab(value),
-    'debug-copy-state-string': DebugModal.copyStateString,
-    'debug-load-state-string': DebugModal.loadStateString,
-    'debug-trigger-file-load': DebugModal.triggerFileLoad,
-    'debug-render-minimal-json': DebugModal.renderMinimalJSON,
-    'debug-render-checkpoint-json': DebugModal.renderCheckpointJSON,
-    'debug-render-rich-json': DebugModal.renderRichJSON,
-    'debug-copy-json-state': DebugModal.copyJsonState,
-    'debug-load-json-file': DebugModal.loadJsonFile,
-    'debug-apply-json-state': DebugModal.applyJsonState,
-    'debug-export-game': DebugModal.exportGameWithHistory,
-    'debug-import-game': DebugModal.importGameWithHistory,
     'show-performance-turn': ({ value }) => Modals.showPerformanceForTurn(Number(value)),
     'close-discard-modal': () => ModalManager.hide(DOM_IDS.MODAL_DISCARD),
     'reload-page': () => window.location.reload(),
@@ -245,7 +233,7 @@ export const AppController = {
 
         await loadTranslations(State.currentLang);
         // Load static card database for fallback card resolution
-        State.loadStaticCardDatabase();
+        await State.loadStaticCardDatabase();
         AppController.restartPolling();
         
         const syncRoomState = () => syncRoomDisplay();

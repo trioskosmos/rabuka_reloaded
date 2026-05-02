@@ -1,6 +1,12 @@
 import { State } from '../state.js';
 import { Network } from '../network.js';
-import { GameExport } from '../replay_system.js';
+
+const buildReverseLookup = (source) => Object.fromEntries(
+    Object.entries(source)
+        .filter(([key, value]) => typeof value === 'number' && !/^[-]?\d+$/.test(key))
+        .map(([key, value]) => [value, key])
+);
+
 import {
     ChoiceTypes,
     ConditionTypes,
@@ -11,12 +17,6 @@ import {
     TargetType,
     TriggerType,
 } from '../generated_constants.js';
-
-const buildReverseLookup = (source) => Object.fromEntries(
-    Object.entries(source)
-        .filter(([key, value]) => typeof value === 'number' && !/^[-]?\d+$/.test(key))
-        .map(([key, value]) => [value, key])
-);
 
 const TRIGGER_NAMES = buildReverseLookup(TriggerType);
 const CONDITION_NAMES = buildReverseLookup(ConditionTypes);
@@ -68,8 +68,6 @@ const FILTER_FLAG_BITS = pickBits([
     'FILTER_IS_OPTIONAL',
 ]);
 
-const cloneDeep = (value) => JSON.parse(JSON.stringify(value));
-
 const escapeHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -102,7 +100,6 @@ const renderChips = (items, accent = '#7dd3fc') => {
     if (!items || items.length === 0) {
         return '<span style="opacity:0.45; font-size:10px;">none</span>';
     }
-
     return items.map((item) => `
         <span class="debug-badge" style="--accent: ${accent}">${escapeHtml(item)}</span>
     `).join('');
@@ -141,48 +138,24 @@ const describeNumber = (key, value, itemType) => {
     return String(value);
 };
 
-const renderScalarCell = (label, value) => `
+const renderScalarCell = (label, value) => {
+    const display = typeof value === 'number' ? value : String(value);
+    return `
     <div class="debug-scalar-cell">
         <div class="debug-scalar-label">${escapeHtml(label)}</div>
-        <div class="debug-scalar-value">${escapeHtml(value)}</div>
+        <div class="debug-scalar-value">${escapeHtml(display)}</div>
     </div>
 `;
+};
 
 const renderStatusBanner = (status) => {
     if (!status?.message) return '';
     const bannerClass = status.kind === 'error' ? 'debug-status-error' : 'debug-status-success';
-
     return `
         <div class="debug-status-banner ${bannerClass}">
             ${escapeHtml(status.message)}
         </div>
     `;
-};
-
-const renderLogLines = (lines, emptyMessage) => {
-    if (!lines || lines.length === 0) {
-        return `<div style="padding:20px; opacity:0.55; font-size:11px; text-align:center;">${emptyMessage}</div>`;
-    }
-
-    return lines.map((line) => {
-        let color = '#94a3b8';
-        let background = 'transparent';
-        if (line.includes('ERR')) {
-            color = '#f87171';
-            background = 'rgba(248,113,113,0.08)';
-        } else if (line.includes('BC_COND') || line.includes('COND')) {
-            color = '#38bdf8';
-            background = 'rgba(56,189,248,0.08)';
-        } else if (line.includes('TRIGGER')) {
-            color = '#4ade80';
-            background = 'rgba(74,222,128,0.08)';
-        } else if (line.includes('EXECUTE') || line.includes('BC_STEP')) {
-            color = '#fbbf24';
-            background = 'rgba(251,191,36,0.08)';
-        }
-
-        return `<div class="debug-log-line" style="--line-color: ${color}; --line-bg: ${background};">${escapeHtml(line)}</div>`;
-    }).join('');
 };
 
 export const DebugModal = {
@@ -192,12 +165,9 @@ export const DebugModal = {
         abilitySearch: '',
     },
 
-    _activeTab: 'json',
-    _snapshot: null,
-    _historyExport: null,
-    _selectedHistoryIndex: null,
-    _jsonMode: 'minimal',
     _status: null,
+    _conditions: null,
+    _conditionError: null,
 
     init: () => {},
 
@@ -206,9 +176,7 @@ export const DebugModal = {
         if (!modal) return;
 
         modal.style.display = 'flex';
-        await DebugModal._ensureTraceEnabled();
         await DebugModal.renderAll();
-        DebugModal.switchTab(DebugModal._activeTab);
     },
 
     closeDebugModal: () => {
@@ -224,244 +192,188 @@ export const DebugModal = {
         DebugModal._status = null;
     },
 
-    switchTab: (tabId) => {
-        DebugModal._activeTab = tabId;
-
-        document.querySelectorAll('[data-tab-pane]').forEach((el) => {
-            el.style.display = 'none';
-        });
-
-        const pane = document.querySelector(`[data-tab-pane="${tabId}"]`);
-        if (pane) pane.style.display = 'block';
-
-        document.querySelectorAll('[data-tab-btn]').forEach((btn) => {
-            const active = btn.getAttribute('data-tab-btn') === tabId;
-            btn.style.borderBottom = active ? '2px solid var(--accent-blue)' : '2px solid transparent';
-            btn.style.color = active ? '#fff' : 'var(--text-dim)';
-        });
-
-        if (tabId === 'inspector') DebugModal.renderInspectorTab();
-        if (tabId === 'trace') DebugModal.renderTraceTab();
-        if (tabId === 'string') DebugModal.renderStringTab();
-        if (tabId === 'json') DebugModal.renderJsonTab();
-    },
-
     renderAll: async () => {
         if (State.roomCode) await Network.fetchState();
-        await DebugModal._refreshSnapshot();
-        await DebugModal._refreshHistoryExport();
+        await DebugModal._fetchConditions();
 
         if (!State.data) {
-            const emptyMarkup = '<div style="padding:24px; opacity:0.6; text-align:center; font-size:12px;">Waiting for game state...</div>';
-            document.querySelectorAll('[data-tab-pane]').forEach((pane) => {
-                pane.innerHTML = emptyMarkup;
-            });
-            return;
-        }
-
-        DebugModal.switchTab(DebugModal._activeTab);
-    },
-
-    _refreshSnapshot: async () => {
-        const snapshot = await Network.fetchDebugSnapshot();
-        DebugModal._snapshot = snapshot && snapshot.success ? snapshot : null;
-    },
-
-    _refreshHistoryExport: async () => {
-        const exportData = await Network.exportGame();
-        DebugModal._historyExport = exportData && exportData.success !== false ? exportData : null;
-        DebugModal._syncHistorySelection();
-    },
-
-    _syncHistorySelection: () => {
-        const history = DebugModal._historyExport?.history || [];
-        if (!history.length) {
-            DebugModal._selectedHistoryIndex = null;
-            return;
-        }
-
-        const preferredIndex = DebugModal._snapshot?.history_index
-            ?? DebugModal._historyExport?.history_index
-            ?? (history.length - 1);
-        const safeIndex = Math.max(0, Math.min(preferredIndex, history.length - 1));
-        if (DebugModal._selectedHistoryIndex === null || DebugModal._selectedHistoryIndex >= history.length) {
-            DebugModal._selectedHistoryIndex = safeIndex;
-        }
-    },
-
-    _ensureTraceEnabled: async () => {
-        await DebugModal._refreshSnapshot();
-        if (DebugModal._snapshot?.debug_mode) {
-            return;
-        }
-
-        const enabled = await Network.toggleDebugMode();
-        if (enabled) {
-            DebugModal._setStatus('success', 'Trace capture enabled.');
-            await DebugModal._refreshSnapshot();
-        }
-    },
-
-    _getHistoryEntries: () => {
-        const exportData = DebugModal._historyExport;
-        if (!exportData) return [];
-        const history = Array.isArray(exportData.history) ? exportData.history : [];
-
-        return history.map((state, index) => ({
-            index,
-            state,
-            serialized: JSON.stringify(state),
-            isCurrent: index === (DebugModal._snapshot?.history_index ?? exportData.history_index),
-            turn: state?.turn ?? '?',
-            phase: PHASE_NAMES[state?.phase] || state?.phase || '?',
-            currentPlayer: (state?.current_player ?? 0) + 1,
-            score: Array.isArray(state?.players)
-                ? state.players.map((player) => player?.success_live_card_zone?.cards?.length ?? 0).join(' - ')
-                : '?',
-        }));
-    },
-
-    _getSelectedHistoryEntry: () => {
-        const entries = DebugModal._getHistoryEntries();
-        if (!entries.length) return null;
-        const selectedIndex = DebugModal._selectedHistoryIndex ?? entries.length - 1;
-        return entries.find((entry) => entry.index === selectedIndex) || entries[entries.length - 1];
-    },
-
-    _updateJsonModeBanner: () => {
-        const labels = {
-            minimal: ['Minimal editor', 'Small editable checkpoint focused on board zones and counts.'],
-            checkpoint: ['Checkpoint snapshot', 'Raw engine-shaped snapshot used for apply/import and history playback.'],
-            viewer: ['Viewer state', 'Fully enriched frontend state including resolved cards and derived debug fields.'],
-        };
-        const [title, hint] = labels[DebugModal._jsonMode] || labels.checkpoint;
-        const titleEl = document.getElementById('debug-json-mode-title');
-        const hintEl = document.getElementById('debug-json-mode-hint');
-        if (titleEl) titleEl.textContent = title;
-        if (hintEl) hintEl.textContent = hint;
-    },
-
-    _getCheckpointPayload: (source = null) => {
-        if (!source && DebugModal._snapshot?.raw_state) {
-            return cloneDeep(DebugModal._snapshot.raw_state);
-        }
-        if (typeof State.createCheckpointData === 'function') {
-            return State.createCheckpointData(source);
-        }
-        return State.stripRichData(source ?? State.data);
-    },
-
-    _decodeStateInput: (rawInput) => {
-        const content = String(rawInput || '').trim();
-        if (!content) throw new Error('No state payload provided');
-
-        if (/^[\[{]/.test(content)) {
-            return JSON.parse(content);
-        }
-
-        if (/^[A-Za-z0-9+/=\s_-]+$/.test(content)) {
-            const normalized = content.replace(/-/g, '+').replace(/_/g, '/').replace(/\s+/g, '');
-            return JSON.parse(decodeURIComponent(escape(atob(normalized))));
-        }
-
-        throw new Error('Unrecognized state payload format');
-    },
-
-    _extractApplyMessage: (result) => {
-        if (!result) return 'Apply failed with no response.';
-        if (result.ok) {
-            return result.data?.message || result.data?.status || 'Checkpoint applied successfully.';
-        }
-
-        if (typeof result.error === 'string') return result.error;
-        if (result.error?.error) return result.error.error;
-        if (result.error?.message) return result.error.message;
-        if (result.data?.error) return result.data.error;
-        return 'Apply failed.';
-    },
-
-    _applyCheckpointPayload: async (payload) => {
-        const cleanState = DebugModal._getCheckpointPayload(payload);
-        return Network.applyState(JSON.stringify(cleanState));
-    },
-
-    _normalizeCard: (rawEntry) => {
-        if (rawEntry === null || rawEntry === undefined) return null;
-        if (typeof rawEntry === 'number') return State.resolveCardData(rawEntry);
-
-        if (typeof rawEntry === 'object' && rawEntry.card) {
-            const { card, ...rest } = rawEntry;
-            const resolvedCard = DebugModal._normalizeCard(card);
-            if (!resolvedCard) return null;
-            return { ...resolvedCard, ...rest };
-        }
-
-        if (typeof rawEntry === 'object') {
-            if (rawEntry.id === undefined && rawEntry.card_id !== undefined) {
-                return { ...rawEntry, id: rawEntry.card_id };
+            const container = document.getElementById('debug-inspector-content');
+            if (container) {
+                container.innerHTML = '<div style="padding:24px; opacity:0.6; text-align:center; font-size:12px;">Waiting for game state...</div>';
             }
-            return rawEntry;
+            return;
         }
 
-        return null;
+        DebugModal.renderInspector();
     },
 
-    _collectVisibleCards: (player, zoneKey) => {
-        const defs = zoneDefinitions(player);
-        const selectedDefs = zoneKey === 'all' ? defs : defs.filter((zone) => zone.key === zoneKey);
-        return selectedDefs.flatMap((zone) => zone.cards.map((rawEntry, index) => ({
-            zoneKey: zone.key,
-            zoneLabel: zone.label,
-            slotLabel: `${zone.label} ${index + 1}`,
-            slotIndex: index,
-            card: DebugModal._normalizeCard(rawEntry),
-        })));
-    },
-
-    _matchesSearch: (entry, search) => {
-        if (!search) return true;
-        const card = entry.card;
-        if (!card) return false;
-
-        const needle = search.toLowerCase();
-        if ((card.name || '').toLowerCase().includes(needle)) return true;
-        if (String(card.id || '').includes(needle)) return true;
-        if ((entry.zoneLabel || '').toLowerCase().includes(needle)) return true;
-
-        return (card.abilities || []).some((ability) => {
-            if ((ability.pseudocode || '').toLowerCase().includes(needle)) return true;
-            const triggerName = TRIGGER_NAMES[ability.trigger] || '';
-            if (triggerName.toLowerCase().includes(needle)) return true;
-            return (ability.conditions || []).some((condition) => {
-                const conditionName = CONDITION_NAMES[condition.condition_type] || '';
-                return conditionName.toLowerCase().includes(needle);
+    _fetchConditions: async () => {
+        DebugModal._conditions = null;
+        DebugModal._conditionError = null;
+        try {
+            const res = await fetch('/api/debug/conditions', {
+                headers: State.roomCode ? { 'X-Room-ID': State.roomCode } : {}
             });
-        });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.conditions)) {
+                DebugModal._conditions = data.conditions;
+            } else {
+                DebugModal._conditionError = data.error || 'Unknown error';
+            }
+        } catch (e) {
+            DebugModal._conditionError = e.message;
+        }
+    },
+
+    renderInspector: () => {
+        const container = document.getElementById('debug-inspector-content');
+        if (!container || !State.data) return;
+
+        const players = State.data.players || [];
+        const playerIdx = DebugModal._filters.selectedPlayer;
+        const currentPlayer = players[playerIdx] || players[0] || null;
+        const zone = DebugModal._filters.selectedZone;
+        const search = DebugModal._filters.abilitySearch.trim();
+        const visibleCards = DebugModal._collectVisibleCards(currentPlayer, zone)
+            .filter((entry) => entry.card && entry.card.id !== -1 && entry.card.id !== -2)
+            .filter((entry) => DebugModal._matchesSearch(entry, search));
+
+        container.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                ${renderStatusBanner(DebugModal._status)}
+                <div style="display:grid; grid-template-columns:minmax(140px, 0.9fr) minmax(140px, 0.9fr) minmax(220px, 1.4fr); gap:8px;">
+                    <div>
+                        <label class="form-label-xs">Player</label>
+                        <select onchange="DebugModal.onPlayerChange(this.value)" class="form-select form-select-sm">
+                            ${players.map((player, index) => `<option value="${index}" ${index === playerIdx ? 'selected' : ''}>Player ${index + 1}${State.data.active_player === index ? ' [active]' : ''}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label-xs">Zone</label>
+                        <select onchange="DebugModal.onZoneChange(this.value)" class="form-select form-select-sm">
+                            <option value="all" ${zone === 'all' ? 'selected' : ''}>All Zones</option>
+                            <option value="stage" ${zone === 'stage' ? 'selected' : ''}>Stage</option>
+                            <option value="live" ${zone === 'live' ? 'selected' : ''}>Live</option>
+                            <option value="hand" ${zone === 'hand' ? 'selected' : ''}>Hand</option>
+                            <option value="success" ${zone === 'success' ? 'selected' : ''}>Success</option>
+                            <option value="energy" ${zone === 'energy' ? 'selected' : ''}>Energy</option>
+                            <option value="discard" ${zone === 'discard' ? 'selected' : ''}>Discard</option>
+                            <option value="looked" ${zone === 'looked' ? 'selected' : ''}>Looked</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label-xs">Search</label>
+                        <input type="text" placeholder="card, trigger, condition, pseudocode" value="${escapeHtml(DebugModal._filters.abilitySearch)}" oninput="DebugModal.onSearchChange(this.value)" class="form-input form-input-sm">
+                    </div>
+                </div>
+
+                ${DebugModal._renderSummaryCards(players, visibleCards)}
+                ${currentPlayer ? DebugModal._renderZoneDiagnostics(currentPlayer) : ''}
+                ${DebugModal._renderAbilityMatrix(visibleCards)}
+                ${DebugModal._renderConditionTable()}
+
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <strong style="font-size:12px;">Card Detail</strong>
+                    ${visibleCards.length === 0
+                        ? '<div style="opacity:0.55; text-align:center; padding:24px; font-size:11px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px;">No cards match the current zone/search filters.</div>'
+                        : visibleCards.map((entry, index) => DebugModal._renderCardInspector(entry, index)).join('')}
+                </div>
+            </div>
+        `;
+    },
+
+    _renderConditionTable: () => {
+        const conditions = DebugModal._conditions;
+        if (DebugModal._conditionError) {
+            return `
+                <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:12px;">
+                    <strong style="font-size:11px; color:#ef4444;">Condition fetch error:</strong>
+                    <div style="font-size:10px; margin-top:4px;">${escapeHtml(DebugModal._conditionError)}</div>
+                </div>
+            `;
+        }
+        if (!conditions) {
+            return `
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px;">
+                    <div style="font-size:11px; opacity:0.6;">Loading conditions...</div>
+                </div>
+            `;
+        }
+        if (conditions.length === 0) {
+            return `
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px;">
+                    <div style="font-size:11px; opacity:0.6;">No conditions found on any card.</div>
+                </div>
+            `;
+        }
+
+        const trueCount = conditions.filter(c => c.result).length;
+        const falseCount = conditions.filter(c => !c.result).length;
+
+        const rows = conditions.map((c, i) => {
+            const resultClass = c.result ? 'condition-true' : 'condition-false';
+            const resultLabel = c.result ? 'TRUE' : 'FALSE';
+            return `
+                <tr style="vertical-align:top; ${i % 2 === 0 ? 'background:rgba(255,255,255,0.015);' : ''}">
+                    <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:10px;">
+                        <span class="${resultClass}" style="display:inline-block; padding:1px 6px; border-radius:4px; font-weight:bold; font-size:10px; ${c.result ? 'background:rgba(34,197,94,0.2); color:#4ade80;' : 'background:rgba(239,68,68,0.15); color:#f87171;'}">${resultLabel}</span>
+                    </td>
+                    <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:10px; white-space:nowrap;">P${c.player + 1}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:10px; white-space:nowrap;">${escapeHtml(c.zone)}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:10px; max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(c.card_name)}">${escapeHtml(c.card_name)}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:10px; white-space:nowrap;">${escapeHtml(c.condition_type || '(none)')}</td>
+                    <td style="padding:6px 8px; border-bottom:1px solid rgba(255,255,255,0.06); font-size:10px; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${escapeHtml(c.condition_text)}">${escapeHtml(c.condition_text || '-')}</td>
+                </tr>
+            `;
+        }).join('');
+
+        return `
+            <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                    <strong style="font-size:12px;">Condition Evaluation (${conditions.length} total)</strong>
+                    <span style="font-size:10px;">
+                        <span style="color:#4ade80;">${trueCount} true</span>
+                        <span style="opacity:0.5;"> / </span>
+                        <span style="color:#f87171;">${falseCount} false</span>
+                    </span>
+                </div>
+                <div style="overflow:auto; border:1px solid rgba(255,255,255,0.06); border-radius:6px; max-height:400px;">
+                    <table style="width:100%; border-collapse:collapse; min-width:800px; font-size:10px;">
+                        <thead>
+                            <tr style="background:rgba(15,23,42,0.95); text-transform:uppercase; letter-spacing:0.04em; position:sticky; top:0;">
+                                <th style="padding:8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08);">Result</th>
+                                <th style="padding:8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08);">P</th>
+                                <th style="padding:8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08);">Zone</th>
+                                <th style="padding:8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08);">Card</th>
+                                <th style="padding:8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08);">Type</th>
+                                <th style="padding:8px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08);">Text</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+                <details>
+                    <summary style="cursor:pointer; opacity:0.65; font-size:10px;">Raw JSON</summary>
+                    <pre style="margin:6px 0 0 0; padding:8px; background:#05070d; border-radius:4px; font-size:9px; line-height:1.35; color:#dbeafe; white-space:pre-wrap; word-break:break-word; max-height:300px; overflow:auto;">${escapeHtml(JSON.stringify(conditions, null, 2))}</pre>
+                </details>
+            </div>
+        `;
     },
 
     _renderSummaryCards: (players, visibleCards) => {
         const phaseName = PHASE_NAMES[State.data.phase] || String(State.data.phase ?? '?');
-        const traceCount = DebugModal._snapshot?.trace_log?.length || 0;
-        const bytecodeCount = DebugModal._snapshot?.bytecode_log?.length || State.data.bytecode_log?.length || 0;
 
         return `
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
                 <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:6px;">
                     <div style="font-size:10px; letter-spacing:0.08em; text-transform:uppercase; opacity:0.6;">State</div>
                     <div style="display:grid; grid-template-columns:repeat(2, minmax(60px, 1fr)); gap:8px; font-size:11px;">
-                        ${renderScalarCell('turn', summarizeObject(State.data.turn ?? '?'))}
+                        ${renderScalarCell('turn', State.data.turn ?? '?')}
                         ${renderScalarCell('phase', phaseName)}
                         ${renderScalarCell('active', `P${(State.data.active_player ?? 0) + 1}`)}
-                        ${renderScalarCell('visible cards', String(visibleCards.length))}
-                    </div>
-                </div>
-                <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:6px;">
-                    <div style="font-size:10px; letter-spacing:0.08em; text-transform:uppercase; opacity:0.6;">Debug Snapshot</div>
-                    <div style="display:grid; grid-template-columns:repeat(2, minmax(60px, 1fr)); gap:8px; font-size:11px;">
-                        ${renderScalarCell('snapshot', DebugModal._snapshot ? 'available' : 'fallback')}
-                        ${renderScalarCell('debug_mode', DebugModal._snapshot?.debug_mode ? 'enabled' : 'disabled')}
-                        ${renderScalarCell('trace lines', String(traceCount))}
-                        ${renderScalarCell('bytecode lines', String(bytecodeCount))}
+                        ${renderScalarCell('visible cards', visibleCards.length)}
                     </div>
                 </div>
                 ${players.map((player, index) => `
@@ -471,7 +383,7 @@ export const DebugModal = {
                             <span style="font-size:10px; opacity:0.72;">Score ${escapeHtml(player?.success_live_card_zone?.cards?.length ?? 0)}</span>
                         </div>
                         <div style="display:grid; grid-template-columns:repeat(2, minmax(70px, 1fr)); gap:6px;">
-                            ${zoneDefinitions(player).map((zone) => renderScalarCell(zone.label, String(zone.cards.length))).join('')}
+                            ${zoneDefinitions(player).map((zone) => renderScalarCell(zone.label, zone.cards.length)).join('')}
                         </div>
                     </div>
                 `).join('')}
@@ -483,7 +395,6 @@ export const DebugModal = {
         if (!State.data?.pending_choice) return '';
 
         const pending = State.data.pending_choice;
-        // Support both choice_type and type field names
         const choiceType = CHOICE_NAMES[pending.choice_type] || CHOICE_NAMES[pending.type] || 'PENDING_CHOICE';
 
         return `
@@ -589,12 +500,12 @@ export const DebugModal = {
                                         <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.06); font-weight:700;">${escapeHtml(zone.label)}</td>
                                         <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.06); min-width:180px;">
                                             <div style="display:grid; grid-template-columns:repeat(2, minmax(80px, 1fr)); gap:6px;">
-                                                ${renderScalarCell('cards', String(diag.cards))}
-                                                ${renderScalarCell('abilities', String(diag.totalAbilities))}
-                                                ${renderScalarCell('tapped', String(diag.tapped))}
-                                                ${renderScalarCell('revealed', String(diag.revealed))}
-                                                ${renderScalarCell('moved', String(diag.moved))}
-                                                ${renderScalarCell('notes', String(diag.totalNotes))}
+                                                ${renderScalarCell('cards', diag.cards)}
+                                                ${renderScalarCell('abilities', diag.totalAbilities)}
+                                                ${renderScalarCell('tapped', diag.tapped)}
+                                                ${renderScalarCell('revealed', diag.revealed)}
+                                                ${renderScalarCell('moved', diag.moved)}
+                                                ${renderScalarCell('notes', diag.totalNotes)}
                                             </div>
                                         </td>
                                         <td style="padding:8px; border-bottom:1px solid rgba(255,255,255,0.06); min-width:180px;"><div style="display:flex; flex-wrap:wrap; gap:4px;">${renderChips(diag.triggers, '#4ade80')}</div></td>
@@ -620,7 +531,6 @@ export const DebugModal = {
 
     _collectAbilityRows: (visibleCards) => visibleCards.flatMap((entry) => {
         const card = entry.card;
-        // Resolve card name using static database fallback if needed
         let cardName = card.name;
         if (!cardName && card.id !== undefined) {
             const resolved = State.resolveCardData(card.id);
@@ -828,9 +738,7 @@ export const DebugModal = {
         if (!card) return '';
 
         const abilities = card.abilities || [];
-        // Engine sends card_type
         const cardType = card.card_type || (card.score !== undefined ? 'Live' : 'Member');
-        // Engine sends orientation, not tapped
         const statusBits = [
             card.orientation === 'Wait' ? 'TAPPED' : null,
             card.moved ? 'MOVED' : null,
@@ -839,7 +747,6 @@ export const DebugModal = {
             card.waiting ? 'WAIT' : null,
         ].filter(Boolean);
 
-        // Resolve card name using static database fallback if needed
         let displayName = card.name;
         if (!displayName && card.id !== undefined) {
             const resolved = State.resolveCardData(card.id);
@@ -865,10 +772,10 @@ export const DebugModal = {
 
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(115px, 1fr)); gap:6px;">
                     ${renderScalarCell('type', cardType)}
-                    ${renderScalarCell(cardType === 'live' ? 'score' : 'cost', String(cardType === 'live' ? (card.score ?? 0) : (card.cost ?? 0)))}
-                    ${renderScalarCell('blades', String(card.blades ?? 0))}
+                    ${renderScalarCell(cardType === 'live' ? 'score' : 'cost', (cardType === 'live' ? (card.score ?? 0) : (card.cost ?? 0)))}
+                    ${renderScalarCell('blades', (card.blades ?? 0))}
                     ${renderScalarCell('hearts', summarizeObject(card.hearts ?? card.required_hearts ?? []))}
-                    ${renderScalarCell('notes', String(card.note_icons ?? 0))}
+                    ${renderScalarCell('notes', (card.note_icons ?? 0))}
                     ${renderScalarCell('status', statusBits.join(', ') || 'none')}
                 </div>
 
@@ -893,391 +800,73 @@ export const DebugModal = {
         `;
     },
 
-    renderInspectorTab: () => {
-        const container = document.querySelector('[data-tab-pane="inspector"]');
-        if (!container || !State.data) return;
-
-        const players = State.data.players || [];
-        const playerIdx = DebugModal._filters.selectedPlayer;
-        const currentPlayer = players[playerIdx] || players[0] || null;
-        const zone = DebugModal._filters.selectedZone;
-        const search = DebugModal._filters.abilitySearch.trim();
-        const visibleCards = DebugModal._collectVisibleCards(currentPlayer, zone)
-            .filter((entry) => entry.card && entry.card.id !== -1 && entry.card.id !== -2)
-            .filter((entry) => DebugModal._matchesSearch(entry, search));
-
-        container.innerHTML = `
-            <div style="display:flex; flex-direction:column; height:100%; padding:0; gap:10px; overflow:auto;">
-                ${renderStatusBanner(DebugModal._status)}
-                <div style="display:grid; grid-template-columns:minmax(140px, 0.9fr) minmax(140px, 0.9fr) minmax(220px, 1.4fr); gap:8px;">
-                    <div>
-                        <label class="form-label-xs">Player</label>
-                        <select onchange="DebugModal.onPlayerChange(this.value)" class="form-select form-select-sm">
-                            ${players.map((player, index) => `<option value="${index}" ${index === playerIdx ? 'selected' : ''}>Player ${index + 1}${State.data.active_player === index ? ' [active]' : ''}</option>`).join('')}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label-xs">Zone</label>
-                        <select onchange="DebugModal.onZoneChange(this.value)" class="form-select form-select-sm">
-                            <option value="all" ${zone === 'all' ? 'selected' : ''}>All Zones</option>
-                            <option value="stage" ${zone === 'stage' ? 'selected' : ''}>Stage</option>
-                            <option value="live" ${zone === 'live' ? 'selected' : ''}>Live</option>
-                            <option value="hand" ${zone === 'hand' ? 'selected' : ''}>Hand</option>
-                            <option value="success" ${zone === 'success' ? 'selected' : ''}>Success</option>
-                            <option value="energy" ${zone === 'energy' ? 'selected' : ''}>Energy</option>
-                            <option value="discard" ${zone === 'discard' ? 'selected' : ''}>Discard</option>
-                            <option value="looked" ${zone === 'looked' ? 'selected' : ''}>Looked</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label-xs">Search</label>
-                        <input type="text" placeholder="card, trigger, condition, pseudocode" value="${escapeHtml(DebugModal._filters.abilitySearch)}" oninput="DebugModal.onSearchChange(this.value)" class="form-input form-input-sm">
-                    </div>
-                </div>
-
-                ${DebugModal._renderSummaryCards(players, visibleCards)}
-                ${DebugModal._renderPendingChoice()}
-                ${currentPlayer ? DebugModal._renderZoneDiagnostics(currentPlayer) : ''}
-                ${DebugModal._renderAbilityMatrix(visibleCards)}
-
-                <div style="display:flex; flex-direction:column; gap:10px;">
-                    <strong style="font-size:12px;">Card Detail</strong>
-                    ${visibleCards.length === 0
-                        ? '<div style="opacity:0.55; text-align:center; padding:24px; font-size:11px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px;">No cards match the current zone/search filters.</div>'
-                        : visibleCards.map((entry, index) => DebugModal._renderCardInspector(entry, index)).join('')}
-                </div>
-            </div>
-        `;
+    _collectVisibleCards: (player, zoneKey) => {
+        const defs = zoneDefinitions(player);
+        const selectedDefs = zoneKey === 'all' ? defs : defs.filter((zone) => zone.key === zoneKey);
+        return selectedDefs.flatMap((zone) => zone.cards.map((rawEntry, index) => ({
+            zoneKey: zone.key,
+            zoneLabel: zone.label,
+            slotLabel: `${zone.label} ${index + 1}`,
+            slotIndex: index,
+            card: DebugModal._normalizeCard(rawEntry),
+        })));
     },
 
-    renderTraceTab: () => {
-        const container = document.querySelector('[data-tab-pane="trace"]');
-        if (!container || !State.data) return;
+    _matchesSearch: (entry, search) => {
+        if (!search) return true;
+        const card = entry.card;
+        if (!card) return false;
 
-        const traceLines = DebugModal._snapshot?.trace_log || [];
-        const bytecodeLines = DebugModal._snapshot?.bytecode_log || State.data.bytecode_log || [];
-        const historyEntry = DebugModal._getSelectedHistoryEntry();
+        const needle = search.toLowerCase();
+        if ((card.name || '').toLowerCase().includes(needle)) return true;
+        if (String(card.id || '').includes(needle)) return true;
+        if ((entry.zoneLabel || '').toLowerCase().includes(needle)) return true;
 
-        container.innerHTML = `
-            <div style="display:flex; flex-direction:column; height:100%; padding:0; gap:10px; overflow:hidden;">
-                ${renderStatusBanner(DebugModal._status)}
-                <div class="debug-action-row">
-                    <button class="btn btn-secondary btn-xs" data-action="toggle-debug-mode">Trace ${DebugModal._snapshot?.debug_mode ? 'On' : 'Off'}</button>
-                    <button class="btn btn-secondary btn-xs" data-action="debug-render-all">Refresh</button>
-                    <span style="margin-left:auto; font-size:10px; opacity:0.7;">${historyEntry ? `Checkpoint ${historyEntry.index + 1}/${DebugModal._getHistoryEntries().length}` : 'No checkpoint timeline yet'}</span>
-                </div>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px;">
-                    ${renderScalarCell('debug_mode', DebugModal._snapshot?.debug_mode ? 'enabled' : 'disabled')}
-                    ${renderScalarCell('trace lines', String(traceLines.length))}
-                    ${renderScalarCell('bytecode lines', String(bytecodeLines.length))}
-                    ${renderScalarCell('snapshot', DebugModal._snapshot ? 'backend /api/debug/snapshot' : 'viewer fallback')}
-                </div>
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:12px; flex:1; min-height:0;">
-                    <div style="display:flex; flex-direction:column; min-height:0; background:#020617; border:1px solid #1e293b; border-radius:8px; overflow:hidden;">
-                        <div style="padding:8px 10px; border-bottom:1px solid #1e293b; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#7dd3fc;">Engine Trace</div>
-                        <div id="debug-trace-log" style="flex:1; overflow:auto; font-family:'Cascadia Code', monospace;">${renderLogLines(traceLines, 'No engine trace has been captured. Enable Debug Mode, then execute game actions.')}</div>
-                    </div>
-                    <div style="display:flex; flex-direction:column; min-height:0; background:#020617; border:1px solid #1e293b; border-radius:8px; overflow:hidden;">
-                        <div style="padding:8px 10px; border-bottom:1px solid #1e293b; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#86efac;">UI Bytecode Log</div>
-                        <div id="debug-bytecode-log" style="flex:1; overflow:auto; font-family:'Cascadia Code', monospace;">${renderLogLines(bytecodeLines, 'No bytecode log has been captured for the current state.')}</div>
-                    </div>
-                </div>
-            </div>
-        `;
-    },
-
-    renderStringTab: () => {
-        const container = document.querySelector('[data-tab-pane="string"]');
-        if (!container || !State.data) return;
-
-        const entries = DebugModal._getHistoryEntries();
-        const selectedEntry = DebugModal._getSelectedHistoryEntry();
-        const serialized = selectedEntry?.serialized || JSON.stringify(DebugModal._getCheckpointPayload());
-
-        container.innerHTML = `
-            <div style="display:flex; flex-direction:column; height:100%; padding:0; gap:8px; overflow:hidden;">
-                ${renderStatusBanner(DebugModal._status)}
-                <div style="font-size:11px; opacity:0.88; background:rgba(56,189,248,0.1); padding:10px 12px; border-radius:6px; border-left:3px solid #38bdf8; line-height:1.45;">
-                    <strong>Checkpoint state strings</strong><br/>
-                    <span style="font-size:10px;">Pick any history entry, copy the one-line state string, or apply/import it directly.</span><br/>
-                    <span style="font-size:9px; font-family:'Cascadia Code', monospace; opacity:0.72;">${(serialized.length / 1024).toFixed(2)} KB${selectedEntry ? ` | turn ${selectedEntry.turn} | ${selectedEntry.phase}` : ''}</span>
-                </div>
-                <div style="display:grid; grid-template-columns:minmax(260px, 0.9fr) minmax(0, 2.1fr); gap:12px; flex:1; min-height:0;">
-                    <div style="display:flex; flex-direction:column; min-height:0; background:#020617; border:1px solid #334155; border-radius:8px; overflow:hidden;">
-                        <div style="padding:8px 10px; border-bottom:1px solid #1e293b; font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:#7dd3fc;">Checkpoint Timeline</div>
-                        <div style="flex:1; overflow:auto; padding:8px; display:flex; flex-direction:column; gap:6px;">
-                            ${entries.length === 0 ? '<div style="opacity:0.5; font-size:11px; padding:12px;">No history exported yet.</div>' : entries.map((entry) => `
-                                <button
-                                    type="button"
-                                    onclick="DebugModal.onHistorySelect(${entry.index})"
-                                    style="text-align:left; padding:10px; border-radius:8px; border:1px solid ${entry.index === selectedEntry?.index ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.08)'}; background:${entry.index === selectedEntry?.index ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.03)'}; color:#e2e8f0; cursor:pointer;"
-                                >
-                                    <div style="display:flex; justify-content:space-between; gap:8px; align-items:center;">
-                                        <strong style="font-size:11px;">#${entry.index + 1}${entry.isCurrent ? ' current' : ''}</strong>
-                                        <span style="font-size:10px; opacity:0.7;">P${entry.currentPlayer}</span>
-                                    </div>
-                                    <div style="font-size:10px; opacity:0.8; margin-top:4px;">Turn ${entry.turn} | ${escapeHtml(entry.phase)}</div>
-                                    <div style="font-size:10px; opacity:0.55; margin-top:2px;">Score ${escapeHtml(entry.score)}</div>
-                                </button>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <div style="display:flex; flex-direction:column; min-height:0; gap:10px;">
-                        <textarea id="debug-string-textarea" spellcheck="false" style="flex:1; width:100%; background:#020617; color:#dbeafe; border:1px solid #334155; border-radius:6px; padding:10px; font-family:'Cascadia Code', monospace; font-size:11px; resize:none; word-break:break-all; box-sizing:border-box;">${escapeHtml(serialized)}</textarea>
-                        <div class="debug-action-row">
-                            <button class="btn btn-primary" data-action="debug-copy-state-string">Copy</button>
-                            <button class="btn btn-secondary" data-action="debug-load-state-string">Apply</button>
-                            <button class="btn btn-accent-gray" data-action="debug-trigger-file-load">Load File</button>
-                            <button class="btn btn-accent-green" data-action="debug-export-game">Download Timeline</button>
-                            <button class="btn btn-accent-blue" data-action="debug-import-game">Import Timeline</button>
-                            <input type="file" id="debug-state-file" style="display:none;" accept=".json,.txt,.b64">
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const stateFileInput = container.querySelector('#debug-state-file');
-        if (stateFileInput) {
-            stateFileInput.addEventListener('change', (event) => DebugModal.loadStateFile(event.target));
-        }
-    },
-
-    renderJsonTab: () => {
-        const container = document.querySelector('[data-tab-pane="json"]');
-        if (!container || !State.data) return;
-
-        const labels = {
-            minimal: ['Minimal editor', 'Small editable checkpoint focused on board zones and counts.'],
-            checkpoint: ['Checkpoint snapshot', 'Raw engine-shaped snapshot used for apply/import and history playback.'],
-            viewer: ['Viewer state', 'Fully enriched frontend state including resolved cards and derived debug fields.'],
-        };
-        const [modeTitle, modeHint] = labels[DebugModal._jsonMode] || labels.checkpoint;
-
-        container.innerHTML = `
-            <div style="display:flex; flex-direction:column; height:100%; padding:0; gap:8px; overflow:hidden;">
-                ${renderStatusBanner(DebugModal._status)}
-                <div class="debug-action-row">
-                    <button class="btn btn-secondary btn-xs" data-action="debug-render-minimal-json">Minimal</button>
-                    <button class="btn btn-secondary btn-xs" data-action="debug-render-checkpoint-json">Checkpoint Snapshot</button>
-                    <button class="btn btn-secondary btn-xs" data-action="debug-render-rich-json">Viewer State</button>
-                    <button class="btn btn-secondary btn-xs" data-action="debug-copy-json-state">Copy</button>
-                    <button class="btn btn-secondary btn-xs" data-action="debug-load-json-file">Load File</button>
-                    <button class="btn btn-primary btn-xs" data-action="debug-apply-json-state">Apply</button>
-                    <input type="file" id="debug-json-file" style="display:none;" accept=".json,.txt,.b64">
-                </div>
-                <div style="font-size:11px; opacity:0.88; background:rgba(255,255,255,0.05); padding:10px 12px; border-radius:6px; border-left:3px solid #64748b; line-height:1.45;">
-                    <strong id="debug-json-mode-title">${modeTitle}</strong><br/>
-                    <span id="debug-json-mode-hint" style="font-size:10px;">${modeHint}</span>
-                </div>
-                <textarea id="debug-json-textarea" spellcheck="false" style="flex:1; width:100%; background:#020617; color:#e2e8f0; border:1px solid #334155; border-radius:6px; padding:10px; font-family:'Cascadia Code', monospace; font-size:12px; resize:none; box-sizing:border-box;"></textarea>
-                <div id="debug-json-result" style="font-size:10px; opacity:0.84; background:rgba(255,255,255,0.05); padding:8px; border-radius:6px; border-left:2px solid #666; display:none;"></div>
-            </div>
-        `;
-
-        const jsonFileInput = container.querySelector('#debug-json-file');
-        if (jsonFileInput) {
-            jsonFileInput.addEventListener('change', (event) => DebugModal.onJsonFileSelected(event.target));
-        }
-
-        if (DebugModal._jsonMode === 'minimal') DebugModal.renderMinimalJSON();
-        else if (DebugModal._jsonMode === 'viewer') DebugModal.renderRichJSON();
-        else DebugModal.renderCheckpointJSON();
-    },
-
-    renderMinimalJSON: () => {
-        if (!State.data) return;
-        DebugModal._jsonMode = 'minimal';
-
-        const source = DebugModal._getCheckpointPayload();
-        const players = source?.players || [];
-        const getIds = (entries = []) => entries.map((entry) => {
-            if (entry === null || entry === undefined) return -1;
-            if (typeof entry === 'number') return entry;
-            if (typeof entry === 'object') return entry.id ?? entry.card_id ?? -1;
-            return -1;
+        return (card.abilities || []).some((ability) => {
+            if ((ability.pseudocode || '').toLowerCase().includes(needle)) return true;
+            const triggerName = TRIGGER_NAMES[ability.trigger] || '';
+            if (triggerName.toLowerCase().includes(needle)) return true;
+            return (ability.conditions || []).some((condition) => {
+                const conditionName = CONDITION_NAMES[condition.condition_type] || '';
+                return conditionName.toLowerCase().includes(needle);
+            });
         });
-
-        const minimal = {
-            phase: source?.phase ?? State.data.phase,
-            prev_phase: source?.prev_phase ?? null,
-            turn: source?.turn ?? State.data.turn,
-            current_player: source?.current_player ?? State.data.active_player ?? 0,
-            first_player: source?.first_player ?? 0,
-            prev_card_id: source?.prev_card_id ?? -1,
-            debug_mode: Boolean(DebugModal._snapshot?.debug_mode),
-            players: players.map((player, index) => ({
-                _label: `Player ${index + 1}`,
-                score: player.score ?? 0,
-                stage: getIds(player.stage || []),
-                live_zone: getIds(player.live_zone || []),
-                hand: getIds(player.hand || []),
-                energy: getIds(player.energy || []),
-                tapped_energy_mask: player.tapped_energy_mask ?? 0,
-                discard: getIds(player.discard || []),
-                success_lives: getIds(player.success_live_card_zone || []),
-                looked_cards: getIds(player.looked_cards || []),
-            })),
-        };
-
-        const textarea = document.getElementById('debug-json-textarea');
-        if (textarea) textarea.value = JSON.stringify(minimal, null, 2);
-        DebugModal._updateJsonModeBanner();
     },
 
-    renderCheckpointJSON: () => {
-        DebugModal._jsonMode = 'checkpoint';
-        const textarea = document.getElementById('debug-json-textarea');
-        if (textarea) textarea.value = JSON.stringify(DebugModal._getCheckpointPayload(), null, 2);
-        DebugModal._updateJsonModeBanner();
-    },
+    _normalizeCard: (rawEntry) => {
+        if (rawEntry === null || rawEntry === undefined) return null;
+        if (typeof rawEntry === 'number') return State.resolveCardData(rawEntry);
 
-    renderFullJSON: () => {
-        DebugModal.renderCheckpointJSON();
-    },
-
-    renderRichJSON: () => {
-        DebugModal._jsonMode = 'viewer';
-        const textarea = document.getElementById('debug-json-textarea');
-        if (textarea) textarea.value = JSON.stringify(State.data);
-        DebugModal._updateJsonModeBanner();
-    },
-
-    applyJsonState: async () => {
-        const textarea = document.getElementById('debug-json-textarea');
-        const result = document.getElementById('debug-json-result');
-        if (!textarea || !result) return;
-
-        try {
-            const payload = DebugModal._decodeStateInput(textarea.value);
-            const response = await DebugModal._applyCheckpointPayload(payload);
-            const ok = Boolean(response?.ok);
-            const message = DebugModal._extractApplyMessage(response);
-
-            result.style.display = 'block';
-            result.style.borderLeftColor = ok ? '#22c55e' : '#ef4444';
-            result.textContent = message;
-            DebugModal._setStatus(ok ? 'success' : 'error', message);
-
-            if (ok) {
-                await DebugModal.renderAll();
-                if (window.Rendering) window.Rendering.render();
-            }
-        } catch (error) {
-            const message = `Parse error: ${error.message}`;
-            result.style.display = 'block';
-            result.style.borderLeftColor = '#ef4444';
-            result.textContent = message;
-            DebugModal._setStatus('error', message);
+        if (typeof rawEntry === 'object' && rawEntry.card) {
+            const { card, ...rest } = rawEntry;
+            const resolvedCard = DebugModal._normalizeCard(card);
+            if (!resolvedCard) return null;
+            return { ...resolvedCard, ...rest };
         }
-    },
 
-    copyJsonState: () => {
-        const textarea = document.getElementById('debug-json-textarea');
-        if (!textarea) return;
-        textarea.select();
-        document.execCommand('copy');
-        DebugModal._setStatus('success', 'JSON copied to clipboard.');
-        DebugModal.renderJsonTab();
-    },
-
-    loadJsonFile: () => {
-        const input = document.getElementById('debug-json-file');
-        if (input) input.click();
-    },
-
-    onJsonFileSelected: (input) => {
-        if (!input.files || !input.files[0]) return;
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const textarea = document.getElementById('debug-json-textarea');
-            if (textarea) textarea.value = event.target.result;
-            input.value = '';
-        };
-        reader.readAsText(input.files[0]);
-    },
-
-    triggerFileLoad: () => {
-        const input = document.getElementById('debug-state-file');
-        if (input) input.click();
-    },
-
-    loadStateFile: (input) => {
-        if (!input.files || !input.files[0]) return;
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const payload = DebugModal._decodeStateInput(event.target.result);
-                const response = await DebugModal._applyCheckpointPayload(payload);
-                const ok = Boolean(response?.ok);
-                const message = DebugModal._extractApplyMessage(response);
-                DebugModal._setStatus(ok ? 'success' : 'error', message);
-                if (ok) {
-                    await DebugModal.renderAll();
-                    if (window.Rendering) window.Rendering.render();
-                } else {
-                    DebugModal.renderStringTab();
-                }
-            } catch (error) {
-                DebugModal._setStatus('error', `File error: ${error.message}`);
-                DebugModal.renderStringTab();
+        if (typeof rawEntry === 'object') {
+            if (rawEntry.id === undefined && rawEntry.card_id !== undefined) {
+                return { ...rawEntry, id: rawEntry.card_id };
             }
-            input.value = '';
-        };
-        reader.readAsText(input.files[0]);
-    },
-
-    copyStateString: () => {
-        const textarea = document.getElementById('debug-string-textarea');
-        if (!textarea) return;
-        textarea.select();
-        document.execCommand('copy');
-        DebugModal._setStatus('success', 'State snapshot copied to clipboard.');
-        DebugModal.renderStringTab();
-    },
-
-    loadStateString: async () => {
-        const textarea = document.getElementById('debug-string-textarea');
-        const rawValue = textarea ? textarea.value : '';
-        if (!rawValue) return;
-
-        try {
-            const payload = DebugModal._decodeStateInput(rawValue);
-            const response = await DebugModal._applyCheckpointPayload(payload);
-            const ok = Boolean(response?.ok);
-            const message = DebugModal._extractApplyMessage(response);
-            DebugModal._setStatus(ok ? 'success' : 'error', message);
-
-            if (ok) {
-                await DebugModal.renderAll();
-                if (window.Rendering) window.Rendering.render();
-            } else {
-                DebugModal.renderStringTab();
-            }
-        } catch (error) {
-            DebugModal._setStatus('error', `Decode error: ${error.message}`);
-            DebugModal.renderStringTab();
+            return rawEntry;
         }
+
+        return null;
     },
 
     onPlayerChange: (value) => {
         DebugModal._filters.selectedPlayer = parseInt(value, 10);
-        DebugModal.renderInspectorTab();
+        DebugModal.renderInspector();
     },
 
     onZoneChange: (value) => {
         DebugModal._filters.selectedZone = value;
-        DebugModal.renderInspectorTab();
+        DebugModal.renderInspector();
     },
 
     onSearchChange: (value) => {
         DebugModal._filters.abilitySearch = value;
-        DebugModal.renderInspectorTab();
-    },
-
-    onHistorySelect: (value) => {
-        DebugModal._selectedHistoryIndex = parseInt(value, 10);
-        DebugModal.renderStringTab();
+        DebugModal.renderInspector();
     },
 
     rewind: async () => {
@@ -1309,40 +898,11 @@ export const DebugModal = {
         DebugModal._setStatus(ok ? 'success' : 'error', ok ? 'Debug mode toggled.' : 'Toggle debug mode failed.');
         await DebugModal.renderAll();
     },
-
-    exportGameWithHistory: async () => {
-        try {
-            await GameExport.downloadGameAsJSON();
-            DebugModal._setStatus('success', 'Game exported to file');
-        } catch (e) {
-            console.error('Export error:', e);
-            DebugModal._setStatus('error', `Export failed: ${e.message}`);
-        }
-    },
-
-    importGameWithHistory: async () => {
-        try {
-            const text = prompt('Paste exported game JSON:', '');
-            if (!text || !text.trim()) return;
-            const success = await GameExport.importGameFromPaste(text);
-            if (success) {
-                DebugModal._clearStatus();
-                await DebugModal.renderAll();
-                if (window.Rendering) window.Rendering.render();
-            } else {
-                DebugModal._setStatus('error', 'Failed to import game');
-            }
-        } catch (e) {
-            console.error('Import error:', e);
-            DebugModal._setStatus('error', `Import failed: ${e.message}`);
-        }
-    },
 };
 
 window.DebugModal = DebugModal;
 window.openDebugModal = () => DebugModal.openDebugModal();
 window.closeDebugModal = () => DebugModal.closeDebugModal();
-window.switchDebugTab = (tab) => DebugModal.switchTab(tab);
 
 window.Modals = window.Modals || {};
 window.Modals.openDebugModal = () => DebugModal.openDebugModal();

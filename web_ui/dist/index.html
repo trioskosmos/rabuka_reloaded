@@ -12,7 +12,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     
     <!-- CSS Load Order managed by Vite via style.css -->
-  <script type="module" crossorigin src="./assets/main-NNFdV4-s.js"></script>
+  <script type="module" crossorigin src="./assets/main-Waq_H_39.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/main-CfK_a9AE.css">
 </head>
 
@@ -745,7 +745,7 @@
     <div id="debug-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content large" style="height: 92vh; width: min(96vw, 1800px); max-width: 1800px; display: flex; flex-direction: column; overflow: hidden;">
             <div class="modal-header" style="padding: 5px 12px; min-height: auto;">
-                <h3 style="margin: 0; font-size: 15px;">Debug Inspector and State Editor</h3>
+                <h3 style="margin: 0; font-size: 15px;">Debug Inspector</h3>
                 <div style="display: flex; gap: 8px; margin-left: auto; margin-right: 15px; font-size: 11px;">
                     <button class="btn btn-secondary btn-sm" data-action="debug-rewind" title="Undo" style="padding: 2px 8px;">Undo</button>
                     <button class="btn btn-secondary btn-sm" data-action="debug-redo" title="Redo" style="padding: 2px 8px;">Redo</button>
@@ -757,33 +757,7 @@
             </div>
 
             <div class="modal-body" style="padding: 0; display: flex; flex: 1; gap: 0; overflow: hidden; flex-direction: column;">
-                <div style="display: flex; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border); gap: 0; flex-wrap: wrap;">
-                        <button data-tab-btn="inspector" data-action="debug-switch-tab" data-value="inspector"
-                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); cursor: pointer; font-size: 11px;">
-                            Inspector</button>
-                        <button data-tab-btn="trace" data-action="debug-switch-tab" data-value="trace"
-                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); cursor: pointer; font-size: 11px;">
-                            Trace</button>
-                        <button data-tab-btn="string" data-action="debug-switch-tab" data-value="string"
-                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-dim); cursor: pointer; font-size: 11px;">
-                            State String</button>
-                        <button data-tab-btn="json" data-action="debug-switch-tab" data-value="json"
-                            style="flex: 1; padding: 4px 8px; background: none; border: none; border-bottom: 2px solid var(--accent-blue); color: #fff; cursor: pointer; font-size: 11px; font-weight: bold;">
-                            JSON Editor</button>
-                </div>
-
-                <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0;">
-                    <div data-tab-pane="inspector" style="flex: 1; overflow-y: auto; display: none; min-height: 0;">
-                    </div>
-
-                    <div data-tab-pane="trace" style="flex: 1; overflow: hidden; display: none; min-height: 0;">
-                    </div>
-
-                    <div data-tab-pane="string" style="flex: 1; overflow-y: auto; display: none; min-height: 0;">
-                    </div>
-
-                    <div data-tab-pane="json" style="flex: 1; overflow: hidden; display: flex; flex-direction: column; min-height: 0;">
-                    </div>
+                <div style="flex: 1; overflow-y: auto; min-height: 0; padding: 12px;" id="debug-inspector-content">
                 </div>
             </div>
         </div>

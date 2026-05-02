@@ -82,8 +82,6 @@ export const ImageLoader = {
 // Consistent image path resolution across all card displays
 export function resolveCardImagePath(cardNo) {
     if (!cardNo) return '';
-    const resolved = State.resolveCardData(cardNo);
-    if (resolved?.img) return fixImgPath(resolved.img);
     const mapped = State.cardImageMapping?.[cardNo];
     if (mapped) return fixImgPath(mapped);
     return fixImgPath(`img/cards_webp/${cardNo}.webp`);
@@ -160,15 +158,19 @@ export const CardRenderer = {
         let imgPath = '';
 
         if (!isHidden) {
-            // Use card.img field directly like temp_rabuka does
-            imgPath = resolvedCard.img || resolvedCard.img_path || '';
             displayName = resolvedCard.name || `[${resolvedCard.card_type}]` || 'Card';
+            const cardNo = resolvedCard.card_no;
+            if (cardNo) {
+                imgPath = resolveCardImagePath(cardNo);
+            } else {
+                imgPath = fixImgPath(resolvedCard.img || resolvedCard.img_path || '');
+            }
         }
 
         return {
             classes: classNames.join(' '),
             displayName,
-            imgPath: imgPath ? fixImgPath(imgPath) : '',
+            imgPath,
             cost: 0, // Rust backend doesn't provide cost in card display
             isHidden,
             isValid,

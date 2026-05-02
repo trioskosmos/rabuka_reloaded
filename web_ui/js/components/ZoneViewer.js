@@ -118,11 +118,12 @@ export const ZoneViewer = {
         div.className = isMini ? 'card card-mini' : 'card';
         
         // Resolve card data if card_no is present but no image path
-        let imgPath = card.img || card.img_path || card.image || '';
-        if (imgPath) {
-            imgPath = fixImg(imgPath);
-        } else if (card.card_no) {
+        let imgPath = '';
+        if (card.card_no) {
             imgPath = resolveCardImagePath(card.card_no);
+        }
+        if (!imgPath) {
+            imgPath = fixImg(card.img || card.img_path || card.image || '');
         }
         
         const img = document.createElement('img');

@@ -64,23 +64,8 @@ export const Modals = {
     downloadReport: () => ReportModal.downloadReport(),
 
     // --- Debug ---
-    openDebugModal: (tab) => {
-        DebugModal.openDebugModal();
-        if (tab) DebugModal.switchTab(tab);
-    },
+    openDebugModal: () => DebugModal.openDebugModal(),
     closeDebugModal: () => DebugModal.closeDebugModal(),
-    saveState: () => DebugModal.saveState(),
-    copyState: () => {
-        DebugModal.openDebugModal();
-        DebugModal.switchTab('string');
-    },
-    loadState: () => {
-        DebugModal.openDebugModal();
-        DebugModal.switchTab('string');
-        setTimeout(() => DebugModal.triggerFileLoad(), 50);
-    },
-    applyState: () => DebugModal.applyCustomState(),
     rewind: () => DebugModal.rewind(),
-    redo: () => DebugModal.redo(),
-    switchDebugTab: (tab) => DebugModal.switchTab(tab)
+    redo: () => DebugModal.redo()
 };

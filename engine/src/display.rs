@@ -14,6 +14,7 @@ pub struct CardDisplay {
     pub orientation: Option<String>,
     pub base_heart: Option<HashMap<String, u32>>,
     pub blade: u32,
+    pub total_blade: u32,
     pub id: i16,
 }
 
@@ -51,7 +52,7 @@ pub struct GameStateDisplay {
     pub pending_choice: Option<serde_json::Value>,
 }
 
-pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option<Orientation>) -> Option<CardDisplay> {
+pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option<Orientation>, blade_modifier: i32) -> Option<CardDisplay> {
     card_db.get_card(card_id).map(|card| {
         let base_heart = card.base_heart.as_ref().map(|bh| {
             bh.hearts.iter().map(|(color, count)| {
@@ -77,6 +78,7 @@ pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option
             orientation: orientation.map(|o| format!("{:?}", o)),
             base_heart,
             blade: card.blade,
+            total_blade: ((card.blade as i32) + blade_modifier).max(0) as u32,
             id: card_id,
         }
     })
@@ -84,19 +86,20 @@ pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option
 
 pub fn zone_to_display(card_ids: &[i16], card_db: &CardDatabase) -> ZoneDisplay {
     ZoneDisplay {
-        cards: card_ids.iter().filter_map(|&id| card_to_display(id, card_db, None)).collect(),
+        cards: card_ids.iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
     }
 }
 
-pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase) -> StageDisplay {
+pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> StageDisplay {
+    let blade_mod = |cid: i16| blade_modifiers.get(cid).copied().unwrap_or(0);
     StageDisplay {
-        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, None) } else { None },
-        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, None) } else { None },
-        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, None) } else { None },
+        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, None, blade_mod(stage.stage[0])) } else { None },
+        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, None, blade_mod(stage.stage[1])) } else { None },
+        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, None, blade_mod(stage.stage[2])) } else { None },
     }
 }
 
-pub fn player_to_display(player: &Player, card_db: &CardDatabase) -> PlayerDisplay {
+pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player.energy_zone.cards.iter()
         .enumerate()
         .map(|(i, &card_id)| {
@@ -111,7 +114,7 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase) -> PlayerDispl
 
     let energy_display = ZoneDisplay {
         cards: energy_cards.iter()
-            .filter_map(|(card_id, orientation)| card_to_display(*card_id, card_db, *orientation))
+            .filter_map(|(card_id, orientation)| card_to_display(*card_id, card_db, *orientation, 0))
             .collect(),
     };
 
@@ -120,7 +123,7 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase) -> PlayerDispl
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display(&player.hand.cards, card_db),
-        stage: stage_to_display(&player.stage, card_db),
+        stage: stage_to_display(&player.stage, card_db, blade_modifiers),
         live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
         success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards, card_db),
         waitroom: waitroom_display.clone(),
@@ -134,8 +137,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database),
-        player2: player_to_display(&game_state.player2, &game_state.card_database),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.blade_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.blade_modifiers),
         pending_choice: game_state.pending_choice.clone(),
     }
 }

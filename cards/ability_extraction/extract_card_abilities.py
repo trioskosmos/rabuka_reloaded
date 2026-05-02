@@ -51,6 +51,12 @@ def extract_trigger(text: str) -> tuple[list, str, str]:
     use_limit = None
     effect = text
     
+    # Handle ［ターン1回］ bracket format (non-icon turn limit notation)
+    bracket_turn_match = re.search(r'［ターン1回］', effect)
+    if bracket_turn_match:
+        use_limit = 1
+        effect = effect.replace('［ターン1回］', '', 1).strip()
+    
     # First, remove / prefix trigger patterns
     slash_matches = SLASH_TRIGGER_PATTERN.findall(text)
     for match in slash_matches:
@@ -341,7 +347,7 @@ def extract_all_abilities(cards_file: Path) -> dict:
                             else:
                                 # Try to extract from icon counts
                                 blade_count = text.count('{{icon_blade.png|ブレード}}')
-                                heart_count = len(re.findall(r'{{heart_\d+\.png|heart\d+}}', text))
+                                heart_count = len(re.findall(r'{{heart_\d+\.png\|heart\d+}}', text))
                                 if blade_count > 0:
                                     obj['count'] = blade_count
                                 elif heart_count > 0:

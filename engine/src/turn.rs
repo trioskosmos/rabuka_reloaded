@@ -26,11 +26,13 @@ impl TurnEngine {
                     // Activate BOTH players' energy, not just active player
                     game_state.player1.activate_all_energy();
                     game_state.player2.activate_all_energy();
+                    game_state.recalculate_constant_blade_modifiers();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
                 }
                 Phase::Energy => {
                     // Rule 7.5: Draw energy card (automatic)
+                    game_state.recalculate_constant_blade_modifiers();
                     Self::check_timing(game_state);
                     let drawn_card = game_state.active_player_mut().draw_energy();
                     if drawn_card.is_none() {
@@ -43,11 +45,13 @@ impl TurnEngine {
                     // Rule 7.6: Draw card (automatic)
                     Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
+                    game_state.recalculate_constant_blade_modifiers();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Main;
                 }
                 Phase::Main => {
                     // Rule 7.7: Main phase complete, advance to next turn phase
+                    game_state.recalculate_constant_blade_modifiers();
                     Self::check_timing(game_state);
                     if game_state.current_turn_phase == TurnPhase::FirstAttackerNormal {
                         game_state.current_turn_phase = TurnPhase::SecondAttackerNormal;
@@ -76,6 +80,7 @@ impl TurnEngine {
                 }
                 Phase::LiveCardSetP2Turn => {
                     // Both done, advance to FirstAttackerPerformance
+                    game_state.recalculate_constant_blade_modifiers();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::FirstAttackerPerformance;
                     let first_attacker_id = if game_state.player1.is_first_attacker {
@@ -97,8 +102,9 @@ impl TurnEngine {
                             game_state.player2.id.clone()
                         };
                         let card_db = game_state.card_database.clone();
+                        let bm = game_state.blade_modifiers.clone();
                         let player = game_state.first_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm)
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
                     game_state.current_phase = Phase::SecondAttackerPerformance;
@@ -114,8 +120,9 @@ impl TurnEngine {
                             game_state.player1.id.clone()
                         };
                         let card_db = game_state.card_database.clone();
+                        let bm = game_state.blade_modifiers.clone();
                         let player = game_state.second_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm)
                     };
                     game_state.player2_cheer_blade_heart_count = blade_heart_count;
                     game_state.current_phase = Phase::LiveVictoryDetermination;
@@ -265,6 +272,9 @@ impl TurnEngine {
     }
 
     fn handle_set_live_card(game_state: &mut GameState, card_id: Option<i16>) -> Result<(), String> {
+        if game_state.is_action_prohibited("cannot_live") {
+            return Err("Setting live cards is prohibited by a restriction effect".to_string());
+        }
         // Rule 8.2: Live Card Set Phase - Place individual card face-down, max MAX_LIVE_CARDS cards
         let card_idx = if let Some(cid) = card_id {
             let active_player = game_state.active_player();
@@ -313,6 +323,11 @@ impl TurnEngine {
 
     
     fn handle_play_member_to_stage(game_state: &mut GameState, card_id: Option<i16>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
+        let use_baton_touch = use_baton_touch.unwrap_or(false);
+        if use_baton_touch && game_state.is_action_prohibited("cannot_baton_touch") {
+            return Err("Baton touch is prohibited by a restriction effect".to_string());
+        }
+
         let card_db = game_state.card_database.clone();
         let player = game_state.active_player_mut();
 
@@ -345,7 +360,6 @@ impl TurnEngine {
         let card_id = player.hand.cards[idx];
         let card_no = card_db.get_card(card_id).map(|c| c.card_no.clone()).unwrap_or_default();
         let player_id = player.id.clone();
-        let use_baton_touch = use_baton_touch.unwrap_or(false);
 
         let (cost_paid, baton_touch_used, replaced_member_cost) = player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
 
@@ -355,6 +369,9 @@ impl TurnEngine {
 
         Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid, baton_touch_used);
         game_state.process_pending_auto_abilities(&player_id);
+
+        // Recalculate 常時 (constant) ability effects (blade bonuses, etc.)
+        game_state.recalculate_constant_blade_modifiers();
 
         if baton_touch_used {
             game_state.record_baton_touch();
@@ -451,9 +468,7 @@ impl TurnEngine {
         }
 
         if let Some(c) = new_choice {
-            if let Ok(json) = serde_json::to_value(&c) {
-                game_state.pending_choice = Some(json);
-            }
+            game_state.pending_choice = c.to_frontend_json();
             game_state.ability_queue.pause_for_choice(c);
         } else {
             game_state.ability_queue.complete_current();
@@ -591,25 +606,37 @@ impl TurnEngine {
 
     fn handle_use_ability(game_state: &mut GameState, card_id: Option<i16>) -> Result<(), String> {
         let card_id = card_id.ok_or("No card specified for ability activation")?;
+
+        if game_state.is_action_prohibited("cannot_activate") || game_state.is_action_prohibited("cannot_activate_by_effect") {
+            return Err("Ability activation is prohibited by a restriction effect".to_string());
+        }
+
         let card_db = game_state.card_database.clone();
         let player = game_state.active_player_mut();
 
         let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-        let stage_card_id = areas.iter().find_map(|a| player.stage.get_area(*a).filter(|&id| id == card_id))
+        let card_position = areas.iter().find(|a| player.stage.get_area(**a).filter(|&id| id == card_id).is_some())
+            .copied()
             .ok_or("Card not found on stage")?;
+        let stage_card_id = player.stage.get_area(card_position).unwrap();
 
         let card = card_db.get_card(stage_card_id).ok_or("Card not in database")?;
         let player_id = player.id.clone();
 
         for (_ability_index, ability) in card.abilities.iter().enumerate() {
+            // 常時 (constant) is passive — not player-activatable
             let is_activatable = ability.triggers.as_ref().map_or(false, |t| {
                 t.contains(crate::triggers::ACTIVATION) ||
-                t.contains(crate::triggers::CONSTANT) ||
                 (t.contains(crate::triggers::AUTO) && ability.cost.is_some()) ||
                 t.contains("main") || t.contains(crate::triggers::MAIN) ||
                 t.contains(crate::triggers::BATON_TOUCH)
             });
             if !is_activatable { continue; }
+
+            // Check position requirement (左サイド/右サイド/センター in trigger string)
+            if !crate::zones::check_trigger_position(ability.triggers.as_deref(), card_position) {
+                continue;
+            }
 
             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
             game_state.trigger_auto_ability(
@@ -721,6 +748,11 @@ impl TurnEngine {
             }
         }
         
+        // Rule 8.4.24: Track opponent live success for condition checks
+        if player2_won {
+            game_state.set_opponent_live_success(true);
+        }
+
         // Rule 8.4.24: Players with live cards have "live succeeded" event - trigger live success abilities
         
         // Collect player IDs first to avoid borrow checker issues
@@ -1052,8 +1084,7 @@ impl TurnEngine {
         }
     }
 
-    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone, _player_id: &str, card_database: &crate::card::CardDatabase) -> u32 {
-        // Rule 8.3: Player performs live - check heart requirements
+    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone, _player_id: &str, card_database: &crate::card::CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> u32 {
         // Note: This function no longer takes game_state to avoid borrow conflicts
         // Ability triggering should be handled by the caller
 
@@ -1078,7 +1109,7 @@ impl TurnEngine {
         // Rule 8.3.7: Live cards exist, perform live
         
         // Rule 8.3.10: Calculate total blades from active members
-        let total_blades = player.stage.total_blades(card_database);
+        let total_blades = player.stage.total_blades(card_database, blade_modifiers);
         
         // Rule 8.3.11: Cheer - move cards from main deck to resolution zone
         for _ in 0..total_blades {

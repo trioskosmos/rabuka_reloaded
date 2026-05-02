@@ -1,39 +1,11 @@
 use crate::card::AbilityEffect;
-use crate::card::CardDatabase;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::resolver::AbilityResolver;
+use super::util;
 use crate::zones::MemberArea;
 
 fn pos_to_area(pos: usize) -> MemberArea {
     match pos { 0 => MemberArea::LeftSide, 1 => MemberArea::Center, _ => MemberArea::RightSide }
-}
-
-fn matching_indices(
-    cards: &[i16], count: usize,
-    card_db: &CardDatabase,
-    card_type_filter: Option<&str>,
-    group_name: Option<&str>,
-    cost_limit: Option<u32>,
-) -> Vec<usize> {
-    let mut matches = Vec::new();
-    for (i, &card_id) in cards.iter().enumerate() {
-        if matches.len() >= count { break; }
-        let type_ok = match card_type_filter {
-            Some("live_card") => card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false),
-            Some("member_card") => card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false),
-            Some("energy_card") => card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false),
-            None => true, _ => true,
-        };
-        if !type_ok { continue; }
-        if let Some(grp) = group_name {
-            if !card_db.get_card(card_id).map(|c| c.group.as_str() == grp).unwrap_or(false) { continue; }
-        }
-        if let Some(limit) = cost_limit {
-            if !card_db.get_card(card_id).and_then(|c| c.cost).map(|c| c <= limit).unwrap_or(false) { continue; }
-        }
-        matches.push(i);
-    }
-    matches
 }
 
 fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
@@ -71,11 +43,7 @@ impl<'a> AbilityResolver<'a> {
         let mut moved_cards: Vec<i16> = Vec::new();
 
         {
-            let player = match target {
-                "self" => &mut self.game_state.player1,
-                "opponent" => &mut self.game_state.player2,
-                _ => &mut self.game_state.player1,
-            };
+            let player = self.game_state.resolve_target_player_mut(target);
 
             match (source.as_str(), destination.as_str()) {
                 // --- DECK → anything ---
@@ -86,17 +54,11 @@ impl<'a> AbilityResolver<'a> {
                     while moved < count as u32 && drawn < max_draws as u32 {
                         if let Some(card) = player.main_deck.draw() {
                             drawn += 1;
-                            let type_ok = match card_type_filter {
-                                Some("live_card") => card_db.get_card(card).map(|c| c.is_live()).unwrap_or(false),
-                                Some("member_card") => card_db.get_card(card).map(|c| c.is_member()).unwrap_or(false),
-                                Some("energy_card") => card_db.get_card(card).map(|c| c.is_energy()).unwrap_or(false),
-                                None => true, _ => true,
-                            };
-                            if !type_ok { player.main_deck.cards.push(card); continue; }
-                            if let Some(grp) = group_name {
-                                if !card_db.get_card(card).map(|c| c.group.as_str() == grp).unwrap_or(false) {
-                                    player.main_deck.cards.push(card); continue;
-                                }
+                            if !util::card_matches_type(&card_db, card, card_type_filter) {
+                                player.main_deck.cards.push(card); continue;
+                            }
+                            if !util::card_matches_group_str(&card_db, card, group_name) {
+                                player.main_deck.cards.push(card); continue;
                             }
                             match dest {
                                 "hand" => player.hand.add_card(card),
@@ -107,7 +69,10 @@ impl<'a> AbilityResolver<'a> {
                                 },
                                 "live_card_zone" => { player.live_card_zone.cards.push(card); }
                                 "success_live_zone" => { player.success_live_card_zone.cards.push(card); }
+                                "energy_zone" => { player.energy_zone.cards.push(card); }
+                                "energy_deck" => { player.energy_deck.cards.push(card); }
                                 "deck_top" => { player.main_deck.cards.insert(0, card); }
+                                "deck_bottom" => { player.main_deck.cards.push(card); }
                                 _ => {}
                             }
                             moved += 1;
@@ -176,16 +141,19 @@ impl<'a> AbilityResolver<'a> {
 
                 // --- HAND → discard/deck/stage/live ---
                 ("hand", "discard") => {
-                    return self.prompt_card_choice("hand", count, &format!("Select {} card(s) from hand to discard", count), card_type_filter);
+                    let idxs = util::matching_indices(&player.hand.cards, &card_db, card_type_filter, group_name, cost_limit);
+                    if idxs.len() < count { return Ok(()); }
+                    if idxs.len() > count { return self.prompt_card_choice("hand", count, &format!("Select {} card(s) from hand to discard", count), card_type_filter); }
+                    for &i in idxs.iter().rev().take(count) { let card = player.hand.cards.remove(i); player.waitroom.add_card(card); moved_cards.push(card); }
                 }
                 ("hand", "deck_bottom") | ("hand", "deck_top") => {
-                    let idxs = matching_indices(&player.hand.cards, player.hand.cards.len(), &card_db, card_type_filter, group_name, cost_limit);
+                    let idxs = util::matching_indices(&player.hand.cards, &card_db, card_type_filter, group_name, cost_limit);
                     if idxs.len() < count { return Err("Not enough cards in hand".into()); }
                     if idxs.len() > count { return self.prompt_card_choice("hand", count, &format!("Select {} cards to move to {}", count, destination), card_type_filter); }
                     for &i in idxs.iter().rev().take(count) { let card = player.hand.cards.remove(i); player.main_deck.cards.push(card); moved_cards.push(card); }
                 }
                 ("hand", "stage") => {
-                    let idxs = matching_indices(&player.hand.cards, player.hand.cards.len(), &card_db, card_type_filter, group_name, cost_limit);
+                    let idxs = util::matching_indices(&player.hand.cards, &card_db, card_type_filter, group_name, cost_limit);
                     if idxs.len() < count { return Err("Not enough cards in hand".into()); }
                     if idxs.len() > count { return self.prompt_card_choice("hand", count, &format!("Select {} cards from hand to stage", count), card_type_filter); }
                     for &i in idxs.iter().rev().take(count) {
@@ -198,27 +166,27 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 ("hand", "live_card_zone") => {
-                    let idxs = matching_indices(&player.hand.cards, count, &card_db, Some("live_card"), group_name, cost_limit);
+                    let idxs = util::matching_indices(&player.hand.cards, &card_db, Some("live_card"), group_name, cost_limit);
                     if idxs.len() < count { return Err("Not enough live cards in hand".into()); }
                     for &i in idxs.iter().rev() { let card = player.hand.cards.remove(i); player.live_card_zone.cards.push(card); moved_cards.push(card); }
                 }
 
                 // --- DISCARD → hand/deck/stage ---
                 ("discard", "hand") => {
-                    let idxs = matching_indices(&player.waitroom.cards, player.waitroom.cards.len(), &card_db, card_type_filter, group_name, cost_limit);
+                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit);
                     if idxs.len() < count { return Err(format!("Not enough cards in discard: need {}, have {}", count, idxs.len())); }
                     if idxs.len() > count { return self.prompt_card_choice("discard", count, &format!("Select {} cards from discard to hand", count), card_type_filter); }
                     for &i in idxs.iter().rev().take(count) { let card = player.waitroom.cards.remove(i); player.hand.add_card(card); moved_cards.push(card); }
                 }
                 ("discard", "deck_bottom") | ("discard", "deck_top") => {
-                    let idxs = matching_indices(&player.waitroom.cards, player.waitroom.cards.len(), &card_db, card_type_filter, group_name, cost_limit);
+                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit);
                     if idxs.len() < count { return Err("Not enough cards in discard".into()); }
                     if idxs.len() > count { return self.prompt_card_choice("discard", count, &format!("Select {} cards from discard to {}", count, destination), card_type_filter); }
                     for &i in idxs.iter().rev().take(count) { let card = player.waitroom.cards.remove(i); player.main_deck.cards.push(card); moved_cards.push(card); }
                 }
                 ("discard", "deck") => {
                     if effect.placement_order.as_deref() == Some("any_order") && count > 1 {
-                        let idxs = matching_indices(&player.waitroom.cards, count, &card_db, card_type_filter, group_name, cost_limit);
+                        let idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit);
                         let cards: Vec<i16> = idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect();
                         for &c in &cards { moved_cards.push(c); }
                         self.looked_at_cards = cards;
@@ -228,7 +196,7 @@ impl<'a> AbilityResolver<'a> {
                         self.execution_context = ExecutionContext::LookAndSelect { step: LookAndSelectStep::Finalize { destination: "deck".to_string() } };
                         return Ok(());
                     }
-                    let idxs = matching_indices(&player.waitroom.cards, count, &card_db, card_type_filter, group_name, cost_limit);
+                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit);
                     let pos = effect.position.as_ref().and_then(|p| p.get_position()).and_then(|s| s.parse::<usize>().ok());
                     for &i in idxs.iter().rev() {
                         let card = player.waitroom.cards.remove(i);
@@ -241,20 +209,7 @@ impl<'a> AbilityResolver<'a> {
                     let _total_cost_limit = effect.total_cost_limit;
                     let is_max = effect.max.unwrap_or(false);
 
-                    let candidate_indices: Vec<usize> = player.waitroom.cards.iter().enumerate()
-                        .filter(|(_, &card_id)| {
-                            let type_ok = card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false);
-                            if !type_ok { return false; }
-                            if let Some(grp) = group_name {
-                                if !card_db.get_card(card_id).map(|c| c.group.as_str() == grp).unwrap_or(false) { return false; }
-                            }
-                            if let Some(limit) = cost_limit {
-                                if !card_db.get_card(card_id).and_then(|c| c.cost).map(|c| c <= limit).unwrap_or(false) { return false; }
-                            }
-                            true
-                        })
-                        .map(|(i, _)| i)
-                        .collect();
+                    let candidate_indices = util::matching_indices(&player.waitroom.cards, &card_db, Some("member_card"), group_name, cost_limit);
 
                     let available_count = candidate_indices.len();
                     let empty_stage_slots = player.stage.stage.iter().filter(|&&s| s == -1).count();
@@ -295,7 +250,7 @@ impl<'a> AbilityResolver<'a> {
 
                 // --- ENERGY_ZONE → hand/discard ---
                 ("energy_zone", "hand") | ("energy_zone", "discard") => {
-                    let idxs = matching_indices(&player.energy_zone.cards, player.energy_zone.cards.len(), &card_db, card_type_filter, None, None);
+                    let idxs = util::matching_indices(&player.energy_zone.cards, &card_db, card_type_filter, None, None);
                     if idxs.len() < count { return Err("Not enough cards in energy zone".into()); }
                     if idxs.len() > count { return self.prompt_card_choice("energy_zone", count, &format!("Select {} cards from energy", count), card_type_filter); }
                     for &i in idxs.iter().rev().take(count) {
@@ -306,7 +261,7 @@ impl<'a> AbilityResolver<'a> {
 
                 // --- LIVE/Success zone → hand/deck ---
                 ("live_card_zone", "hand") | ("live_card_zone", "success_live_zone") | ("live_card_zone", "discard") => {
-                    let idxs = matching_indices(&player.live_card_zone.cards, player.live_card_zone.cards.len(), &card_db, None, None, None);
+                    let idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, None, None, None);
                     if idxs.len() < count { return Err("Not enough cards in live zone".into()); }
                     if idxs.len() > count { return self.prompt_card_choice("live_card_zone", count, &format!("Select {} cards", count), None); }
                     for &i in idxs.iter().rev().take(count) {
@@ -315,7 +270,7 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 ("success_live_zone", "hand") | ("success_live_zone", "deck_top") | ("success_live_zone", "deck_bottom") => {
-                    let idxs = matching_indices(&player.success_live_card_zone.cards, player.success_live_card_zone.cards.len(), &card_db, None, None, None);
+                    let idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, None, None, None);
                     if idxs.len() < count { return Err("Not enough cards in success zone".into()); }
                     if idxs.len() > count { return self.prompt_card_choice("success_live_zone", count, &format!("Select {} cards", count), None); }
                     for &i in idxs.iter().rev().take(count) {

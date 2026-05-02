@@ -544,11 +544,16 @@ def split_cost_effect(text: str) -> Tuple[str, str]:
         return '', text
 
 def split_condition_action(text: str) -> Tuple[str, str]:
-    """Split text into condition and action parts."""
-    for marker in CONDITION_MARKERS:
-        if marker in text:
-            parts = text.split(marker, 1)
-            return parts[0].strip(), parts[1].strip()
+    """Split text into condition and action parts.
+    The condition keyword (場合/とき/なら) is kept with the condition text."""
+    for keyword in ['場合', 'とき', 'なら']:
+        pattern = keyword + '、'
+        if pattern in text:
+            keyword_idx = text.find(keyword)
+            comma_idx = keyword_idx + len(keyword)
+            condition = text[:comma_idx].strip()
+            action = text[comma_idx + 1:].strip()
+            return condition, action
     return '', text
 
 def parse_complex_condition(text: str) -> Dict[str, Any]:
@@ -1209,6 +1214,24 @@ def parse_condition(text: str) -> Dict[str, Any]:
         condition['type'] = 'card_count_condition'
     elif location and condition.get('target'):
         condition['type'] = 'location_condition'
+    elif location and operator:
+        # Location-based check without explicit target — default to self
+        condition.setdefault('target', 'self')
+        condition['type'] = 'location_condition'
+    elif condition.get('card_type') and count:
+        condition['type'] = 'card_count_condition'
+    elif condition.get('card_type'):
+        # Card type check without count — defaults to "at least 1"
+        condition.setdefault('count', 1)
+        condition.setdefault('operator', '>=')
+        condition['type'] = 'card_count_condition'
+    elif text.strip() and any(k in condition for k in ('operator', 'count', 'location', 'card_type', 'target', 'comparison_type', 'group', 'group_names')):
+        # Has meaningful fields but none of the above patterns matched;
+        # try comparison_condition as a fallback with count defaulting to 1
+        condition.setdefault('count', 1)
+        condition.setdefault('operator', '>=')
+        condition.setdefault('target', 'self')
+        condition['type'] = 'comparison_condition'
     elif text.strip():  # Only set custom type if text is not empty
         condition['type'] = 'custom'
     else:
@@ -1693,7 +1716,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: '{{icon_blade.png|ブレード}}' in t and '得る' in t, 'gain_resource',
       lambda t, a: a.update({'resource': 'blade', 'count': t.count('{{icon_blade.png|ブレード}}') or None}))
     R(lambda t: ('{{heart' in t and '得る' in t) or 'ハートを得る' in t or '選んだハート' in t, 'gain_resource',
-      lambda t, a: a.update({'resource': 'heart', 'count': len(__import__('re').findall(r'{{heart_\d+\.png|heart\d+}}', t)) or None}))
+      lambda t, a: a.update({'resource': 'heart', 'count': len(__import__('re').findall(r'{{heart_\d+\.png\|heart\d+}}', t)) or None}))
     R(lambda t: 'もう1度ヤル' in t or 'レヤル' in t, 're_yell',
       lambda t, a: a.update({'lose_blade_hearts': True}) if 'できない' not in t else None)
     R(lambda t: ('見る' in t or '見て' in t), 'look_at', 
@@ -1917,6 +1940,25 @@ def parse_cost(text: str) -> Dict[str, Any]:
         'text': text,
     }
     
+    # Combined cost: energy icons at the start followed by another distinct action
+    # e.g. "{{icon_energy.png|E}}{{icon_energy.png|E}}手札を1枚控え室に置く"
+    # Must be checked FIRST to split before any early return below
+    if '{{icon_energy.png|E}}' in text and text.strip().startswith('{{icon_energy.png|E}}'):
+        energy_end = text.find('}}', text.rfind('{{icon_energy.png|E}}')) + 2
+        energy_text = text[:energy_end].strip()
+        other_text = text[energy_end:].strip()
+        if energy_text and other_text:
+            other_cost = parse_cost(other_text)
+            # Only split if the other part is a genuine cost action
+            # (not just a payment modifier like "支払ってもよい" which is custom)
+            if other_cost.get('type') not in (None, 'custom'):
+                energy_cost = parse_cost(energy_text)
+                return {
+                    'text': text,
+                    'type': 'sequential_cost',
+                    'costs': [energy_cost, other_cost]
+                }
+    
     # Check for sequential cost (～し、～ or ～し、～置いてもよい)
     if '、' in text:
         parts = text.split('、')
@@ -1952,6 +1994,10 @@ def parse_cost(text: str) -> Dict[str, Any]:
         card_type = extract_card_type(text)
         if card_type:
             cost['card_type'] = card_type
+        # Extract group names from 『』 brackets
+        group_names = extract_group_names(text)
+        if group_names:
+            cost['group_names'] = group_names
         return cost
     
     # Check for choice cost (～か、～)
@@ -2009,6 +2055,9 @@ def parse_cost(text: str) -> Dict[str, Any]:
         cost['action'] = 'move_cards'
         if 'もよい' in text or 'てもよい' in text:
             cost['optional'] = True
+        group_names = extract_group_names(text)
+        if group_names:
+            cost['group_names'] = group_names
         return cost
     
     # Extract destination
@@ -2053,6 +2102,11 @@ def parse_cost(text: str) -> Dict[str, Any]:
     target = extract_target(text)
     if target:
         cost['target'] = target
+    
+    # Extract group names from 『』 brackets
+    group_names = extract_group_names(text)
+    if group_names:
+        cost['group_names'] = group_names
     
     # Extract exclude_self for costs (e.g., "このメンバー以外の" or "「character name」以外")
     if 'このメンバー以外' in text or 'ほかのメンバー' in text:
@@ -2776,14 +2830,46 @@ def parse_effect(text: str) -> Dict[str, Any]:
                             if add_action.get('action') == 'move_cards':
                                 add_action['destination'] = 'hand'
                             
+                            # Fix sources: cards come from looked_at, not hand
+                            reveal_action['source'] = 'looked_at'
+                            add_action['source'] = 'looked_at'
+                            
                             # Second action: discard rest
                             second_action = parse_action(parts[1].strip())
+                            if second_action.get('action') == 'move_cards':
+                                second_action['source'] = 'looked_at_remaining'
+                                second_action['destination'] = 'discard'
+                                second_action['dynamic_count'] = {
+                                    'type': 'remaining_looked_at',
+                                    'reference': 'previous_look'
+                                }
                             
-                            effect['select_action'] = {
+                            # Extract count/max/card_type from select_text for select_action
+                            sel_count = extract_count(select_text)
+                            is_max = extract_max(select_text)
+                            sel_card_type = extract_card_type(select_text)
+                            sel_heart_colors = list(dict.fromkeys(
+                                f'heart{m.zfill(2)}' for m in re.findall(r'heart_(\d+)', select_text)
+                            ))
+                            sel_optional = extract_optional(select_text)
+                            
+                            select_action = {
                                 'action': 'sequential',
                                 'actions': [reveal_action, add_action, second_action],
                                 'text': select_text
                             }
+                            if sel_count:
+                                select_action['count'] = sel_count
+                            if is_max:
+                                select_action['max'] = True
+                            if sel_card_type:
+                                select_action['card_type'] = sel_card_type
+                            if sel_heart_colors:
+                                select_action['heart_colors'] = sel_heart_colors
+                            if sel_optional:
+                                select_action['optional'] = True
+                            
+                            effect['select_action'] = select_action
                             post_process_action_comprehensive(effect)
                             return effect
                     else:
@@ -2804,11 +2890,33 @@ def parse_effect(text: str) -> Dict[str, Any]:
                         # Post-process both actions
                         post_process_action_comprehensive(first_action)
                         post_process_action_comprehensive(second_action)
-                        effect['select_action'] = {
+                        
+                        # Extract count/max/card_type from select_text for select_action
+                        sel_count = extract_count(select_text)
+                        is_max = extract_max(select_text)
+                        sel_card_type = extract_card_type(select_text)
+                        sel_heart_colors = list(dict.fromkeys(
+                            f'heart{m.zfill(2)}' for m in re.findall(r'heart_(\d+)', select_text)
+                        ))
+                        sel_optional = extract_optional(select_text)
+                        
+                        select_action = {
                             'action': 'sequential',
                             'actions': [first_action, second_action],
                             'text': select_text
                         }
+                        if sel_count:
+                            select_action['count'] = sel_count
+                        if is_max:
+                            select_action['max'] = True
+                        if sel_card_type:
+                            select_action['card_type'] = sel_card_type
+                        if sel_heart_colors:
+                            select_action['heart_colors'] = sel_heart_colors
+                        if sel_optional:
+                            select_action['optional'] = True
+                        
+                        effect['select_action'] = select_action
                         post_process_action_comprehensive(effect)
                         return effect
 
@@ -2988,8 +3096,10 @@ def parse_effect(text: str) -> Dict[str, Any]:
                             elif 'resource' not in action:
                                 action['resource'] = 'generic'
                     
-                    # Post-processing for missing card_type field in move_cards actions
+                    # Post-processing for state_change inference
                     if action.get('action') == 'move_cards':
+                        action_text = action.get('text', '')
+                        if 'state_change' not in action and 'ウェイト状態' in action_text:
                             action['state_change'] = 'wait'
                     # Post-processing for missing destinations and sources
                     if action.get('action') == 'move_cards':
@@ -3353,6 +3463,42 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 return effect
             # If no valid options, fall through to continue parsing
         # If no valid parts, fall through to continue parsing
+    
+    # Check for これにより (as a result) cascading patterns BEFORE general condition split
+    # Pattern: [actions]。[actions]。これにより[condition]場合、[result]
+    # This should be parsed as sequential actions with a conditional follow-up,
+    # not as a complex condition where the preceding actions are a "cause".
+    kore_niyori_match = re.search(r'^(.*?)。これにより(.+?)場合、(.+)$', text, re.DOTALL)
+    if kore_niyori_match:
+        actions_text = kore_niyori_match.group(1).strip()
+        cond_text = kore_niyori_match.group(2).strip()
+        result_text = kore_niyori_match.group(3).strip()
+        
+        # Parse preceding actions as sequential (split by 。)
+        action_parts = [p.strip() for p in actions_text.split('。') if p.strip()]
+        actions = []
+        for part in action_parts:
+            parsed = parse_action(part)
+            if parsed.get('action') != 'custom':
+                actions.append(parsed)
+            else:
+                actions.append({'action': 'custom', 'text': part})
+        
+        if actions:
+            # Parse the conditional follow-up
+            cond_parsed = parse_condition(cond_text + '場合')
+            result_parsed = parse_effect(result_text)
+            
+            # Build the sequential structure with conditional tail
+            follow_up = {'condition': cond_parsed}
+            follow_up.update(result_parsed)
+            actions.append(follow_up)
+            
+            effect['action'] = 'sequential'
+            effect['actions'] = actions
+            effect['text'] = text
+            post_process_action_comprehensive(effect)
+            return effect
     
     # Check for conditional effects
     condition_text, action_text = split_condition_action(text)
@@ -3806,7 +3952,7 @@ def parse_effect(text: str) -> Dict[str, Any]:
             else:
                 # Try to extract from icon counts
                 blade_count = text.count('{{icon_blade.png|ブレード}}')
-                heart_count = len(re.findall(r'{{heart_\d+\.png|heart\d+}}', text))
+                heart_count = len(re.findall(r'{{heart_\d+\.png\|heart\d+}}', text))
                 if blade_count > 0:
                     effect['count'] = blade_count
                 elif heart_count > 0:

@@ -180,17 +180,57 @@ fn what_ability_does() {
 }
 ```
 
-## Tested Abilities (602 unique texts, work in progress)
+## How to Write a Test
 
-| # | Pattern | JP text summary | Card | Status |
-|---|---------|----------------|------|--------|
-| 1 | 起動 + move_cards (self stage→discard, search discard→hand live) | 起動：このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。 | 黒澤ルビィ PL!S-bp2-009-R | ✅ |
-| 2 | 起動 + move_cards (self stage→discard, search discard→hand member) | 起動：このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。 | 園田海未 PL!-sd1-002-SD | ✅ |
-| 3 | 登場 + look_and_select (optional hand→discard, peek top 3, choose 1) | 登場：手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。 | 園田海未 PL!-sd1-011-SD | ✅ |
-| 4 | 登場 + sequential (draw 1, discard 1) | 登場：カードを1枚引き、手札を1枚控え室に置く。 | TBD | ⬜ |
-| 5 | ライブ開始時 + pay_energy + gain_resource | ライブ開始時[E]支払ってもよい：ライブ終了まで、[B][B]を得る。 | TBD | ⬜ |
-| 6 | 登場 + look_and_select (peek top 3, reorder on deck) | 登場：自分のデッキの上からカードを3枚見る。その中から好きな数を好きな順番でデッキの上に置き、残りを控え室に置く。 | TBD | ⬜ |
-| ... | Continue down the list of 602 unique texts | | | ⬜ |
+1. Find the ability pattern in the table below (sorted by card count, most common first)
+2. Check what the Japanese text says the ability should do
+3. Pick a real card from the `cards` array in `abilities.json`
+4. Check the card's cost in `cards.json`
+5. Call `game.give_energy(cost + 1)` (1 extra for safety)
+6. Set up filler cards in relevant zones (discard, deck, stage)
+7. Play the card, trigger the ability, make choices, assert state
+8. If you hit an engine bug, fix it, then continue
+
+**Rules for writing tests:**
+- Use `game.id("card_no")` — never use raw i16 IDs
+- Always put extra filler cards in zones (avoids edge cases)
+- `give_energy(N)` works for any N — high-cost cards just need more
+- For opponent's board: `game.state.player2.stage.set_area(area, id)`
+- For choices with multiple triggers: handle them in order (cost first, then effect)
+- If `has_pending_choice()` is false after activating, either:
+  - The effect auto-resolved (exactly 1 valid target) — this is correct behavior
+  - Or there was an error (check stderr for "Failed to execute" messages)
+
+## Test Plan (most common unique ability texts)
+
+| # | JP text summary | Card | Cost | Energy needed | Key engine features tested |
+|---|----------------|------|------|---------------|---------------------------|
+| 1 | 起動：このメンバーをステージ→控え室：控え室→ライブ1→手札 | 黒澤ルビィ PL!S-bp2-009-R | 2 | 3 | self_cost stage→discard, discard→hand with card_type filter ✅ |
+| 2 | 起動：このメンバーをステージ→控え室：控え室→メンバー1→手札 | 園田海未 PL!-sd1-002-SD | 2 | 3 | Same as #1 but member_card filter ✅ |
+| 3 | 登場：手札→控え室(opt)：デッキ上3見る→1手札→残り控え室 | 園田海未 PL!-sd1-011-SD | 4 | 5 | optional cost, look_and_select, looked_at_cards persistence ✅ |
+| 4 | 登場：1引き、1控え室 | 中須かすみ PL!N-bp1-019-PR | 4 | 5 | sequential (draw→discard) ✅ |
+| 5-9 | *(being worked on by other dev)* | | | | |
+| 10 | 登場/ライブ開始時：自身ウェイト(opt)：相手のコスト4以下→ウェイト | 星空凛 PL!-PR-007-PR | 4 | 5 | change_state for members, optional change_state cost, opponent targeting ✅ |
+| 11 | 登場：手札→控え室(opt)：エネルギー置場→エネルギー1→ウェイト | 唐可可 PL!SP-PR-004-PR | 4 | 5 | energy deck→zone, wait state ✅ |
+| 12 | 登場：手札→控え室(opt)：控え室→虹ヶ咲ライブ1→手札 | 上原歩夢 PL!N-bp1-003-R＋ | 10 | 11 | group-filtered search ✅ |
+| 13 | 登場：2引き、1控え室 | 夕霧綴理 PL!HS-bp1-006-R＋ | 11 | 12 | sequential (draw 2→discard 1) ✅ |
+| 14 | ライブ開始時：ハート色選択→付与 | *(deferred)* | - | - | ⏳ |
+| 15 | 登場：2引き、2控え室 | 上原歩夢 PL!N-PR-005-PR | 13 | 14 | sequential (draw 2→discard 2) ✅ |
+| 16 | 起動：EE支払う：控え室→ライブ1→手札 | *(TBD)* | ? | ? | pay_energy cost (non-optional) + move_cards |
+| 17 | ライブ成功時：2引き、1控え室 | *(TBD)* | - | - | LiveSuccess trigger + sequential |
+| 18 | 登場：手札→控え室(opt)：コスト4以下のメンバー2→ウェイト | *(TBD)* | ? | ? | change_state with cost_limit and count=2 |
+| 19 | 起動：EE支払う：控え室→メンバー1→手札 | *(TBD)* | ? | ? | pay_energy + move_cards member search |
+| 20 | ライブ開始時：E支払う(opt)：ハート色指定→付与 | *(TBD)* | - | - | specify_heart_color + gain_resource |
+| 21 | 起動：手札→控え室：2エネルギーアクティブ化 | *(TBD)* | ? | ? | move_cards cost, activate energy |
+| 22 | 常時：条件→全体強化 | *(TBD)* | - | - | constant (always-on) modifier |
+| 23 | 登場：EE支払う(opt)：左サイドなら2引く | *(TBD)* | ? | ? | conditional effect (position check) |
+| 24 | 起動：メンバー公開→コスト合計でスコア変動 | *(TBD)* | ? | ? | reveal + modify_score |
+| 25 | 登場：エネルギー11+なら控え室→ライブ1→手札 | *(TBD)* | ? | ? | conditional effect (energy count check) |
+| 26 | 登場：2エネルギーアクティブ化 | *(TBD)* | ? | ? | change_state (activate energy) |
+| 27 | 常時：全員異名+異グループ→スコア+1 | *(TBD)* | - | - | complex constant modifier |
+| 28 | 起動：E支払う：控え室→コスト4以下メンバー1→手札 | *(TBD)* | ? | ? | pay_energy + cost_limit filter |
+| 29 | 起動：EEE支払う：控え室→蓮ノ空ライブ1→手札 | *(TBD)* | ? | ? | pay_energy + group filter |
+| 30 | ライブ開始時：E支払う(opt)：ライブカード毎に[B] | *(TBD)* | - | - | per_unit gain_resource |
 
 ## Bugs Found & Fixed During Tests
 

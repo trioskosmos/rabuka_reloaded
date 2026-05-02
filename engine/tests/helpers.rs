@@ -156,4 +156,50 @@ impl TestGame {
         )
         .expect("pass failed");
     }
+
+    // ---- Debugging ----
+
+    /// Resolve a card ID to its name from the database.
+    pub fn name(&self, id: i16) -> String {
+        self.db.get_card(id).map(|c| format!("{} ({})", c.name, c.card_no)).unwrap_or_else(|| format!("#{}", id))
+    }
+
+    /// Print card IDs in player1's hand.
+    pub fn dbg_hand(&self) {
+        let cards: Vec<String> = self.state.player1.hand.cards.iter().map(|&id| self.name(id)).collect();
+        eprintln!("[HAND] {:?}", cards);
+    }
+
+    /// Print card IDs in player1's waitroom.
+    pub fn dbg_discard(&self) {
+        let cards: Vec<String> = self.state.player1.waitroom.cards.iter().map(|&id| self.name(id)).collect();
+        eprintln!("[DISCARD] {:?}", cards);
+    }
+
+    /// Print cards on player1's stage.
+    pub fn dbg_stage(&self) {
+        let cards: Vec<String> = self.state.player1.stage.stage.iter().map(|&id| {
+            if id == -1 { "empty".into() } else { self.name(id) }
+        }).collect();
+        eprintln!("[STAGE] {:?}", cards);
+    }
+
+    /// Print the current pending choice details.
+    pub fn dbg_choice(&self) {
+        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
+            eprintln!("[CHOICE] {:?}", choice);
+        } else if let Some(ref pc) = self.state.pending_choice {
+            eprintln!("[CHOICE] (json) {:?}", pc);
+        } else {
+            eprintln!("[CHOICE] none");
+        }
+    }
+
+    /// Print all zones and pending state at once.
+    pub fn dbg_all(&self) {
+        self.dbg_hand();
+        self.dbg_discard();
+        self.dbg_stage();
+        self.dbg_choice();
+    }
 }

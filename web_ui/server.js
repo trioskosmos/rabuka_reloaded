@@ -4,6 +4,8 @@ import cors from 'cors';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
+const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days for images
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -23,8 +25,11 @@ app.use('/assets', express.static(path.resolve(__dirname, 'dist', 'assets')));
 app.use('/cards', express.static(path.resolve(__dirname, '..', 'cards')));
 // Serve engine assets that the frontend may fetch directly
 app.use('/engine', express.static(path.resolve(__dirname, '..', 'engine')));
-// Serve img folder for card images and icons
-app.use('/img', express.static(path.resolve(__dirname, 'img')));
+// Serve img folder for card images and icons with caching
+app.use('/img', express.static(path.resolve(__dirname, 'img'), {
+    maxAge: CACHE_DURATION,
+    immutable: true
+}));
 
 // Proxy requests to Rust backend
 app.get('/api/game-state', async (req, res) => {

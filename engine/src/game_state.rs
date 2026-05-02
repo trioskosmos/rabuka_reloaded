@@ -1,8 +1,8 @@
-use crate::card::{BladeColor, CardDatabase};
+use crate::card::{BladeColor, CardDatabase, Ability};
 use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::player::Player;
 use crate::zones::ResolutionZone;
-use crate::ability_queue::AbilityQueue;
+use crate::ability_queue::{AbilityQueue, AbilityQueueEntry, AbilityId};
 use std::sync::Arc;
 use std::collections::HashMap;
 
@@ -67,18 +67,23 @@ pub struct GameState {
     pub heart_color_decision_phase: String,
     pub deck_refresh_pending: bool,
     pub position_change_occurred_this_turn: bool,
+    pub opponent_live_success_this_turn: bool,
+    pub opponent_live_no_excess_heart_this_turn: bool,
     pub formation_change_occurred_this_turn: bool,
     pub opponent_choice_declined: bool,
     pub live_being_performed: bool,
     pub game_ended: bool,
     pub draw_state: bool,
     pub gained_abilities: std::collections::HashMap<i16, Vec<String>>,
+    pub negated_abilities: std::collections::HashSet<i16>,
     pub replacement_effects: Vec<ReplacementEffect>,
     pub looked_at_cards: Vec<i16>,
     pub effect_creation_counter: u32,
     pub game_state_history: Vec<String>,
     pub max_state_history_size: usize,
     pub loop_detected: bool,
+    /// Blade bonuses from 常時 (constant) abilities, tracked so they can be recalculated
+    pub constant_blade_bonuses: HashMap<i16, i32>,
 }
 
 impl GameState {
@@ -156,15 +161,19 @@ impl GameState {
             game_ended: false,
             draw_state: false,
             gained_abilities: std::collections::HashMap::new(),
+            negated_abilities: std::collections::HashSet::new(),
             replacement_effects: Vec::new(),
             position_change_occurred_this_turn: false,
             formation_change_occurred_this_turn: false,
             opponent_choice_declined: false,
+            opponent_live_success_this_turn: false,
+            opponent_live_no_excess_heart_this_turn: false,
             looked_at_cards: Vec::new(),
             effect_creation_counter: 0,
             game_state_history: Vec::new(),
             max_state_history_size: DEFAULT_HISTORY_SIZE,
             loop_detected: false,
+            constant_blade_bonuses: HashMap::new(),
         };
         debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
         state
@@ -378,6 +387,104 @@ impl GameState {
 
     pub fn clear_blade_type_modifier(&mut self, card_id: i16) {
         self.blade_type_modifiers.remove(card_id);
+    }
+
+    /// Recalculate all 常時 (constant) ability blade bonuses.
+    /// Evaluates each constant ability's condition against the current game state
+    /// and applies/removes blade modifiers accordingly.
+    pub fn recalculate_constant_blade_modifiers(&mut self) {
+        let saved_queue = self.ability_queue.clone();
+        let saved_activating = self.activating_card;
+
+        let player1_id = self.player1.id.clone();
+        let player2_id = self.player2.id.clone();
+        let p1_cards: Vec<i16> = self.player1.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+        let p2_cards: Vec<i16> = self.player2.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+
+        // Pre-collect all constant abilities with their card IDs
+        let mut all_const_abilities: Vec<(i16, usize, crate::card::Ability)> = Vec::new();
+        for &cid in &p1_cards {
+            if let Some(card) = self.card_database.get_card(cid) {
+                for (idx, ability) in card.abilities.iter().enumerate() {
+                    if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
+                        all_const_abilities.push((cid, idx, ability.clone()));
+                    }
+                }
+            }
+        }
+        for &cid in &p2_cards {
+            if let Some(card) = self.card_database.get_card(cid) {
+                for (idx, ability) in card.abilities.iter().enumerate() {
+                    if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
+                        all_const_abilities.push((cid, idx, ability.clone()));
+                    }
+                }
+            }
+        }
+
+        let mut expected: HashMap<i16, i32> = HashMap::new();
+
+        // Process each player's cards with proper queue context
+        let players_info = [(player1_id.clone(), &p1_cards[..]), (player2_id.clone(), &p2_cards[..])];
+        for (player_id, stage_cards) in &players_info {
+            if stage_cards.is_empty() { continue; }
+
+            self.ability_queue = AbilityQueue::new();
+            self.ability_queue.enqueue(AbilityQueueEntry {
+                id: AbilityId::new("_const", 0, "Constant"),
+                card_no: String::new(),
+                player_id: player_id.clone(),
+                ability: Ability::default(),
+                ability_index: 0,
+                card_id: None,
+                trigger_type: AbilityTrigger::Constant,
+                completed: false,
+                pending_choice_result: None,
+                choice_card_no: None,
+                conditional_choice: None,
+            });
+            self.ability_queue.start_next();
+            self.activating_card = None;
+
+            let mut eval_state = self.clone();
+            let resolver = crate::ability::resolver::AbilityResolver::new(&mut eval_state);
+
+            for &cid in *stage_cards {
+                for ability in &all_const_abilities {
+                    if ability.0 != cid { continue; }
+                    if let Some(ref effect) = ability.2.effect {
+                        if effect.action == "gain_resource" {
+                            let is_blade = matches!(effect.resource.as_deref(), Some("blade") | Some("ブレード"));
+                            if is_blade {
+                                let cond_met = effect.condition.as_ref()
+                                    .map_or(true, |c| resolver.evaluate_condition(c));
+                                if cond_met {
+                                    let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1));
+                                    *expected.entry(cid).or_insert(0) += count as i32;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        self.ability_queue = saved_queue;
+        self.activating_card = saved_activating;
+
+        // Collect old keys before modifying
+        let old_keys: Vec<i16> = self.constant_blade_bonuses.keys().copied().collect();
+        for &cid in &old_keys {
+            if let Some(&old) = self.constant_blade_bonuses.get(&cid) {
+                self.remove_blade_modifier(cid, old);
+            }
+        }
+
+        for (&cid, &new_val) in &expected {
+            self.add_blade_modifier(cid, new_val);
+        }
+
+        self.constant_blade_bonuses = expected;
     }
 
     pub fn add_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
@@ -770,6 +877,22 @@ impl GameState {
                     }
                 }
             }
+
+            for live_card_id in &player.live_card_zone.cards {
+                if let Some(card) = self.card_database.get_card(*live_card_id) {
+                    if card.card_no == card_no {
+                        return (Some(card.clone()), Some(*live_card_id));
+                    }
+                }
+            }
+
+            for success_card_id in &player.success_live_card_zone.cards {
+                if let Some(card) = self.card_database.get_card(*success_card_id) {
+                    if card.card_no == card_no {
+                        return (Some(card.clone()), Some(*success_card_id));
+                    }
+                }
+            }
         }
 
         (None, None)
@@ -837,6 +960,34 @@ impl GameState {
 
     pub fn entry_conditional_choice(&self) -> Option<String> {
         self.ability_queue.current_entry().and_then(|e| e.conditional_choice.clone())
+    }
+
+    /// Resolve which player "self" refers to based on the ability master's player_id.
+    /// The ability queue entry stores which player activated this ability.
+    fn ability_master_id(&self) -> Option<String> {
+        self.ability_queue.current_entry().map(|e| e.player_id.clone())
+    }
+
+    pub fn resolve_target_player_mut(&mut self, target: &str) -> &mut Player {
+        let master = self.ability_master_id();
+        match (target, master.as_deref()) {
+            ("self", Some("player2")) => &mut self.player2,
+            ("self", _) => &mut self.player1,
+            ("opponent", Some("player2")) => &mut self.player1,
+            ("opponent", _) => &mut self.player2,
+            _ => &mut self.player1,
+        }
+    }
+
+    pub fn resolve_target_player(&self, target: &str) -> &Player {
+        let master = self.ability_master_id();
+        match (target, master.as_deref()) {
+            ("self", Some("player2")) => &self.player2,
+            ("self", _) => &self.player1,
+            ("opponent", Some("player2")) => &self.player1,
+            ("opponent", _) => &self.player2,
+            _ => &self.player1,
+        }
     }
 
     pub fn check_victory(&self) -> GameResult {
@@ -1177,6 +1328,11 @@ impl GameState {
         }
     }
 
+    pub fn set_opponent_live_success(&mut self, no_excess_heart: bool) {
+        self.opponent_live_success_this_turn = true;
+        self.opponent_live_no_excess_heart_this_turn = no_excess_heart;
+    }
+
     pub fn set_formation_change_occurred(&mut self) {
         self.formation_change_occurred_this_turn = true;
     }
@@ -1184,6 +1340,8 @@ impl GameState {
     pub fn reset_change_flags(&mut self) {
         self.position_change_occurred_this_turn = false;
         self.formation_change_occurred_this_turn = false;
+        self.opponent_live_success_this_turn = false;
+        self.opponent_live_no_excess_heart_this_turn = false;
     }
 
     pub fn check_permanent_loop(&mut self) -> bool {

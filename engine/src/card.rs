@@ -517,6 +517,7 @@ pub struct AbilityEffect {
     pub per_unit_type: Option<String>,
     pub per_unit_reference: Option<String>,
     pub group_matching: Option<bool>,
+    #[serde(alias = "max_repeats")]
     pub repeat_limit: Option<u32>,
     pub repeat_optional: Option<bool>,
     pub is_further: Option<bool>,
@@ -751,6 +752,11 @@ pub struct Condition {
     // Missing field from parser
     #[serde(default)]
     pub values: Option<Vec<u32>>, // For comparison conditions - list of valid values
+    // Complex condition fields (cause/effect)
+    #[serde(default)]
+    pub cause: Option<Box<Condition>>,
+    #[serde(default)]
+    pub effect: Option<Box<AbilityEffect>>,
 }
 
 impl Default for Condition {
@@ -814,6 +820,8 @@ impl Default for Condition {
             cost_result_reference: None,
             cost_result_group_match: None,
             group_matching: None,
+            cause: None,
+            effect: None,
         }
     }
 }

@@ -1,5 +1,6 @@
 use crate::card::AbilityEffect;
 use super::types::{Choice, ChoiceResult, ExecutionContext, LookAndSelectStep};
+use super::util;
 
 #[allow(dead_code)]
 impl<'a> super::resolver::AbilityResolver<'a> {
@@ -101,7 +102,23 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 self.execute_selected_cards_from_deck(indices.as_slice(), *count, card_type.as_deref())?;
                             }
                             "looked_at" => {
+                                // Reveal selected cards before moving them
+                                for &idx in indices.iter() {
+                                    if idx < self.looked_at_cards.len() {
+                                        let card_id = self.looked_at_cards[idx];
+                                        self.game_state.revealed_cards.insert(card_id);
+                                    }
+                                }
                                 self.execute_selected_looked_at_cards(indices.as_slice())?;
+                                self.pending_choice = None;
+                                self.resume_execution(context)?;
+                                if let Some(ref pending_actions) = self.game_state.pending_sequential_actions.clone() {
+                                    for action in pending_actions {
+                                        self.execute_effect(action)?;
+                                    }
+                                    self.game_state.pending_sequential_actions = None;
+                                }
+                                return Ok(());
                             }
                             _ => {}
                         }
@@ -124,7 +141,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     "deck" => self.execute_selected_cards_from_deck(indices.as_slice(), *count, card_type.as_deref())?,
                     "discard" => self.execute_selected_cards_from_discard(indices.as_slice(), *count, card_type.as_deref())?,
                     "stage" => self.execute_selected_cards_from_stage(indices.as_slice(), *count, card_type.as_deref())?,
-                    "looked_at" => self.execute_selected_looked_at_cards(indices.as_slice())?,
+                    "looked_at" => {
+                        // Reveal selected cards before moving them
+                        for &idx in indices.iter() {
+                            if idx < self.looked_at_cards.len() {
+                                let card_id = self.looked_at_cards[idx];
+                                self.game_state.revealed_cards.insert(card_id);
+                            }
+                        }
+                        self.execute_selected_looked_at_cards(indices.as_slice())?
+                    }
                     "energy_zone" => self.execute_selected_energy_zone_cards(indices.as_slice(), *count)?,
                     _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
                 }
@@ -205,11 +231,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             if let Some(energy) = cost.energy {
                                 if energy > 0 {
                                     let target = cost.target.as_deref().unwrap_or("self");
-                                    let player = match target {
-                                        "self" => &mut self.game_state.player1,
-                                        "opponent" => &mut self.game_state.player2,
-                                        _ => &mut self.game_state.player1,
-                                    };
+                                    let player = self.game_state.resolve_target_player_mut(target);
                                     if let Err(e) = player.energy_zone.pay_energy(energy as usize) {
                                         return Err(e);
                                     }
@@ -368,25 +390,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_db = self.game_state.card_database.clone();
 
         let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
-            match filter {
-                Some("live_card") => card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false),
-                Some("member_card") => card_db.get_card(card_id).map(|c| c.is_member()).unwrap_or(false),
-                Some("energy_card") => card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false),
-                None => true,
-                _ => true,
-            }
-        };
-
-        let matches_character_names = |card_id: i16, names: &Option<Vec<String>>| -> bool {
-            if let Some(ref required_names) = names {
-                if let Some(card) = card_db.get_card(card_id) {
-                    required_names.iter().any(|name| card.name.contains(name) || card.name == *name)
-                } else {
-                    false
-                }
-            } else {
-                true
-            }
+            util::card_matches_type(&card_db, card_id, filter)
         };
 
         match zone {
@@ -397,7 +401,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.hand.cards.len() {
                         let card_id = player.hand.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) && matches_character_names(card_id, &character_filter) {
+                        if matches_card_type(card_id, card_type_filter) && util::card_matches_characters(&card_db, card_id, character_filter.as_ref()) {
                             player.waitroom.add_card(card_id);
                             cards_moved.push(card_id);
                         } else {
@@ -416,7 +420,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.main_deck.cards.len() {
                         let card_id = player.main_deck.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) && matches_character_names(card_id, &character_filter) {
+                        if matches_card_type(card_id, card_type_filter) && util::card_matches_characters(&card_db, card_id, character_filter.as_ref()) {
                             player.hand.add_card(card_id);
                             cards_moved.push(card_id);
                         } else {
@@ -436,7 +440,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.waitroom.cards.len() {
                         let card_id = player.waitroom.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) && matches_character_names(card_id, &character_filter) {
+                        if matches_card_type(card_id, card_type_filter) && util::card_matches_characters(&card_db, card_id, character_filter.as_ref()) {
                             match destination {
                                 "stage" => {
                                     if player.stage.stage[1] == -1 { player.stage.stage[1] = card_id; }

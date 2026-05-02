@@ -208,6 +208,8 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         "hand" => active.hand.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
                         "discard" => active.waitroom.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
                         "stage" => active.stage.stage.iter().copied().enumerate().filter(|&(_, id)| id != -1).map(|(i, id)| (i, id)).collect(),
+                        "energy_zone" => active.energy_zone.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
+                        "looked_at" => game_state.looked_at_cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
                         _ => Vec::new(),
                     };
                     if !card_ids.is_empty() {
@@ -590,16 +592,21 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             for (card_id, area_name) in stage_positions {
                 if card_id != -1 {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
+                        let card_position: MemberArea = area_name.parse().unwrap_or(MemberArea::Center);
                         for (ability_index, ability) in card.abilities.iter().enumerate() {
                             // Check if ability can be activated (has activation trigger or main phase trigger)
-                            // triggers is a String field, check if it contains "main", "メイン", or "起動" (activation)
-                            // Also include 常時 (constant), 自動 with cost, and baton touch per handle_use_ability
+                            // Only 起動 (activation), メイン (main), 自動 (auto) with cost, and baton touch
+                            // are player-activatable. 常時 (constant) is passive — applies automatically.
                             let can_activate = ability.triggers.as_ref().map_or(false, |t| {
                                 t.contains("main") || t.contains(crate::triggers::MAIN) || t.contains(crate::triggers::ACTIVATION)
-                                || t.contains(crate::triggers::CONSTANT)
                                 || (t.contains(crate::triggers::AUTO) && ability.cost.is_some())
                                 || t.contains(crate::triggers::BATON_TOUCH)
                             });
+
+                            // Check position requirement (左サイド/右サイド/センター in trigger string)
+                            if !crate::zones::check_trigger_position(ability.triggers.as_deref(), card_position) {
+                                continue;
+                            }
 
                             // Check use_limit (e.g., once per turn)
                             let ability_key = format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
@@ -660,7 +667,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
             let current_live_count = active_player.live_card_zone.cards.len();
             let can_add_more = current_live_count < 3;
 
-            if can_add_more {
+            if can_add_more && !game_state.is_action_prohibited("cannot_live") {
                 // Generate individual card selection actions
                 for (hand_index, card_id) in cards_in_hand {
                     let card_name = if let Some(card) = game_state.card_database.get_card(*card_id) {

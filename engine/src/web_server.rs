@@ -22,6 +22,8 @@ use crate::deck_parser;
 
 use crate::deck_builder;
 
+use crate::ability::resolver::AbilityResolver;
+
 
 
 pub use crate::display::{CardDisplay, ZoneDisplay, PlayerDisplay, StageDisplay, GameStateDisplay};
@@ -284,28 +286,28 @@ pub struct AppState {
 
 
 
-pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>) -> Option<CardDisplay> {
-    crate::display::card_to_display(card_id, card_db, orientation)
+pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>, blade_modifier: i32) -> Option<CardDisplay> {
+    crate::display::card_to_display(card_id, card_db, orientation, blade_modifier)
 }
 
 pub fn zone_to_display_from_card_ids(cards: &[i16], card_db: &crate::card::CardDatabase) -> ZoneDisplay {
     crate::display::zone_to_display(cards, card_db)
 }
 
-pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardDatabase) -> StageDisplay {
-    crate::display::stage_to_display(stage, card_db)
+pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> StageDisplay {
+    crate::display::stage_to_display(stage, card_db, blade_modifiers)
 }
 
-pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase) -> PlayerDisplay {
-    crate::display::player_to_display(player, card_db)
+pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> PlayerDisplay {
+    crate::display::player_to_display(player, card_db, blade_modifiers)
 }
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database),
-        player2: player_to_display(&game_state.player2, &game_state.card_database),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.blade_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.blade_modifiers),
         pending_choice: game_state.pending_choice.clone(),
     }
 }
@@ -1362,6 +1364,134 @@ async fn debug_dump_state(data: web::Data<AppState>) -> impl Responder {
 
 
 
+async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
+
+    let game_state = match data.game_state.lock() {
+
+        Ok(guard) => guard,
+
+        Err(e) => {
+
+            eprintln!("Mutex poisoned in debug_conditions: {}", e);
+
+            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false, "error": "Mutex poisoned"}));
+
+        }
+
+    };
+
+    let mut results = Vec::new();
+
+    let card_db = &game_state.card_database;
+
+    for (player_idx, player) in [&game_state.player1, &game_state.player2].iter().enumerate() {
+
+        let zone_defs: [(&str, &[i16]); 6] = [
+
+            ("stage", &player.stage.stage),
+
+            ("hand", &player.hand.cards),
+
+            ("energy", &player.energy_zone.cards),
+
+            ("waitroom", &player.waitroom.cards),
+
+            ("live_zone", &player.live_card_zone.cards),
+
+            ("success_live_zone", &player.success_live_card_zone.cards),
+
+        ];
+
+        for &(zone_name, cards) in &zone_defs {
+
+            for &card_id in cards {
+
+                if card_id < 0 { continue; }
+
+                if let Some(card) = card_db.get_card(card_id) {
+
+                    for (ability_idx, ability) in card.abilities.iter().enumerate() {
+
+                        if let Some(ref effect) = ability.effect {
+
+                            let condition_fields: [(&str, &Option<crate::card::Condition>); 5] = [
+
+                                ("activation_condition_parsed", &effect.activation_condition_parsed),
+
+                                ("condition", &effect.condition),
+
+                                ("alternative_condition", &effect.alternative_condition),
+
+                                ("result_condition", &effect.result_condition),
+
+                                ("choice_condition", &effect.choice_condition),
+
+                            ];
+
+                            for &(field_name, ref condition_opt) in &condition_fields {
+
+                                if let Some(ref condition) = *condition_opt {
+
+                                    results.push((player_idx, zone_name, card_id, card.name.clone(), ability_idx, field_name, condition.clone()));
+
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    let mut state_clone = game_state.clone();
+
+    drop(game_state);
+
+    let resolver = AbilityResolver::new(&mut state_clone);
+
+    let evaluated: Vec<serde_json::Value> = results.into_iter().map(|(player_idx, zone_name, card_id, card_name, ability_idx, field_name, condition)| {
+
+        let result = resolver.evaluate_condition(&condition);
+
+        serde_json::json!({
+
+            "player": player_idx,
+
+            "zone": zone_name,
+
+            "card_id": card_id,
+
+            "card_name": card_name,
+
+            "ability_index": ability_idx,
+
+            "field": field_name,
+
+            "condition_type": condition.condition_type,
+
+            "condition_text": condition.text,
+
+            "condition_data": serde_json::to_value(&condition).unwrap_or_default(),
+
+            "result": result,
+
+        })
+
+    }).collect();
+
+    HttpResponse::Ok().json(serde_json::json!({"success": true, "conditions": evaluated}))
+
+}
+
+
+
 async fn export_game(data: web::Data<AppState>) -> impl Responder {
 
     let game_state = match data.game_state.lock() {
@@ -2369,6 +2499,7 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/debug/redo", web::post().to(debug_redo))
             .route("/api/debug/snapshot", web::get().to(debug_snapshot))
             .route("/api/debug/dump_state", web::get().to(debug_dump_state))
+            .route("/api/debug/conditions", web::get().to(debug_conditions))
             .route("/api/export_game", web::get().to(export_game))
             .route("/api/get_decks", web::get().to(get_decks))
             .route("/api/get_random_deck", web::get().to(get_random_deck))

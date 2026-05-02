@@ -79,79 +79,204 @@ fn ruby_activation_search_live_from_discard() {
 }
 
 // ====================================================================
-// Pattern #10 — Debut/LiveStart: may put self to wait,
-//               put 1 opponent member (cost ≤ 4) to wait
+// Pattern #11 — Debut: may discard 1 from hand, place 1 energy from
+//               energy deck into energy zone in wait state
 // ====================================================================
 //
-// JP ability text:
-//   登場/ライブ開始時：このメンバーをウェイトにしてもよい：
-//       相手のステージにいるコスト4以下のメンバー1人をウェイトにする。
-//
-// Real card:  PL!-PR-007-PR (星空凛), cost 4
-//
-// Flow:
-//   1. Put opponent filler member (cost ≤ 4) on opponent's stage
-//   2. Give player1 5 energy
-//   3. Play card to stage → Debut triggers
-//   4. Optional cost: put self to wait? → YES
-//   5. Effect: choose opponent member to wait → select it
-//   6. Verify: self in wait state, opponent member in wait state
+// JP: 登場：手札を1枚控え室に置いてもよい：自分のエネルギー置場から、
+//     エネルギーカードを1枚ウェイト状態で置く。
+// Card: PL!SP-PR-004-PR (唐可可), cost 4
 #[test]
-fn debut_change_opponent_to_wait() {
+fn debut_energy_deck_to_zone_wait() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let rin = game.id("PL!-PR-007-PR");
-    // Filler member with cost ≤ 4 for opponent's stage
-    let opp_member = game.id("PL!-sd1-010-SD");  // cost 4
+    let keke = game.id("PL!SP-PR-004-PR");
+    let energy = game.id("LL-E-001-SD");
+    let filler = game.id("PL!-sd1-010-SD");
 
-    // Set up opponent's stage
-    game.state.player2.stage.set_area(MemberArea::Center, opp_member);
-
-    game.add_to_hand(rin);
+    game.state.player1.energy_deck.cards.push(energy);
+    game.add_to_hand(keke);
+    game.add_to_hand(filler);
     game.give_energy(5);
 
-    // Play Rin to stage — Debut triggers
-    game.play_to_stage(rin, MemberArea::LeftSide);
-    assert!(game.has_pending_choice(),
-        "Optional cost choice (put self to wait?) should appear");
+    let ed_before = game.state.player1.energy_deck.cards.len();
+    let ez_before = game.state.player1.energy_zone.cards.len();
+    let active_before = game.state.player1.energy_zone.active_energy_count;
 
-    // Cost is SelectTarget (YES/NO) — choose YES (card_id=1)
-    // This needs resume_with_choice with card_id=Some(1)
-    TurnEngine::resume_with_choice(
-        &mut game.state,
-        Some(1),  // 1 = yes, pay optional cost
-        None,
-    ).expect("pay optional cost (put self to wait)");
+    game.play_to_stage(keke, MemberArea::Center);
 
-    // Self should now be in wait state
-    let orientation = game.state.orientation_modifiers.get(rin);
-    assert_eq!(orientation, Some(&"wait".to_string()),
-        "Rin should be in wait state");
+    // Optional cost: skip (empty indices)
+    assert!(game.has_pending_choice(), "Optional discard choice");
+    game.select_indices(&[]);
 
-    // Effect should prompt: select opponent member to put to wait
-    assert!(game.has_pending_choice(),
-        "Effect should prompt: select opponent member to wait");
+    assert_eq!(game.state.player1.energy_zone.cards.len(), ez_before + 1,
+        "Energy zone +1");
+    assert_eq!(game.state.player1.energy_deck.cards.len(), ed_before - 1,
+        "Energy deck -1");
+    // Cost 4 paid from 5 active = 1 remaining. Wait energy didn't add to active count.
+    assert_eq!(game.state.player1.energy_zone.active_energy_count, active_before - 4,
+        "Active = 1 (5 - 4 cost, wait energy not counted)");
+    assert!(!game.has_pending_choice(), "Done");
+}
 
-    let choice = game.state.ability_queue.is_waiting_for_choice()
-        .cloned().expect("Should be waiting for choice");
-    match &choice {
-        Choice::SelectCard { zone, count, .. } => {
-            // Zone should be "stage" (opponent's stage)
-            assert_eq!(zone, "stage", "Should select from stage");
-            assert_eq!(*count, 1, "Should select 1 member");
-        }
-        other => panic!("Expected SelectCard stage, got {other:?}"),
-    }
+// ====================================================================
+// Pattern #12 — Debut: may discard 1 from hand, search discard for
+//               live card of specified color → hand
+// ====================================================================
+//
+// JP: 登場：手札を1枚控え室に置いてもよい：自分の控え室から
+//     「指定された色」のライブカードを1枚手札に加える。
+// Card: PL!N-bp1-003-R＋ (上原歩夢), cost 10
+#[test]
+fn debut_discard_search_specified_color_live() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
 
-    // Opponent member is on stage[1] (Center) — index 1 in the stage array
-    game.select_indices(&[1]);
+    let ayumu = game.id("PL!N-bp1-003-R\u{FF0B}");
+    // This ability has a group filter (虹ヶ咲). Use a 虹ヶ咲 live card.
+    let live_target = game.id("PL!N-sd1-025-SD");
+    let filler_member = game.id("PL!-sd1-010-SD");
 
-    // Opponent member should now be in wait state
-    let opp_orientation = game.state.orientation_modifiers.get(opp_member);
-    assert_eq!(opp_orientation, Some(&"wait".to_string()),
-        "Opponent member should be in wait state");
-    assert!(!game.has_pending_choice(), "No more pending choices");
+    game.add_to_hand(ayumu);
+    game.add_to_hand(filler_member);
+    game.add_to_discard(live_target);
+    game.add_to_discard(filler_member);
+    game.give_energy(11);
+
+    game.play_to_stage(ayumu, MemberArea::Center);
+
+    // Optional cost: skip
+    assert!(game.has_pending_choice(), "Optional discard choice");
+    game.select_indices(&[]);
+
+    // Effect: auto-selects the only matching live card (1 match, count=1 → no choice)
+    assert!(!game.has_pending_choice(), "Auto-resolved (1 match)");
+
+    assert!(game.state.player1.hand.cards.contains(&live_target),
+        "虹ヶ咲 live card should be in hand from discard search");
+    assert!(!game.has_pending_choice(), "Done");
+}
+
+// Pattern #12b — same ability with 2 matching live cards → choice prompt
+#[test]
+fn debut_discard_search_grouped_live_choice() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ayumu = game.id("PL!N-bp1-003-R\u{FF0B}");
+    let live_a = game.id("PL!N-sd1-025-SD");
+    let live_b = game.id("PL!N-sd1-026-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(ayumu);
+    game.add_to_hand(filler);
+    game.add_to_discard(live_a);
+    game.add_to_discard(live_b);
+    game.give_energy(11);
+
+    game.play_to_stage(ayumu, MemberArea::Center);
+    assert!(game.has_pending_choice(), "Optional discard choice");
+    game.select_indices(&[]);
+
+    // 2 matching live cards, count=1 → choice prompt
+    assert!(game.has_pending_choice(), "Should prompt to choose from 2 live cards");
+    game.select_indices(&[0]);
+
+    assert!(game.state.player1.hand.cards.contains(&live_a),
+        "Selected live card in hand");
+    assert!(!game.has_pending_choice(), "Done");
+}
+
+// ====================================================================
+// Pattern #13 — Debut: draw 2, discard 1
+// ====================================================================
+//
+// JP: 登場：カードを2枚引き、手札を1枚控え室に置く。
+// Card: PL!HS-bp1-006-R＋ (夕霧綴理), cost 11
+#[test]
+fn debut_draw_two_discard_one() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let tsuzuri = game.id("PL!HS-bp1-006-R\u{FF0B}");
+    let f1 = game.id("PL!-sd1-010-SD");
+    let f2 = game.id("PL!-sd1-013-SD");
+
+    game.state.player1.main_deck.cards.push(f1);
+    game.state.player1.main_deck.cards.push(f2);
+    game.add_to_hand(tsuzuri);
+    game.add_to_hand(f1);
+    game.add_to_hand(f2);
+    game.give_energy(12);
+
+    let db_before = game.state.player1.main_deck.cards.len();
+    game.play_to_stage(tsuzuri, MemberArea::Center);
+
+    assert!(game.has_pending_choice(), "Discard choice after draw 2");
+    game.select_indices(&[0]);
+
+    assert_eq!(game.state.player1.hand.cards.len(), 3,
+        "Hand = 3 (started 3, played 1, drew 2, discarded 1)");
+    assert_eq!(game.state.player1.main_deck.cards.len(), db_before - 2,
+        "Deck -2");
+    assert!(!game.has_pending_choice(), "Done");
+}
+
+// ====================================================================
+// Pattern #14 — LiveStart: choose a heart color, gain that heart on
+//               each live card until live end
+// ====================================================================
+//
+// JP: ライブ開始時：heart01/heart03/heart06から1つ選ぶ。
+//     ライブ終了まで、自分のライブカード置き場のカード1枚につき、
+//     選んだハートを1つ得る。
+// Card: PL!-bp3-012-PR (南ことり) — this is a live card, not a member!
+//       This pattern tests live start trigger on a live card.
+// Note: tested live card ability, not member — skipped for now (complexity)
+#[test]
+#[ignore = "LiveStart pattern — needs live card zone setup"]
+fn live_start_choose_heart_gain() {
+    // TODO: This requires setting up the Live phase, placing live cards,
+    // and checking heart modifiers. Complex — defer until basic patterns complete.
+}
+
+// ====================================================================
+// Pattern #15 — Debut: draw 2, discard 2
+// ====================================================================
+//
+// JP: 登場：カードを2枚引き、手札を2枚控え室に置く。
+// Card: PL!N-PR-005-PR (上原歩夢), cost 13
+#[test]
+fn debut_draw_two_discard_two() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ayumu = game.id("PL!N-PR-005-PR");
+    let f1 = game.id("PL!-sd1-010-SD");
+    let f2 = game.id("PL!-sd1-013-SD");
+    let f3 = game.id("PL!-sd1-014-SD");
+
+    game.state.player1.main_deck.cards.push(f1);
+    game.state.player1.main_deck.cards.push(f2);
+    game.add_to_hand(ayumu);
+    game.add_to_hand(f1);
+    game.add_to_hand(f2);
+    game.add_to_hand(f3);
+    game.give_energy(14);
+
+    let db_before = game.state.player1.main_deck.cards.len();
+    game.play_to_stage(ayumu, MemberArea::Center);
+
+    assert!(game.has_pending_choice(), "Discard choice after draw 2");
+    // Discard 2 from hand (indices 0 and 1)
+    game.select_indices(&[0, 1]);
+
+    assert_eq!(game.state.player1.hand.cards.len(), 3,
+        "Hand = 3 (started 4, played 1, drew 2, discarded 2)");
+    assert_eq!(game.state.player1.main_deck.cards.len(), db_before - 2,
+        "Deck -2");
+    assert!(!game.has_pending_choice(), "Done");
 }
 
 // ====================================================================

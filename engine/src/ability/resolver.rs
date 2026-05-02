@@ -2,6 +2,7 @@ use crate::card::{Ability, AbilityEffect, Keyword};
 use crate::game_state::{GameState, Phase};
 use crate::zones::MemberArea;
 use super::types::{Choice, ExecutionContext};
+use super::util;
 
 #[allow(dead_code)]
 pub struct AbilityResolver<'a> {
@@ -131,6 +132,12 @@ impl<'a> AbilityResolver<'a> {
         true
     }
 
+    fn store_pending_choice(&mut self) {
+        if let Some(ref choice) = self.pending_choice {
+            self.game_state.pending_choice = choice.to_frontend_json();
+        }
+    }
+
     pub fn resolve_ability(&mut self, ability: &Ability, activating_card: Option<i16>, ability_index: usize) -> Result<(), String> {
 
         if let Some(use_limit) = ability.use_limit {
@@ -155,9 +162,7 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if self.pending_choice.is_some() {
-            if let Ok(json) = serde_json::to_value(&self.pending_choice) {
-                self.game_state.pending_choice = Some(json);
-            }
+            self.store_pending_choice();
             return Ok(());
         }
 
@@ -168,9 +173,7 @@ impl<'a> AbilityResolver<'a> {
             }
 
             if self.pending_choice.is_some() {
-                if let Ok(json) = serde_json::to_value(&self.pending_choice) {
-                    self.game_state.pending_choice = Some(json);
-                }
+                self.store_pending_choice();
                 return Ok(());
             }
         }
@@ -183,26 +186,14 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn card_matches_type(&self, card_id: i16, card_type_filter: Option<&str>) -> bool {
-        match card_type_filter {
-            Some("live_card") => self.game_state.card_database.get_card(card_id).map(|c| c.is_live()).unwrap_or(false),
-            Some("member_card") => self.game_state.card_database.get_card(card_id).map(|c| c.is_member()).unwrap_or(false),
-            Some("energy_card") => self.game_state.card_database.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false),
-            None => true,
-            _ => true,
-        }
+        util::card_matches_type(&self.game_state.card_database, card_id, card_type_filter)
     }
 
     pub fn card_matches_group(&self, card_id: i16, group_filter: Option<&String>) -> bool {
-        match group_filter {
-            Some(group_name) => self.game_state.card_database.get_card(card_id).map(|c| c.group == *group_name).unwrap_or(false),
-            None => true,
-        }
+        util::card_matches_group(&self.game_state.card_database, card_id, group_filter)
     }
 
     pub fn card_matches_cost_limit(&self, card_id: i16, cost_limit: Option<u32>) -> bool {
-        match cost_limit {
-            Some(max_cost) => self.game_state.card_database.get_card(card_id).and_then(|c| c.cost).map(|c| c <= max_cost).unwrap_or(false),
-            None => true,
-        }
+        util::card_matches_cost_limit(&self.game_state.card_database, card_id, cost_limit)
     }
 }

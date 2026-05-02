@@ -1,6 +1,7 @@
 use crate::card::{AbilityCost, AbilityEffect};
 use super::types::Choice;
 use super::resolver::AbilityResolver;
+use super::util;
 
 
 #[allow(dead_code)]
@@ -100,50 +101,23 @@ impl<'a> AbilityResolver<'a> {
                     let cost_limit = cost.cost_limit;
                     let card_type_filter = cost.card_type.as_deref();
 
-                    let player = match target {
-                        "self" => &self.game_state.player1,
-                        "opponent" => &self.game_state.player2,
-                        _ => &self.game_state.player1,
-                    };
+                    let player = &*self.game_state.resolve_target_player(target);
 
-                    let matches_cost_limit = |card_id: i16, limit: Option<u32>| -> bool {
-                        if let Some(limit_val) = limit {
-                            self.game_state.card_database.get_card(card_id)
-                                .and_then(|c| c.cost).map_or(false, |c| c <= limit_val)
-                        } else { true }
-                    };
-
-                    let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
-                        match filter {
-                            Some("live_card") => self.game_state.card_database.get_card(card_id).map(|c| c.is_live()).unwrap_or(false),
-                            Some("member_card") => self.game_state.card_database.get_card(card_id).map(|c| c.is_member()).unwrap_or(false),
-                            Some("energy_card") => self.game_state.card_database.get_card(card_id).map(|c| c.is_energy()).unwrap_or(false),
-                            None => true, _ => true,
-                        }
-                    };
-
-                    let matches_character_names = |card_id: i16, names: Option<&Vec<String>>| -> bool {
-                        if let Some(ref required_names) = names {
-                            self.game_state.card_database.get_card(card_id)
-                                .map(|card| required_names.iter().any(|name| card.name.contains(name) || card.name == *name))
-                                .unwrap_or(false)
-                        } else { true }
-                    };
-
+                    let card_db = &self.game_state.card_database;
                     let character_filter = cost.characters.as_ref();
+                    let count_matching_in = |cards: &[i16]| -> usize {
+                        cards.iter().filter(|&&card_id| {
+                            util::card_matches_type(card_db, card_id, card_type_filter)
+                                && util::card_matches_cost_limit(card_db, card_id, cost_limit)
+                                && util::card_matches_characters(card_db, card_id, character_filter)
+                        }).count()
+                    };
+
                     let matching_count = match source.as_str() {
-                        "deck" | "deck_top" => player.main_deck.cards.iter()
-                            .filter(|&&card_id| matches_card_type(card_id, card_type_filter) && matches_cost_limit(card_id, cost_limit) && matches_character_names(card_id, character_filter))
-                            .count(),
-                        "hand" => player.hand.cards.iter()
-                            .filter(|&&card_id| matches_card_type(card_id, card_type_filter) && matches_cost_limit(card_id, cost_limit) && matches_character_names(card_id, character_filter))
-                            .count(),
-                        "discard" => player.waitroom.cards.iter()
-                            .filter(|&&card_id| matches_card_type(card_id, card_type_filter) && matches_cost_limit(card_id, cost_limit) && matches_character_names(card_id, character_filter))
-                            .count(),
-                        "energy_zone" => player.energy_zone.cards.iter()
-                            .filter(|&&card_id| matches_card_type(card_id, card_type_filter) && matches_cost_limit(card_id, cost_limit) && matches_character_names(card_id, character_filter))
-                            .count(),
+                        "deck" | "deck_top" => count_matching_in(&player.main_deck.cards),
+                        "hand" => count_matching_in(&player.hand.cards),
+                        "discard" => count_matching_in(&player.waitroom.cards),
+                        "energy_zone" => count_matching_in(&player.energy_zone.cards),
                         _ => usize::MAX,
                     };
 
@@ -156,6 +130,9 @@ impl<'a> AbilityResolver<'a> {
                     text: cost.text.clone(), action: cost.cost_type.clone().unwrap_or_default(),
                     source: cost.source.clone(), destination: cost.destination.clone(),
                     count: cost.count, card_type: cost.card_type.clone(), target: cost.target.clone(),
+                    self_cost: cost.self_cost, exclude_self: cost.exclude_self,
+                    cost_limit: cost.cost_limit, state_change: cost.state_change.clone(),
+                    position: cost.position.clone(),
                     effect_type: None, ..Default::default()
                 };
                 self.execute_move_cards(&effect)
@@ -180,8 +157,7 @@ impl<'a> AbilityResolver<'a> {
 
                 if state_change == "wait" {
                     let target = cost.target.as_deref().unwrap_or("self");
-                    let player = if target == "self" { &self.game_state.player1 } else { &self.game_state.player2 };
-                    let card_ids: Vec<i16> = player.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+                    let card_ids: Vec<i16> = self.game_state.resolve_target_player(target).stage.stage.iter().filter(|&&id| id != -1).copied().collect();
                     for card_id in card_ids {
                         self.game_state.add_orientation_modifier(card_id, "wait");
                     }
@@ -213,11 +189,7 @@ impl<'a> AbilityResolver<'a> {
                     return Ok(());
                 }
 
-                let player = match target {
-                    "self" => &mut self.game_state.player1,
-                    "opponent" => &mut self.game_state.player2,
-                    _ => &mut self.game_state.player1,
-                };
+                let player = self.game_state.resolve_target_player_mut(target);
 
                 if energy > 0 {
                     if let Err(e) = player.energy_zone.pay_energy(energy as usize) {
@@ -226,7 +198,31 @@ impl<'a> AbilityResolver<'a> {
                 }
                 Ok(())
             }
-            _ => Ok(()),
+            Some("reveal") => {
+                // Reveal cost: show a card from hand to opponent
+                let effect = AbilityEffect {
+                    text: cost.text.clone(), action: "reveal".to_string(),
+                    source: cost.source.clone(), destination: cost.destination.clone(),
+                    count: cost.count, card_type: cost.card_type.clone(),
+                    target: cost.target.clone(), effect_type: None,
+                    ..Default::default()
+                };
+                self.execute_reveal(&effect)
+            }
+            Some("place_energy_under_member") => {
+                let effect = AbilityEffect {
+                    text: cost.text.clone(), action: "place_energy_under_member".to_string(),
+                    source: cost.source.clone(), destination: cost.destination.clone(),
+                    count: cost.count, card_type: cost.card_type.clone(),
+                    target: cost.target.clone(), effect_type: None,
+                    ..Default::default()
+                };
+                self.execute_place_energy_under_member(&effect)
+            }
+            ct => {
+                eprintln!("Unhandled cost type: {:?}", ct);
+                Ok(())
+            }
         }
     }
 }

@@ -111,6 +111,18 @@ export default defineConfig({
         } else {
           console.log('cards source not found:', cardsSrc);
         }
+        // Copy card_image_mapping.json to dist/js for image resolution
+        const mappingSrc = resolve(__dirname, 'js', 'card_image_mapping.json');
+        const mappingDest = resolve(__dirname, 'dist', 'js', 'card_image_mapping.json');
+        console.log('Copying card_image_mapping.json to dist/js');
+        if (existsSync(mappingSrc)) {
+          const destDir = resolve(__dirname, 'dist', 'js');
+          if (!existsSync(destDir)) mkdirSync(destDir, { recursive: true });
+          copyFileSync(mappingSrc, mappingDest);
+          console.log('card_image_mapping.json copied successfully');
+        } else {
+          console.log('card_image_mapping.json not found:', mappingSrc);
+        }
         console.log('Asset copying complete');
       },
     },

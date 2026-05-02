@@ -106,7 +106,7 @@ fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardData
     }
 }
 
-fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase) -> PlayerDisplay {
+fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<crate::zones::Orientation>)> = player.energy_zone.cards.iter()
         .enumerate()
         .map(|(i, &card_id)| {
@@ -128,7 +128,7 @@ fn player_to_display(player: &crate::player::Player, card_db: &crate::card::Card
             .collect(),
     };
     
-    let stage_blades = player.stage.total_blades(card_db);
+    let stage_blades = player.stage.total_blades(card_db, blade_modifiers);
     
     let mut stage_hearts = std::collections::HashMap::new();
     for &card_id in &player.stage.stage[..] {
@@ -194,8 +194,8 @@ fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         phase: format!("{:?}", game_state.current_phase),
         turn_phase: format!("{:?}", game_state.current_turn_phase),
         game_result,
-        player1: player_to_display(&game_state.player1, &game_state.card_database),
-        player2: player_to_display(&game_state.player2, &game_state.card_database),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.blade_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.blade_modifiers),
         resolution_zone_count: game_state.resolution_zone.cards.len(),
         p1_cheer_blade_heart_count: game_state.player1_cheer_blade_heart_count,
         p2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
@@ -767,10 +767,10 @@ fn output_state_and_actions(game_state: &GameState) {
         game_state.turn_number,
         game_state.current_phase,
         game_state.player1.hand.len(),
-        game_state.player1.stage.total_blades(&game_state.card_database),
+        game_state.player1.stage.total_blades(&game_state.card_database, &game_state.blade_modifiers),
         game_state.player1.success_live_card_zone.len(),
         game_state.player2.hand.len(),
-        game_state.player2.stage.total_blades(&game_state.card_database),
+        game_state.player2.stage.total_blades(&game_state.card_database, &game_state.blade_modifiers),
         game_state.player2.success_live_card_zone.len(),
         game_setup::generate_possible_actions(game_state).len()
     );

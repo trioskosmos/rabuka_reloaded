@@ -88,8 +88,8 @@ export const Rendering = {
         });
     },
 
-    renderHeaderStats: (state, p0) => {
-        HeaderStats.render(state, p0, Rendering.getPhaseKey);
+    renderHeaderStats: (state, p0, p1) => {
+        HeaderStats.render(state, p0, p1, Rendering.getPhaseKey);
     },
 
     get_valid_targets: InteractionAdapter.get_valid_targets,
@@ -137,7 +137,7 @@ export const Rendering = {
         if (!p0 || !p1) return;
 
         // Update UI Headers, Stats, etc. (Logic moved from main.js)
-        Rendering.renderHeaderStats(state, p0);
+        Rendering.renderHeaderStats(state, p0, p1);
         Rendering.renderBoard(state, p0, p1, validTargets);
 
         Rendering.renderMulliganReturn(viewState);

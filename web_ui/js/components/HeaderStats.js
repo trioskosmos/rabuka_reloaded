@@ -32,7 +32,7 @@ export const HeaderStats = {
         HeaderStats.cache.p2.discard = document.getElementById('h-p2-discard');
     },
 
-    render: (state, p0, getPhaseKey) => {
+    render: (state, p0, p1, getPhaseKey) => {
         if (!HeaderStats.cache.turn) HeaderStats.init();
 
         const phaseKey = getPhaseKey(state.phase);
@@ -42,8 +42,9 @@ export const HeaderStats = {
 
         if (HeaderStats.cache.score) {
             // Engine doesn't send player score - calculate from success_live_card_zone
-            const p0Success = state.player1.success_live_card_zone.cards;
-            const p1Success = state.player2.success_live_card_zone.cards;
+            // Use p0/p1 (perspective-aware) so hotseat shows the active player's score on the left
+            const p0Success = p0.success_live_card_zone?.cards || [];
+            const p1Success = p1.success_live_card_zone?.cards || [];
             const p0Score = p0Success.length || 0;
             const p1Score = p1Success.length || 0;
             HeaderStats.cache.score.textContent = `${p0Score} - ${p1Score}`;
@@ -85,18 +86,21 @@ export const HeaderStats = {
         }
 
         if (HeaderStats.cache.blades && p0) {
-            // Calculate blades from stage if total_blades not provided
             let bladesCount = p0.total_blades;
             if (bladesCount === undefined) {
                 bladesCount = 0;
                 if (p0.stage) {
                     const members = [p0.stage.left_side, p0.stage.center, p0.stage.right_side];
                     members.forEach(member => {
-                        if (member && member.card_no) {
-                            const card = State.resolveCardData(member.card_no);
-                            // Support both blade and blades field names
-                            if (card && (card.blade || card.blades)) {
-                                bladesCount += card.blade || card.blades || 0;
+                        if (member) {
+                            // Use total_blade from backend if available (includes modifiers)
+                            if (member.total_blade !== undefined) {
+                                bladesCount += member.total_blade;
+                            } else if (member.card_no) {
+                                const card = State.resolveCardData(member.card_no);
+                                if (card && (card.blade || card.blades)) {
+                                    bladesCount += card.blade || card.blades || 0;
+                                }
                             }
                         }
                     });

@@ -1,4 +1,5 @@
 use crate::card::{CardDatabase, HeartColor, HeartIcon, Keyword};
+use crate::mod_map::ModMap;
 use serde::{Serialize, Deserialize};
 use smallvec::SmallVec;
 
@@ -37,6 +38,20 @@ impl std::str::FromStr for MemberArea {
             _ => Err(format!("Invalid area: {}", s)),
         }
     }
+}
+
+/// Check if a card at the given stage position can activate an ability
+/// whose trigger string contains position requirements (左サイド/右サイド/センター).
+pub fn check_trigger_position(triggers: Option<&str>, card_position: MemberArea) -> bool {
+    let trig = match triggers {
+        Some(t) => t,
+        None => return true,
+    };
+    // Check each position requirement
+    if trig.contains("左サイド") && card_position != MemberArea::LeftSide { return false; }
+    if trig.contains("右サイド") && card_position != MemberArea::RightSide { return false; }
+    if trig.contains("センター") && card_position != MemberArea::Center { return false; }
+    true
 }
 
 // CardInZone removed for performance - use i16 IDs directly
@@ -163,12 +178,13 @@ impl Stage {
         Ok(())
     }
 
-    pub fn total_blades(&self, card_db: &CardDatabase) -> u32 {
+    pub fn total_blades(&self, card_db: &CardDatabase, blade_modifiers: &ModMap<i32>) -> u32 {
         let mut total = 0;
         for &card_id in &self.stage {
             if card_id != -1 {
                 if let Some(card) = card_db.get_card(card_id) {
-                    total += card.blade;
+                    let mod_val = blade_modifiers.get(card_id).copied().unwrap_or(0);
+                    total += (card.blade as i32 + mod_val).max(0) as u32;
                 }
             }
         }

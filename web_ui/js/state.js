@@ -291,6 +291,25 @@ const stateInternal = {
             if (imageMappingData) {
                 State.cardImageMapping = imageMappingData;
                 console.log('[State] Loaded card image mapping, total mappings:', Object.keys(imageMappingData).length);
+                // Replace remote img URLs with local WebP paths in the static database
+                if (State.staticCardDatabase) {
+                    let replaced = 0;
+                    for (const [cardNo, card] of Object.entries(State.staticCardDatabase)) {
+                        if (card.img && card.img.startsWith('http')) {
+                            const localPath = State.cardImageMapping[cardNo];
+                            if (localPath) {
+                                card.img = localPath;
+                                replaced++;
+                            } else {
+                                delete card.img;
+                            }
+                        }
+                    }
+                    if (replaced > 0) console.log('[State] Replaced', replaced, 'remote img URLs with local WebP paths');
+                }
+                if (State.data) {
+                    State.emit('change', State.data);
+                }
             }
         } catch (e) {
             console.error('[State] Failed to load static card database:', e);
