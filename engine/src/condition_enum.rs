@@ -10,7 +10,7 @@ pub enum ConditionEnum {
     CardCount { card_type: String, target: String, count: u32, operator: Option<String> },
     Appearance { appearance: bool, location: String, target: String, baton_touch_trigger: bool },
     Temporal { temporal: String, phase: Option<String> },
-    State { state: String, target: String },
+    State { state: String, target: String, resource_type: Option<String>, all: bool },
     EnergyState { energy_state: String, target: String },
     Movement { movement: String, movement_state: Option<String>, location: String, target: String, baton_touch_trigger: bool },
     AbilityNegation { negation: bool },
@@ -91,6 +91,8 @@ impl ConditionEnum {
             Some("state_condition") => ConditionEnum::State {
                 state: condition.state.as_deref().unwrap_or_default().to_string(),
                 target: condition.target.as_deref().unwrap_or("self").to_string(),
+                resource_type: condition.resource_type.clone(),
+                all: condition.all.unwrap_or(false),
             },
             Some("energy_state_condition") => ConditionEnum::EnergyState {
                 energy_state: condition.energy_state.as_deref().unwrap_or_default().to_string(),

@@ -156,6 +156,22 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         });
                         return actions;
                     }
+                    if target == "choice" {
+                        let options: Vec<&str> = description.split(" / ").collect();
+                        for (i, opt) in options.iter().enumerate() {
+                            actions.push(Action {
+                                description: opt.to_string(),
+                                action_type: ActionType::ChoiceOption,
+                                parameters: Some(ActionParameters {
+                                    card_id: Some(i as i16), card_index: None, card_indices: None,
+                                    stage_area: None, use_baton_touch: None,
+                                    card_name: None, card_no: Some(i.to_string()),
+                                    base_cost: None, final_cost: None, available_areas: None,
+                                }),
+                            });
+                        }
+                        return actions;
+                    }
                     if target == "primary|alternative" {
                         actions.push(Action {
                             description: format!("Primary: {}", description),

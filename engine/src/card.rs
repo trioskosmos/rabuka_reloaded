@@ -593,10 +593,40 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub timing_condition: Option<String>,
     #[serde(default)]
+    pub self_target: Option<bool>,
+    #[serde(default)]
     pub trigger_type: Option<String>,
 }
 
 impl AbilityEffect {
+    /// Extract shared execution modifiers from this ability effect.
+    pub fn extract_modifiers(&self) -> ActionModifiers {
+        ActionModifiers {
+            target: self.target.as_deref().unwrap_or("self").to_string(),
+            count: self.count.unwrap_or(1),
+            card_type: self.card_type.clone(),
+            group_name: self.group.as_ref().map(|g| g.name.clone()),
+            group_names: self.group_names.clone(),
+            cost_limit: self.cost_limit,
+            optional: self.optional.unwrap_or(false),
+            max: self.max.unwrap_or(false),
+            duration: self.duration.clone(),
+            state_change: self.state_change.clone(),
+            per_unit: self.per_unit.unwrap_or(false),
+            per_unit_count: self.per_unit_count.unwrap_or(1),
+            per_unit_type: self.per_unit_type.clone(),
+            dynamic_count: self.dynamic_count.clone(),
+            location: self.location.clone(),
+            state: self.state.clone(),
+            position: self.position.clone(),
+            heart_colors: self.heart_colors.clone(),
+            source: self.source.clone(),
+            destination: self.destination.clone(),
+            exclude_self: self.exclude_self.unwrap_or(false),
+            multiple_targets: self.multiple_targets.unwrap_or(false),
+        }
+    }
+
     /// Get compact debug string showing only non-None fields
     pub fn compact_debug(&self) -> String {
         let mut fields = vec![
@@ -670,6 +700,34 @@ pub struct DynamicCount {
     pub calculation_value: Option<u32>,
 }
 
+/// Shared execution modifiers that apply across multiple action types.
+/// Handled centrally in the effect pipeline before dispatching to action-specific code.
+#[derive(Debug, Clone, Default)]
+pub struct ActionModifiers {
+    pub target: String,
+    pub count: u32,
+    pub card_type: Option<String>,
+    pub group_name: Option<String>,
+    pub group_names: Option<Vec<String>>,
+    pub cost_limit: Option<u32>,
+    pub optional: bool,
+    pub max: bool,
+    pub duration: Option<String>,
+    pub state_change: Option<String>,
+    pub per_unit: bool,
+    pub per_unit_count: u32,
+    pub per_unit_type: Option<String>,
+    pub dynamic_count: Option<DynamicCount>,
+    pub location: Option<String>,
+    pub state: Option<String>,
+    pub position: Option<PositionInfo>,
+    pub heart_colors: Option<Vec<String>>,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub exclude_self: bool,
+    pub multiple_targets: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuotedText {
     pub text: String,
@@ -719,6 +777,7 @@ pub struct Condition {
     pub all_areas: Option<bool>,
     pub no_excess_heart: Option<bool>,
     pub resource_type: Option<String>,
+    pub all: Option<bool>,
     pub unit: Option<String>,
     pub values: Option<Vec<u32>>,
     // Complex condition fields
@@ -782,6 +841,7 @@ impl Default for Condition {
             all_areas: None,
             no_excess_heart: None,
             resource_type: None,
+            all: None,
             unit: None,
             values: None,
             cause: None,

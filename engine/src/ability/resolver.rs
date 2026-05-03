@@ -43,6 +43,36 @@ impl<'a> AbilityResolver<'a> {
         self.pre_resolution_snapshot = Some(self.game_state.clone());
     }
 
+    /// Find matching card indices in a zone, prompt if too many.
+    /// Takes &[i16] (read-only — works with Vec, SmallVec, any container).
+    /// Returns Ok(Some(indices)) if exact match or fewer.
+    /// Returns Ok(None) if too many — sets pending_choice, caller should `return Ok(())`.
+    pub fn match_cards_in_zone(
+        &mut self,
+        cards: &[i16],
+        count: usize,
+        card_db: &crate::card::CardDatabase,
+        card_type: Option<&str>,
+        group_name: Option<&str>,
+        cost_limit: Option<u32>,
+        zone_name: &str,
+        prompt_desc: &str,
+    ) -> Result<Option<Vec<usize>>, String> {
+        let idxs = util::matching_indices(cards, card_db, card_type, group_name, cost_limit);
+        if idxs.is_empty() || idxs.len() < count {
+            return Err(format!("Not enough cards in {}: need {}", zone_name, count));
+        }
+        if idxs.len() > count {
+            self.pending_choice = Some(Choice::SelectCard {
+                zone: zone_name.to_string(), card_type: card_type.map(|s| s.to_string()),
+                count, description: prompt_desc.to_string(), allow_skip: false,
+            });
+            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+            return Ok(None);
+        }
+        Ok(Some(idxs.into_iter().rev().take(count).collect()))
+    }
+
     pub fn rollback(&mut self) {
         if let Some(snapshot) = self.pre_resolution_snapshot.take() {
             *self.game_state = snapshot;
@@ -134,7 +164,19 @@ impl<'a> AbilityResolver<'a> {
 
     fn store_pending_choice(&mut self) {
         if let Some(ref choice) = self.pending_choice {
-            self.game_state.pending_choice = choice.to_frontend_json();
+            let mut json = choice.to_frontend_json();
+            if let Some(entry) = self.game_state.ability_queue.current_entry() {
+                if let Some(ref effect) = entry.ability.effect {
+                    if let Some(ref maker) = effect.choice_maker {
+                        if let Some(ref mut j) = json {
+                            if let Some(obj) = j.as_object_mut() {
+                                obj.insert("choice_maker".to_string(), serde_json::Value::String(maker.clone()));
+                            }
+                        }
+                    }
+                }
+            }
+            self.game_state.pending_choice = json;
         }
     }
 

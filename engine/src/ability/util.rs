@@ -20,7 +20,9 @@ pub fn card_matches_group(card_db: &CardDatabase, card_id: i16, group_filter: Op
 
 pub fn card_matches_group_str(card_db: &CardDatabase, card_id: i16, group_name: Option<&str>) -> bool {
     match group_name {
-        Some(g) => card_db.get_card(card_id).map(|c| c.group == g).unwrap_or(false),
+        Some(g) => card_db.get_card(card_id).map(|c| {
+            c.unit.as_deref() == Some(g) || c.group == g
+        }).unwrap_or(false),
         None => true,
     }
 }

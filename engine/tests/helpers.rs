@@ -56,6 +56,7 @@ pub struct TestGame {
     pub state: GameState,
 }
 
+#[allow(dead_code)]
 impl TestGame {
     /// Create a fresh game in Main phase, turn 1 (skips RPS/mulligan/setup).
     pub fn new(db: Arc<CardDatabase>) -> Self {
@@ -135,6 +136,19 @@ impl TestGame {
         .expect("activate_ability failed");
     }
 
+    /// Set a live card from hand during LiveCardSet phase.
+    pub fn set_live_card(&mut self, card_id: i16) {
+        TurnEngine::execute_main_phase_action(
+            &mut self.state,
+            &ActionType::SetLiveCard,
+            Some(card_id),
+            None,
+            None,
+            None,
+        )
+        .expect("set_live_card failed");
+    }
+
     /// Check if the ability queue is waiting for a player choice.
     pub fn has_pending_choice(&self) -> bool {
         self.state.pending_choice.is_some()
@@ -145,6 +159,12 @@ impl TestGame {
     pub fn select_indices(&mut self, indices: &[usize]) {
         TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
             .expect("select_indices failed");
+    }
+
+    /// Select a choice option by index (for SelectTarget choices like answers, alternatives).
+    pub fn select_option(&mut self, option_index: i16) {
+        TurnEngine::resume_with_choice(&mut self.state, Some(option_index), None)
+            .expect("select_option failed");
     }
 
     /// Advance to the next phase (Pass action).

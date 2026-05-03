@@ -845,11 +845,15 @@ impl GameState {
         }
     }
 
-    pub fn trigger_auto_ability(&mut self, ability_id: String, trigger_type: AbilityTrigger, player_id: String, source_card_id: Option<String>) {
+    pub fn trigger_auto_ability(&mut self, ability_id: String, trigger_type: AbilityTrigger, player_id: String, source_card_id: Option<String>, explicit_card_id: Option<i16>) {
         use crate::ability_queue::{AbilityQueueEntry, AbilityId};
 
         if let Some(ref card_no) = source_card_id {
-            let (card, card_id) = self.find_card_by_number(card_no);
+            let (card, card_id) = if let Some(cid) = explicit_card_id {
+                (self.card_database.get_card(cid).cloned(), Some(cid))
+            } else {
+                self.find_card_by_number(card_no)
+            };
             if let Some(card) = card {
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
                     if ability_id.contains(&ability.full_text) {
@@ -924,9 +928,17 @@ impl GameState {
     }
 
     pub fn process_pending_auto_abilities(&mut self, _active_player_id: &str) {
-        if self.ability_queue.is_idle() {
-            if self.ability_queue.start_next() {
-                self.process_current_ability();
+        loop {
+            if !self.ability_queue.is_idle() {
+                break;
+            }
+            if !self.ability_queue.start_next() {
+                break;
+            }
+            self.process_current_ability();
+            // If a choice is pending, stop processing and wait for player input
+            if self.pending_choice.is_some() {
+                break;
             }
         }
     }
@@ -1000,6 +1012,10 @@ impl GameState {
             ("self", _) => &mut self.player1,
             ("opponent", Some("player2")) => &mut self.player1,
             ("opponent", _) => &mut self.player2,
+            ("both", _) => {
+                eprintln!("WARN: resolve_target_player_mut called with 'both' — returning player1, use execute_for_targets instead");
+                &mut self.player1
+            }
             _ => &mut self.player1,
         }
     }

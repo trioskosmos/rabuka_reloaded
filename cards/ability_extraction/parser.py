@@ -210,93 +210,67 @@ def extract_by_pattern(text: str, patterns: List[Tuple[str, str]]) -> Optional[s
 
 def extract_source(text: str) -> Optional[str]:
     """Extract source location (FROM)."""
-    # Special case for Q226: "自分の控え室からライブカード" pattern
-    if '控え室からライブカード' in text:
-        return 'discard'
-    # Special case for "デッキの一番上のカードを" pattern
-    if 'デッキの一番上のカードを' in text:
-        # Set a global flag to indicate this pattern was matched
-                        return 'deck_top'
-    # Special case for "デッキの一番上からカードを" pattern
     if 'デッキの一番上からカードを' in text:
         return 'deck_top'
-    # Special case for "これにより公開されたほかのすべてのカードを" pattern
+    if 'デッキの一番上のカードを' in text:
+        return 'deck_top'
     if 'これにより公開されたほかのすべてのカードを' in text:
         return 'revealed_remaining'
-    # Special case for "これにより公開したカードを" pattern
-    if 'これにより公開したカードを' in text:
+    if 'これにより公開したカードを' in text or '公開したカードをすべて' in text or 'それらのカードの中から' in text:
         return 'revealed_cards'
-    # Special case for "それらのカードの中から" pattern
-    if 'それらのカードの中から' in text:
-        return 'revealed_cards'
-    # Special case for "このカードを" pattern (when referring to revealed card)
     if 'このカードを手札に加えてもよい' in text:
         return 'revealed_card'
-    # Special case for "自分の成功ライブカード置き場にある" pattern
     if '自分の成功ライブカード置き場にある' in text:
         return 'success_live_zone'
-    # Special case for "自分の控え室にある" pattern
-    if '自分の控え室にある' in text:
+    if '自分の控え室にある' in text or '控え室からライブカード' in text:
         return 'discard'
-    # Special case for "公開したカードをすべて" pattern
-    if '公開したカードをすべて' in text:
-        return 'revealed_cards'
-    # Special case for "手札から" pattern
-    if '手札から' in text:
+    if '手札を' in text or '手札から' in text:
         return 'hand'
-    # Special case for "手札2枚を" pattern
-    if '手札2枚を' in text:
-        return 'hand'
+    if 'デッキの一番下から' in text:
+        return 'deck_bottom'
+    if '控え室を' in text:
+        return 'discard'
+    if 'デッキの上から' in text:
+        return 'deck_top'
+    if 'デッキから' in text or '山札から' in text:
+        return 'deck'
+    if 'ステージから' in text:
+        return 'stage'
+    if 'ライブカード置き場から' in text:
+        return 'live_card_zone'
+    if 'エネルギー置き場から' in text:
+        return 'energy_zone'
     return extract_by_pattern(text, SOURCE_PATTERNS)
 
 def extract_destination(text: str) -> Optional[str]:
     """Extract destination location (TO)."""
-    # Priority 1: Most specific patterns first
     if 'デッキの一番上に置いてもよい' in text:
         return 'deck_top'
-    if 'ウェイト状態で置く' in text:
-        return 'energy_zone'
-    # More specific pattern for ability #575
     if 'エネルギーカードを1枚ウェイト状態で置いてもよい' in text:
         return 'energy_zone'
-    
-    # Priority 2: Check for specific deck position patterns (Q226)
-    deck_pos_match = re.search(r'デッキの一番上から(\d+)枚目に置く', text)
-    if deck_pos_match:
-        return 'deck'  # Return 'deck' as the destination, position will be extracted separately
-    # Also check for "置いてもよい" pattern (Q226)
-    deck_pos_match2 = re.search(r'デッキの一番上から(\d+)枚目に置いてもよい', text)
-    if deck_pos_match2:
+    m = re.search(r'デッキの一番上から(\d+)枚目に置(?:いてもよい|く)', text)
+    if m:
         return 'deck'
-    
-    # Special case for "そのメンバーの下に置く" pattern
     if 'そのメンバーの下に置く' in text:
         return 'under_member'
-    # Special case for "成功ライブカード置き場に置く" pattern
     if '成功ライブカード置き場に置く' in text:
         return 'success_live_zone'
-    # Special case for "メンバーのいないエリアに登場させる" pattern
     if 'メンバーのいないエリアに登場させる' in text:
         return 'empty_area'
-    # Special case for "デッキの一番上に置く" pattern
-    if 'デッキの一番上に置く' in text:
+    if 'デッキの一番上に置く' in text or '山札の上に置く' in text:
         return 'deck_top'
-    # Special case for "ライブカード置き場に置いてもよい" pattern
-    if 'ライブカード置き場に置いてもよい' in text:
+    if 'ライブカード置き場に置いてもよい' in text or '表向きでライブカード置き場に置く' in text:
         return 'live_card_zone'
-    # Special case for "表向きでライブカード置き場に置く" pattern
-    if '表向きでライブカード置き場に置く' in text:
-        return 'live_card_zone'
-    # Special case for "ウェイト状態で置く" pattern (energy cards)
-    if 'ウェイト状態で置く' in text:
+    if 'ウェイト状態で置く' in text or ('エネルギーカードを' in text and '置く' in text):
         return 'energy_zone'
-    # Special case for energy card placement without explicit destination
-    elif 'エネルギーカードを' in text and '置く' in text:
-        return 'energy_zone'
-    # Special case for "デッキの一番上に置く" pattern
-    elif 'デッキの一番上に置く' in text:
-        return 'deck_top'
-        
+    if '登場させる' in text:
+        return 'stage'
+    if '控え室に送る' in text:
+        return 'discard'
+    if 'デッキの下に置く' in text or '山札の下に置く' in text or 'デッキの一番下に置く' in text:
+        return 'deck_bottom'
+    if 'デッキに戻す' in text:
+        return 'deck'
     return extract_by_pattern(text, DESTINATION_PATTERNS)
 
 def extract_location(text: str) -> Optional[str]:
@@ -654,7 +628,8 @@ def _try_compound(text):
     return result
 
 def _try_distinct(text):
-    if '名前が異なる' not in text and 'ユニット名がそれぞれ異なる' not in text:
+    if ('名前が異なる' not in text and '名前の異なる' not in text
+            and 'ユニット名がそれぞれ異なる' not in text):
         return None
     result = {'type': 'location_condition', 'location': 'stage', 'target': 'self',
               'distinct': True, 'text': text}
@@ -665,6 +640,12 @@ def _try_distinct(text):
         result['count'] = int(m.group(1))
         result['operator'] = '>='
         result['unit'] = m.group(2)
+    g = extract_group(text)
+    if g:
+        result['group'] = g
+    gns = extract_group_names(text)
+    if gns:
+        result['group_names'] = gns
     return result
 
 def _try_card_count(text):
@@ -812,6 +793,8 @@ def _try_state(text):
             result = {'type': 'state_condition', 'state': state, 'text': text}
             if state == 'active' and 'エネルギー' in text:
                 result['resource_type'] = 'energy'
+            if 'すべて' in text:
+                result['all'] = True
             return result
     return None
 
@@ -1156,159 +1139,12 @@ def parse_condition(text: str) -> Dict[str, Any]:
 # ============== CONSOLIDATED NORMALIZATION ==============
 
 def normalize_action(obj, original_text=None):
-    """Single-pass normalization for any action/effect dict tree.
-    Call this ONCE at every exit point instead of repeating 8x post-processing blocks."""
-    def _normalize_one(d, text):
-        if not isinstance(d, dict):
-            return
-        a = d.get('action')
-
-        # 1. Fix action name aliases
-        if a == 'draw':
-            d['action'] = 'draw_card'
-            a = 'draw_card'
-
-        # 2. draw_card: set implicit defaults
-        if a == 'draw_card':
-            d.setdefault('source', 'deck')
-            d.setdefault('destination', 'hand')
-
-        # 3. selected_cards source: default count
-        if d.get('source') == 'selected_cards':
-            d.setdefault('count', 1)
-
-        # 4. gain_resource: infer resource from text/icons
-        if a == 'gain_resource' and 'resource' not in d:
-            infer_resource(d, text)
-
-        # 5. gain_resource: infer count from icons or text
-        if a == 'gain_resource':
-            if 'count' not in d:
-                infer_count_from_icons(d, text)
-            if 'count' not in d:
-                d['count'] = 1
-
-        # 6. gain_resource: infer duration
-        if a == 'gain_resource' and 'duration' not in d:
-            dur = extract_duration(text)
-            if dur:
-                d['duration'] = dur
-
-        # 7. move_cards: infer source if missing
-        if a == 'move_cards' and 'source' not in d:
-            inf = _infer_source(text)
-            if inf:
-                d['source'] = inf
-
-        # 8. move_cards: infer destination if missing
-        if a == 'move_cards' and 'destination' not in d:
-            inf = _infer_dest(text)
-            if inf:
-                d['destination'] = inf
-
-        # 9. move_cards: infer card_type if missing
-        if a == 'move_cards' and 'card_type' not in d:
-            inf = _infer_card_type(text, d)
-            if inf:
-                d['card_type'] = inf
-
-        # 10. move_cards: infer state_change
-        if a == 'move_cards' and 'state_change' not in d and 'ウェイト状態' in text:
-            d['state_change'] = 'wait'
-
-        # 11a. under_member source: convert to place_energy_under_member
-        if d.get('source') == 'under_member' and a != 'place_energy_under_member':
-            d['action'] = 'place_energy_under_member'
-            d.setdefault('energy_count', 1)
-            d.setdefault('target_member', 'this_member')
-            a = 'place_energy_under_member'
-
-        # 11b. move_cards: fix revealed_remaining source dynamic_count
-        if a == 'move_cards' and d.get('source') == 'revealed_remaining' and 'dynamic_count' not in d:
-            d['dynamic_count'] = {'type': 'revealed_cards', 'reference': 'previous_reveal'}
-        if a == 'move_cards' and d.get('source') == 'revealed_cards' and 'dynamic_count' not in d:
-            d['dynamic_count'] = {'type': 'revealed_cards', 'reference': 'previous_reveal'}
-        if a == 'move_cards' and d.get('source') == 'revealed_card' and 'count' not in d:
-            d['count'] = 1
-
-        # 12. Default count when none set — try extract_count, then icon counts
-        if 'count' not in d and 'dynamic_count' not in d and not d.get('any_number'):
-            extracted = extract_count(text)
-            if extracted is not None:
-                d['count'] = extracted
-            else:
-                # Try inferring count from icon repetitions
-                icon_count = _count_resource_icons(text)
-                if icon_count > 0:
-                    d['count'] = icon_count
-                elif a in ('move_cards', 'draw_card', 'gain_resource', 'reveal', 'look_at', 'change_state', 'restriction'):
-                    d['count'] = 1
-
-        # 13. Infer optional from text
-        if 'optional' not in d and extract_optional(text):
-            d['optional'] = True
-
-        # 14. Infer max from text
-        if 'max' not in d and extract_max(text):
-            d['max'] = True
-
-        # 15. Convert per_unit with no dynamic_count
-        if d.get('per_unit') and 'dynamic_count' not in d:
-            d['dynamic_count'] = {'type': 'per_unit', 'reference': 'unit_count'}
-            if 'count' in d and d['count'] is None:
-                del d['count']
-
-    def _recurse(node, text):
-        if not isinstance(node, dict):
-            return
-        _normalize_one(node, text)
-        for key in ('actions',):
-            val = node.get(key)
-            if isinstance(val, list):
-                for item in val:
-                    _recurse(item, text)
-            elif isinstance(val, dict):
-                _recurse(val, text)
-        for key in ('primary_effect', 'alternative_effect', 'followup_action',
-                    'optional_action', 'conditional_action', 'opponent_action',
-                    'look_action', 'select_action', 'result_effect'):
-            val = node.get(key)
-            if isinstance(val, dict):
-                _recurse(val, text)
-
-    _recurse(obj, original_text or (obj.get('text', '') if isinstance(obj, dict) else ''))
+    """Stub preserved for external callers — normalization is now inline in parse_action."""
     return obj
 
-
 def _infer_source(text):
-    """Infer source location from text context."""
-    if '手札を' in text or '手札から' in text or '手札の' in text:
-        return 'hand'
-    if '控え室を' in text or '控え室から' in text or '控え室にある' in text:
-        return 'discard'
-    if 'デッキの上から' in text or 'デッキの一番上のカードを' in text:
-        return 'deck_top'
-    if 'デッキの一番上からカードを' in text or 'デッキの一番上から' in text:
-        return 'deck_top'
-    if 'デッキから' in text or 'デッキの' in text or '山札から' in text:
-        return 'deck'
-    if 'ステージから' in text:
-        return 'stage'
-    if '成功ライブカード置き場から' in text or '成功ライブカード置き場にある' in text:
-        return 'success_live_zone'
-    if 'ライブカード置き場から' in text:
-        return 'live_card_zone'
-    if 'エネルギー置き場から' in text:
-        return 'energy_zone'
-    if 'これにより公開されたほかのすべてのカードを' in text:
-        return 'revealed_remaining'
-    if 'これにより公開したカードを' in text or '公開したカードをすべて' in text or 'それらのカードの中から' in text:
-        return 'revealed_cards'
-    if 'このカードを手札に加えてもよい' in text:
-        return 'revealed_card'
-    if 'デッキの一番下から' in text:
-        return 'deck_bottom'
-    return extract_by_pattern(text, SOURCE_PATTERNS)
+    """Infer source location from text context (delegates to extract_source)."""
+    return extract_source(text)
 
 
 def _infer_card_type(text, action=None):
@@ -1549,33 +1385,21 @@ def parse_action(text: str) -> Dict[str, Any]:
     if 'カード名の異なる' in text:
         action['distinct'] = 'card_name'
     
-    # Extract state change
-    state_change = extract_state_change(text)
     if state_change:
         action['state_change'] = state_change
-    
-    # Extract count
-    count = extract_count(text)
+
     if count:
         action['count'] = count
-    # Special case for variable count patterns
     elif 'これにより引いた枚数と同じ枚数を' in text:
-        action['dynamic_count'] = {
-            'type': 'drawn_cards',
-            'reference': 'previous_draw'
-        }
-    # Check for dynamic count patterns (e.g., "スコアに2を足した数に等しい枚数")
+        action['dynamic_count'] = {'type': 'drawn_cards', 'reference': 'previous_draw'}
     else:
         dynamic_count = extract_dynamic_count(text)
         if dynamic_count:
             action['dynamic_count'] = dynamic_count
-    # Extract card type
-    card_type = extract_card_type(text)
+
     if card_type:
         action['card_type'] = card_type
-    
-    # Extract target
-    target = extract_target(text)
+
     if target:
         action['target'] = target
     
@@ -1605,11 +1429,6 @@ def parse_action(text: str) -> Dict[str, Any]:
     group_names = extract_group_names(text)
     if group_names:
         action['group_names'] = group_names
-    
-    # Extract cost limit
-    cost_limit = extract_cost_limit(text)
-    if cost_limit:
-        action['cost_limit'] = cost_limit
     
     # Check for ability gain pattern - MUST BE CHECKED BEFORE general quoted text extraction
     # Pattern 1: Explicit "能力を得る" (gain ability)
@@ -1655,11 +1474,6 @@ def parse_action(text: str) -> Dict[str, Any]:
                         'quoted_type': 'character'
                     }
                 # For multiple characters, don't set quoted_text to avoid deserialization errors
-    
-    # Extract cost limit
-    cost_limit = extract_cost_limit(text)
-    if cost_limit:
-        action['cost_limit'] = cost_limit
     
     # Extract position
     position = extract_position(text)
@@ -1842,30 +1656,76 @@ def parse_action(text: str) -> Dict[str, Any]:
                 try: setter(text, action)
                 except: pass
             break
-    
-    normalize_action(action, text)
+
+    # ---- Post-dispatch normalization (was normalize_action) ----
+    a = action.get('action')
+    if a == 'draw':
+        action['action'] = 'draw_card'; a = 'draw_card'
+    if a == 'draw_card':
+        action.setdefault('source', 'deck'); action.setdefault('destination', 'hand')
+    if action.get('source') == 'selected_cards':
+        action.setdefault('count', 1)
+    if a == 'gain_resource' and 'resource' not in action:
+        infer_resource(action, text)
+    if a == 'gain_resource':
+        if 'count' not in action: infer_count_from_icons(action, text)
+        if 'count' not in action: action['count'] = 1
+    if a == 'gain_resource' and 'duration' not in action:
+        dur = extract_duration(text)
+        if dur: action['duration'] = dur
+    if a == 'modify_score' and 'value' not in action:
+        vm = re.search(r'[+＋](\d+)', text)
+        if vm: action['value'] = int(vm.group(1))
+    if 'このカード' in text:
+        action['self_target'] = True
+    if a == 'move_cards':
+        if 'source' not in action:
+            s = _infer_source(text)
+            if s: action['source'] = s
+        if 'destination' not in action:
+            d = _infer_dest(text)
+            if d: action['destination'] = d
+        if 'card_type' not in action:
+            ct = _infer_card_type(text, action)
+            if ct: action['card_type'] = ct
+        if 'state_change' not in action and 'ウェイト状態' in text:
+            action['state_change'] = 'wait'
+    if action.get('source') == 'under_member' and a != 'place_energy_under_member':
+        action['action'] = 'place_energy_under_member'; a = 'place_energy_under_member'
+        action.setdefault('energy_count', 1); action.setdefault('target_member', 'this_member')
+    if a == 'move_cards' and action.get('source') in ('revealed_remaining', 'revealed_cards') and 'dynamic_count' not in action:
+        action['dynamic_count'] = {'type': 'revealed_cards', 'reference': 'previous_reveal'}
+    if a == 'move_cards' and action.get('source') == 'revealed_card' and 'count' not in action:
+        action['count'] = 1
+    if 'count' not in action and 'dynamic_count' not in action and not action.get('any_number'):
+        extracted = extract_count(text)
+        if extracted is not None:
+            action['count'] = extracted
+        else:
+            icon_count = _count_resource_icons(text)
+            if icon_count > 0: action['count'] = icon_count
+            elif a in ('move_cards', 'draw_card', 'gain_resource', 'reveal', 'look_at', 'change_state', 'restriction'):
+                action['count'] = 1
+    if 'optional' not in action and extract_optional(text):
+        action['optional'] = True
+    if 'max' not in action and extract_max(text):
+        action['max'] = True
+    if action.get('per_unit') and 'dynamic_count' not in action:
+        action['dynamic_count'] = {'type': 'per_unit', 'reference': 'unit_count'}
+        if 'count' in action and action['count'] is None:
+            del action['count']
+
     return action
 
 
 def _infer_dest(text):
-    """Infer destination from text context."""
-    if '手札に加える' in text or '手札に' in text: return 'hand'
-    if '控え室に置く' in text or '控え室に送る' in text: return 'discard'
-    if 'ステージに置く' in text or '登場させる' in text: return 'stage'
-    if 'エネルギー置き場に置く' in text: return 'energy_zone'
-    if 'ライブカード置き場に置く' in text: return 'live_card_zone'
-    if '成功ライブカード置き場に置く' in text: return 'success_live_card_zone'
-    if 'デッキの上に置く' in text or '山札の上に置く' in text: return 'deck_top'
-    if 'デッキの下に置く' in text or '山札の下に置く' in text: return 'deck_bottom'
-    if 'デッキに戻す' in text or 'デッキに置く' in text or 'デッキの一番上から' in text: return 'deck'
-    return None
+    """Infer destination from text context (delegates to extract_destination)."""
+    return extract_destination(text)
 
 
-def post_process_action_comprehensive(action: Dict[str, Any]) -> Dict[str, Any]:
-    """Legacy wrapper — delegates to normalize_action."""
-    return normalize_action(action)
 
-# ============== MAIN PARSING FUNCTIONS ==============
+
+
 
 def parse_cost(text: str) -> Dict[str, Any]:
     """Parse a cost text."""
@@ -2679,14 +2539,16 @@ def _try_conditional_sequential(text):
 
 
 def _try_sequential(text):
-    """その後、 — sequential marker."""
+    """その後、 — sequential marker. Must be checked BEFORE _try_conditional
+    so that 条件→行動。その後、条件→行動 patterns are split correctly
+    (moved from position 17 to position 12 in _EFFECT_HANDLERS)."""
     if SEQUENTIAL_MARKER not in text:
         return None
     parts = text.split(SEQUENTIAL_MARKER, 1)
-    fa = parse_action(parts[0].strip())
+    fa = parse_effect(parts[0].strip())
     sp = parts[1].strip().lstrip('、')
     if sp.startswith('その後'): sp = sp[len('その後'):].strip()
-    sa = parse_action(sp)
+    sa = parse_effect(sp)
     return {'text': text, 'action': 'sequential', 'actions': [fa, sa]}
 
 
@@ -3035,11 +2897,11 @@ _EFFECT_HANDLERS = [
     _try_furthermore,
     _try_sequential_duration,
     _try_conditional_sequential,
+    _try_sequential,
     _try_implicit_sequential,
     _try_conditional,
     _try_shi_sequential,
     _try_choice,
-    _try_sequential,
     _try_kore_niyori_cascade,
     _try_ability_activation,
     _try_baton_touch_effect,
@@ -3092,7 +2954,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
             # Apply duration prefix info
             if 'duration' in effect and 'duration' not in result:
                 result['duration'] = effect['duration']
-            normalize_action(result)
             return result
 
     # Fallback: parse as single action
@@ -3148,7 +3009,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
     if 'duration' in effect and 'duration' not in locals().get('dur_effect', {}):
         pass  # Already handled inline
 
-    normalize_action(effect)
     return effect
 
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
@@ -3176,11 +3036,15 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 # ============== PROCESSING ==============
 
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Legacy: normalize using normalize_action on all abilities (no-op if already done at gen time)."""
+    """Re-parse all abilities from triggerless_text using the current parser."""
     for ability in data['unique_abilities']:
-        effect = ability.get('effect')
-        if effect:
-            normalize_action(effect)
+        triggerless = ability.get('triggerless_text', '')
+        if triggerless:
+            parsed = parse_ability(triggerless)
+            if 'effect' in parsed:
+                ability['effect'] = parsed['effect']
+            if 'cost' in parsed:
+                ability['cost'] = parsed['cost']
     return data
 
 

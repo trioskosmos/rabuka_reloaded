@@ -102,15 +102,18 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             let mut names = std::collections::HashSet::new();
             for &card_id in card_ids {
                 if card_id == -1 { continue; }
-                if card_db.get_card(card_id).is_some() {
+                if let Some(card) = card_db.get_card(card_id) {
                     let card_names = card_db.get_card_names(card_id);
-                    for name in card_names {
-                        if !names.insert(name) {
+                    for name in &card_names {
+                        if !names.insert(name.clone()) {
+                            eprintln!("[DISTINCT] duplicate name '{}' found for card_id={} ({})",
+                                name, card_id, card.name);
                             return false;
                         }
                     }
                 }
             }
+            eprintln!("[DISTINCT] all names unique: {:?} total={}", names, card_ids.iter().filter(|&&id| id != -1).count());
             true
         };
 
@@ -170,8 +173,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         };
 
         if distinct {
+            eprintln!("[DISTINCT] check: target={target} location={location} group_names={group_names:?}");
             let player = self.game_state.resolve_target_player(if target == "either" { "self" } else { target });
-            let card_ids: Vec<i16> = match location {
+            let mut card_ids: Vec<i16> = match location {
                 "stage" => player.stage.stage.to_vec(),
                 "hand" => player.hand.cards.to_vec(),
                 "deck" => player.main_deck.cards.to_vec(),
@@ -181,6 +185,27 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 "success_live_zone" => player.success_live_card_zone.cards.to_vec(),
                 _ => vec![],
             };
+            // When group_names is set, only check distinctness among group members
+            if let Some(ref grp_names) = group_names {
+                if let Some(first_group) = grp_names.first() {
+                    let before_count = card_ids.iter().filter(|&&id| id != -1).count();
+                    card_ids = card_ids.into_iter().filter(|&id| {
+                        id != -1 && card_db.get_card(id).map(|c| {
+                            c.unit.as_deref() == Some(first_group.as_str()) || c.group == *first_group
+                        }).unwrap_or(false)
+                    }).collect();
+                    let after_count = card_ids.iter().filter(|&&id| id != -1).count();
+                    eprintln!("[DISTINCT] group filter '{}': {} stage cards -> {} group members",
+                        first_group, before_count, after_count);
+                    for &id in &card_ids {
+                        if id != -1 {
+                            if let Some(c) = card_db.get_card(id) {
+                                eprintln!("[DISTINCT]   group member: card_id={} name={} group={}", id, c.name, c.group);
+                            }
+                        }
+                    }
+                }
+            }
             if !check_distinct_names(&card_ids) {
                 return false;
             }
@@ -329,10 +354,33 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     fn evaluate_state_condition(&self, condition: &Condition) -> bool {
         let state = condition.state.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
+        let resource_type = condition.resource_type.as_deref();
+        let all_cards = condition.all.unwrap_or(false);
         let player = self.game_state.resolve_target_player(target);
-        match state {
-            "active" | "wait" => player.stage.stage.iter().any(|&card_id| card_id != -1),
-            _ => true,
+
+        if resource_type == Some("energy") {
+            match state {
+                "active" => {
+                    if all_cards {
+                        player.energy_zone.active_energy_count == player.energy_zone.cards.len()
+                    } else {
+                        player.energy_zone.active_energy_count > 0
+                    }
+                }
+                "wait" => {
+                    if all_cards {
+                        player.energy_zone.active_energy_count == 0
+                    } else {
+                        player.energy_zone.active_energy_count < player.energy_zone.cards.len()
+                    }
+                }
+                _ => true,
+            }
+        } else {
+            match state {
+                "active" | "wait" => player.stage.stage.iter().any(|&card_id| card_id != -1),
+                _ => true,
+            }
         }
     }
 

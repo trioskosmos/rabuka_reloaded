@@ -89,6 +89,7 @@ impl TurnEngine {
                         game_state.player2.id.clone()
                     };
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
+                    game_state.process_pending_auto_abilities(&first_attacker_id);
                     return;
                 }
                 Phase::FirstAttackerPerformance => {
@@ -297,12 +298,9 @@ impl TurnEngine {
                 let card_no = card_db.get_card(card).map(|c| c.card_no.clone()).unwrap_or_default();
                 let _ = player.live_card_zone.add_card(card, true, &card_db);
 
-                // Trigger live start abilities for the set live card
-                let player_id = player.id.clone();
-                Self::trigger_live_start_abilities_for_card(game_state, &player_id, &card_no);
-
-                // Process the triggered live start abilities
-                game_state.process_pending_auto_abilities(&player_id);
+                // LiveStart abilities trigger during phase transition to
+                // FirstAttackerPerformance, not when the card is set.
+                // (Rule: ライブ開始時 fires at live start, not at card set.)
             }
         } else {
             // No card selected, finish this player's live card set
@@ -401,7 +399,7 @@ impl TurnEngine {
                         crate::game_state::AbilityTrigger::Debut,
                         player_id.clone(),
                         Some(card_no),
-                    );
+                     None,);
                 }
             }
         }
@@ -658,7 +656,7 @@ impl TurnEngine {
                 crate::game_state::AbilityTrigger::Activation,
                 player_id.clone(),
                 Some(card.card_no.clone()),
-            );
+             None,);
             game_state.process_pending_auto_abilities(&player_id);
         }
         Ok(())
@@ -1393,7 +1391,7 @@ impl TurnEngine {
                 ability_id,
                 crate::game_state::AbilityTrigger::Debut,
                 player_id_clone.clone(),
-                Some(card_no),
+                Some(card_no), None,
             );
         }
     }
@@ -1401,12 +1399,12 @@ impl TurnEngine {
     #[allow(dead_code)]
     fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
         // Rule 11.5: Trigger LiveStart automatic abilities
-        // Rule 11.5.2: Trigger when live card is set
+        // Triggered at live start (FirstAttackerPerformance), when live cards are set
         
         let player_id_clone = player_id.to_string();
         
         // Collect abilities to trigger first to avoid borrow conflicts
-        let mut abilities_to_trigger = Vec::new();
+        let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
         
         {
             let player = if player_id_clone == game_state.player1.id {
@@ -1415,18 +1413,27 @@ impl TurnEngine {
                 &game_state.player2
             };
             
+            // Check all live cards for LiveStart abilities
+            for &live_card_id in &player.live_card_zone.cards {
+                if let Some(card) = game_state.card_database.get_card(live_card_id) {
+                    for ability in &card.abilities {
+                        if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
+                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            abilities_to_trigger.push((ability_id, card.card_no.clone(), Some(live_card_id)));
+                        }
+                    }
+                }
+            }
+            
             // Check all members on stage for LiveStart abilities
             let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
             for area in areas {
-                if let Some(card_id) = player.stage.get_area(area) {
-                    if let Some(card) = game_state.card_database.get_card(card_id) {
-                        // Check if card has LiveStart abilities
+                if let Some(stage_card_id) = player.stage.get_area(area) {
+                    if let Some(card) = game_state.card_database.get_card(stage_card_id) {
                         for ability in &card.abilities {
-                            // Check if ability has LiveStart trigger
                             if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
-                                // Collect ability to trigger
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                                abilities_to_trigger.push((ability_id, card.card_no.clone(), Some(stage_card_id)));
                             }
                         }
                     }
@@ -1434,52 +1441,18 @@ impl TurnEngine {
             }
         }
         
-        // Trigger collected abilities
-        // Queue system handles state management automatically
-        for (ability_id, card_no) in abilities_to_trigger {
+        eprintln!("[LIVESTART] Triggering {} abilities", abilities_to_trigger.len());
+        for (ability_id, card_no, actual_card_id) in &abilities_to_trigger {
+            eprintln!("[LIVESTART]  ability: card_no={} card_id={:?}", card_no, actual_card_id);
+        }
+        // Trigger collected abilities with correct card_id
+        for (ability_id, card_no, actual_card_id) in abilities_to_trigger {
             game_state.trigger_auto_ability(
                 ability_id,
                 crate::game_state::AbilityTrigger::LiveStart,
                 player_id_clone.clone(),
                 Some(card_no),
-            );
-        }
-    }
-
-    /// Trigger live start abilities for a specific live card when it is set
-    fn trigger_live_start_abilities_for_card(game_state: &mut GameState, player_id: &str, card_no: &str) {
-        let player_id_clone = player_id.to_string();
-        let card_no_clone = card_no.to_string();
-
-        let mut abilities_to_trigger = Vec::new();
-
-        {
-            let player = if player_id_clone == game_state.player1.id {
-                &game_state.player1
-            } else {
-                &game_state.player2
-            };
-
-            for card_id in &player.live_card_zone.cards {
-                if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    if card.card_no == card_no_clone {
-                        for ability in &card.abilities {
-                            if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
-                                let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                abilities_to_trigger.push((ability_id, card.card_no.clone()));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        for (ability_id, card_no) in abilities_to_trigger {
-            game_state.trigger_auto_ability(
-                ability_id,
-                crate::game_state::AbilityTrigger::LiveStart,
-                player_id_clone.clone(),
-                Some(card_no),
+                actual_card_id,
             );
         }
     }
@@ -1542,7 +1515,7 @@ impl TurnEngine {
                 ability_id,
                 crate::game_state::AbilityTrigger::LiveSuccess,
                 player_id_clone.clone(),
-                Some(card_no),
+                Some(card_no), None,
             );
         }
     }
