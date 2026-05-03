@@ -1,7 +1,8 @@
-use crate::card::{CardDatabase, HeartColor, HeartIcon, Keyword};
+use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, Keyword};
 use crate::mod_map::ModMap;
 use serde::{Serialize, Deserialize};
 use smallvec::SmallVec;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Orientation {
@@ -220,23 +221,42 @@ impl Stage {
         hearts
     }
 
-    pub fn get_available_hearts(&self, card_db: &CardDatabase) -> crate::card::BaseHeart {
-        // Rule 8.2.7: Calculate available hearts from stage for heart requirement checking
-        let mut hearts = std::collections::HashMap::new();
+    pub fn get_available_hearts(
+        &self, card_db: &CardDatabase,
+        heart_override: &HashMap<i16, (HeartColor, u32)>,
+        heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
+    ) -> BaseHeart {
+        let mut hearts = HashMap::new();
 
         for &card_id in &self.stage {
-            if card_id != -1 {
-                if let Some(card) = card_db.get_card(card_id) {
-                    if let Some(ref base_heart) = card.base_heart {
-                        for (color, count) in &base_heart.hearts {
-                            *hearts.entry(*color).or_insert(0) += count;
-                        }
+            if card_id == -1 { continue; }
+
+            if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
+                *hearts.entry(override_color).or_insert(0) += override_count;
+                continue;
+            }
+
+            if let Some(card) = card_db.get_card(card_id) {
+                if let Some(ref base_heart) = card.base_heart {
+                    for (color, count) in &base_heart.hearts {
+                        *hearts.entry(*color).or_insert(0) += count;
+                    }
+                }
+            }
+
+            if let Some(mods) = heart_modifiers.get(&card_id) {
+                for (color, delta) in mods {
+                    let new_val = (*hearts.get(color).unwrap_or(&0) as i32 + *delta).max(0) as u32;
+                    if new_val > 0 {
+                        hearts.insert(*color, new_val);
+                    } else {
+                        hearts.remove(color);
                     }
                 }
             }
         }
 
-        crate::card::BaseHeart { hearts }
+        BaseHeart { hearts }
     }
 }
 

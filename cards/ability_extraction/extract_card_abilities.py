@@ -20,8 +20,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from parser import (
     parse_cost,
     parse_effect,
-    parse_ability,
-    process_abilities,
+    normalize_action,
 )
 
 TRIGGER_PATTERN = re.compile(r'\{\{([^|]+)\|([^}]+)\}\}')
@@ -211,6 +210,20 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
     return abilities
 
 
+def _enrich_effect_type(effect, triggerless=""):
+    """Extract heart colors from ability text. effect_type is NOT set here
+    (the trigger field already implies whether it's continuous or triggered)."""
+    if effect is None:
+        return
+    heart_colors = []
+    for m in re.findall(r'heart_(\d+)', triggerless):
+        heart_colors.append(f'heart{m.zfill(2)}')
+    for m in re.findall(r'{{heart_(\d+)\.png\|heart\d+}}', triggerless):
+        heart_colors.append(f'heart{m.zfill(2)}')
+    if heart_colors:
+        effect['heart_colors'] = heart_colors
+
+
 def extract_all_abilities(cards_file: Path) -> dict:
     """Extract all abilities from cards.json."""
     with open(cards_file, encoding='utf-8') as f:
@@ -278,90 +291,9 @@ def extract_all_abilities(cards_file: Path) -> dict:
             if 'actions' in effect and not effect['actions']:
                 print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
                 print(f"Effect dict: {effect}")
-            # Post-processing: fix per_unit effects missing action field
-            if effect.get('per_unit') and 'action' not in effect:
-                text = effect.get('text', '')
-                # Check for blade gain (with or without icon tag)
-                if 'ブレードを得る' in text or '選んだブレード' in text or '{{icon_blade.png|ブレード}}を得る' in text:
-                    effect['action'] = 'gain_resource'
-                    effect['resource'] = 'blade'
-                    # Extract resource icon count and use as count
-                    icon_count = text.count('{{icon_blade.png|ブレード}}')
-                    if icon_count > 0:
-                        effect['count'] = icon_count
-                # Check for heart gain (with or without icon tag)
-                elif 'ハートを得る' in text or '選んだハート' in text or ('{{heart' in text and 'を得る' in text):
-                    effect['action'] = 'gain_resource'
-                    effect['resource'] = 'heart'
-                    # Extract heart icon count and use as count
-                    icon_count = len(re.findall(r'{{heart_\d+\.png|heart\d+}}', text))
-                    if icon_count > 0:
-                        effect['count'] = icon_count
-                elif '引く' in text:
-                    effect['action'] = 'draw_card'
-            
-            # Post-processing: fix 'action': 'draw' to 'draw_card' in effect and nested structures
-            def fix_draw_action(obj):
-                if isinstance(obj, dict):
-                    if obj.get('action') == 'draw':
-                        obj['action'] = 'draw_card'
-                    for key, value in obj.items():
-                        fix_draw_action(value)
-                elif isinstance(obj, list):
-                    for item in obj:
-                        fix_draw_action(item)
-            
-            fix_draw_action(effect)
-            
-            # Post-processing: ensure gain_resource effects have count and resource fields in nested structures
-            def fix_gain_resource(obj):
-                if isinstance(obj, dict):
-                    if obj.get('action') == 'gain_resource':
-                        text = obj.get('text', '')
-                        # Check if this is actually a 'gain ability' pattern
-                        quoted_text_match = re.search(r'「([^」]+)」を得る', text)
-                        if quoted_text_match:
-                            quoted_content = quoted_text_match.group(1)
-                            # If the quoted text contains ability keywords, convert to gain_ability
-                            if 'ライブ' in quoted_content or 'スコア' in quoted_content:
-                                obj['action'] = 'gain_ability'
-                                obj['ability_gain'] = quoted_content  # Use ability_gain as string to match engine
-                                # Remove resource and count fields if they were added incorrectly
-                                if 'resource' in obj:
-                                    del obj['resource']
-                                if 'count' in obj:
-                                    del obj['count']
-                                return
-                        # Ensure resource field is set
-                        if 'resource' not in obj:
-                            if 'ブレード' in text:
-                                obj['resource'] = 'blade'
-                            elif 'ハート' in text:
-                                obj['resource'] = 'heart'
-                        # Ensure count field is set
-                        if 'count' not in obj:
-                            # Try to extract from numeric text
-                            count_match = re.search(r'(\d+)つ', text)
-                            if count_match:
-                                obj['count'] = int(count_match.group(1))
-                            else:
-                                # Try to extract from icon counts
-                                blade_count = text.count('{{icon_blade.png|ブレード}}')
-                                heart_count = len(re.findall(r'{{heart_\d+\.png\|heart\d+}}', text))
-                                if blade_count > 0:
-                                    obj['count'] = blade_count
-                                elif heart_count > 0:
-                                    obj['count'] = heart_count
-                                else:
-                                    # Default to 1 if not specified
-                                    obj['count'] = 1
-                    for key, value in obj.items():
-                        fix_gain_resource(value)
-                elif isinstance(obj, list):
-                    for item in obj:
-                        fix_gain_resource(item)
-            
-            fix_gain_resource(effect)
+            # Single-pass normalization (replaces fix_draw_action, fix_gain_resource, etc.)
+            normalize_action(effect)
+            _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
             
         except Exception as e:
             print(f"Error parsing effect: {effect_text}")

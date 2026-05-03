@@ -43,6 +43,7 @@ pub struct GameState {
     pub blade_modifiers: ModMap<i32>,
     pub blade_type_modifiers: ModMap<BladeColor>,
     pub heart_modifiers: HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
+    pub heart_override: HashMap<i16, (crate::card::HeartColor, u32)>,
     pub orientation_modifiers: ModMap<String>,
     pub cost_modifiers: ModMap<i32>,
     pub revealed_cards: std::collections::HashSet<i16>,
@@ -84,6 +85,9 @@ pub struct GameState {
     pub loop_detected: bool,
     /// Blade bonuses from 常時 (constant) abilities, tracked so they can be recalculated
     pub constant_blade_bonuses: HashMap<i16, i32>,
+    /// Tracks which stage area (0=left,1=center,2=right) was vacated by the last self_cost move
+    /// Used for "same_area" destination in move_cards
+    pub last_vacated_stage_area: Option<usize>,
 }
 
 impl GameState {
@@ -135,6 +139,7 @@ impl GameState {
             blade_modifiers: ModMap::new(),
             blade_type_modifiers: ModMap::new(),
             heart_modifiers: HashMap::new(),
+            heart_override: HashMap::new(),
             orientation_modifiers: ModMap::new(),
             cost_modifiers: ModMap::new(),
             revealed_cards: std::collections::HashSet::new(),
@@ -174,6 +179,7 @@ impl GameState {
             max_state_history_size: DEFAULT_HISTORY_SIZE,
             loop_detected: false,
             constant_blade_bonuses: HashMap::new(),
+            last_vacated_stage_area: None,
         };
         debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
         state
@@ -513,6 +519,24 @@ impl GameState {
             .unwrap_or(0)
     }
 
+    pub fn set_heart_override(&mut self, card_id: i16, color: crate::card::HeartColor, count: u32, duration: &str) {
+        self.heart_override.insert(card_id, (color, count));
+        let mut data = serde_json::Map::new();
+        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
+        data.insert("color".to_string(), serde_json::Value::String(format!("{:?}", color)));
+        data.insert("count".to_string(), serde_json::Value::Number(count.into()));
+        self.temporary_effects.push(TemporaryEffect {
+            effect_type: "heart_override".to_string(),
+            duration: match duration { "live_end" => Duration::LiveEnd, "this_turn" => Duration::ThisTurn, _ => Duration::ThisLive },
+            created_turn: self.turn_number,
+            created_phase: self.current_phase.clone(),
+            target_player_id: String::new(),
+            description: format!("Heart override: card {} = {:?} x{}", card_id, color, count),
+            creation_order: 0,
+            effect_data: Some(serde_json::Value::Object(data)),
+        });
+    }
+
     pub fn add_score_modifier(&mut self, card_id: i16, delta: i32) {
         *self.score_modifiers.entry(card_id).or_insert(0) += delta;
     }
@@ -802,6 +826,7 @@ impl GameState {
     pub fn clear_modifiers_for_card(&mut self, card_id: i16) {
         self.blade_modifiers.remove(card_id);
         self.heart_modifiers.remove(&card_id);
+        self.heart_override.remove(&card_id);
         self.score_modifiers.remove(card_id);
         self.need_heart_modifiers.remove(&card_id);
         self.orientation_modifiers.remove(card_id);
@@ -1270,6 +1295,14 @@ impl GameState {
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                "heart_override" => {
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
+                            self.heart_override.remove(&(card_id as i16));
+                            eprintln!("Removed heart override for card {}", card_id);
                         }
                     }
                 }

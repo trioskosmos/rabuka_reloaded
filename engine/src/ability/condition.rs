@@ -1,4 +1,5 @@
 use crate::card::Condition;
+use crate::condition_enum::ConditionEnum;
 use crate::game_state::Phase;
 use super::util;
 use super::util::compare_counts;
@@ -6,32 +7,29 @@ use super::util::compare_counts;
 #[allow(dead_code)]
 impl<'a> super::resolver::AbilityResolver<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
-        let result = match condition.condition_type.as_deref() {
-            Some("compound") => self.evaluate_compound_condition(condition),
-            Some("comparison_condition") => self.evaluate_comparison_condition(condition),
-            Some("location_condition") => self.evaluate_location_condition(condition),
-            Some("position_condition") => self.evaluate_position_condition(condition),
-            Some("group_condition") => self.evaluate_group_condition(condition),
-            Some("card_count_condition") => self.evaluate_card_count_condition(condition),
-            Some("appearance_condition") => self.evaluate_appearance_condition(condition),
-            Some("temporal_condition") => self.evaluate_temporal_condition(condition),
-            Some("state_condition") => self.evaluate_state_condition(condition),
-            Some("energy_state_condition") => self.evaluate_energy_state_condition(condition),
-            Some("movement_condition") => self.evaluate_movement_condition(condition),
-            Some("ability_negation_condition") => self.evaluate_ability_negation_condition(condition),
-            Some("or_condition") => self.evaluate_or_condition(condition),
-            Some("any_of_condition") => self.evaluate_any_of_condition(condition),
-            Some("score_threshold_condition") => self.evaluate_score_threshold_condition(condition),
-            Some("choice_condition") => self.evaluate_choice_condition(condition),
-            Some("position_change_condition") => self.evaluate_position_change_condition(condition),
-            Some("state_change_condition") => self.evaluate_state_change_condition(condition),
-            Some("opponent_choice_condition") => self.evaluate_opponent_choice_condition(condition),
-            Some("opponent_live_success") => self.evaluate_opponent_live_success_condition(condition),
-            Some("complex_condition") => self.evaluate_complex_condition(condition),
-            _ => {
-                eprintln!("Unknown condition type: {:?}", condition.condition_type);
-                true
-            }
+        let cond_enum = ConditionEnum::from_condition(condition);
+        let result = match cond_enum {
+            ConditionEnum::Compound { .. } => self.evaluate_compound_condition(condition),
+            ConditionEnum::Comparison { .. } => self.evaluate_comparison_condition(condition),
+            ConditionEnum::Location { .. } => self.evaluate_location_condition(condition),
+            ConditionEnum::Position { .. } => self.evaluate_position_condition(condition),
+            ConditionEnum::Group { .. } => self.evaluate_group_condition(condition),
+            ConditionEnum::CardCount { .. } => self.evaluate_card_count_condition(condition),
+            ConditionEnum::Appearance { .. } => self.evaluate_appearance_condition(condition),
+            ConditionEnum::Temporal { .. } => self.evaluate_temporal_condition(condition),
+            ConditionEnum::State { .. } => self.evaluate_state_condition(condition),
+            ConditionEnum::EnergyState { .. } => self.evaluate_energy_state_condition(condition),
+            ConditionEnum::Movement { .. } => self.evaluate_movement_condition(condition),
+            ConditionEnum::AbilityNegation { .. } => self.evaluate_ability_negation_condition(condition),
+            ConditionEnum::Or { .. } => self.evaluate_or_condition(condition),
+            ConditionEnum::AnyOf { .. } => self.evaluate_any_of_condition(condition),
+            ConditionEnum::ScoreThreshold { .. } => self.evaluate_score_threshold_condition(condition),
+            ConditionEnum::Choice => self.evaluate_choice_condition(condition),
+            ConditionEnum::PositionChange { .. } => self.evaluate_position_change_condition(condition),
+            ConditionEnum::StateChange { .. } => self.evaluate_state_change_condition(condition),
+            ConditionEnum::OpponentChoice { .. } => self.evaluate_opponent_choice_condition(condition),
+            ConditionEnum::OpponentLiveSuccess => self.evaluate_opponent_live_success_condition(condition),
+            ConditionEnum::Complex => self.evaluate_complex_condition(condition),
         };
 
         if condition.negation.unwrap_or(false) {
@@ -78,7 +76,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let location = condition.location.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let card_type_filter = condition.card_type.as_deref();
-        let _aggregate = condition.aggregate.as_deref();
         let comparison_type = condition.comparison_type.as_deref();
         let operator = condition.operator.as_deref();
         // When count is not specified but filters are set, default to 1

@@ -372,6 +372,32 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 self.execution_context = ExecutionContext::None;
                 Ok(())
             }
+            (Some(Choice::SelectHeartColor { count, options: _, description: _ }), ChoiceResult::HeartColorSelected { colors }) => {
+                if let Some(chosen) = colors.first() {
+                    let color = crate::zones::parse_heart_color(chosen);
+                    if let Some(card_id) = self.game_state.activating_card {
+                        let count = *count as u32;
+                        self.game_state.set_heart_override(card_id, color, count.max(1), "live_end");
+                        eprintln!("Heart override: card {} now contributes {:?} x{}", card_id, color, count);
+                    }
+                }
+                self.pending_choice = None;
+                let context = self.execution_context.clone();
+                self.resume_execution(context)
+            }
+            (Some(Choice::SelectHeartType { count, options: _, description: _ }), ChoiceResult::HeartTypeSelected { types }) => {
+                if let Some(chosen) = types.first() {
+                    let color = crate::zones::parse_heart_color(chosen);
+                    if let Some(card_id) = self.game_state.activating_card {
+                        let count = *count as u32;
+                        self.game_state.set_heart_override(card_id, color, count.max(1), "live_end");
+                        eprintln!("Heart type override: card {} now contributes {:?} x{}", card_id, color, count);
+                    }
+                }
+                self.pending_choice = None;
+                let context = self.execution_context.clone();
+                self.resume_execution(context)
+            }
             _ => Err("Choice result does not match pending choice".to_string()),
         }
     }
@@ -386,8 +412,11 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     fn execute_selected_cards_from_zone(&mut self, zone: &str, indices: &[usize], _count: usize, card_type_filter: Option<&str>) -> Result<(), String> {
         let destination = if zone == "discard" { self.game_state.entry_destination().map(|s| s.to_string()) } else { None };
         let character_filter = self.game_state.entry_characters().cloned();
-        let player = &mut self.game_state.player1;
+        let target = self.game_state.entry_effect()
+            .and_then(|e| e.target.clone())
+            .unwrap_or_else(|| "self".to_string());
         let card_db = self.game_state.card_database.clone();
+        let player = self.game_state.resolve_target_player_mut(&target);
 
         let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
             util::card_matches_type(&card_db, card_id, filter)
@@ -493,7 +522,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         self.execute_selected_cards_from_zone("stage", indices, count, card_type_filter)
     }
     fn execute_selected_looked_at_cards(&mut self, indices: &[usize]) -> Result<(), String> {
-        let player = &mut self.game_state.player1;
+        let player = self.game_state.resolve_target_player_mut("self");
         let mut indices_to_remove: Vec<usize> = indices.iter().copied().collect();
         indices_to_remove.sort_by(|a, b| b.cmp(a));
         for i in indices_to_remove {
@@ -508,7 +537,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         Ok(())
     }
     fn execute_selected_energy_zone_cards(&mut self, indices: &[usize], _count: usize) -> Result<(), String> {
-        let player = &mut self.game_state.player1;
+        let player = self.game_state.resolve_target_player_mut("self");
         let mut indices_to_remove: Vec<usize> = indices.iter().copied().collect();
         indices_to_remove.sort_by(|a, b| b.cmp(a));
         for i in indices_to_remove {

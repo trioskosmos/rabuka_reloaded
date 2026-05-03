@@ -42,8 +42,16 @@ impl<'a> AbilityResolver<'a> {
         // Collect moved cards for modifier clearing after player borrow ends
         let mut moved_cards: Vec<i16> = Vec::new();
 
+        // Read vacated stage area (set by the cost phase) for same_area destination
+        let vacated_stage_area = self.game_state.last_vacated_stage_area;
+        self.game_state.last_vacated_stage_area = None;
+
         {
-            let player = self.game_state.resolve_target_player_mut(target);
+            let player = match target {
+                "self" => &mut self.game_state.player1,
+                "opponent" => &mut self.game_state.player2,
+                _ => &mut self.game_state.player1,
+            };
 
             match (source.as_str(), destination.as_str()) {
                 // --- DECK → anything ---
@@ -87,6 +95,7 @@ impl<'a> AbilityResolver<'a> {
                             let mut found = false;
                             for i in 0..3 {
                                 if player.stage.stage[i] == activating_id {
+                                    self.game_state.last_vacated_stage_area = Some(i);
                                     let card_id = player.stage.stage[i];
                                     player.stage.stage[i] = -1;
                                     match dest {
@@ -95,9 +104,8 @@ impl<'a> AbilityResolver<'a> {
                                         "deck_bottom" => player.main_deck.cards.push(card_id),
                                         "deck_top" => player.main_deck.cards.insert(0, card_id),
                                         "same_area" => {
-                                            if let Some(act_id) = self.activating_card_id {
-                                                for pos in 0..3 { if player.stage.stage[pos] == act_id { player.stage.stage[pos] = card_id; break; } }
-                                            } else { player.hand.add_card(card_id); }
+                                            player.stage.stage[i] = card_id;
+                                            self.game_state.last_vacated_stage_area = None;
                                         }
                                         "live_card_zone" => player.live_card_zone.cards.push(card_id),
                                         "success_live_zone" => player.success_live_card_zone.cards.push(card_id),
@@ -205,8 +213,41 @@ impl<'a> AbilityResolver<'a> {
                         moved_cards.push(card);
                     }
                 }
-                ("discard", "stage") => {
-                    let _total_cost_limit = effect.total_cost_limit;
+                ("discard", "live_card_zone") => {
+                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, Some("live_card"), group_name, cost_limit);
+                    if idxs.is_empty() {
+                        return Err("No live cards in discard to move to live card zone".into());
+                    }
+                    let select_count = if idxs.len() < count { idxs.len() } else { count };
+                    if idxs.len() > count {
+                        return self.prompt_card_choice("discard", count, &format!("Select {} live cards for live card zone", count), Some("live_card"));
+                    }
+                    for &i in idxs.iter().rev().take(select_count) {
+                        let card = player.waitroom.cards.remove(i);
+                        player.live_card_zone.cards.push(card);
+                        moved_cards.push(card);
+                    }
+                }
+                ("discard", "same_area") => {
+                    let target_pos = vacated_stage_area.unwrap_or(1);
+                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, Some("member_card"), group_name, cost_limit);
+                    if idxs.is_empty() {
+                        return Err("No matching member cards in discard to place in same area".into());
+                    }
+                    let pick_idx = if idxs.len() > 1 { idxs[0] } else { idxs[0] };
+                    let card = player.waitroom.cards.remove(pick_idx);
+                    if target_pos < 3 && player.stage.stage[target_pos] == -1 {
+                        player.stage.stage[target_pos] = card;
+                        player.areas_locked_this_turn.insert(pos_to_area(target_pos));
+                    } else if let Some(pos) = stage_first_empty(&player.stage.stage) {
+                        player.stage.stage[pos] = card;
+                        player.areas_locked_this_turn.insert(pos_to_area(pos));
+                    } else {
+                        player.hand.add_card(card);
+                    }
+                    moved_cards.push(card);
+                }
+                ("discard", "stage") | ("discard", "empty_area") => {
                     let is_max = effect.max.unwrap_or(false);
 
                     let candidate_indices = util::matching_indices(&player.waitroom.cards, &card_db, Some("member_card"), group_name, cost_limit);
@@ -283,6 +324,38 @@ impl<'a> AbilityResolver<'a> {
                 _ => { eprintln!("Unsupported move: {} -> {}", source, destination); }
             }
         } // player borrow scope ends here
+
+        // Apply state_change to moved cards (e.g. "ウェイト状態で置く")
+        if let Some(ref sc) = effect.state_change {
+            if sc == "wait" {
+                for card_id in &moved_cards {
+                    self.game_state.add_orientation_modifier(*card_id, "wait");
+                }
+                // For energy zone placements, deactivate energy
+                if destination == "energy_zone" {
+                    for _ in &moved_cards {
+                        let p = match target {
+                            "self" => &mut self.game_state.player1,
+                            "opponent" => &mut self.game_state.player2,
+                            _ => &mut self.game_state.player1,
+                        };
+                        p.energy_zone.active_energy_count = p.energy_zone.active_energy_count.saturating_sub(1);
+                    }
+                }
+            } else if sc == "active" {
+                for card_id in &moved_cards {
+                    self.game_state.add_orientation_modifier(*card_id, "active");
+                }
+                if destination == "energy_zone" {
+                    let p = match target {
+                        "self" => &mut self.game_state.player1,
+                        "opponent" => &mut self.game_state.player2,
+                        _ => &mut self.game_state.player1,
+                    };
+                    p.energy_zone.active_energy_count += moved_cards.len();
+                }
+            }
+        }
 
         // Clear modifiers after player borrow ends
         for card_id in &moved_cards { self.game_state.clear_modifiers_for_card(*card_id); }

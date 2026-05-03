@@ -235,10 +235,54 @@ fn debut_draw_two_discard_one() {
 //       This pattern tests live start trigger on a live card.
 // Note: tested live card ability, not member — skipped for now (complexity)
 #[test]
-#[ignore = "LiveStart pattern — needs live card zone setup"]
 fn live_start_choose_heart_gain() {
-    // TODO: This requires setting up the Live phase, placing live cards,
-    // and checking heart modifiers. Complex — defer until basic patterns complete.
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let kasumi = game.id("PL!N-bp3-014-N");
+
+    game.add_to_stage(MemberArea::Center, kasumi);
+
+    let card = game.db.get_card(kasumi).expect("Kasumi card");
+    let ability = card.abilities.first().expect("Kasumi has at least 1 ability");
+    let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+
+    game.state.trigger_auto_ability(
+        ability_id,
+        rabuka_engine::game_state::AbilityTrigger::LiveStart,
+        "p1".to_string(),
+        Some("PL!N-bp3-014-N".to_string()),
+    );
+
+    game.state.process_pending_auto_abilities("p1");
+
+    assert!(game.has_pending_choice(), "Should have a pending heart color choice");
+
+    let choice = game.state.ability_queue.is_waiting_for_choice()
+        .cloned()
+        .expect("Should have a queued choice");
+    match &choice {
+        rabuka_engine::ability_resolver::Choice::SelectHeartColor { count, options, description: _ } => {
+            assert_eq!(*count, 3, "Should have count 3");
+            assert!(options.contains(&"heart01".to_string()), "Should offer heart01");
+            assert!(options.contains(&"heart03".to_string()), "Should offer heart03");
+            assert!(options.contains(&"heart04".to_string()), "Should offer heart04");
+            // Select heart03 (index 1 in unique sorted list)
+            TurnEngine::resume_with_choice(&mut game.state, Some(1), None)
+                .expect("resume_with_choice should succeed");
+        }
+        _ => panic!("Expected SelectHeartColor choice, got {:?}", choice),
+    }
+
+    // After choice, heart_override should be set for Kasumi
+    assert!(game.state.heart_override.contains_key(&kasumi), "Heart override should be set for Kasumi");
+    let (color, count) = game.state.heart_override.get(&kasumi).expect("Heart override for Kasumi");
+    assert_eq!(*color, rabuka_engine::card::HeartColor::Heart03, "Should override to heart03");
+    assert_eq!(*count, 3, "Override count should be 3");
+
+    // Verify temporary effect is registered for cleanup
+    let has_temp = game.state.temporary_effects.iter().any(|te| te.effect_type == "heart_override");
+    assert!(has_temp, "Should have a heart_override temporary effect registered for cleanup");
 }
 
 // ====================================================================

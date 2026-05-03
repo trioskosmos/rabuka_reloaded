@@ -103,8 +103,10 @@ impl TurnEngine {
                         };
                         let card_db = game_state.card_database.clone();
                         let bm = game_state.blade_modifiers.clone();
+                        let ho = game_state.heart_override.clone();
+                        let hm = game_state.heart_modifiers.clone();
                         let player = game_state.first_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm)
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
                     game_state.current_phase = Phase::SecondAttackerPerformance;
@@ -121,8 +123,10 @@ impl TurnEngine {
                         };
                         let card_db = game_state.card_database.clone();
                         let bm = game_state.blade_modifiers.clone();
+                        let ho = game_state.heart_override.clone();
+                        let hm = game_state.heart_modifiers.clone();
                         let player = game_state.second_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm)
                     };
                     game_state.player2_cheer_blade_heart_count = blade_heart_count;
                     game_state.current_phase = Phase::LiveVictoryDetermination;
@@ -442,6 +446,16 @@ impl TurnEngine {
             crate::ability_resolver::Choice::SelectPosition { .. } => {
                 let pos = card_id.map(|id| match id { 0 => "left".into(), 1 => "center".into(), 2 => "right".into(), _ => "center".into() }).unwrap_or_else(|| "center".into());
                 Ok(crate::ability_resolver::ChoiceResult::PositionSelected { position: pos })
+            }
+            crate::ability_resolver::Choice::SelectHeartColor { count: _, options, description: _ } => {
+                let idx = card_id.unwrap_or(0) as usize;
+                let chosen = if idx < options.len() { options[idx].clone() } else { "heart00".to_string() };
+                Ok(crate::ability_resolver::ChoiceResult::HeartColorSelected { colors: vec![chosen] })
+            }
+            crate::ability_resolver::Choice::SelectHeartType { count: _, options, description: _ } => {
+                let idx = card_id.unwrap_or(0) as usize;
+                let chosen = if idx < options.len() { options[idx].clone() } else { "heart00".to_string() };
+                Ok(crate::ability_resolver::ChoiceResult::HeartTypeSelected { types: vec![chosen] })
             }
             _ => Err("Unsupported choice type for resumption".into()),
         }
@@ -1084,7 +1098,15 @@ impl TurnEngine {
         }
     }
 
-    pub fn player_perform_live(player: &mut crate::player::Player, resolution_zone: &mut crate::zones::ResolutionZone, _player_id: &str, card_database: &crate::card::CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> u32 {
+    pub fn player_perform_live(
+        player: &mut crate::player::Player,
+        resolution_zone: &mut crate::zones::ResolutionZone,
+        _player_id: &str,
+        card_database: &crate::card::CardDatabase,
+        blade_modifiers: &crate::mod_map::ModMap<i32>,
+        heart_override: &std::collections::HashMap<i16, (crate::card::HeartColor, u32)>,
+        heart_modifiers: &std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>,
+    ) -> u32 {
         // Note: This function no longer takes game_state to avoid borrow conflicts
         // Ability triggering should be handled by the caller
 
@@ -1158,7 +1180,7 @@ impl TurnEngine {
         // Rule 8.3.13: Check timing (caller responsibility)
         
         // Rule 8.3.14: Calculate live-owned hearts from stage and blade hearts
-        let stage_hearts = player.stage.get_available_hearts(&card_database);
+        let stage_hearts = player.stage.get_available_hearts(&card_database, heart_override, heart_modifiers);
         let mut live_owned_hearts = stage_hearts.clone();
         
         // Add blade hearts from resolution zone (excluding b_all which is handled as wildcard)

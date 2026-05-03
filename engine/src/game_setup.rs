@@ -283,6 +283,36 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     }
                     return actions;
                 }
+                Choice::SelectHeartColor { count: _, options, description } => {
+                    for (i, color) in options.iter().enumerate() {
+                        actions.push(Action {
+                            description: format!("{} — {}", color, description),
+                            action_type: ActionType::ChoiceOption,
+                            parameters: Some(ActionParameters {
+                                card_id: Some(i as i16), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some(color.clone()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                    }
+                    return actions;
+                }
+                Choice::SelectHeartType { count: _, options, description } => {
+                    for (i, color) in options.iter().enumerate() {
+                        actions.push(Action {
+                            description: format!("{} — {}", color, description),
+                            action_type: ActionType::ChoiceOption,
+                            parameters: Some(ActionParameters {
+                                card_id: Some(i as i16), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some(color.clone()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                    }
+                    return actions;
+                }
                 _ => {}
             }
         }

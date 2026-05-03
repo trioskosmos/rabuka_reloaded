@@ -288,6 +288,26 @@ app.get('/api/get_card_registry', async (req, res) => {
     }
 });
 
+// Generic proxy for any /api/* routes not handled locally (undo, redo, debug, etc.)
+app.all('/api/*', async (req, res) => {
+    try {
+        const targetUrl = `${RUST_API_URL}${req.originalUrl}`;
+        const fetchOptions = {
+            method: req.method,
+            headers: { 'Content-Type': 'application/json' },
+        };
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+            fetchOptions.body = JSON.stringify(req.body);
+        }
+        const response = await fetch(targetUrl, fetchOptions);
+        const text = await response.text();
+        res.status(response.status).type('application/json').send(text);
+    } catch (error) {
+        console.error(`Error proxying ${req.method} ${req.originalUrl} to Rust API:`, error);
+        res.status(500).json({ error: `Failed to proxy ${req.originalUrl}` });
+    }
+});
+
 // Fallback to index.html for SPA routing (must be last)
 app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));

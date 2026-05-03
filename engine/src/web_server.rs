@@ -808,6 +808,9 @@ async fn execute_action(
 
     
 
+    // Save undo snapshot before executing
+    game_state.save_state();
+
     // Execute the action
 
     let result = crate::turn::TurnEngine::execute_main_phase_action(
@@ -1414,7 +1417,7 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
 
                         if let Some(ref effect) = ability.effect {
 
-                            let condition_fields: [(&str, &Option<crate::card::Condition>); 5] = [
+                            let condition_fields: [(&str, &Option<crate::card::Condition>); 4] = [
 
                                 ("activation_condition_parsed", &effect.activation_condition_parsed),
 
@@ -1423,8 +1426,6 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
                                 ("alternative_condition", &effect.alternative_condition),
 
                                 ("result_condition", &effect.result_condition),
-
-                                ("choice_condition", &effect.choice_condition),
 
                             ];
 
