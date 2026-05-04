@@ -13,6 +13,10 @@ pub struct AbilityResolver<'a> {
     pub activating_card_id: Option<i16>,
     pub execution_context: ExecutionContext,
     pub current_effect: Option<AbilityEffect>,
+    pub revealed_cost_cards: Vec<i16>,
+    pub is_reveal_cost: bool,
+    pub last_draw_count: u32,
+    pub looked_at_total_count: usize,
 }
 
 #[allow(dead_code)]
@@ -29,6 +33,10 @@ impl<'a> AbilityResolver<'a> {
             activating_card_id,
             execution_context: ExecutionContext::None,
             current_effect: None,
+            revealed_cost_cards: Vec::new(),
+            is_reveal_cost: false,
+            last_draw_count: 0,
+            looked_at_total_count: 0,
         }
     }
 

@@ -78,6 +78,8 @@ pub struct GameState {
     pub gained_abilities: std::collections::HashMap<i16, Vec<String>>,
     pub negated_abilities: std::collections::HashSet<i16>,
     pub replacement_effects: Vec<ReplacementEffect>,
+    /// Cards revealed as part of cost payment (for condition evaluation like chisato)
+    pub revealed_cost_cards: Vec<i16>,
     pub looked_at_cards: Vec<i16>,
     pub effect_creation_counter: u32,
     pub game_state_history: Vec<String>,
@@ -168,6 +170,7 @@ impl GameState {
             gained_abilities: std::collections::HashMap::new(),
             negated_abilities: std::collections::HashSet::new(),
             replacement_effects: Vec::new(),
+            revealed_cost_cards: Vec::new(),
             position_change_occurred_this_turn: false,
             formation_change_occurred_this_turn: false,
             opponent_choice_declined: false,

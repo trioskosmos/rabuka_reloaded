@@ -40,6 +40,9 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
         let vacated_stage_area = self.game_state.last_vacated_stage_area;
         self.game_state.last_vacated_stage_area = None;
 
+        // Extract character name filter from quoted_text
+        let character_filter: Option<Vec<String>> = effect.quoted_text.as_ref().map(|qt| vec![qt.text.clone()]);
+
         let mut moved_cards: Vec<i16> = Vec::new();
 
         {

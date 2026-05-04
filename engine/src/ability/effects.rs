@@ -188,7 +188,13 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::Appear => self.execute_appear(effect.source.as_deref().unwrap_or(""), effect.destination.as_deref().unwrap_or("stage"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
             EffectAction::Choice => self.execute_choice(effect.choice_options.as_ref(), effect.choice_type.as_deref(), effect.options.as_ref()),
             EffectAction::PayEnergy => self.execute_pay_energy(effect.count.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
-            EffectAction::SetCardIdentity => self.execute_set_card_identity(&effect.identities.clone().unwrap_or_default()),
+            EffectAction::SetCardIdentity => {
+                if effect.all_regions.unwrap_or(false) {
+                    self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target.as_deref().unwrap_or("self"))
+                } else {
+                    self.execute_set_card_identity(&effect.identities.clone().unwrap_or_default())
+                }
+            },
             EffectAction::RepeatProcedure => self.execute_repeat_procedure(effect, effect.repeat_limit.unwrap_or(1)),
             EffectAction::DiscardUntilCount => self.execute_discard_until_count(effect.target_count.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
             EffectAction::Restriction => self.execute_restriction(effect.restriction_type.as_deref(), effect.restricted_destination.as_deref()),

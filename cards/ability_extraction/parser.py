@@ -1897,6 +1897,9 @@ def parse_cost(text: str) -> Dict[str, Any]:
         group_names = extract_group_names(text)
         if group_names:
             cost['group_names'] = group_names
+        count = extract_count(text)
+        if count:
+            cost['count'] = count
         return cost
     
     # Extract destination

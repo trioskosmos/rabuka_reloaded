@@ -95,15 +95,17 @@ impl GameState {
         if let Some(entry) = self.ability_queue.current_entry().cloned() {
             self.activating_card = entry.card_id;
 
-            let (choice, looked_at, ctx, result) = {
+            let (choice, looked_at, ctx, rev, result) = {
                 let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
                 let result = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index);
                 let choice = resolver.get_pending_choice().cloned();
                 let looked_at = resolver.take_looked_at();
                 let ctx = resolver.execution_context.clone();
-                (choice, looked_at, ctx, result)
+                let rev = std::mem::take(&mut resolver.revealed_cost_cards);
+                (choice, looked_at, ctx, rev, result)
             };
             self.looked_at_cards = looked_at;
+            self.revealed_cost_cards = rev;
 
             if let Err(e) = result {
                 eprintln!("Failed to resolve ability: {}", e);

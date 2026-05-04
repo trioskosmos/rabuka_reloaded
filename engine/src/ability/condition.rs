@@ -93,10 +93,63 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let cost_limit = condition.cost_limit;
         let group_names = condition.group_names.as_ref();
         let _characters = condition.characters.as_ref();
+        let heart_type = condition.heart_type.as_deref();
+        let card_property = condition.card_property.as_deref();
+
+        // Heart type check (e.g., heart_type = "all" means check for heart00/ALL heart)
+        if let Some(ht) = heart_type {
+            match ht {
+                "all" => {
+                    let card_db = &self.game_state.card_database;
+                    let player = self.game_state.resolve_target_player(target);
+                    let has_heart00 = player.stage.stage.iter().any(|&id| {
+                        if id == -1 { false } else {
+                            card_db.get_card(id).map_or(false, |c| {
+                                c.base_heart.as_ref().map_or(false, |bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
+                            })
+                        }
+                    });
+                    // negation is checked separately below, so we return the raw result
+                    if !has_heart00 { return false; }
+                }
+                _ => {}
+            }
+        }
+
+        // Card property check (e.g., "has_blade_heart")
+        if let Some(prop) = card_property {
+            match prop {
+                "has_blade_heart" => {
+                    let card_db = &self.game_state.card_database;
+                    let player = self.game_state.resolve_target_player(target);
+                    let has_property = match location {
+                        "revealed_cards" => self.game_state.revealed_cards.iter().any(|&id| {
+                            card_db.get_card(id).map_or(false, |c| c.has_blade_heart())
+                        }),
+                        "stage" => player.stage.stage.iter().any(|&id| {
+                            if id == -1 { false } else { card_db.get_card(id).map_or(false, |c| c.has_blade_heart()) }
+                        }),
+                        _ => false,
+                    };
+                    if !has_property { return false; }
+                }
+                _ => {}
+            }
+        }
 
         if baton_touch_trigger {
             if self.game_state.baton_touch_count == 0 {
                 return false;
+            }
+            // Check specific baton_touch_source if specified
+            if let Some(source_name) = condition.baton_touch_source.as_deref() {
+                let source_found = self.game_state.player1.waitroom.cards.iter()
+                    .chain(self.game_state.player2.waitroom.cards.iter())
+                    .any(|&id| self.game_state.card_database.get_card(id)
+                        .map_or(false, |c| c.name.contains(source_name)));
+                if !source_found {
+                    return false;
+                }
             }
         }
 
@@ -331,23 +384,44 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             p.stage.stage.iter().filter(|&&id| id != -1).count()
         };
 
-        let actual_count = match card_type {
-            "live_card" => player.live_card_zone.len(),
-            "member_card" => {
-                let mut member_count = stage_member_count(player);
-                if exclude_self {
-                    if let Some(cid) = activating_id {
-                        if player.stage.stage.iter().any(|&id| id == cid) {
-                            member_count = member_count.saturating_sub(1);
+        let actual_count = match condition.unit.as_deref() {
+            Some("types") => {
+                // Count distinct heart color types among stage members
+                let mut color_types = std::collections::HashSet::new();
+                let card_db = &self.game_state.card_database;
+                for &cid in &player.stage.stage {
+                    if cid == -1 { continue; }
+                    if let Some(card) = card_db.get_card(cid) {
+                        if let Some(ref base_heart) = card.base_heart {
+                            for (color, _) in &base_heart.hearts {
+                                color_types.insert(*color);
+                            }
                         }
                     }
                 }
-                member_count
+                color_types.len() as u32
             }
-            "energy_card" => player.energy_zone.cards.len(),
-            _ => 0,
+            _ => {
+                let count = match card_type {
+                    "live_card" => player.live_card_zone.len(),
+                    "member_card" => {
+                        let mut member_count = stage_member_count(player);
+                        if exclude_self {
+                            if let Some(cid) = activating_id {
+                                if player.stage.stage.iter().any(|&id| id == cid) {
+                                    member_count = member_count.saturating_sub(1);
+                                }
+                            }
+                        }
+                        member_count
+                    }
+                    "energy_card" => player.energy_zone.cards.len(),
+                    _ => 0,
+                };
+                count as u32
+            }
         };
-        compare_counts(condition.operator.as_deref(), actual_count as u32, count)
+        compare_counts(condition.operator.as_deref(), actual_count, count)
     }
 
     fn evaluate_appearance_condition(&self, condition: &Condition) -> bool {
@@ -578,6 +652,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let _during_main_phase = condition.text.contains("main_phase");
         if _during_main_phase && self.game_state.current_phase != Phase::Main {
             return false;
+        }
+        // Check from_state / to_state if present
+        if let (Some(from), Some(to)) = (condition.from_state.as_deref(), condition.to_state.as_deref()) {
+            // Check if the activating card has changed from 'from' to 'to' by
+            // looking at orientation modifiers. A state change from active→wait
+            // means the card was reoriented during this ability resolution.
+            if let Some(card_id) = self.activating_card_id {
+                let current_orientation = self.game_state.get_orientation_modifier(card_id);
+                match (from, to) {
+                    ("active", "wait") => return current_orientation.map_or(false, |o| o == "wait"),
+                    ("wait", "active") => return current_orientation.map_or(true, |o| o == "active"),
+                    _ => return false,
+                }
+            }
         }
         true
     }

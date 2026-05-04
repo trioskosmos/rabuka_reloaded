@@ -137,7 +137,7 @@ impl super::TurnEngine {
         let saved_ctx = game_state.ability_queue.current_entry()
             .and_then(|e| e.execution_context.clone())
             .unwrap_or(crate::ability::types::ExecutionContext::None);
-        let (new_choice, looked_at, ctx, res) = {
+        let (new_choice, looked_at, ctx, rev, res) = {
             let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
             resolver.execution_context = saved_ctx;
             resolver.pending_choice = Some(choice);
@@ -145,9 +145,11 @@ impl super::TurnEngine {
             let new_choice = resolver.get_pending_choice().cloned();
             let looked_at = resolver.take_looked_at();
             let ctx = resolver.execution_context.clone();
-            (new_choice, looked_at, ctx, res)
+            let rev = std::mem::take(&mut resolver.revealed_cost_cards);
+            (new_choice, looked_at, ctx, rev, res)
         };
         game_state.looked_at_cards = looked_at;
+        game_state.revealed_cost_cards = rev;
         if let Err(e) = res { game_state.ability_queue.complete_current(); game_state.pending_choice = None; return Err(e); }
         if let Some(c) = new_choice {
             if let Some(e) = game_state.ability_queue.current_entry_mut() {

@@ -616,11 +616,6 @@
             "location": "live_card_zone",
             "duration": "live_end"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart03",
-          "heart06"
         ]
       }
     },
@@ -1344,12 +1339,7 @@
             "heart05"
           ],
           "optional": true
-        },
-        "heart_colors": [
-          "heart02",
-          "heart04",
-          "heart05"
-        ]
+        }
       }
     },
     {
@@ -1690,10 +1680,7 @@
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
         "target": "opponent",
-        "all": true,
-        "heart_colors": [
-          "heart00"
-        ]
+        "all": true
       }
     },
     {
@@ -1945,9 +1932,6 @@
             "resource": "blade",
             "count": 1
           }
-        ],
-        "heart_colors": [
-          "heart04"
         ]
       }
     },
@@ -2113,10 +2097,7 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2,
-        "heart_colors": [
-          "heart03"
-        ]
+        "count": 2
       }
     },
     {
@@ -2187,11 +2168,6 @@
             "action": "gain_resource",
             "resource": "heart"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart03",
-          "heart06"
         ]
       }
     },
@@ -2395,34 +2371,29 @@
       "cost": null,
       "effect": {
         "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-        "action": "conditional_on_optional",
-        "optional_action": {
-          "action": "place_energy_under_member",
-          "energy_count": 1,
-          "target": "self"
-        },
-        "conditional_action": {
-          "action": "sequential",
-          "actions": [
-            {
-              "text": "カードを1枚引き",
-              "count": 1,
-              "target": "self",
-              "action": "draw_card",
-              "source": "deck",
-              "destination": "hand"
-            },
-            {
-              "text": "ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-              "target": "self",
-              "action": "gain_resource",
-              "resource": "blade",
-              "count": 2,
-              "card_type": "member_card",
-              "duration": "live_end"
-            }
-          ]
-        },
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。",
+            "destination": "under_member",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "self",
+            "optional": true,
+            "action": "place_energy_under_member",
+            "energy_count": 1
+          },
+          {
+            "text": "カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+            "count": 1,
+            "card_type": "member_card",
+            "target": "self",
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
+          }
+        ],
+        "conditional": true,
         "parenthetical": [
           "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
         ]
@@ -2576,10 +2547,7 @@
             "count": 1
           }
         ],
-        "conditional": true,
-        "heart_colors": [
-          "heart04"
-        ]
+        "conditional": true
       }
     },
     {
@@ -2601,7 +2569,8 @@
         "destination": "deck_bottom",
         "type": "move_cards",
         "action": "move_cards",
-        "optional": true
+        "optional": true,
+        "count": 2
       },
       "effect": {
         "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
@@ -2649,10 +2618,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2,
-        "heart_colors": [
-          "heart06"
-        ]
+        "count": 2
       }
     },
     {
@@ -2876,10 +2842,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2,
-        "heart_colors": [
-          "heart02"
-        ]
+        "count": 2
       }
     },
     {
@@ -2987,10 +2950,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart04"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -3443,10 +3403,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart03"
-        ]
+        "count": 1
       }
     },
     {
@@ -3739,11 +3696,6 @@
             "resource": "heart",
             "all": true
           }
-        ],
-        "heart_colors": [
-          "heart03",
-          "heart04",
-          "heart05"
         ]
       }
     },
@@ -3797,14 +3749,6 @@
             "text": "」を得る",
             "action": "gain_ability"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart03",
-          "heart04",
-          "heart05",
-          "heart06"
         ]
       }
     },
@@ -3889,10 +3833,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart02"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -3980,9 +3921,6 @@
             "resource": "heart",
             "count": 1
           }
-        ],
-        "heart_colors": [
-          "heart01"
         ]
       }
     },
@@ -4280,9 +4218,6 @@
             "resource": "heart",
             "count": 1
           }
-        ],
-        "heart_colors": [
-          "heart02"
         ]
       }
     },
@@ -4465,10 +4400,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1,
-        "heart_colors": [
-          "heart05"
-        ]
+        "count": 1
       }
     },
     {
@@ -4559,10 +4491,7 @@
         "count": 1,
         "card_type": "member_card",
         "action": "gain_resource",
-        "resource": "heart",
-        "heart_colors": [
-          "heart01"
-        ]
+        "resource": "heart"
       }
     },
     {
@@ -5370,10 +5299,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2,
-        "heart_colors": [
-          "heart03"
-        ]
+        "count": 2
       }
     },
     {
@@ -5402,10 +5328,7 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards",
-        "heart_colors": [
-          "heart06"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -5648,10 +5571,7 @@
             "heart04"
           ],
           "optional": true
-        },
-        "heart_colors": [
-          "heart04"
-        ]
+        }
       }
     },
     {
@@ -6432,10 +6352,7 @@
         "text": "{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3,
-        "heart_colors": [
-          "heart02"
-        ]
+        "count": 3
       }
     },
     {
@@ -6456,10 +6373,7 @@
         "position": "center",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3,
-        "heart_colors": [
-          "heart03"
-        ]
+        "count": 3
       }
     },
     {
@@ -6479,10 +6393,7 @@
         "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_05.png|heart05}}を得る",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3,
-        "heart_colors": [
-          "heart05"
-        ]
+        "count": 3
       }
     },
     {
@@ -6567,10 +6478,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart05"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -6598,10 +6506,7 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2,
-        "heart_colors": [
-          "heart01"
-        ]
+        "count": 2
       }
     },
     {
@@ -6976,10 +6881,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1,
-        "heart_colors": [
-          "heart05"
-        ]
+        "count": 1
       }
     },
     {
@@ -7033,11 +6935,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart01",
-          "heart04"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -7124,10 +7022,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart04"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -7187,10 +7082,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart01"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -8624,10 +8516,7 @@
         },
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart03"
-        ]
+        "count": 1
       }
     },
     {
@@ -9087,10 +8976,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart01"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -9188,10 +9074,7 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards",
-        "heart_colors": [
-          "heart04"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -10489,10 +10372,7 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "state": "wait",
-        "location": "stage",
-        "heart_colors": [
-          "heart06"
-        ]
+        "location": "stage"
       }
     },
     {
@@ -12307,15 +12187,7 @@
         },
         "duration": "as_long_as",
         "action": "gain_ability",
-        "count": 1,
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart03",
-          "heart04",
-          "heart05",
-          "heart06"
-        ]
+        "count": 1
       }
     },
     {
@@ -12406,11 +12278,6 @@
             "resource": "heart",
             "count": 3
           }
-        ],
-        "heart_colors": [
-          "heart03",
-          "heart05",
-          "heart06"
         ]
       }
     },
@@ -13211,10 +13078,7 @@
         "group": {
           "name": "A-RISE"
         },
-        "location": "stage",
-        "heart_colors": [
-          "heart05"
-        ]
+        "location": "stage"
       }
     },
     {
@@ -13383,10 +13247,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart05"
-        ]
+        "count": 1
       }
     },
     {
@@ -13607,11 +13468,6 @@
             "action": "gain_resource",
             "resource": "heart"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart03",
-          "heart06"
         ]
       }
     },
@@ -13889,10 +13745,7 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone",
-        "heart_colors": [
-          "heart00"
-        ]
+        "location": "live_card_zone"
       }
     },
     {
@@ -13919,10 +13772,7 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards",
-        "heart_colors": [
-          "heart03"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -13949,10 +13799,7 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards",
-        "heart_colors": [
-          "heart01"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -14199,10 +14046,7 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 2,
-        "heart_colors": [
-          "heart04"
-        ]
+        "count": 2
       }
     },
     {
@@ -14228,10 +14072,7 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 2,
-        "heart_colors": [
-          "heart05"
-        ]
+        "count": 2
       }
     },
     {
@@ -14280,10 +14121,7 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart01"
-        ]
+        "count": 1
       }
     },
     {
@@ -14482,14 +14320,6 @@
         "location": "stage",
         "parenthetical": [
           "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart04",
-          "heart05",
-          "heart02",
-          "heart03",
-          "heart06"
         ]
       }
     },
@@ -14665,11 +14495,7 @@
             "resources": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}"
           }
         ],
-        "duration": "live_end",
-        "heart_colors": [
-          "heart05",
-          "heart01"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -15062,10 +14888,7 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart04"
-        ]
+        "count": 1
       }
     },
     {
@@ -15706,10 +15529,7 @@
           "name": "5yncri5e!"
         },
         "timing_condition": "appeared_or_moved_this_turn",
-        "location": "stage",
-        "heart_colors": [
-          "heart00"
-        ]
+        "location": "stage"
       }
     },
     {
@@ -15872,10 +15692,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart06"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -15902,10 +15719,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart02"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -15932,10 +15746,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart03"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -16360,12 +16171,6 @@
             "optional": true,
             "action": "select"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart00",
-          "heart04",
-          "heart05"
         ]
       }
     },
@@ -16419,10 +16224,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
         "self_target": true,
-        "count": 1,
-        "heart_colors": [
-          "heart04"
-        ]
+        "count": 1
       }
     },
     {
@@ -16473,10 +16275,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
         "self_target": true,
-        "count": 1,
-        "heart_colors": [
-          "heart05"
-        ]
+        "count": 1
       }
     },
     {
@@ -16514,10 +16313,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
         "self_target": true,
-        "count": 3,
-        "heart_colors": [
-          "heart00"
-        ]
+        "count": 3
       }
     },
     {
@@ -16543,10 +16339,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
         "self_target": true,
-        "count": 1,
-        "heart_colors": [
-          "heart01"
-        ]
+        "count": 1
       }
     },
     {
@@ -16707,10 +16500,7 @@
             "heart04"
           ],
           "optional": true
-        },
-        "heart_colors": [
-          "heart04"
-        ]
+        }
       }
     },
     {
@@ -16771,10 +16561,7 @@
             "heart02"
           ],
           "optional": true
-        },
-        "heart_colors": [
-          "heart02"
-        ]
+        }
       }
     },
     {
@@ -16835,10 +16622,7 @@
             "heart05"
           ],
           "optional": true
-        },
-        "heart_colors": [
-          "heart05"
-        ]
+        }
       }
     },
     {
@@ -16882,9 +16666,6 @@
             "card_type": "energy_card",
             "action": "move_cards"
           }
-        ],
-        "heart_colors": [
-          "heart02"
         ]
       }
     },
@@ -16916,10 +16697,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 2,
-        "self_target": true,
-        "heart_colors": [
-          "heart04"
-        ]
+        "self_target": true
       }
     },
     {
@@ -16970,10 +16748,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 2,
-        "self_target": true,
-        "heart_colors": [
-          "heart05"
-        ]
+        "self_target": true
       }
     },
     {
@@ -17118,10 +16893,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
         "self_target": true,
-        "count": 2,
-        "heart_colors": [
-          "heart00"
-        ]
+        "count": 2
       }
     },
     {
@@ -17170,11 +16942,6 @@
             "action": "gain_resource",
             "resource": "heart"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart03",
-          "heart06"
         ]
       }
     },
@@ -17552,11 +17319,6 @@
             "resource": "heart",
             "count": null
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart03",
-          "heart04"
         ]
       }
     },
@@ -17588,11 +17350,6 @@
             "resource": "heart",
             "count": null
           }
-        ],
-        "heart_colors": [
-          "heart02",
-          "heart05",
-          "heart06"
         ]
       }
     },
@@ -17713,10 +17470,7 @@
         "state_change": "wait",
         "count": 1,
         "target": "self",
-        "action": "move_cards",
-        "heart_colors": [
-          "heart04"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -17789,7 +17543,8 @@
         "shuffle": true,
         "destination": "deck_bottom",
         "type": "move_cards",
-        "action": "move_cards"
+        "action": "move_cards",
+        "count": 6
       },
       "effect": {
         "text": "エネルギーを6枚までアクティブにする",
@@ -17932,10 +17687,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
         "self_target": true,
-        "count": 2,
-        "heart_colors": [
-          "heart00"
-        ]
+        "count": 2
       }
     },
     {
@@ -18166,10 +17918,7 @@
         "target": "self",
         "exclude_self": true,
         "action": "gain_resource",
-        "resource": "heart",
-        "heart_colors": [
-          "heart01"
-        ]
+        "resource": "heart"
       }
     },
     {
@@ -18439,9 +18188,6 @@
             "value": 1,
             "self_target": true
           }
-        ],
-        "heart_colors": [
-          "heart00"
         ]
       }
     },
@@ -18491,10 +18237,7 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand",
-        "heart_colors": [
-          "heart01"
-        ]
+        "destination": "hand"
       }
     },
     {
@@ -18669,15 +18412,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart03",
-          "heart04",
-          "heart05",
-          "heart06"
-        ]
+        "self_target": true
       }
     },
     {
@@ -18797,9 +18532,6 @@
             "per_unit_type": "枚",
             "location": "live_card_zone"
           }
-        ],
-        "heart_colors": [
-          "heart00"
         ]
       }
     },
@@ -19048,10 +18780,7 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart02"
-        ]
+        "count": 1
       }
     },
     {
@@ -19108,10 +18837,7 @@
         "parenthetical": [
           "相手のカードの効果でも発動する。"
         ],
-        "activation_condition": "相手のカードの効果でも発動する。",
-        "heart_colors": [
-          "heart06"
-        ]
+        "activation_condition": "相手のカードの効果でも発動する。"
       }
     },
     {
@@ -19237,10 +18963,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart06"
-        ]
+        "count": 1
       }
     },
     {
@@ -19378,9 +19101,6 @@
             "resource": "blade",
             "count": 2
           }
-        ],
-        "heart_colors": [
-          "heart02"
         ]
       }
     },
@@ -19653,11 +19373,6 @@
             "resource": "heart",
             "count": null
           }
-        ],
-        "heart_colors": [
-          "heart03",
-          "heart04",
-          "heart05"
         ]
       }
     },
@@ -19689,11 +19404,6 @@
             "resource": "heart",
             "count": null
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart06"
         ]
       }
     },
@@ -19758,10 +19468,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "heart_colors": [
-          "heart01"
-        ]
+        "self_target": true
       }
     },
     {
@@ -19795,11 +19502,7 @@
         ],
         "action": "gain_resource",
         "resource": "heart",
-        "duration": "live_end",
-        "heart_colors": [
-          "heart01",
-          "heart06"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -19825,10 +19528,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
         "self_target": true,
-        "count": 3,
-        "heart_colors": [
-          "heart00"
-        ]
+        "count": 3
       }
     },
     {
@@ -19911,11 +19611,6 @@
             "location": "live_card_zone",
             "duration": "live_end"
           }
-        ],
-        "heart_colors": [
-          "heart04",
-          "heart05",
-          "heart06"
         ]
       }
     },
@@ -20008,11 +19703,7 @@
             "heart06"
           ],
           "optional": true
-        },
-        "heart_colors": [
-          "heart05",
-          "heart06"
-        ]
+        }
       }
     },
     {
@@ -20038,11 +19729,7 @@
         "condition": {
           "type": "position_condition",
           "text": "自分のセンターエリアに『μ's』のメンバーがいる場合"
-        },
-        "heart_colors": [
-          "heart03",
-          "heart00"
-        ]
+        }
       }
     },
     {
@@ -20141,9 +19828,6 @@
             "value": 1,
             "self_target": true
           }
-        ],
-        "heart_colors": [
-          "heart03"
         ]
       }
     },
@@ -20183,12 +19867,6 @@
             "per_unit_type": "枚",
             "location": "live_card_zone"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart03",
-          "heart06",
-          "heart00"
         ]
       }
     },
@@ -20212,12 +19890,7 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
-        "location": "stage",
-        "heart_colors": [
-          "heart01",
-          "heart06",
-          "heart00"
-        ]
+        "location": "stage"
       }
     },
     {
@@ -20243,11 +19916,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
-        "target": "opponent",
-        "heart_colors": [
-          "heart02",
-          "heart00"
-        ]
+        "target": "opponent"
       }
     },
     {
@@ -20273,11 +19942,7 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
-        "target": "opponent",
-        "heart_colors": [
-          "heart05",
-          "heart00"
-        ]
+        "target": "opponent"
       }
     },
     {
@@ -20305,10 +19970,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart04"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -20385,10 +20047,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart05"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -20477,10 +20136,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart01"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -20506,15 +20162,7 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart03",
-          "heart04",
-          "heart05",
-          "heart06"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -20580,15 +20228,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart03",
-          "heart04",
-          "heart05",
-          "heart06"
-        ]
+        "self_target": true
       }
     },
     {
@@ -20707,9 +20347,6 @@
             "restriction_type": "modify_required_hearts",
             "count": 5
           }
-        ],
-        "heart_colors": [
-          "heart02"
         ]
       }
     },
@@ -20861,10 +20498,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart03"
-        ]
+        "count": 1
       }
     },
     {
@@ -21011,10 +20645,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2,
-        "heart_colors": [
-          "heart06"
-        ]
+        "count": 2
       }
     },
     {
@@ -21176,11 +20807,6 @@
             "resource": "heart",
             "all": true
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart06"
         ]
       }
     },
@@ -21385,10 +21011,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart06"
-        ]
+        "count": 1
       }
     },
     {
@@ -21493,10 +21116,7 @@
         "group": {
           "name": "蓮ノ空"
         },
-        "location": "live_card_zone",
-        "heart_colors": [
-          "heart04"
-        ]
+        "location": "live_card_zone"
       }
     },
     {
@@ -21550,10 +21170,7 @@
         ],
         "action": "gain_resource",
         "resource": "heart",
-        "heart_selection": true,
-        "heart_colors": [
-          "heart01"
-        ]
+        "heart_selection": true
       }
     },
     {
@@ -21638,9 +21255,6 @@
             "self_target": true,
             "count": 1
           }
-        ],
-        "heart_colors": [
-          "heart06"
         ]
       }
     },
@@ -21667,15 +21281,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "heart_colors": [
-          "heart01",
-          "heart04",
-          "heart05",
-          "heart02",
-          "heart03",
-          "heart06"
-        ]
+        "self_target": true
       }
     },
     {
@@ -22011,10 +21617,7 @@
             "heart05"
           ],
           "optional": true
-        },
-        "heart_colors": [
-          "heart05"
-        ]
+        }
       }
     },
     {
@@ -22047,10 +21650,7 @@
           "蓮ノ空"
         ],
         "action": "gain_resource",
-        "resource": "blade",
-        "heart_colors": [
-          "heart01"
-        ]
+        "resource": "blade"
       }
     },
     {
@@ -22106,10 +21706,7 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1,
-        "heart_colors": [
-          "heart04"
-        ]
+        "count": 1
       }
     },
     {
@@ -22247,12 +21844,6 @@
             "action": "gain_resource",
             "resource": "heart"
           }
-        ],
-        "heart_colors": [
-          "heart01",
-          "heart04",
-          "heart05",
-          "heart06"
         ]
       }
     },
@@ -22284,10 +21875,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_colors": [
-          "heart05"
-        ]
+        "duration": "live_end"
       }
     },
     {
@@ -22467,10 +22055,7 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "duration": "live_end",
-        "heart_colors": [
-          "heart02"
-        ]
+        "duration": "live_end"
       }
     },
     {
