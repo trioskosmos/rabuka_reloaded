@@ -3,6 +3,84 @@ use super::types::{Choice, ExecutionContext};
 use super::resolver::AbilityResolver;
 use super::util;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EffectAction {
+    Sequential, ConditionalAlternative, LookAndSelect,
+    Draw, DrawCard, DrawUntilCount, DiscardCard, MoveCards,
+    GainResource, ChangeState, ModifyScore, ModifyRequiredHearts,
+    SetCost, SetBladeType, SetHeartType, ActivateAbility,
+    InvalidateAbility, GainAbility, PlayBatonTouch, Reveal,
+    Select, LookAt, ModifyRequiredHeartsGlobal, ModifyYellCount,
+    PlaceEnergyUnderMember, ActivationCost, PositionChange, Appear,
+    Choice, PayEnergy, SetCardIdentity, RepeatProcedure,
+    DiscardUntilCount, Restriction, ReYell, ActivationRestriction,
+    ChooseRequiredHearts, ModifyLimit, SetBladeCount, DoNothing,
+    SetRequiredHearts, SetScore, SpecifyHeartColor,
+    ModifyRequiredHeartsSuccess, SetCostToUse, AllBladeTiming,
+    SetCardIdentityAllRegions, Shuffle, RevealPerGroup,
+    ConditionalOnResult, ConditionalOnOptional, ModifyCost,
+}
+
+impl EffectAction {
+    fn from_action(s: &str) -> Self {
+        match s {
+            "sequential" => Self::Sequential,
+            "conditional_alternative" => Self::ConditionalAlternative,
+            "look_and_select" => Self::LookAndSelect,
+            "draw" => Self::Draw,
+            "draw_card" => Self::DrawCard,
+            "draw_until_count" => Self::DrawUntilCount,
+            "discard_card" => Self::DiscardCard,
+            "move_cards" => Self::MoveCards,
+            "gain_resource" => Self::GainResource,
+            "change_state" => Self::ChangeState,
+            "modify_score" => Self::ModifyScore,
+            "modify_required_hearts" => Self::ModifyRequiredHearts,
+            "set_cost" => Self::SetCost,
+            "set_blade_type" => Self::SetBladeType,
+            "set_heart_type" => Self::SetHeartType,
+            "activate_ability" => Self::ActivateAbility,
+            "invalidate_ability" => Self::InvalidateAbility,
+            "gain_ability" => Self::GainAbility,
+            "play_baton_touch" => Self::PlayBatonTouch,
+            "reveal" => Self::Reveal,
+            "select" => Self::Select,
+            "look_at" => Self::LookAt,
+            "modify_required_hearts_global" => Self::ModifyRequiredHeartsGlobal,
+            "modify_yell_count" => Self::ModifyYellCount,
+            "place_energy_under_member" => Self::PlaceEnergyUnderMember,
+            "activation_cost" => Self::ActivationCost,
+            "position_change" => Self::PositionChange,
+            "appear" => Self::Appear,
+            "choice" => Self::Choice,
+            "pay_energy" => Self::PayEnergy,
+            "set_card_identity" => Self::SetCardIdentity,
+            "repeat_procedure" => Self::RepeatProcedure,
+            "discard_until_count" => Self::DiscardUntilCount,
+            "restriction" => Self::Restriction,
+            "re_yell" => Self::ReYell,
+            "activation_restriction" => Self::ActivationRestriction,
+            "choose_required_hearts" => Self::ChooseRequiredHearts,
+            "modify_limit" => Self::ModifyLimit,
+            "set_blade_count" => Self::SetBladeCount,
+            "do_nothing" => Self::DoNothing,
+            "set_required_hearts" => Self::SetRequiredHearts,
+            "set_score" => Self::SetScore,
+            "specify_heart_color" => Self::SpecifyHeartColor,
+            "modify_required_hearts_success" => Self::ModifyRequiredHeartsSuccess,
+            "set_cost_to_use" => Self::SetCostToUse,
+            "all_blade_timing" => Self::AllBladeTiming,
+            "set_card_identity_all_regions" => Self::SetCardIdentityAllRegions,
+            "shuffle" => Self::Shuffle,
+            "reveal_per_group" => Self::RevealPerGroup,
+            "conditional_on_result" => Self::ConditionalOnResult,
+            "conditional_on_optional" => Self::ConditionalOnOptional,
+            "modify_cost" => Self::ModifyCost,
+            _ => { eprintln!("Unknown effect action: '{}'", s); Self::DoNothing }
+        }
+    }
+}
+
 impl<'a> AbilityResolver<'a> {
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
 
@@ -27,19 +105,19 @@ impl<'a> AbilityResolver<'a> {
         }
 
         self.game_state.reset_replacement_effect_flags();
-        let action_to_use = effect.action.clone();
+        let action_str = effect.action.clone();
 
         // Empty action with opponent_action means it was entirely handled by opponent
-        if action_to_use.is_empty() && effect.action_by.is_some() {
+        if action_str.is_empty() && effect.action_by.is_some() {
             return Ok(());
         }
 
-        let replacement_effects: Vec<crate::game_state::ReplacementEffect> = self.game_state.get_replacement_effects_for_event(&action_to_use)
+        let replacement_effects: Vec<crate::game_state::ReplacementEffect> = self.game_state.get_replacement_effects_for_event(&action_str)
             .iter().map(|r| (*r).clone()).collect();
         if !replacement_effects.is_empty() {
             for replacement in &replacement_effects {
                 if replacement.is_choice_based {
-                    let description = format!("Apply replacement effect for action '{}'?", action_to_use);
+                    let description = format!("Apply replacement effect for action '{}'?", action_str);
                     self.pending_choice = Some(Choice::SelectTarget { target: "apply_replacement".to_string(), description });
                     return Err("Pending choice required: apply replacement effect".to_string());
                 } else {
@@ -80,58 +158,58 @@ impl<'a> AbilityResolver<'a> {
             return self.execute_effect(&for_opponent);
         }
 
-        match effect.action.as_str() {
-            "sequential" => self.execute_sequential_effect(effect, effect.conditional.unwrap_or(false), effect.is_further.unwrap_or(false)),
-            "conditional_alternative" => self.execute_conditional_alternative(effect),
-            "look_and_select" => self.execute_look_and_select(effect),
-            "draw" | "draw_card" => self.execute_draw(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck"), effect.destination.as_deref().unwrap_or("hand"), effect.card_type.as_deref(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref()),
-            "draw_until_count" => self.execute_draw_until_count(effect.target_count.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.destination.as_deref().unwrap_or("hand")),
-            "discard_card" | "move_cards" => self.execute_move_cards(effect),
-            "gain_resource" => { let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1)); self.execute_gain_resource(effect.resource.as_deref().unwrap_or(""), count, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.heart_color.as_deref(), effect.heart_colors.as_ref(), effect.resource_icon_count) },
-            "change_state" => self.execute_change_state(effect.state_change.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1), effect.max.unwrap_or(false), effect.card_type.as_deref(), effect.cost_limit, effect.optional.unwrap_or(false), effect.group.as_ref().map(|g| g.name.as_str()), effect.self_cost.unwrap_or(false), effect.source.as_deref(), effect.destination.as_deref()),
-            "modify_score" => self.execute_modify_score(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.effect_constraint.as_deref(), effect.self_target.unwrap_or(false)),
-            "modify_required_hearts" => self.execute_modify_required_hearts(effect.operation.as_deref().unwrap_or("decrease"), effect.value.unwrap_or(0), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self")),
-            "set_cost" => self.execute_set_cost(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
-            "set_blade_type" => self.execute_set_blade_type(effect.blade_type.as_deref(), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
-            "set_heart_type" => self.execute_set_heart_type(effect.heart_type.as_deref().or(effect.heart_color.as_deref()), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1) as i32),
-            "activate_ability" => self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or("")),
-            "invalidate_ability" => self.execute_invalidate_ability(),
-            "gain_ability" => self.execute_gain_ability(effect.ability_gain.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
-            "play_baton_touch" => self.execute_play_baton_touch(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self")),
-            "reveal" => self.execute_reveal(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.heart_colors.as_ref()),
-            "select" => self.execute_select(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.distinct.as_deref(), effect.heart_colors.as_ref()),
-            "look_at" => self.execute_look_at(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck")),
-            "modify_required_hearts_global" => self.execute_modify_required_hearts_global(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(1), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self")),
-            "modify_yell_count" => self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count.unwrap_or(0)),
-            "place_energy_under_member" => self.execute_place_energy_under_member(effect.energy_count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.position.as_ref()),
-            "activation_cost" => self.execute_activation_cost(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
-            "position_change" => self.execute_position_change(effect, effect.position.clone(), effect.target.as_deref().unwrap_or("self"), effect.target_member.as_deref().unwrap_or("this_member")),
-            "appear" => self.execute_appear(effect.source.as_deref().unwrap_or(""), effect.destination.as_deref().unwrap_or("stage"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
-            "choice" => self.execute_choice(effect.choice_options.as_ref(), effect.choice_type.as_deref(), effect.options.as_ref()),
-            "pay_energy" => self.execute_pay_energy(effect.count.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
-            "set_card_identity" => self.execute_set_card_identity(&effect.identities.clone().unwrap_or_default()),
-            "repeat_procedure" => self.execute_repeat_procedure(effect, effect.repeat_limit.unwrap_or(1)),
-            "discard_until_count" => self.execute_discard_until_count(effect.target_count.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
-            "restriction" => self.execute_restriction(effect.restriction_type.as_deref(), effect.restricted_destination.as_deref()),
-            "re_yell" => self.execute_re_yell(effect.lose_blade_hearts.unwrap_or(false), effect.target.as_deref().unwrap_or("self")),
-            "activation_restriction" => self.execute_activation_restriction(effect.target.as_deref().unwrap_or("self")),
-            "choose_required_hearts" => self.execute_choose_required_hearts(),
-            "modify_limit" => self.execute_modify_limit(effect.operation.as_deref().unwrap_or("decrease"), effect.count.unwrap_or(0)),
-            "set_blade_count" => self.execute_set_blade_count(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
-            "do_nothing" => Ok(()),
-            "set_required_hearts" => self.execute_set_required_hearts(&effect.heart_colors.clone().unwrap_or_default(), effect.target.as_deref().unwrap_or("self")),
-            "set_score" => self.execute_set_score(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
-            "specify_heart_color" => self.execute_specify_heart_color(effect.choice.unwrap_or(false), effect.target.as_deref().unwrap_or("self")),
-            "modify_required_hearts_success" => self.execute_modify_required_hearts_success(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
-            "set_cost_to_use" => self.execute_set_cost_to_use(effect.value.unwrap_or(0)),
-            "all_blade_timing" => self.execute_all_blade_timing(effect.timing.as_deref().unwrap_or("check_required_hearts"), effect.treat_as.as_deref().unwrap_or("any_heart_color")),
-            "set_card_identity_all_regions" => self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target.as_deref().unwrap_or("self")),
-            "shuffle" => self.execute_shuffle(effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck")),
-            "reveal_per_group" => self.execute_reveal_per_group(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self")),
-            "conditional_on_result" => self.execute_conditional_on_result(effect),
-            "conditional_on_optional" => self.execute_conditional_on_optional(effect),
-            "modify_cost" => self.execute_modify_cost(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
-            _ => { eprintln!("Unknown action: '{}', treating as DoNothing", effect.action); Ok(()) }
+        let action = EffectAction::from_action(&action_str);
+        match action {
+            EffectAction::Sequential => self.execute_sequential_effect(effect, effect.conditional.unwrap_or(false), effect.is_further.unwrap_or(false)),
+            EffectAction::ConditionalAlternative => self.execute_conditional_alternative(effect),
+            EffectAction::LookAndSelect => self.execute_look_and_select(effect),
+            EffectAction::Draw | EffectAction::DrawCard => self.execute_draw(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck"), effect.destination.as_deref().unwrap_or("hand"), effect.card_type.as_deref(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref()),
+            EffectAction::DrawUntilCount => self.execute_draw_until_count(effect.target_count.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.destination.as_deref().unwrap_or("hand")),
+            EffectAction::DiscardCard | EffectAction::MoveCards => self.execute_move_cards(effect),
+            EffectAction::GainResource => { let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1)); self.execute_gain_resource(effect.resource.as_deref().unwrap_or(""), count, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.heart_color.as_deref(), effect.heart_colors.as_ref(), effect.resource_icon_count) },
+            EffectAction::ChangeState => self.execute_change_state(effect.state_change.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1), effect.max.unwrap_or(false), effect.card_type.as_deref(), effect.cost_limit, effect.optional.unwrap_or(false), effect.group.as_ref().map(|g| g.name.as_str()), effect.self_cost.unwrap_or(false), effect.source.as_deref(), effect.destination.as_deref()),
+            EffectAction::ModifyScore => self.execute_modify_score(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.effect_constraint.as_deref(), effect.self_target.unwrap_or(false)),
+            EffectAction::ModifyRequiredHearts => self.execute_modify_required_hearts(effect.operation.as_deref().unwrap_or("decrease"), effect.value.unwrap_or(0), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::SetCost => self.execute_set_cost(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
+            EffectAction::SetBladeType => self.execute_set_blade_type(effect.blade_type.as_deref(), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
+            EffectAction::SetHeartType => self.execute_set_heart_type(effect.heart_type.as_deref().or(effect.heart_color.as_deref()), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1) as i32),
+            EffectAction::ActivateAbility => self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or("")),
+            EffectAction::InvalidateAbility => self.execute_invalidate_ability(),
+            EffectAction::GainAbility => self.execute_gain_ability(effect.ability_gain.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
+            EffectAction::PlayBatonTouch => self.execute_play_baton_touch(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::Reveal => self.execute_reveal(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.heart_colors.as_ref()),
+            EffectAction::Select => self.execute_select(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.distinct.as_deref(), effect.heart_colors.as_ref()),
+            EffectAction::LookAt => self.execute_look_at(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck")),
+            EffectAction::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_global(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(1), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::ModifyYellCount => self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count.unwrap_or(0)),
+            EffectAction::PlaceEnergyUnderMember => self.execute_place_energy_under_member(effect.energy_count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.position.as_ref()),
+            EffectAction::ActivationCost => self.execute_activation_cost(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
+            EffectAction::PositionChange => self.execute_position_change(effect, effect.position.clone(), effect.target.as_deref().unwrap_or("self"), effect.target_member.as_deref().unwrap_or("this_member")),
+            EffectAction::Appear => self.execute_appear(effect.source.as_deref().unwrap_or(""), effect.destination.as_deref().unwrap_or("stage"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
+            EffectAction::Choice => self.execute_choice(effect.choice_options.as_ref(), effect.choice_type.as_deref(), effect.options.as_ref()),
+            EffectAction::PayEnergy => self.execute_pay_energy(effect.count.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::SetCardIdentity => self.execute_set_card_identity(&effect.identities.clone().unwrap_or_default()),
+            EffectAction::RepeatProcedure => self.execute_repeat_procedure(effect, effect.repeat_limit.unwrap_or(1)),
+            EffectAction::DiscardUntilCount => self.execute_discard_until_count(effect.target_count.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::Restriction => self.execute_restriction(effect.restriction_type.as_deref(), effect.restricted_destination.as_deref()),
+            EffectAction::ReYell => self.execute_re_yell(effect.lose_blade_hearts.unwrap_or(false), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::ActivationRestriction => self.execute_activation_restriction(effect.target.as_deref().unwrap_or("self")),
+            EffectAction::ChooseRequiredHearts => self.execute_choose_required_hearts(),
+            EffectAction::ModifyLimit => self.execute_modify_limit(effect.operation.as_deref().unwrap_or("decrease"), effect.count.unwrap_or(0)),
+            EffectAction::SetBladeCount => self.execute_set_blade_count(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::DoNothing => Ok(()),
+            EffectAction::SetRequiredHearts => self.execute_set_required_hearts(&effect.heart_colors.clone().unwrap_or_default(), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::SetScore => self.execute_set_score(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::SpecifyHeartColor => self.execute_specify_heart_color(effect.choice.unwrap_or(false), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::ModifyRequiredHeartsSuccess => self.execute_modify_required_hearts_success(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
+            EffectAction::SetCostToUse => self.execute_set_cost_to_use(effect.value.unwrap_or(0)),
+            EffectAction::AllBladeTiming => self.execute_all_blade_timing(effect.timing.as_deref().unwrap_or("check_required_hearts"), effect.treat_as.as_deref().unwrap_or("any_heart_color")),
+            EffectAction::SetCardIdentityAllRegions => self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::Shuffle => self.execute_shuffle(effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck")),
+            EffectAction::RevealPerGroup => self.execute_reveal_per_group(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::ConditionalOnResult => self.execute_conditional_on_result(effect),
+            EffectAction::ConditionalOnOptional => self.execute_conditional_on_optional(effect),
+            EffectAction::ModifyCost => self.execute_modify_cost(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
         }
     }
 
@@ -546,17 +624,18 @@ impl<'a> AbilityResolver<'a> {
                 value * matching_count * per_unit_count_val
             } else { value };
 
-            let live_card_ids: Vec<(i16, i32)> = player.live_card_zone.cards.iter()
+            let candidate_ids: Vec<i16> = match card_type_filter.as_deref() {
+                Some("member_card") => player.stage.stage.iter().filter(|&&id| id != -1).copied().collect(),
+                _ => player.live_card_zone.cards.iter().copied().collect(),
+            };
+            let target_card_ids: Vec<(i16, i32)> = candidate_ids.iter()
                 .filter(|&&card_id| {
                     if !matches_card_type(card_id) || !matches_group(card_id) {
                         return false;
                     }
-                    // self_target (parser "このカード"): scope to activating card only
                     if self_target {
                         if let Some(activating_id) = self.activating_card_id {
-                            if card_id != activating_id {
-                                return false;
-                            }
+                            if card_id != activating_id { return false; }
                         }
                     }
                     true
@@ -571,13 +650,10 @@ impl<'a> AbilityResolver<'a> {
                     (card_id, delta)
                 }).collect();
 
-
-
-            eprintln!("[SCORE] live_card_ids={:?} final_value={} self_target={} target={} activating_id={:?} live_zone={:?}",
-                live_card_ids.iter().map(|(id, d)| format!("id={} delta={}", id, d)).collect::<Vec<_>>(),
-                final_value, self_target, target, self.activating_card_id,
-                player.live_card_zone.cards.iter().map(|c| format!("{}", c)).collect::<Vec<_>>());
-            (live_card_ids, final_value)
+            eprintln!("[SCORE] ids={:?} final_value={} self_target={} target={} activating_id={:?}",
+                target_card_ids.iter().map(|(id, d)| format!("id={} delta={}", id, d)).collect::<Vec<_>>(),
+                final_value, self_target, target, self.activating_card_id);
+            (target_card_ids, final_value)
         };
 
         let mut count_applied = 0u32;
@@ -1081,8 +1157,8 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_set_score(&mut self, value: u32, target: &str) -> Result<(), String> {
-        let player = self.game_state.resolve_target_player_mut(target);
-        player.live_score = value as i32;
+        let _ = target;
+        let _ = value;
         Ok(())
     }
 

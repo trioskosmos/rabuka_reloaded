@@ -1,6 +1,7 @@
 use crate::card::Ability;
 use crate::ability_resolver::Choice;
 use crate::game_state::AbilityTrigger;
+use crate::ability::types::ExecutionContext;
 
 /// Unique identifier for an ability instance in the queue
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -45,6 +46,8 @@ pub struct AbilityQueueEntry {
     pub choice_card_no: Option<String>,
     /// JSON-serialized options for choice/choice_string discriminators
     pub conditional_choice: Option<String>,
+    /// Execution context saved across resolver create/destroy cycles
+    pub execution_context: Option<ExecutionContext>,
 }
 
 /// Unified ability queue with proper state management

@@ -1,35 +1,33 @@
 use crate::card::Condition;
-use crate::condition_enum::ConditionEnum;
 use crate::game_state::Phase;
 use super::util;
 use super::util::compare_counts;
 
-#[allow(dead_code)]
 impl<'a> super::resolver::AbilityResolver<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
-        let cond_enum = ConditionEnum::from_condition(condition);
-        let result = match cond_enum {
-            ConditionEnum::Compound { .. } => self.evaluate_compound_condition(condition),
-            ConditionEnum::Comparison { .. } => self.evaluate_comparison_condition(condition),
-            ConditionEnum::Location { .. } => self.evaluate_location_condition(condition),
-            ConditionEnum::Position { .. } => self.evaluate_position_condition(condition),
-            ConditionEnum::Group { .. } => self.evaluate_group_condition(condition),
-            ConditionEnum::CardCount { .. } => self.evaluate_card_count_condition(condition),
-            ConditionEnum::Appearance { .. } => self.evaluate_appearance_condition(condition),
-            ConditionEnum::Temporal { .. } => self.evaluate_temporal_condition(condition),
-            ConditionEnum::State { .. } => self.evaluate_state_condition(condition),
-            ConditionEnum::EnergyState { .. } => self.evaluate_energy_state_condition(condition),
-            ConditionEnum::Movement { .. } => self.evaluate_movement_condition(condition),
-            ConditionEnum::AbilityNegation { .. } => self.evaluate_ability_negation_condition(condition),
-            ConditionEnum::Or { .. } => self.evaluate_or_condition(condition),
-            ConditionEnum::AnyOf { .. } => self.evaluate_any_of_condition(condition),
-            ConditionEnum::ScoreThreshold { .. } => self.evaluate_score_threshold_condition(condition),
-            ConditionEnum::Choice => self.evaluate_choice_condition(condition),
-            ConditionEnum::PositionChange { .. } => self.evaluate_position_change_condition(condition),
-            ConditionEnum::StateChange { .. } => self.evaluate_state_change_condition(condition),
-            ConditionEnum::OpponentChoice { .. } => self.evaluate_opponent_choice_condition(condition),
-            ConditionEnum::OpponentLiveSuccess => self.evaluate_opponent_live_success_condition(condition),
-            ConditionEnum::Complex => self.evaluate_complex_condition(condition),
+        let result = match condition.condition_type.as_deref() {
+            Some("compound") => self.evaluate_compound_condition(condition),
+            Some("comparison_condition") => self.evaluate_comparison_condition(condition),
+            Some("location_condition") => self.evaluate_location_condition(condition),
+            Some("position_condition") => self.evaluate_position_condition(condition),
+            Some("group_condition") => self.evaluate_group_condition(condition),
+            Some("card_count_condition") => self.evaluate_card_count_condition(condition),
+            Some("appearance_condition") => self.evaluate_appearance_condition(condition),
+            Some("temporal_condition") => self.evaluate_temporal_condition(condition),
+            Some("state_condition") => self.evaluate_state_condition(condition),
+            Some("energy_state_condition") => self.evaluate_energy_state_condition(condition),
+            Some("movement_condition") => self.evaluate_movement_condition(condition),
+            Some("ability_negation_condition") => self.evaluate_ability_negation_condition(condition),
+            Some("or_condition") => self.evaluate_or_condition(condition),
+            Some("any_of_condition") => self.evaluate_any_of_condition(condition),
+            Some("score_threshold_condition") => self.evaluate_score_threshold_condition(condition),
+            Some("choice_condition") => self.evaluate_choice_condition(condition),
+            Some("position_change_condition") => self.evaluate_position_change_condition(condition),
+            Some("state_change_condition") => self.evaluate_state_change_condition(condition),
+            Some("opponent_choice_condition") => self.evaluate_opponent_choice_condition(condition),
+            Some("opponent_live_success") => self.evaluate_opponent_live_success_condition(condition),
+            Some("complex_condition") => self.evaluate_complex_condition(condition),
+            _ => false,
         };
 
         if condition.negation.unwrap_or(false) {
@@ -123,6 +121,21 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             true
         };
 
+        // Collect both players' cards for targets that need cross-player comparison
+        let p1_cards: &[i16] = match location {
+            "stage" => &self.game_state.player1.stage.stage, "hand" => &self.game_state.player1.hand.cards,
+            "deck" => &self.game_state.player1.main_deck.cards, "discard" | "waitroom" => &self.game_state.player1.waitroom.cards,
+            "energy_zone" => &self.game_state.player1.energy_zone.cards, "live_card_zone" => &self.game_state.player1.live_card_zone.cards,
+            "success_live_zone" => &self.game_state.player1.success_live_card_zone.cards, _ => &[],
+        };
+        let p2_cards: &[i16] = match location {
+            "stage" => &self.game_state.player2.stage.stage, "hand" => &self.game_state.player2.hand.cards,
+            "deck" => &self.game_state.player2.main_deck.cards, "discard" | "waitroom" => &self.game_state.player2.waitroom.cards,
+            "energy_zone" => &self.game_state.player2.energy_zone.cards, "live_card_zone" => &self.game_state.player2.live_card_zone.cards,
+            "success_live_zone" => &self.game_state.player2.success_live_card_zone.cards, _ => &[],
+        };
+        fn player_cards_for_target<'b>(p1: &'b [i16], p2: &'b [i16], is_p1: bool) -> &'b [i16] { if is_p1 { p1 } else { p2 } }
+
         let location_value = match target {
             "either" => {
                 if comparison_type == Some("score") || comparison_type == Some("cost") {
@@ -130,18 +143,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     let v2 = self.get_count_for_target(condition, "opponent");
                     v1.max(v2)
                 } else {
-                    let p1_cards: &[i16] = match location {
-                        "stage" => &self.game_state.player1.stage.stage, "hand" => &self.game_state.player1.hand.cards,
-                        "deck" => &self.game_state.player1.main_deck.cards, "discard" | "waitroom" => &self.game_state.player1.waitroom.cards,
-                        "energy_zone" => &self.game_state.player1.energy_zone.cards, "live_card_zone" => &self.game_state.player1.live_card_zone.cards,
-                        "success_live_zone" => &self.game_state.player1.success_live_card_zone.cards, _ => &[],
-                    };
-                    let p2_cards: &[i16] = match location {
-                        "stage" => &self.game_state.player2.stage.stage, "hand" => &self.game_state.player2.hand.cards,
-                        "deck" => &self.game_state.player2.main_deck.cards, "discard" | "waitroom" => &self.game_state.player2.waitroom.cards,
-                        "energy_zone" => &self.game_state.player2.energy_zone.cards, "live_card_zone" => &self.game_state.player2.live_card_zone.cards,
-                        "success_live_zone" => &self.game_state.player2.success_live_card_zone.cards, _ => &[],
-                    };
                     let c1 = util::count_matching(p1_cards, card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
                     let c2 = util::count_matching(p2_cards, card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
                     if all_areas {
@@ -154,6 +155,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                     c1.max(c2)
                 }
+            }
+            "both" => {
+                if let Some(op) = operator {
+                    let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
+                    let self_count = util::count_matching(player_cards_for_target(p1_cards, p2_cards, self_is_p1), card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
+                    let opp_count = util::count_matching(player_cards_for_target(p1_cards, p2_cards, !self_is_p1), card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
+                    return compare_counts(Some(op), self_count, opp_count);
+                }
+                let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
+                let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
+                util::count_matching(player_cards_for_target(p1_cards, p2_cards, self_is_p1), card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator)
             }
             _ => {
                 let player = self.game_state.resolve_target_player(target);

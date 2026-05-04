@@ -4,7 +4,6 @@ use crate::zones::MemberArea;
 use super::types::{Choice, ExecutionContext};
 use super::util;
 
-#[allow(dead_code)]
 pub struct AbilityResolver<'a> {
     pub game_state: &'a mut GameState,
     pub pending_choice: Option<Choice>,
@@ -14,7 +13,6 @@ pub struct AbilityResolver<'a> {
     pub activating_card_id: Option<i16>,
     pub execution_context: ExecutionContext,
     pub current_effect: Option<AbilityEffect>,
-    pre_resolution_snapshot: Option<GameState>,
 }
 
 #[allow(dead_code)]
@@ -31,16 +29,11 @@ impl<'a> AbilityResolver<'a> {
             activating_card_id,
             execution_context: ExecutionContext::None,
             current_effect: None,
-            pre_resolution_snapshot: None,
         }
     }
 
     pub fn take_looked_at(&mut self) -> Vec<i16> {
         std::mem::take(&mut self.looked_at_cards)
-    }
-
-    pub fn capture_snapshot(&mut self) {
-        self.pre_resolution_snapshot = Some(self.game_state.clone());
     }
 
     /// Find matching card indices in a zone, prompt if too many.
@@ -71,16 +64,6 @@ impl<'a> AbilityResolver<'a> {
             return Ok(None);
         }
         Ok(Some(idxs.into_iter().rev().take(count).collect()))
-    }
-
-    pub fn rollback(&mut self) {
-        if let Some(snapshot) = self.pre_resolution_snapshot.take() {
-            *self.game_state = snapshot;
-        }
-    }
-
-    pub fn clear_snapshot(&mut self) {
-        self.pre_resolution_snapshot = None;
     }
 
     pub fn get_pending_choice(&self) -> Option<&Choice> {
@@ -194,11 +177,9 @@ impl<'a> AbilityResolver<'a> {
 
         self.current_ability = Some(ability.clone());
         self.game_state.activating_card = activating_card;
-        self.capture_snapshot();
 
         if let Some(ref cost) = ability.cost {
             if let Err(e) = self.pay_cost(cost) {
-                self.rollback();
                 return Err(e);
             }
         }
@@ -210,7 +191,6 @@ impl<'a> AbilityResolver<'a> {
 
         if let Some(ref effect) = ability.effect {
             if let Err(e) = self.execute_effect(effect) {
-                self.rollback();
                 return Err(e);
             }
 
@@ -219,8 +199,6 @@ impl<'a> AbilityResolver<'a> {
                 return Ok(());
             }
         }
-
-        self.clear_snapshot();
 
         self.game_state.activating_card = None;
         self.current_ability = None;

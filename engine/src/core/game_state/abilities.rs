@@ -7,7 +7,7 @@ impl GameState {
             let (card, card_id) = if let Some(cid) = explicit_card_id {
                 (self.card_database.get_card(cid).cloned(), Some(cid))
             } else {
-                self.find_card_by_number(card_no)
+                self.find_card_by_number_for_player(card_no, &player_id)
             };
             if let Some(card) = card {
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
@@ -24,6 +24,7 @@ impl GameState {
                             pending_choice_result: None,
                             choice_card_no: None,
                             conditional_choice: None,
+                            execution_context: None,
                         };
 
                         self.ability_queue.enqueue(entry);
@@ -34,51 +35,43 @@ impl GameState {
         }
     }
 
-    fn find_card_by_number(&self, card_no: &str) -> (Option<crate::card::Card>, Option<i16>) {
-        for player in [&self.player1, &self.player2] {
-            for id in &player.hand.cards {
-                if let Some(card) = self.card_database.get_card(*id) {
-                    if card.card_no == card_no {
-                        return (Some(card.clone()), Some(*id));
-                    }
-                }
-            }
+    /// Search for a card in the specified player's zones first, fall back to the other player.
+    fn find_card_by_number_for_player(&self, card_no: &str, player_id: &str) -> (Option<crate::card::Card>, Option<i16>) {
+        let preferred = if player_id == self.player1.id || player_id == "p1" { &self.player1 } else { &self.player2 };
+        let other = if std::ptr::eq(preferred, &self.player1) { &self.player2 } else { &self.player1 };
+        let result = self.search_player_zones_for_card(card_no, preferred);
+        if result.0.is_some() { return result; }
+        self.search_player_zones_for_card(card_no, other)
+    }
 
-            for stage_card_id in &player.stage.stage {
-                if *stage_card_id != -1 {
-                    if let Some(card) = self.card_database.get_card(*stage_card_id) {
-                        if card.card_no == card_no {
-                            return (Some(card.clone()), Some(*stage_card_id));
-                        }
-                    }
-                }
+    fn search_player_zones_for_card(&self, card_no: &str, player: &Player) -> (Option<crate::card::Card>, Option<i16>) {
+        for id in &player.hand.cards {
+            if let Some(card) = self.card_database.get_card(*id) {
+                if card.card_no == card_no { return (Some(card.clone()), Some(*id)); }
             }
-
-            for waitroom_card_id in &player.waitroom.cards {
-                if let Some(card) = self.card_database.get_card(*waitroom_card_id) {
-                    if card.card_no == card_no {
-                        return (Some(card.clone()), Some(*waitroom_card_id));
-                    }
-                }
-            }
-
-            for live_card_id in &player.live_card_zone.cards {
-                if let Some(card) = self.card_database.get_card(*live_card_id) {
-                    if card.card_no == card_no {
-                        return (Some(card.clone()), Some(*live_card_id));
-                    }
-                }
-            }
-
-            for success_card_id in &player.success_live_card_zone.cards {
-                if let Some(card) = self.card_database.get_card(*success_card_id) {
-                    if card.card_no == card_no {
-                        return (Some(card.clone()), Some(*success_card_id));
-                    }
+        }
+        for stage_card_id in &player.stage.stage {
+            if *stage_card_id != -1 {
+                if let Some(card) = self.card_database.get_card(*stage_card_id) {
+                    if card.card_no == card_no { return (Some(card.clone()), Some(*stage_card_id)); }
                 }
             }
         }
-
+        for waitroom_card_id in &player.waitroom.cards {
+            if let Some(card) = self.card_database.get_card(*waitroom_card_id) {
+                if card.card_no == card_no { return (Some(card.clone()), Some(*waitroom_card_id)); }
+            }
+        }
+        for live_card_id in &player.live_card_zone.cards {
+            if let Some(card) = self.card_database.get_card(*live_card_id) {
+                if card.card_no == card_no { return (Some(card.clone()), Some(*live_card_id)); }
+            }
+        }
+        for success_card_id in &player.success_live_card_zone.cards {
+            if let Some(card) = self.card_database.get_card(*success_card_id) {
+                if card.card_no == card_no { return (Some(card.clone()), Some(*success_card_id)); }
+            }
+        }
         (None, None)
     }
 
@@ -102,12 +95,13 @@ impl GameState {
         if let Some(entry) = self.ability_queue.current_entry().cloned() {
             self.activating_card = entry.card_id;
 
-            let (choice, looked_at, result) = {
+            let (choice, looked_at, ctx, result) = {
                 let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
                 let result = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index);
                 let choice = resolver.get_pending_choice().cloned();
                 let looked_at = resolver.take_looked_at();
-                (choice, looked_at, result)
+                let ctx = resolver.execution_context.clone();
+                (choice, looked_at, ctx, result)
             };
             self.looked_at_cards = looked_at;
 
@@ -118,6 +112,9 @@ impl GameState {
             }
 
             if let Some(c) = choice {
+                if let Some(e) = self.ability_queue.current_entry_mut() {
+                    e.execution_context = Some(ctx);
+                }
                 self.ability_queue.pause_for_choice(c);
             } else {
                 self.ability_queue.complete_current();
@@ -163,9 +160,9 @@ impl GameState {
     pub fn resolve_target_player_mut(&mut self, target: &str) -> &mut Player {
         let master = self.ability_master_id();
         match (target, master.as_deref()) {
-            ("self", Some("player2")) => &mut self.player2,
+            ("self", Some("player2") | Some("p2")) => &mut self.player2,
             ("self", _) => &mut self.player1,
-            ("opponent", Some("player2")) => &mut self.player1,
+            ("opponent", Some("player2") | Some("p2")) => &mut self.player1,
             ("opponent", _) => &mut self.player2,
             ("both", _) => {
                 eprintln!("WARN: resolve_target_player_mut called with 'both' — returning player1, use execute_for_targets instead");
@@ -178,9 +175,9 @@ impl GameState {
     pub fn resolve_target_player(&self, target: &str) -> &Player {
         let master = self.ability_master_id();
         match (target, master.as_deref()) {
-            ("self", Some("player2")) => &self.player2,
+            ("self", Some("player2") | Some("p2")) => &self.player2,
             ("self", _) => &self.player1,
-            ("opponent", Some("player2")) => &self.player1,
+            ("opponent", Some("player2") | Some("p2")) => &self.player1,
             ("opponent", _) => &self.player2,
             _ => &self.player1,
         }

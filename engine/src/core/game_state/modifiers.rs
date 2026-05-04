@@ -32,97 +32,40 @@ impl GameState {
     /// Evaluates each constant ability's condition against the current game state
     /// and applies/removes blade modifiers accordingly.
     pub fn recalculate_constant_blade_modifiers(&mut self) {
-        let saved_queue = self.ability_queue.clone();
-        let saved_activating = self.activating_card;
-
-        let player1_id = self.player1.id.clone();
-        let player2_id = self.player2.id.clone();
-        let p1_cards: Vec<i16> = self.player1.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
-        let p2_cards: Vec<i16> = self.player2.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
-
-        // Pre-collect all constant abilities with their card IDs
-        let mut all_const_abilities: Vec<(i16, usize, crate::card::Ability)> = Vec::new();
-        for &cid in &p1_cards {
-            if let Some(card) = self.card_database.get_card(cid) {
-                for (idx, ability) in card.abilities.iter().enumerate() {
-                    if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
-                        all_const_abilities.push((cid, idx, ability.clone()));
-                    }
-                }
-            }
-        }
-        for &cid in &p2_cards {
-            if let Some(card) = self.card_database.get_card(cid) {
-                for (idx, ability) in card.abilities.iter().enumerate() {
-                    if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
-                        all_const_abilities.push((cid, idx, ability.clone()));
-                    }
-                }
-            }
-        }
-
-        let mut expected: HashMap<i16, i32> = HashMap::new();
-
-        // Process each player's cards with proper queue context
-        let players_info = [(player1_id.clone(), &p1_cards[..]), (player2_id.clone(), &p2_cards[..])];
-        for (player_id, stage_cards) in &players_info {
-            if stage_cards.is_empty() { continue; }
-
-            self.ability_queue = AbilityQueue::new();
-            self.ability_queue.enqueue(AbilityQueueEntry {
-                id: AbilityId::new("_const", 0, "Constant"),
-                card_no: String::new(),
-                player_id: player_id.clone(),
-                ability: Ability::default(),
-                ability_index: 0,
-                card_id: None,
-                trigger_type: AbilityTrigger::Constant,
-                completed: false,
-                pending_choice_result: None,
-                choice_card_no: None,
-                conditional_choice: None,
-            });
-            self.ability_queue.start_next();
-            self.activating_card = None;
-
-            let mut eval_state = self.clone();
-            let resolver = crate::ability::resolver::AbilityResolver::new(&mut eval_state);
-
-            for &cid in *stage_cards {
-                for ability in &all_const_abilities {
-                    if ability.0 != cid { continue; }
-                    if let Some(ref effect) = ability.2.effect {
-                        if effect.action == "gain_resource" {
-                            let is_blade = matches!(effect.resource.as_deref(), Some("blade") | Some("ブレード"));
-                            if is_blade {
-                                let cond_met = effect.condition.as_ref()
-                                    .map_or(true, |c| resolver.evaluate_condition(c));
-                                if cond_met {
-                                    let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1));
-                                    *expected.entry(cid).or_insert(0) += count as i32;
-                                }
-                            }
+        // Collect blade-granting constant abilities from all stage cards
+        let mut blade_abilities: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
+        for &cid in self.player1.stage.stage.iter().chain(self.player2.stage.stage.iter()) {
+            if cid == -1 { continue; }
+            let card = match self.card_database.get_card(cid) { Some(c) => c, None => continue };
+            for ability in &card.abilities {
+                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
+                    if let Some(ref effect) = ability.effect {
+                        if effect.action == "gain_resource" && matches!(effect.resource.as_deref(), Some("blade") | Some("ブレード")) {
+                            blade_abilities.push((cid, effect.clone()));
                         }
                     }
                 }
             }
         }
 
-        self.ability_queue = saved_queue;
-        self.activating_card = saved_activating;
-
-        // Collect old keys before modifying
-        let old_keys: Vec<i16> = self.constant_blade_bonuses.keys().copied().collect();
-        for &cid in &old_keys {
-            if let Some(&old) = self.constant_blade_bonuses.get(&cid) {
-                self.remove_blade_modifier(cid, old);
+        // Evaluate conditions and sum expected bonuses
+        let mut expected: HashMap<i16, i32> = HashMap::new();
+        {
+            let resolver = crate::ability::resolver::AbilityResolver::new(self);
+            for &(cid, ref effect) in &blade_abilities {
+                let cond_met = effect.condition.as_ref().map_or(true, |c| resolver.evaluate_condition(c));
+                if cond_met {
+                    let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1));
+                    *expected.entry(cid).or_insert(0) += count as i32;
+                }
             }
         }
 
-        for (&cid, &new_val) in &expected {
-            self.add_blade_modifier(cid, new_val);
-        }
-
+        // Remove old bonuses (clone before mutating self)
+        let old_bonuses = std::mem::take(&mut self.constant_blade_bonuses);
+        for (cid, old) in &old_bonuses { self.remove_blade_modifier(*cid, *old); }
+        // Apply new bonuses
+        for (&cid, &new_val) in &expected { self.add_blade_modifier(cid, new_val); }
         self.constant_blade_bonuses = expected;
     }
 
@@ -218,22 +161,6 @@ impl GameState {
 
     pub fn clear_card_appearance_tracking(&mut self) {
         self.cards_appeared_this_turn.clear();
-    }
-
-    pub fn set_player_has_live_score(&mut self, player_id: &str, has_score: bool) {
-        if player_id == "player1" {
-            self.player1.has_live_score = has_score;
-        } else {
-            self.player2.has_live_score = has_score;
-        }
-    }
-
-    pub fn player_has_live_score(&self, player_id: &str) -> bool {
-        if player_id == "player1" {
-            self.player1.has_live_score
-        } else {
-            self.player2.has_live_score
-        }
     }
 
     pub fn set_turn_order_changed(&mut self, changed: bool) {

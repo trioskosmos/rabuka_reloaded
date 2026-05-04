@@ -2,39 +2,55 @@ use crate::card::CardDatabase;
 use crate::game_state::GameState;
 
 impl super::TurnEngine {
-    pub fn execute_live_victory_determination(game_state: &mut GameState) {
-        let player1_stage_hearts = game_state.player1.calculate_stage_hearts(&game_state.card_database);
-        let player2_stage_hearts = game_state.player2.calculate_stage_hearts(&game_state.card_database);
-        game_state.player1.stage_hearts = Some(player1_stage_hearts);
-        game_state.player2.stage_hearts = Some(player2_stage_hearts);
+    /// Compute the score modifier delta for cards in a specific zone since a snapshot.
+    fn score_delta_since(current: &crate::mod_map::ModMap<i32>, snapshot: &crate::mod_map::ModMap<i32>, zone_cards: &[i16]) -> u32 {
+        let mut total = 0i32;
+        for &cid in zone_cards {
+            let cur = current.get(cid).copied().unwrap_or(0);
+            let prev = snapshot.get(cid).copied().unwrap_or(0);
+            total += (cur - prev).max(0);
+        }
+        total as u32
+    }
 
-        let player1_score = game_state.player1.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player1_cheer_blade_heart_count, game_state.player1.stage_hearts.as_ref());
-        let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count, game_state.player2.stage_hearts.as_ref());
+    pub fn execute_live_victory_determination(game_state: &mut GameState) {
+        game_state.player1.stage_hearts = Some(game_state.player1.calculate_stage_hearts(&game_state.card_database));
+        game_state.player2.stage_hearts = Some(game_state.player2.calculate_stage_hearts(&game_state.card_database));
+
+        // Rule 11.6: LiveSuccess abilities trigger BEFORE winner determination (Q36)
+        // Snapshot before each player's abilities so per-player score deltas are isolated
+        let player1_id = game_state.player1.id.clone();
+        let player2_id = game_state.player2.id.clone();
+        let pre_p1 = game_state.score_modifiers.clone();
+        Self::trigger_live_success_abilities(game_state, &player1_id);
+        game_state.process_pending_auto_abilities(&player1_id);
+        if game_state.pending_choice.is_some() { return; }
+        let p1_extra = Self::score_delta_since(&game_state.score_modifiers, &pre_p1, &game_state.player1.live_card_zone.cards);
+
+        let pre_p2 = game_state.score_modifiers.clone();
+        Self::trigger_live_success_abilities(game_state, &player2_id);
+        game_state.process_pending_auto_abilities(&player2_id);
+        if game_state.pending_choice.is_some() { return; }
+        let p2_extra = Self::score_delta_since(&game_state.score_modifiers, &pre_p2, &game_state.player2.live_card_zone.cards);
+
+        // Determine winner (scores may have been modified by live_success abilities)
+        let player1_score = game_state.player1.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player1_cheer_blade_heart_count, game_state.player1.stage_hearts.as_ref()) + p1_extra;
+        let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count, game_state.player2.stage_hearts.as_ref()) + p2_extra;
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
 
-        let mut player1_won = false;
-        let mut player2_won = false;
+        eprintln!("LIVE_VICTORY: P1_cards={} P1_score={} P2_cards={} P2_score={}", player1_has_cards, player1_score, player2_has_cards, player2_score);
 
-        if !player1_has_cards && !player2_has_cards {}
-        else if player1_has_cards && !player2_has_cards { player1_won = true; }
-        else if !player1_has_cards && player2_has_cards { player2_won = true; }
+        let (player1_won, player2_won) = if !player1_has_cards && !player2_has_cards { (false, false) }
+        else if player1_has_cards && !player2_has_cards { (true, false) }
+        else if !player1_has_cards && player2_has_cards { (false, true) }
         else {
-            if player1_score > player2_score { player1_won = true; }
-            else if player2_score > player1_score { player2_won = true; }
-        }
+            (player1_score > player2_score, player2_score > player1_score)
+        };
+
+        eprintln!("LIVE_VICTORY_RESULT: P1_won={} P2_won={}", player1_won, player2_won);
 
         if player2_won { game_state.set_opponent_live_success(true); }
-
-        let player1_id = game_state.player1.id.clone();
-        let player2_id = game_state.player2.id.clone();
-
-        if player1_won { Self::trigger_live_success_abilities(game_state, &player1_id);
-            game_state.process_pending_auto_abilities(&player1_id); }
-        if player2_won { Self::trigger_live_success_abilities(game_state, &player2_id);
-            game_state.process_pending_auto_abilities(&player2_id); }
-
-        if game_state.pending_choice.is_some() { return; }
 
         let card_db = game_state.card_database.clone();
         Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);

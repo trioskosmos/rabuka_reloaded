@@ -134,17 +134,28 @@ impl super::TurnEngine {
 
     fn resume_queue_with_choice(game_state: &mut GameState, choice: crate::ability_resolver::Choice, result: crate::ability_resolver::ChoiceResult) -> Result<(), String> {
         game_state.ability_queue.resume_with_choice(result.clone());
-        let (new_choice, looked_at, res) = {
+        let saved_ctx = game_state.ability_queue.current_entry()
+            .and_then(|e| e.execution_context.clone())
+            .unwrap_or(crate::ability::types::ExecutionContext::None);
+        let (new_choice, looked_at, ctx, res) = {
             let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+            resolver.execution_context = saved_ctx;
             resolver.pending_choice = Some(choice);
             let res = resolver.provide_choice_result(result);
             let new_choice = resolver.get_pending_choice().cloned();
             let looked_at = resolver.take_looked_at();
-            (new_choice, looked_at, res)
+            let ctx = resolver.execution_context.clone();
+            (new_choice, looked_at, ctx, res)
         };
         game_state.looked_at_cards = looked_at;
         if let Err(e) = res { game_state.ability_queue.complete_current(); game_state.pending_choice = None; return Err(e); }
-        if let Some(c) = new_choice { game_state.pending_choice = c.to_frontend_json(); game_state.ability_queue.pause_for_choice(c); }
+        if let Some(c) = new_choice {
+            if let Some(e) = game_state.ability_queue.current_entry_mut() {
+                e.execution_context = Some(ctx);
+            }
+            game_state.pending_choice = c.to_frontend_json();
+            game_state.ability_queue.pause_for_choice(c);
+        }
         else { game_state.ability_queue.complete_current(); game_state.pending_choice = None; game_state.activating_card = None; }
         Ok(())
     }

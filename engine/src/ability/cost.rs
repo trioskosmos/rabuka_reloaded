@@ -1,26 +1,23 @@
 use crate::card::{AbilityCost, AbilityEffect};
-use crate::cost_enum::CostEnum;
 use super::types::Choice;
 use super::resolver::AbilityResolver;
 use super::util;
 
-
-#[allow(dead_code)]
 impl<'a> AbilityResolver<'a> {
     pub fn validate_cost(&self, cost: &AbilityCost) -> Result<(), String> {
-        let cost_enum = CostEnum::from_ability_cost(cost);
-        match cost_enum {
-            CostEnum::Sequential { .. } => {
+        match cost.cost_type.as_deref() {
+            Some("sequential_cost") => {
                 if let Some(ref costs) = cost.costs {
                     for sub_cost in costs { self.validate_cost(sub_cost)?; }
                 }
                 Ok(())
             }
-            CostEnum::ChoiceCondition { .. } => Ok(()),
-            CostEnum::MoveCards { ref source, count, .. } => {
-                let count = count as usize;
+            Some("choice_condition") => Ok(()),
+            Some("move_cards") => {
+                let count = cost.count.unwrap_or(1) as usize;
+                let source = cost.source.as_deref().unwrap_or("");
                 let player = self.game_state.active_player();
-                let available = match source.as_str() {
+                let available = match source {
                     "hand" => player.hand.cards.len(),
                     "stage" => player.stage.stage.iter().filter(|&&id| id != -1).count(),
                     "waitroom" => player.waitroom.cards.len(),
@@ -32,8 +29,8 @@ impl<'a> AbilityResolver<'a> {
                 }
                 Ok(())
             }
-            CostEnum::EnergyCondition { count, .. } => {
-                let count = count as usize;
+            Some("energy_condition") => {
+                let count = cost.count.unwrap_or(1) as usize;
                 let player = self.game_state.active_player();
                 if player.energy_zone.cards.len() < count {
                     return Err(format!("Not enough energy cards: need {}, have {}", count, player.energy_zone.cards.len()));
@@ -44,9 +41,9 @@ impl<'a> AbilityResolver<'a> {
         }
     }
 
-    fn pay_cost_inner(&mut self, cost: &AbilityCost, _cost_enum: &CostEnum) -> Result<(), String> {
-        match _cost_enum {
-            CostEnum::Sequential { .. } => {
+    fn pay_cost_inner(&mut self, cost: &AbilityCost) -> Result<(), String> {
+        match cost.cost_type.as_deref() {
+            Some("sequential_cost") => {
                 if let Some(ref costs) = cost.costs {
                     for sub_cost in costs {
                         if let Err(e) = self.validate_cost(sub_cost) {
@@ -57,7 +54,10 @@ impl<'a> AbilityResolver<'a> {
                 }
                 Ok(())
             }
-            CostEnum::ChoiceCondition { texts, .. } => {
+            Some("choice_condition") => {
+                let texts: Vec<String> = cost.options.as_ref()
+                    .map(|o| o.iter().map(|opt| opt.text.clone()).collect())
+                    .unwrap_or_default();
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
@@ -67,16 +67,21 @@ impl<'a> AbilityResolver<'a> {
                 }
                 Ok(())
             }
-            CostEnum::MoveCards { source, count, card_type, optional, text, .. } => {
+            Some("move_cards") => {
+                let source = cost.source.as_deref().unwrap_or("");
+                let count = cost.count.unwrap_or(1) as usize;
+                let card_type = cost.card_type.clone();
+                let optional = cost.optional.unwrap_or(false);
+                let text = &cost.text;
                 let is_activation = self.current_ability.as_ref()
                     .and_then(|a| a.triggers.as_ref())
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
-                if *optional && !is_activation {
+                if optional && !is_activation {
                     self.pending_choice = Some(Choice::SelectCard {
-                        zone: source.clone(),
+                        zone: source.to_string(),
                         card_type: card_type.clone(),
-                        count: *count as usize,
+                        count,
                         description: format!("Select card(s) to pay optional cost (or skip): {}", text),
                         allow_skip: true,
                     });
@@ -99,7 +104,7 @@ impl<'a> AbilityResolver<'a> {
                         }).count()
                     };
 
-                    let matching_count = match source.as_str() {
+                    let matching_count = match source {
                         "deck" | "deck_top" => count_matching_in(&player.main_deck.cards),
                         "hand" => count_matching_in(&player.hand.cards),
                         "discard" => count_matching_in(&player.waitroom.cards),
@@ -107,7 +112,7 @@ impl<'a> AbilityResolver<'a> {
                         _ => usize::MAX,
                     };
 
-                    if matching_count < *count as usize {
+                    if matching_count < count {
                         return Err(format!("Cannot pay cost: {} has only {} cards matching cost limit {}, need {}", source, matching_count, cost_limit.map(|l| l.to_string()).unwrap_or("none".to_string()), count));
                     }
                 }
@@ -123,12 +128,15 @@ impl<'a> AbilityResolver<'a> {
                 };
                 self.execute_move_cards(&effect)
             }
-            CostEnum::ChangeState { state_change, target, optional } => {
+            Some("change_state") => {
+                let state_change = cost.state_change.as_deref().unwrap_or("");
+                let target = cost.target.as_deref().unwrap_or("self");
+                let optional = cost.optional.unwrap_or(false);
                 let is_activation = self.current_ability.as_ref()
                     .and_then(|a| a.triggers.as_ref())
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
-                if *optional && !is_activation {
+                if optional && !is_activation {
                     let cost_description = if state_change == "wait" { "Put this member to wait state" } else { "Pay cost" };
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
@@ -148,12 +156,15 @@ impl<'a> AbilityResolver<'a> {
                 }
                 Ok(())
             }
-            CostEnum::PayEnergy { energy, target, optional } => {
+            Some("pay_energy") => {
+                let energy = cost.energy.unwrap_or(0);
+                let target = cost.target.as_deref().unwrap_or("self");
+                let optional = cost.optional.unwrap_or(false);
                 let is_activation = self.current_ability.as_ref()
                     .and_then(|a| a.triggers.as_ref())
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
-                if *optional && !is_activation {
+                if optional && !is_activation {
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),
@@ -164,22 +175,23 @@ impl<'a> AbilityResolver<'a> {
                     return Ok(());
                 }
 
-                if self.game_state.baton_touch_zero_cost && *energy > 0 {
+                if self.game_state.baton_touch_zero_cost && energy > 0 {
                     eprintln!("Skipping pay_energy cost of {} due to baton touch zero cost", energy);
                     return Ok(());
                 }
 
                 let player = self.game_state.resolve_target_player_mut(target);
 
-                if *energy > 0 {
-                    if let Err(e) = player.energy_zone.pay_energy(*energy as usize) {
+                if energy > 0 {
+                    if let Err(e) = player.energy_zone.pay_energy(energy as usize) {
                         return Err(e);
                     }
                 }
                 Ok(())
             }
-            CostEnum::EnergyCondition { count, target } => {
-                let count = *count as usize;
+            Some("energy_condition") => {
+                let count = cost.count.unwrap_or(1) as usize;
+                let target = cost.target.as_deref().unwrap_or("self");
                 let player = self.game_state.resolve_target_player_mut(target);
                 if player.energy_zone.cards.len() < count {
                     return Err(format!("Not enough energy cards: need {}, have {}", count, player.energy_zone.cards.len()));
@@ -192,14 +204,7 @@ impl<'a> AbilityResolver<'a> {
                 player.energy_zone.active_energy_count = player.energy_zone.active_energy_count.saturating_sub(count);
                 Ok(())
             }
-            CostEnum::Reveal { .. } => {
-                let _effect = AbilityEffect {
-                    text: cost.text.clone(), action: "reveal".to_string(),
-                    source: cost.source.clone(), destination: cost.destination.clone(),
-                    count: cost.count, card_type: cost.card_type.clone(),
-                    target: cost.target.clone(), effect_type: None,
-                    ..Default::default()
-                };
+            Some("reveal") => {
                 self.execute_reveal(
                     cost.source.as_deref().unwrap_or("hand"),
                     cost.count.unwrap_or(1),
@@ -208,20 +213,20 @@ impl<'a> AbilityResolver<'a> {
                     None,
                 )
             }
-            CostEnum::PlaceEnergyUnderMember { .. } => {
+            Some("place_energy_under_member") => {
                 self.execute_place_energy_under_member(
                     cost.count.unwrap_or(1),
                     cost.target.as_deref().unwrap_or("self"),
                     cost.position.as_ref(),
                 )
             }
+            _ => Ok(()),
         }
     }
 
     pub fn pay_cost(&mut self, cost: &AbilityCost) -> Result<(), String> {
         eprintln!("PAY_COST: cost_type={:?}, source={:?}, destination={:?}, card_type={:?}", cost.cost_type, cost.source, cost.destination, cost.card_type);
-        let cost_enum = CostEnum::from_ability_cost(cost);
-        self.pay_cost_inner(cost, &cost_enum)
+        self.pay_cost_inner(cost)
     }
 }
 
