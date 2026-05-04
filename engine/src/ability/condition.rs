@@ -9,9 +9,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             Some("compound") => self.evaluate_compound_condition(condition),
             Some("comparison_condition") => self.evaluate_comparison_condition(condition),
             Some("location_condition") => self.evaluate_location_condition(condition),
-            Some("position_condition") => self.evaluate_position_condition(condition),
-            Some("group_condition") => self.evaluate_group_condition(condition),
             Some("card_count_condition") => self.evaluate_card_count_condition(condition),
+            Some("group_condition") => self.evaluate_group_condition(condition),
+            Some("position_condition") => self.evaluate_position_condition(condition),
             Some("appearance_condition") => self.evaluate_appearance_condition(condition),
             Some("temporal_condition") => self.evaluate_temporal_condition(condition),
             Some("state_condition") => self.evaluate_state_condition(condition),
@@ -50,6 +50,18 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn evaluate_comparison_condition(&self, condition: &Condition) -> bool {
+        if condition.comparison_type.as_deref() == Some("cost") && condition.location.is_none() {
+            let total_cost: u32 = self.game_state.revealed_cost_cards.iter()
+                .filter_map(|&id| self.game_state.card_database.get_card(id))
+                .filter_map(|c| c.cost)
+                .sum();
+            if let Some(ref values) = condition.values {
+                return values.contains(&total_cost);
+            }
+            let target = condition.count.unwrap_or(0);
+            return compare_counts(condition.operator.as_deref(), total_cost, target);
+        }
+
         let count = self.get_count_for_condition(condition);
 
         if let Some(ref values) = condition.values {
@@ -461,6 +473,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         match temporal {
             "this_turn" => {
+                if let Some(count) = condition.count {
+                    if condition.location.as_deref() == Some("stage")
+                        && condition.card_type.as_deref() == Some("member_card")
+                    {
+                        let target = condition.target.as_deref().unwrap_or("self");
+                        let player = self.game_state.resolve_target_player(target);
+                        return player.debut_count_this_turn >= count;
+                    }
+                }
                 if let Some(created_turn) = condition.temporal_scope.as_ref().and_then(|s| s.parse::<u32>().ok()) {
                     created_turn == self.game_state.turn_number
                 } else {
@@ -677,8 +698,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         if negation { opponent_declined } else { !opponent_declined }
     }
 
-    fn evaluate_opponent_live_success_condition(&self, _condition: &Condition) -> bool {
-        self.game_state.opponent_live_success_this_turn
+    fn evaluate_opponent_live_success_condition(&self, condition: &Condition) -> bool {
+        if !self.game_state.opponent_live_success_this_turn {
+            return false;
+        }
+        // If no_excess_heart is set, also check the stored flag
+        if condition.no_excess_heart.unwrap_or(false) {
+            return self.game_state.opponent_live_no_excess_heart_this_turn;
+        }
+        true
     }
 
     fn evaluate_complex_condition(&self, condition: &Condition) -> bool {
@@ -752,29 +780,49 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let mut count = 0;
         let card_db = self.game_state.card_database.clone();
 
-        let matches_group = |card_id: i16, groups: Option<&Vec<String>>| -> bool {
-            match groups {
-                Some(group_names) => card_db.get_card(card_id).map(|c| group_names.iter().any(|g| c.group == *g)).unwrap_or(false),
-                None => true,
-            }
+        // Use group name from either group_names or group.value.name
+        let group_name = group_filter.and_then(|g| g.first().map(|s| s.as_str()))
+            .or_else(|| condition.group.as_ref().and_then(|g| g.get("name").and_then(|n| n.as_str())));
+
+        let is_aggregate = condition.aggregate.as_deref() == Some("total");
+
+        let matches_group = |card_id: i16| -> bool {
+            util::card_matches_group_str(&card_db, card_id, group_name)
         };
+
+        // When aggregate="total", sum heart values instead of counting cards
+        if is_aggregate {
+            let mut total = 0u32;
+            for i in 0..3 {
+                let cid = player.stage.stage[i];
+                if cid == -1 || !matches_group(cid) { continue; }
+                if let Some(card) = card_db.get_card(cid) {
+                    if let Some(ref bh) = card.base_heart {
+                        for (color, val) in &bh.hearts {
+                            total += val;
+                        }
+                    }
+                }
+            }
+            return total;
+        }
 
         match location {
             "stage" => {
                 for i in 0..3 {
-                    if player.stage.stage[i] != -1 && matches_group(player.stage.stage[i], group_filter) {
+                    if player.stage.stage[i] != -1 && matches_group(player.stage.stage[i]) {
                         count += 1;
                     }
                 }
             }
             "hand" => {
                 for card in &player.hand.cards {
-                    if matches_group(*card, group_filter) { count += 1; }
+                    if matches_group(*card) { count += 1; }
                 }
             }
             "discard" | "waitroom" => {
                 for card in &player.waitroom.cards {
-                    if matches_group(*card, group_filter) { count += 1; }
+                    if matches_group(*card) { count += 1; }
                 }
             }
             _ => {}

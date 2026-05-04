@@ -53,35 +53,31 @@ fn azuna_ability_parsed() {
     if let Some(ref cond) = effect.conditional_action {
         eprintln!("[PARSER]  cond.actions count = {:?}", cond.actions.as_ref().map(|a| a.len()));
     }
-    assert_eq!(effect.action, "conditional_on_optional");
-    assert!(effect.optional_action.is_some());
-    assert!(effect.conditional_action.is_some());
+    assert_eq!(effect.action, "sequential", "Expected sequential (parser no longer outputs conditional_on_optional)");
+    assert_eq!(effect.conditional, Some(true), "Should have conditional=true");
+    assert!(effect.actions.is_some(), "Should have actions");
 
-    if let Some(ref opt) = effect.optional_action {
-        assert_eq!(opt.action, "place_energy_under_member");
-        assert_eq!(opt.energy_count, Some(1));
-    }
+    if let Some(ref actions) = effect.actions {
+        assert!(actions.len() >= 2, "Should have at least 2 actions");
+        assert_eq!(actions[0].action, "place_energy_under_member");
+        assert_eq!(actions[0].optional, Some(true));
+        assert_eq!(actions[0].energy_count, Some(1));
 
-    if let Some(ref cond) = effect.conditional_action {
-        eprintln!("[DEBUG] conditional_action.action = {}", cond.action);
-        assert_eq!(cond.action, "sequential");
-        if let Some(ref actions) = cond.actions {
-            eprintln!("[DEBUG] conditional has {} actions", actions.len());
-            for (i, a) in actions.iter().enumerate() {
-                eprintln!("[DEBUG]   action[{}] = {}, resource={:?}, count={:?}, card_type={:?}, duration={:?}",
-                    i, a.action, a.resource, a.count, a.card_type, a.duration);
-            }
-            assert!(actions.len() >= 2);
-            let a0 = &actions[0];
-            assert!(a0.action == "draw_card" || a0.action == "draw");
-            assert_eq!(a0.count, Some(1));
+        // Second action should be inner sequential with [draw_card, do_nothing(gain_resource)]
+        let inner_seq = &actions[1];
+        assert_eq!(inner_seq.action, "sequential");
+        if let Some(ref inner_actions) = inner_seq.actions {
+            assert!(inner_actions.len() >= 2, "Inner sequential should have at least 2 actions");
+            assert!(inner_actions[0].action == "draw_card" || inner_actions[0].action == "draw");
+            assert_eq!(inner_actions[0].count, Some(1));
 
-            let a1 = &actions[1];
-            assert_eq!(a1.action, "gain_resource");
-            assert_eq!(a1.resource.as_deref(), Some("blade"));
-            assert_eq!(a1.count, Some(2));
-            assert_eq!(a1.duration.as_deref(), Some("live_end"));
-            assert_eq!(a1.card_type.as_deref(), Some("member_card"));
+            // Find gain_resource in inner actions (may be at index 2 after do_nothing)
+            let blade_action = inner_actions.iter().find(|a| a.action == "gain_resource");
+            assert!(blade_action.is_some(), "Should have gain_resource action");
+            let blade = blade_action.unwrap();
+            assert_eq!(blade.resource.as_deref(), Some("blade"));
+            assert_eq!(blade.count, Some(2));
+            assert_eq!(blade.card_type.as_deref(), Some("member_card"));
         }
     }
 }

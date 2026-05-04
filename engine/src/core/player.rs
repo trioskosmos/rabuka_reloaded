@@ -50,9 +50,9 @@ pub struct Player {
 
     pub stage_hearts: Option<crate::card::BaseHeart>,
 
+    pub debut_count_this_turn: u32,
+
 }
-
-
 
 impl Player {
 
@@ -87,6 +87,8 @@ impl Player {
             areas_locked_this_turn: std::collections::HashSet::new(),
 
             stage_hearts: None,
+
+            debut_count_this_turn: 0,
 
         }
 

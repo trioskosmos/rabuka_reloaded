@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-04T21:44:01.945658",
+  "generated_at": "2026-05-05T06:40:44.777869",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1705,8 +1705,8 @@
           "operator": ">=",
           "text": "自分のステージにこのメンバー以外のメンバーが1人以上いる場合",
           "unit": "人",
-          "exclude_self": true,
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "exclude_self": true
         },
         "action": "modify_yell_count",
         "operation": "subtract",
@@ -2385,12 +2385,29 @@
           },
           {
             "text": "カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-            "count": 1,
-            "card_type": "member_card",
-            "target": "self",
-            "action": "draw_card",
-            "source": "deck",
-            "destination": "hand"
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "カードを1枚引き",
+                "count": 1,
+                "action": "draw_card",
+                "source": "deck",
+                "destination": "hand"
+              },
+              {
+                "text": "",
+                "duration": "live_end",
+                "action": "do_nothing"
+              },
+              {
+                "text": "自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+                "card_type": "member_card",
+                "target": "self",
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": 2
+              }
+            ]
           }
         ],
         "conditional": true,
@@ -2538,7 +2555,7 @@
             "action": "change_state"
           },
           {
-            "text": "ライブ終了時まで、これによりアクティブにしたメンバーと、このメンバーは、それぞれ{{heart_04.png|heart04}}を得る",
+            "text": "これによりアクティブにしたメンバーと、このメンバーは、それぞれ{{heart_04.png|heart04}}を得る",
             "duration": "live_end",
             "card_type": "member_card",
             "multiple_targets": true,
@@ -4395,7 +4412,8 @@
           "count": 3,
           "operator": ">=",
           "text": "自分のステージにコストがそれぞれ異なるメンバーが3人以上いるかぎり",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "duration": "as_long_as",
         "action": "gain_resource",
@@ -5642,7 +5660,7 @@
             "card_type": "card"
           },
           {
-            "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+            "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
             "action": "gain_resource",
             "resource": "blade",
@@ -6284,7 +6302,7 @@
                 "action": "do_nothing"
               },
               {
-                "text": "ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
+                "text": "{{icon_blade.png|ブレード}}を得る",
                 "duration": "live_end",
                 "action": "gain_resource",
                 "resource": "blade",
@@ -8720,6 +8738,7 @@
             "action": "select"
           },
           {
+            "text": "相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える",
             "action": "sequential",
             "actions": [
               {
@@ -8736,8 +8755,7 @@
                 "count": 1,
                 "source": "selected_cards"
               }
-            ],
-            "text": "相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える"
+            ]
           }
         ],
         "conditional": true
@@ -16219,7 +16237,8 @@
           "count": 2,
           "operator": ">=",
           "text": "自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
@@ -16270,7 +16289,8 @@
           "count": 2,
           "operator": ">=",
           "text": "自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
@@ -16334,7 +16354,8 @@
           "count": 2,
           "operator": ">=",
           "text": "自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
@@ -16475,9 +16496,9 @@
           "actions": [
             {
               "text": "ハートに{{heart_04.png|heart04}}を2個以上持つメンバーカードか",
+              "count": 2,
               "card_type": "member_card",
-              "action": "custom",
-              "count": 1
+              "action": "custom"
             },
             {
               "text": "必要ハートに{{heart_04.png|heart04}}を2以上含むライブカードを1枚公開して手札に加えてもよい",
@@ -16536,9 +16557,9 @@
           "actions": [
             {
               "text": "ハートに{{heart_02.png|heart02}}を2個以上持つメンバーカードか",
+              "count": 2,
               "card_type": "member_card",
-              "action": "custom",
-              "count": 1
+              "action": "custom"
             },
             {
               "text": "必要ハートに{{heart_02.png|heart02}}を2以上含むライブカードを1枚公開して手札に加えてもよい",
@@ -16597,9 +16618,9 @@
           "actions": [
             {
               "text": "ハートに{{heart_05.png|heart05}}を2個以上持つメンバーカードか",
+              "count": 2,
               "card_type": "member_card",
-              "action": "custom",
-              "count": 1
+              "action": "custom"
             },
             {
               "text": "必要ハートに{{heart_05.png|heart05}}を2以上含むライブカードを1枚公開して手札に加えてもよい",
@@ -16643,6 +16664,7 @@
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
+          "count": 6,
           "operator": ">=",
           "aggregate": "total",
           "group": {
@@ -16687,6 +16709,7 @@
           "target": "self",
           "location": "stage",
           "card_type": "member_card",
+          "count": 10,
           "operator": ">=",
           "aggregate": "total",
           "group": {
@@ -16722,6 +16745,7 @@
               "target": "self",
               "location": "stage",
               "card_type": "member_card",
+              "count": 4,
               "operator": ">=",
               "aggregate": "total",
               "group": {
@@ -17169,7 +17193,7 @@
             "action": "move_cards"
           },
           {
-            "text": "ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}を得る",
+            "text": "自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
             "count": 1,
             "card_type": "member_card",
@@ -17378,15 +17402,12 @@
             "destination": null
           },
           {
-            "text": "、［赤ハート］［赤ハート］［赤ハート］を得る",
+            "text": "そのメンバーは、これによって置いたエネルギーカード1枚につき、［赤ハート］［赤ハート］［赤ハート］を得る",
+            "action": "gain_ability",
             "per_unit": true,
             "per_unit_count": 1,
-            "per_unit_type": "member",
-            "action": "gain_ability",
-            "dynamic_count": {
-              "type": "per_unit",
-              "reference": "unit_count"
-            }
+            "per_unit_type": "枚",
+            "duration": "live_end"
           }
         ],
         "conditional": true
@@ -17604,9 +17625,12 @@
             "type": "group_condition"
           },
           "effect": {
-            "type": "state_condition",
-            "state": "wait",
-            "text": "ウェイト状態のメンバーが3人以上アクティブ状態になったとき"
+            "type": "card_count_condition",
+            "count": 3,
+            "operator": ">=",
+            "text": "ウェイト状態のメンバーが3人以上アクティブ状態になったとき",
+            "unit": "人",
+            "card_type": "member_card"
           },
           "text": "自分のステージにいる『Printemps』のメンバーをアクティブにする。これによりウェイト状態のメンバーが3人以上アクティブ状態になったとき"
         },
@@ -19523,7 +19547,8 @@
           "count": 2,
           "operator": ">=",
           "text": "自分のステージに同じ名前の『虹ヶ咲』のメンバーが2人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "action": "restriction",
         "restriction_type": "modify_required_hearts",
@@ -19754,7 +19779,8 @@
               "count": 1,
               "operator": ">=",
               "text": "自分のステージにメンバーが1人以上いる場合",
-              "unit": "人"
+              "unit": "人",
+              "card_type": "member_card"
             },
             "action": "sequential",
             "actions": [
@@ -19783,7 +19809,8 @@
               "count": 2,
               "operator": ">=",
               "text": "2人以上いる場合",
-              "unit": "人"
+              "unit": "人",
+              "card_type": "member_card"
             },
             "action": "sequential",
             "actions": [
@@ -19807,11 +19834,12 @@
               "operator": "and",
               "conditions": [
                 {
-                  "text": "3人以上おり、",
+                  "type": "card_count_condition",
                   "count": 3,
                   "operator": ">=",
-                  "target": "self",
-                  "type": "comparison_condition"
+                  "text": "3人以上おり、",
+                  "unit": "人",
+                  "card_type": "member_card"
                 },
                 {
                   "type": "location_condition",
@@ -21006,7 +21034,8 @@
           "count": 2,
           "operator": ">=",
           "text": "相手のステージにウェイト状態のメンバーが2人以上いるかぎり",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "duration": "as_long_as",
         "action": "gain_resource",
@@ -21037,16 +21066,12 @@
           "operator": "and",
           "conditions": [
             {
-              "text": "自分のステージに『蓮ノ空』のメンバー1人を含むメンバーが2人以上おり、",
-              "target": "self",
-              "location": "stage",
-              "card_type": "member_card",
-              "count": 1,
+              "type": "card_count_condition",
+              "count": 2,
               "operator": ">=",
-              "group": {
-                "name": "蓮ノ空"
-              },
-              "type": "group_condition"
+              "text": "自分のステージに『蓮ノ空』のメンバー1人を含むメンバーが2人以上おり、",
+              "unit": "人",
+              "card_type": "member_card"
             },
             {
               "type": "location_condition",
@@ -21085,7 +21110,8 @@
           "count": 3,
           "operator": ">=",
           "text": "自分のステージに名前とコストが両方ともそれぞれ異なるメンバーが3人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "action": "modify_score",
         "operation": "add",
@@ -21137,7 +21163,8 @@
           "count": 2,
           "operator": ">=",
           "text": "自分のステージにコスト10以上の『蓮ノ空』のメンバーが2人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "action": "modify_score",
         "operation": "add",
@@ -21191,7 +21218,8 @@
           "count": 3,
           "operator": ">=",
           "text": "自分のステージに『みらくらぱーく！』のメンバーが3人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "action": "modify_score",
         "operation": "add",
@@ -21302,9 +21330,9 @@
           "count": 3,
           "operator": ">=",
           "text": "自分のステージにグループ名がそれぞれ異なるメンバーが3人以上いる場合",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
-        "card_type": "member_card",
         "target": "self",
         "position": "center",
         "action": "gain_ability",
@@ -21973,16 +22001,12 @@
           "operator": "and",
           "conditions": [
             {
-              "text": "自分のステージに『蓮ノ空』のメンバーが3人以上いて、",
-              "target": "self",
-              "location": "stage",
-              "card_type": "member_card",
+              "type": "card_count_condition",
               "count": 3,
               "operator": ">=",
-              "group": {
-                "name": "蓮ノ空"
-              },
-              "type": "group_condition"
+              "text": "自分のステージに『蓮ノ空』のメンバーが3人以上いて、",
+              "unit": "人",
+              "card_type": "member_card"
             },
             {
               "text": "自分の控え室にカード名に「DreamBelievers」を含むライブカードがある場合",

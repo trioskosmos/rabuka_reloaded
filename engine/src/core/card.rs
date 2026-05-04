@@ -229,9 +229,9 @@ impl CardDatabase {
         }
         
         // Save mapping
-        db.save_mapping();
         
         db
+
     }
 
     pub fn save_mapping(&self) {
@@ -239,7 +239,7 @@ impl CardDatabase {
             let _ = std::fs::write("card_id_mapping.json", mapping);
         }
     }
-
+    
     pub fn get_card(&self, card_id: i16) -> Option<&Card> {
         self.cards.get(&card_id)
     }
@@ -805,6 +805,8 @@ pub struct Condition {
     pub source: Option<String>,
     #[serde(default)]
     pub to_state: Option<String>,
+    #[serde(default)]
+    pub aggregate: Option<String>,
 }
 
 impl Default for Condition {
@@ -859,6 +861,7 @@ impl Default for Condition {
             optional: None,
             source: None,
             to_state: None,
+            aggregate: None,
         }
     }
 }

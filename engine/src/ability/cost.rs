@@ -205,19 +205,51 @@ impl<'a> AbilityResolver<'a> {
                 Ok(())
             }
             Some("reveal") => {
-                self.execute_reveal(
-                    cost.source.as_deref().unwrap_or("hand"),
-                    cost.count.unwrap_or(1),
-                    cost.target.as_deref().unwrap_or("self"),
-                    cost.card_type.as_deref(),
-                    None,
-                )
+                let source = cost.source.as_deref().unwrap_or("hand");
+                let target = cost.target.as_deref().unwrap_or("self");
+                let card_type = cost.card_type.clone();
+
+                let card_ids: Vec<i16> = {
+                    let player = &*self.game_state.resolve_target_player(target);
+                    let card_db = &self.game_state.card_database;
+                    match source {
+                        "hand" => player.hand.cards.iter()
+                            .filter(|&&id| super::util::card_matches_type(card_db, id, card_type.as_deref()))
+                            .copied().collect(),
+                        _ => vec![],
+                    }
+                };
+
+                if card_ids.is_empty() {
+                    return Err("No cards to reveal".to_string());
+                }
+
+                let has_explicit_count = cost.count.is_some();
+                let explicit_count = cost.count.unwrap_or(1) as usize;
+
+                if has_explicit_count && card_ids.len() <= explicit_count {
+                    for card_id in card_ids {
+                        self.game_state.revealed_cards.insert(card_id);
+                        self.revealed_cost_cards.push(card_id);
+                    }
+                    Ok(())
+                } else {
+                    self.pending_choice = Some(Choice::SelectCard {
+                        zone: source.to_string(),
+                        card_type: card_type.clone(),
+                        count: if has_explicit_count { explicit_count } else { 0 },
+                        description: "Select cards to reveal from hand".to_string(),
+                        allow_skip: true,
+                    });
+                    Ok(())
+                }
             }
             Some("place_energy_under_member") => {
                 self.execute_place_energy_under_member(
                     cost.count.unwrap_or(1),
                     cost.target.as_deref().unwrap_or("self"),
                     cost.position.as_ref(),
+                    cost.optional.unwrap_or(false),
                 )
             }
             _ => Ok(()),

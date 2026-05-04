@@ -47,6 +47,10 @@ impl GameState {
         self.turn2_abilities_played.clear();
         self.player1_cheer_blade_heart_count = 0;
         self.player2_cheer_blade_heart_count = 0;
+        self.player1.debut_count_this_turn = 0;
+        self.player2.debut_count_this_turn = 0;
+        self.clear_card_appearance_tracking();
+        self.clear_auto_ability_trigger_tracking();
         self.reset_change_flags();
         self.cheer_check_completed = false;
         self.reset_loop_detection();

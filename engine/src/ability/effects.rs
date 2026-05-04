@@ -182,7 +182,7 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::LookAt => self.execute_look_at(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck")),
             EffectAction::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_global(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(1), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self")),
             EffectAction::ModifyYellCount => self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count.unwrap_or(0)),
-            EffectAction::PlaceEnergyUnderMember => self.execute_place_energy_under_member(effect.energy_count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.position.as_ref()),
+            EffectAction::PlaceEnergyUnderMember => self.execute_place_energy_under_member(effect.energy_count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.position.as_ref(), effect.optional.unwrap_or(false)),
             EffectAction::ActivationCost => self.execute_activation_cost(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
             EffectAction::PositionChange => self.execute_position_change(effect, effect.position.clone(), effect.target.as_deref().unwrap_or("self"), effect.target_member.as_deref().unwrap_or("this_member")),
             EffectAction::Appear => self.execute_appear(effect.source.as_deref().unwrap_or(""), effect.destination.as_deref().unwrap_or("stage"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
@@ -832,7 +832,22 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    pub fn execute_place_energy_under_member(&mut self, count: u32, target: &str, position: Option<&PositionInfo>) -> Result<(), String> {
+    pub fn execute_place_energy_under_member(&mut self, count: u32, target: &str, position: Option<&PositionInfo>, optional: bool) -> Result<(), String> {
+        if optional {
+            let is_activation = self.current_ability.as_ref()
+                .and_then(|a| a.triggers.as_ref())
+                .map_or(false, |t| t == crate::triggers::ACTIVATION);
+            if !is_activation {
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: "Place energy under member? (pay or skip)".to_string(),
+                });
+                if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some("optional_cost".to_string());
+                }
+                return Ok(());
+            }
+        }
         let player = self.game_state.resolve_target_player_mut(target);
         let mut energy_cards = Vec::new();
         for _ in 0..count {

@@ -140,7 +140,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     }
-                    idxs.into_iter().map(|i| player.waitroom.cards.remove(i)).collect()
+                    idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect()
                 }
                 "energy_zone" => {
                     let idxs = util::matching_indices(&player.energy_zone.cards, &card_db, card_type_filter, None, None);
@@ -154,7 +154,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     }
-                    idxs.into_iter().map(|i| player.energy_zone.cards.remove(i)).collect()
+                    idxs.iter().rev().map(|&i| player.energy_zone.cards.remove(i)).collect()
                 }
                 "live_card_zone" => {
                     let idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, Some("live_card"), group_name, cost_limit);
@@ -168,7 +168,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     }
-                    idxs.into_iter().map(|i| player.live_card_zone.cards.remove(i)).collect()
+                    idxs.iter().rev().map(|&i| player.live_card_zone.cards.remove(i)).collect()
                 }
                 "success_live_zone" => {
                     let idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, None::<&str>, None::<&str>, None);
@@ -182,7 +182,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     }
-                    idxs.into_iter().map(|i| player.success_live_card_zone.cards.remove(i)).collect()
+                    idxs.iter().rev().map(|&i| player.success_live_card_zone.cards.remove(i)).collect()
                 }
                 _ => { return Err(format!("Unknown source zone: {}", source)); }
             };

@@ -109,9 +109,10 @@ fn ll_joint_creates_choice_with_6_cards() {
     game.state.player1.stage.stage[1] = joint;
     game.give_energy(5);
 
-    // Put 6 cards in discard (character filtering not yet applied in engine)
-    for _ in 0..6 {
-        game.state.player1.waitroom.cards.push(game.id("PL!-sd1-010-SD"));
+    // Put 7 cards matching the character filter (more than count=6 -> creates a choice)
+    let sonoda_umi = game.id("PL!-PR-014-PR");
+    for _ in 0..7 {
+        game.state.player1.waitroom.cards.push(sonoda_umi);
     }
 
     game.activate_ability(joint);

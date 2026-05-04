@@ -42,18 +42,20 @@ impl<'a> AbilityResolver<'a> {
                     match self.execute_effect(&action_to_execute) {
                         Ok(_) => {
                             if self.pending_choice.is_some() {
-                                let remaining_actions: Vec<AbilityEffect> = repeat_actions[i + 1..].to_vec();
-                                if !remaining_actions.is_empty() {
-                                    self.game_state.pending_sequential_actions = Some(remaining_actions);
+                                let mut current_with_rest: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
+                                if !current_with_rest.is_empty() {
+                                    current_with_rest[0].optional = None;
                                 }
+                                self.game_state.pending_sequential_actions = Some(current_with_rest);
                                 return Ok(());
                             }
                         },
                         Err(e) if e.contains("Pending choice required") => {
-                            let remaining_actions: Vec<AbilityEffect> = repeat_actions[i + 1..].to_vec();
-                            if !remaining_actions.is_empty() {
-                                self.game_state.pending_sequential_actions = Some(remaining_actions);
+                            let mut current_with_rest: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
+                            if !current_with_rest.is_empty() {
+                                current_with_rest[0].optional = None;
                             }
+                            self.game_state.pending_sequential_actions = Some(current_with_rest);
                             return Ok(());
                         }
                         Err(e) => return Err(e),

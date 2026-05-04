@@ -21,9 +21,25 @@ pub fn card_matches_group(card_db: &CardDatabase, card_id: i16, group_filter: Op
 pub fn card_matches_group_str(card_db: &CardDatabase, card_id: i16, group_name: Option<&str>) -> bool {
     match group_name {
         Some(g) => card_db.get_card(card_id).map(|c| {
-            c.unit.as_deref() == Some(g) || c.group == g
+            c.unit.as_deref() == Some(g)
+                || c.group == g
+                || card_series_matches_group(&c.series, g)
         }).unwrap_or(false),
         None => true,
+    }
+}
+
+/// Infer group membership from a card's series field.
+/// Based on 付録A (Appendix A) of the rules: series → group mapping.
+fn card_series_matches_group(series: &str, group: &str) -> bool {
+    match group {
+        "Aqours" => series.contains("サンシャイン"),
+        "虹ヶ咲" => series.contains("虹ヶ咲"),
+        "Liella!" => series.contains("スーパースター"),
+        "蓮ノ空" => series.contains("蓮ノ空"),
+        "μ's" => series.contains("ラブライブ！") && !series.contains("サンシャイン")
+            && !series.contains("虹ヶ咲") && !series.contains("スーパースター") && !series.contains("蓮ノ空"),
+        _ => false,
     }
 }
 

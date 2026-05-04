@@ -90,6 +90,30 @@ impl super::TurnEngine {
         }
     }
 
+    pub fn trigger_auto_abilities_for_player(game_state: &mut GameState, player_id: &str) {
+        let player_id_clone = player_id.to_string();
+        let mut abilities_to_trigger = Vec::new();
+
+        {
+            let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
+            for &card_id in &player.stage.stage {
+                if card_id == -1 { continue; }
+                if let Some(card) = game_state.card_database.get_card(card_id) {
+                    for ability in &card.abilities {
+                        if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::AUTO) {
+                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                        }
+                    }
+                }
+            }
+        }
+
+        for (ability_id, card_no) in abilities_to_trigger {
+            game_state.trigger_auto_ability(ability_id, AbilityTrigger::Auto, player_id_clone.clone(), Some(card_no), None);
+        }
+    }
+
     pub fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger = Vec::new();

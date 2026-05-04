@@ -60,6 +60,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let context = self.execution_context.clone();
         match (&choice, result) {
             (Some(Choice::SelectCard { zone, card_type, count, description: _, allow_skip }), ChoiceResult::CardSelected { indices }) => {
+                let is_reveal = self.game_state.entry_cost()
+                    .and_then(|c| c.cost_type.as_deref())
+                    == Some("reveal");
+                if is_reveal {
+                    let card_ids: Vec<i16> = {
+                        let player = self.game_state.active_player();
+                        indices.iter().filter_map(|&idx| {
+                            if idx < player.hand.cards.len() { Some(player.hand.cards[idx]) } else { None }
+                        }).collect()
+                    };
+                    for card_id in card_ids {
+                        self.game_state.revealed_cards.insert(card_id);
+                        self.revealed_cost_cards.push(card_id);
+                    }
+                    self.pending_choice = None;
+                    self.resume_execution(context)?;
+                    return Ok(());
+                }
                 if *allow_skip {
                     if !indices.is_empty() {
                         match zone.as_str() {
@@ -246,14 +264,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 }
                             }
                         }
-                        let old_choice = self.pending_choice.clone();
-                        if let Some(effect) = self.game_state.entry_effect().cloned() {
-                            if let Err(e) = self.execute_effect(&effect) {
-                                eprintln!("Failed to execute effect after optional cost: {}", e);
+                        self.pending_choice = None;
+                        if let Some(cost) = self.game_state.entry_cost().cloned() {
+                            // Cost-based optional: re-execute the full effect
+                            if let Some(effect) = self.game_state.entry_effect().cloned() {
+                                if let Err(e) = self.execute_effect(&effect) {
+                                    eprintln!("Failed to execute effect after optional cost: {}", e);
+                                }
                             }
-                        }
-                        if self.pending_choice == old_choice {
-                            self.pending_choice = None;
+                        } else {
+                            // Action-based optional: re-execute remaining sequential actions
+                            if let Some(ref pending_actions) = self.game_state.pending_sequential_actions.clone() {
+                                for action in pending_actions {
+                                    if let Err(e) = self.execute_effect(action) {
+                                        eprintln!("Failed to execute action after optional: {}", e);
+                                    }
+                                }
+                                self.game_state.pending_sequential_actions = None;
+                            }
                         }
                         return Ok(());
                     }

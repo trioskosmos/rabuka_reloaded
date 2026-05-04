@@ -168,7 +168,11 @@ impl super::TurnEngine {
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;
 
+        game_state.active_player_mut().debut_count_this_turn += 1;
+        game_state.record_card_appearance(card_id);
+
         Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid, baton_touch_used);
+        Self::trigger_auto_abilities_for_player(game_state, &player_id);
         game_state.process_pending_auto_abilities(&player_id);
         game_state.recalculate_constant_blade_modifiers();
 
