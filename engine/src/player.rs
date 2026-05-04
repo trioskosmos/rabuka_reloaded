@@ -251,37 +251,29 @@ impl Player {
 
 
             // Rule 9.6.2.3: Cost is equal to the card's cost value in energy
-            // TEMPORARY FIX: card.cost appears to be incorrect (showing 15 for all cards)
-            // Use a reasonable cost based on the card's name/type as a temporary workaround
             let card_cost = card.cost.unwrap_or(0);
-            
-            // Temporary cost fix - use reasonable costs based on card patterns
-            let actual_cost = if card_cost == 15 {
-                // This appears to be the broken cost, use a reasonable default
-                match card.card_no.as_str() {
-                    // Known 2-cost cards from investigation
-                    card_no if card_no.contains("PR-026-PR") => 2, // 2-cost cards
-                    card_no if card_no.contains("PR-025-PR") => 2,
-                    card_no if card_no.contains("bp2-009-P") => 2,
-                    card_no if card_no.contains("pb1-004-P") => 2,
-                    card_no if card_no.contains("bp3-010-N") => 4, // 4-cost cards
-                    card_no if card_no.contains("PR-017-PR") => 4,
-                    card_no if card_no.contains("bp2-006-P") => 11, // 11-cost cards
-                    card_no if card_no.contains("bp3-002-R") => 9,  // 9-cost cards
-                    _ => 2 // Default to 2 for unknown cards
-                }
-            } else {
-                card_cost
-            };
-            
-            // eprintln!("Playing card {} with corrected cost {} (original: {})", card.name, actual_cost, card_cost);
 
 
 
             // Rule 9.6.2.3: Determine cost and pay all costs
 
-            let mut cost_to_pay = actual_cost;
-
+            // Rule: Cost reduction from 常時 abilities (parsed as modify_cost/subtract/hand)
+            // Card was already removed from hand, so add 1 to get true hand count
+            let hand_count = self.hand.cards.len() + 1;
+            let mut cost_reduction: u32 = 0;
+            for ability in &card.abilities {
+                if let Some(ref effect) = ability.effect {
+                    if effect.action == "modify_cost"
+                        && effect.operation.as_deref() == Some("subtract")
+                        && effect.location.as_deref() == Some("hand")
+                    {
+                        let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
+                        cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
+                        break;
+                    }
+                }
+            }
+            let mut cost_to_pay = card_cost.saturating_sub(cost_reduction);
 
 
             // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead
@@ -461,7 +453,18 @@ impl Player {
         // Send replaced member to waitroom if baton touch was used
 
         if let Some(member_id) = replaced_member {
-
+            // Check if replaced member has baton touch discard protection
+            // (parsed as restriction_type: "cannot_baton_touch" in abilities.json)
+            let has_protection = card_db.get_card(member_id).map_or(false, |existing_card| {
+                existing_card.abilities.iter().any(|a| {
+                    a.effect.as_ref().map_or(false, |ef| {
+                        ef.restriction_type.as_deref() == Some("cannot_baton_touch")
+                    })
+                })
+            });
+            if has_protection {
+                return Err("Cannot baton touch: member has baton touch discard protection".to_string());
+            }
             self.waitroom.cards.push(member_id);
 
         }
@@ -993,13 +996,21 @@ impl Player {
 
         // Rule 9.6.2.3: Check if player can afford to play a member
 
-        // Find the cheapest member card in hand
+        // Find the cheapest member card in hand, accounting for hand-based cost reduction
+
+        let hand_count = self.hand.cards.len();
 
         let cheapest_cost = self.hand.cards.iter()
 
             .filter(|&card_id| card_db.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false))
 
-            .map(|&card_id| card_db.get_card(card_id).map(|c| c.cost.unwrap_or(0)).unwrap_or(0))
+            .map(|&card_id| {
+                let cost = card_db.get_card(card_id).map(|c| c.cost.unwrap_or(0)).unwrap_or(0);
+                let reduction = card_db.get_card(card_id)
+                    .map(|c| c.get_hand_cost_reduction(hand_count))
+                    .unwrap_or(0);
+                cost.saturating_sub(reduction)
+            })
 
             .min()
 

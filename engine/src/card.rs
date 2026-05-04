@@ -1041,4 +1041,19 @@ impl Card {
     pub fn set_cost(&mut self, amount: u32) {
         self.cost = Some(amount);
     }
+
+    pub fn get_hand_cost_reduction(&self, hand_size: usize) -> u32 {
+        for ability in &self.abilities {
+            if let Some(ref effect) = ability.effect {
+                if effect.action == "modify_cost"
+                    && effect.operation.as_deref() == Some("subtract")
+                    && effect.location.as_deref() == Some("hand")
+                {
+                    let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
+                    return (hand_size.saturating_sub(1) * per_unit) as u32;
+                }
+            }
+        }
+        0
+    }
 }

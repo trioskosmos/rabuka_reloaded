@@ -318,77 +318,24 @@ fn display_with_ui_state(display: GameStateDisplay, ui_config: &UiConfig) -> ser
     json
 }
 
-async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
-
-    // Check if there's an active room and use its game state
-
+fn resolve_game_state_arc(data: &AppState) -> Arc<Mutex<GameState>> {
     let rooms = data.rooms.lock().unwrap();
+    if rooms.is_empty() {
+        return data.game_state.clone();
+    }
+    let latest = rooms.values().max_by_key(|r| r.created_at).unwrap();
+    latest.game_state.as_ref().unwrap_or(&data.game_state).clone()
+}
 
-    let game_state_to_use = if rooms.len() >= 1 {
-
-        // If there's at least one room, use the most recently created room
-
-        let mut latest_room = None;
-
-        let mut latest_time = 0u64;
-
-        
-
-        for room in rooms.values() {
-
-            if room.created_at > latest_time {
-
-                latest_time = room.created_at;
-
-                latest_room = Some(room);
-
-            }
-
-        }
-
-        
-
-        if let Some(room) = latest_room {
-
-            if let Some(room_game_state) = &room.game_state {
-
-                room_game_state.clone()
-
-            } else {
-
-                data.game_state.clone()
-
-            }
-
-        } else {
-
-            data.game_state.clone()
-
-        }
-
-    } else {
-
-        data.game_state.clone()
-
-    };
-
-    
-
-    let game_state = match game_state_to_use.lock() {
-
+async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
+    let gs_arc = resolve_game_state_arc(&data);
+    let game_state = match gs_arc.lock() {
         Ok(guard) => guard,
-
         Err(e) => {
-
             eprintln!("Mutex poisoned in get_game_state: {}", e);
-
             return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
         }
-
     };
-
-
 
     let display = game_state_to_display(&game_state);
     drop(game_state);
@@ -403,84 +350,20 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
 
 
 async fn get_actions(data: web::Data<AppState>) -> impl Responder {
-
-    // Check if there's an active room and use its game state
-
-    let rooms = data.rooms.lock().unwrap();
-
-    let game_state_to_use = if rooms.len() >= 1 {
-
-        // If there's at least one room, use the most recently created room
-
-        let mut latest_room = None;
-
-        let mut latest_time = 0u64;
-
-        
-
-        for room in rooms.values() {
-
-            if room.created_at > latest_time {
-
-                latest_time = room.created_at;
-
-                latest_room = Some(room);
-
-            }
-
-        }
-
-        
-
-        if let Some(room) = latest_room {
-
-            if let Some(room_game_state) = &room.game_state {
-
-                room_game_state.clone()
-
-            } else {
-
-                data.game_state.clone()
-
-            }
-
-        } else {
-
-            data.game_state.clone()
-
-        }
-
-    } else {
-
-        data.game_state.clone()
-
-    };
-
-    
-
-    let game_state = match game_state_to_use.lock() {
-
+    let gs_arc = resolve_game_state_arc(&data);
+    let game_state = match gs_arc.lock() {
         Ok(guard) => guard,
-
         Err(e) => {
-
             eprintln!("Mutex poisoned in get_actions: {}", e);
-
             return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
         }
-
     };
-
-
-
-    // Generate possible actions based on current game state
 
     let actions = generate_possible_actions(&game_state);
-
     HttpResponse::Ok().json(ActionsResponse { actions })
 
 }
+
 
 
 
@@ -726,63 +609,8 @@ async fn execute_action(
 
 ) -> impl Responder {
 
-        
-
-    // Check if there's an active room and use its game state
-
-    let rooms = data.rooms.lock().unwrap();
-
-    let game_state_to_use = if rooms.len() >= 1 {
-
-        // If there's at least one room, use the most recently created room
-
-        let mut latest_room = None;
-
-        let mut latest_time = 0u64;
-
-        
-
-        for room in rooms.values() {
-
-            if room.created_at > latest_time {
-
-                latest_time = room.created_at;
-
-                latest_room = Some(room);
-
-            }
-
-        }
-
-        
-
-        if let Some(room) = latest_room {
-
-            if let Some(room_game_state) = &room.game_state {
-
-                room_game_state.clone()
-
-            } else {
-
-                data.game_state.clone()
-
-            }
-
-        } else {
-
-            data.game_state.clone()
-
-        }
-
-    } else {
-
-        data.game_state.clone()
-
-    };
-
-    
-
-    let mut game_state = match game_state_to_use.lock() {
+    let gs_arc = resolve_game_state_arc(&data);
+    let mut game_state = match gs_arc.lock() {
 
         Ok(guard) => guard,
 
@@ -971,7 +799,8 @@ async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) 
 
 async fn undo(data: web::Data<AppState>) -> impl Responder {
 
-    let mut game_state = match data.game_state.lock() {
+    let gs_arc = resolve_game_state_arc(&data);
+    let mut game_state = match gs_arc.lock() {
 
         Ok(guard) => guard,
 
@@ -1024,7 +853,8 @@ async fn undo(data: web::Data<AppState>) -> impl Responder {
 
 async fn redo(data: web::Data<AppState>) -> impl Responder {
 
-    let mut game_state = match data.game_state.lock() {
+    let gs_arc = resolve_game_state_arc(&data);
+    let mut game_state = match gs_arc.lock() {
 
         Ok(guard) => guard,
 
@@ -1241,7 +1071,8 @@ async fn exec_code(
 
 async fn debug_rewind(data: web::Data<AppState>) -> impl Responder {
 
-    let mut game_state = match data.game_state.lock() {
+    let gs_arc = resolve_game_state_arc(&data);
+    let mut game_state = match gs_arc.lock() {
 
         Ok(guard) => guard,
 
@@ -1279,7 +1110,8 @@ async fn debug_rewind(data: web::Data<AppState>) -> impl Responder {
 
 async fn debug_redo(data: web::Data<AppState>) -> impl Responder {
 
-    let mut game_state = match data.game_state.lock() {
+    let gs_arc = resolve_game_state_arc(&data);
+    let mut game_state = match gs_arc.lock() {
 
         Ok(guard) => guard,
 

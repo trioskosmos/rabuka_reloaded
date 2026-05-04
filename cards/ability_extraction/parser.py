@@ -641,8 +641,13 @@ def _try_distinct(text):
     if ('名前が異なる' not in text and '名前の異なる' not in text
             and 'ユニット名がそれぞれ異なる' not in text):
         return None
-    result = {'type': 'location_condition', 'location': 'stage', 'target': 'self',
+    locs = extract_locations(text)
+    result = {'type': 'location_condition', 'target': 'self',
               'distinct': True, 'text': text}
+    if locs:
+        result['locations'] = locs
+    else:
+        result['location'] = 'stage'
     if 'エリアすべて' in text:
         result['all_areas'] = True
     m = re.search(r'(\d+)(人|枚|つ)以上いる', text)
@@ -673,6 +678,11 @@ def _try_card_count(text):
                 result['unit'] = unit
             elif len(m.groups()) >= 2 and m.group(2):
                 result['unit'] = m.group(2)
+            # Extract exclude_self for "このメンバー以外" pattern
+            if 'このメンバー以外' in text or 'このカード以外' in text or 'ほかのメンバー' in text:
+                result['exclude_self'] = True
+                # Also set card_type to member_card since "メンバー" is in the text
+                result['card_type'] = 'member_card'
             return result
     return None
 
@@ -1638,7 +1648,7 @@ def parse_action(text: str) -> Dict[str, Any]:
       lambda t, a: a.update({'resource': 'heart', 'heart_selection': True}))
     # If "コスト" text contains heart icons, it's about required hearts (not energy cost)
     R(lambda t: ('コストを' in t or 'コストが' in t or 'コストは' in t) and '{{heart_' in t, 'set_required_hearts',
-      lambda t, a: a.update({'heart_colors': [m.group() for m in __import__('re').finditer(r'heart\d{2}', t)]}) or
+      lambda t, a: a.update({'heart_colors': [m.group(1) for m in __import__('re').finditer(r'\|(heart\d{2})}', t)]}) or
                    a.update({'count': len([m.group() for m in __import__('re').finditer(r'{{heart_\d+\.png\|heart\d+}}', t)])}) or
                    a.update({'text': t}))
     R(lambda t: 'コストを' in t or 'コストが' in t or 'コストは' in t, 'modify_cost', 
@@ -1728,6 +1738,8 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Detect すべて/全 (all) — set flag; suppress count when all is set
     if not action.get('all') and re.search(r'すべての|全ての|全部の|全て|全員|全体', text):
         action['all'] = True
+    if action.get('all'):
+        action.pop('count', None)
     # Detect それぞれ (each/respectively) — multiple targets
     if 'それぞれ' in text or 'ずつ' in text:
         action['multiple_targets'] = True
@@ -2043,7 +2055,50 @@ def _try_per_unit(text):
     if not m:
         return None
     per_text = m.group(1).strip()
+    # If per_text contains a sentence boundary (。), the structure is likely
+    # "choice/action。per_unit_effect" — defer to sequential/choice handlers
+    if '。' in per_text:
+        return None
     result = {'text': text, 'per_unit': True}
+
+    # Extract condition from per_text if present
+    # Pattern: "条件場合、per_unit_reference" e.g.
+    # "自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つheart03 2つ"
+    cond_part, remaining = split_condition_action(per_text)
+    if cond_part and remaining:
+        parsed_cond = parse_condition(cond_part)
+        if parsed_cond and parsed_cond.get('type') != 'custom':
+            result['condition'] = parsed_cond
+            per_text = remaining  # Use remaining for per-unit extraction
+    # Also check for とき、/時、pattern not inside ライブ終了時まで
+    if 'condition' not in result:
+        for mark in ('とき、', '時、'):
+            t_pos = per_text.find(mark)
+            if t_pos > 0:
+                before = per_text[:t_pos + 2]
+                if 'ライブ終了時まで' not in before:
+                    cond_text = per_text[:t_pos + 2].rstrip('、').strip()
+                    remaining = per_text[t_pos + len(mark):].strip()
+                    if cond_text and remaining:
+                        result['raw_condition'] = cond_text
+                        per_text = remaining
+                    break
+    # Also check for 時、pattern (any form, kanji) at a position not inside ライブ終了時まで
+    if 'condition' not in result:
+        t_pos = per_text.find('時、')
+        if t_pos > 0 and 'ライブ終了時まで' not in per_text[:t_pos + 2]:
+            cond_text = per_text[:t_pos + 1].strip()  # Include 時
+            remaining = per_text[t_pos + 2:].strip()
+            if cond_text and remaining:
+                result['raw_condition'] = cond_text
+                per_text = remaining
+
+    # Extract duration from per_text (e.g., "ライブ終了時まで、カード1枚につき")
+    for prefix, code in [('ライブ終了時まで', 'live_end'), ('このターンの間', 'turn_end'), ('ターン終了時まで', 'turn_end')]:
+        if per_text.startswith(prefix):
+            result['duration'] = code
+            per_text = per_text[len(prefix):].lstrip('、').strip()
+            break
 
     pm = re.search(r'(\d+)(人|枚|つ)(につき|ごとに)', text)
     if pm:
@@ -2060,6 +2115,15 @@ def _try_per_unit(text):
     if gm: result['group'] = {'name': gm.group(1)}
     if '名前の異なる' in per_text or 'カード名の異なる' in per_text:
         result['distinct'] = 'card_name'
+
+    # Extract cost_limit from per-text (e.g., "コスト4以上")
+    cl = extract_cost_limit(per_text)
+    if cl:
+        result['cost_limit'] = cl
+        if '以下' in per_text: result['cost_limit_operator'] = '<='
+        elif '以上' in per_text: result['cost_limit_operator'] = '>='
+        elif '未満' in per_text: result['cost_limit_operator'] = '<'
+        elif '超' in per_text: result['cost_limit_operator'] = '>'
 
     if 'このターン中に登場' in per_text and 'エリアを移動した' in per_text:
         result['timing_condition'] = 'appeared_or_moved_this_turn'
@@ -2085,14 +2149,16 @@ def _try_per_unit(text):
             for part in parts:
                 pa = parse_action(part)
                 if pa.get('action') != 'custom':
-                    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location'):
+                    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location',
+                              'cost_limit', 'cost_limit_operator', 'duration', 'condition'):
                         if k in result: pa[k] = result[k]
                     actions.append(pa)
             if len(actions) >= 2:
                 return {'text': text, 'action': 'sequential', 'actions': actions}
 
     action = parse_action(action_text)
-    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location'):
+    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location',
+              'cost_limit', 'cost_limit_operator', 'duration', 'condition'):
         if k in result: action[k] = result[k]
 
     # Detect cost reduction per unit patterns (コストが～につき～少なくなる/減る)
@@ -2114,22 +2180,22 @@ def _try_per_unit(text):
                 for st in sub_texts:
                     spa = parse_effect(st)
                     if spa.get('action') != 'custom' or spa.get('actions'):
-                        for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location'):
+                        for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location', 'cost_limit', 'cost_limit_operator', 'duration', 'condition', 'raw_condition'):
                             if k in result and k not in spa:
                                 spa[k] = result[k]
                         sub_actions.append(spa)
                 if len(sub_actions) >= 2:
                     fa = {'action': 'sequential', 'actions': sub_actions}
-                    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location'):
+                    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location', 'cost_limit', 'cost_limit_operator', 'duration', 'condition', 'raw_condition'):
                         if k in result and k not in fa:
                             fa[k] = result[k]
                 else:
                     fa = parse_action(fa_text)
-                    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location'):
+                    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location', 'cost_limit', 'cost_limit_operator', 'duration', 'condition', 'raw_condition'):
                         if k in result: fa[k] = result[k]
             else:
                 fa = parse_action(fa_text)
-                for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location'):
+                for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct', 'timing_condition', 'state', 'location', 'cost_limit', 'cost_limit_operator', 'duration', 'condition', 'raw_condition'):
                     if k in result: fa[k] = result[k]
             sa = parse_action(parts[1].strip())
             return {'text': text, 'action': 'sequential', 'actions': [fa, sa]}
@@ -2512,15 +2578,20 @@ def _try_sequential_duration(text):
 
 def _try_implicit_sequential(text):
     """、— comma-separated actions (implicit sequential).
+    Also handles 。(period-separated) patterns.
     Checked AFTER そうした場合 and conditional patterns to prevent
     mis-parsing actions that happen to contain commas."""
-    if '、' not in text:
+    if '、' not in text and '。' not in text:
         return None
     if any(m in text for m in CONDITION_MARKERS):
         return None
     if CHOICE_MARKER in text:
         return None
-    parts = text.split('、')
+    # Prefer 。as separator when present (sentence boundaries)
+    if '。' in text:
+        parts = [p.strip() for p in text.split('。') if p.strip()]
+    else:
+        parts = text.split('、')
     if len(parts) < 2:
         return None
     actions = []
@@ -2528,8 +2599,8 @@ def _try_implicit_sequential(text):
         cp = p.strip().lstrip('、')
         if cp.endswith('その後'): cp = cp[:-len('その後')].strip()
         elif cp.endswith('その後。'): cp = cp[:-len('その後。')].strip()
-        a = parse_action(cp)
-        if a.get('action') != 'custom':
+        a = parse_effect(cp)
+        if a and a.get('action', 'custom') != 'custom':
             actions.append(a)
     if len(actions) >= 2:
         return {'text': text, 'action': 'sequential', 'actions': actions}
@@ -2705,10 +2776,36 @@ def _try_kore_niyori_cascade(text):
 
 def _try_conditional(text):
     """場合、 / とき、 / なら、 — conditional effects (generic).
+    Also handles た時、 (past tense + kanji 時) e.g., "エネルギーを選んだ時、"
     Checked LAST among conditional handlers so that specific conditional
     patterns (これにより～の場合, そうした場合) get their own structure."""
     ct, at = split_condition_action(text)
     if not ct or not at:
+        # Check for 時、pattern (any form, kanji) at a position not inside ライブ終了時まで
+        t_pos = text.find('時、')
+        if t_pos > 0 and 'ライブ終了時まで' not in text[:t_pos + 2]:
+            ct = text[:t_pos + 1].strip()
+            at = text[t_pos + 2:].strip()
+            cond = parse_condition(ct)
+            if cond.get('type') == 'custom':
+                # Store as raw_condition if parse_condition doesn't recognize it
+                result = {'text': text, 'raw_condition': ct}
+            else:
+                result = {'text': text, 'condition': cond}
+            at = at.lstrip('、')
+            dur = None
+            for prefix in DURATION_PREFIXES:
+                if at.startswith(prefix):
+                    dur = 'live_end'; at = at[len(prefix):].strip(); break
+            at = strip_suffix_period(at)
+            action = parse_effect(at)
+            if dur: action['duration'] = dur
+            result['action'] = action.get('action', 'custom')
+            if action.get('action') == 'sequential':
+                result['actions'] = action.get('actions', [])
+            else:
+                result.update(action)
+            return result
         return None
     # If choice marker appears before the first condition marker,
     # let _try_choice handle this (the condition is part of a choice modifier)
@@ -2867,7 +2964,13 @@ def _try_global_modifier(text):
         result = {'text': text, 'action': 'restriction', 'restriction_type': 'modify_required_hearts_global',
                   'operation': 'increase' if '多くなる' in text else 'decrease'}
         tm = re.search(r'([^は]+)は', text)
-        if tm: result['target'] = tm.group(1).strip()
+        if tm:
+            raw_target = tm.group(1).strip()
+            if '相手の' in raw_target:
+                result['target'] = 'opponent'
+            else:
+                result['target'] = raw_target
+        if 'すべて' in text: result['all'] = True
         return result
     return None
 
@@ -2883,7 +2986,9 @@ def _try_play_baton_touch(text):
 
 
 def _try_duration_effect(text):
-    """かぎり — duration effects."""
+    """かぎり — duration effects.
+    If the condition is an "unless pay N energy" pattern (negation + energy resource),
+    convert to an optional cost instead of a conditional effect (Q92: player chooses)."""
     if DURATION_MARKER not in text:
         return None
     parts = text.split(DURATION_MARKER, SPLIT_LIMIT)
@@ -2891,6 +2996,20 @@ def _try_duration_effect(text):
     at = parts[1].strip().lstrip('、')
     cond = parse_condition(ct)
     action = parse_action(at)
+    
+    # Detect "unless pay N energy": negated condition with energy resource type
+    if (cond.get('negation') and cond.get('resource_type') == 'energy'
+            and cond.get('count') and cond.get('operator') == '>='):
+        energy_count = cond['count']
+        # Restructure as optional cost + unconditional effect
+        result = {'text': text, 'action': action.get('action', 'custom')}
+        result['cost'] = {'type': 'pay_energy', 'energy': energy_count, 'optional': True}
+        if action.get('action') == 'sequential':
+            result['actions'] = action.get('actions', [])
+        else:
+            result.update(action)
+        return result
+    
     result = {'text': text, 'condition': cond, 'duration': 'as_long_as'}
     result.update(action)
     return result
@@ -2977,6 +3096,7 @@ _EFFECT_HANDLERS = [
     _try_sequential_duration,
     _try_conditional_sequential,
     _try_sequential,
+    _try_duration_effect,
     _try_implicit_sequential,
     _try_conditional,
     _try_shi_sequential,
@@ -2988,7 +3108,6 @@ _EFFECT_HANDLERS = [
     _try_same_action,
     _try_global_modifier,
     _try_play_baton_touch,
-    _try_duration_effect,
     _try_energy_under_member,
     _try_re_yell,
     _try_restriction_effect,
@@ -3033,11 +3152,15 @@ def parse_effect(text: str) -> Dict[str, Any]:
             # Apply duration prefix info
             if 'duration' in effect and 'duration' not in result:
                 result['duration'] = effect['duration']
-            # Propagate duration to sub-actions in sequential/choice effects
+            # Propagate duration to sub-actions in sequential/choice/conditional_alternative effects
             if result.get('duration'):
-                if result.get('action') == 'sequential':
+                if result.get('action') in ('sequential', 'conditional_alternative'):
                     for sub in result.get('actions', []):
                         if 'duration' not in sub and sub.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
+                            sub['duration'] = result['duration']
+                    for key in ('primary_effect', 'alternative_effect'):
+                        sub = result.get(key)
+                        if sub and 'duration' not in sub and sub.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
                             sub['duration'] = result['duration']
                 if result.get('action') == 'choice':
                     for opt in result.get('options', []):
@@ -3118,7 +3241,12 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     
     # Parse effect
     if effect_text:
-        ability['effect'] = parse_effect(effect_text)
+        effect = parse_effect(effect_text)
+        # If the effect handler embedded a cost (e.g. "unless pay N energy"),
+        # lift it to the ability level (Q92: player chooses whether to pay)
+        if isinstance(effect, dict) and 'cost' in effect:
+            ability['cost'] = effect.pop('cost')
+        ability['effect'] = effect
     
     return ability
 

@@ -4,21 +4,7 @@ use super::resolver::AbilityResolver;
 use super::util;
 use crate::zones::MemberArea;
 
-macro_rules! take_n {
-    ($self:expr, $cards:expr, $count:expr, $card_db:expr, $type:expr, $group:expr, $cost:expr, $zone:expr, $desc:expr, $fail:expr) => {{
-        let idxs = util::matching_indices($cards, $card_db, $type, $group, $cost);
-        if idxs.len() < $count { return $fail; }
-        if idxs.len() > $count {
-            $self.pending_choice = Some(Choice::SelectCard {
-                zone: $zone.to_string(), card_type: $type.map(|s| s.to_string()),
-                count: $count, description: $desc.to_string(), allow_skip: false,
-            });
-            $self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-            return Ok(());
-        }
-        idxs.into_iter().rev().take($count).collect::<Vec<_>>()
-    }};
-}
+
 
 fn pos_to_area(pos: usize) -> MemberArea {
     match pos { 0 => MemberArea::LeftSide, 1 => MemberArea::Center, _ => MemberArea::RightSide }
@@ -29,6 +15,10 @@ fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
     else if stage[0] == -1 { Some(0) }
     else if stage[2] == -1 { Some(2) }
     else { None }
+}
+
+fn remove_cards_from_hand(player: &mut crate::player::Player, indices: &[usize]) -> Vec<i16> {
+    indices.iter().rev().map(|&i| player.hand.cards.remove(i)).collect()
 }
 
 #[allow(dead_code)]
@@ -120,25 +110,75 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     }
                 }
 
-                // Zones with player selection
+                // Zones with player selection — select cards via matching indices
                 "hand" => {
-                    let idxs = take_n!(self, &player.hand.cards, count, &card_db, card_type_filter, group_name, cost_limit, "hand", &format!("Select {} card(s) from hand", count), Ok(()));
-                    idxs.into_iter().map(|i| player.hand.cards.remove(i)).collect()
+                    let idxs = util::matching_indices(&player.hand.cards, &card_db, card_type_filter, group_name, cost_limit);
+                    if idxs.len() < count { vec![] }
+                    else if idxs.len() > count {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "hand".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
+                            count, description: format!("Select {} card(s) from hand", count), allow_skip: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    } else {
+                        remove_cards_from_hand(player, &idxs)
+                    }
                 }
                 "discard" => {
-                    let idxs = take_n!(self, &player.waitroom.cards, count, &card_db, card_type_filter, group_name, cost_limit, "discard", &format!("Select {} card(s) from discard", count), Err(format!("Not enough cards in discard: need {}", count)));
+                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit);
+                    if idxs.len() < count {
+                        return Err(format!("Not enough cards in discard: need {}", count));
+                    } else if idxs.len() > count {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "discard".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
+                            count, description: format!("Select {} card(s) from discard", count), allow_skip: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    }
                     idxs.into_iter().map(|i| player.waitroom.cards.remove(i)).collect()
                 }
                 "energy_zone" => {
-                    let idxs = take_n!(self, &player.energy_zone.cards, count, &card_db, card_type_filter, None, None, "energy_zone", &format!("Select {} card(s) from energy zone", count), Err(format!("Not enough cards in energy zone: need {}", count)));
+                    let idxs = util::matching_indices(&player.energy_zone.cards, &card_db, card_type_filter, None, None);
+                    if idxs.len() < count {
+                        return Err(format!("Not enough cards in energy zone: need {}", count));
+                    } else if idxs.len() > count {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "energy_zone".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
+                            count, description: format!("Select {} card(s) from energy zone", count), allow_skip: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    }
                     idxs.into_iter().map(|i| player.energy_zone.cards.remove(i)).collect()
                 }
                 "live_card_zone" => {
-                    let idxs = take_n!(self, &player.live_card_zone.cards, count, &card_db, Some("live_card"), group_name, cost_limit, "live_card_zone", &format!("Select {} card(s) from live card zone", count), Err(format!("Not enough cards in live card zone: need {}", count)));
+                    let idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, Some("live_card"), group_name, cost_limit);
+                    if idxs.len() < count {
+                        return Err(format!("Not enough cards in live card zone: need {}", count));
+                    } else if idxs.len() > count {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "live_card_zone".to_string(), card_type: Some("live_card".to_string()),
+                            count, description: format!("Select {} card(s) from live card zone", count), allow_skip: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    }
                     idxs.into_iter().map(|i| player.live_card_zone.cards.remove(i)).collect()
                 }
                 "success_live_zone" => {
-                    let idxs = take_n!(self, &player.success_live_card_zone.cards, count, &card_db, None::<&str>, None::<&str>, None, "success_live_zone", &format!("Select {} card(s) from success live zone", count), Err(format!("Not enough cards in success live zone: need {}", count)));
+                    let idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, None::<&str>, None::<&str>, None);
+                    if idxs.len() < count {
+                        return Err(format!("Not enough cards in success live zone: need {}", count));
+                    } else if idxs.len() > count {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "success_live_zone".to_string(), card_type: None,
+                            count, description: format!("Select {} card(s) from success live zone", count), allow_skip: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    }
                     idxs.into_iter().map(|i| player.success_live_card_zone.cards.remove(i)).collect()
                 }
                 _ => { return Err(format!("Unknown source zone: {}", source)); }

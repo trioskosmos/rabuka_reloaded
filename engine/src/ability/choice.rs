@@ -330,6 +330,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
                 if target == "conditional_optional" {
                     let effect = self.game_state.entry_effect().cloned();
+                    self.pending_choice = None;
                     if selected == "1" || selected == "yes" {
                         if let Some(ref effect) = effect {
                             if let Some(ref optional) = effect.optional_action {
@@ -344,7 +345,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             }
                         }
                     }
-                    self.pending_choice = None;
                     return Ok(());
                 }
 

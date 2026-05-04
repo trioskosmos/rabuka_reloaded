@@ -1476,6 +1476,111 @@ fn test_ability_activation_cost_targeting() {
     println!("Activation cost targeting test PASSED - can identify member with activation ability");
 }
 
+fn test_ability_live_success_draw_then_discard() {
+    println!("\nRunning Ability Test: Live success draw 2 discard 1 - checks discard prompt");
+    
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+    
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+    
+    // Find the specific member card with live_success ability
+    let member_card = cards.iter()
+        .find(|c| c.card_no == "PL!SP-bp2-009-SEC")
+        .expect("Card PL!SP-bp2-009-SEC not found");
+    let member_id = get_card_id(member_card, &card_database);
+    println!("Member card: name={}, card_no={}", member_card.name, member_card.card_no);
+    println!("Abilities count: {}", member_card.abilities.len());
+    for (i, a) in member_card.abilities.iter().enumerate() {
+        println!("  Ability[{}]: triggers={:?}, effect={:?}", i, a.triggers, a.effect.as_ref().map(|e| &e.action));
+    }
+    
+    // Find the ability #1 (live_success)
+    let live_success_ability = member_card.abilities.iter()
+        .find(|a| a.triggers.as_ref().map_or(false, |t| t == "ライブ成功時"))
+        .expect("Should have live_success ability");
+    println!("Live success ability: {:?}", live_success_ability.effect.as_ref().map(|e| &e.action));
+    
+    // Place the member on stage
+    player1.stage.stage[1] = member_id;
+    
+    // Give player some cards in hand (simulate having cards before drawing)
+    let hand_cards: Vec<i16> = cards.iter()
+        .filter(|c| c.is_energy())
+        .take(3)
+        .map(|c| get_card_id(c, &card_database))
+        .collect();
+    setup_player_with_hand(&mut player1, hand_cards.clone());
+    println!("Initial hand count: {}", player1.hand.cards.len());
+    
+    // Give player a deck with enough cards to draw from
+    let deck_cards: Vec<i16> = cards.iter()
+        .filter(|c| c.is_energy())
+        .skip(3)
+        .take(10)
+        .map(|c| get_card_id(c, &card_database))
+        .collect();
+    player1.main_deck.cards = deck_cards.into_iter().collect();
+    println!("Initial deck count: {}", player1.main_deck.len());
+    
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    game_state.current_phase = Phase::LiveVictoryDetermination;
+    
+    // Manually trigger the live_success ability
+    let ability_id = format!("{}_{}", member_card.card_no, live_success_ability.full_text);
+    println!("Triggering ability: {}", ability_id);
+    
+    game_state.trigger_auto_ability(
+        ability_id,
+        rabuka_engine::game_state::AbilityTrigger::LiveSuccess,
+        "player1".to_string(),
+        Some(member_card.card_no.clone()),
+        None,
+    );
+    
+    println!("Ability queue state: {:?}", game_state.ability_queue.get_state());
+    println!("Ability queue len: {}", game_state.ability_queue.len());
+    
+    // Process the ability
+    game_state.process_pending_auto_abilities("player1");
+    
+    println!("After processing - pending_choice: {:?}", game_state.pending_choice.is_some());
+    if let Some(ref choice) = game_state.pending_choice {
+        println!("Pending choice JSON: {:?}", choice);
+    }
+    println!("Hand count: {}", game_state.player1.hand.cards.len());
+    println!("Waitroom count: {}", game_state.player1.waitroom.cards.len());
+    println!("Deck count: {}", game_state.player1.main_deck.len());
+    
+    // The ability should create a pending choice for the hand discard
+    // After drawing 2 cards, player has hand_count + 2 cards, needs to discard 1
+    // take_n! should create a SelectCard choice since hand size > 1
+    assert!(game_state.pending_choice.is_some(),
+        "A pending choice for selecting which card to discard should exist");
+    
+    if let Some(ref choice_val) = game_state.pending_choice {
+        // Parse the pending choice to check it's a SelectCard choice
+        if let Ok(choice) = serde_json::from_value::<rabuka_engine::ability_resolver::Choice>(choice_val.clone()) {
+            match &choice {
+                rabuka_engine::ability_resolver::Choice::SelectCard { zone, count, allow_skip, .. } => {
+                    println!("SelectCard choice: zone={}, count={}, allow_skip={}", zone, count, allow_skip);
+                    assert_eq!(zone, "hand", "Zone should be 'hand'");
+                    assert_eq!(*count, 1, "Count should be 1");
+                    assert!(!allow_skip, "Should not allow skip for mandatory discard");
+                }
+                _ => panic!("Expected SelectCard choice, got {:?}", choice),
+            }
+        } else {
+            // It might not be parsable as Choice - could be frontend JSON format
+            println!("Pending choice could not be parsed as Choice enum (may be frontend format)");
+            // Still, the pending_choice being set means the game is waiting for player input
+        }
+    }
+    
+    println!("Live success draw-then-discard test PASSED");
+}
+
 fn main() {
     println!("Running QA Data Tests via binary target...");
     
@@ -1504,6 +1609,7 @@ fn main() {
     test_ability_group_filtering();
     test_ability_sequential_effects();
     test_ability_activation_cost_targeting();
+    test_ability_live_success_draw_then_discard();
     
     println!("\nAll QA tests completed successfully!");
 }

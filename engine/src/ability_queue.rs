@@ -113,6 +113,11 @@ impl AbilityQueue {
         self.entries.iter()
     }
 
+    /// Check if an entry with this ID already exists (completed or not)
+    pub fn has_entry_with_id(&self, id: &AbilityId) -> bool {
+        self.entries.iter().any(|e| e.id == *id)
+    }
+
     /// Add ability to queue
     pub fn enqueue(&mut self, entry: AbilityQueueEntry) {
         self.entries.push(entry);

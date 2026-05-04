@@ -187,20 +187,18 @@ export const DebugService = {
     },
 
     toggleDebugMode: async () => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return null;
+        const headers = State.roomCode ? { 'X-Room-ID': State.roomCode } : {};
         try {
-            const res = await fetch('/api/debug/toggle', { method: 'POST', headers: { 'X-Room-ID': roomCode } });
+            const res = await fetch('/api/debug/toggle', { method: 'POST', headers });
             const data = await res.json();
             return data.success ? data.debug_mode : null;
         } catch (e) { return null; }
     },
 
     rewind: async (networkFacade) => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return false;
+        const headers = State.roomCode ? { 'X-Room-ID': State.roomCode } : {};
         try {
-            const res = await fetch('/api/debug/rewind', { method: 'POST', headers: { 'X-Room-ID': roomCode } });
+            const res = await fetch('/api/debug/rewind', { method: 'POST', headers });
             const data = await res.json();
             if (data.success && networkFacade?.fetchState) await networkFacade.fetchState();
             return data.success;
@@ -208,10 +206,9 @@ export const DebugService = {
     },
 
     redo: async (networkFacade) => {
-        const roomCode = State.roomCode;
-        if (!roomCode) return false;
+        const headers = State.roomCode ? { 'X-Room-ID': State.roomCode } : {};
         try {
-            const res = await fetch('/api/debug/redo', { method: 'POST', headers: { 'X-Room-ID': roomCode } });
+            const res = await fetch('/api/debug/redo', { method: 'POST', headers });
             const data = await res.json();
             if (data.success && networkFacade?.fetchState) await networkFacade.fetchState();
             return data.success;

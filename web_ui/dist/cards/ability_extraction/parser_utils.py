@@ -70,9 +70,9 @@ def normalize_whitespace(text):
 
 
 def normalize_fullwidth_digits(text):
-    """Normalize full-width digits to half-width (e.g., １ -> 1)."""
-    fullwidth = '０１２３４５６７８９'
-    halfwidth = '0123456789'
+    """Normalize full-width digits and symbols to half-width (e.g., １ -> 1, ＋ -> +, − -> -)."""
+    fullwidth = '０１２３４５６７８９＋−'
+    halfwidth = '0123456789+-'
     translation = str.maketrans(fullwidth, halfwidth)
     return text.translate(translation)
 

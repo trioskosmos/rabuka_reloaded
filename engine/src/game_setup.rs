@@ -129,208 +129,206 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
     let mut actions = Vec::new();
     
     // If there's a pending choice, generate choice-resolution actions instead of phase actions
-    if let Some(ref pending_choice_val) = game_state.pending_choice {
-        if let Ok(choice) = serde_json::from_value::<Choice>(pending_choice_val.clone()) {
-            match &choice {
-                Choice::SelectTarget { target, description } => {
-                    if target == "pay_optional_cost:skip_optional_cost" {
-                        actions.push(Action {
-                            description: "Pay optional cost".to_string(),
-                            action_type: ActionType::ChoiceDecision,
-                            parameters: Some(ActionParameters {
-                                card_id: Some(1), card_index: None, card_indices: None,
-                                stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some("pay_optional_cost".to_string()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                        actions.push(Action {
-                            description: "Skip optional cost".to_string(),
-                            action_type: ActionType::ChoiceDecision,
-                            parameters: Some(ActionParameters {
-                                card_id: Some(0), card_index: None, card_indices: None,
-                                stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some("skip_optional_cost".to_string()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                        return actions;
-                    }
-                    if target == "choice" {
-                        let options: Vec<&str> = description.split(" / ").collect();
-                        for (i, opt) in options.iter().enumerate() {
-                            actions.push(Action {
-                                description: opt.to_string(),
-                                action_type: ActionType::ChoiceOption,
-                                parameters: Some(ActionParameters {
-                                    card_id: Some(i as i16), card_index: None, card_indices: None,
-                                    stage_area: None, use_baton_touch: None,
-                                    card_name: None, card_no: Some(i.to_string()),
-                                    base_cost: None, final_cost: None, available_areas: None,
-                                }),
-                            });
-                        }
-                        return actions;
-                    }
-                    if target == "primary|alternative" {
-                        actions.push(Action {
-                            description: format!("Primary: {}", description),
-                            action_type: ActionType::ChoiceOption,
-                            parameters: Some(ActionParameters {
-                                card_id: Some(0), card_index: None, card_indices: None,
-                                stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some("primary".to_string()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                        actions.push(Action {
-                            description: format!("Alternative: {}", description),
-                            action_type: ActionType::ChoiceOption,
-                            parameters: Some(ActionParameters {
-                                card_id: Some(1), card_index: None, card_indices: None,
-                                stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some("alternative".to_string()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                        return actions;
-                    }
-                    // Generic SelectTarget: yes/no
+    if let Some(choice) = game_state.get_pending_choice() {
+        match choice {
+            Choice::SelectTarget { target, description } => {
+                if target == "pay_optional_cost:skip_optional_cost" {
                     actions.push(Action {
-                        description: format!("Yes — {}", description),
+                        description: "Pay optional cost".to_string(),
                         action_type: ActionType::ChoiceDecision,
                         parameters: Some(ActionParameters {
                             card_id: Some(1), card_index: None, card_indices: None,
                             stage_area: None, use_baton_touch: None,
-                            card_name: None, card_no: Some("yes".to_string()),
+                            card_name: None, card_no: Some("pay_optional_cost".to_string()),
                             base_cost: None, final_cost: None, available_areas: None,
                         }),
                     });
                     actions.push(Action {
-                        description: format!("No — {}", description),
+                        description: "Skip optional cost".to_string(),
                         action_type: ActionType::ChoiceDecision,
                         parameters: Some(ActionParameters {
                             card_id: Some(0), card_index: None, card_indices: None,
                             stage_area: None, use_baton_touch: None,
-                            card_name: None, card_no: Some("no".to_string()),
+                            card_name: None, card_no: Some("skip_optional_cost".to_string()),
                             base_cost: None, final_cost: None, available_areas: None,
                         }),
                     });
                     return actions;
                 }
-                Choice::SelectCard { zone, card_type, count: _, description, allow_skip } => {
-                    let active = game_state.active_player();
-                    let card_ids: Vec<(usize, i16)> = match zone.as_str() {
-                        "hand" => active.hand.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
-                        "discard" => active.waitroom.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
-                        "stage" => active.stage.stage.iter().copied().enumerate().filter(|&(_, id)| id != -1).map(|(i, id)| (i, id)).collect(),
-                        "energy_zone" => active.energy_zone.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
-                        "looked_at" => game_state.looked_at_cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
-                        _ => Vec::new(),
-                    };
-                    if !card_ids.is_empty() {
-                        for (zone_index, card_id) in &card_ids {
-                            let card_matches = match card_type.as_deref() {
-                                Some("member_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false),
-                                Some("live_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_live()).unwrap_or(false),
-                                Some("energy_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false),
-                                None => true,
-                                _ => true,
-                            };
-                            if !card_matches { continue; }
-                            let card_name = game_state.card_database.get_card(*card_id).map(|c| c.name.as_str()).unwrap_or("Unknown");
-                            actions.push(Action {
-                                description: format!("{} ({})", card_name, zone_index),
-                                action_type: ActionType::ChoiceSelect,
-                                parameters: Some(ActionParameters {
-                                    card_id: Some(*card_id), card_index: Some(*zone_index), card_indices: Some(vec![*zone_index]),
-                                    stage_area: None, use_baton_touch: None,
-                                    card_name: Some(card_name.to_string()), card_no: Some("select".to_string()),
-                                    base_cost: None, final_cost: None, available_areas: None,
-                                }),
-                            });
-                        }
-                    } else {
+                if target == "choice" {
+                    let options: Vec<&str> = description.split(" / ").collect();
+                    for (i, opt) in options.iter().enumerate() {
                         actions.push(Action {
-                            description: format!("Select card(s): {}", description),
+                            description: opt.to_string(),
+                            action_type: ActionType::ChoiceOption,
+                            parameters: Some(ActionParameters {
+                                card_id: Some(i as i16), card_index: None, card_indices: None,
+                                stage_area: None, use_baton_touch: None,
+                                card_name: None, card_no: Some(i.to_string()),
+                                base_cost: None, final_cost: None, available_areas: None,
+                            }),
+                        });
+                    }
+                    return actions;
+                }
+                if target == "primary|alternative" {
+                    actions.push(Action {
+                        description: format!("Primary: {}", description),
+                        action_type: ActionType::ChoiceOption,
+                        parameters: Some(ActionParameters {
+                            card_id: Some(0), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("primary".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
+                    actions.push(Action {
+                        description: format!("Alternative: {}", description),
+                        action_type: ActionType::ChoiceOption,
+                        parameters: Some(ActionParameters {
+                            card_id: Some(1), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("alternative".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
+                    return actions;
+                }
+                // Generic SelectTarget: yes/no
+                actions.push(Action {
+                    description: format!("Yes — {}", description),
+                    action_type: ActionType::ChoiceDecision,
+                    parameters: Some(ActionParameters {
+                        card_id: Some(1), card_index: None, card_indices: None,
+                        stage_area: None, use_baton_touch: None,
+                        card_name: None, card_no: Some("yes".to_string()),
+                        base_cost: None, final_cost: None, available_areas: None,
+                    }),
+                });
+                actions.push(Action {
+                    description: format!("No — {}", description),
+                    action_type: ActionType::ChoiceDecision,
+                    parameters: Some(ActionParameters {
+                        card_id: Some(0), card_index: None, card_indices: None,
+                        stage_area: None, use_baton_touch: None,
+                        card_name: None, card_no: Some("no".to_string()),
+                        base_cost: None, final_cost: None, available_areas: None,
+                    }),
+                });
+                return actions;
+            }
+            Choice::SelectCard { zone, card_type, count: _, description, allow_skip } => {
+                let active = game_state.active_player();
+                let card_ids: Vec<(usize, i16)> = match zone.as_str() {
+                    "hand" => active.hand.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
+                    "discard" => active.waitroom.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
+                    "stage" => active.stage.stage.iter().copied().enumerate().filter(|&(_, id)| id != -1).map(|(i, id)| (i, id)).collect(),
+                    "energy_zone" => active.energy_zone.cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
+                    "looked_at" => game_state.looked_at_cards.iter().copied().enumerate().map(|(i, id)| (i, id)).collect(),
+                    _ => Vec::new(),
+                };
+                if !card_ids.is_empty() {
+                    for (zone_index, card_id) in &card_ids {
+                        let card_matches = match card_type.as_deref() {
+                            Some("member_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_member()).unwrap_or(false),
+                            Some("live_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_live()).unwrap_or(false),
+                            Some("energy_card") => game_state.card_database.get_card(*card_id).map(|c| c.is_energy()).unwrap_or(false),
+                            None => true,
+                            _ => true,
+                        };
+                        if !card_matches { continue; }
+                        let card_name = game_state.card_database.get_card(*card_id).map(|c| c.name.as_str()).unwrap_or("Unknown");
+                        actions.push(Action {
+                            description: format!("{} ({})", card_name, zone_index),
                             action_type: ActionType::ChoiceSelect,
                             parameters: Some(ActionParameters {
-                                card_id: None, card_index: None, card_indices: Some(Vec::new()),
+                                card_id: Some(*card_id), card_index: Some(*zone_index), card_indices: Some(vec![*zone_index]),
                                 stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some("select".to_string()),
+                                card_name: Some(card_name.to_string()), card_no: Some("select".to_string()),
                                 base_cost: None, final_cost: None, available_areas: None,
                             }),
                         });
                     }
-                    if *allow_skip {
-                        actions.push(Action {
-                            description: "Skip".to_string(),
-                            action_type: ActionType::ChoiceSkip,
-                            parameters: Some(ActionParameters {
-                                card_id: None, card_index: None, card_indices: None,
-                                stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some("skip".to_string()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                    }
-                    return actions;
+                } else {
+                    actions.push(Action {
+                        description: format!("Select card(s): {}", description),
+                        action_type: ActionType::ChoiceSelect,
+                        parameters: Some(ActionParameters {
+                            card_id: None, card_index: None, card_indices: Some(Vec::new()),
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("select".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
                 }
-                Choice::SelectPosition { position, description } => {
-                    let areas: Vec<&str> = position.split(',').map(|s| s.trim()).collect();
-                    for area in areas {
-                        let stage_area_str = match area {
-                            "left" | "left_side" | "左サイドエリア" => Some("left".to_string()),
-                            "center" | "センターエリア" => Some("center".to_string()),
-                            "right" | "right_side" | "右サイドエリア" => Some("right".to_string()),
-                            _ => Some(area.to_string()),
-                        };
-                        let area_parsed = stage_area_str.as_deref().and_then(|s| s.parse::<MemberArea>().ok());
-                        actions.push(Action {
-                            description: format!("Place at {}: {}", area, description),
-                            action_type: ActionType::ChoicePosition,
-                            parameters: Some(ActionParameters {
-                                card_id: None, card_index: None, card_indices: None,
-                                stage_area: area_parsed, use_baton_touch: None,
-                                card_name: None, card_no: Some("select".to_string()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                    }
-                    return actions;
+                if *allow_skip {
+                    actions.push(Action {
+                        description: "Skip".to_string(),
+                        action_type: ActionType::ChoiceSkip,
+                        parameters: Some(ActionParameters {
+                            card_id: None, card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some("skip".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
                 }
-                Choice::SelectHeartColor { count: _, options, description } => {
-                    for (i, color) in options.iter().enumerate() {
-                        actions.push(Action {
-                            description: format!("{} — {}", color, description),
-                            action_type: ActionType::ChoiceOption,
-                            parameters: Some(ActionParameters {
-                                card_id: Some(i as i16), card_index: None, card_indices: None,
-                                stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some(color.clone()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                    }
-                    return actions;
-                }
-                Choice::SelectHeartType { count: _, options, description } => {
-                    for (i, color) in options.iter().enumerate() {
-                        actions.push(Action {
-                            description: format!("{} — {}", color, description),
-                            action_type: ActionType::ChoiceOption,
-                            parameters: Some(ActionParameters {
-                                card_id: Some(i as i16), card_index: None, card_indices: None,
-                                stage_area: None, use_baton_touch: None,
-                                card_name: None, card_no: Some(color.clone()),
-                                base_cost: None, final_cost: None, available_areas: None,
-                            }),
-                        });
-                    }
-                    return actions;
-                }
-                _ => {}
+                return actions;
             }
+            Choice::SelectPosition { position, description } => {
+                let areas: Vec<&str> = position.split(',').map(|s| s.trim()).collect();
+                for area in areas {
+                    let stage_area_str = match area {
+                        "left" | "left_side" | "左サイドエリア" => Some("left".to_string()),
+                        "center" | "センターエリア" => Some("center".to_string()),
+                        "right" | "right_side" | "右サイドエリア" => Some("right".to_string()),
+                        _ => Some(area.to_string()),
+                    };
+                    let area_parsed = stage_area_str.as_deref().and_then(|s| s.parse::<MemberArea>().ok());
+                    actions.push(Action {
+                        description: format!("Place at {}: {}", area, description),
+                        action_type: ActionType::ChoicePosition,
+                        parameters: Some(ActionParameters {
+                            card_id: None, card_index: None, card_indices: None,
+                            stage_area: area_parsed, use_baton_touch: None,
+                            card_name: None, card_no: Some("select".to_string()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
+                }
+                return actions;
+            }
+            Choice::SelectHeartColor { count: _, options, description } => {
+                for (i, color) in options.iter().enumerate() {
+                    actions.push(Action {
+                        description: format!("{} — {}", color, description),
+                        action_type: ActionType::ChoiceOption,
+                        parameters: Some(ActionParameters {
+                            card_id: Some(i as i16), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some(color.clone()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
+                }
+                return actions;
+            }
+            Choice::SelectHeartType { count: _, options, description } => {
+                for (i, color) in options.iter().enumerate() {
+                    actions.push(Action {
+                        description: format!("{} — {}", color, description),
+                        action_type: ActionType::ChoiceOption,
+                        parameters: Some(ActionParameters {
+                            card_id: Some(i as i16), card_index: None, card_indices: None,
+                            stage_area: None, use_baton_touch: None,
+                            card_name: None, card_no: Some(color.clone()),
+                            base_cost: None, final_cost: None, available_areas: None,
+                        }),
+                    });
+                }
+                return actions;
+            }
+            _ => {}
         }
     }
 
@@ -511,6 +509,9 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                     if let Some(card) = game_state.card_database.get_card(*card_id) {
                         if card.is_member() && !card.is_live() {
                             let card_cost = card.cost.unwrap_or(0);
+                            let hand_count = active_player.hand.cards.len();
+                            let hand_reduction = card.get_hand_cost_reduction(hand_count);
+                            let effective_cost = card_cost.saturating_sub(hand_reduction);
                             // Use actual active energy count
                             let active_energy_count = active_player.energy_zone.active_count();
                         
@@ -556,7 +557,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                                     } else {
                                         0
                                     };
-                                    let cost_to_pay = card_cost.saturating_sub(member_cost);
+                                    let cost_to_pay = effective_cost.saturating_sub(member_cost);
 
                                     if (active_energy_count as u32) >= cost_to_pay {
                                         area_info.available = true;
@@ -572,9 +573,9 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                                 }
                             } else {
                                 // Play to empty area
-                                if (active_energy_count as u32) >= card_cost {
+                                if (active_energy_count as u32) >= effective_cost {
                                     area_info.available = true;
-                                    area_info.cost = card_cost;
+                                    area_info.cost = effective_cost;
                                     has_any_available = true;
                                 }
                             }

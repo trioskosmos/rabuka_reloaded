@@ -136,6 +136,11 @@ impl TurnEngine {
                     // Rule 8.4: Determine live victory (automatic)
                     Self::execute_live_victory_determination(game_state);
                     
+                    // If live_success abilities created a pending choice, wait for player input
+                    if game_state.pending_choice.is_some() {
+                        return;
+                    }
+                    
                     // After Live phase completes, start a new turn
                     game_state.turn_number += 1;
                     game_state.current_turn_phase = TurnPhase::FirstAttackerNormal;
@@ -773,9 +778,17 @@ impl TurnEngine {
         
         if player1_won {
             Self::trigger_live_success_abilities(game_state, &player1_id);
+            game_state.process_pending_auto_abilities(&player1_id);
         }
         if player2_won {
             Self::trigger_live_success_abilities(game_state, &player2_id);
+            game_state.process_pending_auto_abilities(&player2_id);
+        }
+        
+        // If live_success ability created a pending choice (e.g. draw + discard),
+        // stop here and wait for player input instead of advancing the phase
+        if game_state.pending_choice.is_some() {
+            return;
         }
         
         // Rule 8.4.7: Move winning live card to success zone
@@ -1295,7 +1308,7 @@ impl TurnEngine {
     }
 
     /// Trigger debut abilities for a player when a card is placed on stage
-    fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, cost_paid: u32, baton_touch_used: bool) {
+    pub(crate) fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, cost_paid: u32, baton_touch_used: bool) {
         // Rule 11.4: Trigger Debut automatic abilities
         // Rule 11.4.2: Trigger when member is placed on stage
         

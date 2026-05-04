@@ -216,11 +216,13 @@ def _enrich_effect_type(effect, triggerless=""):
     if effect is None:
         return
     heart_colors = []
-    for m in re.findall(r'heart_(\d+)', triggerless):
-        heart_colors.append(f'heart{m.zfill(2)}')
+    seen = set()
     for m in re.findall(r'{{heart_(\d+)\.png\|heart\d+}}', triggerless):
-        heart_colors.append(f'heart{m.zfill(2)}')
-    if heart_colors:
+        h = f'heart{m.zfill(2)}'
+        if h not in seen:
+            seen.add(h)
+            heart_colors.append(h)
+    if heart_colors and 'heart_colors' not in effect:
         effect['heart_colors'] = heart_colors
 
 
@@ -301,6 +303,11 @@ def extract_all_abilities(cards_file: Path) -> dict:
             import traceback
             traceback.print_exc()
             effect = {"text": effect_text, "actions": []}
+        
+        # If the effect handler embedded a cost (e.g. "unless pay N energy"),
+        # lift it to the ability level (Q92: player chooses whether to pay)
+        if isinstance(effect, dict) and 'cost' in effect:
+            cost = effect.pop('cost')
         
         unique_abilities.append({
             "full_text": full_text,

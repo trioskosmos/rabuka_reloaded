@@ -86,6 +86,15 @@ Identify what engine changes are needed to support the parsed ability:
 
 ### Helper functions
 
+Helper functions (`advance_to_live_card_set_p1`, `advance_to_live_start`, `assert_score`, `assert_energy`) are defined in `helpers.rs` and shared across test files via `mod helpers; use helpers::*;`.
+
+For new test files, either import from helpers.rs or define local copies:
+
+```rust
+mod helpers;
+use helpers::*;
+```
+
 ```rust
 fn assert_score(game: &TestGame, expected: i32) { ... }
 fn assert_energy(game: &TestGame, active: usize, total: usize) { ... }

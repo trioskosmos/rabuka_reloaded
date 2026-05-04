@@ -256,24 +256,29 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 "success_live_zone" => &player.success_live_card_zone.cards,
                 _ => continue,
             };
+            eprintln!("[MULTI] location={} has {} cards", loc, cards.len());
             combined.extend_from_slice(cards);
         }
+        eprintln!("[MULTI] combined {} cards", combined.len());
 
         if condition.distinct.unwrap_or(false) {
             let mut distinct_names: std::collections::HashSet<String> = std::collections::HashSet::new();
             for &cid in &combined {
-                if cid == -1 { continue; }
+                if cid == -1 { eprintln!("[MULTI]   skipping -1"); continue; }
                 let passes_type = card_type_filter.map_or(true, |f| util::card_matches_type(card_db, cid, Some(f)));
                 let passes_group = group_names.map_or(true, |gn| {
                     card_db.get_card(cid).map(|c| gn.iter().any(|g| c.group == *g || c.unit.as_deref() == Some(g.as_str()))).unwrap_or(false)
                 });
+                eprintln!("[MULTI]   card={} type_pass={} group_pass={}", cid, passes_type, passes_group);
                 if !passes_type || !passes_group { continue; }
                 let names = card_db.get_card_names(cid);
                 for name in &names {
+                    eprintln!("[MULTI]   name='{}'", name);
                     distinct_names.insert(name.clone());
                 }
             }
             let count = distinct_names.len() as u32;
+            eprintln!("[MULTI] distinct_names={} threshold={}", count, count_threshold);
             compare_counts(operator, count, count_threshold)
         } else {
             let matching_count = util::count_matching(&combined, card_db, card_type_filter,
@@ -305,12 +310,28 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     fn evaluate_card_count_condition(&self, condition: &Condition) -> bool {
         let card_type = condition.card_type.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
-        // Default to 1 when count is not set (checking "at least one of this type")
         let count = condition.count.unwrap_or(1);
         let player = self.game_state.resolve_target_player(target);
+        let exclude_self = condition.exclude_self.unwrap_or(false);
+        let activating_id = self.activating_card_id;
+
+        let stage_member_count = |p: &crate::player::Player| -> usize {
+            p.stage.stage.iter().filter(|&&id| id != -1).count()
+        };
+
         let actual_count = match card_type {
             "live_card" => player.live_card_zone.len(),
-            "member_card" => player.stage.total_blades(&self.game_state.card_database, &self.game_state.blade_modifiers) as usize,
+            "member_card" => {
+                let mut member_count = stage_member_count(player);
+                if exclude_self {
+                    if let Some(cid) = activating_id {
+                        if player.stage.stage.iter().any(|&id| id == cid) {
+                            member_count = member_count.saturating_sub(1);
+                        }
+                    }
+                }
+                member_count
+            }
             "energy_card" => player.energy_zone.cards.len(),
             _ => 0,
         };
