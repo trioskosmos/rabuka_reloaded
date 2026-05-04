@@ -328,7 +328,6 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 }
                 return actions;
             }
-            _ => {}
         }
     }
 
@@ -652,6 +651,13 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
 
                             // Check position requirement (左サイド/右サイド/センター in trigger string)
                             if !crate::zones::check_trigger_position(ability.triggers.as_deref(), card_position) {
+                                continue;
+                            }
+                            // Also check activation_position from parsed effect data
+                            if !crate::zones::check_effect_position(
+                                ability.effect.as_ref().and_then(|e| e.activation_position.as_deref()),
+                                card_position,
+                            ) {
                                 continue;
                             }
 

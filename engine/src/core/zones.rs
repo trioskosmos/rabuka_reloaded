@@ -55,6 +55,17 @@ pub fn check_trigger_position(triggers: Option<&str>, card_position: MemberArea)
     true
 }
 
+/// Check if a card matches the required stage position from a parsed
+/// `activation_position` field (e.g. "center", "left", "right").
+pub fn check_effect_position(effect_pos: Option<&str>, card_position: MemberArea) -> bool {
+    match effect_pos {
+        Some("center") | Some("中央") => card_position == MemberArea::Center,
+        Some("left") | Some("左") | Some("左側") => card_position == MemberArea::LeftSide,
+        Some("right") | Some("右") | Some("右側") => card_position == MemberArea::RightSide,
+        _ => true,
+    }
+}
+
 // CardInZone removed for performance - use i16 IDs directly
 use crate::constants::{STAGE_SIZE, EMPTY_SLOT};
 

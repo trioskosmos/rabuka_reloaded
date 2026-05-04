@@ -1,5 +1,5 @@
 use crate::card::{AbilityEffect, PositionInfo};
-use super::types::{Choice, ExecutionContext, LookAndSelectStep};
+use super::types::{Choice, ExecutionContext};
 use super::resolver::AbilityResolver;
 use super::util;
 
@@ -135,206 +135,7 @@ impl<'a> AbilityResolver<'a> {
         }
     }
 
-// ===== RECURSIVE COMPOUND EFFECTS (need &AbilityEffect for sub-action access) =====
-
-    fn execute_sequential_effect(&mut self, effect: &AbilityEffect, conditional: bool, is_further: bool) -> Result<(), String> {
-        let cond_met = if conditional {
-            effect.condition.as_ref().map_or(true, |c| self.evaluate_condition(c))
-        } else { true };
-        if !cond_met { return Ok(()); }
-
-        if is_further { eprintln!("Further conditional effect (さらに) - executing additional actions"); }
-
-        if let Some(ref actions) = effect.actions {
-            let has_repeat = actions.last().map_or(false, |a| a.action == "repeat_procedure");
-            let repeat_max = if has_repeat {
-                actions.last().and_then(|a| a.repeat_limit).unwrap_or(1)
-            } else {
-                1
-            };
-            let repeat_actions: &[AbilityEffect] = if has_repeat {
-                &actions[..actions.len() - 1]
-            } else {
-                actions.as_slice()
-            };
-
-            eprintln!("[ABILITY] sequential: {} actions, repeat_max={} card_id={:?}", repeat_actions.len(), repeat_max, self.activating_card_id);
-            for _repeat in 0..repeat_max {
-                for (i, action) in repeat_actions.iter().enumerate() {
-                    eprintln!("[ABILITY]  >> sub-action[{}]: action={} has_condition={} card_id={:?}", i, action.action, action.condition.is_some(), self.activating_card_id);
-                    let mut action_to_execute = action.clone();
-                    if action_to_execute.per_unit.is_none() && effect.per_unit.is_some() {
-                        action_to_execute.per_unit = effect.per_unit;
-                    }
-                    if action_to_execute.per_unit_count.is_none() && effect.per_unit_count.is_some() {
-                        action_to_execute.per_unit_count = effect.per_unit_count;
-                    }
-                    if action_to_execute.per_unit_type.is_none() && effect.per_unit_type.is_some() {
-                        action_to_execute.per_unit_type = effect.per_unit_type.clone();
-                    }
- 
-                    match self.execute_effect(&action_to_execute) {
-                        Ok(_) => {
-                            if self.pending_choice.is_some() {
-                                let remaining_actions: Vec<AbilityEffect> = repeat_actions[i + 1..].to_vec();
-                                if !remaining_actions.is_empty() {
-                                    self.game_state.pending_sequential_actions = Some(remaining_actions);
-                                }
-                                return Ok(());
-                            }
-                        },
-                        Err(e) if e.contains("Pending choice required") => {
-                            let remaining_actions: Vec<AbilityEffect> = repeat_actions[i + 1..].to_vec();
-                            if !remaining_actions.is_empty() {
-                                self.game_state.pending_sequential_actions = Some(remaining_actions);
-                            }
-                            return Ok(());
-                        }
-                        Err(e) => return Err(e),
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn execute_conditional_alternative(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let has_primary = effect.primary_effect.is_some();
-        let has_alternative = effect.alternative_effect.is_some();
-
-        if has_primary && has_alternative {
-            let primary_text = effect.primary_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Primary effect");
-            let alternative_text = effect.alternative_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Alternative effect");
-            let description = format!("Choose effect:\nPrimary: {}\nAlternative: {}", primary_text, alternative_text);
-            self.pending_choice = Some(Choice::SelectTarget { target: "primary|alternative".to_string(), description });
-            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-            return Ok(());
-        }
-
-        if let Some(ref alt_condition) = effect.alternative_condition {
-            if self.evaluate_condition(alt_condition) {
-                if let Some(ref alt_effect) = effect.alternative_effect {
-                    return self.execute_effect(alt_effect);
-                }
-            }
-        }
-
-        if let Some(ref primary_effect) = effect.primary_effect {
-            self.execute_effect(primary_effect)
-        } else { Ok(()) }
-    }
-
-    fn execute_look_and_select(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        self.current_effect = Some(effect.clone());
-
-        if let Some(ref look_action) = effect.look_action {
-            self.execute_effect(look_action)?;
-        }
-
-        if let Some(ref select_action) = effect.select_action {
-            let placement_order = select_action.placement_order.as_deref();
-            let count = select_action.count.unwrap_or(1);
-            let optional = select_action.optional.unwrap_or(false);
-            let any_number = select_action.any_number.unwrap_or(false);
-
-            let card_db = &self.game_state.card_database;
-            let card_type_filter = select_action.card_type.as_deref();
-            let heart_colors_filter = select_action.heart_colors.as_ref();
-            let has_filter = card_type_filter.is_some()
-                || heart_colors_filter.map_or(false, |c| !c.is_empty());
-            if has_filter {
-                self.looked_at_cards = self.looked_at_cards.iter().filter(|&&card_id| {
-                    super::util::card_matches_type(card_db, card_id, card_type_filter)
-                        && super::util::card_matches_heart_colors(card_db, card_id, heart_colors_filter)
-                }).copied().collect();
-            }
-
-            let available_count = self.looked_at_cards.len();
-            let max_select = if any_number { available_count } else { std::cmp::min(count as usize, available_count) };
-
-            let description = if available_count == 0 {
-                "No eligible cards found among looked-at cards".to_string()
-            } else if any_number {
-                format!("Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
-                    available_count, placement_order.unwrap_or("default"))
-            } else if optional {
-                format!("Select up to {} card(s) from the {} looked-at cards (or skip) (placement_order: {})",
-                    max_select, available_count, placement_order.unwrap_or("default"))
-            } else {
-                format!("Select {} card(s) from the {} looked-at cards (placement_order: {})",
-                    max_select, available_count, placement_order.unwrap_or("default"))
-            };
-
-            let choice = Choice::SelectCard {
-                zone: "looked_at".to_string(), card_type: select_action.card_type.clone(), count: max_select,
-                description, allow_skip: optional || any_number || available_count == 0,
-            };
-            self.pending_choice = Some(choice);
-            self.execution_context = ExecutionContext::LookAndSelect {
-                step: LookAndSelectStep::Select { count: max_select },
-            };
-            return Ok(());
-        }
-
-        self.current_effect = None;
-        Ok(())
-    }
-
-    fn execute_repeat_procedure(&mut self, effect: &AbilityEffect, repeat_limit: u32) -> Result<(), String> {
-        let repeat_limit = repeat_limit as usize;
-        if let Some(ref actions) = effect.actions {
-            for _ in 0..repeat_limit {
-                for action in actions {
-                    self.execute_effect(action)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn execute_conditional_on_result(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let primary_action = effect.primary_effect.as_ref();
-        let result_condition = effect.result_condition.as_ref();
-        let followup_action = effect.followup_action.as_ref();
-
-        if let Some(ref primary) = primary_action {
-            if let Err(e) = self.execute_effect(primary) {
-                eprintln!("Primary action failed in conditional_on_result: {}", e);
-                return Err(e);
-            }
-        }
-
-        let condition_met = result_condition.map(|c| self.evaluate_condition(c)).unwrap_or(true);
-
-        if condition_met {
-            if let Some(ref followup) = followup_action {
-                self.execute_effect(followup)?;
-            }
-        } else {
-            eprintln!("Result condition not met, skipping followup action");
-        }
-        Ok(())
-    }
-
-    fn execute_conditional_on_optional(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let optional_action = effect.optional_action.as_ref();
-        let conditional_action = effect.conditional_action.as_ref();
-
-        if optional_action.is_some() && conditional_action.is_some() {
-            let desc = optional_action.as_ref().map(|a| a.text.as_str()).unwrap_or("Perform optional action");
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "conditional_optional".to_string(),
-                description: format!("{}?", desc),
-            });
-            return Ok(());
-        }
-
-        if let Some(ref optional) = optional_action { self.execute_effect(optional)?; }
-        if let Some(ref conditional) = conditional_action { self.execute_effect(conditional)?; }
-        Ok(())
-    }
-
-    // ===== LEAF EFFECTS (all data from enum params, no &AbilityEffect) =====
+// ===== LEAF EFFECTS (all data directly from AbilityEffect params) =====
 
     fn execute_draw(&mut self, count: u32, target: &str, source: &str, destination: &str, card_type: Option<&str>, per_unit: bool, per_unit_count: u32, per_unit_type: Option<&str>) -> Result<(), String> {
         let card_db = self.game_state.card_database.clone();
@@ -770,6 +571,8 @@ impl<'a> AbilityResolver<'a> {
                     (card_id, delta)
                 }).collect();
 
+
+
             eprintln!("[SCORE] live_card_ids={:?} final_value={} self_target={} target={} activating_id={:?} live_zone={:?}",
                 live_card_ids.iter().map(|(id, d)| format!("id={} delta={}", id, d)).collect::<Vec<_>>(),
                 final_value, self_target, target, self.activating_card_id,
@@ -922,78 +725,7 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    pub fn execute_reveal(&mut self, source: &str, count: u32, target: &str, card_type: Option<&str>, heart_colors: Option<&Vec<String>>) -> Result<(), String> {
-        let card_db = self.game_state.card_database.clone();
-        let card_ids: Vec<i16> = {
-            let player = self.game_state.resolve_target_player_mut(target);
-            match source {
-                "hand" => player.hand.cards.iter().copied().collect(),
-                "deck" => player.main_deck.cards.iter().take(count as usize).copied().collect(),
-                "looked_at" => self.looked_at_cards.iter().filter(|&&card_id| {
-                    super::util::card_matches_type(&card_db, card_id, card_type)
-                        && super::util::card_matches_heart_colors(&card_db, card_id, heart_colors)
-                }).copied().collect(),
-                _ => vec![],
-            }
-        };
 
-        for card_id in &card_ids { self.game_state.revealed_cards.insert(*card_id); }
-        Ok(())
-    }
-
-    fn execute_select(&mut self, source: &str, count: u32, target: &str, card_type: Option<&str>, distinct: Option<&str>, heart_colors: Option<&Vec<String>>) -> Result<(), String> {
-        let target = target.to_string();
-        let card_db = self.game_state.card_database.clone();
-        let player = self.game_state.resolve_target_player_mut(&target);
-
-        let card_ids: Vec<i16> = match source {
-            "hand" => player.hand.cards.iter().copied().collect(),
-            "deck" => player.main_deck.cards.iter().take(count as usize).copied().collect(),
-            "discard" => player.waitroom.cards.iter().copied().collect(),
-            "looked_at" => self.looked_at_cards.clone(),
-            _ => vec![],
-        };
-
-        let filtered: Vec<i16> = card_ids.iter().filter(|&&card_id| {
-            super::util::card_matches_type(&card_db, card_id, card_type)
-                && super::util::card_matches_heart_colors(&card_db, card_id, heart_colors)
-        }).copied().collect();
-
-        if distinct == Some("true") || distinct == Some("distinct") {
-            let mut names = std::collections::HashSet::new();
-            let unique: Vec<i16> = filtered.into_iter().filter(|&card_id| {
-                card_db.get_card(card_id)
-                    .map(|c| names.insert(c.name.clone()))
-                    .unwrap_or(false)
-            }).collect();
-            self.looked_at_cards = unique;
-        } else { self.looked_at_cards = filtered; }
-
-        self.pending_choice = Some(Choice::SelectCard {
-            zone: source.to_string(), card_type: card_type.map(|s| s.to_string()),
-            count: count as usize,
-            description: format!("Select {} card(s) from {}", count, source),
-            allow_skip: false,
-        });
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-        Ok(())
-    }
-
-    fn execute_look_at(&mut self, count: u32, target: &str, source: &str) -> Result<(), String> {
-        let player = self.game_state.resolve_target_player_mut(target);
-
-        let cards = match source {
-            "deck" | "deck_top" => player.main_deck.draw_multiple(count as usize),
-            "hand" => player.hand.cards.iter().take(count as usize).copied().collect(),
-            "discard" => player.waitroom.cards.iter().take(count as usize).copied().collect(),
-            "stage" => player.stage.stage.iter().filter(|&&id| id != -1).take(count as usize).copied().collect(),
-            "energy_zone" => player.energy_zone.cards.iter().take(count as usize).copied().collect(),
-            _ => vec![],
-        };
-
-        self.looked_at_cards = cards;
-        Ok(())
-    }
 
     fn execute_modify_required_hearts_global(&mut self, operation: &str, value: u32, heart_color: &str, target: &str) -> Result<(), String> {
         let color = crate::zones::parse_heart_color(heart_color);
@@ -1409,33 +1141,6 @@ impl<'a> AbilityResolver<'a> {
             "deck" => { use rand::seq::SliceRandom; player.main_deck.cards.shuffle(&mut rand::thread_rng()); }
             "energy_deck" => { use rand::seq::SliceRandom; player.energy_deck.cards.shuffle(&mut rand::thread_rng()); }
             _ => { eprintln!("Unknown shuffle zone: {}", source); }
-        }
-        Ok(())
-    }
-
-    fn execute_reveal_per_group(&mut self, source: &str, count: u32, target: &str) -> Result<(), String> {
-        let card_db = self.game_state.card_database.clone();
-        let card_ids: Vec<i16> = {
-            let player = self.game_state.resolve_target_player_mut(target);
-            match source {
-                "hand" => player.hand.cards.iter().copied().collect(),
-                "deck" => player.main_deck.cards.iter().take(count as usize).copied().collect(),
-                "discard" => player.waitroom.cards.iter().copied().collect(),
-                "looked_at" => self.looked_at_cards.clone(),
-                _ => vec![],
-            }
-        };
-
-        let mut by_group: std::collections::HashMap<String, Vec<i16>> = std::collections::HashMap::new();
-        for &card_id in &card_ids {
-            let group_name = card_db.get_card(card_id).map(|c| c.group.clone()).unwrap_or_default();
-            by_group.entry(group_name).or_default().push(card_id);
-        }
-
-        for (_group, members) in &by_group {
-            for &card_id in members {
-                self.game_state.revealed_cards.insert(card_id);
-            }
         }
         Ok(())
     }
