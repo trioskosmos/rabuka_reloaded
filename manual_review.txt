@@ -1,0 +1,240 @@
+﻿================================================================================
+ABILITY #0
+================================================================================
+TRIGGER: 起動
+FULL: {{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。
+
+COST: {"text": "このメンバーをステージから控え室に置く", "source": "stage", "destination": "discard", "card_type": "member_card", "self_cost": true, "type": "move_cards"}
+
+EFFECT: {"text": "自分の控え室からライブカードを1枚手札に加える", "source": "discard", "destination": "hand", "count": 1, "card_type": "live_card", "target": "self", "action": "move_cards"}
+
+================================================================================
+ABILITY #2
+================================================================================
+TRIGGER: 登場
+FULL: {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。
+
+COST: {"text": "手札を1枚控え室に置いてもよい", "source": "hand", "destination": "discard", "count": 1, "optional": true, "type": "move_cards"}
+
+EFFECT: {"text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く", "action": "look_and_select", "look_action": {"text": "自分のデッキの上からカードを3枚見る。", "source": "deck_top", "count": 3, "target": "self", "action": "look_at"}, "select_action": {"action": "sequential", "actions": [{"text": "1枚を手札に加え、", "count": 1, "action": "move_cards", "destination": "hand", "card_type": "card", "source": "looked_at"}, {"text": "残りを控え室に置く", "destination": "discard", "action": "move_cards", "card_type": "card", "count": 1, "source": 
+
+================================================================================
+ABILITY #8
+================================================================================
+TRIGGER: 登場
+FULL: {{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+
+COST: {"text": "このメンバーをウェイトにしてもよい", "state_change": "wait", "type": "change_state", "card_type": "member_card", "self_cost": true, "optional": true}
+
+EFFECT: {"text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。", "action": "look_and_select", "look_action": {"text": "自分のデッキの上からカードを2枚見る。", "source": "deck_top", "count": 2, "target": "self", "action": "look_at"}, "select_action": {"action": "sequential", "actions": [{"text": "好きな枚数を好きな順番でデッキの上に置き", "placement_order": "any_order", "action": "move_cards", "destination": "deck_top", "card_type": "card", "count": 1, "any_number": true, "source": "looked_at"}, {"text": "残りを控え室に置く。", "destination
+
+================================================================================
+ABILITY #13
+================================================================================
+TRIGGER: ライブ開始時
+FULL: {{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。
+
+COST: {}
+
+EFFECT: {"text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る", "count": null, "action": "gain_resource", "resource": "heart", "per_unit": true, "per_unit_count": 1, "per_unit_type": "枚", "location": "live_card_zone"}
+
+================================================================================
+ABILITY #21
+================================================================================
+TRIGGER: 常時
+FULL: {{jyouji.png|常時}}自分のライブ中のカードが3枚以上あり、その中に『虹ヶ咲』のライブカードを1枚以上含む場合、{{icon_all.png|ハート}}{{icon_all.png|ハート}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+
+COST: {}
+
+EFFECT: {"text": "{{icon_all.png|ハート}}{{icon_all.png|ハート}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る", "condition": {"type": "compound", "operator": "and", "conditions": [{"type": "temporal_condition", "temporal": "during_live", "text": "自分のライブ中のカードが3枚以上", "target": "self"}, {"text": "その中に『虹ヶ咲』のライブカードを1枚以上含む場合", "card_type": "live_card", "count": 1, "operator": ">=", "includes": true, "includes_pattern": "nested", "group": {"name": "虹ヶ咲"}, "type": "group_condition"}], "text": "自分のライブ中のカードが3枚以上あり、
+
+================================================================================
+ABILITY #29
+================================================================================
+TRIGGER: ライブ開始時
+FULL: {{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、自分のライブ中のカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+
+COST: {"text": "{{icon_energy.png|E}}支払ってもよい", "optional": true, "type": "pay_energy", "energy": 1}
+
+EFFECT: {"text": "自分のライブ中のカード1枚につき、{{icon_blade.png|ブレード}}を得る", "action": "gain_resource", "resource": "blade", "count": 1, "per_unit": true, "per_unit_count": 1, "per_unit_type": "枚", "duration": "live_end"}
+
+================================================================================
+ABILITY #35
+================================================================================
+TRIGGER: 常時
+FULL: {{jyouji.png|常時}}自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを＋１する。ライブカードが3枚以上ある場合、代わりに合計スコアを＋２する。」を得る。
+
+COST: {}
+
+EFFECT: {"text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、代わりに合計スコアを+2する。」を得る", "action": "conditional_alternative", "primary_effect": {"text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、", "count": 1, "card_type": "member_card", "target": "self", "group": {"name": "Aqours"}, "group_names": ["Aqours"], "a
+
+================================================================================
+ABILITY #42
+================================================================================
+TRIGGER: 登場
+FULL: {{toujyou.png|登場}}自分の控え室からコスト2以下のメンバーカードを2枚まで手札に加える。
+
+COST: {}
+
+EFFECT: {"text": "自分の控え室からコスト2以下のメンバーカードを2枚まで手札に加える", "source": "discard", "destination": "hand", "cost_limit": 2, "count": 2, "card_type": "member_card", "target": "self", "max": true, "action": "move_cards"}
+
+================================================================================
+ABILITY #49
+================================================================================
+TRIGGER: ライブ開始時
+FULL: {{live_start.png|ライブ開始時}}自分の成功ライブカード置き場にカードがある場合、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『μ's』のライブカードを1枚手札に加える。
+
+COST: {}
+
+EFFECT: {"text": "自分の成功ライブカード置き場にカードがある場合、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『μ's』のライブカードを1枚手札に加える", "action": "sequential", "actions": [{"text": "手札を1枚控え室に置いてもよい", "source": "hand", "destination": "discard", "count": 1, "optional": true, "action": "move_cards", "card_type": "card"}, {"text": "自分の控え室から『μ's』のライブカードを1枚手札に加える", "source": "discard", "destination": "hand", "count": 1, "card_type": "live_card", "target": "self", "group": {"name": "μ's"}, "group_names": ["μ's"], "action": "move_cards"}], "conditio
+
+================================================================================
+ABILITY #57
+================================================================================
+TRIGGER: 起動
+FULL: {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる
+
+COST: {"text": "{{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く", "type": "sequential_cost", "costs": [{"text": "{{center.png|センター}}このメンバーをウェイトにし", "state_change": "wait", "type": "change_state", "card_type": "member_card", "self_cost": true}, {"text": "手札を1枚控え室に置く", "source": "hand", "destination": "discard
+
+EFFECT: {"text": "このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。", "action": "sequential", "actions": [{"text": "このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く", "source": "stage", "destination": "discard", "count": 1, "card_type": "member_card", "target": "self", "exclude_self": true, "group": {"name": "Aqours"}, "group_names": ["Aqours"], "action": "move_cards"}, {"text": "自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーが
+
+================================================================================
+ABILITY #63
+================================================================================
+TRIGGER: ライブ開始時
+FULL: {{live_start.png|ライブ開始時}}控え室にあるメンバーカード2枚を好きな順番でデッキの一番下に置いてもよい：それらのカードのコストの合計が、6の場合、カードを1枚引く。合計が8の場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+
+COST: {"text": "控え室にあるメンバーカード2枚を好きな順番でデッキの一番下に置いてもよい", "source": "discard", "destination": "deck_bottom", "type": "move_cards", "action": "move_cards", "optional": true}
+
+EFFECT: {"text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る", "condition": {"text": "{{icon_all.png|ハート}}を得る。合計が25の場合", "aggregate": "total", "type": "score_threshold_condition"}, "action": "gain_ability", "ability_text": "ライブの合計スコアを+1する。", "duration": "live_end"}
+
+================================================================================
+ABILITY #72
+================================================================================
+TRIGGER: ライブ成功時
+FULL: {{live_success.png|ライブ成功時}}自分と相手はそれぞれ、自身のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+
+COST: {}
+
+EFFECT: {"text": "自分と相手はそれぞれ、自身のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く", "source": "deck", "destination": "energy_zone", "state_change": "wait", "count": 1, "card_type": "energy_card", "target": "both", "multiple_targets": true, "action": "move_cards"}
+
+================================================================================
+ABILITY #85
+================================================================================
+TRIGGER: ライブ成功時
+FULL: {{live_success.png|ライブ成功時}}手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く。
+
+COST: {"text": "手札を1枚控え室に置いてもよい", "source": "hand", "destination": "discard", "count": 1, "optional": true, "type": "move_cards"}
+
+EFFECT: {"text": "自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く", "action": "look_and_select", "look_action": {"text": "自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。", "source": "deck_top", "count": 1, "dynamic_count": {"type": "dynamic_count", "reference": "自分のデッキの上から、自分のライブの合計スコアに2を足した数", "mode": "equals", "base_reference": "自分のデッキの上から、自分のライブの合計スコア", "calculation": "add", "calculation_value": 2}, "target": "self", "action": "look_at"}, "select_action": {"action": "sequential", "actions"
+
+================================================================================
+ABILITY #106
+================================================================================
+TRIGGER: 起動
+FULL: {{kidou.png|起動}}{{turn1.png|ターン1回}}デッキの上からカードを3枚控え室に置く：ライブ終了時まで、これにより控え室に置いた『Liella!』のメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+
+COST: {"text": "デッキの上からカードを3枚控え室に置く", "source": "deck_top", "destination": "discard", "count": 3, "type": "move_cards"}
+
+EFFECT: {"text": "これにより控え室に置いた『Liella!』のメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る", "action": "gain_resource", "resource": "blade", "count": 1, "per_unit": true, "per_unit_count": 1, "per_unit_type": "枚", "group": {"name": "Liella!"}, "duration": "live_end"}
+
+================================================================================
+ABILITY #120
+================================================================================
+TRIGGER: 起動
+FULL: {{kidou.png|起動}}{{turn1.png|ターン1回}}手札をすべて公開する：自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合、自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+
+COST: {"text": "手札をすべて公開する", "type": "reveal", "action": "reveal", "source": "hand"}
+
+EFFECT: {"text": "自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合、自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く", "action": "look_and_select", "look_action": {"text": "自分のステージにほかのメンバーがおり、かつこれにより公開した手札の中にライブカードがない場合、自分のデッキの上からカードを5枚見る。", "source": "deck_top", "count": 5, "card_type": "member_card", "target": "self", "exclude_self": true, "action": "look_at"}, "select_action": {"action": "sequential", "actions": [{"text": "ライブカードを1枚公開する", "count": 1, "card_type": "live_card", "action": "reveal",
+
+================================================================================
+ABILITY #150
+================================================================================
+TRIGGER: ライブ成功時
+FULL: {{live_success.png|ライブ成功時}}自分が余剰ハートを持たない場合、ライブの合計スコアを＋１する。自分が余剰ハートを2つ以上持つ場合、ライブの合計スコアを－１する。この効果ではライブの合計スコアは０未満にはならない。
+
+COST: {}
+
+EFFECT: {"text": "ライブの合計スコアを－1する。この効果ではライブの合計スコアは0未満にはならない", "condition": {"text": "ライブの合計スコアを+1する。自分が余剰ハートを2つ以上持つ場合", "resource_type": "surplus_heart", "count": 2, "operator": ">=", "comparison_type": "score", "aggregate": "total", "type": "comparison_condition"}, "effect_constraint": "minimum_value:0", "action": "modify_score", "operation": null}
+
+================================================================================
+ABILITY #183
+================================================================================
+TRIGGER: 登場
+FULL: {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを2枚控え室に置く。その後、自分の控え室からメンバーカードを1枚手札に加える。
+
+COST: {"text": "手札を1枚控え室に置いてもよい", "source": "hand", "destination": "discard", "count": 1, "optional": true, "type": "move_cards"}
+
+EFFECT: {"text": "自分のデッキの上からカードを2枚控え室に置く。その後、自分の控え室からメンバーカードを1枚手札に加える", "action": "sequential", "actions": [{"text": "自分のデッキの上からカードを2枚控え室に置く", "source": "deck_top", "count": 2, "destination": "discard", "target": "self", "action": "move_cards", "card_type": "card"}, {"text": "自分の控え室からメンバーカードを1枚手札に加える", "source": "discard", "destination": "hand", "count": 1, "card_type": "member_card", "target": "self", "action": "move_cards"}]}
+
+================================================================================
+ABILITY #221
+================================================================================
+TRIGGER: 登場
+FULL: {{toujyou.png|登場}}自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。そうした場合、相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える。
+
+COST: {}
+
+EFFECT: {"text": "自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。そうした場合、相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える", "action": "sequential", "actions": [{"text": "自分の控え室にある、カード名の異なるライブカードを2枚選ぶ", "source": "discard", "distinct": "card_name", "count": 2, "card_type": "live_card", "target": "self", "action": "select"}, {"action": "sequential", "actions": [{"text": "相手はそれらのカードのうち1枚を選ぶ", "count": 1, "action": "select"}, {"text": "これにより相手に選ばれたカードを自分の手札に加える", "destination": "hand", "target": "self", "action": "move_cards", "
+
+================================================================================
+ABILITY #277
+================================================================================
+TRIGGER: ライブ開始時, 登場
+FULL: {{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}{{center.png|センター}}『BiBi』のメンバー1人をウェイトにしてもよい：相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。（この能力はセンターエリアにいる場合のみ発動する。）
+
+COST: {"text": "{{center.png|センター}}『BiBi』のメンバー1人をウェイトにしてもよい", "state_change": "wait", "type": "change_state", "count": 1, "card_type": "member_card", "group_names": ["BiBi"], "optional": true}
+
+EFFECT: {"text": "相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。", "action_by": "opponent", "opponent_action": {"text": "自身のステージにいるアクティブ状態のメンバー1人をウェイトにする", "state_change": "wait", "count": 1, "card_type": "member_card", "action": "change_state"}, "parenthetical": ["この能力はセンターエリアにいる場合のみ発動する。"], "activation_condition": "この能力はセンターエリアにいる場合のみ発動する。", "activation_position": "center"}
+
+================================================================================
+ABILITY #306
+================================================================================
+TRIGGER: 登場
+FULL: {{toujyou.png|登場}}自分のエネルギー置き場にあるエネルギー2枚をこのメンバーの下に置いてもよい。
+
+COST: {}
+
+EFFECT: {"text": "自分のエネルギー置き場にあるエネルギー2枚をこのメンバーの下に置いてもよい", "destination": "under_member", "count": 2, "card_type": "member_card", "target": "self", "optional": true, "action": "place_energy_under_member", "energy_count": 2}
+
+================================================================================
+ABILITY #447
+================================================================================
+TRIGGER: ライブ成功時
+FULL: {{live_success.png|ライブ成功時}}このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合、このカードのスコアは４になる。
+
+COST: {}
+
+EFFECT: {"text": "このカードのスコアは4になる", "condition": {"text": "または自分が余剰ハートを2つ以上持っている場合", "resource_type": "surplus_heart", "count": 2, "operator": ">=", "type": "comparison_condition"}, "action": "set_score", "value": 4, "self_target": true}
+
+================================================================================
+ABILITY #505
+================================================================================
+TRIGGER: ライブ開始時
+FULL: {{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。
+
+COST: {}
+
+EFFECT: {"text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる", "duration": "live_end", "count": 3, "card_type": "member_card", "target": "self", "position": "center", "group": {"name": "Liella!"}, "group_names": ["Liella!"], "action": "set_blade_count"}
+
+================================================================================
+ABILITY #522
+================================================================================
+TRIGGER: ライブ開始時
+FULL: {{live_start.png|ライブ開始時}}自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つ{{heart_03.png|heart03}}2つにつき、このカードの必要ハートを{{heart_00.png|heart0}}減らす。この能力では{{heart_00.png|heart0}}は3つまでしか減らない。
+
+COST: {}
+
+EFFECT: {"text": "自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つ{{heart_03.png|heart03}}2つにつき、このカードの必要ハートを{{heart_00.png|heart0}}減らす。この能力では{{heart_00.png|heart0}}は3つまでしか減らない", "count": 3, "action": "restriction", "restriction_type": "modify_required_hearts", "self_target": true, "per_unit": true, "per_unit_count": 2, "per_unit_type": "つ", "condition": {"type": "position_condition", "text": "自分のセンターエリアに『μ's』のメンバーがいる場合"}}
+
+================================================================================
+ABILITY #558
+================================================================================
+TRIGGER: ライブ開始時
+FULL: {{live_start.png|ライブ開始時}}自分のデッキの上からカードを3枚控え室に置く。それらがすべてメンバーカードの場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+
+COST: {}
+
+EFFECT: {"text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る", "condition": {"text": "自分のデッキの上からカードを3枚控え室に置く。それらがすべてメンバーカードの場合", "target": "self", "location": "discard", "card_type": "member_card", "count": 3, "type": "location_condition"}, "action": "gain_resource", "resource": "blade", "count": 2, "duration": "live_end"}
+

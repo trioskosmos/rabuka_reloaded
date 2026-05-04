@@ -73,6 +73,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn evaluate_location_condition(&self, condition: &Condition) -> bool {
+        // Handle multiple locations (e.g. "stage and waitroom")
+        if let Some(ref locs) = condition.locations {
+            if locs.len() >= 2 {
+                return self.evaluate_multi_location_condition(condition);
+            }
+        }
         let location = condition.location.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let card_type_filter = condition.card_type.as_deref();
@@ -226,6 +232,54 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
 
         compare_counts(operator, location_value, count_threshold)
+    }
+
+    fn evaluate_multi_location_condition(&self, condition: &Condition) -> bool {
+        let target = condition.target.as_deref().unwrap_or("self");
+        let player = self.game_state.resolve_target_player(target);
+        let card_db = &self.game_state.card_database;
+        let card_type_filter = condition.card_type.as_deref();
+        let group_names = condition.group_names.as_ref();
+        let operator = condition.operator.as_deref();
+        let count_threshold = condition.count.unwrap_or(1);
+        let locs = condition.locations.as_ref().unwrap();
+
+        let mut combined: Vec<i16> = Vec::new();
+        for loc in locs {
+            let cards: &[i16] = match loc.as_str() {
+                "stage" => &player.stage.stage,
+                "hand" => &player.hand.cards,
+                "deck" => &player.main_deck.cards,
+                "discard" | "waitroom" => &player.waitroom.cards,
+                "energy_zone" => &player.energy_zone.cards,
+                "live_card_zone" => &player.live_card_zone.cards,
+                "success_live_zone" => &player.success_live_card_zone.cards,
+                _ => continue,
+            };
+            combined.extend_from_slice(cards);
+        }
+
+        if condition.distinct.unwrap_or(false) {
+            let mut distinct_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+            for &cid in &combined {
+                if cid == -1 { continue; }
+                let passes_type = card_type_filter.map_or(true, |f| util::card_matches_type(card_db, cid, Some(f)));
+                let passes_group = group_names.map_or(true, |gn| {
+                    card_db.get_card(cid).map(|c| gn.iter().any(|g| c.group == *g || c.unit.as_deref() == Some(g.as_str()))).unwrap_or(false)
+                });
+                if !passes_type || !passes_group { continue; }
+                let names = card_db.get_card_names(cid);
+                for name in &names {
+                    distinct_names.insert(name.clone());
+                }
+            }
+            let count = distinct_names.len() as u32;
+            compare_counts(operator, count, count_threshold)
+        } else {
+            let matching_count = util::count_matching(&combined, card_db, card_type_filter,
+                group_names.and_then(|g| g.first().map(|s| s.as_str())), condition.cost_limit, operator);
+            compare_counts(operator, matching_count, count_threshold)
+        }
     }
 
     fn evaluate_position_condition(&self, condition: &Condition) -> bool {

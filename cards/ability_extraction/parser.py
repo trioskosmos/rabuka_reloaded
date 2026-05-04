@@ -277,6 +277,16 @@ def extract_location(text: str) -> Optional[str]:
     """Extract location (general)."""
     return extract_by_pattern(text, LOCATION_PATTERNS)
 
+def extract_locations(text: str) -> Optional[List[str]]:
+    """Extract multiple locations connected by 'と' (e.g. 'ステージと控え室')."""
+    locs = []
+    for pattern, loc_name in LOCATION_PATTERNS:
+        if pattern in text:
+            locs.append(loc_name)
+    if len(locs) >= 2:
+        return locs
+    return None
+
 def extract_state_change(text: str) -> Optional[str]:
     """Extract state change (wait/active)."""
     return extract_by_pattern(text, STATE_CHANGE_PATTERNS)
@@ -875,14 +885,25 @@ def _try_heart_possession(text):
 def _try_live_mid(text):
     if 'ライブ中' not in text:
         return None
-    result = {'type': 'temporal_condition', 'temporal': 'during_live', 'text': text}
+    result = {'text': text}
+    count_match = re.search(r'(\d+)枚以上', text)
+    if count_match:
+        result['type'] = 'card_count_condition'
+        result['count'] = int(count_match.group(1))
+        result['operator'] = '>='
+        result['card_type'] = 'live_card'
+        result['target'] = 'self'
+        result['temporal'] = 'during_live'
+    else:
+        result['type'] = 'temporal_condition'
+        result['temporal'] = 'during_live'
     if '手札にある' in text:
         result['location'] = 'hand'
     elif 'ステージにいる' in text:
         result['location'] = 'stage'
     # Also extract generic fields (target, location from full patterns, etc.)
     tgt = extract_target(text)
-    if tgt: result['target'] = tgt
+    if tgt and 'target' not in result: result['target'] = tgt
     loc = extract_location(text)
     if loc and 'location' not in result: result['location'] = loc
     return result
@@ -894,9 +915,11 @@ def _extract_generic_fields(condition, text):
     tgt = extract_target(text)
     if tgt: condition['target'] = tgt
 
-    # Location
+    # Location (single or multiple via 'と' conjunction)
     loc = extract_location(text)
     if loc: condition['location'] = loc
+    locs = extract_locations(text)
+    if locs: condition['locations'] = locs
 
     # Heart count
     if 'heart' in text and ('つ以上持つ' in text or '枚持つ' in text or 'つ持つ' in text):
@@ -1613,6 +1636,11 @@ def parse_action(text: str) -> Dict[str, Any]:
     R('ブレードの色を', 'set_blade_type', None)
     R(lambda t: 'ハートの色を' in t or ('ハートを' in t and 'にする' in t), 'gain_resource',
       lambda t, a: a.update({'resource': 'heart', 'heart_selection': True}))
+    # If "コスト" text contains heart icons, it's about required hearts (not energy cost)
+    R(lambda t: ('コストを' in t or 'コストが' in t or 'コストは' in t) and '{{heart_' in t, 'set_required_hearts',
+      lambda t, a: a.update({'heart_colors': [m.group() for m in __import__('re').finditer(r'heart\d{2}', t)]}) or
+                   a.update({'count': len([m.group() for m in __import__('re').finditer(r'{{heart_\d+\.png\|heart\d+}}', t)])}) or
+                   a.update({'text': t}))
     R(lambda t: 'コストを' in t or 'コストが' in t or 'コストは' in t, 'modify_cost', 
       lambda t, a: _handle_cost_modification(t, a))
     R(lambda t: '繰り返してもよい' in t, 'repeat_procedure',
@@ -1697,7 +1725,13 @@ def parse_action(text: str) -> Dict[str, Any]:
         action['dynamic_count'] = {'type': 'revealed_cards', 'reference': 'previous_reveal'}
     if a == 'move_cards' and action.get('source') == 'revealed_card' and 'count' not in action:
         action['count'] = 1
-    if 'count' not in action and 'dynamic_count' not in action and not action.get('any_number'):
+    # Detect すべて/全 (all) — set flag; suppress count when all is set
+    if not action.get('all') and re.search(r'すべての|全ての|全部の|全て|全員|全体', text):
+        action['all'] = True
+    # Detect それぞれ (each/respectively) — multiple targets
+    if 'それぞれ' in text or 'ずつ' in text:
+        action['multiple_targets'] = True
+    if 'count' not in action and 'dynamic_count' not in action and not action.get('any_number') and not action.get('all'):
         extracted = extract_count(text)
         if extracted is not None:
             action['count'] = extracted
@@ -1900,6 +1934,19 @@ def parse_cost(text: str) -> Dict[str, Any]:
     group_names = extract_group_names(text)
     if group_names:
         cost['group_names'] = group_names
+    
+    # Extract cost_limit (e.g., コスト4以下 → cost_limit=4)
+    cl = extract_cost_limit(text)
+    if cl:
+        cost['cost_limit'] = cl
+        if '以下' in text:
+            cost['cost_limit_operator'] = '<='
+        elif '以上' in text:
+            cost['cost_limit_operator'] = '>='
+        elif '未満' in text:
+            cost['cost_limit_operator'] = '<'
+        elif '超' in text:
+            cost['cost_limit_operator'] = '>'
     
     # Extract exclude_self for costs (e.g., "このメンバー以外の" or "「character name」以外")
     if 'このメンバー以外' in text or 'ほかのメンバー' in text:
@@ -2704,13 +2751,45 @@ def _try_conditional(text):
 
 
 def _try_ability_activation(text):
-    """能力を発動させる — ability activation effects."""
+    """能力を発動させる — ability activation effects.
+    Handles both simple patterns ("...能力を発動させる") and sequential
+    patterns ("select card. activate its ability")."""
+    # Check for compound patterns: "select card. activate its ability"
+    if '。' in text:
+        parts = [p.strip() for p in text.split('。') if p.strip()]
+        if len(parts) >= 2:
+            actions = []
+            for p in parts:
+                result = _try_ability_activation(p)
+                if result and result.get('action') == 'activate_ability':
+                    actions.append(result)
+                else:
+                    pa = parse_action(p)
+                    if pa.get('action') != 'custom':
+                        actions.append(pa)
+            if len(actions) >= 2:
+                return {'text': text, 'action': 'sequential', 'actions': actions}
+    # Simple pattern: "...能力を発動させる"
     m = re.search(r'(.+?)能力.*?を発動させる', text)
     if not m:
         return None
-    result = {'text': text, 'action': 'activate_ability', 'target': m.group(1).strip() + '能力'}
-    tm = re.search(r'\{\{(.+?)\}\}', result['target'])
-    if tm: result['target_trigger'] = tm.group(1)
+    target_raw = m.group(1).strip() + '能力'
+    result = {'text': text, 'action': 'activate_ability'}
+    # Detect "これにより" pattern — references the card from the cost payment
+    if 'これにより' in target_raw:
+        result['source_card'] = 'cost_card'
+    result['target'] = target_raw
+    tm = re.search(r'\{\{(.+?)\}\}', target_raw)
+    if tm:
+        trigger_raw = tm.group(1)
+        if '|' in trigger_raw:
+            trigger_raw = trigger_raw.split('|')[1]
+        result['target_trigger'] = trigger_raw
+        result['ability_text'] = '%s_ability' % trigger_raw
+    # Extract count (e.g., "1つ" in "能力1つを発動させる")
+    cnt = extract_count(text)
+    if cnt:
+        result['count'] = cnt
     return result
 
 
@@ -2954,6 +3033,16 @@ def parse_effect(text: str) -> Dict[str, Any]:
             # Apply duration prefix info
             if 'duration' in effect and 'duration' not in result:
                 result['duration'] = effect['duration']
+            # Propagate duration to sub-actions in sequential/choice effects
+            if result.get('duration'):
+                if result.get('action') == 'sequential':
+                    for sub in result.get('actions', []):
+                        if 'duration' not in sub and sub.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
+                            sub['duration'] = result['duration']
+                if result.get('action') == 'choice':
+                    for opt in result.get('options', []):
+                        if 'duration' not in opt and opt.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
+                            opt['duration'] = result['duration']
             return result
 
     # Fallback: parse as single action

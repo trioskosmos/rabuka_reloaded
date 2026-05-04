@@ -1,0 +1,32 @@
+﻿re-yell test:
+{
+  "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
+  "action": "re_yell",
+  "lose_blade_hearts": true
+}
+
+Full ability #213:
+{
+  "text": "そのエールで得たブレードハートを失い、もう一度エールを行う",
+  "condition": {
+    "type": "complex_condition",
+    "cause": {
+      "type": "location_condition",
+      "location": "revealed_cards",
+      "target": "self",
+      "negation": true,
+      "text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。"
+    },
+    "effect": {
+      "text": "1枚以上のカードが控え室に置かれた場合",
+      "location": "discard",
+      "count": 1,
+      "operator": ">=",
+      "target": "self",
+      "type": "location_condition"
+    },
+    "text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。これにより1枚以上のカードが控え室に置かれた場合"
+  },
+  "action": "re_yell",
+  "lose_blade_hearts": true
+}

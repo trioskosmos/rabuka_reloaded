@@ -1,0 +1,29 @@
+﻿
+============================================================
+  RADICAL PARSER - Comparison with existing parser
+  Testing on 602 unique abilities
+============================================================
+
+python : Traceback (most recent call last):
+発生場所 行:1 文字:1
++ python demo.py 2>&1 | Out-File -Encoding utf8 demo_results.txt; Get-C ...
++ ~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Traceback (most recent call last)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  File "C:\Users\trios\OneDrive\Documents\rabuka_reloaded\test_parser\demo.py", line 238, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "C:\Users\trios\OneDrive\Documents\rabuka_reloaded\test_parser\demo.py", line 174, in main
+    parsed = parse_ability(triggerless)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trios\OneDrive\Documents\rabuka_reloaded\test_parser\radical_parser.py", line 1227, in parse_ability
+    result["effect"] = assemble_effect(struct)
+                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trios\OneDrive\Documents\rabuka_reloaded\test_parser\radical_parser.py", line 789, in assemble_effect
+    actions = [assemble_effect(match_structure(p)) for p in parts if p.strip()]
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\trios\OneDrive\Documents\rabuka_reloaded\test_parser\radical_parser.py", line 789, in <listcomp>
+    actions = [assemble_effect(match_structure(p)) for p in parts if p.strip()]
+                                                                     ^^^^^^^
+AttributeError: 'list' object has no attribute 'strip'

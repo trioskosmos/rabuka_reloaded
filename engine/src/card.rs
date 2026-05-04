@@ -452,7 +452,11 @@ pub struct AbilityCost {
     #[serde(default)]
     pub cost_limit: Option<u32>,
     #[serde(default)]
+    pub cost_limit_operator: Option<String>,
+    #[serde(default)]
     pub characters: Option<Vec<String>>,
+    #[serde(default)]
+    pub group_names: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -742,6 +746,7 @@ pub struct Condition {
     #[serde(rename = "type")]
     pub condition_type: Option<String>,
     pub location: Option<String>,
+    pub locations: Option<Vec<String>>,
     pub count: Option<u32>,
     pub operator: Option<String>,
     pub card_type: Option<String>,
@@ -808,6 +813,7 @@ impl Default for Condition {
             text: String::new(),
             condition_type: None,
             location: None,
+            locations: None,
             count: None,
             operator: None,
             card_type: None,

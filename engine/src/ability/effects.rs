@@ -121,7 +121,7 @@ impl<'a> AbilityResolver<'a> {
             Effect::ModifyLimit { operation, count } => self.execute_modify_limit(&operation, count),
             Effect::SetBladeCount { value, .. } => self.execute_set_blade_count(value, effect.target.as_deref().unwrap_or("self")),
             Effect::DoNothing => Ok(()),
-            Effect::SetRequiredHearts { count, heart_color, .. } => self.execute_set_required_hearts(count, &heart_color, effect.target.as_deref().unwrap_or("self")),
+            Effect::SetRequiredHearts { heart_colors, .. } => self.execute_set_required_hearts(&heart_colors, effect.target.as_deref().unwrap_or("self")),
             Effect::SetScore { value, .. } => self.execute_set_score(value, effect.target.as_deref().unwrap_or("self")),
             Effect::SpecifyHeartColor { choice, .. } => self.execute_specify_heart_color(choice, effect.target.as_deref().unwrap_or("self")),
             Effect::ModifyRequiredHeartsSuccess { operation, value, .. } => self.execute_modify_required_hearts_success(&operation, value, effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
@@ -1333,14 +1333,20 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_set_required_hearts(&mut self, count: u32, heart_color: &str, target: &str) -> Result<(), String> {
-        let color = crate::zones::parse_heart_color(heart_color);
+    fn execute_set_required_hearts(&mut self, heart_colors: &[String], target: &str) -> Result<(), String> {
         let card_ids: Vec<i16> = {
             let player = self.game_state.resolve_target_player_mut(target);
             player.live_card_zone.cards.to_vec()
         };
         for card_id in card_ids {
-            self.game_state.set_need_heart_modifier(card_id, color, count as i32);
+            let mut color_counts: std::collections::HashMap<crate::card::HeartColor, u32> = std::collections::HashMap::new();
+            for color_str in heart_colors {
+                let color = crate::zones::parse_heart_color(color_str);
+                *color_counts.entry(color).or_insert(0) += 1;
+            }
+            for (color, count) in &color_counts {
+                self.game_state.set_need_heart_modifier(card_id, *color, *count as i32);
+            }
         }
         Ok(())
     }

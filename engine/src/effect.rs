@@ -102,6 +102,10 @@ pub enum Effect {
         heart_color: String,
         modifiers: ActionModifiers,
     },
+    SetRequiredHearts {
+        heart_colors: Vec<String>,
+        modifiers: ActionModifiers,
+    },
     ModifyYellCount {
         operation: String,
         modifiers: ActionModifiers,
@@ -166,11 +170,6 @@ pub enum Effect {
         modifiers: ActionModifiers,
     },
     DoNothing,
-    SetRequiredHearts {
-        count: u32,
-        heart_color: String,
-        modifiers: ActionModifiers,
-    },
     SetScore {
         value: u32,
         modifiers: ActionModifiers,
@@ -406,8 +405,7 @@ impl Effect {
             },
             "do_nothing" => Effect::DoNothing,
             "set_required_hearts" => Effect::SetRequiredHearts {
-                count: effect.count.unwrap_or(0),
-                heart_color: effect.heart_color.as_deref().unwrap_or("heart00").to_string(),
+                heart_colors: effect.heart_colors.clone().unwrap_or_default(),
                 modifiers: m,
             },
             "set_score" => Effect::SetScore {

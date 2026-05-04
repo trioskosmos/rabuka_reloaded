@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-04T01:03:18.542338",
+  "generated_at": "2026-05-04T19:20:02.465996",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1995,6 +1995,10 @@
           "text": "自分の成功ライブカード置き場にカードがある場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "type": "location_condition"
         }
@@ -3595,7 +3599,8 @@
         "count": 3,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state"
+        "action": "change_state",
+        "all": true
       }
     },
     {
@@ -3639,7 +3644,8 @@
               "Aqours"
             ],
             "action": "gain_resource",
-            "resource": "heart"
+            "resource": "heart",
+            "all": true
           }
         ],
         "heart_colors": [
@@ -3789,6 +3795,10 @@
           "text": "自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合",
           "target": "both",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": "=",
           "comparison_type": "equality",
@@ -4140,7 +4150,7 @@
           "Liella!"
         ],
         "action": "change_state",
-        "count": 1
+        "all": true
       }
     },
     {
@@ -4285,6 +4295,10 @@
           "text": "自分のデッキの上からカードを4枚控え室に置く。それらの中にライブカードがある場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "deck"
+          ],
           "card_type": "live_card",
           "count": 4,
           "type": "location_condition"
@@ -4426,6 +4440,10 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
           "type": "location_condition"
         },
@@ -4560,7 +4578,7 @@
             "card_type": "member_card",
             "target": "opponent",
             "action": "change_state",
-            "count": 1
+            "all": true
           }
         ]
       }
@@ -4818,7 +4836,8 @@
             "text": "{{icon_blade.png|ブレード}}を得る",
             "action": "gain_resource",
             "resource": "blade",
-            "count": 1
+            "count": 1,
+            "duration": "live_end"
           },
           {
             "text": "カードを1枚引く",
@@ -4989,7 +5008,8 @@
           "みらくらぱーく！"
         ],
         "all_regions": true,
-        "self_target": true
+        "self_target": true,
+        "all": true
       }
     },
     {
@@ -5030,6 +5050,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -5146,6 +5170,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -5251,6 +5279,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上であるかぎり",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -6758,6 +6790,10 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
           "type": "location_condition"
         },
@@ -7024,6 +7060,10 @@
           "text": "自分のデッキの上からカードを3枚控え室に置く。それらがすべて{{heart_04.png|heart04}}を持つメンバーカードの場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "deck"
+          ],
           "card_type": "member_card",
           "count": 3,
           "type": "location_condition"
@@ -7086,6 +7126,10 @@
           "text": "自分のデッキの上からカードを3枚控え室に置く。それらがすべて{{heart_01.png|heart01}}を持つメンバーカードの場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "deck"
+          ],
           "card_type": "member_card",
           "count": 3,
           "type": "location_condition"
@@ -7297,7 +7341,8 @@
             },
             "destination": "discard",
             "action": "move_cards",
-            "card_type": "card"
+            "card_type": "card",
+            "all": true
           }
         ]
       }
@@ -7678,6 +7723,10 @@
           "text": "自分のデッキの上からカードを3枚控え室に置く。それらがすべてメンバーカードの場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "deck"
+          ],
           "card_type": "member_card",
           "count": 3,
           "type": "location_condition"
@@ -8260,6 +8309,10 @@
               "text": "自分の成功ライブカード置き場のカードが0枚で、",
               "target": "self",
               "location": "success_live_card_zone",
+              "locations": [
+                "success_live_card_zone",
+                "live_card_zone"
+              ],
               "card_type": "live_card",
               "type": "location_condition"
             },
@@ -8325,6 +8378,10 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
           "type": "location_condition"
         }
@@ -9462,7 +9519,7 @@
         "card_type": "member_card",
         "target": "self",
         "action": "change_state",
-        "count": 1
+        "all": true
       }
     },
     {
@@ -9743,6 +9800,10 @@
           "text": "自分の控え室からライブカードを1枚手札に加える。それがスコア6以上の『Aqours』のライブカードの場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "hand"
+          ],
           "card_type": "live_card",
           "count": 1,
           "operator": ">=",
@@ -10307,7 +10368,8 @@
             },
             "destination": "discard",
             "action": "move_cards",
-            "card_type": "card"
+            "card_type": "card",
+            "all": true
           }
         ]
       }
@@ -10472,6 +10534,10 @@
           "text": "自分の成功ライブカード置き場にカードがある場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "type": "location_condition"
         },
@@ -10814,6 +10880,10 @@
           "text": "自分の成功ライブカード置き場に『lilywhite』のカードがある場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "group": {
             "name": "lilywhite"
@@ -11082,6 +11152,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -11183,6 +11257,10 @@
               "text": "自分の成功ライブカード置き場にカードが1枚以上あり、",
               "target": "self",
               "location": "success_live_card_zone",
+              "locations": [
+                "success_live_card_zone",
+                "live_card_zone"
+              ],
               "card_type": "live_card",
               "count": 1,
               "operator": ">=",
@@ -11227,6 +11305,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上であるかぎり",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -11276,6 +11358,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が3以上の場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -11510,6 +11596,10 @@
           "text": "相手の成功ライブカード置き場にあるカードのスコアの合計が6以上であるかぎり",
           "target": "opponent",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -13604,6 +13694,10 @@
           "text": "自分のデッキの上からカードを5枚控え室に置く。それらの中にライブカードがある場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "deck"
+          ],
           "card_type": "live_card",
           "count": 5,
           "type": "location_condition"
@@ -13867,6 +13961,12 @@
           "text": "自分の控え室から『μ's』のライブカードを1枚手札に加える。自分の成功ライブカード置き場にあるカードのスコアの合計が9以上の場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone",
+            "discard",
+            "hand"
+          ],
           "card_type": "live_card",
           "count": 1,
           "operator": ">=",
@@ -13948,6 +14048,7 @@
             "resource": "blade",
             "count": 1,
             "duration": "live_end",
+            "all": true,
             "answers": [
               "お願いします"
             ]
@@ -14457,7 +14558,8 @@
               "澁谷かのん"
             ],
             "target": "self",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "duration": "live_end"
           },
           {
             "action": "gain_resource",
@@ -14468,7 +14570,8 @@
               "澁谷かのん"
             ],
             "target": "self",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "duration": "live_end"
           },
           {
             "action": "gain_resource",
@@ -14478,7 +14581,8 @@
               "唐可可"
             ],
             "target": "self",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "duration": "live_end"
           },
           {
             "action": "gain_resource",
@@ -14489,7 +14593,8 @@
               "唐可可"
             ],
             "target": "self",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "duration": "live_end"
           }
         ],
         "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
@@ -14571,12 +14676,7 @@
             "Liella!"
           ]
         },
-        "action": "modify_cost",
-        "self_target": true,
-        "count": 6,
-        "parenthetical": [
-          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
-        ],
+        "action": "set_required_hearts",
         "heart_colors": [
           "heart02",
           "heart02",
@@ -14590,6 +14690,11 @@
           "heart03",
           "heart06",
           "heart06"
+        ],
+        "count": 6,
+        "self_target": true,
+        "parenthetical": [
+          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
         ]
       }
     },
@@ -15807,6 +15912,10 @@
           "text": "自分の成功ライブカード置き場のカード枚数が相手より少ない場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": "<",
           "comparison_target": "opponent",
@@ -16027,6 +16136,10 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
           "type": "location_condition"
         },
@@ -17009,6 +17122,10 @@
           "text": "自分の成功ライブカード置き場にカードがある場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "type": "location_condition"
         },
@@ -17716,6 +17833,10 @@
               "text": "自分の成功ライブカード置き場のカードが0枚で、",
               "target": "self",
               "location": "success_live_card_zone",
+              "locations": [
+                "success_live_card_zone",
+                "live_card_zone"
+              ],
               "card_type": "live_card",
               "type": "location_condition"
             },
@@ -17874,6 +17995,10 @@
           "text": "自分の成功ライブカード置き場に『μ's』のカードがある場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "group": {
             "name": "μ's"
@@ -17922,6 +18047,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "operator": ">=",
           "comparison_type": "score",
@@ -18076,6 +18205,10 @@
           "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が相手より高いかぎり",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "comparison_target": "opponent",
           "operator": ">",
@@ -18110,6 +18243,10 @@
               "text": "このカードが自分の成功ライブカード置き場にあり、",
               "target": "self",
               "location": "success_live_card_zone",
+              "locations": [
+                "success_live_card_zone",
+                "live_card_zone"
+              ],
               "card_type": "live_card",
               "type": "location_condition"
             },
@@ -18185,6 +18322,10 @@
           "text": "このカードが自分の成功ライブカード置き場にあるかぎり",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "type": "location_condition"
         },
@@ -18224,6 +18365,10 @@
               "text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合",
               "target": "self",
               "location": "success_live_card_zone",
+              "locations": [
+                "success_live_card_zone",
+                "live_card_zone"
+              ],
               "card_type": "live_card",
               "operator": ">=",
               "comparison_type": "score",
@@ -18539,6 +18684,10 @@
           "text": "自分のメインフェイズにこのカードが控え室から手札に加えられたとき",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "hand"
+          ],
           "type": "location_condition"
         }
       }
@@ -18715,6 +18864,10 @@
           "text": "。自分の成功ライブカード置き場に『虹ヶ咲』のカードがある場合",
           "target": "self",
           "location": "success_live_card_zone",
+          "locations": [
+            "success_live_card_zone",
+            "live_card_zone"
+          ],
           "card_type": "live_card",
           "group": {
             "name": "虹ヶ咲"
@@ -19108,7 +19261,8 @@
             "text": "{{icon_blade.png|ブレード}}を得る",
             "action": "gain_resource",
             "resource": "blade",
-            "count": 1
+            "count": 1,
+            "duration": "live_end"
           }
         ],
         "duration": "live_end"
@@ -21180,6 +21334,10 @@
           "text": "自分のデッキの上からカードを3枚控え室に置く。それらがすべてメンバーカードの場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "deck"
+          ],
           "card_type": "member_card",
           "count": 3,
           "type": "location_condition"
@@ -21589,7 +21747,8 @@
         "count": 1,
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "all": true
       }
     },
     {
@@ -22135,6 +22294,10 @@
           "text": "自分のデッキの上からカードを3枚控え室に置く。それらがすべて{{heart_05.png|heart05}}を持つメンバーカードの場合",
           "target": "self",
           "location": "discard",
+          "locations": [
+            "discard",
+            "deck"
+          ],
           "card_type": "member_card",
           "count": 3,
           "type": "location_condition"
