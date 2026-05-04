@@ -173,7 +173,7 @@ EITHER_CASE_MARKER = 'いずれかの場合'
 ALTERNATIVE_MARKER = '代わりに'
 
 # ============== DURATION PREFIXES ==============
-DURATION_PREFIXES = ['ライブ終了時まで、', 'このターンの間、', 'このライブの間、', 'ライブ終了時まで 、', 'このターンの間 、', 'このライブの間 、']
+DURATION_PREFIXES = ['ライブ終了時まで、', 'ライブ終了まで、', 'このターンの間、', 'このライブの間、', 'ライブ終了時まで 、', 'ライブ終了まで 、', 'このターンの間 、', 'このライブの間 、']
 
 # ============== COST MODIFICATION PATTERNS ==============
 COST_MODIFICATION_PATTERNS = [
