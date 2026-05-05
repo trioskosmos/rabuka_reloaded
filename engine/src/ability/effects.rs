@@ -11,7 +11,7 @@ enum EffectAction {
     SetCost, SetBladeType, SetHeartType, ActivateAbility,
     InvalidateAbility, GainAbility, PlayBatonTouch, Reveal,
     Select, LookAt, ModifyRequiredHeartsGlobal, ModifyYellCount,
-    PlaceEnergyUnderMember, ActivationCost, PositionChange, Appear,
+    PlaceEnergyUnderMember, ActivationCost, PositionChange, FormationChange, Appear,
     Choice, PayEnergy, SetCardIdentity, RepeatProcedure,
     DiscardUntilCount, Restriction, ReYell, ActivationRestriction,
     ChooseRequiredHearts, ModifyLimit, SetBladeCount, DoNothing,
@@ -52,6 +52,7 @@ impl EffectAction {
             "place_energy_under_member" => Self::PlaceEnergyUnderMember,
             "activation_cost" => Self::ActivationCost,
             "position_change" => Self::PositionChange,
+            "formation_change" => Self::FormationChange,
             "appear" => Self::Appear,
             "choice" => Self::Choice,
             "pay_energy" => Self::PayEnergy,
@@ -85,17 +86,13 @@ impl EffectAction {
 
 impl<'a> AbilityResolver<'a> {
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-
         if !self.can_activate_effect(effect) {
             return Ok(());
         }
 
         if let Some(ref condition) = effect.condition {
             let cond_result = self.evaluate_condition(condition);
-            eprintln!("[ABILITY]  check condition: action={} condition_type={:?} result={} card_id={:?}",
-                effect.action, condition.condition_type, cond_result, self.activating_card_id);
             if !cond_result {
-                eprintln!("[ABILITY]  >> condition NOT met, skipping action={} card_id={:?}", effect.action, self.activating_card_id);
                 return Ok(());
             }
         }
@@ -151,7 +148,9 @@ impl<'a> AbilityResolver<'a> {
 
         
         // Handle target="both" generically: execute once for each player.
-        if effect.target.as_deref() == Some("both") {
+        // position_change handles "both" internally (opponent choice first, then self).
+        let is_position_change = effect.action.as_str() == "position_change";
+        if effect.target.as_deref() == Some("both") && !is_position_change {
             let mut for_self = effect.clone();
             for_self.target = Some("self".to_string());
             self.execute_effect(&for_self)?;
@@ -187,6 +186,7 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::PlaceEnergyUnderMember => self.execute_place_energy_under_member(effect.energy_count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.position.as_ref(), effect.optional.unwrap_or(false)),
             EffectAction::ActivationCost => self.execute_activation_cost(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
             EffectAction::PositionChange => self.execute_position_change(effect, effect.position.clone(), effect.target.as_deref().unwrap_or("self"), effect.target_member.as_deref().unwrap_or("this_member")),
+            EffectAction::FormationChange => self.execute_formation_change(effect),
             EffectAction::Appear => self.execute_appear(effect.source.as_deref().unwrap_or(""), effect.destination.as_deref().unwrap_or("stage"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
             EffectAction::Choice => self.execute_choice(effect.choice_options.as_ref(), effect.choice_type.as_deref(), effect.options.as_ref()),
             EffectAction::PayEnergy => self.execute_pay_energy(effect.count.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
@@ -268,16 +268,10 @@ impl<'a> AbilityResolver<'a> {
                 let matches_type = util::card_matches_type(card_db, card, card_type_filter);
                 if matches_type {
                     match destination {
-                        "hand" => player.hand.add_card(card),
-                        "discard" => player.waitroom.add_card(card),
-                        "deck_top" => player.main_deck.cards.insert(0, card),
-                        "deck_bottom" | "deck" => player.main_deck.cards.push(card),
-                        "stage" => {
-                            if player.stage.stage[1] == -1 { player.stage.stage[1] = card; }
-                            else if player.stage.stage[0] == -1 { player.stage.stage[0] = card; }
-                            else if player.stage.stage[2] == -1 { player.stage.stage[2] = card; }
-                            else { player.hand.add_card(card); }
-                        },
+                        "hand" | "discard" | "deck_top" | "deck_bottom" | "deck" |
+                        "energy_zone" | "live_card_zone" | "success_live_zone" | "stage" => {
+                            util::place_card_in_zone(player, card, destination, None, false, 1);
+                        }
                         _ => { player.hand.add_card(card); }
                     }
                     drawn += 1;
@@ -335,39 +329,32 @@ impl<'a> AbilityResolver<'a> {
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let matches_card_type = |card_id: i16| -> bool {
-                util::card_matches_type(&card_db, card_id, card_type_filter.as_deref())
-            };
-
-            let matches_group = |card_id: i16| -> bool {
-                util::card_matches_group_str(&card_db, card_id, group_filter.as_deref())
+            let filter = util::CardFilter {
+                card_type: card_type_filter.as_deref(),
+                group: group_filter.as_deref(),
+                ..util::CardFilter::default()
             };
 
             let final_count = if per_unit {
                 let matching_count = match per_unit_type_str.as_deref() {
-                    Some("stage") | Some("member") | Some("人") => { player.stage.stage.iter().filter(|&&card_id| card_id != -1).filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
-                    Some("hand") | Some("card") | Some("枚") => { player.hand.cards.iter().filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
-                    _ => { player.stage.stage.iter().filter(|&&card_id| card_id != -1).filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
+                    Some("stage") | Some("member") | Some("人") => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true),
+                    Some("hand") | Some("card") | Some("枚") => util::count_matching(util::zone_cards(player, "hand"), &card_db, &filter, false),
+                    Some("discard") => util::count_matching(&player.waitroom.cards, &card_db, &filter, false),
+                    _ => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true),
                 };
                 (matching_count / per_unit_count_val) * count
             } else { count };
 
             let has_blade_filter = card_type_filter.is_some() || group_filter.is_some();
             let blade_targets: Vec<i16> = if has_blade_filter {
-                vec![player.stage.stage[0], player.stage.stage[1], player.stage.stage[2]]
-                    .into_iter().filter(|&card_id| card_id != -1)
-                    .filter(|&card_id| matches_card_type(card_id) && matches_group(card_id))
-                    .collect()
+                util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true)
             } else {
                 vec![]
             };
 
             let heart_color_inner = heart_color.map(|s| s.to_string());
             let heart_targets: Vec<i16> = if resource == "heart" || resource == "ハート" {
-                (0..3).filter_map(|i| {
-                    let card_id = player.stage.stage[i];
-                    if card_id != -1 && matches_card_type(card_id) && matches_group(card_id) { Some(card_id) } else { None }
-                }).collect()
+                util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true)
             } else { vec![] };
 
             (blade_targets, heart_targets, heart_color_inner, final_count)
@@ -462,13 +449,16 @@ impl<'a> AbilityResolver<'a> {
             let card_db = self.game_state.card_database.clone();
             let player = self.game_state.resolve_target_player_mut(&target);
 
+            let filter = util::CardFilter {
+                card_type: card_type_filter.as_deref(),
+                group: group_filter.as_deref(),
+                cost_limit,
+                ..util::CardFilter::default()
+            };
             let mut candidates: Vec<(usize, i16)> = Vec::new();
             for (i, slot_id) in player.stage.stage.iter().enumerate() {
                 if *slot_id == -1 { continue; }
-                if util::card_matches_type(&card_db, *slot_id, card_type_filter.as_deref())
-                    && util::card_matches_group_str(&card_db, *slot_id, group_filter.as_deref())
-                    && util::card_matches_cost_limit(&card_db, *slot_id, cost_limit)
-                {
+                if filter.matches(&card_db, *slot_id, false) {
                     candidates.push((i, *slot_id));
                 }
             }
@@ -519,26 +509,13 @@ impl<'a> AbilityResolver<'a> {
         let (wait_cards, deactivate_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let matches_card_type = |card_id: i16| -> bool {
-                util::card_matches_type(&card_db, card_id, card_type_filter.as_deref())
+            let filter = util::CardFilter {
+                card_type: card_type_filter.as_deref(),
+                group: group_filter.as_deref(),
+                cost_limit,
+                ..util::CardFilter::default()
             };
-
-            let matches_group = |card_id: i16| -> bool {
-                util::card_matches_group_str(&card_db, card_id, group_filter.as_deref())
-            };
-
-            let matches_cost_limit = |card_id: i16| -> bool {
-                util::card_matches_cost_limit(&card_db, card_id, cost_limit)
-            };
-
-            let mut valid_indices: Vec<usize> = Vec::new();
-            for i in 0..player.energy_zone.cards.len() {
-                if let Some(&card_id) = player.energy_zone.cards.get(i) {
-                    if matches_card_type(card_id) && matches_group(card_id) && matches_cost_limit(card_id) {
-                        valid_indices.push(i);
-                    }
-                }
-            }
+            let valid_indices = util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
 
             // When max=true, cap count to available cards (no error, no prompt)
             let effective_count = if max {
@@ -637,32 +614,28 @@ impl<'a> AbilityResolver<'a> {
         let (live_card_ids, final_value) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let matches_card_type = |card_id: i16| -> bool {
-                util::card_matches_type(&card_db, card_id, card_type_filter.as_deref())
-            };
-
-            let matches_group = |card_id: i16| -> bool {
-                util::card_matches_group_str(&card_db, card_id, group_filter.as_deref())
+            let filter = util::CardFilter {
+                card_type: card_type_filter.as_deref(),
+                group: group_filter.as_deref(),
+                ..util::CardFilter::default()
             };
 
             let final_value = if per_unit {
                 let matching_count = match per_unit_type_str.as_deref() {
-                    Some("hand") => player.hand.cards.iter().filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32,
-                    Some("stage") => player.stage.stage.iter().filter(|&&card_id| card_id != -1).filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32,
+                    Some("hand") => util::count_matching(util::zone_cards(player, "hand"), &card_db, &filter, false) as u32,
+                    Some("stage") => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true) as u32,
                     _ => 1,
                 };
                 value * matching_count * per_unit_count_val
             } else { value };
 
             let candidate_ids: Vec<i16> = match card_type_filter.as_deref() {
-                Some("member_card") => player.stage.stage.iter().filter(|&&id| id != -1).copied().collect(),
+                Some("member_card") => util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true),
                 _ => player.live_card_zone.cards.iter().copied().collect(),
             };
             let target_card_ids: Vec<(i16, i32)> = candidate_ids.iter()
                 .filter(|&&card_id| {
-                    if !matches_card_type(card_id) || !matches_group(card_id) {
-                        return false;
-                    }
+                    if !filter.matches(&card_db, card_id, false) { return false; }
                     if self_target {
                         if let Some(activating_id) = self.activating_card_id {
                             if card_id != activating_id { return false; }
@@ -959,12 +932,44 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_position_change(&mut self, effect: &AbilityEffect, position: Option<PositionInfo>, target: &str, target_member: &str) -> Result<(), String> {
-        let position_str = position.as_ref().and_then(|p| p.get_position()).unwrap_or("");
+        // Check source_position from effect (new parser field), fall back to position param
+        let source_pos = effect.source_position.as_deref()
+            .or_else(|| position.as_ref().and_then(|p| p.get_position()));
+        let position_str = source_pos.unwrap_or("");
+
+        // Handle "both" target: opponent first (choice), then self (choice via pending).
+        if target == "both" {
+            let mut opp_effect = effect.clone();
+            opp_effect.target = Some("opponent".to_string());
+            self.execute_position_change(&opp_effect, position.clone(), "opponent", target_member)?;
+            if self.pending_choice.is_some() {
+                let mut self_effect = effect.clone();
+                self_effect.target = Some("self".to_string());
+                self.game_state.pending_sequential_actions = Some(vec![self_effect]);
+            } else {
+                let mut self_effect = effect.clone();
+                self_effect.target = Some("self".to_string());
+                self.execute_position_change(&self_effect, position.clone(), "self", target_member)?;
+            }
+            return Ok(());
+        }
 
         if target_member == "this_member" {
-            if position_str.is_empty() {
+            if !position_str.is_empty() {
+                // Position is SOURCE ("member AT center"). Find that member on
+                // the target's stage and create choice to pick destination.
+                let player = self.game_state.resolve_target_player_mut(target);
+                let pos_idx = match position_str {
+                    "center" | "センターエリア" => 1,
+                    "left_side" | "左サイドエリア" => 0,
+                    "right_side" | "右サイドエリア" => 2,
+                    _ => return Err(format!("Unknown position: {}", position_str)),
+                };
+                if player.stage.stage[pos_idx] == -1 {
+                    return Ok(());  // no member at source → skip this side
+                }
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some("position_change".to_string());
+                    entry.choice_card_no = Some(format!("position_change:{}", target));
                 }
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
@@ -972,7 +977,16 @@ impl<'a> AbilityResolver<'a> {
                 });
                 return Ok(());
             }
-            return self.execute_position_change_with_destination(effect, position_str);
+
+            // No position specified: create choice for destination (move activating card).
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some("position_change:self".to_string());
+            }
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "position|destination".to_string(),
+                description: "Choose destination for position change".to_string(),
+            });
+            return Ok(());
         }
 
         let card_database = self.game_state.card_database.clone();
@@ -1002,23 +1016,78 @@ impl<'a> AbilityResolver<'a> {
             }
             self.game_state.record_card_movement(card_id);
         } else { return Err(format!("Member not found: {}", target_member)); }
+        self.game_state.position_change_occurred_this_turn = true;
         Ok(())
     }
 
     pub fn execute_position_change_with_destination(&mut self, effect: &AbilityEffect, destination: &str) -> Result<(), String> {
-        let target = effect.target.as_deref().unwrap_or("self");
+        let raw_target = effect.target.as_deref().unwrap_or("self");
+        // "both" at resolution time means "self" (the ability controller resolves choices)
+        let target = if raw_target == "both" { "self" } else { raw_target };
         let target_member = effect.target_member.as_deref().unwrap_or("this_member");
+        // Check source_position first (new parser field), fall back to position
+        let source_position = effect.source_position.as_deref()
+            .or_else(|| effect.position.as_ref().and_then(|p| p.get_position()));
+
+        // Reject destination if it matches exclude_position
+        if let Some(ref exclude) = effect.exclude_position {
+            let exclude_idx = match exclude.as_str() {
+                "center" | "センターエリア" => 1,
+                "left_side" | "左サイドエリア" => 0,
+                "right_side" | "右サイドエリア" => 2,
+                _ => -1,
+            };
+            let dest_idx = match destination {
+                "center" | "センターエリア" => 1,
+                "left_side" | "左サイドエリア" => 0,
+                "right_side" | "右サイドエリア" => 2,
+                _ => -1,
+            };
+            if exclude_idx == dest_idx {
+                return Err(format!("Destination {} is excluded by exclude_position={}", destination, exclude));
+            }
+        }
+
+        let target_index = match destination {
+            "center" | "センターエリア" => 1,
+            "left_side" | "左サイドエリア" => 0,
+            "right_side" | "右サイドエリア" => 2,
+            _ => return Err(format!("Unknown destination: {}", destination)),
+        };
+
+        if let Some(source) = source_position {
+            // Source position specified: move member AT source TO destination.
+            let player = self.game_state.resolve_target_player_mut(target);
+            let source_idx = match source {
+                "center" | "センターエリア" => 1,
+                "left_side" | "左サイドエリア" => 0,
+                "right_side" | "右サイドエリア" => 2,
+                _ => return Err(format!("Unknown source position: {}", source)),
+            };
+            if player.stage.stage[source_idx] == -1 {
+                return Ok(());  // no member at source, skip
+            }
+            let card_id = player.stage.stage[source_idx];
+            if source_idx == target_index {
+                return Ok(());  // same position, no move needed
+            }
+            if player.stage.stage[target_index] != -1 {
+                let occupying = player.stage.stage[target_index];
+                player.stage.stage[target_index] = card_id;
+                player.stage.stage[source_idx] = occupying;
+                self.game_state.record_card_movement(occupying);
+            } else {
+                player.stage.stage[target_index] = card_id;
+                player.stage.stage[source_idx] = -1;
+            }
+            self.game_state.record_card_movement(card_id);
+            self.game_state.position_change_occurred_this_turn = true;
+            return Ok(());
+        }
 
         if target_member == "this_member" {
             if let Some(activating_card_id) = self.activating_card_id {
                 let player = self.game_state.resolve_target_player_mut(target);
-
-                let target_index = match destination {
-                    "center" | "センターエリア" => 1,
-                    "left_side" | "左サイドエリア" => 0,
-                    "right_side" | "右サイドエリア" => 2,
-                    _ => return Err(format!("Unknown destination: {}", destination)),
-                };
 
                 let current_index = player.stage.stage.iter().position(|&card_id| card_id == activating_card_id);
 
@@ -1038,6 +1107,91 @@ impl<'a> AbilityResolver<'a> {
                 } else { return Err(format!("Activating card {} not found on stage", activating_card_id)); }
             } else { return Err("No activating card for position change".to_string()); }
         }
+        self.game_state.position_change_occurred_this_turn = true;
+        Ok(())
+    }
+
+    fn execute_formation_change(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        let target = effect.target.as_deref().unwrap_or("self");
+        let player = self.game_state.resolve_target_player_mut(target);
+
+        // Collect non-empty areas with their card IDs and names
+        let members: Vec<(usize, i16)> = (0..3)
+            .filter(|&i| player.stage.stage[i] != -1)
+            .map(|i| (i, player.stage.stage[i]))
+            .collect();
+
+        if members.is_empty() {
+            return Ok(());
+        }
+
+        // Determine which positions are already taken by these members
+        let occupied: Vec<usize> = members.iter().map(|&(idx, _)| idx).collect();
+
+        // Build choice description showing each member and asking for destinations
+        let card_db = self.game_state.card_database.clone();
+        let member_names: Vec<String> = members.iter().map(|&(_, id)| {
+            card_db.get_card(id).map(|c| c.name.clone()).unwrap_or_else(|| format!("#{}", id))
+        }).collect();
+
+        if member_names.len() == 1 {
+            // Single member: just position change, not formation change
+            return self.execute_position_change(effect, effect.position.clone(), target, "this_member");
+        }
+
+        // Create choice: which destination for each member?
+        // Store the formation state for sequential resolution
+        self.game_state.pending_sequential_actions = Some(Vec::new());
+        let mut pending = Vec::new();
+        for &(src_idx, card_id) in &members {
+            let dest_options: Vec<String> = (0..3).map(|i| match i {
+                0 => "left_side".to_string(),
+                1 => "center".to_string(),
+                2 => "right_side".to_string(),
+                _ => unreachable!(),
+            }).filter(|d| {
+                let dest_idx = match d.as_str() {
+                    "left_side" => 0, "center" => 1, "right_side" => 2, _ => unreachable!(),
+                };
+                // Can't send two members to same dest (except source stays same)
+                !pending.contains(&dest_idx) || dest_idx == src_idx
+            }).collect();
+
+            if dest_options.len() == 1 {
+                continue;  // only one option, skip choice
+            }
+
+            // Create a position_change effect for this card
+            let mut sub_effect = AbilityEffect::default();
+            sub_effect.action = "position_change".to_string();
+            sub_effect.target = Some(target.to_string());
+            sub_effect.source_position = Some(match src_idx {
+                0 => "left_side".to_string(),
+                1 => "center".to_string(),
+                2 => "right_side".to_string(),
+                _ => unreachable!(),
+            });
+            sub_effect.text = format!("Move {} to destination", member_names[members.iter().position(|&(i,_)| i == src_idx).unwrap_or(0)]);
+            pending.push(src_idx);
+            // The choice will be processed via the normal position_change choice mechanism
+        }
+
+        self.game_state.pending_sequential_actions = None;
+        // For now: execute as sequential single position changes
+        for &(src_idx, _) in &members {
+            let mut sub = AbilityEffect::default();
+            sub.action = "position_change".to_string();
+            sub.target = Some(target.to_string());
+            sub.source_position = Some(match src_idx {
+                0 => "left_side".to_string(),
+                1 => "center".to_string(),
+                2 => "right_side".to_string(),
+                _ => unreachable!(),
+            });
+            let _ = self.execute_effect(&sub);
+        }
+
+        self.game_state.formation_change_occurred_this_turn = true;
         Ok(())
     }
 
@@ -1246,8 +1400,17 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_set_score(&mut self, value: u32, target: &str) -> Result<(), String> {
-        let _ = target;
-        let _ = value;
+        let activating_id = self.activating_card_id;
+        let card_ids: Vec<i16> = {
+            let player = self.game_state.resolve_target_player_mut(target);
+            player.live_card_zone.cards.iter().copied().collect()
+        };
+        for &card_id in &card_ids {
+            if let Some(aid) = activating_id {
+                if card_id != aid { continue; }
+            }
+            self.game_state.set_score_modifier(card_id, value as i32);
+        }
         Ok(())
     }
 

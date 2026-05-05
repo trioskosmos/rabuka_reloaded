@@ -58,7 +58,8 @@ impl<'a> AbilityResolver<'a> {
         zone_name: &str,
         prompt_desc: &str,
     ) -> Result<Option<Vec<usize>>, String> {
-        let idxs = util::matching_indices(cards, card_db, card_type, group_name, cost_limit, None);
+        let filter = util::CardFilter { card_type, group: group_name, cost_limit, ..util::CardFilter::default() };
+        let idxs = util::matching_indices(cards, card_db, &filter, false);
         if idxs.is_empty() || idxs.len() < count {
             return Err(format!("Not enough cards in {}: need {}", zone_name, count));
         }

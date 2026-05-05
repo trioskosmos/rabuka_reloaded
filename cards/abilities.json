@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-05T23:54:55.860179",
+  "generated_at": "2026-05-06T03:50:06.059347",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1549,46 +1549,37 @@
       "cost": null,
       "effect": {
         "text": "自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい。これにより無効にした場合、自分の控え室から『Liella!』のカードを1枚手札に加える",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい",
-            "action": "sequential",
-            "actions": [
-              {
-                "text": "",
-                "duration": "live_end",
-                "action": "do_nothing",
-                "all": true
-              },
-              {
-                "text": "無効にしてもよい",
-                "optional": true,
-                "action": "invalidate_ability"
-              }
-            ],
-            "all": true
+        "action": "conditional_on_result",
+        "primary_action": {
+          "text": "自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい。",
+          "card_type": "member_card",
+          "target": "self",
+          "group": {
+            "name": "Liella!"
           },
-          {
-            "text": "自分の控え室から『Liella!』のカードを1枚手札に加える",
-            "condition": {
-              "text": "これにより無効にした場合",
-              "type": "custom"
-            },
-            "source": "discard",
-            "destination": "hand",
-            "count": 1,
-            "target": "self",
-            "group": {
-              "name": "Liella!"
-            },
-            "group_names": [
-              "Liella!"
-            ],
-            "action": "move_cards",
-            "card_type": "card"
-          }
-        ],
+          "group_names": [
+            "Liella!"
+          ],
+          "optional": true,
+          "action": "invalidate_ability",
+          "all": true
+        },
+        "result_condition": null,
+        "followup_action": {
+          "text": "自分の控え室から『Liella!』のカードを1枚手札に加える",
+          "source": "discard",
+          "destination": "hand",
+          "count": 1,
+          "target": "self",
+          "group": {
+            "name": "Liella!"
+          },
+          "group_names": [
+            "Liella!"
+          ],
+          "action": "move_cards",
+          "card_type": "card"
+        },
         "all": true
       }
     },
@@ -1849,7 +1840,8 @@
         "group_names": [
           "みらくらぱーく！"
         ],
-        "action": "move_cards"
+        "action": "move_cards",
+        "card_type": "card"
       }
     },
     {
@@ -2583,9 +2575,9 @@
           },
           "type": "group_condition"
         },
-        "position": "center",
         "action": "position_change",
         "target": null,
+        "exclude_position": "center",
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
         ]
@@ -3072,6 +3064,7 @@
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 2,
+        "card_type": "energy_card",
         "target": "self",
         "action": "move_cards"
       }
@@ -4206,7 +4199,7 @@
         "count": 1,
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚",
+        "per_unit_type": "discard",
         "group": {
           "name": "Liella!"
         },
@@ -5160,6 +5153,7 @@
         "source": "energy_deck",
         "destination": "energy_zone",
         "count": 1,
+        "card_type": "energy_card",
         "target": "self",
         "action": "move_cards"
       }
@@ -6313,6 +6307,7 @@
               "type": "location_condition"
             },
             "state_change": "wait",
+            "card_type": "member_card",
             "action": "change_state",
             "count": 1
           },
@@ -6342,8 +6337,8 @@
         "text": "自分と相手は、自身のステージのセンターにいるメンバーをポジションチェンジする。",
         "card_type": "member_card",
         "target": "both",
-        "position": "center",
         "action": "position_change",
+        "source_position": "center",
         "parenthetical": [
           "センターにいるメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはセンターエリアに移動させる。"
         ]
@@ -8099,6 +8094,7 @@
           "group": {
             "name": "5yncri5e!"
           },
+          "all_members": true,
           "type": "group_condition"
         },
         "position": "center",
@@ -8222,13 +8218,7 @@
           "対戦相手のカードの効果でも発動する。"
         ],
         "activation_condition": "対戦相手のカードの効果でも発動する。",
-        "activation_condition_parsed": {
-          "text": "対戦相手のカードの効果でも発動する。",
-          "target": "opponent",
-          "count": 1,
-          "operator": ">=",
-          "type": "comparison_condition"
-        }
+        "activation_condition_parsed": null
       }
     },
     {
@@ -9388,7 +9378,8 @@
           "count": 1,
           "card_type": "live_card",
           "optional": true,
-          "action": "move_cards"
+          "action": "move_cards",
+          "target": "opponent"
         },
         "conditional_action": {
           "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
@@ -9498,7 +9489,8 @@
           "count": 1,
           "optional": true,
           "action": "move_cards",
-          "card_type": "card"
+          "card_type": "card",
+          "target": "opponent"
         },
         "conditional_action": {
           "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -10070,7 +10062,7 @@
         "count": 2,
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚",
+        "per_unit_type": "discard",
         "duration": "live_end"
       }
     },
@@ -10114,7 +10106,7 @@
         "count": 2,
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚",
+        "per_unit_type": "discard",
         "duration": "live_end"
       }
     },
@@ -11102,6 +11094,7 @@
           "group": {
             "name": "BiBi"
           },
+          "all_members": true,
           "type": "group_condition"
         },
         "state_change": "wait",
@@ -11598,6 +11591,7 @@
           },
           "type": "group_condition"
         },
+        "card_type": "member_card",
         "action": "modify_cost",
         "operation": "decrease",
         "value": 2
@@ -12383,6 +12377,7 @@
               "group": {
                 "name": "Liella!"
               },
+              "all_members": true,
               "type": "group_condition"
             },
             {
@@ -12401,6 +12396,7 @@
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
+        "card_type": "energy_card",
         "target": "self",
         "action": "move_cards"
       }
@@ -12709,6 +12705,7 @@
         "source": "discard",
         "destination": "hand",
         "count": 1,
+        "card_type": "live_card",
         "target": "self",
         "group": {
           "name": "虹ヶ咲"
@@ -13962,6 +13959,7 @@
             "source": "discard",
             "destination": "hand",
             "count": 1,
+            "card_type": "live_card",
             "target": "self",
             "action": "move_cards"
           }
@@ -14933,6 +14931,7 @@
           "group": {
             "name": "みらくらぱーく！"
           },
+          "all_members": true,
           "type": "group_condition"
         },
         "count": 1,
@@ -16625,6 +16624,7 @@
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
+        "card_type": "energy_card",
         "target": "self",
         "action": "move_cards",
         "parenthetical": [
@@ -17335,13 +17335,7 @@
           "対戦相手のカードの効果でも発動する。"
         ],
         "activation_condition": "対戦相手のカードの効果でも発動する。",
-        "activation_condition_parsed": {
-          "text": "対戦相手のカードの効果でも発動する。",
-          "target": "opponent",
-          "count": 1,
-          "operator": ">=",
-          "type": "comparison_condition"
-        }
+        "activation_condition_parsed": null
       }
     },
     {
@@ -17536,6 +17530,7 @@
           },
           "type": "group_condition"
         },
+        "card_type": "member_card",
         "target": "self",
         "action": "gain_resource",
         "resource": "blade",
@@ -18235,7 +18230,7 @@
         "count": 1,
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚",
+        "per_unit_type": "discard",
         "parenthetical": [
           "手札のこのカードもこの効果で控え室に置ける。"
         ],
@@ -18929,7 +18924,10 @@
               "location": "revealed_cards",
               "target": "self",
               "negation": true,
-              "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合"
+              "text": "このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合",
+              "card_property": "has_blade_heart",
+              "count": 1,
+              "operator": ">="
             },
             {
               "text": "または自分が余剰ハートを2つ以上持っている場合",
@@ -19341,6 +19339,7 @@
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
+        "card_type": "energy_card",
         "target": "self",
         "action": "move_cards",
         "heart_colors": [
@@ -19539,6 +19538,7 @@
               "group": {
                 "name": "lilywhite"
               },
+              "all_members": true,
               "type": "group_condition"
             }
           ],
@@ -19974,6 +19974,7 @@
           "group": {
             "name": "μ's"
           },
+          "all_members": true,
           "type": "group_condition"
         },
         "count": 1,
@@ -20380,6 +20381,7 @@
           "type": "location_condition"
         },
         "count": 2,
+        "card_type": "member_card",
         "target": "self",
         "group": {
           "name": "虹ヶ咲"
@@ -20705,13 +20707,7 @@
           "相手のカードの効果でも発動する。"
         ],
         "activation_condition": "相手のカードの効果でも発動する。",
-        "activation_condition_parsed": {
-          "text": "相手のカードの効果でも発動する。",
-          "target": "opponent",
-          "count": 1,
-          "operator": ">=",
-          "type": "comparison_condition"
-        },
+        "activation_condition_parsed": null,
         "heart_colors": [
           "heart06"
         ]
@@ -21154,11 +21150,13 @@
           "group": {
             "name": "Liella!"
           },
+          "all_members": true,
           "type": "group_condition"
         },
         "target": "self",
         "optional": true,
-        "action": "position_change",
+        "action": "formation_change",
+        "multiple_targets": true,
         "parenthetical": [
           "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
         ]
@@ -23507,6 +23505,7 @@
         "source": "discard",
         "placement_order": "any_order",
         "count": 4,
+        "card_type": "live_card",
         "target": "self",
         "group": {
           "name": "Aqours"
@@ -24095,7 +24094,7 @@
         "count": 1,
         "per_unit": true,
         "per_unit_count": 1,
-        "per_unit_type": "枚",
+        "per_unit_type": "discard",
         "target": "self",
         "duration": "live_end"
       }
@@ -24868,7 +24867,8 @@
         "destination": "discard",
         "target": "self",
         "optional": true,
-        "action": "move_cards"
+        "action": "move_cards",
+        "card_type": "card"
       }
     },
     {

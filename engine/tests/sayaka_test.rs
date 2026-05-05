@@ -36,16 +36,10 @@ fn sayaka_q63_ability_debut_no_cost_payment() {
         game.select_indices(&[0]);
     }
 
-    // The cost should be paid (2E spent, sayaka moved to waitroom)
-    // Effect should debut the 蓮ノ空 member from discard to Center (same area)
     assert_eq!(game.state.player1.energy_zone.active_energy_count, 0,
         "Q63: 2E should be fully consumed by activation cost");
-
-    // sayaka should now be in waitroom (cost: self_cost move to discard)
     assert!(game.state.player1.waitroom.cards.contains(&sayaka),
         "sayaka should be in waitroom after activation cost");
-
-    // The 蓮ノ空 member should be on stage at Center (same_area)
     assert_eq!(game.state.player1.stage.stage[1], hasuno_member,
         "Q63: 蓮ノ空 member should appear in sayaka's former area without cost payment");
 }

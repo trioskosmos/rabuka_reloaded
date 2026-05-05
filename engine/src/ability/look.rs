@@ -95,7 +95,8 @@ impl<'a> AbilityResolver<'a> {
         }).copied().collect();
 
         // Apply distinct filter if needed, then check count
-        let distinct_indices = super::util::filter_distinct_indices(&filtered, &card_db, distinct);
+        let distinct_filter = super::util::CardFilter { distinct, ..super::util::CardFilter::default() };
+        let distinct_indices = super::util::filter_distinct(&filtered, &card_db, &distinct_filter, false);
         self.looked_at_cards = distinct_indices.iter().map(|&i| filtered[i]).collect();
 
         if self.looked_at_cards.len() < count as usize {

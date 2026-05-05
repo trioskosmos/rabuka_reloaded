@@ -57,13 +57,11 @@ fn strawberry_trapper_q132_conditions_met_score_plus_2() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
-    // Pre-set the opponent live success flag (simulating a prior successful live
-    // without excess heart this turn — the engine normally sets this after
-    // LiveVictoryDetermination, so it's true for the NEXT live's LiveSuccess)
+    advance_to_live_card_set_p1(&mut game);
+
+    // Set after phase advancement (which resets tracking at Active phase)
     game.state.opponent_live_success_this_turn = true;
     game.state.opponent_live_no_excess_heart_this_turn = true;
-
-    advance_to_live_card_set_p1(&mut game);
     game.set_live_card(strawberry);
     advance_to_live_start(&mut game);
 

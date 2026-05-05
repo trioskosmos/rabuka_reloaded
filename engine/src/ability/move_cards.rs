@@ -2,20 +2,6 @@ use crate::card::AbilityEffect;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::resolver::AbilityResolver;
 use super::util;
-use crate::zones::MemberArea;
-
-
-
-fn pos_to_area(pos: usize) -> MemberArea {
-    match pos { 0 => MemberArea::LeftSide, 1 => MemberArea::Center, _ => MemberArea::RightSide }
-}
-
-pub fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
-    if stage[1] == -1 { Some(1) }
-    else if stage[0] == -1 { Some(0) }
-    else if stage[2] == -1 { Some(2) }
-    else { None }
-}
 
 fn remove_cards_from_hand(player: &mut crate::player::Player, indices: &[usize]) -> Vec<i16> {
     indices.iter().rev().map(|&i| player.hand.cards.remove(i)).collect()
@@ -152,8 +138,15 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
 
                 // Zones with player selection — select cards via matching indices
                 "hand" => {
-                    let mut idxs = util::matching_indices(&player.hand.cards, &card_db, card_type_filter, group_name, cost_limit, character_filter.as_ref());
-                    idxs.retain(|&i| i < player.hand.cards.len() && name_filter(&card_db, player.hand.cards[i]));
+                    let filter = util::CardFilter {
+                        card_type: card_type_filter,
+                        group: group_name,
+                        cost_limit,
+                        characters: character_filter.as_ref(),
+                        name_fragments: name_fragments.as_ref(),
+                        ..util::CardFilter::default()
+                    };
+                    let mut idxs = util::matching_indices(&player.hand.cards, &card_db, &filter, false);
                     if is_all { idxs.iter().rev().map(|&i| player.hand.cards.remove(i)).collect() }
                     else if idxs.len() < count { vec![] }
                     else if idxs.len() > count {
@@ -168,8 +161,16 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     }
                 }
                 "discard" => {
-                    let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit, character_filter.as_ref());
-                    idxs.retain(|&i| i < player.waitroom.cards.len() && name_filter(&card_db, player.waitroom.cards[i]));
+                    let filter = util::CardFilter {
+                        card_type: card_type_filter,
+                        group: group_name,
+                        cost_limit,
+                        characters: character_filter.as_ref(),
+                        name_fragments: name_fragments.as_ref(),
+                        ..util::CardFilter::default()
+                    };
+                    let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
+                    idxs.retain(|&i| i < player.waitroom.cards.len());
                     let taken: Vec<i16> = if is_all {
                         idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect()
                     } else if idxs.len() < count {
@@ -187,7 +188,8 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     taken
                 }
                 "energy_zone" => {
-                    let idxs = util::matching_indices(&player.energy_zone.cards, &card_db, card_type_filter, None, None, character_filter.as_ref());
+                    let filter = util::CardFilter { card_type: card_type_filter, characters: character_filter.as_ref(), ..util::CardFilter::default() };
+                    let idxs = util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
                     let taken: Vec<i16> = if is_all {
                         idxs.iter().rev().map(|&i| player.energy_zone.cards.remove(i)).collect()
                     } else if idxs.len() < count {
@@ -205,7 +207,14 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     taken
                 }
                 "live_card_zone" => {
-                    let idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, Some("live_card"), group_name, cost_limit, character_filter.as_ref());
+                    let filter = util::CardFilter {
+                        card_type: Some("live_card"),
+                        group: group_name,
+                        cost_limit,
+                        characters: character_filter.as_ref(),
+                        ..util::CardFilter::default()
+                    };
+                    let idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, &filter, false);
                     if idxs.len() < count {
                         return Err(format!("Not enough cards in live card zone: need {}", count));
                     } else if idxs.len() > count {
@@ -219,7 +228,8 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     idxs.iter().rev().map(|&i| player.live_card_zone.cards.remove(i)).collect()
                 }
                 "success_live_zone" => {
-                    let idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, None::<&str>, None::<&str>, None, character_filter.as_ref());
+                    let filter = util::CardFilter { characters: character_filter.as_ref(), ..util::CardFilter::default() };
+                    let idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, &filter, false);
                     if idxs.len() < count {
                         return Err(format!("Not enough cards in success live zone: need {}", count));
                     } else if idxs.len() > count {
@@ -233,9 +243,13 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     idxs.iter().rev().map(|&i| player.success_live_card_zone.cards.remove(i)).collect()
                 }
                 "those_cards" => {
-                    // "Those cards" — resolves based on ability trigger context.
-                    // For triggers involving cards placed in waitroom, read from discard.
-                    let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, None, character_filter.as_ref());
+                    let filter = util::CardFilter {
+                        card_type: card_type_filter,
+                        group: group_name,
+                        characters: character_filter.as_ref(),
+                        ..util::CardFilter::default()
+                    };
+                    let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
                     if idxs.len() < count { vec![] }
                     else if idxs.len() > count {
                         self.pending_choice = Some(Choice::SelectCard {
@@ -306,41 +320,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
 
             // --- STEP 3: Place cards in destination ---
             for card_id in taken {
-                let dest = destination.as_str();
-                match dest {
-                    "hand" => player.hand.add_card(card_id),
-                    "discard" | "" => player.waitroom.add_card(card_id),
-                    "stage" | "empty_area" => {
-                        let empty_slots: Vec<usize> = (0..3).filter(|&i| player.stage.stage[i] == -1).collect();
-                        if is_max && empty_slots.len() < count { /* skip placement if no room */ }
-                        else if let Some(pos) = stage_first_empty(&player.stage.stage) {
-                            player.stage.stage[pos] = card_id;
-                            player.areas_locked_this_turn.insert(pos_to_area(pos));
-                        } else {
-                            player.hand.add_card(card_id);
-                        }
-                    }
-                    "deck_top" => { player.main_deck.cards.insert(0, card_id); }
-                    "deck_bottom" => { player.main_deck.cards.push(card_id); }
-                    "energy_zone" => { player.energy_zone.cards.push(card_id); }
-                    "live_card_zone" => { player.live_card_zone.cards.push(card_id); }
-                    "success_live_zone" => { player.success_live_card_zone.cards.push(card_id); }
-                    "same_area" => {
-                        if let Some(pos) = vacated_stage_area {
-                            if pos < 3 && player.stage.stage[pos] == -1 {
-                                player.stage.stage[pos] = card_id;
-                                player.areas_locked_this_turn.insert(pos_to_area(pos));
-                            } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
-                                player.stage.stage[ep] = card_id;
-                                player.areas_locked_this_turn.insert(pos_to_area(ep));
-                            } else { player.hand.add_card(card_id); }
-                        } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
-                            player.stage.stage[ep] = card_id;
-                            player.areas_locked_this_turn.insert(pos_to_area(ep));
-                        } else { player.hand.add_card(card_id); }
-                    }
-                    _ => { player.hand.add_card(card_id); }
-                }
+                util::place_card_in_zone(player, card_id, destination.as_str(), vacated_stage_area, is_max, count);
                 moved_cards.push(card_id);
             }
         } // player borrow ends here

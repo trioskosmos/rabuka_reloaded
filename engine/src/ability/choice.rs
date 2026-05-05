@@ -233,16 +233,37 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     return Ok(());
                 }
 
-                if choice_card_no.as_deref() == Some("position_change") {
+                if choice_card_no.as_deref().map(|s| s.starts_with("position_change")).unwrap_or(false) {
                     if let Some(effect) = self.game_state.entry_effect().cloned() {
                         let mut modified_effect = effect.clone();
-                        modified_effect.destination = Some(selected.clone());
-                        if let Err(e) = self.execute_position_change_with_destination(&modified_effect, &selected) {
+                        let dest = match selected.as_str() {
+                            "0" | "left" => "left_side",
+                            "1" | "center" => "center",
+                            "2" | "right" => "right_side",
+                            _ => &selected,
+                        };
+                        // Override target from choice_card_no (e.g. "position_change:opponent")
+                        if let Some(ccn) = choice_card_no.as_deref() {
+                            if let Some(tgt) = ccn.strip_prefix("position_change:") {
+                                modified_effect.target = Some(tgt.to_string());
+                            }
+                        }
+                        modified_effect.destination = Some(dest.to_string());
+                        if let Err(e) = self.execute_position_change_with_destination(&modified_effect, dest) {
                             eprintln!("Failed to execute position change: {}", e);
                         }
                     }
                     self.pending_choice = None;
                     self.clear_choice_meta();
+                    // Process pending sequential actions (e.g. self-side of "both")
+                    if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
+                        for action in pending {
+                            if let Err(e) = self.execute_effect(action) {
+                                eprintln!("Failed to execute pending action after position change: {}", e);
+                            }
+                        }
+                        self.game_state.pending_sequential_actions = None;
+                    }
                     return Ok(());
                 }
 
@@ -486,10 +507,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let vacated_area = self.game_state.last_vacated_stage_area;
         let player = self.game_state.resolve_target_player_mut(&target);
 
-        let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
-            util::card_matches_type(&card_db, card_id, filter)
-        };
-
         match zone {
             "hand" => {
                 let mut indices_to_remove: Vec<usize> = indices.iter().copied().collect();
@@ -498,7 +515,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.hand.cards.len() {
                         let card_id = player.hand.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) {
+                        if util::card_matches_type(&card_db, card_id, card_type_filter) {
                             player.waitroom.add_card(card_id);
                             cards_moved.push(card_id);
                         } else {
@@ -517,7 +534,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.main_deck.cards.len() {
                         let card_id = player.main_deck.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) {
+                        if util::card_matches_type(&card_db, card_id, card_type_filter) {
                             player.hand.add_card(card_id);
                             cards_moved.push(card_id);
                         } else {
@@ -537,7 +554,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.waitroom.cards.len() {
                         let card_id = player.waitroom.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) {
+                        if util::card_matches_type(&card_db, card_id, card_type_filter) {
                             match destination {
                                 "stage" => {
                                     if player.stage.stage[1] == -1 { player.stage.stage[1] = card_id; }
@@ -546,15 +563,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                     else { player.hand.add_card(card_id); }
                                 }
                                 "same_area" => {
-                                    if let Some(pos) = vacated_area {
-                                        if pos < 3 && player.stage.stage[pos] == -1 {
-                                            player.stage.stage[pos] = card_id;
-                                        } else if let Some(ep) = crate::ability::move_cards::stage_first_empty(&player.stage.stage) {
-                                            player.stage.stage[ep] = card_id;
-                                        } else { player.hand.add_card(card_id); }
-                                    } else if let Some(ep) = crate::ability::move_cards::stage_first_empty(&player.stage.stage) {
-                                        player.stage.stage[ep] = card_id;
-                                    } else { player.hand.add_card(card_id); }
+                                    super::util::place_card_in_zone(player, card_id, "same_area", vacated_area, false, 1);
                                 }
                                 _ => player.hand.add_card(card_id),
                             }
@@ -575,7 +584,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         let pos = stage_positions[idx];
                         if player.stage.stage[pos] != -1 {
                             let card_id = player.stage.stage[pos];
-                            if matches_card_type(card_id, card_type_filter) {
+                            if util::card_matches_type(&card_db, card_id, card_type_filter) {
                                 player.stage.stage[pos] = -1;
                                 player.hand.add_card(card_id);
                             }

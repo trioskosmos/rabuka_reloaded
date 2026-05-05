@@ -95,20 +95,17 @@ impl<'a> AbilityResolver<'a> {
 
                     let player = &*self.game_state.resolve_target_player(target);
                     let card_db = &self.game_state.card_database;
-                    let character_filter = cost.characters.as_ref();
-                    let count_matching_in = |cards: &[i16]| -> usize {
-                        cards.iter().filter(|&&card_id| {
-                            util::card_matches_type(card_db, card_id, card_type_filter)
-                                && util::card_matches_cost_limit(card_db, card_id, cost_limit)
-                                && util::card_matches_characters(card_db, card_id, character_filter)
-                        }).count()
+                    let filter = util::CardFilter {
+                        card_type: card_type_filter,
+                        cost_limit,
+                        characters: cost.characters.as_ref(),
+                        ..util::CardFilter::default()
                     };
-
                     let matching_count = match source {
-                        "deck" | "deck_top" => count_matching_in(&player.main_deck.cards),
-                        "hand" => count_matching_in(&player.hand.cards),
-                        "discard" => count_matching_in(&player.waitroom.cards),
-                        "energy_zone" => count_matching_in(&player.energy_zone.cards),
+                        "deck" | "deck_top" => util::count_matching(util::zone_cards(player, "deck"), card_db, &filter, false) as usize,
+                        "hand" => util::count_matching(util::zone_cards(player, "hand"), card_db, &filter, false) as usize,
+                        "discard" => util::count_matching(util::zone_cards(player, "discard"), card_db, &filter, false) as usize,
+                        "energy_zone" => util::count_matching(util::zone_cards(player, "energy_zone"), card_db, &filter, false) as usize,
                         _ => usize::MAX,
                     };
 

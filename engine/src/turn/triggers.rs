@@ -2,8 +2,6 @@ use crate::game_state::{GameState, AbilityTrigger};
 
 impl super::TurnEngine {
     pub(crate) fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, cost_paid: u32, baton_touch_used: bool) {
-        if baton_touch_used && cost_paid >= 10 { return; }
-
         let player_id_clone = player_id.to_string();
         let card_no_clone = card_no.to_string();
         let mut abilities_to_trigger = Vec::new();
@@ -31,14 +29,6 @@ impl super::TurnEngine {
                         if card.card_no == card_no_clone {
                             for ability in &card.abilities {
                                 if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN)) {
-                                    let requires_baton_touch = ability.full_text.contains(crate::triggers::BATON_TOUCH) && ability.full_text.contains(crate::triggers::DEBUT_EN);
-                                    if requires_baton_touch {
-                                        if !baton_touch_used { continue; }
-                                        if let Some(replaced_cost) = game_state.baton_touch_replaced_member_cost {
-                                            let current_cost = card.cost.unwrap_or(0);
-                                            if replaced_cost >= current_cost { continue; }
-                                        }
-                                    }
                                     let ability_id = format!("{}_{}", card_no_clone, ability.full_text);
                                     abilities_to_trigger.push((ability_id, card_no_clone.clone()));
                                 }

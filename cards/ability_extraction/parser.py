@@ -857,8 +857,14 @@ def _try_revealed(text):
         return None
     result = {'type': 'location_condition', 'location': 'revealed_cards',
               'target': 'self', 'negation': True, 'text': text}
-    if 'ブレードハートを持つ' in text:
+    if 'ブレードハートを持つ' in text or 'ブレードハートを持たない' in text:
         result['card_property'] = 'has_blade_heart'
+    # "持たないカードが0枚" = cards WITHOUT property = 0.
+    # This means NOT(at least 1 card has the property).
+    # Set count:1 with operator >= so negation → false only when ≥1 match.
+    if '0枚' in text:
+        result['count'] = 1
+        result['operator'] = '>='
     return result
 
 def _try_opponent_choice(text):
@@ -893,7 +899,31 @@ def _try_position_change(text):
         result['target'] = 'both'
     if 'センターエリア以外' in text:
         result['exclude_position'] = 'center'
+    if 'センターにいる' in text:
+        result['source_position'] = 'center'
     return result
+
+def _handle_position_change_fields(text, action):
+    """Set position-related fields for a position_change action.
+    
+    Distinguishes three cases:
+    1. Exclude:   "センターエリア以外に" → exclude_position='center'
+    2. Source:    "センターにいる" → source_position='center'  
+    3. Destination: default → position='center'
+    
+    Clears pre-set 'position' from the keyword loop when setting source
+    or exclude, to avoid ambiguity in the engine.
+    """
+    if 'センターエリア以外' in text or 'センター以外' in text:
+        action['exclude_position'] = 'center'
+        action.pop('position', None)
+        return
+    if 'センター' in text:
+        if 'にいる' in text:
+            action['source_position'] = 'center'
+            action.pop('position', None)
+        else:
+            action['position'] = 'center'
 
 def _try_position(text):
     for keyword in POSITION_KEYWORDS:
@@ -1115,6 +1145,10 @@ def _extract_generic_fields(condition, text):
     if not g or not g.get('name'):
         gns = extract_group_names(text)
         if gns: condition['group_names'] = gns
+    # Detect "のみ" (only/all members must match the group)
+    if g or gns:
+        if 'のみの場合' in text or ('のみ' in text and ('ステージ' in text or 'メンバー' in text)):
+            condition['all_members'] = True
 
     # Cost limit
     cl = extract_cost_limit(text)
@@ -1626,8 +1660,8 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: 'シャッフルする' in t or 'シャッフルして' in t, 'shuffle',
       lambda t, a: a.update({'target': 'deck' if 'デッキ' in t else 'energy_deck'}))
     R(lambda t: '入れ替える' in t or '入れ替えて' in t, 'position_change', None)
-    R(lambda t: 'フォーメーションチェンジ' in t, 'position_change',
-      lambda t, a: a.update({'optional': extract_optional(t)}))
+    R(lambda t: 'フォーメーションチェンジ' in t, 'formation_change',
+      lambda t, a: a.update({'optional': extract_optional(t), 'multiple_targets': True}))
     R(lambda t: '{{icon_energy.png|E}}' in t and '支払う' in t, 'pay_energy', 
       lambda t, a: a.update({'energy': t.count('{{icon_energy.png|E}}'), 'optional': 'もよい' in t or 'してもよい' in t}) or None)
     R(lambda t, a: destination == 'under_member' and ('エネルギー' in t or 'energy_card' in t), 'place_energy_under_member',
@@ -1646,7 +1680,10 @@ def parse_action(text: str) -> Dict[str, Any]:
     # move_cards with known source+destination beats change_state when both movement and state are specified
     R(lambda t, a: 'source' in a and a.get('source') and 'destination' in a and a.get('destination'), 'move_cards', None)
     R(lambda t, a: state_change and state_change != '', 'change_state',
-      lambda t, a: a.update({'target': extract_target(t)}) if extract_target(t) else None)
+      lambda t, a: (
+          a.update({'target': extract_target(t)}) if extract_target(t) else None,
+          a.update({'card_type': 'member_card'}) if 'このメンバー' in t or ('メンバー' in t and 'ウェイト' in t) else None,
+      )[-1])
     R(lambda t: 'アクティブにしてもよい' in t or 'アクティブにする' in t, 'change_state',
       lambda t, a: a.update({'state_change': 'active'}) or (a.update({'optional': True}) if 'してもよい' in t else None))
     R(lambda t: 'のみ起動できる' in t or 'のみ発動する' in t, 'activation_restriction', lambda t, a: a.update({'restriction_type': 'only'}))
@@ -1661,7 +1698,10 @@ def parse_action(text: str) -> Dict[str, Any]:
     R('移動できない', 'restriction', lambda t, a: a.update({'restriction_type': 'cannot_move'}))
     R(lambda t: '加える' in t or '加え' in t, 'move_cards', lambda t, a: a.update({'destination': 'hand'}))
     R('ポジションチェンジ', 'position_change',
-      lambda t, a: a.update({'target': extract_target(t), 'position': 'center'}) if 'センター' in t else a.update({'target': extract_target(t)}))
+      lambda t, a: (
+          a.update({'target': extract_target(t)}),
+          _handle_position_change_fields(t, a),
+      )[-1])
     R(lambda t: '移動させ' in t and 'エリア' in t, 'position_change', None)
     R(lambda t: '移動させ' in t and 'エリア' not in t, 'move_cards', None)
     R(lambda t: '置く' in t or '置いて' in t, 'move_cards',
@@ -2107,6 +2147,10 @@ def _try_per_unit(text):
             if kw in per_text:
                 result['per_unit_type'] = t
                 break
+
+    # "これにより控え室に置いた" = placed in waitroom by this cost → count in discard
+    if '控え室に置いた' in per_text:
+        result['per_unit_type'] = 'discard'
 
     gm = re.search(r'『([^』]+)』', per_text)
     if gm: result['group'] = {'name': gm.group(1)}
@@ -2909,7 +2953,7 @@ def _try_conditional(text):
         if 'text' in action: result['text'] = action['text']
     else:
         result.update(action)
-    if cond.get('card_type') and result.get('card_type'):
+    if cond.get('card_type') and result.get('card_type') and cond['card_type'] == result['card_type']:
         del result['card_type']
     return result if (result.get('action') or result.get('actions')) else None
 
@@ -2983,9 +3027,13 @@ def _try_kore_niyori_result(text):
     if '場合' not in sp:
         return None
     cp, fp = sp.split('場合', 1)
+    cond = parse_condition(cp.strip() + '場合')
+    # "custom" type conditions can't be evaluated by the engine — skip them
+    if cond.get('type') == 'custom':
+        cond = None
     return {'text': text, 'action': 'conditional_on_result',
             'primary_action': parse_action(parts[0].strip()),
-            'result_condition': parse_condition(cp.strip() + '場合'),
+            'result_condition': cond,
             'followup_action': parse_action(fp.strip())}
 
 
@@ -2994,7 +3042,11 @@ def _try_sou_shinakatta(text):
     if 'そうしなかった場合' not in text:
         return None
     parts = text.split('そうしなかった場合', SPLIT_LIMIT)
-    fa = parse_action(parts[0].strip())
+    opt_text = parts[0].strip()
+    fa = parse_action(opt_text)
+    # If optional action starts with "相手は" (opponent does X), set target to opponent
+    if opt_text.startswith('相手は'):
+        fa['target'] = 'opponent'
     aa_text = parts[1].strip().lstrip('、')
     # The alternative action text may include duration prefixes
     aa = parse_effect(aa_text)
@@ -3250,6 +3302,7 @@ _EFFECT_HANDLERS = [
     _try_opponent_after_conditional,
     _try_reveal_until_live,
     _try_furthermore,
+    _try_kore_niyori_result,
     _try_sequential_duration,
     _try_conditional_sequential,
     _try_sequential,
@@ -3265,7 +3318,6 @@ _EFFECT_HANDLERS = [
     _try_choice,
     _try_kore_niyori_cascade,
     _try_baton_touch_effect,
-    _try_kore_niyori_result,
     _try_same_action,
     _try_global_modifier,
     _try_play_baton_touch,
@@ -3286,9 +3338,16 @@ def _merge_parenthetical(target, parenthetical):
     for note in parenthetical:
         if '起動できる' in note or '発動する' in note:
             target['activation_condition'] = note
-            cond_parsed = parse_condition(note)
-            if cond_parsed and cond_parsed.get('type') != 'custom':
-                target['activation_condition_parsed'] = cond_parsed
+            # Only parse positional conditions from parenthetical notes
+            # (e.g. "センターエリアにいる場合のみ発動できる").
+            # Informational notes like "対戦相手のカードの効果でも発動する"
+            # should NOT be parsed into activation_condition_parsed.
+            if 'センター' in note or 'サイド' in note or 'エリアにいる場合' in note:
+                cond_parsed = parse_condition(note)
+                if cond_parsed and cond_parsed.get('type') != 'custom':
+                    target['activation_condition_parsed'] = cond_parsed
+            else:
+                target['activation_condition_parsed'] = None
             if 'センターエリア' in note: target['activation_position'] = 'center'
             elif '左サイドエリア' in note or '左サイド' in note: target['activation_position'] = 'left_side'
             elif '右サイドエリア' in note or '右サイド' in note: target['activation_position'] = 'right_side'
@@ -3435,7 +3494,7 @@ def _normalize_effect_tree(effect, original_text=None):
             return actions[-1:] if actions else []
         # Propagate fields from parent to each sub-action
         if parent_effect:
-            for f in ('exclude_self', 'all', 'target', 'position', 'activation_position'):
+            for f in ('exclude_self', 'all', 'target', 'position', 'activation_position', 'source_position', 'exclude_position'):
                 if f in parent_effect:
                     for sub in cleaned:
                         if f not in sub:
@@ -3534,7 +3593,8 @@ def _normalize_effect_tree(effect, original_text=None):
             d['per_unit_count'] = 1
 
         # Propagate position from text context (for condition+action splits)
-        if 'position' not in d and d_ctx:
+        # Don't set position if source_position or exclude_position already set
+        if 'position' not in d and 'source_position' not in d and 'exclude_position' not in d and d_ctx:
             pos = _has_position_keywords(d_ctx)
             if pos:
                 d['position'] = pos

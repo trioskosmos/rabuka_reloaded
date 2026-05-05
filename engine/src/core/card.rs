@@ -574,6 +574,12 @@ pub struct AbilityEffect {
     // Parser-only fields that were missing struct fields
     #[serde(default)]
     pub activation_position: Option<String>,
+    /// Source position: member AT this position gets moved (e.g. "センターにいる")
+    #[serde(default)]
+    pub source_position: Option<String>,
+    /// Excluded destination position (e.g. "センターエリア以外" → don't allow center)
+    #[serde(default)]
+    pub exclude_position: Option<String>,
     #[serde(default)]
     pub all_regions: Option<bool>,
     #[serde(default)]
@@ -802,6 +808,9 @@ pub struct Condition {
     /// "元々持つ" — compare against original/natural value, not current modified value
     #[serde(default)]
     pub original_value: Option<bool>,
+    /// "のみ" — ALL members on stage must match the group (not just any)
+    #[serde(default)]
+    pub all_members: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

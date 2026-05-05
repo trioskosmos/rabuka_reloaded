@@ -39,14 +39,8 @@ fn jellyfish_q99_two_qualifying_members_reduce_by_2() {
     let member_b = game.id("PL!SP-pb1-014-N"); // 嵐 千砂都, cost=2, 5yncri5e!
     let filler = game.id("PL!-sd1-010-SD");
 
-    // Stage: 2 5yncri5e! members (add via add_to_stage, then play_to_stage to set debut flags)
-    // We use add_to_stage so they're already on stage, then manually set appeared flag
-    // OR: use play_to_stage which naturally sets the flags
+    // Stage: 2 5yncri5e! members
     game.state.player1.stage.stage = [member_a, member_b, -1];
-
-    // Record them as appeared this turn (as if they debuted)
-    game.state.record_card_appearance(member_a);
-    game.state.record_card_appearance(member_b);
 
     // Hand: Jellyfish + filler
     game.state.player1.hand.cards.push(jellyfish);
@@ -58,6 +52,11 @@ fn jellyfish_q99_two_qualifying_members_reduce_by_2() {
     }
 
     advance_to_live_card_set_p1(&mut game);
+
+    // Record appearances AFTER phase advancement (Active phase resets tracking)
+    game.state.record_card_appearance(member_a);
+    game.state.record_card_appearance(member_b);
+
     game.set_live_card(jellyfish);
     advance_to_live_start(&mut game);
 

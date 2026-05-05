@@ -10,6 +10,7 @@ impl super::TurnEngine {
         if game_state.current_turn_phase == crate::game_state::TurnPhase::FirstAttackerNormal || game_state.current_turn_phase == crate::game_state::TurnPhase::SecondAttackerNormal {
             match game_state.current_phase {
                 Phase::Active => {
+                    game_state.reset_keyword_tracking();
                     game_state.player1.activate_all_energy();
                     game_state.player2.activate_all_energy();
                     game_state.recalculate_constant_blade_modifiers();
@@ -181,13 +182,16 @@ impl super::TurnEngine {
         game_state.active_player_mut().debut_count_this_turn += 1;
         game_state.record_card_appearance(card_id);
 
+        if baton_touch_used {
+            game_state.record_baton_touch();
+        }
+
         Self::trigger_debut_abilities(game_state, &player_id, &card_no, cost_paid, baton_touch_used);
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
         game_state.process_pending_auto_abilities(&player_id);
         game_state.recalculate_constant_blade_modifiers();
 
         if baton_touch_used {
-            game_state.record_baton_touch();
             for area in [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide] {
                 let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {

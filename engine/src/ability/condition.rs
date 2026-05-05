@@ -130,16 +130,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 "has_blade_heart" => {
                     let card_db = &self.game_state.card_database;
                     let player = self.game_state.resolve_target_player(target);
-                    let has_property = match location {
-                        "revealed_cards" => self.game_state.revealed_cards.iter().any(|&id| {
-                            card_db.get_card(id).map_or(false, |c| c.has_blade_heart())
-                        }),
-                        "stage" => player.stage.stage.iter().any(|&id| {
-                            if id == -1 { false } else { card_db.get_card(id).map_or(false, |c| c.has_blade_heart()) }
-                        }),
-                        _ => false,
+                    let cards: Vec<i16> = match location {
+                        "revealed_cards" => self.game_state.revealed_cards.iter().copied().collect(),
+                        "stage" => player.stage.stage.iter().filter(|&&id| id != -1).copied().collect(),
+                        _ => vec![],
                     };
-                    if !has_property { return false; }
+                    if !cards.is_empty() {
+                        let has_property = cards.iter().any(|&id| {
+                            card_db.get_card(id).map_or(false, |c| c.has_blade_heart())
+                        });
+                        if !has_property { return false; }
+                    }
                 }
                 _ => {}
             }
@@ -159,6 +160,22 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     return false;
                 }
             }
+            // Cost comparison: e.g. operator "<" means replaced cost < new card cost
+            if comparison_type == Some("cost") {
+                if let Some(replaced_cost) = self.game_state.baton_touch_replaced_member_cost {
+                    if let Some(activating_id) = self.game_state.activating_card {
+                        if let Some(card) = self.game_state.card_database.get_card(activating_id) {
+                            if let Some(current_cost) = card.cost {
+                                if !compare_counts(operator, replaced_cost, current_cost) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // operator/comparison_type consumed by baton touch, skip compare_counts
+            return true;
         }
 
         let card_db = &self.game_state.card_database;
@@ -231,7 +248,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             _ => {
                 let player = self.game_state.resolve_target_player(target);
-                let cards: &[i16] = util::zone_cards(player, location);
+                let revealed_vec: Vec<i16> = if location == "revealed_cards" {
+                    self.game_state.revealed_cards.iter().copied().collect()
+                } else { vec![] };
+                let cards: &[i16] = if location == "revealed_cards" { &revealed_vec } else { util::zone_cards(player, location) };
                 if comparison_type == Some("score") || comparison_type == Some("cost") || comparison_type == Some("energy") {
                     self.get_count_for_target(condition, target)
                 } else {
@@ -315,17 +335,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         let mut combined: Vec<i16> = Vec::new();
         for loc in locs {
-            let cards: &[i16] = match loc.as_str() {
-                "stage" => &player.stage.stage,
-                "hand" => &player.hand.cards,
-                "deck" => &player.main_deck.cards,
-                "discard" | "waitroom" => &player.waitroom.cards,
-                "energy_zone" => &player.energy_zone.cards,
-                "live_card_zone" => &player.live_card_zone.cards,
-                "success_live_zone" => &player.success_live_card_zone.cards,
-                _ => continue,
-            };
-            eprintln!("[MULTI] location={} has {} cards", loc, cards.len());
+            let cards = util::zone_cards(player, loc.as_str());
             combined.extend_from_slice(cards);
         }
         eprintln!("[MULTI] combined {} cards", combined.len());
@@ -350,8 +360,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             eprintln!("[MULTI] distinct_names={} threshold={}", count, count_threshold);
             compare_counts(operator, count, count_threshold)
         } else {
-            let matching_count = util::count_matching(&combined, card_db, card_type_filter,
-                group_names.and_then(|g| g.first().map(|s| s.as_str())), condition.cost_limit, operator);
+            let filter = util::CardFilter {
+                card_type: card_type_filter,
+                group: group_names.and_then(|g| g.first().map(|s| s.as_str())),
+                cost_limit: condition.cost_limit,
+                cost_operator: operator,
+                ..util::CardFilter::default()
+            };
+            let matching_count = util::count_matching(&combined, card_db, &filter, false);
             compare_counts(operator, matching_count, count_threshold)
         }
     }
@@ -370,6 +386,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn evaluate_group_condition(&self, condition: &Condition) -> bool {
+        // When all_members is true, every card on stage must match the group ("のみ")
+        if condition.all_members.unwrap_or(false) {
+            let target = condition.target.as_deref().unwrap_or("self");
+            let player = self.game_state.resolve_target_player(target);
+            let group_name = condition.group.as_ref()
+                .and_then(|g| g.get("name").and_then(|n| n.as_str()))
+                .or_else(|| condition.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str())));
+            let card_db = &self.game_state.card_database;
+            // Every non-empty stage slot must match the group
+            return player.stage.stage.iter().filter(|&&id| id != -1).all(|&id| {
+                crate::ability::util::card_matches_group_str(card_db, id, group_name)
+            });
+        }
         let count = self.get_group_card_count(condition);
         // Default to 1 when count is not set (checking "at least one matching")
         let target_count = condition.count.unwrap_or(1);
@@ -748,6 +777,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let location = condition.location.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let comparison_type = condition.comparison_type.as_deref();
+        let resource_type = condition.resource_type.as_deref();
         if comparison_type == Some("score") {
             return self.get_count_for_target(condition, target);
         }
@@ -756,6 +786,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 .filter_map(|&id| self.game_state.card_database.get_card(id))
                 .filter_map(|c| c.cost)
                 .sum();
+        }
+        if resource_type == Some("surplus_heart") {
+            let player = self.game_state.resolve_target_player(target);
+            let card_db = &self.game_state.card_database;
+            let member_hearts: u32 = player.stage.stage.iter()
+                .filter(|&&id| id != -1)
+                .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
+                .sum();
+            let needed: u32 = player.live_card_zone.cards.iter()
+                .chain(player.success_live_card_zone.cards.iter())
+                .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
+                .sum();
+            return member_hearts.saturating_sub(needed);
         }
         let player = self.game_state.resolve_target_player(target);
         self.zone_len(player, location)
@@ -840,12 +883,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "hand" => {
-                for card in &player.hand.cards {
+                for card in util::zone_cards(player, "hand") {
                     if matches_group(*card) { count += 1; }
                 }
             }
             "discard" | "waitroom" => {
-                for card in &player.waitroom.cards {
+                for card in util::zone_cards(player, "discard") {
                     if matches_group(*card) { count += 1; }
                 }
             }
