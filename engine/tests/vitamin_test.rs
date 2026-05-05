@@ -41,6 +41,14 @@ fn vitamin_q128_hand_greater_triggers_score() {
     game.state.player1.hand.cards.push(filler);
     game.state.player2.hand.cards.clear();
 
+    // Stage: members providing hearts to satisfy vitamin's need_heart
+    // {heart02:1, heart03:4, heart06:1, heart0:6}. Three members each with
+    // {heart02:1, heart03:2, heart06:1} = 12 hearts total, enough to satisfy.
+    let heart_member = game.id("PL!SP-bp1-013-PR");
+    game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, heart_member);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::Center, heart_member);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::RightSide, heart_member);
+
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
@@ -80,6 +88,12 @@ fn vitamin_q119_score_locked_after_resolution() {
     game.state.player1.hand.cards.push(vitamin);
     game.state.player1.hand.cards.push(filler);
     game.state.player2.hand.cards.clear();
+
+    // Stage: members providing hearts to satisfy vitamin's need_heart
+    let heart_member = game.id("PL!SP-bp1-013-PR");
+    game.add_to_stage(rabuka_engine::zones::MemberArea::LeftSide, heart_member);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::Center, heart_member);
+    game.add_to_stage(rabuka_engine::zones::MemberArea::RightSide, heart_member);
 
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(filler);

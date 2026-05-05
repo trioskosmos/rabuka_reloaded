@@ -19,7 +19,6 @@ pub struct AbilityResolver<'a> {
     pub looked_at_total_count: usize,
 }
 
-#[allow(dead_code)]
 impl<'a> AbilityResolver<'a> {
     pub fn new(game_state: &'a mut GameState) -> Self {
         let activating_card_id = game_state.activating_card;

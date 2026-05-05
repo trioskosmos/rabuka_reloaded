@@ -90,6 +90,9 @@ pub struct GameState {
     /// Tracks which stage area (0=left,1=center,2=right) was vacated by the last self_cost move
     /// Used for "same_area" destination in move_cards
     pub last_vacated_stage_area: Option<usize>,
+    pub live_success_triggered_this_turn: bool,
+    /// Count of members changed from wait→active by the most recent change_state effect
+    pub last_state_change_wait_to_active_count: u32,
 }
 
 impl GameState {
@@ -183,6 +186,8 @@ impl GameState {
             loop_detected: false,
             constant_blade_bonuses: HashMap::new(),
             last_vacated_stage_area: None,
+            live_success_triggered_this_turn: false,
+            last_state_change_wait_to_active_count: 0,
         };
         debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
         state

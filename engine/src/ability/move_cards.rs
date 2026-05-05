@@ -10,7 +10,7 @@ fn pos_to_area(pos: usize) -> MemberArea {
     match pos { 0 => MemberArea::LeftSide, 1 => MemberArea::Center, _ => MemberArea::RightSide }
 }
 
-fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
+pub fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
     if stage[1] == -1 { Some(1) }
     else if stage[0] == -1 { Some(0) }
     else if stage[2] == -1 { Some(2) }
@@ -21,7 +21,6 @@ fn remove_cards_from_hand(player: &mut crate::player::Player, indices: &[usize])
     indices.iter().rev().map(|&i| player.hand.cards.remove(i)).collect()
 }
 
-#[allow(dead_code)]
 impl<'a> AbilityResolver<'a> {
 pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let m = effect.extract_modifiers();
@@ -41,8 +40,8 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
         let vacated_stage_area = self.game_state.last_vacated_stage_area;
         self.game_state.last_vacated_stage_area = None;
 
-        // Extract character name filter from quoted_text
-        let character_filter: Option<Vec<String>> = effect.quoted_text.as_ref().map(|qt| vec![qt.text.clone()]);
+        // Character name filter from universal ActionModifiers
+        let character_filter: Option<Vec<String>> = m.characters.clone();
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
         let name_fragments: Option<Vec<String>> = if effect.name_constraint.as_deref() == Some("contains_all")

@@ -328,7 +328,7 @@ impl LiveCardZone {
         self.cards.len()
     }
 
-    pub fn calculate_live_score(&self, card_db: &CardDatabase, cheer_blade_heart_count: u32, stage_hearts: Option<&crate::card::BaseHeart>) -> u32 {
+    pub fn calculate_live_score(&self, card_db: &CardDatabase, cheer_blade_heart_count: u32, stage_hearts: Option<&crate::card::BaseHeart>, need_heart_modifiers: Option<&std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>>) -> u32 {
         let mut total_score = 0;
 
         for card_id in &self.cards {
@@ -337,7 +337,30 @@ impl LiveCardZone {
 
                 if let Some(ref need_heart) = card.need_heart {
                     if !need_heart.hearts.is_empty() {
-                        let satisfied = stage_hearts.map_or(false, |sh| card.satisfies_heart_requirement(sh));
+                        // Compute effective need_heart by applying modifiers
+                        let effective_need = if let Some(modifiers) = need_heart_modifiers {
+                            if let Some(card_mods) = modifiers.get(card_id) {
+                                let mut adjusted = need_heart.clone();
+                                for (color, delta) in card_mods {
+                                    let entry = adjusted.hearts.entry(*color).or_insert(0);
+                                    *entry = (*entry as i32 + delta).max(0) as u32;
+                                }
+                                Some(adjusted)
+                            } else { None }
+                        } else { None };
+                        let ref_need = effective_need.as_ref().unwrap_or(need_heart);
+                        let satisfied = stage_hearts.map_or(false, |sh| {
+                            let wildcard_count = *sh.hearts.get(&crate::card::HeartColor::Heart00).unwrap_or(&0);
+                            for (color, needed_amount) in &ref_need.hearts {
+                                if let Some(&provided_amount) = sh.hearts.get(color) {
+                                    if provided_amount + wildcard_count >= *needed_amount {
+                                        let remaining_needed = if provided_amount >= *needed_amount { 0 } else { *needed_amount - provided_amount };
+                                        if remaining_needed > wildcard_count { return false; }
+                                    } else if *needed_amount > wildcard_count { return false; }
+                                } else if *needed_amount > wildcard_count { return false; }
+                            }
+                            true
+                        });
                         if satisfied { total_score += 1; }
                     }
                 }

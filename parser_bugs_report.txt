@@ -1,0 +1,338 @@
+======================================================================
+1. ENERGY_ZONE source parsed as DECK (when text says エネルギー置き場から)
+======================================================================
+======================================================================
+2. SUCCESS_LIVE_ZONE source parsed as DISCARD
+======================================================================
+======================================================================
+3. UNDER_MEMBER source missing (actions referencing 下に置かれている)
+======================================================================
+  TEXT: 自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}
+  PARSED: source=None, action=sequential
+  EXPECTED: source='under_member'
+  CARDS: 4
+
+  TEXT: {{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメン
+  PARSED: source=None, action=sequential
+  EXPECTED: source='under_member'
+  CARDS: 2
+
+  TEXT: このメンバーの下にエネルギーカードが2枚以上置かれているかぎり、ライブの合計スコアを＋１する。
+(メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻す。)
+  PARSED: source=None, action=modify_score
+  EXPECTED: source='under_member'
+  CARDS: 2
+
+  TEXT: 自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+(メンバーがステージから離れたとき、下に置かれているエネルギーカードは
+  PARSED: source=discard, action=move_cards
+  EXPECTED: source='under_member'
+  CARDS: 2
+
+  TEXT: 自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを2枚引く。（メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離
+  PARSED: source=None, action=sequential
+  EXPECTED: source='under_member'
+  CARDS: 1
+
+======================================================================
+4. gain_resource with WRONG resource type
+======================================================================
+======================================================================
+5. change_state actions MISSING state_change field
+======================================================================
+  COST with ウェイトにする but type=choice_condition
+  TEXT: このメンバーをウェイトにするか、手札を1枚控え室に置く：エネルギーを1枚アクティブにする。
+
+  COST with ウェイトにする but type=sequential_cost
+  TEXT: {{icon_energy.png|E}}このメンバーをウェイトにする：自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+
+======================================================================
+6. Missing state_change field in EFFECT change_state
+======================================================================
+======================================================================
+7. Sequential actions missing conditional=true (contain 場合など)
+======================================================================
+  TEXT: 自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバ
+  Contains そうした場合 but PARSED: conditional=None
+  CARDS: 3
+
+  TEXT: {{icon_energy.png|E}}：自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く。
+  Contains そうした場合 but PARSED: conditional=None
+  CARDS: 2
+
+  TEXT: 自分か相手を選ぶ。自分は、そのプレイヤーの控え室にあるライブカードを1枚、そのプレイヤーのデッキの一番下に置く。そうした場合、自分はカードを1枚引く。
+  Contains そうした場合 but PARSED: conditional=None
+  CARDS: 1
+
+======================================================================
+8. Conditions with potentially wrong type
+======================================================================
+  TEXT: 自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、かつ名前が異なる場合、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+  '名前が異なる' but type=compound
+  COND: {"type": "compound", "operator": "and", "conditions": [{"type": "appearance_condition", "appearance"
+  CARDS: 4
+
+  TEXT: 自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカー
+  '名前が異なる' but type=None
+  COND: {}
+  CARDS: 4
+
+  TEXT: 能力を持たないメンバーからバトンタッチして登場した場合、カードを1枚引く。
+  '能力を持たない' but type=location_condition
+  CARDS: 4
+
+  TEXT: 能力を持たないメンバーカードを自分の手札から登場させるためのコストは1減る。
+  '能力を持たない' but type=None
+  CARDS: 4
+
+  TEXT: 自分のステージにメンバーが1人以上いる場合、自分と相手はカードを1枚引き、手札を1枚控え室に置く。2人以上いる場合、さらに自分のステージにいる『μ's』のメンバー1人は、ライブ終了時まで、{{hear
+  '名前が異なる' but type=None
+  COND: {}
+  CARDS: 1
+
+======================================================================
+9. exclude_self missing on actions with このメンバー以外
+======================================================================
+  TEXT: 自分のステージにこのメンバー以外のメンバーが1人以上いる場合、ライブ終了時まで、エールによって公開される自分のカードの枚数が8枚減る。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 4
+
+  TEXT: {{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室か
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 4
+
+  TEXT: このメンバー以外の『虹ヶ咲』のメンバー1人をウェイトにする：カードを1枚引く。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 4
+
+  TEXT: 手札を2枚控え室に置いてもよい：自分のステージにいるこのメンバー以外のウェイト状態のメンバー1人をアクティブにする。そうした場合、ライブ終了時まで、これによりアクティブにしたメンバーと、このメンバーは
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 4
+
+  TEXT: 以下から1つを選ぶ。
+・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+・自分のステージにいる『Sai
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 3
+
+  TEXT: 自分のステージにこのメンバー以外のメンバーがいる場合、このメンバーをウェイトにする。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 3
+
+  TEXT: 自分のステージにこのメンバー以外の『EdelNote』のメンバーがいるかぎり、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 3
+
+  TEXT: 手札を1枚控え室に置いてもよい：好きなハートの色を1つ指定する。ライブ終了時まで、自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 2
+
+  TEXT: 手札を1枚控え室に置いてもよい：自分のステージにこのメンバー以外のコスト11のメンバーがいる場合、自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 2
+
+  TEXT: 自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 2
+
+  TEXT: 自分のステージにいるこのメンバー以外の『A-RISE』のメンバー1人につき、{{heart_05.png|heart05}}を得る。
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 2
+
+  TEXT: 手札の『蓮ノ空』のカードを2枚控え室に置いてもよい：{{heart_01.png|heart01}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}
+  PARSED: exclude_self=None
+  EXPECTED: exclude_self=True
+  CARDS: 1
+
+======================================================================
+10. Missing position fields (センター/左/右)
+======================================================================
+  TEXT: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ステージの左サイドエリアに登場しているなら、カードを2枚引く。
+  Contains '左サイドエリア' but position=None
+  CARDS: 4
+
+  TEXT: {{center.png|センター}}メンバー1人をウェイトにする：ライブ終了時まで、これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を
+  Contains 'センターエリア' but position=None
+  CARDS: 4
+
+  TEXT: {{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室か
+  Contains 'センターエリア' but position=None
+  CARDS: 4
+
+  TEXT: {{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3
+  Contains '左サイドエリア' but position=None
+  CARDS: 4
+
+  TEXT: {{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3
+  Contains '右サイドエリア' but position=None
+  CARDS: 4
+
+  TEXT: ステージのセンターエリアにいる場合、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.
+  Contains 'センターエリア' but position=None
+  CARDS: 2
+
+  TEXT: 自分のステージにいるメンバーのうち、センターエリアにいるメンバーが最も大きいコストを持つ場合、{{heart_03.png|heart03}}を得る。
+  Contains 'センターエリア' but position=None
+  CARDS: 2
+
+  TEXT: {{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常
+  Contains 'センターエリア' but position=None
+  CARDS: 2
+
+  TEXT: {{center.png|センター}}『BiBi』のメンバー1人をウェイトにしてもよい：相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。（この能力はセンターエリアにいる場合の
+  Contains 'センターエリア' but position=None
+  CARDS: 2
+
+  TEXT: カードを2枚引き、手札を2枚控え室に置く。（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）
+  Contains '左サイドエリア' but position=None
+  CARDS: 2
+
+  TEXT: カードを2枚引き、手札を2枚控え室に置く。（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）
+  Contains '右サイドエリア' but position=None
+  CARDS: 2
+
+  TEXT: 自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合、このカードのスコアを＋２する。
+  Contains 'センターエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合、このカードのスコアを＋２する。
+  Contains '左サイドエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のステージの右サイドエリアに「大沢瑠璃乃」が、左サイドエリアに「安養寺姫芽」が、センターエリアに「藤島慈」がそれぞれ登場している場合、このカードのスコアを＋２する。
+  Contains '右サイドエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のステージのセンターエリアにコスト9以上の『Aqours』のメンバーがいる場合、以下から1つを選ぶ。
+・ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png|ブレ
+  Contains 'センターエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合、このカードのスコアを＋２する。
+  Contains 'センターエリア' but position=None
+  CARDS: 1
+
+  TEXT: このターン、このメンバーがエリアを移動している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（この能力は左サイドエリアにい
+  Contains '左サイドエリア' but position=None
+  CARDS: 1
+
+  TEXT: このターン、このメンバーがエリアを移動している場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。（この能力は右サイドエリアにい
+  Contains '右サイドエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合、このカードのスコアを＋１する。
+  Contains 'センターエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png
+  Contains '左サイドエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカードのスコアを＋１する。
+  Contains 'センターエリア' but position=None
+  CARDS: 1
+
+  TEXT: 自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つ{{heart_03.png|heart03}}2つにつき、このカードの必要ハートを{{heart_00.png|heart0}
+  Contains 'センターエリア' but position=None
+  CARDS: 1
+
+======================================================================
+11. 'all' flag missing for すべての patterns
+======================================================================
+  TEXT: 自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライブ終了時まで、無効にしてもよい。これにより無効にした場合、自分の控え室から『
+  Contains 'すべての' but PARSED: all=None
+  CARDS: 4
+
+  TEXT: 自分と相手のステージの中で、このメンバーがほかのすべてのメンバーより多くのハートを持つかぎり、ライブの合計スコアを＋１する。
+  Contains 'すべての' but PARSED: all=None
+  CARDS: 3
+
+  TEXT: 相手のステージにいるすべてのメンバーのそれぞれのコストよりコストが高いメンバーが自分のステージにいる場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.pn
+  Contains 'すべての' but PARSED: all=None
+  CARDS: 1
+
+======================================================================
+12. Wrong card_type in effect
+======================================================================
+  TEXT: ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、このメンバーの下にあるエネルギーカードの枚数に1を足した枚数のエネルギーカードをウェイト状態で置く。
+  Contains 'エネルギーカード' but card_type=member_card
+  CARDS: 4
+
+  TEXT: 自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。
+(メンバーがステージから離れたとき、下に置かれているエネルギーカードは
+  Contains 'エネルギーカード' but card_type=live_card
+  CARDS: 2
+
+======================================================================
+13. Missing count on move_cards with explicit 枚
+======================================================================
+======================================================================
+14. do_nothing actions between real actions
+======================================================================
+  TEXT: 手札を1枚控え室に置いてもよい：これにより控え室に置いたカードがメンバーカードの場合、控え室に置いたカードと同じ名前を持つメンバー1人は、ライブ終了時まで、{{heart_04.png|heart04
+  do_nothing at index 0 between real actions
+  ALL ACTS: ['do_nothing', 'gain_resource']
+  CARDS: 4
+
+  TEXT: エネルギー置き場にあるエネルギー1枚をこのメンバーの下に置く：カードを1枚引き、ライブ終了時まで、{{heart_01.png|heart01}}を得る。
+  do_nothing at index 1 between real actions
+  ALL ACTS: ['draw_card', 'do_nothing', 'gain_resource']
+  CARDS: 4
+
+  TEXT: 自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき、カードを1枚引き、ライブ終了時まで、{{heart_02.png|heart02}}を得る
+  do_nothing at index 1 between real actions
+  ALL ACTS: ['draw_card', 'do_nothing', 'gain_resource']
+  CARDS: 4
+
+  TEXT: このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+(対戦相手のカードの効果でも発動する
+  do_nothing at index 1 between real actions
+  ALL ACTS: ['do_nothing', 'do_nothing', 'gain_resource']
+  CARDS: 2
+
+  TEXT: このターン、ブレードハートを持たないメンバーカードが自分のライブカード置き場から控え室に置かれている場合、カードを1枚引き、ライブ終了時まで、{{heart_03.png|heart03}}{{hea
+  do_nothing at index 1 between real actions
+  ALL ACTS: ['draw_card', 'do_nothing', 'gain_resource']
+  CARDS: 2
+
+  TEXT: このメンバーがエリアを移動するたび、カードを1枚引く。
+(対戦相手のカードの効果でも発動する。)
+  do_nothing at index 0 between real actions
+  ALL ACTS: ['do_nothing', 'draw_card']
+  CARDS: 1
+
+  TEXT: このゲームの1ターン目のライブフェイズの場合、このカードのスコアを＋１し、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+  do_nothing at index 1 between real actions
+  ALL ACTS: ['modify_score', 'do_nothing', 'gain_resource']
+  CARDS: 1
+
+  TEXT: カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれるたび、ライブ終了時まで、{{heart_06.png|heart06}}を得る。(相手のカードの効果でも発動する。)
+  do_nothing at index 1 between real actions
+  ALL ACTS: ['do_nothing', 'do_nothing', 'gain_resource']
+  CARDS: 1
+
+  TEXT: 自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合、そのメンバーは、ライブ終了時まで、{{icon_blade.png
+  do_nothing at index 0 between real actions
+  ALL ACTS: ['do_nothing', 'gain_resource']
+  CARDS: 1
+
+  TEXT: 自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび、カードを1枚引く。
+  do_nothing at index 0 between real actions
+  ALL ACTS: ['do_nothing', 'draw_card']
+  CARDS: 1
+
+  TEXT: 手札の『Aqours』のカードを1枚公開してもよい：これにより公開したカードをデッキの一番上か一番下に置き、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。
+  do_nothing at index 0 between real actions
+  ALL ACTS: ['do_nothing', 'gain_resource']
+  CARDS: 1

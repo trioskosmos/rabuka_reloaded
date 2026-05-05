@@ -1,0 +1,518 @@
+======================================================================
+A. 元々持つ (original/natural) patterns
+======================================================================
+  TEXT: このメンバーが登場か、エリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。
+  CONDITION TYPE: or_condition
+  CONDITION: {"type": "or_condition", "conditions": [{"type": "appearance_condition", "appearance": true, "text": "このメンバーが登場"}, {"type": "movement_condition", "mov
+  ACTION: change_state
+  CARDS: 4
+
+  TEXT: {{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする
+  CONDITION TYPE: position_condition
+  CONDITION: {"type": "position_condition", "text": "{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合"}
+  ACTION: change_state
+  CARDS: 4
+
+  TEXT: このメンバーをウェイトにしてもよい：相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がちょうど4つのメンバー1人をウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: change_state
+  CARDS: 3
+
+  TEXT: 手札の『DOLLCHESTRA』のカードを1枚控え室に置いてもよい：自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる。これに
+  CONDITION TYPE: complex_condition
+  CONDITION: {"type": "complex_condition", "cause": {"text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる。", "target": "self
+  ACTION: gain_resource
+  CARDS: 3
+
+  TEXT: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。{{live_success.
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: move_cards
+  CARDS: 2
+
+  TEXT: このメンバーをウェイトにしてもよい：自分のステージにいるメンバーが『BiBi』のみの場合、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。
+  CONDITION TYPE: group_condition
+  CONDITION: {"text": "自分のステージにいるメンバーが『BiBi』のみの場合", "target": "self", "location": "stage", "card_type": "member_card", "group": {"name": "BiBi"}, "type": "group_co
+  ACTION: change_state
+  CARDS: 2
+
+  TEXT: 相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする。
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: change_state
+  CARDS: 2
+
+  TEXT: このメンバーがエリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が2つ以下のメンバー1人をウェイトにする。
+  CONDITION TYPE: movement_condition
+  CONDITION: {"type": "movement_condition", "movement": "moved", "movement_state": "has_moved", "text": "このメンバーがエリアを移動したとき"}
+  ACTION: change_state
+  CARDS: 2
+
+  TEXT: 自分のステージに、元々持つハートの数より多い数のハートを持つメンバーがいる場合、カードを1枚引く。
+  CONDITION TYPE: location_condition
+  CONDITION: {"type": "location_condition", "card_type": "member_card", "location": "stage", "text": "自分のステージに、元々持つハートの数より多い数のハートを持つメンバーがいる場合"}
+  ACTION: draw_card
+  CARDS: 1
+
+  TEXT: {{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_04.png|heart04}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる。
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: sequential
+  CARDS: 1
+
+  TEXT: {{heart_02.png|heart02}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる。
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: sequential
+  CARDS: 1
+
+  TEXT: ライブ終了時まで、自分のステージのセンターエリアにいる『Liella!』のメンバーが元々持つ{{icon_blade.png|ブレード}}の数は3つになる。
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: set_blade_count
+  CARDS: 1
+
+  TEXT: 自分のデッキの上からカードを5枚見る。その中から「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: look_and_select
+  CARDS: 1
+
+  TEXT: {{heart_03.png|heart03}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる。
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: sequential
+  CARDS: 1
+
+  TEXT: {{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち1つを選ぶ。ライブ終了時まで、このメンバーが元々持つハートは選んだハートになる。
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: sequential
+  CARDS: 1
+
+  TEXT: ライブ終了時まで、自分のステージにいる『蓮ノ空』のメンバー1人が元々持つハートをすべて{{heart_01.png|heart01}}にする。
+  CONDITION TYPE: None
+  CONDITION: {}
+  ACTION: gain_resource
+  CARDS: 1
+
+  TEXT: 自分のステージに『A-RISE』のメンバーがいる場合、以下から1つを選ぶ。
+・ウェイト状態のメンバー1人をアクティブにし、ライブ終了時まで、そのメンバーは{{icon_blade.png|ブレード}}を得る。
+・相手のステージにいる元々持つ
+  CONDITION TYPE: group_condition
+  CONDITION: {"text": "自分のステージに『A-RISE』のメンバーがいる場合", "target": "self", "location": "stage", "card_type": "member_card", "group": {"name": "A-RISE"}, "type": "group_
+  ACTION: choice
+  CARDS: 1
+
+======================================================================
+B. 能力を持たない (does not have ability) patterns
+======================================================================
+  TEXT: 自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがあるかぎり、{{heart_06.png|heart06}}{{heart_
+  CONDITION: {"type": "ability_negation_condition", "text": "自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがあるかぎり"}
+  CARDS: 4
+
+  TEXT: 能力を持たないメンバーからバトンタッチして登場した場合、カードを1枚引く。
+  CONDITION: {"type": "location_condition", "location": "stage", "target": "self", "baton_touch_trigger": true, "text": "能力を持たないメンバーからバトンタッチして登場した場合"}
+  CARDS: 4
+
+  TEXT: 能力を持たないメンバーカードを自分の手札から登場させるためのコストは1減る。
+  CONDITION: {}
+  CARDS: 4
+
+  TEXT: 自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがある場合、ライブ終了時まで、自分のステージにいるこのメンバー以外のメンバー1
+  CONDITION: {"type": "ability_negation_condition", "text": "自分のライブ中のライブカードに、{{live_start.png|ライブ開始時}}能力も{{live_success.png|ライブ成功時}}能力も持たないカードがある場合"}
+  CARDS: 1
+
+======================================================================
+C. 名前が異なる (different names) patterns
+======================================================================
+  TEXT: 自分のステージのエリアすべてに『蓮ノ空』のメンバーが登場しており、かつ名前が異なる場合、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+  CONDITION TYPE: compound
+    SUB-COND 0: type=appearance_condition, distinct=None
+    SUB-COND 1: type=location_condition, distinct=True
+  CARDS: 4
+
+  TEXT: 自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコア
+  CONDITION TYPE: None
+  DISTINCT: None
+  CARDS: 4
+
+  TEXT: 自分のステージに名前が異なるメンバーが3人以上いるかぎり、{{heart_03.png|heart03}}を得る。
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 4
+
+  TEXT: 自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合、相手のステージにいるコスト4以下のメンバー1人をウェイトにする。
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 2
+
+  TEXT: エールにより公開された自分のカードの中に、名前が異なる『Liella!』のメンバーカードが3枚以上ある場合、エールにより公開された自分のカードの中から『Liella!』のライブカードを1枚手札に加える。
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 2
+
+  TEXT: 自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.p
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 1
+
+  TEXT: 自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。
+  CONDITION TYPE: None
+  DISTINCT: None
+  CARDS: 1
+
+  TEXT: 自分のステージに名前の異なる『KALEIDOSCORE』のメンバーが2人以上いる場合、このカードのスコアを＋１する。
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 1
+
+  TEXT: 自分のステージに「澁谷かのん」、「ウィーン・マルガレーテ」、「鬼塚冬毬」のうち、名前の異なるメンバーが2人以上いる場合、エールにより公開された自分のカードの中から、カードを1枚手札に加える。
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 1
+
+  TEXT: 自分のステージにいる名前の異なる『蓮ノ空』のメンバー1人につき、このカードのスコアを＋２する。
+  CONDITION TYPE: None
+  DISTINCT: None
+  CARDS: 1
+
+  TEXT: 自分のステージに名前の異なる『BiBi』のメンバーが2人以上いる場合、自分の控え室から『BiBi』のメンバーカードを1枚手札に加える。
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 1
+
+  TEXT: エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、このカードのスコアを＋１する。
+  CONDITION TYPE: location_condition
+  DISTINCT: True
+  CARDS: 1
+
+  TEXT: 自分のステージにメンバーが1人以上いる場合、自分と相手はカードを1枚引き、手札を1枚控え室に置く。2人以上いる場合、さらに自分のステージにいる『μ's』のメンバー1人は、ライブ終了時まで、{{heart_03.png|heart03}}を得
+  CONDITION TYPE: None
+  DISTINCT: None
+  CARDS: 1
+
+  TEXT: 自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる場合、このカードのスコアを＋１する。
+  CONDITION TYPE: compound
+    SUB-COND 0: type=location_condition, distinct=None
+    SUB-COND 1: type=location_condition, distinct=True
+  CARDS: 1
+
+======================================================================
+D. コストがそれぞれ異なる (costs all different)
+======================================================================
+  TEXT: 自分のステージにコストがそれぞれ異なるメンバーが3人以上いるかぎり、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る。
+  CONDITION: {"type": "card_count_condition", "count": 3, "operator": ">=", "text": "自分のステージにコストがそれぞれ異なるメンバーが3人以上いるかぎり", "unit": "人", "card_type": "member_card"}
+  CARDS: 4
+
+======================================================================
+E. 登場か、エリアを移動 (OR conditions)
+======================================================================
+  TEXT: このメンバーが登場か、エリアを移動したとき、相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバー1人をウェイトにする。
+  CONDITION TYPE: or_condition
+  CARDS: 4
+
+  TEXT: このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+(対戦相手のカードの効果でも発動する。)
+  CONDITION TYPE: None
+  CARDS: 2
+
+======================================================================
+F. ステージから控え室に置かれた (placed from stage to discard)
+======================================================================
+  TEXT: このメンバーがステージから控え室に置かれたとき、このメンバーがコスト10以上のブレードハートを持たない『虹ヶ咲』のメンバーとバトンタッチしていた場合、エネルギーを2枚アクティブにする。コスト15以上のブレードハートを持たない『虹ヶ咲』のメン
+  CONDITION: {}
+  CARDS: 4
+
+  TEXT: このメンバーがステージから控え室に置かれたとき、メンバー1人をポジションチェンジさせてもよい。
+  CONDITION: {"text": "このメンバーがステージから控え室に置かれたとき", "location": "discard", "locations": ["discard", "stage"], "card_type": "member_card", "type": "location_condition"
+  CARDS: 4
+
+  TEXT: このメンバーがステージから控え室に置かれたとき、メンバー1人をアクティブにしてもよい。
+  CONDITION: {"text": "このメンバーがステージから控え室に置かれたとき", "location": "discard", "locations": ["discard", "stage"], "card_type": "member_card", "type": "location_condition"
+  CARDS: 2
+
+  TEXT: このメンバーがステージから控え室に置かれたとき、手札を1枚控え室に置いてもよい。そうした場合、自分の控え室から『Aqours』のライブカードを1枚手札に加える。
+  CONDITION: {"text": "このメンバーがステージから控え室に置かれたとき", "location": "discard", "locations": ["discard", "stage"], "card_type": "member_card", "type": "location_condition"
+  CARDS: 2
+
+  TEXT: このメンバーがステージから控え室に置かれたとき、自分のデッキの上からカードを5枚見る。その中からメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+  CONDITION: {}
+  CARDS: 1
+
+  TEXT: このメンバーがステージから控え室に置かれたとき、自分のデッキの上からカードを5枚見る。その中からライブカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+  CONDITION: {}
+  CARDS: 1
+
+  TEXT: このメンバーがステージから控え室に置かれたとき、カードを2枚引き、手札を1枚控え室に置く。
+  CONDITION: {"text": "このメンバーがステージから控え室に置かれたとき", "location": "discard", "locations": ["discard", "stage"], "card_type": "member_card", "type": "location_condition"
+  CARDS: 1
+
+======================================================================
+G. いずれかの領域 (any zone/region)
+======================================================================
+  TEXT: 手札にあるメンバーカードを好きな枚数公開する：公開したカードのコストの合計が、10、20、30、40、50のいずれかの場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+  EFFECT ACTION: sequential
+  CARDS: 4
+
+  TEXT: 自分のメインフェイズの間、自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える。
+  EFFECT ACTION: sequential
+  CARDS: 4
+
+======================================================================
+H. グループ名 (group name) patterns
+======================================================================
+  TEXT: {{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}：相手のステージにいるコスト10以下のメンバー1人をウェイトにする。この
+  HAS group_names: False
+  HAS group: False
+  ACTION: sequential
+  CARDS: 4
+
+  TEXT: 手札を1枚控え室に置いてもよい：ライブ終了時まで、これにより控え室に置いたカードと同じグループ名を持つメンバー1人は、{{heart_01.png|heart01}}を得る。
+  HAS group_names: False
+  HAS group: False
+  ACTION: gain_resource
+  CARDS: 4
+
+  TEXT: 以下から1つを選ぶ。
+・自分の控え室にカード名が異なるライブカードが3枚以上ある場合、自分の控え室からライブカードを1枚手札に加える。
+・自分の控え室にグループ名が異なるライブカードが3枚以上ある場合、自分の控え室からライブカードを2枚手札
+  HAS group_names: False
+  HAS group: False
+  ACTION: choice
+  CARDS: 3
+
+  TEXT: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から各グループ名につき1枚ずつ公開し、3枚まで手札に加えてもよい。残りを控え室に置く。
+  HAS group_names: False
+  HAS group: False
+  ACTION: look_and_select
+  CARDS: 3
+
+  TEXT: 手札の同じグループ名を持つカード2枚を控え室に置いてもよい：ライブ終了時まで、{{heart_01.png|heart01}}{{heart_01.png|heart01}}を得る。
+  HAS group_names: False
+  HAS group: False
+  ACTION: gain_resource
+  CARDS: 3
+
+  TEXT: 自分がエールしたとき、エールにより公開された自分のカードの中に同じグループ名を持つメンバーカードが3枚以上ある場合、ライブ終了時まで、{{heart_01.png|heart01}}{{heart_04.png|heart04}}を得る。
+  HAS group_names: False
+  HAS group: False
+  ACTION: gain_resource
+  CARDS: 2
+
+  TEXT: 自分のステージにグループ名がそれぞれ異なるメンバーが3人以上いる場合、ライブ終了時まで、自分のセンターエリアにいるメンバーは{{icon_all.png|ハート}}を得る。
+  HAS group_names: False
+  HAS group: False
+  ACTION: gain_ability
+  CARDS: 1
+
+  TEXT: 自分の控え室にある、自分のステージにいるすべてのメンバーと異なるグループ名を持つカード1枚を手札に加える。
+  HAS group_names: False
+  HAS group: False
+  ACTION: move_cards
+  CARDS: 1
+
+======================================================================
+I. カード名がすべて含まれる (card name contains all)
+======================================================================
+  TEXT: {{icon_energy.png|E}}{{icon_energy.png|E}}手札のライブカードを1枚公開する：自分の控え室から、これにより公開したカードのカード名がすべて含まれるライブカードを1枚手札に加える。
+  HAS name_constraint: contains_all
+  CARDS: 4
+
+======================================================================
+J. エールで～枚数を増やす (yell count modification)
+======================================================================
+  TEXT: このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開す
+  PARSED: {"text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。", "action": "look_and_select", "look_action": {"text": "自分のデッキの上からカードを2枚見る。", "source": "deck_top", "count": 2, "target": "self", "act
+  CARDS: 6
+
+  TEXT: 自分のステージにこのメンバー以外のメンバーが1人以上いる場合、ライブ終了時まで、エールによって公開される自分のカードの枚数が8枚減る。
+  PARSED: {"text": "自分のステージにこのメンバー以外のメンバーが1人以上いる場合、ライブ終了時まで、エールによって公開される自分のカードの枚数が8枚減る", "condition": {"type": "card_count_condition", "count": 1, "operator": ">=", "text": "自分のステージにこのメンバー以外のメンバーが1人以上いる場合", "un
+  CARDS: 4
+
+  TEXT: エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合、カードを1枚引く。
+  PARSED: {"text": "カードを1枚引く", "condition": {"text": "エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合", "target": "self", "operator": "<", "type": "comparison_condition"}, "count": 1, "action": "draw_card", "
+  CARDS: 2
+
+  TEXT: エールにより公開されている自分のライブカードの枚数が、エールにより公開されている相手のライブカードの枚数より多い場合、このカードのスコアを＋１する。
+  PARSED: {"text": "このカードのスコアを+1する", "condition": {"text": "エールにより公開されている自分のライブカードの枚数が、エールにより公開されている相手のライブカードの枚数より多い場合", "target": "both", "card_type": "live_card", "operator": ">", "type": "comparison_conditio
+  CARDS: 1
+
+======================================================================
+K. ハートを増やす/減らす (modify required hearts)
+======================================================================
+  TEXT: 相手のライブカード置き場にあるすべてのライブカードは、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる。
+  PARSED: {"text": "相手のライブカード置き場にあるすべてのライブカードは、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる", "action": "restriction", "restriction_type": "modify_required_hearts_global", "operation": "increase", "target": "oppon
+  CARDS: 4
+
+  TEXT: 自分の成功ライブカード置き場にあるカード1枚につき、このカードを成功させるための必要ハートは{{heart_00.png|heart0}}{{heart_00.png|heart0}}少なくなる。
+  PARSED: {"text": "自分の成功ライブカード置き場にあるカード1枚につき、このカードを成功させるための必要ハートは{{heart_00.png|heart0}}{{heart_00.png|heart0}}少なくなる", "action": "modify_required_hearts", "self_target": true, "count": 2, "per_unit": true, "pe
+  CARDS: 1
+
+  TEXT: 自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。
+  PARSED: {"text": "自分のステージにいる、このターン中に登場、またはエリアを移動した『5yncri5e!』のメンバー1人につき、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす", "action": "modify_required_hearts", "self_target": true, "count": 1, "per_unit": true, 
+  CARDS: 1
+
+  TEXT: 自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_04.png|heart04}}減らす。
+  PARSED: {"text": "このカードを成功させるための必要ハートを{{heart_04.png|heart04}}減らす", "condition": {"type": "card_count_condition", "count": 2, "operator": ">=", "text": "自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合", "unit
+  CARDS: 1
+
+  TEXT: 自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_05.png|heart05}}減らす。
+  PARSED: {"text": "このカードを成功させるための必要ハートを{{heart_05.png|heart05}}減らす", "condition": {"type": "card_count_condition", "count": 2, "operator": ">=", "text": "自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合", "unit
+  CARDS: 1
+
+  TEXT: 自分のステージに「徒町小鈴」が登場しており、かつ「徒町小鈴」よりコストの大きい「村野さやか」が登場している場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0
+  PARSED: {"text": "このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす", "condition": {"type": "compound", "operator": "and", "conditions": [{"type": "appearance_condit
+  CARDS: 1
+
+  TEXT: 自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_01.png|heart01}}減らす。
+  PARSED: {"text": "このカードを成功させるための必要ハートを{{heart_01.png|heart01}}減らす", "condition": {"type": "card_count_condition", "count": 2, "operator": ">=", "text": "自分のステージに、このターン中にバトンタッチして登場した『蓮ノ空』のメンバーが2人以上いる場合", "unit
+  CARDS: 1
+
+  TEXT: 自分のステージにいるメンバーが持つ{{icon_blade.png|ブレード}}の合計が10以上の場合、このカードを成功させるための必要ハートは{{heart_00.png|heart0}}{{heart_00.png|heart0}}少な
+  PARSED: {"text": "このカードを成功させるための必要ハートは{{heart_00.png|heart0}}{{heart_00.png|heart0}}少なくなる", "condition": {"text": "自分のステージにいるメンバーが持つ{{icon_blade.png|ブレード}}の合計が10以上の場合", "target": "self", "location": "stage", 
+  CARDS: 1
+
+  TEXT: 相手のステージにウェイト状態のメンバーがいる場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす。
+  PARSED: {"text": "このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす", "condition": {"type": "state_condition", "state": "wait", "text": "相手のステージにウェイト状態のメンバーがいる場合"}, "action": "modify_requi
+  CARDS: 1
+
+  TEXT: 自分の成功ライブカード置き場にあるカードのスコアの合計が６以上の場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。スコアの合計が９以上の場合、さらにこのカードのスコアを＋１する。
+  PARSED: {"text": "自分の成功ライブカード置き場にあるカードのスコアの合計が6以上の場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}減らす。スコアの合計が9以上の場合、さらにこのカードのスコアを+1する", "action": "sequential", "actions": [{"text": "このカードを成功させるための必要ハートを{{heart_
+  CARDS: 1
+
+  TEXT: 自分の成功ライブカード置き場にあるカード名が「EMOTION」のカード1枚につき、このカードのスコアを＋２し、成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{hea
+  PARSED: {"text": "自分の成功ライブカード置き場にあるカード名が「EMOTION」のカード1枚につき、このカードのスコアを+2し、成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}増やす", "action": "sequential", "actions": [{"text": "
+  CARDS: 1
+
+  TEXT: 自分のステージに同じ名前の『虹ヶ咲』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0
+  PARSED: {"text": "このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす", "condition": {"type": "card_count_condition", "count": 2, "operator": ">=", "text": "自分のステージに同じ
+  CARDS: 1
+
+  TEXT: 自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つ{{heart_03.png|heart03}}2つにつき、このカードの必要ハートを{{heart_00.png|heart0}}減らす。この能力では{{heart_0
+  PARSED: {"text": "自分のセンターエリアに『μ's』のメンバーがいる場合、そのメンバーが持つ{{heart_03.png|heart03}}2つにつき、このカードの必要ハートを{{heart_00.png|heart0}}減らす。この能力では{{heart_00.png|heart0}}は3つまでしか減らない", "count": 3, "action": "modify_required_hea
+  CARDS: 1
+
+  TEXT: 自分の成功ライブカード置き場にあるカード1枚につき、このカードのスコアを＋２し、必要ハートを{{heart_01.png|heart01}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{
+  PARSED: {"text": "自分の成功ライブカード置き場にあるカード1枚につき、このカードのスコアを+2し、必要ハートを{{heart_01.png|heart01}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_00.png|heart0}}増やす", "action": "sequential", "actions": [{"text"
+  CARDS: 1
+
+  TEXT: 自分のステージにいる{{heart_01.png|heart01}}と{{heart_06.png|heart06}}以外の色のハートを持つメンバー1人につき、このカードの必要ハートを{{heart_00.png|heart0}}減らす。
+  PARSED: {"text": "自分のステージにいる{{heart_01.png|heart01}}と{{heart_06.png|heart06}}以外の色のハートを持つメンバー1人につき、このカードの必要ハートを{{heart_00.png|heart0}}減らす", "action": "modify_required_hearts", "self_target": true, "count": 1, 
+  CARDS: 1
+
+  TEXT: 自分のステージにいるメンバーが持つハートに{{heart_02.png|heart02}}が合計5つ以上ある場合、相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png
+  PARSED: {"text": "相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる", "condition": {"text": "相手のライブ開始時", "target": "opponent", "count": 1, "operator": ">=", "type": "comparison_condition"}, "
+  CARDS: 1
+
+  TEXT: 自分のステージにいるメンバーが持つハートに{{heart_05.png|heart05}}が合計5つ以上ある場合、相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png
+  PARSED: {"text": "相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる", "condition": {"text": "相手のライブ開始時", "target": "opponent", "count": 1, "operator": ">=", "type": "comparison_condition"}, "
+  CARDS: 1
+
+  TEXT: 自分のライブカード置き場にあるこのカード以外の『蓮ノ空』のカード1枚につき、このカードの必要ハートを{{heart_04.png|heart04}}{{heart_04.png|heart04}}減らす。
+  PARSED: {"text": "自分のライブカード置き場にあるこのカード以外の『蓮ノ空』のカード1枚につき、このカードの必要ハートを{{heart_04.png|heart04}}{{heart_04.png|heart04}}減らす", "action": "modify_required_hearts", "self_target": true, "count": 2, "per_unit": true,
+  CARDS: 1
+
+  TEXT: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のステージにコスト9以上の『EdelNote』のメンバーがいる場合、以下から1つを選ぶ。
+・自分の控え室からコスト4以下の『EdelNo
+  PARSED: {"text": "以下から1つを選ぶ。\n・自分の控え室からコスト4以下の『EdelNote』のメンバーカードを1枚、メンバーのいないエリアに登場させる。\n・このカードの必要ハートを{{heart_06.png|heart06}}減らす", "condition": {"text": "自分のステージにコスト9以上の『EdelNote』のメンバーがいる場合", "target": "self"
+  CARDS: 1
+
+======================================================================
+L. すべての領域 (all zones) card identity setting
+======================================================================
+  TEXT: すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、『みらくらぱーく！』として扱う。
+  PARSED: {"text": "すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、『みらくらぱーく！』として扱う", "group": {"name": "スリーズブーケ"}, "group_names": ["スリーズブーケ", "DOLLCHESTRA", "みらくらぱーく！"], "action": "set_card_identity", "identities": ["ス
+  CARDS: 3
+
+======================================================================
+M. として扱う (treat as) patterns
+======================================================================
+  TEXT: すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、『みらくらぱーく！』として扱う。
+  PARSED: {"text": "すべての領域にあるこのカードは『スリーズブーケ』、『DOLLCHESTRA』、『みらくらぱーく！』として扱う", "group": {"name": "スリーズブーケ"}, "group_names": ["スリーズブーケ", "DOLLCHESTRA", "みらくらぱーく！"], "action": "set_card_identity", "identities": ["ス
+  CARDS: 3
+
+  TEXT: ライブの合計スコアが相手より高い場合、エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える。
+(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う
+  PARSED: {"text": "エールにより公開された自分のカードの中から、『虹ヶ咲』のカードを1枚手札に加える", "condition": {"text": "ライブの合計スコアが相手より高い場合", "comparison_target": "opponent", "operator": ">", "comparison_type": "score", "aggregate": "total", "ty
+  CARDS: 1
+
+  TEXT: 自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。
+(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)
+  PARSED: {"text": "カードを1枚引く", "condition": {"text": "自分のステージに「澁谷かのん」と「唐可可」がいる場合", "target": "self", "location": "stage", "type": "location_condition"}, "count": 1, "action": "draw_card", "source": "deck", "des
+  CARDS: 1
+
+  TEXT: 自分の、ステージと控え室に名前の異なる『Liella!』のメンバーが5人以上いる場合、このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.p
+  PARSED: {"text": "このカードを使用するためのコストは{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_03.png|heart03}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_06.png|heart06}}になる", "condition": {"type": "
+  CARDS: 1
+
+  TEXT: エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。
+(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)
+  PARSED: {"text": "エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。", "destination": "hand", "count": 1, "card_type": "live_card", "target": "self", "group": {"name": "蓮ノ空"}, "group_names": ["蓮ノ空"], "action": "mov
+  CARDS: 1
+
+  TEXT: ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+(必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレ
+  PARSED: {"text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く", "condition": {"type": "compound", "operator": "and", "conditions": [{"text": "ライブの合計スコアが相手より高く、", "comparison_target": "opponent", "comparison_type": "sc
+  CARDS: 1
+
+======================================================================
+N. ～に等しい枚数 (number equal to X)
+======================================================================
+  TEXT: {{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に
+  PARSED: {"text": "このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。", "action": "sequential", "actions": [{"text": "このメンバー以外の『Aqours』のメン
+  CARDS: 4
+
+  TEXT: 手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く。
+  PARSED: {"text": "自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。その中からカードを1枚手札に加える。残りを控え室に置く", "action": "look_and_select", "look_action": {"text": "自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見る。", "source": "deck_top", "co
+  CARDS: 4
+
+  TEXT: 手札を1枚控え室に置く：自分の控え室にあるライブカードを1枚選び、そのカードのスコアに等しい数の{{icon_energy.png|E}}を支払ってもよい。そうした場合、そのライブカードを手札に加える。
+  PARSED: {"text": "自分の控え室にあるライブカードを1枚選び、そのカードのスコアに等しい数の{{icon_energy.png|E}}を支払ってもよい。そうした場合、そのライブカードを手札に加える", "action": "sequential", "actions": [{"text": "自分の控え室にあるライブカードを1枚選び、そのカードのスコアに等しい数の{{icon_energy.png
+  CARDS: 3
+
+======================================================================
+O. Missing per_unit flag on につき patterns
+======================================================================
+  TEXT: {{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：自分のステージに『虹ヶ咲』のメンバーがいる場合、このカードのスコアを＋１する。
+(エールをすべて行った後、エールで出た{{icon_draw
+  PARSED: per_unit=None, action=modify_score
+  CARDS: 1
+
+  TEXT: 自分のライブ中のカードが3枚以上ある場合、このカードのスコアを＋２する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+  PARSED: per_unit=None, action=modify_score
+  CARDS: 1
+
+  TEXT: ライブの合計スコアが相手より高い場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+(エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)
+  PARSED: per_unit=None, action=move_cards
+  CARDS: 1
+
+  TEXT: 自分のエネルギーが12枚以上ある場合、このカードのスコアを＋１する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+  PARSED: per_unit=None, action=modify_score
+  CARDS: 1
+
+  TEXT: エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合、このカードのスコアを＋１する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+  PARSED: per_unit=None, action=modify_score
+  CARDS: 1
+
+  TEXT: 自分のステージにいるメンバーが持つ{{icon_blade.png|ブレード}}の合計が10以上の場合、このカードのスコアを＋１する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚
+  PARSED: per_unit=None, action=modify_score
+  CARDS: 1
+
+  TEXT: 自分のエネルギーが9枚以上ある場合、このカードのスコアを＋１する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+  PARSED: per_unit=None, action=modify_score
+  CARDS: 1
+
+======================================================================
+P. Cost modification patterns (元々持つコスト)
+======================================================================
+  TEXT: 手札の『DOLLCHESTRA』のカードを1枚控え室に置いてもよい：自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる。これに
+  PARSED: {"text": "{{heart_05.png|heart05}}を得る", "condition": {"type": "complex_condition", "cause": {"text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる。", "target": "s
+  CARDS: 3

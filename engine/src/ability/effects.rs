@@ -166,10 +166,10 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::Draw | EffectAction::DrawCard => self.execute_draw(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck"), effect.destination.as_deref().unwrap_or("hand"), effect.card_type.as_deref(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref()),
             EffectAction::DrawUntilCount => self.execute_draw_until_count(effect.target_count.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.destination.as_deref().unwrap_or("hand")),
             EffectAction::DiscardCard | EffectAction::MoveCards => self.execute_move_cards(effect),
-            EffectAction::GainResource => { let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1)); self.execute_gain_resource(effect.resource.as_deref().unwrap_or(""), count, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.heart_color.as_deref(), effect.heart_colors.as_ref(), effect.resource_icon_count) },
-            EffectAction::ChangeState => self.execute_change_state(effect.state_change.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1), effect.max.unwrap_or(false), effect.card_type.as_deref(), effect.cost_limit, effect.optional.unwrap_or(false), effect.group.as_ref().map(|g| g.name.as_str()), effect.self_cost.unwrap_or(false), effect.source.as_deref(), effect.destination.as_deref()),
+            EffectAction::GainResource => { let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1)); self.execute_gain_resource(effect.resource.as_deref().unwrap_or(""), count, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.heart_color.as_deref(), effect.heart_colors.as_ref(), effect.resource_icon_count, effect.heart_selection.unwrap_or(false)) },
+            EffectAction::ChangeState => self.execute_change_state(effect.state_change.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(0), effect.max.unwrap_or(false), effect.card_type.as_deref(), effect.cost_limit, effect.optional.unwrap_or(false), effect.group.as_ref().map(|g| g.name.as_str()), effect.self_cost.unwrap_or(false), effect.source.as_deref(), effect.destination.as_deref()),
             EffectAction::ModifyScore => self.execute_modify_score(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.effect_constraint.as_deref(), effect.self_target.unwrap_or(false)),
-            EffectAction::ModifyRequiredHearts => self.execute_modify_required_hearts(effect.operation.as_deref().unwrap_or("decrease"), effect.value.unwrap_or(0), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::ModifyRequiredHearts => self.execute_modify_required_hearts(effect.operation.as_deref().unwrap_or("decrease"), effect.value.unwrap_or(0), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self"), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.group.as_ref(), effect.timing_condition.as_deref(), effect.location.as_deref()),
             EffectAction::SetCost => self.execute_set_cost(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
             EffectAction::SetBladeType => self.execute_set_blade_type(effect.blade_type.as_deref(), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
             EffectAction::SetHeartType => self.execute_set_heart_type(effect.heart_type.as_deref().or(effect.heart_color.as_deref()), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1) as i32),
@@ -298,7 +298,7 @@ impl<'a> AbilityResolver<'a> {
         &mut self, resource: &str, count: u32, target: &str, duration: Option<&str>,
         card_type: Option<&str>, group_name: Option<&str>, per_unit: bool, per_unit_count: u32,
         per_unit_type: Option<&str>, heart_color: Option<&str>, heart_colors: Option<&Vec<String>>,
-        _resource_icon_count: Option<u32>,
+        _resource_icon_count: Option<u32>, heart_selection: bool,
     ) -> Result<(), String> {
         let resource = resource.to_string();
         let target = target.to_string();
@@ -312,7 +312,7 @@ impl<'a> AbilityResolver<'a> {
         let card_db = self.game_state.card_database.clone();
 
         // If heart_colors is present and resource is heart, this is a choose-and-replace operation
-        if (resource == "heart" || resource == "ハート") && heart_colors.is_some() {
+        if (resource == "heart" || resource == "ハート") && (heart_colors.is_some() || heart_selection) {
             if let Some(colors) = heart_colors {
                 let mut unique_colors: Vec<String> = Vec::new();
                 for c in colors {
@@ -342,11 +342,11 @@ impl<'a> AbilityResolver<'a> {
 
             let final_count = if per_unit {
                 let matching_count = match per_unit_type_str.as_deref() {
-                    Some("stage") => { player.stage.stage.iter().filter(|&&card_id| card_id != -1).filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
-                    Some("hand") => { player.hand.cards.iter().filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
+                    Some("stage") | Some("member") | Some("人") => { player.stage.stage.iter().filter(|&&card_id| card_id != -1).filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
+                    Some("hand") | Some("card") | Some("枚") => { player.hand.cards.iter().filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
                     _ => { player.stage.stage.iter().filter(|&&card_id| card_id != -1).filter(|&&card_id| matches_card_type(card_id) && matches_group(card_id)).count() as u32 }
                 };
-                matching_count * per_unit_count_val
+                (matching_count / per_unit_count_val) * count
             } else { count };
 
             let has_blade_filter = card_type_filter.is_some() || group_filter.is_some();
@@ -472,7 +472,19 @@ impl<'a> AbilityResolver<'a> {
                 return Err("No matching members on stage to change state".to_string());
             }
 
-            if candidates.len() > count as usize {
+            // Count how many are in wait state before changing (for wait→active tracking)
+            let wait_before_count = candidates.iter()
+                .filter(|(_, card_id)| {
+                    let o = self.game_state.get_orientation_modifier(*card_id);
+                    // None = active (no modifier), Some("wait") = wait
+                    o.map_or(false, |o| o == "wait")
+                })
+                .count();
+
+            // count=0 means "change all matching" (no limit)
+            let is_change_all = count == 0;
+
+            if !is_change_all && candidates.len() > count as usize {
                 self.pending_choice = Some(Choice::SelectCard {
                     zone: "stage".to_string(),
                     card_type: card_type_filter.clone(),
@@ -484,9 +496,16 @@ impl<'a> AbilityResolver<'a> {
                 return Ok(());
             }
 
-            for (_, card_id) in candidates.iter().take(count as usize) {
+            let change_count = if is_change_all { candidates.len() } else { count as usize };
+            for (_, card_id) in candidates.iter().take(change_count) {
                 self.game_state.add_orientation_modifier(*card_id, &state_change);
             }
+
+            // Track how many members were changed from wait→active
+            if state_change == "active" {
+                self.game_state.last_state_change_wait_to_active_count = wait_before_count as u32;
+            }
+
             return Ok(());
         }
 
@@ -697,7 +716,33 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_modify_required_hearts(&mut self, operation: &str, value: u32, heart_color: &str, target: &str) -> Result<(), String> {
+    fn execute_modify_required_hearts(&mut self, operation: &str, mut value: u32, heart_color: &str, target: &str, per_unit: bool, per_unit_count: u32, group: Option<&crate::card::GroupInfo>, timing_condition: Option<&str>, _location: Option<&str>) -> Result<(), String> {
+        if per_unit {
+            let card_db = &self.game_state.card_database;
+            let player = self.game_state.resolve_target_player(target);
+            let stage_cards: Vec<i16> = player.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+            let mut count = 0u32;
+            for &card_id in &stage_cards {
+                if let Some(g) = group {
+                    if !super::util::card_matches_group_str(card_db, card_id, Some(&g.name)) {
+                        continue;
+                    }
+                }
+                if let Some(tc) = timing_condition {
+                    match tc {
+                        "appeared_or_moved_this_turn" => {
+                            let moved = self.game_state.has_card_moved_this_turn(card_id);
+                            let appeared = self.game_state.has_card_appeared_this_turn(card_id);
+                            if !moved && !appeared { continue; }
+                        }
+                        _ => {}
+                    }
+                }
+                count += 1;
+            }
+            value = count * per_unit_count;
+            eprintln!("[MODIFY_HEARTS] per_unit count={} value={} group={:?} timing={:?}", count, value, group.map(|g| &g.name), timing_condition);
+        }
         let color = crate::zones::parse_heart_color(heart_color);
         let card_ids: Vec<i16> = {
             let player = self.game_state.resolve_target_player_mut(target);
@@ -854,6 +899,7 @@ impl<'a> AbilityResolver<'a> {
             if let Some(energy_card) = player.energy_zone.cards.pop() { energy_cards.push(energy_card); }
             else { break; }
         }
+        if energy_cards.is_empty() { return Ok(()); }
         let target_index = match position.and_then(|p| p.get_position()) {
             Some("center") | Some("中央") => 1,
             Some("left") | Some("左側") => 0,
@@ -862,14 +908,18 @@ impl<'a> AbilityResolver<'a> {
                 if player.stage.stage[1] != -1 { 1 }
                 else if player.stage.stage[0] != -1 { 0 }
                 else if player.stage.stage[2] != -1 { 2 }
-                else { for card in energy_cards { player.energy_zone.cards.push(card); } return Ok(()); }
+                else { for card in energy_cards { player.energy_deck.cards.push(card); } return Ok(()); }
             }
             _ => 1,
         };
         if player.stage.stage[target_index] == -1 {
-            for card in energy_cards { player.energy_zone.cards.push(card); }
+            // Rule 10.5.4: Energy without a member goes to energy deck
+            for card in energy_cards { player.energy_deck.cards.push(card); }
             return Ok(());
         }
+        // Rule 10.5.3: Energy placed under member — track it for recycling
+        // The energy cards are off the energy zone count; when the member leaves,
+        // they should return to the energy deck.
         Ok(())
     }
 
@@ -936,10 +986,12 @@ impl<'a> AbilityResolver<'a> {
                 let occupying_card = player.stage.stage[target_index];
                 player.stage.stage[target_index] = card_id;
                 player.stage.stage[current_idx] = occupying_card;
+                self.game_state.record_card_movement(occupying_card);
             } else {
                 player.stage.stage[target_index] = card_id;
                 player.stage.stage[current_idx] = -1;
             }
+            self.game_state.record_card_movement(card_id);
         } else { return Err(format!("Member not found: {}", target_member)); }
         Ok(())
     }
@@ -968,10 +1020,12 @@ impl<'a> AbilityResolver<'a> {
                         let occupying_card = player.stage.stage[target_index];
                         player.stage.stage[target_index] = card_id;
                         player.stage.stage[current_idx] = occupying_card;
+                        self.game_state.record_card_movement(occupying_card);
                     } else {
                         player.stage.stage[target_index] = card_id;
                         player.stage.stage[current_idx] = -1;
                     }
+                    self.game_state.record_card_movement(card_id);
                 } else { return Err(format!("Activating card {} not found on stage", activating_card_id)); }
             } else { return Err("No activating card for position change".to_string()); }
         }

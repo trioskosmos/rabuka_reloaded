@@ -58,13 +58,14 @@ impl super::TurnEngine {
                 Phase::FirstAttackerPerformance => {
                     let blade_heart_count = {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                        let player_id = if game_state.player1.is_first_attacker { game_state.player1.id.clone() } else { game_state.player2.id.clone() };
+                        let player_id = game_state.first_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
                         let bm = game_state.blade_modifiers.clone();
                         let ho = game_state.heart_override.clone();
                         let hm = game_state.heart_modifiers.clone();
+                        let btm = game_state.blade_type_modifiers.clone();
                         let player = game_state.first_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
                     game_state.current_phase = Phase::SecondAttackerPerformance;
@@ -72,13 +73,14 @@ impl super::TurnEngine {
                 Phase::SecondAttackerPerformance => {
                     let blade_heart_count = {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                        let player_id = if game_state.player1.is_first_attacker { game_state.player2.id.clone() } else { game_state.player1.id.clone() };
+                        let player_id = game_state.second_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
                         let bm = game_state.blade_modifiers.clone();
                         let ho = game_state.heart_override.clone();
                         let hm = game_state.heart_modifiers.clone();
+                        let btm = game_state.blade_type_modifiers.clone();
                         let player = game_state.second_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };
                     game_state.player2_cheer_blade_heart_count = blade_heart_count;
                     game_state.current_phase = Phase::LiveVictoryDetermination;

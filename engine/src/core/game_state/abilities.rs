@@ -186,13 +186,14 @@ impl GameState {
     }
 
     pub fn check_victory(&self) -> GameResult {
+        use crate::constants::VICTORY_CARD_COUNT;
         let p1_success = self.player1.success_live_card_zone.len();
         let p2_success = self.player2.success_live_card_zone.len();
 
-        let p1_wins = p1_success >= 3 && p2_success <= 2;
-        let p2_wins = p2_success >= 3 && p1_success <= 2;
+        let p1_wins = p1_success >= VICTORY_CARD_COUNT && p2_success <= VICTORY_CARD_COUNT - 1;
+        let p2_wins = p2_success >= VICTORY_CARD_COUNT && p1_success <= VICTORY_CARD_COUNT - 1;
 
-        if p1_success >= 3 && p2_success >= 3 {
+        if p1_success >= VICTORY_CARD_COUNT && p2_success >= VICTORY_CARD_COUNT {
             GameResult::Draw
         } else if p1_wins && !p2_wins {
             GameResult::FirstAttackerWins
@@ -289,11 +290,13 @@ impl GameState {
             for ability in &card.abilities {
                 if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
                     if let Some(ref effect) = ability.effect {
+                        let restricted_to = effect.restricted_destination.as_deref()
+                            .or_else(|| effect.destination.as_deref());
                         if effect.action == "restriction"
                             && effect.restriction_type.as_deref() == Some("cannot_place")
-                            && (effect.restricted_destination.as_deref() == Some(zone)
-                                || effect.restricted_destination.as_deref() == Some("live_card_zone") && zone == "success_live_zone"
-                                || effect.restricted_destination.as_deref() == Some("success_live_zone") && zone == "live_card_zone")
+                            && (restricted_to == Some(zone)
+                                || restricted_to == Some("live_card_zone") && zone == "success_live_zone"
+                                || restricted_to == Some("success_live_zone") && zone == "live_card_zone")
                         {
                             eprintln!("Card {} cannot be placed in {} due to constant ability restriction", card.card_no, zone);
                             return false;
@@ -545,6 +548,8 @@ impl GameState {
         self.formation_change_occurred_this_turn = false;
         self.opponent_live_success_this_turn = false;
         self.opponent_live_no_excess_heart_this_turn = false;
+        self.live_success_triggered_this_turn = false;
+        self.last_state_change_wait_to_active_count = 0;
     }
 
     pub fn check_permanent_loop(&mut self) -> bool {

@@ -303,13 +303,7 @@ pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::
 }
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
-    GameStateDisplay {
-        turn: game_state.turn_number,
-        phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.blade_modifiers),
-        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.blade_modifiers),
-        pending_choice: game_state.pending_choice.clone(),
-    }
+    crate::display::game_state_to_display(game_state)
 }
 
 fn display_with_ui_state(display: GameStateDisplay, ui_config: &UiConfig) -> serde_json::Value {
@@ -465,20 +459,6 @@ fn is_live_card_set_phase(game_state: &GameState) -> bool {
 
 }
 
-#[allow(dead_code)]
-fn is_human_decision_phase(game_state: &GameState) -> bool {
-    match game_state.current_phase {
-        crate::game_state::Phase::RockPaperScissors
-        | crate::game_state::Phase::ChooseFirstAttacker
-        | crate::game_state::Phase::MulliganP1Turn
-        | crate::game_state::Phase::MulliganP2Turn
-        | crate::game_state::Phase::LiveCardSetP1Turn
-        | crate::game_state::Phase::LiveCardSetP2Turn
-        | crate::game_state::Phase::Main => true,
-        _ => false,
-    }
-}
-
 fn is_player2_decision_phase(game_state: &GameState) -> bool {
     match game_state.current_phase {
         crate::game_state::Phase::MulliganP2Turn
@@ -490,8 +470,6 @@ fn is_player2_decision_phase(game_state: &GameState) -> bool {
 }
 
 
-
-#[allow(dead_code)]
 
 fn execute_player2_ai_action(game_state: &mut GameState) -> Result<bool, String> {
 
@@ -1959,58 +1937,6 @@ async fn rooms_leave(data: web::Data<AppState>, req: web::Json<serde_json::Value
 
 
 
-#[allow(dead_code)]
-
-async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
-
-    let rooms = data.rooms.lock().unwrap();
-
-    let public_rooms: Vec<_> = rooms.values()
-
-        .filter(|r| r.public)
-
-        .map(|r| {
-
-            let occupied_slots = r.sessions.values()
-
-                .filter(|s| s.player_id >= 0)
-
-                .map(|s| s.player_id)
-
-                .collect::<std::collections::HashSet<_>>()
-
-                .len();
-
-            
-
-            serde_json::json!({
-
-                "room_id": r.room_id,
-
-                "mode": r.mode,
-
-                "players": occupied_slots,
-
-                "created_at": r.created_at
-
-            })
-
-        })
-
-        .collect();
-
-    
-
-    HttpResponse::Ok().json(serde_json::json!({
-
-        "success": true,
-
-        "rooms": public_rooms
-
-    }))
-
-}
-
 
 
 async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequest>>) -> impl Responder {
@@ -2341,7 +2267,6 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
-            .route("/api/debug/dump_state", web::get().to(debug_dump_state))
             .service(fs::Files::new("/", "../web_ui/dist").index_file("index.html"))
     })
 

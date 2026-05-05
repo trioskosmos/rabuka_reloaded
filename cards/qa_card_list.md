@@ -4,6 +4,7 @@ Cards with QA entries, grouped by ability (all variants share the same ability).
 Tests MUST validate actual game behavior from `qa_data.json` entries — not just confirm
 that JSON fields map to other JSON fields. Each test should prove a real game rule:
 engine evaluates conditions correctly, filters work, edge cases are handled, etc.
+Write tests in engine\tests\gameplay_test_process.md
 
 | # | QA Count | Card | QA IDs | Status |
 |---|----------|------|--------|--------|
@@ -11,7 +12,7 @@ engine evaluates conditions correctly, filters work, edge cases are handled, etc
 |2|4|LL-bp2-001-R＋ (渡辺 曜&鬼塚夏美&大沢瑠璃乃 (ab#2))|Q129, Q186, Q62, Q89|✓ ll_joint_test|
 |3|4|PL!-bp3-026-L (Oh,Love&Peace! (ab#1))|Q149, Q150, Q172, Q36|✓ lovepeace (gameplay_test)|
 |4|4|PL!-pb1-018-R (矢澤にこ (ab#0))|Q168, Q169, Q170, Q181|✓ nico (gameplay_test)|
-| 5 | 4 | PL!N-bp1-002-R＋ (中須かすみ (ab#1)) | Q122, Q63, Q75, Q76 | |
+| 5 | 4 | PL!N-bp1-002-R＋ (中須かすみ (ab#1)) | Q122, Q63, Q75, Q76 | | ✓ kasumi_test |
 |6|4|PL!N-bp3-027-L (La Bella Patria (ab#0))|Q142, Q173, Q174, Q36|✓ bella (gameplay_test)|
 |7|4|PL!SP-bp1-026-L (未来予報ハレルヤ！ (ab#0))|Q105, Q127, Q64, Q74|✓ hareruya (gameplay_test)|
 |8|4|PL!SP-bp2-010-R＋ (ウィーン・マルガレーテ (ab#1))|Q110, Q111, Q117, Q127|✓ wien (gameplay_test)|
@@ -28,14 +29,14 @@ engine evaluates conditions correctly, filters work, edge cases are handled, etc
 | 19 | 2 | PL!-bp5-003-R＋ (南 ことり (ab#1)) | Q207, Q208 | |
 |20|2|PL!-bp5-021-L (SUNNY DAY SONG (ab#0))|Q210, Q211|✓ sunny_test|
 | 21 | 2 | PL!-pb1-001-R (高坂穂乃果 (ab#0)) | Q166, Q167 | |
-| 22 | 2 | PL!-pb1-028-L (WAO-WAO Powerful day! (ab#0)) | Q178, Q179 | |
+| 22 | 2 | PL!-pb1-028-L (WAO-WAO Powerful day! (ab#0)) | Q178, Q179 | ✓ wao_wao_test |
 | 23 | 2 | PL!-sd1-005-SD (星空 凛 (ab#0)) | Q123, Q79 | |
-| 24 | 2 | PL!HS-bp1-002-R (村野さやか (ab#0)) | Q63, Q80 | |
+| 24 | 2 | PL!HS-bp1-002-R (村野さやか (ab#0)) | Q63, Q80 | | ✓ sayaka_test |
 | 25 | 2 | PL!HS-bp1-022-L (AWOKE (ab#0)) | Q107, Q36 | |
-| 26 | 2 | PL!HS-bp5-001-R＋ (日野下花帆 (ab#1)) | Q236, Q237 | |
+| 26 | 2 | PL!HS-bp5-001-R＋ (日野下花帆 (ab#1)) | Q236, Q237 | | ✓ hinoshita_test |
 | 27 | 2 | PL!N-bp1-011-R (ミア・テイラー (ab#0)) | Q102, Q73 | |
-| 28 | 2 | PL!N-bp1-026-L (Poppin' Up! (ab#0)) | Q36, Q66 | |
-| 29 | 2 | PL!N-bp3-007-R (優木せつ菜 (ab#0)) | Q157, Q184 | |
+| 28 | 2 | PL!N-bp1-026-L (Poppin' Up! (ab#0)) | Q36, Q66 | | ✓ poppin_test |
+| 29 | 2 | PL!N-bp3-007-R (優木せつ菜 (ab#0)) | Q157, Q184 | | ✓ setsuna_test |
 | 30 | 2 | PL!N-bp3-013-N (上原歩夢 (ab#0)) | Q157, Q184 | |
 | 31 | 2 | PL!N-bp3-030-L (Love U my friends (ab#0)) | Q192, Q36 | |
 | 32 | 2 | PL!N-bp5-026-L (TOKIMEKI Runners (ab#1)) | Q216, Q232 | |
@@ -44,12 +45,12 @@ engine evaluates conditions correctly, filters work, edge cases are handled, etc
 | 35 | 2 | PL!N-pb1-013-R (上原歩夢 (ab#0)) | Q199, Q200 | |
 | 36 | 2 | PL!N-pb1-017-R (宮下 愛 (ab#0)) | Q199, Q201 | |
 | 37 | 2 | PL!N-pb1-023-R (ミア・テイラー (ab#0)) | Q199, Q202 | |
-| 38 | 2 | PL!S-bp2-024-L (君のこころは輝いてるかい？ (ab#0)) | Q125, Q36 | |
+| 38 | 2 | PL!S-bp2-024-L (君のこころは輝いてるかい？ (ab#0)) | Q125, Q36 | | ✓ kagayaiteru_test |
 | 39 | 2 | PL!S-bp3-019-L (MIRACLE WAVE (ab#0)) | Q182, Q36 | |
 | 40 | 2 | PL!S-pb1-002-R (桜内梨子 (ab#0)) | Q130, Q171 | |
 | 41 | 2 | PL!SP-bp1-023-L (START!! True dreams (ab#0)) | Q36, Q66 | |
 | 42 | 2 | PL!SP-bp2-001-R＋ (澁谷かのん (ab#0)) | Q106, Q171 | |
-| 43 | 2 | PL!SP-bp2-009-R＋ (鬼塚夏美 (ab#0)) | Q109, Q36 | |
+| 43 | 2 | PL!SP-bp2-009-R＋ (鬼塚夏美 (ab#0)) | Q109, Q36 | | ✓ natsumi_test |
 | 44 | 2 | PL!SP-bp2-015-N (平安名すみれ (ab#0)) | Q112, Q113 | |
 | 45 | 2 | PL!SP-bp2-020-N (鬼塚夏美 (ab#0)) | Q112, Q113 | |
 | 46 | 2 | PL!SP-bp2-021-N (ウィーン・マルガレーテ (ab#0)) | Q112, Q113 | |
@@ -58,7 +59,7 @@ engine evaluates conditions correctly, filters work, edge cases are handled, etc
 | 49 | 2 | PL!SP-bp5-005-R＋ (葉月 恋 (ab#1)) | Q221, Q233 | |
 | 50 | 2 | PL!SP-pb1-006-R (桜小路きな子 (ab#0)) | Q171, Q94 | |
 | 51 | 2 | PL!SP-pb1-011-R (鬼塚冬毬 (ab#0)) | Q63, Q95 | |
-| 52 | 2 | PL!SP-pb1-025-L (Jellyfish (ab#0)) | Q98, Q99 | |
+| 52 | 2 | PL!SP-pb1-025-L (Jellyfish (ab#0)) | Q98, Q99 | | ✓ jellyfish_test |
 | 53 | 1 | LL-PR-004-PR (愛♡スクリ～ム！ (ab#0)) | Q185 | |
 | 54 | 1 | LL-bp5-001-L (Live with a smile! (ab#0)) | Q224 | |
 | 55 | 1 | LL-bp5-002-L (Bring the LOVE！ (ab#1)) | Q225 | |
@@ -99,7 +100,7 @@ engine evaluates conditions correctly, filters work, edge cases are handled, etc
 | 90 | 1 | PL!HS-bp5-007-R (セラス 柳田 リリエンフェルト (ab#1)) | Q209 | |
 | 91 | 1 | PL!HS-bp5-017-L (Dream Believers（104期Ver.） (ab#0)) | Q212 | |
 | 92 | 1 | PL!HS-bp5-019-L (ハナムスビ (ab#0)) | Q213 | |
-| 93 | 1 | PL!N-bp1-006-R＋ (近江彼方 (ab#0)) | Q77 | |
+| 93 | 1 | PL!N-bp1-006-R＋ (近江彼方 (ab#0)) | Q77 | | ✓ konata_test |
 | 94 | 1 | PL!N-bp1-012-R＋ (鐘 嵐珠 (ab#0)) | Q38 | |
 | 95 | 1 | PL!N-bp1-027-L (Solitude Rain (ab#0)) | Q67 | |
 | 96 | 1 | PL!N-bp1-029-L (Eutopia (ab#0)) | Q38 | |
@@ -152,7 +153,7 @@ engine evaluates conditions correctly, filters work, edge cases are handled, etc
 | 143 | 1 | PL!SP-bp1-001-R (澁谷かのん (ab#0)) | Q68 | |
 | 144 | 1 | PL!SP-bp1-024-L (Tiny Stars (ab#1)) | Q36 | |
 | 145 | 1 | PL!SP-bp2-003-R (嵐 千砂都 (ab#0)) | Q126 | |
-| 146 | 1 | PL!SP-bp2-006-R＋ (桜小路きな子 (ab#1)) | Q108 | |
+| 146 | 1 | PL!SP-bp2-006-R＋ (桜小路きな子 (ab#1)) | Q108 | | ✓ kinako_test |
 | 147 | 1 | PL!SP-bp2-011-R (鬼塚冬毬 (ab#0)) | Q118 | |
 | 148 | 1 | PL!SP-bp2-025-L (Bubble Rise (ab#0)) | Q36 | |
 | 149 | 1 | PL!SP-bp4-025-L (Special Color (ab#1)) | Q195 | |

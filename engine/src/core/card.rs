@@ -603,6 +603,15 @@ pub struct AbilityEffect {
     /// "すべての" — apply to ALL cards in zone, not just matching count
     #[serde(default)]
     pub all: Option<bool>,
+    /// "元々持つ" — refers to original/natural value, not current modified value
+    #[serde(default)]
+    pub original_value: Option<bool>,
+    /// Dynamic group reference (same_group_name, different_group_names)
+    #[serde(default)]
+    pub group_reference: Option<String>,
+    /// Conditional trigger for each_time / たび patterns (e.g. OR conditions)
+    #[serde(default)]
+    pub trigger_condition: Option<Box<Condition>>,
 }
 
 impl AbilityEffect {
@@ -619,6 +628,7 @@ impl AbilityEffect {
             source: self.source.clone(),
             destination: self.destination.clone(),
             exclude_self: self.exclude_self.unwrap_or(false),
+            characters: self.quoted_text.as_ref().map(|qt| vec![qt.text.clone()]),
         }
     }
 
@@ -695,8 +705,8 @@ pub struct DynamicCount {
     pub calculation_value: Option<u32>,
 }
 
-/// Shared execution modifiers that apply across multiple action types.
-/// Handled centrally in the effect pipeline before dispatching to action-specific code.
+/// Extracted common parameters for move_cards and card selection.
+/// Each effect handler reads from `AbilityEffect` directly for its specific fields.
 #[derive(Debug, Clone, Default)]
 pub struct ActionModifiers {
     pub target: String,
@@ -709,6 +719,7 @@ pub struct ActionModifiers {
     pub source: Option<String>,
     pub destination: Option<String>,
     pub exclude_self: bool,
+    pub characters: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -717,8 +728,7 @@ pub struct QuotedText {
     pub quoted_type: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Condition {
     #[serde(default = "default_empty_string")]
     pub text: String,
@@ -771,78 +781,19 @@ pub struct Condition {
     pub effect: Option<Box<AbilityEffect>>,
     // Parser-only fields that were missing struct fields
     #[serde(default)]
-    pub action: Option<String>,
-    #[serde(default)]
-    pub destination: Option<String>,
-    #[serde(default)]
     pub from_state: Option<String>,
     #[serde(default)]
     pub heart_type: Option<String>,
     #[serde(default)]
-    pub optional: Option<bool>,
-    #[serde(default)]
-    pub source: Option<String>,
-    #[serde(default)]
     pub to_state: Option<String>,
     #[serde(default)]
     pub aggregate: Option<String>,
-}
-
-impl Default for Condition {
-    fn default() -> Self {
-        Condition {
-            text: String::new(),
-            condition_type: None,
-            location: None,
-            locations: None,
-            count: None,
-            operator: None,
-            card_type: None,
-            target: None,
-            group: None,
-            group_names: None,
-            characters: None,
-            state: None,
-            position: None,
-            temporal_scope: None,
-            distinct: None,
-            exclude_self: None,
-            any_of: None,
-            cost_limit: None,
-            negation: None,
-            movement_condition: None,
-            baton_touch_trigger: None,
-            baton_touch_source: None,
-            movement_state: None,
-            energy_state: None,
-            comparison_target: None,
-            movement: None,
-            temporal: None,
-            phase: None,
-            comparison_type: None,
-            appearance: None,
-            conditions: None,
-            options: None,
-            condition: None,
-            card_property: None,
-            all_areas: None,
-            no_excess_heart: None,
-            resource_type: None,
-            all: None,
-            unit: None,
-            values: None,
-            cause: None,
-            effect: None,
-            action: None,
-            destination: None,
-            from_state: None,
-            heart_type: None,
-            optional: None,
-            source: None,
-            to_state: None,
-            aggregate: None,
-        }
-    }
+    /// ability_negation flag for "能力を持たない" (does not have ability) conditions
+    #[serde(default)]
+    pub ability_negation: Option<bool>,
+    /// "元々持つ" — compare against original/natural value, not current modified value
+    #[serde(default)]
+    pub original_value: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

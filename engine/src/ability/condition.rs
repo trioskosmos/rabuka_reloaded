@@ -30,6 +30,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             _ => false,
         };
 
+        // Check ability_negation field on any condition type
+        if condition.ability_negation.unwrap_or(false) {
+            let negated = self.evaluate_ability_negation_condition(condition);
+            if !negated { return false; }
+        }
+
         if condition.negation.unwrap_or(false) {
             !result
         } else {
@@ -50,18 +56,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn evaluate_comparison_condition(&self, condition: &Condition) -> bool {
-        if condition.comparison_type.as_deref() == Some("cost") && condition.location.is_none() {
-            let total_cost: u32 = self.game_state.revealed_cost_cards.iter()
-                .filter_map(|&id| self.game_state.card_database.get_card(id))
-                .filter_map(|c| c.cost)
-                .sum();
-            if let Some(ref values) = condition.values {
-                return values.contains(&total_cost);
-            }
-            let target = condition.count.unwrap_or(0);
-            return compare_counts(condition.operator.as_deref(), total_cost, target);
-        }
-
         let count = self.get_count_for_condition(condition);
 
         if let Some(ref values) = condition.values {
@@ -94,6 +88,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_type_filter = condition.card_type.as_deref();
         let comparison_type = condition.comparison_type.as_deref();
         let operator = condition.operator.as_deref();
+        let original_value = condition.original_value.unwrap_or(false);
         // When count is not specified but filters are set, default to 1
         // (checking "at least one matching card exists") instead of 0
         // which would make >= always true.
@@ -201,6 +196,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         };
         fn player_cards_for_target<'b>(p1: &'b [i16], p2: &'b [i16], is_p1: bool) -> &'b [i16] { if is_p1 { p1 } else { p2 } }
 
+        let original_blade_filter = |card_id: i16| -> bool {
+            if !original_value { return true; }
+            if let Some(op) = operator {
+                let threshold = condition.count.unwrap_or(0) as u32;
+                let card_blade = card_db.get_card(card_id).map(|c| c.blade).unwrap_or(0);
+                compare_counts(Some(op), card_blade, threshold)
+            } else { true }
+        };
+
         let location_value = match target {
             "either" => {
                 if comparison_type == Some("score") || comparison_type == Some("cost") {
@@ -208,8 +212,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     let v2 = self.get_count_for_target(condition, "opponent");
                     v1.max(v2)
                 } else {
-                    let c1 = util::count_matching(p1_cards, card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
-                    let c2 = util::count_matching(p2_cards, card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
+                    let c1 = p1_cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32;
+                    let c2 = p2_cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32;
                     if all_areas {
                         let p1_stage: &[i16] = &self.game_state.player1.stage.stage;
                         let p2_stage: &[i16] = &self.game_state.player2.stage.stage;
@@ -222,15 +226,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "both" => {
+                let blade_count = |cards: &[i16]| -> u32 {
+                    cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32
+                };
                 if let Some(op) = operator {
                     let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
-                    let self_count = util::count_matching(player_cards_for_target(p1_cards, p2_cards, self_is_p1), card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
-                    let opp_count = util::count_matching(player_cards_for_target(p1_cards, p2_cards, !self_is_p1), card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
+                    let self_count = blade_count(player_cards_for_target(p1_cards, p2_cards, self_is_p1));
+                    let opp_count = blade_count(player_cards_for_target(p1_cards, p2_cards, !self_is_p1));
                     return compare_counts(Some(op), self_count, opp_count);
                 }
                 let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
-                let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
-                util::count_matching(player_cards_for_target(p1_cards, p2_cards, self_is_p1), card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator)
+                blade_count(player_cards_for_target(p1_cards, p2_cards, self_is_p1))
             }
             _ => {
                 let player = self.game_state.resolve_target_player(target);
@@ -243,7 +249,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if comparison_type == Some("score") || comparison_type == Some("cost") || comparison_type == Some("energy") {
                     self.get_count_for_target(condition, target)
                 } else {
-                    let c = util::count_matching(cards, card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator);
+                    let c = cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32;
                     if all_areas {
                         let stage_slice: &[i16] = &player.stage.stage;
                         if stage_slice.iter().filter(|&&c| c != -1).count() != 3 {
@@ -676,9 +682,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
         // Check from_state / to_state if present
         if let (Some(from), Some(to)) = (condition.from_state.as_deref(), condition.to_state.as_deref()) {
-            // Check if the activating card has changed from 'from' to 'to' by
-            // looking at orientation modifiers. A state change from active→wait
-            // means the card was reoriented during this ability resolution.
+            // If count is specified, check against the number of members changed
+            // by the preceding effect (e.g. "3+ wait members became active")
+            if let Some(target_count) = condition.count {
+                if condition.operator.as_deref() == Some(">=") {
+                    let actual = self.game_state.last_state_change_wait_to_active_count;
+                    return actual >= target_count;
+                }
+            }
+            // Legacy: check the activating card's own orientation change
             if let Some(card_id) = self.activating_card_id {
                 let current_orientation = self.game_state.get_orientation_modifier(card_id);
                 match (from, to) {
@@ -733,6 +745,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     fn get_count_for_condition(&self, condition: &Condition) -> u32 {
         let location = condition.location.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
+        let comparison_type = condition.comparison_type.as_deref();
+        if comparison_type == Some("score") {
+            return self.get_count_for_target(condition, target);
+        }
+        if comparison_type == Some("cost") && condition.location.is_none() {
+            return self.game_state.revealed_cost_cards.iter()
+                .filter_map(|&id| self.game_state.card_database.get_card(id))
+                .filter_map(|c| c.cost)
+                .sum();
+        }
         let player = self.game_state.resolve_target_player(target);
         self.zone_len(player, location)
     }
@@ -746,7 +768,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             match comp_type {
                 "score" => {
                     let mut total_score = 0;
-                    for card_id in &player.success_live_card_zone.cards {
+                    for card_id in player.success_live_card_zone.cards.iter().chain(player.live_card_zone.cards.iter()) {
                         if let Some(card) = self.game_state.card_database.get_card(*card_id) {
                             total_score += card.score.unwrap_or(0);
                         }

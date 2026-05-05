@@ -2,7 +2,6 @@ use crate::card::AbilityEffect;
 use super::types::{Choice, ChoiceResult, ExecutionContext, LookAndSelectStep};
 use super::util;
 
-#[allow(dead_code)]
 impl<'a> super::resolver::AbilityResolver<'a> {
     pub fn resume_execution(&mut self, context: ExecutionContext) -> Result<(), String> {
         match context {
@@ -326,6 +325,26 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     return Ok(());
                 }
 
+                if target == "position|destination" {
+                    let destination = match selected.as_str() {
+                        "0" | "left" => "left_side",
+                        "1" | "center" => "center",
+                        "2" | "right" => "right_side",
+                        _ => "center",
+                    };
+                    if let Some(ref ability) = self.current_ability.clone() {
+                        if let Some(ref effect) = ability.effect {
+                            if effect.action == "position_change" {
+                                if let Err(e) = self.execute_position_change_with_destination(effect, destination) {
+                                    eprintln!("Failed to execute position change: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    self.pending_choice = None;
+                    return Ok(());
+                }
+
                 if target == "heart_color" {
                     let heart_values = ["heart00", "heart01", "heart02", "heart03", "heart04", "heart05", "heart06"];
                     let idx: usize = selected.parse().unwrap_or(0);
@@ -444,6 +463,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             .and_then(|e| e.target.clone())
             .unwrap_or_else(|| "self".to_string());
         let card_db = self.game_state.card_database.clone();
+        let vacated_area = self.game_state.last_vacated_stage_area;
         let player = self.game_state.resolve_target_player_mut(&target);
 
         let matches_card_type = |card_id: i16, filter: Option<&str>| -> bool {
@@ -504,6 +524,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                     else if player.stage.stage[0] == -1 { player.stage.stage[0] = card_id; }
                                     else if player.stage.stage[2] == -1 { player.stage.stage[2] = card_id; }
                                     else { player.hand.add_card(card_id); }
+                                }
+                                "same_area" => {
+                                    if let Some(pos) = vacated_area {
+                                        if pos < 3 && player.stage.stage[pos] == -1 {
+                                            player.stage.stage[pos] = card_id;
+                                        } else if let Some(ep) = crate::ability::move_cards::stage_first_empty(&player.stage.stage) {
+                                            player.stage.stage[ep] = card_id;
+                                        } else { player.hand.add_card(card_id); }
+                                    } else if let Some(ep) = crate::ability::move_cards::stage_first_empty(&player.stage.stage) {
+                                        player.stage.stage[ep] = card_id;
+                                    } else { player.hand.add_card(card_id); }
                                 }
                                 _ => player.hand.add_card(card_id),
                             }

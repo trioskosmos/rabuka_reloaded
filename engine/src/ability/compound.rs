@@ -42,20 +42,28 @@ impl<'a> AbilityResolver<'a> {
                     match self.execute_effect(&action_to_execute) {
                         Ok(_) => {
                             if self.pending_choice.is_some() {
-                                let mut current_with_rest: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
-                                if !current_with_rest.is_empty() {
-                                    current_with_rest[0].optional = None;
-                                }
-                                self.game_state.pending_sequential_actions = Some(current_with_rest);
+                                let current_was_optional = action.optional.unwrap_or(false);
+                                let remaining = if current_was_optional {
+                                    let mut actions: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
+                                    if !actions.is_empty() { actions[0].optional = None; }
+                                    actions
+                                } else {
+                                    repeat_actions[i + 1..].to_vec()
+                                };
+                                self.game_state.pending_sequential_actions = if remaining.is_empty() { None } else { Some(remaining) };
                                 return Ok(());
                             }
                         },
                         Err(e) if e.contains("Pending choice required") => {
-                            let mut current_with_rest: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
-                            if !current_with_rest.is_empty() {
-                                current_with_rest[0].optional = None;
-                            }
-                            self.game_state.pending_sequential_actions = Some(current_with_rest);
+                            let current_was_optional = action.optional.unwrap_or(false);
+                            let remaining = if current_was_optional {
+                                let mut actions: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
+                                if !actions.is_empty() { actions[0].optional = None; }
+                                actions
+                            } else {
+                                repeat_actions[i + 1..].to_vec()
+                            };
+                            self.game_state.pending_sequential_actions = if remaining.is_empty() { None } else { Some(remaining) };
                             return Ok(());
                         }
                         Err(e) => return Err(e),
