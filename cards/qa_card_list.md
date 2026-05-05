@@ -62,7 +62,7 @@ Write tests in engine\tests\gameplay_test_process.md
 | 53 | 1 | LL-PR-004-PR (愛♡スクリ～ム！ (ab#0)) | Q185 | |
 | 54 | 1 | LL-bp5-001-L (Live with a smile! (ab#0)) | Q224 | |
 | 55 | 1 | LL-bp5-002-L (Bring the LOVE！ (ab#1)) | Q225 | |
-| 56 | 1 | PL!-bp3-002-R (絢瀬絵里 (ab#1)) | Q144 | |
+| 56 | 1 | PL!-bp3-002-R (絢瀬絵里 (ab#1)) | Q144 | ✓ eri_bp3_test | |
 | 57 | 1 | PL!-bp3-003-R (南ことり (ab#0)) | Q145 | |
 | 58 | 1 | PL!-bp3-004-R＋ (園田海未 (ab#1)) | Q146 | |
 | 59 | 1 | PL!-bp3-008-R＋ (小泉花陽 (ab#1)) | Q145 | |

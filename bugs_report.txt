@@ -1,0 +1,273 @@
+====================================================================================================
+COMPREHENSIVE BUG/ISSUE REPORT: RAW ABILITY vs PARSED JSON
+====================================================================================================
+
+====================================================================================================
+CARD 1: PL!-pb1-001-R (高坂穂乃果)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+{{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+
+--- Q CODES ---
+  Q167（2025.09.18）
+    Q: 『
+{{kidou.png|起動}}
+{{center.png|センター}}
+{{turn1.png|ターン1回}}
+このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１...
+    A: 効果や処理は実行可能な限り解決し、一部でも実行可能な場合はその一部を解決します。まったく解決できない場合は何も行いません。
+この場合、メインデッキのカードをすべて公開してリフレッシュを行い、さらに新しいメインデッキのカードをすべて公開した時点で『選んだカードが公開されるまで、自分のデッキの一番上から...
+  Q166（2025.09.18）
+    Q: 『
+{{kidou.png|起動}}
+{{center.png|センター}}
+{{turn1.png|ターン1回}}
+このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１...
+    A: 能力に効果によって公開しているカードを含めずに「リフレッシュ」をして控え室のカードを新たなメインデッキにします。その後、効果の解決を再開します。...
+
+--- PARSED (uab#261) ---
+  Type: Activated (起動), Use limit: 1
+  Cost: sequential_cost [change_state(wait), move_cards(hand->discard x1)]
+  Effect: sequential
+    [0] select: ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ
+    [1] sequential: 選んだカードが公開されるまで、自分のデッキの一番上からカードを1枚ずつ公開する
+    [2] sequential: そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く
+
+>> ISSUE 1: SELECT action in effect[0] specifies card_type='member_card' and cost_limit=10
+   but raw text says 'ライブカードかコスト10以上のメンバーカードのどちらか1つ'
+   (either a LIVE card OR a member card with cost 10+).
+   The 'live_card' option is NOT represented in the parsed output.
+   This means the engine would only search for member_card with cost_limit=10,
+   missing the option to pick a live_card of any cost.
+
+>> ISSUE 2: The effect captures 'select->reveal->move' but the reveal action
+   '選んだカードが公開されるまで' (until selected card is revealed) is parsed
+   as a nested 'sequential' with inner 'select' which seems semantically odd.
+   The 'reveal until found' pattern should be a 'reveal_until' type, not nested sequential.
+
+====================================================================================================
+CARD 2: PL!HS-bp1-022-L (AWOKE)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合、このカードのスコアを＋１する。
+
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+
+--- PARSED (uab#380) ---
+  Trigger: ライブ成功時
+  Condition: card_count_condition(location=revealed_cards, count=10, operator=>=)
+  Action: modify_score(+1, self)
+  Parenthetical: captured
+
+>> ISSUE: Q107 is assigned to this card but Q107's QUESTION references TWO abilities:
+   1) 自動 ability (from another card) that re-yells
+   2) THIS card's live_success ability
+   The Q107 QA clarifies: '2つ目の能力を使用する時点で公開されている、2回目のエールにより公開された自分のカードのみ参照します'
+   This means the condition must check cards revealed by the CURRENT yell (second yell),
+   not ALL yell-revealed cards this turn. The parsed condition uses 'revealed_cards' which
+   is ambiguous - does it scope to the current yell's revealed cards? If not, it's wrong.
+
+>> ISSUE: No cost is expected (triggered ability), but 'Missing cost field entirely'
+   warns incorrectly. This is actually correct for triggered abilities.
+
+====================================================================================================
+CARD 3: PL!N-bp5-030-L (繚乱！ビクトリーロード)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+{{jidou.png|自動}}自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決するたび、そのメンバーが{{icon_all.png|ハート}}を持たない場合、ライブ終了時まで、そのメンバーは{{icon_all.png|ハート}}を得る。
+{{jidou.png|自動}}自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび、カードを1枚引く。
+
+--- PARSED ab#0 (uab#542) ---
+  Trigger: 自動, trigger_type: each_time
+  Condition: location_condition(stage, member, negation=true, heart_type=all)
+  Action: gain_ability(count=1, duration=live_end)
+
+>> ISSUE 1: The raw text says '自分のステージにいるメンバーのライブ開始時能力が解決するたび'
+   (each time a member's live_start ability resolves)
+   This is a 'watching' trigger - it triggers when OTHER cards' abilities resolve.
+   The parsed entry has trigger_type=each_time but does NOT capture the sub-trigger
+   condition that it only fires when 'live_start' abilities resolve. This means the
+   engine might trigger on ANY auto ability resolving, not just live_start abilities.
+
+>> ISSUE 2: QA Q217 and Q227 clarify that this ability ONLY triggers if cost WAS PAID
+   for the triggering live_start ability. This 'cost_paid' dependency is NOT captured
+   anywhere in the parsed condition/effect.
+   Q227: 'コストの支払いが必要な能力に対してコストを支払いませんでした。このとき、このカードの能力は発動しますか？ → いいえ'
+
+--- PARSED ab#1 (uab#543) ---
+  Action: sequential [do_nothing, draw_card]
+
+>> CRITICAL BUG: Effect[0] is 'do_nothing' with empty text!
+   This is a parser artifact. The raw text says simply 'カードを1枚引く' (draw 1 card).
+   There is NO reason for a do_nothing action before draw_card.
+   The parsed output should just be {action: draw_card, count: 1, ...}
+   This 'do_nothing' wasteland will cause the engine to waste an action step doing nothing.
+
+====================================================================================================
+CARD 4: PL!S-pb1-002-R (桜内梨子)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+{{toujyou.png|登場}}相手は手札からライブカードを1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+
+--- PARSED (uab#230) ---
+  Effect: sequential
+    [0] move_cards: 相手は手札からライブカードを1枚控え室に置いてもよい
+    [1] modify_score: 「{{jyouji.png|常時}}ライブの合計スコアを+1する
+    [2] gain_ability: 」を得る
+
+>> ISSUE 1: The conditional logic 'そうしなかった場合' (if opponent did NOT discard)
+   is NOT captured as a conditional branch in the sequential effect.
+   The three actions run sequentially regardless. The engine needs to know that
+   actions[1] and [2] should ONLY execute if the opponent chose NOT to discard.
+   Currently parsed as unconditional sequential, which is WRONG.
+
+>> ISSUE 2: Actions[1] and [2] split 'ライブの合計スコアを+1するを得る' into two:
+   [1] modify_score (score+1) and [2] gain_ability
+   These should be a SINGLE action: 'gain an ability that does modify_score'.
+   As parsed, the engine would add +1 to score immediately AND gain a separate
+   ability that does... nothing (since the score mod was already applied).
+
+====================================================================================================
+CARD 5: PL!SP-bp4-023-L (Dazzling Game)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+  {{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+  {{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。
+
+--- PARSED ab#0 (uab#501) ---
+  action[0]: select | これにより選んだメンバー以外の『Liella!』のメンバー1人は
+  action[1]: gain_resource | {{icon_blade.png|ブレード}}を得る
+
+>> CRITICAL BUG: FIRST SELECTION IS MISSING!
+   Raw text: '「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、
+            これにより選んだメンバー以外の『Liella!』のメンバー1人は、ブレードを得る。'
+   This requires TWO selections:
+     1) Select 1 member FROM {Kanon, Margarete, Fuyuka}
+     2) Select 1 Liella! member OTHER than the one chosen in step 1
+   Parsed output only has ONE select action (step 2) and skips step 1 entirely!
+   The 'group': {'name': 'Liella!'} doesn't reflect the 3 named characters.
+   QA Q187 confirms: '選んだメンバー以外のメンバーを選ぶ必要がありますか？ はい'
+   (Is it necessary to select a member other than the chosen one? YES)
+   This means the engine would select just 1 Liella! member and give blade,
+   missing the first named-character target entirely.
+
+====================================================================================================
+CARD 6: PL!S-bp3-019-L (MIRACLE WAVE)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+{{live_success.png|ライブ成功時}}このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合、このカードのスコアは４になる。
+
+--- PARSED (uab#447) ---
+  Condition: {"text": "または自分が余剰ハートを2つ以上持っている場合", "resource_type": "surplus_heart", "count": 2, "operator": ">=", "type": "comparison_condition"}
+  Action: set_score(value=4, self_target=true)
+
+>> CRITICAL BUG: ONLY ONE OF TWO CONDITIONS IS PARSED!
+   Raw text says: 'エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合
+                  か、または自分が余剰ハートを2つ以上持っている場合'
+   Condition A: 0 cards WITHOUT blade heart among yell-revealed cards
+   Condition B: 2+ surplus hearts
+   These are OR conditions (どちらか = either one qualifies).
+   The parsed output ONLY shows condition B (surplus_heart >= 2)!
+   Condition A about blade-heart-less cards is COMPLETELY MISSING.
+
+   QA Q182 confirms Condition A works independently:
+   'ウェイト状態などによってエールで公開したカードが0枚の場合、このライブカードのスコアはいくつになりますか？
+    → エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合 を満たすため、4'
+   This is a MAJOR bug - the parser dropped the first condition entirely.
+
+====================================================================================================
+CARD 7: PL!SP-bp5-005-R＋ (葉月 恋)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+{{kidou.png|起動}}{{turn1.png|ターン1回}}デッキの上からカードを3枚控え室に置く：ライブ終了時まで、これにより控え室に置いた『Liella!』のメンバーカード1枚につき、{{icon_blade.png|ブレード}}を得る。
+{{jidou.png|自動}}{{turn1.png|ターン1回}}自分のメインフェイズの間、自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える。
+
+--- PARSED ab#0 (uab#106) - Activated ability ---
+  Cost: move_cards(deck_top->discard, 3)
+  Effect: gain_resource(blade, per_unit=true, group=Liella!, duration=live_end)
+
+>> Looks correct. The 'per_unit' mechanism captures '1枚につき' (per card).
+
+--- PARSED ab#1 (uab#107) - Auto ability ---
+  Effect actions:
+    [0] custom: 、{{icon_energy.png|E}}支払ってもよい。
+    [1] move_cards: それらのカードの中から1枚手札に加える
+  Conditional: True
+
+>> ISSUE 1: The optional E payment (actions[0]) has action='custom' which is vague.
+   The raw text says 'Eを支払ってもよい' (may pay E). This should be an optional cost
+   payment, not a 'custom' action.
+
+>> ISSUE 2: The card recovery (actions[1]) uses source='revealed_cards' and
+   dynamic_count with reference 'previous_reveal'. But the actual source is 'discard' -
+   the cards that were just placed in the discard triggered this ability.
+   QA Q221 confirms: 'それらのカードの中 = 能力の誘発条件として控え室に置いたカードの中から選ぶ'
+   (pick from among the cards placed in discard that triggered this ability)
+   Using 'revealed_cards' as the source is INCORRECT - it should be 'discard' with
+   a reference to the cards that triggered this ability instance.
+
+====================================================================================================
+CARD 8: PL!-pb1-009-R (矢澤にこ)
+====================================================================================================
+
+--- RAW ABILITY TEXT ---
+  {{toujyou.png|登場}}相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする。
+  {{toujyou.png|登場}}このターン、自分と相手のステージにいるメンバーは、効果によってはアクティブにならない。
+
+--- PARSED ab#0 (uab#270) - Wait ability ---
+  Action: change_state(wait)
+  Target: opponent
+  Card type: member_card
+  Count: 1
+
+>> ISSUE: Condition '元々持つブレードの数が1つ以下' (originally has <=1 blade)
+   is NOT captured as a target filter condition.
+   The target selection should only include opponent members whose base blade count
+   is 1 or less. Without this condition, the engine could target ANY opponent member.
+
+--- PARSED ab#1 (uab#271) - Restriction ability ---
+  Action: restriction(cannot_activate_by_effect)
+  Target: both
+  Duration: this_turn
+
+>> Looks correct. The restriction type captures the semantics well.
+
+
+====================================================================================================
+SUMMARY OF CRITICAL PARSER BUGS FOUND
+====================================================================================================
+
+CRITICAL (affects gameplay):
+  1. Dazzling Game ab#0: FIRST MEMBER SELECTION ENTIRELY MISSING
+     The parser skipped selecting from {かのん, マルガレーテ, 冬毬} entirely.
+  2. MIRACLE WAVE: FIRST OR-CONDITION DROPPED
+     The '0 cards without blade heart' condition is not parsed.
+  3. 繚乱！ビクトリーロード ab#1: SPURIOUS do_nothing ACTION
+     Empty 'do_nothing' action before draw_card wastes an action step.
+  4. 桜内梨子: CONDITIONAL BRANCH NOT CAPTURED
+     'そうしなかった場合' (if [opponent] did not discard) logic is missing.
+  5. 高坂穂乃果: SELECT ACTION MISSES live_card OPTION
+     Only member_card (cost_limit=10) is parsed, live_card option dropped.
+
+MODERATE (affects correctness):
+  6. 葉月恋 ab#1: WRONG SOURCE in move_cards
+     Should be 'discard' not 'revealed_cards' for the card recovery.
+  7. 桜内梨子: SPLIT modify_score + gain_ability
+     Should be one 'gain ability' action, not separate score mod + ability gain.
+  8. 矢澤にこ ab#0: MISSING blade count filter
+     '元々持つブレードが1つ以下' condition not in target filter.
+  9. 繚乱！ビクトリーロード ab#0: MISSING sub-trigger scope
+     Should only fire when 'live_start' abilities resolve, not all auto abilities.
+  10. AWOKE: Condition scope ambiguity - current yell vs all revealed cards.
+
+LOW (edge cases / parser quality):
+  11. 高坂穂乃果: 'reveal until found' pattern parsed as nested sequential+select
+     instead of a dedicated 'reveal_until' action type.
+  12. 葉月恋 ab#1: Optional E payment as 'custom' instead of proper optional cost.

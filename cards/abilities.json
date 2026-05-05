@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-05T21:34:40.683123",
+  "generated_at": "2026-05-05T21:44:40.278706",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -498,7 +498,7 @@
       },
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -617,6 +617,7 @@
             "per_unit_count": 1,
             "per_unit_type": "枚",
             "location": "live_card_zone",
+            "target": "self",
             "duration": "live_end"
           }
         ],
@@ -1226,6 +1227,7 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
+        "target": "self",
         "duration": "live_end"
       }
     },
@@ -1681,6 +1683,7 @@
         "per_unit": true,
         "per_unit_count": 2,
         "per_unit_type": "枚",
+        "target": "self",
         "duration": "live_end"
       }
     },
@@ -2947,7 +2950,7 @@
       "cost": null,
       "effect": {
         "text": "自分と相手はそれぞれ、自身のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -3265,7 +3268,7 @@
           "target": "self",
           "card_type": "member_card"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 2,
@@ -3659,7 +3662,7 @@
               "type": "per_unit",
               "reference": "unit_count"
             },
-            "operation": "decrease"
+            "operation": "subtract"
           }
         ]
       }
@@ -4091,7 +4094,7 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "card_type": "member_card",
@@ -5342,7 +5345,7 @@
           "aggregate": "total",
           "type": "location_condition"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "count": 1,
         "target": "self",
@@ -6632,7 +6635,8 @@
         },
         "location": "stage",
         "cost_limit": 4,
-        "cost_limit_operator": ">="
+        "cost_limit_operator": ">=",
+        "target": "self"
       }
     },
     {
@@ -8254,7 +8258,7 @@
       },
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -8302,7 +8306,7 @@
       "cost": null,
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -8817,7 +8821,7 @@
           "movement_state": "has_moved",
           "text": "このメンバーがエリアを移動したとき"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -9253,7 +9257,8 @@
         "group": {
           "name": "みらくらぱーく！"
         },
-        "location": "stage"
+        "location": "stage",
+        "target": "self"
       }
     },
     {
@@ -9521,7 +9526,7 @@
           "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき",
           "location": "revealed_cards"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -9713,7 +9718,8 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "state": "wait",
-        "location": "stage"
+        "location": "stage",
+        "target": "opponent"
       }
     },
     {
@@ -9803,6 +9809,7 @@
         "per_unit_count": 1,
         "per_unit_type": "枚",
         "location": "live_card_zone",
+        "target": "self",
         "duration": "live_end"
       }
     },
@@ -10592,7 +10599,8 @@
                 "group": {
                   "name": "虹ヶ咲"
                 },
-                "location": "stage"
+                "location": "stage",
+                "target": "self"
               }
             ],
             "per_unit": true,
@@ -10601,7 +10609,8 @@
             "group": {
               "name": "虹ヶ咲"
             },
-            "location": "stage"
+            "location": "stage",
+            "target": "self"
           },
           {
             "text": "、自分のデッキの一番上のカードを1枚公開する。これによりライブカードを公開した場合、このカードのスコアを+1する",
@@ -10763,6 +10772,7 @@
         "per_unit_type": "人",
         "state": "wait",
         "location": "stage",
+        "target": "opponent",
         "heart_colors": [
           "heart06"
         ]
@@ -10798,7 +10808,8 @@
         "group": {
           "name": "Printemps"
         },
-        "location": "stage"
+        "location": "stage",
+        "target": "self"
       }
     },
     {
@@ -10979,7 +10990,7 @@
               "type": "per_unit",
               "reference": "unit_count"
             },
-            "operation": "decrease"
+            "operation": "subtract"
           }
         ]
       }
@@ -11744,7 +11755,7 @@
           "comparison_target": "opponent",
           "type": "comparison_condition"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -12025,7 +12036,7 @@
           "location": "stage",
           "card_type": "member_card"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -12295,7 +12306,7 @@
       },
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -12866,7 +12877,7 @@
           "appearance": true,
           "text": "自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -13537,6 +13548,7 @@
           "name": "A-RISE"
         },
         "location": "stage",
+        "target": "self",
         "heart_colors": [
           "heart05"
         ]
@@ -13815,7 +13827,7 @@
       },
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -13870,7 +13882,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "target": "self"
       }
     },
     {
@@ -14227,6 +14240,7 @@
         "per_unit_count": 1,
         "per_unit_type": "枚",
         "location": "live_card_zone",
+        "target": "self",
         "heart_colors": [
           "heart00"
         ]
@@ -14523,7 +14537,7 @@
           "text": "エールにより公開された自分のカードの中に『Liella!』のカードが7枚以上ある場合",
           "location": "revealed_cards"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -14827,6 +14841,7 @@
           "name": "虹ヶ咲"
         },
         "location": "stage",
+        "target": "self",
         "parenthetical": [
           "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
         ],
@@ -14926,7 +14941,7 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -15223,7 +15238,7 @@
           "card_type": "member_card",
           "aggregate": "total"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -15470,7 +15485,8 @@
         "destination": "hand",
         "per_unit": true,
         "per_unit_count": 6,
-        "per_unit_type": "枚"
+        "per_unit_type": "枚",
+        "target": "self"
       }
     },
     {
@@ -15663,7 +15679,7 @@
       },
       "effect": {
         "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く",
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -16068,6 +16084,7 @@
         },
         "timing_condition": "appeared_or_moved_this_turn",
         "location": "stage",
+        "target": "self",
         "heart_colors": [
           "heart00"
         ]
@@ -16733,7 +16750,8 @@
           "name": "蓮ノ空"
         },
         "distinct": "card_name",
-        "location": "stage"
+        "location": "stage",
+        "target": "self"
       }
     },
     {
@@ -16930,6 +16948,7 @@
         "per_unit_count": 1,
         "per_unit_type": "枚",
         "location": "hand",
+        "target": "self",
         "operation": "subtract"
       }
     },
@@ -17215,7 +17234,7 @@
           },
           {
             "text": "{{live_success.png|ライブ成功時}}相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く",
-            "source": "deck",
+            "source": "energy_deck",
             "destination": "energy_zone",
             "state_change": "wait",
             "count": 1,
@@ -17402,7 +17421,8 @@
                 "per_unit": true,
                 "per_unit_count": 1,
                 "per_unit_type": "人",
-                "location": "stage"
+                "location": "stage",
+                "target": "both"
               },
               {
                 "text": "それらの中にあるライブカード1枚につき、このカードのスコアを+1する",
@@ -17413,13 +17433,15 @@
                 "per_unit": true,
                 "per_unit_count": 1,
                 "per_unit_type": "枚",
-                "location": "stage"
+                "location": "stage",
+                "target": "both"
               }
             ],
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "人",
-            "location": "stage"
+            "location": "stage",
+            "target": "both"
           },
           {
             "text": "、これにより公開したカードを控え室に置く",
@@ -17645,7 +17667,8 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "target": "self"
       }
     },
     {
@@ -18053,7 +18076,7 @@
           "location": "stage",
           "card_type": "member_card"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -18112,7 +18135,8 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "state": "wait",
-        "location": "stage"
+        "location": "stage",
+        "target": "self"
       }
     },
     {
@@ -19131,7 +19155,8 @@
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "枚",
-            "location": "live_card_zone"
+            "location": "live_card_zone",
+            "target": "self"
           },
           {
             "text": "成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}増やす",
@@ -19140,7 +19165,8 @@
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "枚",
-            "location": "live_card_zone"
+            "location": "live_card_zone",
+            "target": "self"
           }
         ],
         "heart_colors": [
@@ -19271,7 +19297,7 @@
             },
             "alternative_effect": {
               "text": "1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・自分の控え室からメンバーカードを1枚手札に加える",
-              "source": "deck",
+              "source": "energy_deck",
               "destination": "energy_zone",
               "state_change": "wait",
               "count": 1,
@@ -20247,6 +20273,7 @@
             "per_unit_count": 1,
             "per_unit_type": "枚",
             "location": "live_card_zone",
+            "target": "self",
             "duration": "live_end"
           }
         ],
@@ -20512,7 +20539,8 @@
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "枚",
-            "location": "live_card_zone"
+            "location": "live_card_zone",
+            "target": "self"
           },
           {
             "text": "必要ハートを{{heart_01.png|heart01}}{{heart_03.png|heart03}}{{heart_06.png|heart06}}{{heart_00.png|heart0}}増やす",
@@ -20521,7 +20549,8 @@
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "枚",
-            "location": "live_card_zone"
+            "location": "live_card_zone",
+            "target": "self"
           }
         ],
         "heart_colors": [
@@ -20552,6 +20581,7 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "location": "stage",
+        "target": "self",
         "heart_colors": [
           "heart01",
           "heart06",
@@ -21426,7 +21456,7 @@
           "operator": ">=",
           "text": "自分のエネルギーが6枚以上ある場合"
         },
-        "source": "deck",
+        "source": "energy_deck",
         "destination": "energy_zone",
         "state_change": "wait",
         "count": 1,
@@ -21833,6 +21863,7 @@
           "name": "蓮ノ空"
         },
         "location": "live_card_zone",
+        "target": "self",
         "heart_colors": [
           "heart04"
         ]
@@ -22235,7 +22266,7 @@
         "actions": [
           {
             "text": "自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置いてもよい。",
-            "source": "deck",
+            "source": "energy_deck",
             "destination": "energy_zone",
             "count": 1,
             "card_type": "energy_card",
@@ -22792,6 +22823,7 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
+        "target": "self",
         "duration": "live_end"
       }
     },
@@ -22815,6 +22847,7 @@
         "per_unit_count": 1,
         "per_unit_type": "枚",
         "duration": "live_end",
+        "target": "self",
         "heart_colors": [
           "heart02"
         ]

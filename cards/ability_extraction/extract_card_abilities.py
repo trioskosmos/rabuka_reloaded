@@ -20,7 +20,6 @@ sys.path.append(str(Path(__file__).parent.parent))
 from parser import (
     parse_cost,
     parse_effect,
-    normalize_action,
 )
 
 TRIGGER_PATTERN = re.compile(r'\{\{([^|]+)\|([^}]+)\}\}')
@@ -293,8 +292,6 @@ def extract_all_abilities(cards_file: Path) -> dict:
             if 'actions' in effect and not effect['actions']:
                 print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
                 print(f"Effect dict: {effect}")
-            # Single-pass normalization (replaces fix_draw_action, fix_gain_resource, etc.)
-            normalize_action(effect)
             _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
             
         except Exception as e:

@@ -1,0 +1,10 @@
+﻿python :   File "<string>", line 18
+発生場所 行:1 文字:1
++ python -c "
++ ~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (  File "<string>", line 18:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    print(f'=== {t} ({c.get(" name\,\???\)})
+          ^
+SyntaxError: unterminated string literal (detected at line 18)

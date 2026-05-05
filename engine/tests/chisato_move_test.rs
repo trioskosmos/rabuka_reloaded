@@ -9,6 +9,14 @@
 mod helpers;
 use helpers::*;
 use rabuka_engine::zones::MemberArea;
+use rabuka_engine::turn::TurnEngine;
+
+fn setup_energy_deck(game: &mut TestGame) {
+    let energy = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
+}
 
 #[test]
 fn chisato_q126_area_move_triggers_energy_placement() {
@@ -20,25 +28,21 @@ fn chisato_q126_area_move_triggers_energy_placement() {
 
     // Stage: chisato on left, filler on right (swap to trigger area move)
     game.state.player1.stage.stage = [chisato, -1, filler];
-
-    // Seed energy deck
-    let energy = game.id("LL-E-001-SD");
-    for _ in 0..10 {
-        game.state.player1.energy_deck.cards.push(energy);
-    }
+    setup_energy_deck(&mut game);
 
     let energy_before = game.state.player1.energy_zone.cards.len();
     let energy_deck_before = game.state.player1.energy_deck.cards.len();
 
-    // Manually trigger position change via stage API
+    // Perform position change via the stage API
     game.state.player1.stage.position_change(MemberArea::LeftSide, MemberArea::RightSide)
         .expect("Position change should succeed");
 
-    // Process any pending auto abilities triggered by the move
+    // Manually trigger auto abilities for the player
     let player_id = game.state.player1.id.clone();
+    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
     game.state.process_pending_auto_abilities(&player_id);
 
-    // Q126 core: area move should trigger the auto ability,
+    // Q126: area move should trigger the auto ability,
     // placing 1 energy card from energy deck → energy zone
     let energy_after = game.state.player1.energy_zone.cards.len();
     assert!(energy_after > energy_before,

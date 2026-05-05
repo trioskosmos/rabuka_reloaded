@@ -1,0 +1,337 @@
+================================================================================
+CARD ABILITY ANALYSIS: RAW TEXT vs PARSED JSON
+================================================================================
+
+======================================================================
+CARD: PL!-pb1-001-R (高坂穂乃果)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+{{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  Unique ability index: #261
+  Q code: N/A
+  Full text: {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+  Triggerless text: {{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+  Triggers: 起動
+  Use limit: 1
+  Is null: False
+
+  COST:
+    text: {{center.png|センター}}このメンバーをウェイトにし、手札を1枚控え室に置く
+    type: sequential_cost
+    costs: [{'text': '{{center.png|センター}}このメンバーをウェイトにし', 'state_change': 'wait', 'type': 'change_state', 'card_type': 'member_card', 'self_cost': True}, {'text': '手札を1枚控え室に置く', 'source': 'hand', 'destination': 'discard', 'count': 1, 'type': 'move_cards'}]
+
+  EFFECT:
+    text: ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを1枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く
+    action: sequential
+    actions: [{'text': 'ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ', 'cost_limit': 10, 'count': 1, 'card_type': 'member_card', 'action': 'select'}, {'text': '選んだカードが公開されるまで、自分のデッキの一番上からカードを1枚ずつ公開する', 'action': 'sequential', 'actions': [{'text': '選んだカードが公開されるまで', 'action': 'select'}, {'text': '自分のデッキの一番上からカードを1枚ずつ公開する', 'source': 'deck_top', 'count': 1, 'target': 'self', 'multiple_targets': True, 'action': 'reveal'}]}, {'text': 'そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く', 'action': 'sequential', 'actions': [{'text': 'そのカードを手札に加え', 'action': 'move_cards', 'destination': 'hand', 'source': 'discard', 'card_type': 'card', 'count': 1}, {'text': 'これにより公開されたほかのすべてのカードを控え室に置く', 'source': 'revealed_remaining', 'dynamic_count': {'type': 'revealed_cards', 'reference': 'previous_reveal'}, 'destination': 'discard', 'action': 'move_cards', 'card_type': 'card', 'all': True}]}]
+
+  ANALYSIS / POTENTIAL ISSUES:
+    No obvious issues detected.
+
+--------------------------------------------------
+
+--- PARSED: ability slot ab#1 ---
+  ** NOT FOUND in unique_abilities for ab#1 **
+  Available slots: {0: 261}
+
+--------------------------------------------------
+
+======================================================================
+CARD: PL!HS-bp1-022-L (AWOKE)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合、このカードのスコアを＋１する。
+
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  Unique ability index: #380
+  Q code: N/A
+  Full text: {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合、このカードのスコアを＋１する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+  Triggerless text: エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合、このカードのスコアを＋１する。
+(エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。)
+  Triggers: ライブ成功時
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: このカードのスコアを+1する
+    condition: {'type': 'card_count_condition', 'count': 10, 'operator': '>=', 'text': 'エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合', 'location': 'revealed_cards'}
+    action: modify_score
+    operation: add
+    value: 1
+    self_target: True
+    parenthetical: ['エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。']
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+--- PARSED: ability slot ab#1 ---
+  ** NOT FOUND in unique_abilities for ab#1 **
+  Available slots: {0: 380}
+
+--------------------------------------------------
+
+======================================================================
+CARD: PL!N-bp5-030-L (繚乱！ビクトリーロード)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+{{jidou.png|自動}}自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決するたび、そのメンバーが{{icon_all.png|ハート}}を持たない場合、ライブ終了時まで、そのメンバーは{{icon_all.png|ハート}}を得る。
+{{jidou.png|自動}}自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび、カードを1枚引く。
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  Unique ability index: #542
+  Q code: N/A
+  Full text: {{jidou.png|自動}}自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決するたび、そのメンバーが{{icon_all.png|ハート}}を持たない場合、ライブ終了時まで、そのメンバーは{{icon_all.png|ハート}}を得る。
+  Triggerless text: 自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決するたび、そのメンバーが{{icon_all.png|ハート}}を持たない場合、ライブ終了時まで、そのメンバーは{{icon_all.png|ハート}}を得る。
+  Triggers: 自動
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: 自分のステージにいるメンバーの{{live_start.png|ライブ開始時}}能力が解決するたび、そのメンバーが{{icon_all.png|ハート}}を持たない場合、ライブ終了時まで、そのメンバーは{{icon_all.png|ハート}}を得る
+    condition: {'type': 'location_condition', 'card_type': 'member_card', 'location': 'stage', 'text': '、そのメンバーが{{icon_all.png|ハート}}を持たない場合', 'negation': True, 'heart_type': 'all'}
+    action: gain_ability
+    count: 1
+    duration: live_end
+    trigger_type: each_time
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+--- PARSED: ability slot ab#1 ---
+  Unique ability index: #543
+  Q code: N/A
+  Full text: {{jidou.png|自動}}自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび、カードを1枚引く。
+  Triggerless text: 自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび、カードを1枚引く。
+  Triggers: 自動
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: 自分のステージにいるメンバーの{{live_success.png|ライブ成功時}}能力が解決するたび、カードを1枚引く
+    action: sequential
+    actions: [{'text': '', 'action': 'do_nothing'}, {'text': 'カードを1枚引く', 'count': 1, 'action': 'draw_card', 'source': 'deck', 'destination': 'hand'}]
+    trigger_type: each_time
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+======================================================================
+CARD: PL!S-pb1-002-R (桜内梨子)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+{{toujyou.png|登場}}相手は手札からライブカードを1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  Unique ability index: #230
+  Q code: N/A
+  Full text: {{toujyou.png|登場}}相手は手札からライブカードを1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+  Triggerless text: 相手は手札からライブカードを1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを＋１する。」を得る。
+  Triggers: 登場
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: 相手は手札からライブカードを1枚控え室に置いてもよい。そうしなかった場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る
+    action: sequential
+    actions: [{'text': '相手は手札からライブカードを1枚控え室に置いてもよい', 'source': 'hand', 'destination': 'discard', 'count': 1, 'card_type': 'live_card', 'optional': True, 'action': 'move_cards'}, {'text': '「{{jyouji.png|常時}}ライブの合計スコアを+1する', 'action': 'modify_score', 'operation': 'add', 'value': 1}, {'text': '」を得る', 'action': 'gain_ability'}]
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+--- PARSED: ability slot ab#1 ---
+  ** NOT FOUND in unique_abilities for ab#1 **
+  Available slots: {0: 230}
+
+--------------------------------------------------
+
+======================================================================
+CARD: PL!SP-bp4-023-L (Dazzling Game)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  Unique ability index: #501
+  Q code: N/A
+  Full text: {{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+  Triggerless text: ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+  Triggers: ライブ開始時
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: 自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る
+    action: sequential
+    actions: [{'text': 'これにより選んだメンバー以外の『Liella!』のメンバー1人は', 'count': 1, 'card_type': 'member_card', 'group': {'name': 'Liella!'}, 'group_names': ['Liella!'], 'action': 'select'}, {'text': '{{icon_blade.png|ブレード}}を得る', 'action': 'gain_resource', 'resource': 'blade', 'count': 1, 'duration': 'live_end'}]
+    duration: live_end
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+--- PARSED: ability slot ab#1 ---
+  Unique ability index: #502
+  Q code: N/A
+  Full text: {{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。
+  Triggerless text: ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。
+  Triggers: ライブ開始時
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる
+    action: set_blade_type
+    blade_type: 紫ブレード
+    duration: live_end
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+======================================================================
+CARD: PL!S-bp3-019-L (MIRACLE WAVE)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+{{live_success.png|ライブ成功時}}このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合、このカードのスコアは４になる。
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  Unique ability index: #447
+  Q code: N/A
+  Full text: {{live_success.png|ライブ成功時}}このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合、このカードのスコアは４になる。
+  Triggerless text: このターン、エールにより公開された自分のカードの中にブレードハートを持たないカードが0枚の場合か、または自分が余剰ハートを2つ以上持っている場合、このカードのスコアは４になる。
+  Triggers: ライブ成功時
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: このカードのスコアは4になる
+    condition: {'text': 'または自分が余剰ハートを2つ以上持っている場合', 'resource_type': 'surplus_heart', 'count': 2, 'operator': '>=', 'type': 'comparison_condition'}
+    action: set_score
+    value: 4
+    self_target: True
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+--- PARSED: ability slot ab#1 ---
+  ** NOT FOUND in unique_abilities for ab#1 **
+  Available slots: {0: 447}
+
+--------------------------------------------------
+
+======================================================================
+CARD: PL!SP-bp5-005-R+ (???)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+NO ABILITY TEXT
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  ** NOT FOUND in unique_abilities for ab#0 **
+  Available slots: {}
+
+--------------------------------------------------
+
+--- PARSED: ability slot ab#1 ---
+  ** NOT FOUND in unique_abilities for ab#1 **
+  Available slots: {}
+
+--------------------------------------------------
+
+======================================================================
+CARD: PL!-pb1-009-R (矢澤にこ)
+======================================================================
+
+--- RAW ABILITY TEXT (from cards.json) ---
+{{toujyou.png|登場}}相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする。
+{{toujyou.png|登場}}このターン、自分と相手のステージにいるメンバーは、効果によってはアクティブにならない。
+
+Q-codes found in raw text: []
+
+--- PARSED: ability slot ab#0 ---
+  Unique ability index: #270
+  Q code: N/A
+  Full text: {{toujyou.png|登場}}相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする。
+  Triggerless text: 相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする。
+  Triggers: 登場
+  Use limit: None
+  Is null: False
+
+  COST:
+    None
+
+  EFFECT:
+    text: 相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が1つ以下のメンバー1人をウェイトにする
+    state_change: wait
+    count: 1
+    card_type: member_card
+    target: opponent
+    action: change_state
+
+  ANALYSIS / POTENTIAL ISSUES:
+    [ISSUE] Missing cost field entirely
+
+--------------------------------------------------
+
+======================================================================
+CROSS-REFERENCE: Q-codes in raw text -> unique ability index
+======================================================================
