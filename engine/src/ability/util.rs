@@ -143,6 +143,28 @@ pub fn matching_indices(
         .collect()
 }
 
+/// Filter card IDs by distinct card names when a distinct constraint is set.
+/// Handles all parser output forms: "card_name", "true", "distinct".
+/// Returns deduplicated Vec<usize> of indices into the original `cards` slice.
+pub fn filter_distinct_indices(cards: &[i16], card_db: &CardDatabase, distinct: Option<&str>) -> Vec<usize> {
+    let distinct = match distinct {
+        Some("card_name") | Some("true") | Some("distinct") => true,
+        _ => return (0..cards.len()).collect(),
+    };
+    if !distinct {
+        return (0..cards.len()).collect();
+    }
+    let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+    cards.iter().enumerate()
+        .filter(|(_, &id)| {
+            card_db.get_card(id)
+                .map(|c| seen.insert(c.name.clone()))
+                .unwrap_or(true)
+        })
+        .map(|(i, _)| i)
+        .collect()
+}
+
 pub fn compare_counts(operator: Option<&str>, actual: u32, expected: u32) -> bool {
     match operator {
         Some(">=") => actual >= expected,
@@ -169,3 +191,34 @@ pub fn sum_score_in_zone(cards: &[i16], card_db: &CardDatabase, get_modifier: im
         (base as i32 + get_modifier(id)) as u32
     }).sum()
 }
+
+/// Resolve a named zone to an immutable card slice.
+pub fn zone_cards<'a>(player: &'a crate::player::Player, zone: &str) -> &'a [i16] {
+    match zone {
+        "stage" => &player.stage.stage,
+        "hand" => &player.hand.cards,
+        "deck" => &player.main_deck.cards,
+        "discard" | "waitroom" => &player.waitroom.cards,
+        "energy_zone" => &player.energy_zone.cards,
+        "live_card_zone" => &player.live_card_zone.cards,
+        "success_live_zone" => &player.success_live_card_zone.cards,
+        _ => &[],
+    }
+}
+
+/// Count matching cards with an additional blade-constraint closure.
+pub fn count_matching_with_blade(
+    cards: &[i16], card_db: &CardDatabase,
+    card_type: Option<&str>, group: Option<&str>,
+    cost_limit: Option<u32>, cost_op: Option<&str>,
+    blade_filter: impl Fn(i16) -> bool,
+) -> u32 {
+    cards.iter().filter(|&&id| {
+        id != -1
+            && card_matches_type(card_db, id, card_type)
+            && card_matches_group_str(card_db, id, group)
+            && card_matches_cost_limit_op(card_db, id, cost_limit, cost_op)
+            && blade_filter(id)
+    }).count() as u32
+}
+

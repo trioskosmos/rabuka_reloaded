@@ -202,7 +202,22 @@ impl Player {
                     }
                 }
             }
-            let mut cost_to_pay = card_cost.saturating_sub(cost_reduction);
+            // Rule: Cost increase from 常時 abilities (e.g. success_live_zone cards → +cost)
+            let mut cost_increase: u32 = 0;
+            for ability in &card.abilities {
+                if let Some(ref effect) = ability.effect {
+                    if effect.action == "modify_cost"
+                        && effect.operation.as_deref() == Some("increase")
+                        && effect.location.as_deref() == Some("success_live_zone")
+                    {
+                        let per_unit_count = effect.per_unit_count.unwrap_or(1) as usize;
+                        let success_count = self.success_live_card_zone.cards.len();
+                        let multiplier = effect.count.unwrap_or(1) as u32;
+                        cost_increase = ((success_count / per_unit_count) as u32) * multiplier;
+                    }
+                }
+            }
+            let mut cost_to_pay = card_cost.saturating_sub(cost_reduction).saturating_add(cost_increase);
 
 
             // Rule 9.6.2.3.2: Baton touch - if 1+ energy to pay, can send member from target area to waitroom instead

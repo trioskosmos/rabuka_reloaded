@@ -183,18 +183,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         };
 
         // Collect both players' cards for targets that need cross-player comparison
-        let p1_cards: &[i16] = match location {
-            "stage" => &self.game_state.player1.stage.stage, "hand" => &self.game_state.player1.hand.cards,
-            "deck" => &self.game_state.player1.main_deck.cards, "discard" | "waitroom" => &self.game_state.player1.waitroom.cards,
-            "energy_zone" => &self.game_state.player1.energy_zone.cards, "live_card_zone" => &self.game_state.player1.live_card_zone.cards,
-            "success_live_zone" => &self.game_state.player1.success_live_card_zone.cards, _ => &[],
-        };
-        let p2_cards: &[i16] = match location {
-            "stage" => &self.game_state.player2.stage.stage, "hand" => &self.game_state.player2.hand.cards,
-            "deck" => &self.game_state.player2.main_deck.cards, "discard" | "waitroom" => &self.game_state.player2.waitroom.cards,
-            "energy_zone" => &self.game_state.player2.energy_zone.cards, "live_card_zone" => &self.game_state.player2.live_card_zone.cards,
-            "success_live_zone" => &self.game_state.player2.success_live_card_zone.cards, _ => &[],
-        };
+        let p1_cards: &[i16] = util::zone_cards(&self.game_state.player1, location);
+        let p2_cards: &[i16] = util::zone_cards(&self.game_state.player2, location);
         fn player_cards_for_target<'b>(p1: &'b [i16], p2: &'b [i16], is_p1: bool) -> &'b [i16] { if is_p1 { p1 } else { p2 } }
 
         let original_blade_filter = |card_id: i16| -> bool {
@@ -213,8 +203,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     let v2 = self.get_count_for_target(condition, "opponent");
                     v1.max(v2)
                 } else {
-                    let c1 = p1_cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32;
-                    let c2 = p2_cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32;
+                    let c1 = util::count_matching_with_blade(p1_cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter);
+                    let c2 = util::count_matching_with_blade(p2_cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter);
                     if all_areas {
                         let p1_stage: &[i16] = &self.game_state.player1.stage.stage;
                         let p2_stage: &[i16] = &self.game_state.player2.stage.stage;
@@ -228,7 +218,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             "both" => {
                 let blade_count = |cards: &[i16]| -> u32 {
-                    cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32
+                    util::count_matching_with_blade(cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter)
                 };
                 if let Some(op) = operator {
                     let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
@@ -241,16 +231,11 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             _ => {
                 let player = self.game_state.resolve_target_player(target);
-                let cards: &[i16] = match location {
-                    "stage" => &player.stage.stage, "hand" => &player.hand.cards,
-                    "deck" => &player.main_deck.cards, "discard" | "waitroom" => &player.waitroom.cards,
-                    "energy_zone" => &player.energy_zone.cards, "live_card_zone" => &player.live_card_zone.cards,
-                    "success_live_zone" => &player.success_live_card_zone.cards, _ => &[],
-                };
+                let cards: &[i16] = util::zone_cards(player, location);
                 if comparison_type == Some("score") || comparison_type == Some("cost") || comparison_type == Some("energy") {
                     self.get_count_for_target(condition, target)
                 } else {
-                    let c = cards.iter().filter(|&&id| id != -1 && util::card_matches_type(card_db, id, card_type_filter) && util::card_matches_group_str(card_db, id, group_names.and_then(|g| g.first().map(|s| s.as_str()))) && util::card_matches_cost_limit_op(card_db, id, cost_limit, operator) && original_blade_filter(id)).count() as u32;
+                    let c = util::count_matching_with_blade(cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter);
                     if all_areas {
                         let stage_slice: &[i16] = &player.stage.stage;
                         if stage_slice.iter().filter(|&&c| c != -1).count() != 3 {

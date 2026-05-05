@@ -168,14 +168,14 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::Draw | EffectAction::DrawCard => self.execute_draw(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck"), effect.destination.as_deref().unwrap_or("hand"), effect.card_type.as_deref(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref()),
             EffectAction::DrawUntilCount => self.execute_draw_until_count(effect.target_count.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.destination.as_deref().unwrap_or("hand")),
             EffectAction::DiscardCard | EffectAction::MoveCards => self.execute_move_cards(effect),
-            EffectAction::GainResource => { let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1)); self.execute_gain_resource(effect.resource.as_deref().unwrap_or(""), count, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.heart_color.as_deref(), effect.heart_colors.as_ref(), effect.resource_icon_count, effect.heart_selection.unwrap_or(false)) },
+            EffectAction::GainResource => { let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1)); self.execute_gain_resource(effect.resource.as_deref().unwrap_or(""), count, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.heart_color.as_deref(), effect.heart_colors.as_ref(), effect.resource_icon_count, effect.heart_selection.unwrap_or(false), effect.sign.as_deref()) },
             EffectAction::ChangeState => self.execute_change_state(effect.state_change.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(0), effect.max.unwrap_or(false), effect.card_type.as_deref(), effect.cost_limit, effect.optional.unwrap_or(false), effect.group.as_ref().map(|g| g.name.as_str()), effect.self_cost.unwrap_or(false), effect.source.as_deref(), effect.destination.as_deref()),
             EffectAction::ModifyScore => self.execute_modify_score(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.effect_constraint.as_deref(), effect.self_target.unwrap_or(false)),
             EffectAction::ModifyRequiredHearts => self.execute_modify_required_hearts(effect.operation.as_deref().unwrap_or("decrease"), effect.value.unwrap_or(0), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self"), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.group.as_ref(), effect.timing_condition.as_deref(), effect.location.as_deref()),
             EffectAction::SetCost => self.execute_set_cost(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
             EffectAction::SetBladeType => self.execute_set_blade_type(effect.blade_type.as_deref(), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
             EffectAction::SetHeartType => self.execute_set_heart_type(effect.heart_type.as_deref().or(effect.heart_color.as_deref()), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1) as i32),
-            EffectAction::ActivateAbility => self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or("")),
+            EffectAction::ActivateAbility => self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or(""), effect.target_trigger.as_deref(), effect.count),
             EffectAction::InvalidateAbility => self.execute_invalidate_ability(),
             EffectAction::GainAbility => self.execute_gain_ability(effect.ability_gain.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
             EffectAction::PlayBatonTouch => self.execute_play_baton_touch(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self")),
@@ -301,7 +301,7 @@ impl<'a> AbilityResolver<'a> {
         &mut self, resource: &str, count: u32, target: &str, duration: Option<&str>,
         card_type: Option<&str>, group_name: Option<&str>, per_unit: bool, per_unit_count: u32,
         per_unit_type: Option<&str>, heart_color: Option<&str>, heart_colors: Option<&Vec<String>>,
-        _resource_icon_count: Option<u32>, heart_selection: bool,
+        _resource_icon_count: Option<u32>, heart_selection: bool, sign: Option<&str>,
     ) -> Result<(), String> {
         let resource = resource.to_string();
         let target = target.to_string();
@@ -374,9 +374,10 @@ impl<'a> AbilityResolver<'a> {
         };
 
         let mut effect_data: Option<serde_json::Value> = None;
+        let is_negative = sign == Some("negative");
 
         if resource == "blade" || resource == "ブレード" {
-            let blades_to_add = final_count as i32;
+            let blades_to_add = if is_negative { -(final_count as i32) } else { final_count as i32 };
             if blade_targets.is_empty() {
                 if let Some(card_id) = activating_card_id {
                     self.game_state.add_blade_modifier(card_id, blades_to_add);
@@ -396,8 +397,9 @@ impl<'a> AbilityResolver<'a> {
 
         if resource == "heart" || resource == "ハート" {
             let color = crate::zones::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
+            let heart_to_add = if is_negative { -(final_count as i32) } else { final_count as i32 };
             for card_id in heart_targets {
-                self.game_state.add_heart_modifier(card_id, color, final_count as i32);
+                self.game_state.add_heart_modifier(card_id, color, heart_to_add);
             }
         }
 
@@ -819,9 +821,13 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_activate_ability(&mut self, ability_text: &str) -> Result<(), String> {
+    fn execute_activate_ability(&mut self, ability_text: &str, target_trigger: Option<&str>, _count: Option<u32>) -> Result<(), String> {
         if let Some(card_id) = self.game_state.activating_card {
-            self.game_state.gained_abilities.entry(card_id).or_default().push(ability_text.to_string());
+            let mut text = ability_text.to_string();
+            if let Some(trigger) = target_trigger {
+                text = format!("{}_trigger:{}", text, trigger);
+            }
+            self.game_state.gained_abilities.entry(card_id).or_default().push(text);
         }
         Ok(())
     }
@@ -1154,6 +1160,11 @@ impl<'a> AbilityResolver<'a> {
     fn execute_restriction(&mut self, restriction_type: Option<&str>, restricted_destination: Option<&str>) -> Result<(), String> {
         eprintln!("restriction: type={:?}, destination={:?}", restriction_type, restricted_destination);
         self.game_state.prohibition_effects.push(format!("restriction:{}:{}", restriction_type.unwrap_or("unknown"), restricted_destination.unwrap_or("")));
+        // Handle cannot_activate restrictions — store for checking during Active phase
+        if restriction_type == Some("cannot_activate") || restriction_type == Some("cannot_activate_by_effect") {
+            let target = self.game_state.activating_card.map(|_| "self".to_string()).unwrap_or("opponent".to_string());
+            self.game_state.cannot_activate_members.push(target);
+        }
         Ok(())
     }
 

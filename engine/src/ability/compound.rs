@@ -139,6 +139,7 @@ impl<'a> AbilityResolver<'a> {
     pub fn execute_conditional_on_optional(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let optional_action = effect.optional_action.as_ref();
         let conditional_action = effect.conditional_action.as_ref();
+        let is_negation = effect.conditional_negation.unwrap_or(false);
 
         if optional_action.is_some() && conditional_action.is_some() {
             let desc = optional_action.as_ref().map(|a| a.text.as_str()).unwrap_or("Perform optional action");
@@ -150,7 +151,9 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if let Some(ref optional) = optional_action { self.execute_effect(optional)?; }
-        if let Some(ref conditional) = conditional_action { self.execute_effect(conditional)?; }
+        if let Some(ref conditional) = conditional_action {
+            if !is_negation { self.execute_effect(conditional)?; }
+        }
         Ok(())
     }
 }

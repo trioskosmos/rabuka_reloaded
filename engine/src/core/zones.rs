@@ -18,6 +18,18 @@ pub enum MemberArea {
     RightSide,
 }
 
+impl MemberArea {
+    /// Returns the opposing player's front area for this area.
+    /// Rule 4.5.7: Left side face opponent's right side, center faces center, right side faces opponent's left side.
+    pub fn front_area(&self) -> MemberArea {
+        match self {
+            MemberArea::LeftSide => MemberArea::RightSide,
+            MemberArea::Center => MemberArea::Center,
+            MemberArea::RightSide => MemberArea::LeftSide,
+        }
+    }
+}
+
 impl std::fmt::Display for MemberArea {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {

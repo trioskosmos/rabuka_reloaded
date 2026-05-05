@@ -62,13 +62,13 @@ Write tests in engine\tests\gameplay_test_process.md
 | 53 | 1 | LL-PR-004-PR (愛♡スクリ～ム！ (ab#0)) | Q185 | |
 | 54 | 1 | LL-bp5-001-L (Live with a smile! (ab#0)) | Q224 | |
 | 55 | 1 | LL-bp5-002-L (Bring the LOVE！ (ab#1)) | Q225 | |
-| 56 | 1 | PL!-bp3-002-R (絢瀬絵里 (ab#1)) | Q144 | ✓ eri_bp3_test | |
-| 57 | 1 | PL!-bp3-003-R (南ことり (ab#0)) | Q145 | |
-| 58 | 1 | PL!-bp3-004-R＋ (園田海未 (ab#1)) | Q146 | |
-| 59 | 1 | PL!-bp3-008-R＋ (小泉花陽 (ab#1)) | Q145 | |
-| 60 | 1 | PL!-bp3-019-L (僕らのLIVE 君とのLIFE (ab#0)) | Q147 | |
-| 61 | 1 | PL!-bp3-023-L (ミはμ'sicのミ (ab#0)) | Q148 | |
-| 62 | 1 | PL!-bp4-009-R (矢澤にこ (ab#0)) | Q189 | |
+| 56 | 1 | PL!-bp3-002-R (絢瀬絵里 (ab#1)) | Q144 | ✓ eri_bp3_test | | | ✓ b7_constant |
+| 57 | 1 | PL!-bp3-003-R (南ことり (ab#0)) | Q145 | ✓ parse_test | |
+| 58 | 1 | PL!-bp3-004-R＋ (園田海未 (ab#1)) | Q146 | ✓ parse_test | |
+| 59 | 1 | PL!-bp3-008-R＋ (小泉花陽 (ab#1)) | Q145 | ✓ parse_test | |
+| 60 | 1 | PL!-bp3-019-L (僕らのLIVE 君とのLIFE (ab#0)) | Q147 | ✓ parse_test | |
+| 61 | 1 | PL!-bp3-023-L (ミはμ'sicのミ (ab#0)) | Q148 | ✓ parse_test | |
+| 62 | 1 | PL!-bp4-009-R (矢澤にこ (ab#0)) | Q189 | ✓ batch_nico_bp4_hanayo_test | |
 | 63 | 1 | PL!-bp5-004-R＋ (園田海未 (ab#1)) | Q228 | |
 | 64 | 1 | PL!-bp5-007-R (東條 希 (ab#0)) | Q229 | |
 | 65 | 1 | PL!-bp5-009-R (矢澤にこ (ab#0)) | Q209 | |
@@ -80,8 +80,8 @@ Write tests in engine\tests\gameplay_test_process.md
 | 71 | 1 | PL!-pb1-031-L (輝夜の城で踊りたい (ab#0)) | Q36 | |
 | 72 | 1 | PL!-pb1-032-L (SENTIMENTAL StepS (ab#0)) | Q36 | |
 | 73 | 1 | PL!-sd1-002-SD (絢瀬 絵里 (ab#0)) | Q79 | |
-| 74 | 1 | PL!-sd1-006-SD (西木野 真姫 (ab#0)) | Q125 | |
-| 75 | 1 | PL!-sd1-019-SD (START:DASH!! (ab#0)) | Q36 | |
+| 74 | 1 | PL!-sd1-006-SD (西木野 真姫 (ab#0)) | Q125 | | | ✓ batch5_test |
+| 75 | 1 | PL!-sd1-019-SD (START:DASH!! (ab#0)) | Q36 | ✓ batch_nico_bp4_hanayo_test | |
 | 76 | 1 | PL!HS-PR-016-PR (日野下花帆 (ab#0)) | Q175 | |
 | 77 | 1 | PL!HS-PR-017-PR (村野さやか (ab#0)) | Q175 | |
 | 78 | 1 | PL!HS-PR-019-PR (百生 吟子 (ab#0)) | Q171 | |
@@ -136,10 +136,10 @@ Write tests in engine\tests\gameplay_test_process.md
 | 127 | 1 | PL!S-bp2-021-L (未体験HORIZON (ab#0)) | Q36 | |
 | 128 | 1 | PL!S-bp2-022-L (未熟DREAMER (ab#0)) | Q36 | |
 | 129 | 1 | PL!S-bp2-023-L (MY舞☆TONIGHT (ab#0)) | Q121 | |
-| 130 | 1 | PL!S-bp3-005-R (渡辺 曜 (ab#0)) | Q153 | |
+| 130 | 1 | PL!S-bp3-005-R (渡辺 曜 (ab#0)) | Q153 | | | ✓ batch5_test |
 | 131 | 1 | PL!S-bp3-006-R＋ (津島善子 (ab#0)) | Q154 | |
 | 132 | 1 | PL!S-bp3-008-R (小原鞠莉 (ab#0)) | Q79 | |
-| 133 | 1 | PL!S-bp3-016-N (国木田花丸 (ab#0)) | Q155 | |
+| 133 | 1 | PL!S-bp3-016-N (国木田花丸 (ab#0)) | Q155 | ✓ b7_constant_ability_test | |
 | 134 | 1 | PL!S-bp3-020-L (ダイスキだったらダイジョウブ！ (ab#0)) | Q156 | |
 | 135 | 1 | PL!S-bp5-001-R＋ (高海千歌 (ab#1)) | Q218 | |
 | 136 | 1 | PL!S-pb1-003-R (松浦果南 (ab#0)) | Q36 | |

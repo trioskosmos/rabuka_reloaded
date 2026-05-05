@@ -177,6 +177,21 @@ def merge_position_requirement(result, action):
     return result
 
 
+def check_exclude_self(text):
+    """Check if text contains 'other' patterns (ほかの/他の) that imply exclude_self."""
+    return 'ほかの' in text or '他の' in text or '以外' in text
+
+
+def check_distinct_name(text):
+    """Check if text contains 'different name' pattern (名前の異なる)."""
+    return '名前の異なる' in text
+
+
+def check_original_value(text):
+    """Check if text contains 'original value' pattern (元々持つ)."""
+    return '元々持つ' in text
+
+
 def split_commas_smartly(text):
     """Split text by commas, but preserve structural commas."""
     parts = []
@@ -214,21 +229,23 @@ def split_commas_smartly(text):
     return parts
 
 
-# Main groups (large idol groups)
+# Main groups (large idol groups) - from rules v1.06 Appendix A
 MAIN_GROUPS = {
     'μ\'s', 'Aqours', 'Saint Snow', '虹ヶ咲', 'Liella!',
     'Nijigaku', 'Liella', 'SaintSnow', 'Muse',
     '蓮ノ空',  # Hasunosora
+    'A-RISE', 'Sunny Passion',
 }
 
-# Subunits (smaller groups within main groups)
+# Subunits (smaller groups within main groups) - from rules v1.06 Appendix A
 SUBUNITS = {
     'CYaRon!', 'AZALEA', 'Guilty Kiss', 'Dance',
     'Qu4rtz', 'R3BIRTH',
     'CatChu!', '5yncri5e!', 'BiBi', 'Printemps',
     'lily white', 'DOLLCHESTRA', 'スリーズブーケ',
-    'みらくらぱーく！', 'MIRAPARK', 'EdelNote',
-    'A-RISE', 'SunnyPassion', 'KALEIDOSCORE',
+    'みらくらぱーく！', 'MIRAPARK', 'EdelNote', 'Edel Note',
+    'KALEIDOSCORE',
+    'A・ZU・NA', 'DiverDiva', 'AiScReam',
 }
 
 # Combined known units (both main groups and subunits)

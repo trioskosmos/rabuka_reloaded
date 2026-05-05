@@ -497,6 +497,8 @@ pub struct AbilityEffect {
     pub optional_action: Option<Box<AbilityEffect>>,
     #[serde(default)]
     pub conditional_action: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub conditional_negation: Option<bool>,
     pub operation: Option<String>,
     pub value: Option<u32>,
     // Subvariable fields for ability effects
@@ -600,6 +602,12 @@ pub struct AbilityEffect {
     pub self_target: Option<bool>,
     #[serde(default)]
     pub trigger_type: Option<String>,
+    /// "+" or "-" sign for resource operations (gain_resource with sign: "negative" = lose)
+    #[serde(default)]
+    pub sign: Option<String>,
+    /// Phase restriction for restriction actions (e.g., "active_phase")
+    #[serde(default)]
+    pub phase: Option<String>,
     /// "すべての" — apply to ALL cards in zone, not just matching count
     #[serde(default)]
     pub all: Option<bool>,

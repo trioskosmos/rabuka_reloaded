@@ -81,7 +81,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
             };
 
             // --- STEP 1: Get cards from source ---
-            let taken: Vec<i16> = match source.as_str() {
+            let mut taken: Vec<i16> = match source.as_str() {
                 // Deck → anything (sequential draw, no selection prompt)
                 "deck" | "deck_top" => {
                     let mut drawn = Vec::new();
@@ -232,6 +232,22 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     }
                     idxs.iter().rev().map(|&i| player.success_live_card_zone.cards.remove(i)).collect()
                 }
+                "those_cards" => {
+                    // "Those cards" — resolves based on ability trigger context.
+                    // For triggers involving cards placed in waitroom, read from discard.
+                    let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, None, character_filter.as_ref());
+                    if idxs.len() < count { vec![] }
+                    else if idxs.len() > count {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "discard".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
+                            count, description: format!("Select {} card(s) from those cards", count), allow_skip: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    } else {
+                        idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect()
+                    }
+                }
                 "looked_at" => {
                     // Take cards from looked_at buffer (from reveal_until_live_card etc.)
                     let mut idxs: Vec<usize> = (0..self.looked_at_cards.len()).filter(|&i| {
@@ -274,6 +290,20 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                 return Ok(());
             }
 
+            // Apply distinct card name filter if specified
+            let distinct = effect.distinct.as_deref();
+            if distinct == Some("card_name") || distinct == Some("true") || distinct == Some("distinct") {
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                taken.retain(|&id| {
+                    card_db.get_card(id)
+                        .map(|c| seen.insert(c.name.clone()))
+                        .unwrap_or(true)
+                });
+                if taken.len() < count {
+                    taken.clear();  // Not enough distinct cards — skip
+                }
+            }
+
             // --- STEP 3: Place cards in destination ---
             for card_id in taken {
                 let dest = destination.as_str();
@@ -304,7 +334,10 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                                 player.stage.stage[ep] = card_id;
                                 player.areas_locked_this_turn.insert(pos_to_area(ep));
                             } else { player.hand.add_card(card_id); }
-                        }
+                        } else if let Some(ep) = stage_first_empty(&player.stage.stage) {
+                            player.stage.stage[ep] = card_id;
+                            player.areas_locked_this_turn.insert(pos_to_area(ep));
+                        } else { player.hand.add_card(card_id); }
                     }
                     _ => { player.hand.add_card(card_id); }
                 }

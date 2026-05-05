@@ -20,6 +20,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 from parser import (
     parse_cost,
     parse_effect,
+    _normalize_effect_tree,
 )
 
 TRIGGER_PATTERN = re.compile(r'\{\{([^|]+)\|([^}]+)\}\}')
@@ -87,10 +88,18 @@ def extract_trigger(text: str) -> tuple[list, str, str]:
         
         # Check if this is a use limit (turn restriction)
         if any(use_limit_pattern in icon_file for use_limit_pattern in use_limit_patterns):
-            use_limit = icon_text
-            # Set once_per_turn if use_limit is ターン1回
-            if use_limit == "ターン1回":
-                use_limit = 1  # Convert to integer
+            use_limit_text = icon_text
+            # Convert Japanese turn limit text to integer
+            if use_limit_text == "ターン1回":
+                use_limit = 1
+            elif use_limit_text == "ターン2回":
+                use_limit = 2
+            elif use_limit_text == "ターン3回":
+                use_limit = 3
+            else:
+                # Try to extract any number from text like "ターンN回"
+                num_match = re.match(r'ターン(\d+)回', use_limit_text)
+                use_limit = int(num_match.group(1)) if num_match else use_limit_text
             # Remove use limit from effect
             trigger_pattern = f"{{{{{icon_file}|{icon_text}}}}}"
             effect = effect.replace(trigger_pattern, '', 1)
@@ -288,6 +297,8 @@ def extract_all_abilities(cards_file: Path) -> dict:
         effect = {}
         try:
             effect = parse_effect(effect_text)
+            # Run post-processing normalizer (propagates exclude_self, distinct, position, original_value, etc.)
+            effect = _normalize_effect_tree(effect, sample["triggerless_text"])
             # Check if effect has empty actions array
             if 'actions' in effect and not effect['actions']:
                 print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")

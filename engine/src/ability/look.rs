@@ -94,15 +94,13 @@ impl<'a> AbilityResolver<'a> {
                 && super::util::card_matches_heart_colors(&card_db, card_id, heart_colors)
         }).copied().collect();
 
-        if distinct == Some("true") || distinct == Some("distinct") {
-            let mut names = std::collections::HashSet::new();
-            let unique: Vec<i16> = filtered.into_iter().filter(|&card_id| {
-                card_db.get_card(card_id)
-                    .map(|c| names.insert(c.name.clone()))
-                    .unwrap_or(false)
-            }).collect();
-            self.looked_at_cards = unique;
-        } else { self.looked_at_cards = filtered; }
+        // Apply distinct filter if needed, then check count
+        let distinct_indices = super::util::filter_distinct_indices(&filtered, &card_db, distinct);
+        self.looked_at_cards = distinct_indices.iter().map(|&i| filtered[i]).collect();
+
+        if self.looked_at_cards.len() < count as usize {
+            return Ok(());  // Not enough distinct cards — skip silently
+        }
 
         self.pending_choice = Some(Choice::SelectCard {
             zone: source.to_string(), card_type: card_type.map(|s| s.to_string()),

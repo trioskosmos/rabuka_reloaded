@@ -91,16 +91,23 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 }
                             }
                             "stage" => {
-                                let player = self.game_state.active_player_mut();
-                                let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-                                for &idx in indices.iter().rev() {
-                                    if idx < areas.len() {
-                                        let area = areas[idx];
-                                        if let Some(card_id) = player.stage.get_area(area) {
-                                            player.stage.clear_area(area);
-                                            player.waitroom.add_card(card_id);
+                                let mut last_vacated = None;
+                                {
+                                    let player = self.game_state.active_player_mut();
+                                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+                                    for &idx in indices.iter().rev() {
+                                        if idx < areas.len() {
+                                            let area = areas[idx];
+                                            if let Some(card_id) = player.stage.get_area(area) {
+                                                player.stage.clear_area(area);
+                                                player.waitroom.add_card(card_id);
+                                                last_vacated = Some(idx);
+                                            }
                                         }
                                     }
+                                }
+                                if let Some(pos) = last_vacated {
+                                    self.game_state.last_vacated_stage_area = Some(pos);
                                 }
                             }
                             "energy_zone" => {
@@ -378,6 +385,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if target == "conditional_optional" {
                     let effect = self.game_state.entry_effect().cloned();
                     self.pending_choice = None;
+                    let is_negation = effect.as_ref().map(|e| e.conditional_negation.unwrap_or(false)).unwrap_or(false);
                     if selected == "1" || selected == "yes" {
                         if let Some(ref effect) = effect {
                             if let Some(ref optional) = effect.optional_action {
@@ -385,6 +393,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                     eprintln!("Failed to execute optional action: {}", e);
                                 }
                             }
+                            // When conditional_negation is true, the conditional action
+                            // only runs if the optional action was NOT taken
+                            if !is_negation {
+                                if let Some(ref conditional) = effect.conditional_action {
+                                    if let Err(e) = self.execute_effect(conditional) {
+                                        eprintln!("Failed to execute conditional action: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    } else if is_negation {
+                        // "そうしなかった場合" — conditional runs when optional NOT taken
+                        if let Some(ref effect) = effect {
                             if let Some(ref conditional) = effect.conditional_action {
                                 if let Err(e) = self.execute_effect(conditional) {
                                     eprintln!("Failed to execute conditional action: {}", e);
@@ -458,7 +479,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
     fn execute_selected_cards_from_zone(&mut self, zone: &str, indices: &[usize], _count: usize, card_type_filter: Option<&str>) -> Result<(), String> {
         let destination = if zone == "discard" { self.game_state.entry_destination().map(|s| s.to_string()) } else { None };
-        let character_filter = self.game_state.entry_characters().cloned();
         let target = self.game_state.entry_effect()
             .and_then(|e| e.target.clone())
             .unwrap_or_else(|| "self".to_string());
@@ -478,7 +498,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.hand.cards.len() {
                         let card_id = player.hand.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) && util::card_matches_characters(&card_db, card_id, character_filter.as_ref()) {
+                        if matches_card_type(card_id, card_type_filter) {
                             player.waitroom.add_card(card_id);
                             cards_moved.push(card_id);
                         } else {
@@ -497,7 +517,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.main_deck.cards.len() {
                         let card_id = player.main_deck.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) && util::card_matches_characters(&card_db, card_id, character_filter.as_ref()) {
+                        if matches_card_type(card_id, card_type_filter) {
                             player.hand.add_card(card_id);
                             cards_moved.push(card_id);
                         } else {
@@ -517,7 +537,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 for i in indices_to_remove {
                     if i < player.waitroom.cards.len() {
                         let card_id = player.waitroom.cards.remove(i);
-                        if matches_card_type(card_id, card_type_filter) && util::card_matches_characters(&card_db, card_id, character_filter.as_ref()) {
+                        if matches_card_type(card_id, card_type_filter) {
                             match destination {
                                 "stage" => {
                                     if player.stage.stage[1] == -1 { player.stage.stage[1] = card_id; }
