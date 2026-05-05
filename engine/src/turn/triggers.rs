@@ -126,6 +126,7 @@ impl super::TurnEngine {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         for ability in &card.abilities {
                             if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS) {
+                                eprintln!("[TRIGGER] live_success stage: card={} trigger={:?}", card.card_no, ability.triggers);
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
                             }
@@ -136,7 +137,9 @@ impl super::TurnEngine {
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
                     for ability in &card.abilities {
-                        if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.contains(crate::triggers::LIVE_SUCCESS_EN)) {
+                        let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.contains(crate::triggers::LIVE_SUCCESS_EN));
+                        eprintln!("[TRIGGER] live_success live_card: card={} trigger={:?} match={}", card.card_no, ability.triggers, trigger_match);
+                        if trigger_match {
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card.card_no.clone()));
                         }

@@ -93,6 +93,8 @@ pub struct GameState {
     pub live_success_triggered_this_turn: bool,
     /// Count of members changed from wait→active by the most recent change_state effect
     pub last_state_change_wait_to_active_count: u32,
+    /// Whether the current player had no excess heart this live (for Takaramono)
+    pub self_no_excess_heart_this_turn: bool,
 }
 
 impl GameState {
@@ -188,6 +190,7 @@ impl GameState {
             last_vacated_stage_area: None,
             live_success_triggered_this_turn: false,
             last_state_change_wait_to_active_count: 0,
+            self_no_excess_heart_this_turn: false,
         };
         debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
         state

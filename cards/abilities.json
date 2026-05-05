@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-05T19:14:44.756639",
+  "generated_at": "2026-05-05T21:34:40.683123",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -619,6 +619,11 @@
             "location": "live_card_zone",
             "duration": "live_end"
           }
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06"
         ]
       }
     },
@@ -1347,7 +1352,12 @@
             "heart05"
           ],
           "optional": true
-        }
+        },
+        "heart_colors": [
+          "heart02",
+          "heart04",
+          "heart05"
+        ]
       }
     },
     {
@@ -1370,7 +1380,8 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合"
+          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分の手札が7枚以下の場合",
+          "location": "revealed_cards"
         },
         "count": 1,
         "action": "draw_card",
@@ -1540,13 +1551,16 @@
             "action": "sequential",
             "actions": [
               {
+                "text": "",
+                "duration": "live_end",
+                "action": "do_nothing"
+              },
+              {
                 "text": "無効にしてもよい",
                 "optional": true,
-                "action": "invalidate_ability",
-                "all": true
+                "action": "invalidate_ability"
               }
-            ],
-            "all": true
+            ]
           },
           {
             "text": "自分の控え室から『Liella!』のカードを1枚手札に加える",
@@ -1565,11 +1579,9 @@
               "Liella!"
             ],
             "action": "move_cards",
-            "card_type": "card",
-            "all": true
+            "card_type": "card"
           }
-        ],
-        "all": true
+        ]
       }
     },
     {
@@ -1692,7 +1704,10 @@
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
         "target": "opponent",
-        "all": true
+        "all": true,
+        "heart_colors": [
+          "heart00"
+        ]
       }
     },
     {
@@ -1723,8 +1738,7 @@
         "action": "modify_yell_count",
         "operation": "subtract",
         "count": 8,
-        "duration": "live_end",
-        "exclude_self": true
+        "duration": "live_end"
       }
     },
     {
@@ -1935,11 +1949,19 @@
         "action": "sequential",
         "actions": [
           {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る",
             "action": "gain_resource",
             "resource": "blade",
             "count": 1
           }
+        ],
+        "heart_colors": [
+          "heart04"
         ]
       }
     },
@@ -1973,7 +1995,7 @@
             "location": "stage"
           },
           {
-            "text": "手札を1枚控え室に置く",
+            "text": "、手札を1枚控え室に置く",
             "source": "hand",
             "destination": "discard",
             "count": 1,
@@ -2105,7 +2127,10 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -2176,6 +2201,11 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06"
         ]
       }
     },
@@ -2209,13 +2239,11 @@
             "action": "modify_score",
             "operation": "add",
             "value": 1,
-            "duration": "live_end",
-            "activation_position": "center"
+            "duration": "live_end"
           },
           {
             "text": "」を得る",
-            "action": "gain_ability",
-            "activation_position": "center"
+            "action": "gain_ability"
           }
         ],
         "parenthetical": [
@@ -2344,8 +2372,7 @@
             "group_names": [
               "Aqours"
             ],
-            "action": "move_cards",
-            "activation_position": "center"
+            "action": "move_cards"
           },
           {
             "text": "自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる",
@@ -2360,9 +2387,7 @@
             "group_names": [
               "Aqours"
             ],
-            "action": "move_cards",
-            "exclude_self": true,
-            "activation_position": "center"
+            "action": "move_cards"
           }
         ],
         "conditional": true,
@@ -2375,8 +2400,7 @@
           "appearance": true,
           "text": "この能力はセンターエリアに登場している場合のみ起動できる。"
         },
-        "activation_position": "center",
-        "exclude_self": true
+        "activation_position": "center"
       }
     },
     {
@@ -2417,6 +2441,11 @@
                 "action": "draw_card",
                 "source": "deck",
                 "destination": "hand"
+              },
+              {
+                "text": "",
+                "duration": "live_end",
+                "action": "do_nothing"
               },
               {
                 "text": "自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -2580,12 +2609,13 @@
             "multiple_targets": true,
             "action": "gain_resource",
             "resource": "heart",
-            "count": 1,
-            "exclude_self": true
+            "count": 1
           }
         ],
         "conditional": true,
-        "exclude_self": true
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -2668,7 +2698,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -2892,7 +2925,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -3025,6 +3061,9 @@
             "count": 1,
             "duration": "live_end"
           }
+        ],
+        "heart_colors": [
+          "heart04"
         ]
       }
     },
@@ -3381,8 +3420,7 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state",
-        "original_value": true
+        "action": "change_state"
       }
     },
     {
@@ -3482,7 +3520,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -3608,7 +3649,7 @@
             "action": "change_state"
           },
           {
-            "text": "{{icon_energy.png|E}}減る",
+            "text": "、{{icon_energy.png|E}}減る",
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "group_name",
@@ -3643,7 +3684,8 @@
           "type": "card_count_condition",
           "count": 3,
           "operator": ">=",
-          "text": "自分がエールしたとき、エールにより公開された自分のカードの中にブレードハートを持たないメンバーカードが3枚以上ある場合"
+          "text": "自分がエールしたとき、エールにより公開された自分のカードの中にブレードハートを持たないメンバーカードが3枚以上ある場合",
+          "location": "revealed_cards"
         },
         "action": "gain_ability",
         "count": 1,
@@ -3729,8 +3771,7 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "all": true,
-        "original_value": true
+        "all": true
       }
     },
     {
@@ -3761,8 +3802,7 @@
           {
             "text": "{{heart_03.png|heart03}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select",
-            "all": true
+            "action": "select"
           },
           {
             "text": "自分のステージにいるこのターンに登場したメンバーのうち、『Aqours』以外のすべてのメンバーは選んだハートを1つ得る",
@@ -3780,7 +3820,11 @@
             "all": true
           }
         ],
-        "all": true
+        "heart_colors": [
+          "heart03",
+          "heart04",
+          "heart05"
+        ]
       }
     },
     {
@@ -3808,7 +3852,8 @@
               "count": 3,
               "operator": ">=",
               "text": "自分がエールしたとき、エールにより公開された自分のカードが持つブレードハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}、{{icon_all.png|ハート}}のうち、3種類以上ある場合",
-              "unit": "types"
+              "unit": "types",
+              "location": "revealed_cards"
             },
             "action": "gain_resource",
             "resource": "heart",
@@ -3833,6 +3878,14 @@
             "text": "」を得る",
             "action": "gain_ability"
           }
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
         ]
       }
     },
@@ -3917,7 +3970,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -3995,11 +4051,19 @@
             "destination": "hand"
           },
           {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{heart_01.png|heart01}}を得る",
             "action": "gain_resource",
             "resource": "heart",
             "count": 1
           }
+        ],
+        "heart_colors": [
+          "heart01"
         ]
       }
     },
@@ -4288,11 +4352,19 @@
             "destination": "hand"
           },
           {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{heart_02.png|heart02}}を得る",
             "action": "gain_resource",
             "resource": "heart",
             "count": 1
           }
+        ],
+        "heart_colors": [
+          "heart02"
         ]
       }
     },
@@ -4349,7 +4421,7 @@
         "action": "sequential",
         "actions": [
           {
-            "text": "{{icon_energy.png|E}}支払ってもよい。",
+            "text": "、{{icon_energy.png|E}}支払ってもよい。",
             "optional": true,
             "action": "custom",
             "count": 1
@@ -4486,7 +4558,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -4578,7 +4653,9 @@
         "card_type": "member_card",
         "action": "gain_resource",
         "resource": "heart",
-        "group_reference": "same_group_name"
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -4663,8 +4740,7 @@
             "source": "deck",
             "destination": "hand",
             "count": 1,
-            "action": "draw_card",
-            "all": true
+            "action": "draw_card"
           },
           {
             "text": "相手のステージにいるすべてのコスト2以下のメンバーをウェイトにする",
@@ -4675,8 +4751,7 @@
             "action": "change_state",
             "all": true
           }
-        ],
-        "all": true
+        ]
       }
     },
     {
@@ -4834,8 +4909,7 @@
           "count": 1,
           "card_type": "live_card",
           "optional": true
-        },
-        "exclude_self": true
+        }
       }
     },
     {
@@ -5340,6 +5414,10 @@
                 "multiple_targets": true,
                 "action": "discard_until_count",
                 "target_count": 3
+              },
+              {
+                "text": "",
+                "action": "do_nothing"
               }
             ]
           },
@@ -5387,7 +5465,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -5416,7 +5497,10 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -5500,14 +5584,12 @@
             "group_names": [
               "SaintSnow"
             ],
-            "action": "position_change",
-            "exclude_self": true
+            "action": "position_change"
           }
         ],
         "parenthetical": [
           "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ],
-        "exclude_self": true
+        ]
       }
     },
     {
@@ -5661,7 +5743,10 @@
             "heart04"
           ],
           "optional": true
-        }
+        },
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -5878,8 +5963,7 @@
         "action": "change_state",
         "parenthetical": [
           "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
-        ],
-        "original_value": true
+        ]
       }
     },
     {
@@ -6139,8 +6223,7 @@
             "target": "self",
             "action": "move_cards"
           }
-        ],
-        "group_reference": "different_group_names"
+        ]
       }
     },
     {
@@ -6395,6 +6478,10 @@
             "action": "sequential",
             "actions": [
               {
+                "text": "",
+                "action": "do_nothing"
+              },
+              {
                 "text": "{{icon_blade.png|ブレード}}を得る",
                 "duration": "live_end",
                 "action": "gain_resource",
@@ -6466,7 +6553,10 @@
         "text": "{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3
+        "count": 3,
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -6487,7 +6577,10 @@
         "position": "center",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3
+        "count": 3,
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -6507,7 +6600,10 @@
         "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_05.png|heart05}}を得る",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3
+        "count": 3,
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -6604,7 +6700,9 @@
             "duration": "live_end"
           }
         ],
-        "original_value": true
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -6632,7 +6730,10 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -7007,7 +7108,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -7056,12 +7160,17 @@
           "type": "card_count_condition",
           "count": 3,
           "operator": ">=",
-          "text": "自分がエールしたとき、エールにより公開された自分のカードの中に同じグループ名を持つメンバーカードが3枚以上ある場合"
+          "text": "自分がエールしたとき、エールにより公開された自分のカードの中に同じグループ名を持つメンバーカードが3枚以上ある場合",
+          "location": "revealed_cards"
         },
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart01",
+          "heart04"
+        ]
       }
     },
     {
@@ -7158,6 +7267,9 @@
             "count": 1,
             "duration": "live_end"
           }
+        ],
+        "heart_colors": [
+          "heart04"
         ]
       }
     },
@@ -7228,6 +7340,9 @@
             "count": 1,
             "duration": "live_end"
           }
+        ],
+        "heart_colors": [
+          "heart01"
         ]
       }
     },
@@ -7406,12 +7521,29 @@
       },
       "effect": {
         "text": "ライブカードが公開されるまで、自分のデッキの一番上のカードを公開し続ける。そのライブカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く",
-        "source": "deck_top",
-        "destination": "discard",
-        "card_type": "live_card",
-        "target": "self",
-        "action": "move_cards",
-        "all": true
+        "action": "sequential",
+        "actions": [
+          {
+            "action": "reveal_until_live_card",
+            "source": "deck_top",
+            "target": "self"
+          },
+          {
+            "action": "move_cards",
+            "source": "looked_at",
+            "destination": "hand",
+            "card_type": "live_card",
+            "count": 1,
+            "text": "そのライブカードを手札に加え"
+          },
+          {
+            "action": "move_cards",
+            "source": "looked_at_remaining",
+            "destination": "discard",
+            "all": true,
+            "text": "これにより公開されたほかのすべてのカードを控え室に置く"
+          }
+        ]
       }
     },
     {
@@ -8196,6 +8328,15 @@
         "action": "sequential",
         "actions": [
           {
+            "text": "",
+            "action": "do_nothing"
+          },
+          {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
             "action": "gain_resource",
             "resource": "blade",
@@ -8513,7 +8654,8 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき"
+          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき",
+          "location": "revealed_cards"
         },
         "action": "gain_ability",
         "duration": "live_end"
@@ -8704,7 +8846,10 @@
         },
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -9177,7 +9322,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -9275,7 +9423,9 @@
         "target": "self",
         "action": "move_cards",
         "source": "discard",
-        "original_value": true
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -9368,7 +9518,8 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき"
+          "text": "エールにより公開された自分のカードの中にライブカードが1枚以上あるとき",
+          "location": "revealed_cards"
         },
         "source": "deck",
         "destination": "energy_zone",
@@ -9849,16 +10000,14 @@
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards",
-                "target": "self"
+                "action": "move_cards"
               },
               {
                 "text": "自分はカードを1枚引く",
                 "count": 1,
                 "action": "draw_card",
                 "source": "deck",
-                "destination": "hand",
-                "target": "self"
+                "destination": "hand"
               }
             ],
             "conditional": true,
@@ -10043,8 +10192,7 @@
             "count": 1,
             "action": "gain_resource",
             "resource": "heart",
-            "heart_selection": true,
-            "exclude_self": true
+            "heart_selection": true
           },
           {
             "text": "自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る",
@@ -10061,8 +10209,7 @@
             ],
             "action": "gain_ability"
           }
-        ],
-        "exclude_self": true
+        ]
       }
     },
     {
@@ -10318,11 +10465,9 @@
             },
             "action": "gain_resource",
             "resource": "blade",
-            "count": 1,
-            "original_value": true
+            "count": 1
           }
-        ],
-        "original_value": true
+        ]
       }
     },
     {
@@ -10459,7 +10604,7 @@
             "location": "stage"
           },
           {
-            "text": "自分のデッキの一番上のカードを1枚公開する。これによりライブカードを公開した場合、このカードのスコアを+1する",
+            "text": "、自分のデッキの一番上のカードを1枚公開する。これによりライブカードを公開した場合、このカードのスコアを+1する",
             "source": "deck_top",
             "count": 1,
             "card_type": "live_card",
@@ -10510,8 +10655,7 @@
             "cost_limit": 10,
             "count": 1,
             "card_type": "member_card",
-            "action": "select",
-            "all": true
+            "action": "select"
           },
           {
             "text": "選んだカードが公開されるまで、自分のデッキの一番上からカードを1枚ずつ公開する",
@@ -10519,8 +10663,7 @@
             "actions": [
               {
                 "text": "選んだカードが公開されるまで",
-                "action": "select",
-                "all": true
+                "action": "select"
               },
               {
                 "text": "自分のデッキの一番上からカードを1枚ずつ公開する",
@@ -10528,11 +10671,9 @@
                 "count": 1,
                 "target": "self",
                 "multiple_targets": true,
-                "action": "reveal",
-                "all": true
+                "action": "reveal"
               }
-            ],
-            "all": true
+            ]
           },
           {
             "text": "そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く",
@@ -10544,8 +10685,7 @@
                 "destination": "hand",
                 "source": "discard",
                 "card_type": "card",
-                "count": 1,
-                "all": true
+                "count": 1
               },
               {
                 "text": "これにより公開されたほかのすべてのカードを控え室に置く",
@@ -10559,11 +10699,9 @@
                 "card_type": "card",
                 "all": true
               }
-            ],
-            "all": true
+            ]
           }
-        ],
-        "all": true
+        ]
       }
     },
     {
@@ -10600,8 +10738,7 @@
         "state_change": "wait",
         "count": 1,
         "target": "opponent",
-        "action": "change_state",
-        "original_value": true
+        "action": "change_state"
       }
     },
     {
@@ -10625,7 +10762,10 @@
         "per_unit_count": 1,
         "per_unit_type": "人",
         "state": "wait",
-        "location": "stage"
+        "location": "stage",
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -10707,8 +10847,7 @@
           "appearance": true,
           "text": "この能力はセンターエリアに登場した場合のみ発動する。"
         },
-        "activation_position": "center",
-        "position": "center"
+        "activation_position": "center"
       }
     },
     {
@@ -10828,7 +10967,7 @@
             "action": "move_cards"
           },
           {
-            "text": "控え室に置く手札の数が1枚減る",
+            "text": "、控え室に置く手札の数が1枚減る",
             "per_unit": true,
             "per_unit_count": 1,
             "per_unit_type": "card",
@@ -10894,8 +11033,7 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state",
-        "original_value": true
+        "action": "change_state"
       }
     },
     {
@@ -11639,8 +11777,7 @@
                 "text": "自分は、そのプレイヤーのデッキの一番上のカードを見る",
                 "source": null,
                 "count": 1,
-                "action": "look_at",
-                "target": "self"
+                "action": "look_at"
               },
               {
                 "text": "自分はそのカードを控え室に置いてもよい",
@@ -11648,8 +11785,7 @@
                 "optional": true,
                 "action": "move_cards",
                 "card_type": "card",
-                "count": 1,
-                "target": "self"
+                "count": 1
               }
             ],
             "target": "self"
@@ -12502,7 +12638,15 @@
         },
         "duration": "as_long_as",
         "action": "gain_ability",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -12583,11 +12727,21 @@
             "destination": "hand"
           },
           {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{heart_03.png|heart03}}{{heart_05.png|heart05}}{{heart_06.png|heart06}}を得る",
             "action": "gain_resource",
             "resource": "heart",
             "count": 3
           }
+        ],
+        "heart_colors": [
+          "heart03",
+          "heart05",
+          "heart06"
         ]
       }
     },
@@ -13383,7 +13537,9 @@
           "name": "A-RISE"
         },
         "location": "stage",
-        "exclude_self": true
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -13555,7 +13711,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -13582,8 +13741,7 @@
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state",
-        "original_value": true
+        "action": "change_state"
       }
     },
     {
@@ -13777,6 +13935,11 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06"
         ]
       }
     },
@@ -14063,7 +14226,10 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "heart_colors": [
+          "heart00"
+        ]
       }
     },
     {
@@ -14090,7 +14256,10 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -14117,7 +14286,10 @@
         "count": 1,
         "card_type": "live_card",
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -14244,16 +14416,14 @@
                 "destination": "deck_bottom",
                 "count": 1,
                 "card_type": "live_card",
-                "action": "move_cards",
-                "target": "self"
+                "action": "move_cards"
               },
               {
                 "text": "自分はカードを1枚引く",
                 "count": 1,
                 "action": "draw_card",
                 "source": "deck",
-                "destination": "hand",
-                "target": "self"
+                "destination": "hand"
               }
             ],
             "conditional": true,
@@ -14291,13 +14461,19 @@
             "answers": [
               "お願いします"
             ]
+          },
+          {
+            "text": "何もしない",
+            "action": "do_nothing",
+            "answers": [
+              "それ以外"
+            ]
           }
         ],
         "choice_maker": "opponent",
         "parenthetical": [
           "相手を傷つけないよう、やさしく、愛をこめて魔法のパンチをすること。"
-        ],
-        "all": true
+        ]
       }
     },
     {
@@ -14344,7 +14520,8 @@
           "type": "card_count_condition",
           "count": 7,
           "operator": ">=",
-          "text": "エールにより公開された自分のカードの中に『Liella!』のカードが7枚以上ある場合"
+          "text": "エールにより公開された自分のカードの中に『Liella!』のカードが7枚以上ある場合",
+          "location": "revealed_cards"
         },
         "source": "deck",
         "destination": "energy_zone",
@@ -14378,7 +14555,10 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -14404,7 +14584,10 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "blade",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -14453,7 +14636,10 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -14643,6 +14829,14 @@
         "location": "stage",
         "parenthetical": [
           "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart02",
+          "heart03",
+          "heart06"
         ]
       }
     },
@@ -14818,7 +15012,11 @@
             "resources": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}"
           }
         ],
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart05",
+          "heart01"
+        ]
       }
     },
     {
@@ -14972,7 +15170,8 @@
           "type": "card_count_condition",
           "count": 10,
           "operator": ">=",
-          "text": "エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合"
+          "text": "エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合",
+          "location": "revealed_cards"
         },
         "action": "modify_score",
         "operation": "add",
@@ -15215,7 +15414,10 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -15727,6 +15929,10 @@
         "action": "sequential",
         "actions": [
           {
+            "text": "",
+            "action": "do_nothing"
+          },
+          {
             "text": "カードを1枚引く",
             "count": 1,
             "action": "draw_card",
@@ -15861,7 +16067,10 @@
           "name": "5yncri5e!"
         },
         "timing_condition": "appeared_or_moved_this_turn",
-        "location": "stage"
+        "location": "stage",
+        "heart_colors": [
+          "heart00"
+        ]
       }
     },
     {
@@ -16014,7 +16223,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -16041,7 +16253,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -16068,7 +16283,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -16482,6 +16700,12 @@
             "optional": true,
             "action": "select"
           }
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart00",
+          "heart04",
+          "heart05"
         ]
       }
     },
@@ -16535,7 +16759,10 @@
         },
         "action": "modify_required_hearts",
         "self_target": true,
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -16586,7 +16813,10 @@
         },
         "action": "modify_required_hearts",
         "self_target": true,
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -16623,7 +16853,10 @@
         },
         "action": "modify_required_hearts",
         "self_target": true,
-        "count": 3
+        "count": 3,
+        "heart_colors": [
+          "heart00"
+        ]
       }
     },
     {
@@ -16649,7 +16882,10 @@
         },
         "action": "modify_required_hearts",
         "self_target": true,
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -16810,7 +17046,10 @@
             "heart04"
           ],
           "optional": true
-        }
+        },
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -16871,7 +17110,10 @@
             "heart02"
           ],
           "optional": true
-        }
+        },
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -16932,7 +17174,10 @@
             "heart05"
           ],
           "optional": true
-        }
+        },
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -16977,6 +17222,9 @@
             "card_type": "energy_card",
             "action": "move_cards"
           }
+        ],
+        "heart_colors": [
+          "heart02"
         ]
       }
     },
@@ -17009,7 +17257,10 @@
         "action": "modify_score",
         "operation": "add",
         "value": 2,
-        "self_target": true
+        "self_target": true,
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -17061,7 +17312,10 @@
         "action": "modify_score",
         "operation": "add",
         "value": 2,
-        "self_target": true
+        "self_target": true,
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -17168,7 +17422,7 @@
             "location": "stage"
           },
           {
-            "text": "これにより公開したカードを控え室に置く",
+            "text": "、これにより公開したカードを控え室に置く",
             "source": "revealed_cards",
             "dynamic_count": {
               "type": "revealed_cards",
@@ -17205,7 +17459,10 @@
         },
         "action": "modify_required_hearts",
         "self_target": true,
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart00"
+        ]
       }
     },
     {
@@ -17254,6 +17511,11 @@
             "action": "gain_resource",
             "resource": "heart"
           }
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06"
         ]
       }
     },
@@ -17296,11 +17558,13 @@
       "effect": {
         "text": "このカードのスコアを+1する",
         "condition": {
-          "type": "location_condition",
-          "card_type": "member_card",
-          "location": "stage",
-          "text": "このターン、自分が余剰ハートを持たない場合",
-          "negation": true
+          "type": "temporal_condition",
+          "temporal": "this_turn",
+          "condition": {
+            "type": "no_excess_heart",
+            "no_excess_heart": true
+          },
+          "text": "このターン、自分が余剰ハートを持たない場合"
         },
         "action": "modify_score",
         "operation": "add",
@@ -17634,11 +17898,14 @@
             "card_type": "member_card",
             "action": "gain_resource",
             "resource": "heart",
-            "count": null,
-            "original_value": true
+            "count": null
           }
         ],
-        "original_value": true
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart04"
+        ]
       }
     },
     {
@@ -17667,11 +17934,14 @@
             "card_type": "member_card",
             "action": "gain_resource",
             "resource": "heart",
-            "count": null,
-            "original_value": true
+            "count": null
           }
         ],
-        "original_value": true
+        "heart_colors": [
+          "heart02",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -17788,7 +18058,10 @@
         "state_change": "wait",
         "count": 1,
         "target": "self",
-        "action": "move_cards"
+        "action": "move_cards",
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -17808,7 +18081,9 @@
           "type": "card_count_condition",
           "count": 1,
           "operator": ">=",
-          "text": "エールにより公開された自分のカードの中に{{icon_b_all.png|ALLブレード}}を持つカードが1枚以上ある場合"
+          "text": "エールにより公開された自分のカードの中に{{icon_b_all.png|ALLブレード}}を持つカードが1枚以上ある場合",
+          "card_property": "has_all_blade",
+          "location": "revealed_cards"
         },
         "action": "modify_score",
         "operation": "add",
@@ -18013,7 +18288,10 @@
         },
         "action": "modify_required_hearts",
         "self_target": true,
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart00"
+        ]
       }
     },
     {
@@ -18235,7 +18513,10 @@
         "target": "self",
         "exclude_self": true,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -18504,6 +18785,9 @@
             "value": 1,
             "self_target": true
           }
+        ],
+        "heart_colors": [
+          "heart00"
         ]
       }
     },
@@ -18553,7 +18837,10 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand"
+        "destination": "hand",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -18728,7 +19015,15 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true
+        "self_target": true,
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -18847,6 +19142,9 @@
             "per_unit_type": "枚",
             "location": "live_card_zone"
           }
+        ],
+        "heart_colors": [
+          "heart00"
         ]
       }
     },
@@ -18915,6 +19213,11 @@
             "operation": "add",
             "value": 1,
             "self_target": true
+          },
+          {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
           },
           {
             "text": "{{icon_blade.png|ブレード}}を得る",
@@ -19065,7 +19368,10 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -19106,6 +19412,15 @@
         "action": "sequential",
         "actions": [
           {
+            "text": "",
+            "action": "do_nothing"
+          },
+          {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{heart_06.png|heart06}}を得る",
             "action": "gain_resource",
             "resource": "heart",
@@ -19123,7 +19438,10 @@
           "count": 1,
           "operator": ">=",
           "type": "comparison_condition"
-        }
+        },
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -19257,7 +19575,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -19385,11 +19706,19 @@
         "action": "sequential",
         "actions": [
           {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
             "action": "gain_resource",
             "resource": "blade",
             "count": 2
           }
+        ],
+        "heart_colors": [
+          "heart02"
         ]
       }
     },
@@ -19417,8 +19746,7 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "set_blade_count",
-        "original_value": true
+        "action": "set_blade_count"
       }
     },
     {
@@ -19631,10 +19959,8 @@
           "text": "「絢瀬絵里」か「朝香果林」か「葉月恋」のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。その後、相手のステージにいる、これにより公開したカードのコスト以下で、かつ元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のメンバーをすべてウェイトにする",
           "count": 1,
           "card_type": "member_card",
-          "optional": true,
-          "original_value": true
-        },
-        "original_value": true
+          "optional": true
+        }
       }
     },
     {
@@ -19663,11 +19989,14 @@
             "card_type": "member_card",
             "action": "gain_resource",
             "resource": "heart",
-            "count": null,
-            "original_value": true
+            "count": null
           }
         ],
-        "original_value": true
+        "heart_colors": [
+          "heart03",
+          "heart04",
+          "heart05"
+        ]
       }
     },
     {
@@ -19696,11 +20025,14 @@
             "card_type": "member_card",
             "action": "gain_resource",
             "resource": "heart",
-            "count": null,
-            "original_value": true
+            "count": null
           }
         ],
-        "original_value": true
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart06"
+        ]
       }
     },
     {
@@ -19764,7 +20096,10 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true
+        "self_target": true,
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -19798,7 +20133,11 @@
         ],
         "action": "gain_resource",
         "resource": "heart",
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart01",
+          "heart06"
+        ]
       }
     },
     {
@@ -19824,7 +20163,10 @@
         },
         "action": "modify_required_hearts",
         "self_target": true,
-        "count": 3
+        "count": 3,
+        "heart_colors": [
+          "heart00"
+        ]
       }
     },
     {
@@ -19907,6 +20249,11 @@
             "location": "live_card_zone",
             "duration": "live_end"
           }
+        ],
+        "heart_colors": [
+          "heart04",
+          "heart05",
+          "heart06"
         ]
       }
     },
@@ -19999,7 +20346,11 @@
             "heart06"
           ],
           "optional": true
-        }
+        },
+        "heart_colors": [
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -20025,7 +20376,10 @@
           "type": "position_condition",
           "text": "自分のセンターエリアに『μ's』のメンバーがいる場合"
         },
-        "position": "center"
+        "heart_colors": [
+          "heart03",
+          "heart00"
+        ]
       }
     },
     {
@@ -20086,6 +20440,11 @@
             "action": "sequential",
             "actions": [
               {
+                "text": "",
+                "duration": "live_end",
+                "action": "do_nothing"
+              },
+              {
                 "text": "{{heart_03.png|heart03}}を得る",
                 "action": "gain_resource",
                 "resource": "heart",
@@ -20123,6 +20482,9 @@
             "value": 1,
             "self_target": true
           }
+        ],
+        "heart_colors": [
+          "heart03"
         ]
       }
     },
@@ -20161,6 +20523,12 @@
             "per_unit_type": "枚",
             "location": "live_card_zone"
           }
+        ],
+        "heart_colors": [
+          "heart01",
+          "heart03",
+          "heart06",
+          "heart00"
         ]
       }
     },
@@ -20183,7 +20551,12 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
-        "location": "stage"
+        "location": "stage",
+        "heart_colors": [
+          "heart01",
+          "heart06",
+          "heart00"
+        ]
       }
     },
     {
@@ -20209,7 +20582,11 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
-        "target": "opponent"
+        "target": "opponent",
+        "heart_colors": [
+          "heart02",
+          "heart00"
+        ]
       }
     },
     {
@@ -20235,7 +20612,11 @@
         "action": "restriction",
         "restriction_type": "modify_required_hearts_global",
         "operation": "increase",
-        "target": "opponent"
+        "target": "opponent",
+        "heart_colors": [
+          "heart05",
+          "heart00"
+        ]
       }
     },
     {
@@ -20263,7 +20644,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -20340,7 +20724,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -20420,7 +20807,10 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -20446,7 +20836,15 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -20512,7 +20910,15 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true
+        "self_target": true,
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -20631,6 +21037,9 @@
             "action": "modify_required_hearts",
             "count": 5
           }
+        ],
+        "heart_colors": [
+          "heart02"
         ]
       }
     },
@@ -20740,6 +21149,10 @@
         "action": "sequential",
         "actions": [
           {
+            "text": "",
+            "action": "do_nothing"
+          },
+          {
             "text": "カードを1枚引く",
             "count": 1,
             "action": "draw_card",
@@ -20778,7 +21191,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart03"
+        ]
       }
     },
     {
@@ -20925,7 +21341,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -21044,7 +21463,8 @@
               "type": "card_count_condition",
               "count": 1,
               "operator": ">=",
-              "text": "エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合"
+              "text": "エールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合",
+              "location": "revealed_cards"
             }
           ],
           "text": "自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつエールにより公開された自分のカードの中に{{icon_score.png|スコア}}を持つライブカードが1枚以上ある場合",
@@ -21076,8 +21496,7 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select",
-            "all": true
+            "action": "select"
           },
           {
             "text": "自分のステージにいる、このターン中にエリアを移動しているすべてのメンバーは、選んだハートを1つ得る",
@@ -21089,7 +21508,11 @@
             "all": true
           }
         ],
-        "all": true
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart06"
+        ]
       }
     },
     {
@@ -21304,7 +21727,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart06"
+        ]
       }
     },
     {
@@ -21406,7 +21832,10 @@
         "group": {
           "name": "蓮ノ空"
         },
-        "location": "live_card_zone"
+        "location": "live_card_zone",
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -21462,7 +21891,9 @@
         "action": "gain_resource",
         "resource": "heart",
         "heart_selection": true,
-        "original_value": true
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -21547,6 +21978,9 @@
             "self_target": true,
             "count": 1
           }
+        ],
+        "heart_colors": [
+          "heart06"
         ]
       }
     },
@@ -21568,12 +22002,21 @@
           "count": 2,
           "operator": ">=",
           "text": "エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち合計5種類以上あるか、このターンに自分のステージにいるメンバーがエリアを移動している場合",
+          "location": "revealed_cards",
           "aggregate": "total"
         },
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true
+        "self_target": true,
+        "heart_colors": [
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart02",
+          "heart03",
+          "heart06"
+        ]
       }
     },
     {
@@ -21664,11 +22107,9 @@
             "count": 1,
             "card_type": "member_card",
             "target": "opponent",
-            "action": "change_state",
-            "original_value": true
+            "action": "change_state"
           }
-        ],
-        "original_value": true
+        ]
       }
     },
     {
@@ -21911,7 +22352,10 @@
             "heart05"
           ],
           "optional": true
-        }
+        },
+        "heart_colors": [
+          "heart05"
+        ]
       }
     },
     {
@@ -21944,7 +22388,10 @@
           "蓮ノ空"
         ],
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -22000,7 +22447,10 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -22120,8 +22570,7 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select",
-            "exclude_self": true
+            "action": "select"
           },
           {
             "text": "自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、選んだハートを2つ得る",
@@ -22140,7 +22589,12 @@
             "resource": "heart"
           }
         ],
-        "exclude_self": true
+        "heart_colors": [
+          "heart01",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -22181,6 +22635,9 @@
             "count": 1,
             "duration": "live_end"
           }
+        ],
+        "heart_colors": [
+          "heart05"
         ]
       }
     },
@@ -22357,7 +22814,10 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart02"
+        ]
       }
     },
     {
@@ -22633,6 +23093,11 @@
         "action": "sequential",
         "actions": [
           {
+            "text": "",
+            "duration": "live_end",
+            "action": "do_nothing"
+          },
+          {
             "text": "{{icon_blade.png|ブレード}}を得る",
             "action": "gain_resource",
             "resource": "blade",
@@ -22719,7 +23184,7 @@
             "location": "stage"
           },
           {
-            "text": "これにより引いた枚数と同じ枚数を手札から控え室に置く",
+            "text": "、これにより引いた枚数と同じ枚数を手札から控え室に置く",
             "source": "hand",
             "destination": "discard",
             "dynamic_count": {

@@ -27,6 +27,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             Some("opponent_choice_condition") => self.evaluate_opponent_choice_condition(condition),
             Some("opponent_live_success") => self.evaluate_opponent_live_success_condition(condition),
             Some("complex_condition") => self.evaluate_complex_condition(condition),
+            Some("no_excess_heart") => self.evaluate_no_excess_heart_condition(condition),
             _ => false,
         };
 
@@ -434,7 +435,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         member_count
                     }
                     "energy_card" => player.energy_zone.cards.len(),
-                    _ => 0,
+                    _ => {
+                        // Check for special locations
+                        if condition.location.as_deref() == Some("revealed_cards") {
+                            self.game_state.revealed_cards.len() as usize
+                        } else {
+                            0 as usize
+                        }
+                    }
                 };
                 count as u32
             }
@@ -719,6 +727,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             return self.game_state.opponent_live_no_excess_heart_this_turn;
         }
         true
+    }
+
+    fn evaluate_no_excess_heart_condition(&self, condition: &Condition) -> bool {
+        let target = condition.target.as_deref().unwrap_or("self");
+        if target == "opponent" {
+            self.game_state.opponent_live_no_excess_heart_this_turn
+        } else {
+            self.game_state.self_no_excess_heart_this_turn
+        }
     }
 
     fn evaluate_complex_condition(&self, condition: &Condition) -> bool {

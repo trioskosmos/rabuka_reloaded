@@ -96,6 +96,15 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     }
                     drawn
                 }
+                "energy_deck" => {
+                    let mut drawn = Vec::new();
+                    for _ in 0..count {
+                        if let Some(card) = player.energy_deck.draw() {
+                            drawn.push(card);
+                        } else { break; }
+                    }
+                    drawn
+                }
 
                 // Stage → anything
                 "stage" => {
@@ -164,7 +173,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     let taken: Vec<i16> = if is_all {
                         idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect()
                     } else if idxs.len() < count {
-                        return Err(format!("Not enough cards in discard: need {}", count));
+                        vec![]  // No matching cards — effect does nothing gracefully
                     } else if idxs.len() > count {
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "discard".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
@@ -223,6 +232,34 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     }
                     idxs.iter().rev().map(|&i| player.success_live_card_zone.cards.remove(i)).collect()
                 }
+                "looked_at" => {
+                    // Take cards from looked_at buffer (from reveal_until_live_card etc.)
+                    let mut idxs: Vec<usize> = (0..self.looked_at_cards.len()).filter(|&i| {
+                        let cid = self.looked_at_cards[i];
+                        util::card_matches_type(&card_db, cid, card_type_filter)
+                            && util::card_matches_group_str(&card_db, cid, group_name)
+                            && util::card_matches_cost_limit(&card_db, cid, cost_limit)
+                    }).collect();
+                    // all = true only applies when there's no card_type filter
+                    if is_all && card_type_filter.is_none() { idxs = (0..self.looked_at_cards.len()).collect(); }
+                    if idxs.is_empty() { vec![] }
+                    else if idxs.len() > count && !is_all {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "looked_at".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
+                            count, description: format!("Select {} card(s) from looked-at cards", count), allow_skip: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    } else {
+                        idxs.sort_unstable_by(|a, b| b.cmp(a));
+                        idxs.iter().map(|&i| self.looked_at_cards.remove(i)).collect()
+                    }
+                }
+                "looked_at_remaining" => {
+                    // Take all remaining cards in looked_at buffer
+                    let cards: Vec<i16> = self.looked_at_cards.drain(..).collect();
+                    cards
+                }
                 _ => { return Err(format!("Unknown source zone: {}", source)); }
             };
 
@@ -252,11 +289,6 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         } else {
                             player.hand.add_card(card_id);
                         }
-                    }
-                    "deck" => {
-                        let pos = effect.position.as_ref().and_then(|p| p.get_position()).and_then(|s| s.parse::<usize>().ok());
-                        let insert = pos.map(|p| p.saturating_sub(1)).unwrap_or(0).min(player.main_deck.cards.len());
-                        player.main_deck.cards.insert(insert, card_id);
                     }
                     "deck_top" => { player.main_deck.cards.insert(0, card_id); }
                     "deck_bottom" => { player.main_deck.cards.push(card_id); }

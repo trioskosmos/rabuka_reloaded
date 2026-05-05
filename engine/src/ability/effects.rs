@@ -19,6 +19,7 @@ enum EffectAction {
     ModifyRequiredHeartsSuccess, SetCostToUse, AllBladeTiming,
     SetCardIdentityAllRegions, Shuffle, RevealPerGroup,
     ConditionalOnResult, ConditionalOnOptional, ModifyCost,
+    RevealUntilLiveCard,
 }
 
 impl EffectAction {
@@ -76,6 +77,7 @@ impl EffectAction {
             "conditional_on_result" => Self::ConditionalOnResult,
             "conditional_on_optional" => Self::ConditionalOnOptional,
             "modify_cost" => Self::ModifyCost,
+            "reveal_until_live_card" => Self::RevealUntilLiveCard,
             _ => { eprintln!("Unknown effect action: '{}'", s); Self::DoNothing }
         }
     }
@@ -216,6 +218,7 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::ConditionalOnResult => self.execute_conditional_on_result(effect),
             EffectAction::ConditionalOnOptional => self.execute_conditional_on_optional(effect),
             EffectAction::ModifyCost => self.execute_modify_cost(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
+            EffectAction::RevealUntilLiveCard => self.execute_reveal_until_live_card(effect.target.as_deref().unwrap_or("self")),
         }
     }
 

@@ -43,6 +43,7 @@ DESTINATION_PATTERNS = [
     ('ステージに置く', 'stage'),
     ('ステージに登場させる', 'stage'),
     ('エネルギー置き場に置く', 'energy_zone'),
+    ('エネルギーゾーンに置く', 'energy_zone'),
     ('ライブカード置き場に置く', 'live_card_zone'),
     ('成功ライブカード置き場に置く', 'success_live_zone'),
     ('デッキの上に置く', 'deck_top'),
@@ -113,6 +114,7 @@ TEMPORAL_PATTERNS = [
     ('移動していない', 'not_moved'),
     ('移動している', 'has_moved'),
     ('ライブを成功させていた', 'opponent_live_success'),
+    ('余剰ハートを持たない', 'no_excess_heart'),
 ]
 
 # ============== COMPARISON TARGETS ==============
@@ -717,6 +719,12 @@ def _try_card_count(text):
             if 'このメンバー以外' in text or 'このカード以外' in text or 'ほかのメンバー' in text:
                 result['exclude_self'] = True
                 result['card_type'] = 'member_card'
+            # Detect ALL blade property
+            if 'ALLブレード' in text or '{{icon_b_all.png' in text:
+                result['card_property'] = 'has_all_blade'
+            # Detect revealed cards context (yell)
+            if 'エールにより公開された' in text:
+                result['location'] = 'revealed_cards'
             return result
     return None
 
@@ -734,7 +742,7 @@ def _try_temporal_this_turn(text):
                       'condition': {'type': cond_type}, 'text': text}
             ct = extract_card_type(text)
             if ct: result['card_type'] = ct
-            if '余剰のハートを持たずに' in text:
+            if '余剰のハートを持たずに' in text or '余剰ハートを持たない' in text or '余剰ハート' in text:
                 result['condition']['no_excess_heart'] = True
             return result
     return None
@@ -1250,6 +1258,9 @@ def _infer_card_type(text, action=None):
     # Check energy BEFORE broad メンバー match (エネルギーの下にメンバー may contain メンバー)
     if 'エネルギーカード' in text:
         return 'energy_card'
+    # Ambiguous: text contains BOTH メンバーカード and ライブカード (e.g. "メンバーカードかライブカード")
+    if 'メンバーカード' in text and 'ライブカード' in text:
+        return 'card'
     if 'メンバーカード' in text or ('メンバー' in text and 'エネルギー' not in text):
         return 'member_card'
     if 'ライブカード' in text:
@@ -1668,7 +1679,8 @@ def parse_action(text: str) -> Dict[str, Any]:
       lambda t, a: _handle_cost_modification(t, a))
     # move_cards with known source+destination beats change_state when both movement and state are specified
     R(lambda t, a: 'source' in a and a.get('source') and 'destination' in a and a.get('destination'), 'move_cards', None)
-    R(lambda t, a: state_change and state_change != '', 'change_state', None)
+    R(lambda t, a: state_change and state_change != '', 'change_state',
+      lambda t, a: a.update({'target': extract_target(t)}) if extract_target(t) else None)
     R(lambda t: 'アクティブにしてもよい' in t or 'アクティブにする' in t, 'change_state',
       lambda t, a: a.update({'state_change': 'active'}) or (a.update({'optional': True}) if 'してもよい' in t else None))
     R(lambda t: 'のみ起動できる' in t or 'のみ発動する' in t, 'activation_restriction', lambda t, a: a.update({'restriction_type': 'only'}))
@@ -2216,6 +2228,10 @@ def _try_per_unit(text):
     if 'ウェイト状態' in per_text: result['state'] = 'wait'
     elif 'アクティブ状態' in per_text: result['state'] = 'active'
 
+    # Extract target from per_text
+    tgt = extract_target(per_text)
+    if tgt: result['target'] = tgt
+
     for kw, loc in [('ステージにいる', 'stage'), ('控え室にある', 'discard'),
                      ('ライブカード置き場にある', 'live_card_zone'), ('手札にある', 'hand'), ('デッキにある', 'deck')]:
         if kw in per_text: result['location'] = loc; break
@@ -2643,6 +2659,21 @@ def _try_look_and_select(text):
     if am:
         result['select_action'] = _build_look_select_actions(am.group(1).strip())
     return result
+
+
+def _try_reveal_until_live(text):
+    """ライブカードが公開されるまで — reveal deck until live card found."""
+    if 'ライブカードが公開されるまで' not in text:
+        return None
+    return {
+        'text': text,
+        'action': 'sequential',
+        'actions': [
+            {'action': 'reveal_until_live_card', 'source': 'deck_top', 'target': 'self'},
+            {'action': 'move_cards', 'source': 'looked_at', 'destination': 'hand', 'card_type': 'live_card', 'count': 1, 'text': 'そのライブカードを手札に加え'},
+            {'action': 'move_cards', 'source': 'looked_at_remaining', 'destination': 'discard', 'all': True, 'text': 'これにより公開されたほかのすべてのカードを控え室に置く'}
+        ]
+    }
 
 
 def _try_furthermore(text):
@@ -3266,6 +3297,7 @@ _EFFECT_HANDLERS = [
     _try_opponent_action,
     _try_choose_self_opponent,
     _try_opponent_after_conditional,
+    _try_reveal_until_live,
     _try_furthermore,
     _try_sequential_duration,
     _try_conditional_sequential,
@@ -3501,8 +3533,54 @@ def _normalize_effect_tree(effect, original_text=None):
             d['exclude_self'] = True
 
         # Propagate all from text context
-        if 'all' not in d and d_ctx and ('すべての' in d_ctx or '全ての' in d_ctx or '全部の' in d_ctx):
-            d['all'] = True
+        if 'all' not in d and d_ctx:
+            if 'すべての' in d_ctx or '全ての' in d_ctx or '全部の' in d_ctx or 'カードをすべて' in d_ctx:
+                d['all'] = True
+
+        # Propagate multiple_targets from parent text to sub-actions
+        if d_ctx and 'それぞれ' in d_ctx:
+            for sub_key in ('actions', 'options'):
+                if sub_key in d:
+                    for sub in d.get(sub_key, []):
+                        if 'multiple_targets' not in sub:
+                            if 'それぞれ' in sub.get('text', '') or sub.get('target') == 'both':
+                                sub['multiple_targets'] = True
+
+        # Collapse single-action sequential wrappers (preserve condition + trigger_type + text)
+        if d.get('action') == 'sequential' and d.get('actions') and len(d['actions']) == 1:
+            inner = d['actions'][0]
+            if not d.get('condition') and not d.get('conditional'):
+                outer_fields = {}
+                for k in ('condition', 'trigger_type', 'text'):
+                    if k in d:
+                        outer_fields[k] = d[k]
+                d.clear()
+                d.update(inner)
+                for k, v in outer_fields.items():
+                    if k not in d:
+                        d[k] = v
+
+        # Default target to "self" for location_conditions if missing
+        if d.get('type') == 'location_condition' and 'target' not in d:
+            d['target'] = 'self'
+
+        # Infer operator for comparison conditions when counts are present
+        ct = d.get('condition_type') or d.get('type')
+        if ct in ('comparison_condition', 'card_count_condition') and 'operator' not in d:
+            if d.get('values'):
+                d['operator'] = 'in'
+            elif d.get('comparison_target') and not d.get('operator'):
+                text = d.get('text', '')
+                if '高い' in text or '多い' in text or '大きい' in text:
+                    d['operator'] = '>'
+                elif '低い' in text or '少ない' in text or '小さい' in text:
+                    d['operator'] = '<'
+            elif d.get('count') and not d.get('operator') and not d.get('comparison_target'):
+                d['operator'] = '='
+
+        # Default per_unit_count to 1 when missing
+        if d.get('per_unit') and 'per_unit_count' not in d:
+            d['per_unit_count'] = 1
 
         # Propagate position from text context (for condition+action splits)
         if 'position' not in d and d_ctx:
@@ -3524,21 +3602,6 @@ def _normalize_effect_tree(effect, original_text=None):
         # Strip leading comma from text artifacts (e.g. "、{{icon_energy.png|E}}支払ってもよい")
         if d_text and (d_text.startswith('、') or d_text.startswith('，')):
             d['text'] = d_text.lstrip('、，').strip()
-
-        # Walk sub-actions first
-        for key in ('actions', 'options'):
-            if key in d and isinstance(d[key], list):
-                d[key] = _clean_action_list(d[key], parent_effect=d, parent_text=d_ctx)
-                for sub in d[key]:
-                    _walk(sub, d_ctx)
-
-        for key in ('primary_effect', 'alternative_effect'):
-            if key in d and isinstance(d[key], dict):
-                d[key] = _walk(d[key], d_ctx)
-
-        for key in ('select_action', 'look_action'):
-            if key in d and isinstance(d[key], dict):
-                d[key] = _walk(d[key], d_ctx)
 
         # Clean up empty actions
         if d.get('action') == 'sequential' and not d.get('actions'):

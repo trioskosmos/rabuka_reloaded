@@ -264,7 +264,15 @@ If a LiveSuccess ability creates a pending choice (e.g., "draw 2, discard 1"), `
 
 | Card | Fix | Type |
 |------|-----|------|
-| PL!-pb1-028-L (WAO-WAO) | Added `_try_period_conditional` to effect handlers; fixed `_try_state_change` direction detection (wait→active); added `last_state_change_wait_to_active_count` field to GameState; fixed change_state count=0→all-matching; fixed wait detection (None=active not wait) | Parser+Engine |
+| PL!-pb1-028-L (WAO-WAO) | Added `_try_period_conditional` to effect handlers; fixed `_try_state_change` direction detection (wait→active); added `last_state_change_wait_to_active_count` field; fixed change_state count=0→all-matching; fixed wait detection (None=active not wait) | Parser+Engine |
+| PL!N-bp3-030-L (Love U) | `_try_card_count` detects `ALLブレード` → `card_property: has_all_blade` and `location: revealed_cards`; engine checks revealed_cards location in card_count_condition | Parser+Engine |
+| PL!N-bp1-011-R (Mia Taylor) | Added `_try_reveal_until_live` handler for "ライブカードが公開されるまで" sequential pattern; added `RevealUntilLiveCard` effect action; added `looked_at`/`looked_at_remaining` move_cards sources | Parser+Engine |
+| PL!-bp3-025-L (Takaramono) | Added `余剰ハートを持たない` to TEMPORAL_PATTERNS; added `self_no_excess_heart_this_turn` flag; added `no_excess_heart` condition evaluator | Parser+Engine |
+| PL!N-pb1-013-R (上原歩夢) | Wrote test for cost-limited debut ability placing member on stage; verified `areas_locked` prevents baton touch (Q199) and placed card retains abilities (Q200) | Test only |
+| PL!-sd1-005-SD (星空凛) | Fixed `move_cards` from `discard` returning error when no cards match; verified self_cost ability works with empty waitroom (Q123) and vacated area can receive new cards (Q79) | Engine+Test |
+| PL!SP-bp1-023-L (START!! True dreams) | Test verifying comparison_condition for score between players (Q66); added `energy_deck` source handler in move_cards | Engine+Test |
+| PL!SP-bp2-015-N (平安名すみれ) | Auto ability test for revealed_cards blade heart check; verified no-cheer = no trigger (Q113) | Test only |
+| All cards | **Phase advancement**: From LiveCardSetP1, LiveVictoryDetermination processing requires 5 passes (P2→FirstAttacker→SecondAttacker→LiveVictoryDet→Processed) | Test fix |
 
 ## Step 4: Verifying QA Scenarios
 

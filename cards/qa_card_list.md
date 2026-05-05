@@ -25,41 +25,40 @@ Write tests in engine\tests\gameplay_test_process.md
 |15|3|PL!SP-bp1-003-R＋ (嵐 千砂都 (ab#0))|Q129, Q171, Q78|✓ chisato_test|
 |16|3|PL!SP-bp2-024-L (ビタミンSUMMER！ (ab#0))|Q119, Q128, Q36|✓ vitamin_test|
 |17|3|PL!SP-pb1-023-L (ディストーション (ab#0))|Q103, Q96, Q97|✓ distortion (gameplay_test)|
-| 18 | 2 | PL!-bp3-025-L (タカラモノズ (ab#0)) | Q142, Q36 | |
+| 18 | 2 | PL!-bp3-025-L (タカラモノズ (ab#0)) | Q142, Q36 | ✓ takaramono_test |
 | 19 | 2 | PL!-bp5-003-R＋ (南 ことり (ab#1)) | Q207, Q208 | |
 |20|2|PL!-bp5-021-L (SUNNY DAY SONG (ab#0))|Q210, Q211|✓ sunny_test|
 | 21 | 2 | PL!-pb1-001-R (高坂穂乃果 (ab#0)) | Q166, Q167 | |
 | 22 | 2 | PL!-pb1-028-L (WAO-WAO Powerful day! (ab#0)) | Q178, Q179 | ✓ wao_wao_test |
-| 23 | 2 | PL!-sd1-005-SD (星空 凛 (ab#0)) | Q123, Q79 | |
-| 24 | 2 | PL!HS-bp1-002-R (村野さやか (ab#0)) | Q63, Q80 | | ✓ sayaka_test |
-| 25 | 2 | PL!HS-bp1-022-L (AWOKE (ab#0)) | Q107, Q36 | |
-| 26 | 2 | PL!HS-bp5-001-R＋ (日野下花帆 (ab#1)) | Q236, Q237 | | ✓ hinoshita_test |
-| 27 | 2 | PL!N-bp1-011-R (ミア・テイラー (ab#0)) | Q102, Q73 | |
-| 28 | 2 | PL!N-bp1-026-L (Poppin' Up! (ab#0)) | Q36, Q66 | | ✓ poppin_test |
-| 29 | 2 | PL!N-bp3-007-R (優木せつ菜 (ab#0)) | Q157, Q184 | | ✓ setsuna_test |
-| 30 | 2 | PL!N-bp3-013-N (上原歩夢 (ab#0)) | Q157, Q184 | |
-| 31 | 2 | PL!N-bp3-030-L (Love U my friends (ab#0)) | Q192, Q36 | |
-| 32 | 2 | PL!N-bp5-026-L (TOKIMEKI Runners (ab#1)) | Q216, Q232 | |
-| 33 | 2 | PL!N-bp5-027-L (ミラクル STAY TUNE！ (ab#0)) | Q207, Q208 | |
-| 34 | 2 | PL!N-bp5-030-L (繚乱！ビクトリーロード (ab#1)) | Q217, Q227 | |
-| 35 | 2 | PL!N-pb1-013-R (上原歩夢 (ab#0)) | Q199, Q200 | |
-| 36 | 2 | PL!N-pb1-017-R (宮下 愛 (ab#0)) | Q199, Q201 | |
-| 37 | 2 | PL!N-pb1-023-R (ミア・テイラー (ab#0)) | Q199, Q202 | |
-| 38 | 2 | PL!S-bp2-024-L (君のこころは輝いてるかい？ (ab#0)) | Q125, Q36 | | ✓ kagayaiteru_test |
-| 39 | 2 | PL!S-bp3-019-L (MIRACLE WAVE (ab#0)) | Q182, Q36 | |
-| 40 | 2 | PL!S-pb1-002-R (桜内梨子 (ab#0)) | Q130, Q171 | |
-| 41 | 2 | PL!SP-bp1-023-L (START!! True dreams (ab#0)) | Q36, Q66 | |
-| 42 | 2 | PL!SP-bp2-001-R＋ (澁谷かのん (ab#0)) | Q106, Q171 | |
-| 43 | 2 | PL!SP-bp2-009-R＋ (鬼塚夏美 (ab#0)) | Q109, Q36 | | ✓ natsumi_test |
-| 44 | 2 | PL!SP-bp2-015-N (平安名すみれ (ab#0)) | Q112, Q113 | |
-| 45 | 2 | PL!SP-bp2-020-N (鬼塚夏美 (ab#0)) | Q112, Q113 | |
-| 46 | 2 | PL!SP-bp2-021-N (ウィーン・マルガレーテ (ab#0)) | Q112, Q113 | |
-| 47 | 2 | PL!SP-bp4-004-R＋ (平安名すみれ (ab#1)) | Q193, Q194 | |
-| 48 | 2 | PL!SP-bp4-023-L (Dazzling Game (ab#1)) | Q187, Q192 | |
-| 49 | 2 | PL!SP-bp5-005-R＋ (葉月 恋 (ab#1)) | Q221, Q233 | |
-| 50 | 2 | PL!SP-pb1-006-R (桜小路きな子 (ab#0)) | Q171, Q94 | |
-| 51 | 2 | PL!SP-pb1-011-R (鬼塚冬毬 (ab#0)) | Q63, Q95 | |
-| 52 | 2 | PL!SP-pb1-025-L (Jellyfish (ab#0)) | Q98, Q99 | | ✓ jellyfish_test |
+| 23 | 2 | PL!N-bp3-030-L (Love U my friends (ab#0)) | Q192, Q36 | ✓ love_u_test |
+| 24 | 2 | PL!-sd1-005-SD (星空 凛 (ab#0)) | Q123, Q79 | ✓ rin_test |
+| 25 | 2 | PL!HS-bp1-002-R (村野さやか (ab#0)) | Q63, Q80 | ✓ sayaka_test |
+| 26 | 2 | PL!HS-bp1-022-L (AWOKE (ab#0)) | Q107, Q36 | |
+| 27 | 2 | PL!N-bp1-011-R (ミア・テイラー (ab#0)) | Q102, Q73 | ✓ mia_test |
+| 28 | 2 | PL!N-bp1-026-L (Poppin' Up! (ab#0)) | Q36, Q66 | ✓ poppin_test |
+| 29 | 2 | PL!N-bp3-007-R (優木せつ菜 (ab#0)) | Q157, Q184 | ✓ setsuna_test |
+| 30 | 2 | PL!N-bp3-013-N (上原歩夢 (ab#0)) | Q157, Q184 | | ✓ (same ability as azuna)
+| 31 | 2 | PL!N-bp5-026-L (TOKIMEKI Runners (ab#1)) | Q216, Q232 | |
+| 32 | 2 | PL!N-bp5-027-L (ミラクル STAY TUNE！ (ab#0)) | Q207, Q208 | |
+| 33 | 2 | PL!N-bp5-030-L (繚乱！ビクトリーロード (ab#1)) | Q217, Q227 | |
+| 34 | 2 | PL!N-pb1-013-R (上原歩夢 (ab#0)) | Q199, Q200 | ✓ ayumu_pb1_test |
+| 35 | 2 | PL!N-pb1-017-R (宮下 愛 (ab#0)) | Q199, Q201 | ✓ ayumu_pb1_test |
+| 36 | 2 | PL!N-pb1-023-R (ミア・テイラー (ab#0)) | Q199, Q202 | ✓ ayumu_pb1_test |
+| 37 | 2 | PL!S-bp2-024-L (君のこころは輝いてるかい？ (ab#0)) | Q125, Q36 | ✓ kagayaiteru_test |
+| 38 | 2 | PL!S-bp3-019-L (MIRACLE WAVE (ab#0)) | Q182, Q36 | |
+| 39 | 2 | PL!S-pb1-002-R (桜内梨子 (ab#0)) | Q130, Q171 | |
+| 40 | 2 | PL!SP-bp1-023-L (START!! True dreams (ab#0)) | Q36, Q66 | ✓ start_true_dreams_test |
+| 41 | 2 | PL!SP-bp2-001-R＋ (澁谷かのん (ab#0)) | Q106, Q171 | |
+| 42 | 2 | PL!SP-bp2-009-R＋ (鬼塚夏美 (ab#0)) | Q109, Q36 | ✓ natsumi_test |
+| 43 | 2 | PL!SP-bp2-015-N (平安名すみれ (ab#0)) | Q112, Q113 | ✓ sumire_auto_test |
+| 44 | 2 | PL!SP-bp2-020-N (鬼塚夏美 (ab#0)) | Q112, Q113 | ✓ sumire_auto_test |
+|46|2|PL!SP-bp2-021-N (ウィーン・マルガレーテ (ab#0))|Q112, Q113|
+|47|2|PL!SP-bp4-004-R＋ (平安名すみれ (ab#1))|Q193, Q194|
+|48|2|PL!SP-bp4-023-L (Dazzling Game (ab#1))|Q187, Q192|
+|49|2|PL!SP-bp5-005-R＋ (葉月 恋 (ab#1))|Q221, Q233|
+|50|2|PL!SP-pb1-006-R (桜小路きな子 (ab#0))|Q171, Q94|
+|51|2|PL!SP-pb1-011-R (鬼塚冬毬 (ab#0))|Q63, Q95|
+|52|2|PL!SP-pb1-025-L (Jellyfish (ab#0))|Q98, Q99|✓ jellyfish_test|
 | 53 | 1 | LL-PR-004-PR (愛♡スクリ～ム！ (ab#0)) | Q185 | |
 | 54 | 1 | LL-bp5-001-L (Live with a smile! (ab#0)) | Q224 | |
 | 55 | 1 | LL-bp5-002-L (Bring the LOVE！ (ab#1)) | Q225 | |
@@ -73,9 +72,9 @@ Write tests in engine\tests\gameplay_test_process.md
 | 63 | 1 | PL!-bp5-004-R＋ (園田海未 (ab#1)) | Q228 | |
 | 64 | 1 | PL!-bp5-007-R (東條 希 (ab#0)) | Q229 | |
 | 65 | 1 | PL!-bp5-009-R (矢澤にこ (ab#0)) | Q209 | |
-| 66 | 1 | PL!-pb1-008-R (小泉花陽 (ab#0)) | Q183 | |
-| 67 | 1 | PL!-pb1-009-R (矢澤にこ (ab#1)) | Q180 | |
-| 68 | 1 | PL!-pb1-013-R (園田海未 (ab#0)) | Q176 | |
+| 66 | 1 | PL!-pb1-008-R (小泉花陽 (ab#0)) | Q183 | ✓ hanayo_test |
+| 67 | 1 | PL!-pb1-009-R (矢澤にこ (ab#1)) | Q180 | ✓ batch3_test | |
+| 68 | 1 | PL!-pb1-013-R (園田海未 (ab#0)) | Q176 | ✓ batch3_test | |
 | 69 | 1 | PL!-pb1-015-R (西木野真姫 (ab#1)) | Q177 | |
 | 70 | 1 | PL!-pb1-030-L (Cutie Panther (ab#1)) | Q36 | |
 | 71 | 1 | PL!-pb1-031-L (輝夜の城で踊りたい (ab#0)) | Q36 | |
@@ -130,7 +129,7 @@ Write tests in engine\tests\gameplay_test_process.md
 | 120 | 1 | PL!N-sd1-009-SD (天王寺璃奈 (ab#0)) | Q209 | |
 | 121 | 1 | PL!N-sd1-028-SD (Dream with You (ab#0)) | Q116 | |
 | 122 | 1 | PL!S-PR-016-PR (黒澤ダイヤ (ab#0)) | Q171 | |
-| 123 | 1 | PL!S-bp2-004-R (黒澤ダイヤ (ab#0)) | Q107 | |
+| 123 | 1 | PL!S-bp2-004-R (黒澤ダイヤ (ab#0)) | Q107 | ✓ batch3_test | |
 | 124 | 1 | PL!S-bp2-005-R＋ (渡辺 曜 (ab#0)) | Q124 | |
 | 125 | 1 | PL!S-bp2-007-R＋ (国木田花丸 (ab#1)) | Q120 | |
 | 126 | 1 | PL!S-bp2-008-R＋ (小原鞠莉 (ab#1)) | Q36 | |

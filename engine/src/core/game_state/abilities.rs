@@ -550,6 +550,7 @@ impl GameState {
         self.opponent_live_no_excess_heart_this_turn = false;
         self.live_success_triggered_this_turn = false;
         self.last_state_change_wait_to_active_count = 0;
+        self.self_no_excess_heart_this_turn = false;
     }
 
     pub fn check_permanent_loop(&mut self) -> bool {

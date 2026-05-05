@@ -154,4 +154,53 @@ impl<'a> AbilityResolver<'a> {
         }
         Ok(())
     }
+    pub fn execute_reveal_until_live_card(&mut self, target: &str) -> Result<(), String> {
+        let card_db = self.game_state.card_database.clone();
+        let mut all_revealed: Vec<i16> = Vec::new();
+
+        loop {
+            let card_id = {
+                let player = self.game_state.resolve_target_player_mut(target);
+                player.main_deck.draw()
+            };
+            match card_id {
+                Some(cid) => {
+                    all_revealed.push(cid);
+                    self.game_state.revealed_cards.insert(cid);
+                    let is_live = card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false);
+                    if is_live {
+                        break;
+                    }
+                }
+                None => {
+                    // Deck exhausted — try refresh
+                    let player = self.game_state.resolve_target_player_mut(target);
+                    let refresh_count = player.waitroom.cards.len();
+                    if refresh_count == 0 {
+                        break; // Nothing to refresh with
+                    }
+                    for _ in 0..refresh_count {
+                        if let Some(card) = player.waitroom.cards.pop() {
+                            player.main_deck.cards.push(card);
+                        }
+                    }
+                    player.main_deck.shuffle();
+                    // After refresh, try drawing again
+                    if let Some(cid) = player.main_deck.draw() {
+                        all_revealed.push(cid);
+                        self.game_state.revealed_cards.insert(cid);
+                        let is_live = card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false);
+                        if is_live {
+                            break;
+                        }
+                    } else {
+                        break; // Still nothing
+                    }
+                }
+            }
+        }
+
+        self.looked_at_cards = all_revealed;
+        Ok(())
+    }
 }

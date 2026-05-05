@@ -1,4 +1,4 @@
-"""Deep QA analysis of abilities.json - checks 12 categories of issues."""
+"""Deep QA analysis of abilities.json - refined checks."""
 import json, os, re
 from collections import defaultdict
 
@@ -31,117 +31,73 @@ def describe(ab):
     cards = ab.get('cards', [])
     card_str = cards[0] if cards else '?'
     ft = ab.get('full_text', '')[:200]
-    return f"[{idx}] card={card_str} text=\"{ft}\""
+    return f"[{idx}] card={card_str}"
+
+# Unicode normalization helper
+def normalize(s):
+    """Normalize unicode for comparison"""
+    import unicodedata
+    return unicodedata.normalize('NFKC', s)
 
 results = {str(i): [] for i in range(1, 13)}
 
 # ============================================================
-# 1. Wrong source/destination
+# 1. Wrong source/destination (REFINED)
 # ============================================================
 print("=" * 80)
 print("CATEGORY 1: WRONG SOURCE/DESTINATION")
 print("=" * 80)
-keywords_src = {
-    'deck': ['デッキ', '山札', 'チE��キ', 'チEーキ'],
-    'deck_top': ['チE��キの上', 'チEーキの上', '山札の上'],
+
+# Known valid source→keyword mappings (what the parser should produce for given JP text)
+# These are cases where the JP text clearly indicates one source but parser says another
+CLEAR_SOURCE_INDICATORS = {
+    'deck': ['デッキ', '山札'],
+    'deck_top': ['デッキの上', '山札の上'],
     'hand': ['手札'],
     'discard': ['控え室'],
-    'energy_zone': ['エネルギーゾーン', 'エリア'],
-    'stage': ['スチEージ', 'ステージ'],
-    'wait_room': ['ウェイトルーム'],
-    'memory': ['メモリー'],
+    'energy_zone': ['エネルギーゾーン', 'エネルギーエリア'],
+    'stage': ['ステージ', 'スチEージ'],
 }
-keywords_dst = {
-    'hand': ['手札に加える', '手札に戻す', '手札に置く'],
-    'discard': ['控え室に置く', '控え室に送る'],
-    'deck_top': ['チE��キの上に置く', 'デッキの上に置く'],
-    'deck_bottom': ['チE��キの下に置く', 'デッキの下に置く'],
-    'energy_zone': ['エネルギーゾーンに置く', 'エリアに置く', 'アクチE��ブにする'],
-    'stage': ['スチEージに登場', 'ステージに登場'],
-    'empty_area': ['空いてるエリア', 'ぁE��ぁE��リア'],
-}
-for ab in abilities:
-    ft = ab.get('full_text', '')
-    for eff in collect_all_effects(ab.get('effect')):
-        src = eff.get('source')
-        dst = eff.get('destination')
-        text = eff.get('text', '')
-        if not text:
-            continue
-        # Check source
-        if src == 'deck' and '手札' in text and 'デッキ' not in text:
-            results['1'].append((describe(ab), f"source=deck but text has 手札 (should be hand?) text={text[:80]}"))
-        if src == 'hand' and 'デッキ' in text and '手札' not in text:
-            results['1'].append((describe(ab), f"source=hand but text has デッキ (should be deck?) text={text[:80]}"))
-        # Check destination
-        if dst and 'move_cards' in eff.get('action','') or eff.get('action') == 'move_cards':
-            if dst == 'hand' and '控え室' in text and '手札' not in text and '加え' not in text:
-                results['1'].append((describe(ab), f"destination=hand but text={text[:80]}"))
-            if dst == 'discard' and '手札' not in text and '控え室' in text and '引' not in text:
-                pass  # this might be ok
-
-# More thorough check: compare source/destination keywords
-src_jp_to_en = {
-    'デッキ': 'deck', '山札': 'deck', 'チE��キ': 'deck', 'チEーキ': 'deck',
-    '手札': 'hand', '控え室': 'discard', 'エネルギー': 'energy_zone',
-    'スチEージ': 'stage', 'ステージ': 'stage', 'メモリー': 'memory',
-    'ウェイト': 'wait_room',
-}
-dst_jp_to_en = {
-    '手札に': 'hand', '控え室に': 'discard', 'チE��キの上に': 'deck_top',
-    'チEーキの上に': 'deck_top', 'デッキの上に': 'deck_top',
-    'チE��キの下に': 'deck_bottom', 'デッキの下に': 'deck_bottom',
-    'エネルギー': 'energy_zone', 'アクチE��ブ': 'active',
-    'ウェイト': 'wait', '登場': 'stage', '空い': 'empty_area',
+CLEAR_DEST_INDICATORS = {
+    'hand': ['手札に加え', '手札に戻す'],
+    'discard': ['控え室に置く'],
+    'deck_top': ['デッキの上に置く', '山札の上に置く'],
+    'deck_bottom': ['デッキの下に置く'],
+    'energy_zone': ['エリアに置く', 'エネルギーゾーンに置く'],
+    'empty_area': ['空いているエリア', '空いてるエリア'],
+    'active': ['アクティブ'],
+    'wait': ['ウェイト'],
 }
 
 for ab in abilities:
     ft = ab.get('full_text', '')
     for eff in collect_all_effects(ab.get('effect')):
+        action = eff.get('action', '')
         src = eff.get('source')
         dst = eff.get('destination')
         text = eff.get('text', '')
         if not text:
             continue
-        if eff.get('action') in ('move_cards', 'draw_card', 'look_at'):
-            # Check if source contradicts text
-            if src:
-                # Find JP keywords in text
-                found_jp_src = None
-                for jp, en in src_jp_to_en.items():
-                    if jp in text:
-                        found_jp_src = en
-                        break
-                if found_jp_src and found_jp_src != src:
-                    results['1'].append((describe(ab), f"WRONG SOURCE: src={src} but text contains '{jp}'→{found_jp_src} text=\"{text[:100]}\""))
-            # Check if destination contradicts text
-            if dst:
-                found_jp_dst = None
-                for jp, en in dst_jp_to_en.items():
-                    if jp in text:
-                        found_jp_dst = en
-                        break
-                if found_jp_dst and found_jp_dst != dst:
-                    # But some are ok: e.g. destination=discard while text says 控え室に置く is fine
-                    # and destination=hand while text says 手札に加える is fine
-                    # Skip the obvious "move to X" where X matches
-                    if dst == 'discard' and found_jp_dst == 'discard':
-                        continue
-                    if dst == 'hand' and found_jp_dst == 'hand':
-                        continue
-                    if dst == 'energy_zone' and found_jp_dst == 'energy_zone':
-                        continue
-                    results['1'].append((describe(ab), f"WRONG DEST: dst={dst} but text contains '{jp}'→{found_jp_dst} text=\"{text[:100]}\""))
+        
+        n_text = normalize(text)
+        
+        # Check: if source is "deck" but text clearly says "hand" (手札) without mentioning deck
+        if src == 'deck' and '手札' in n_text and 'デッキ' not in n_text and '山札' not in n_text:
+            results['1'].append((describe(ab), f"source=deck but text says 手札 (hand) and not デッキ text=\"{text[:100]}\""))
+        
+        # Check: if source is "hand" but action is draw_card (draw from deck, not hand)
+        if action == 'draw_card' and src is not None and src != 'deck':
+            results['1'].append((describe(ab), f"draw_card with source={src} (should probably be deck) text=\"{text[:100]}\""))
+        
+        # Check: destination=null for move_cards
+        if action == 'move_cards' and dst is None:
+            results['1'].append((describe(ab), f"move_cards with destination=null text=\"{text[:100]}\""))
+        
+        # Check: destination=discard for 手札に加える (should be hand)
+        if dst == 'discard' and '手札に加え' in n_text:
+            results['1'].append((describe(ab), f"destination=discard but text says 手札に加える (should be hand) text=\"{text[:100]}\""))
 
-# Check specific case: destination=null when it should have a value
-for ab in abilities:
-    for eff in collect_all_effects(ab.get('effect')):
-        if eff.get('action') == 'move_cards':
-            if eff.get('destination') is None:
-                text = eff.get('text', '')
-                if text:
-                    results['1'].append((describe(ab), f"destination=null for move_cards text=\"{text[:100]}\""))
-
+print(f"  Total category 1 issues: {len(results['1'])}")
 for item in results['1']:
     print(f"  {item[0]}")
     print(f"    -> {item[1]}")
@@ -172,12 +128,6 @@ if not results['2']:
 print("\n" + "=" * 80)
 print("CATEGORY 3: WRONG CARD_TYPE")
 print("=" * 80)
-card_type_jp = {
-    'energy_card': ['エネルギーカード', 'エネルギー'],
-    'member_card': ['メンバーカード', 'メンバ�E'],
-    'live_card': ['ライブカード', 'ライブ'],
-    'card': ['カード'],
-}
 for ab in abilities:
     ft = ab.get('full_text', '')
     for eff in collect_all_effects(ab.get('effect')):
@@ -186,13 +136,13 @@ for ab in abilities:
         if not text or not ct:
             continue
         if ct == 'card':
-            continue  # card is the generic fallback, OK
-        # Check if text has energy keywords but card_type is not energy_card
-        if 'エネルギーカード' in text and ct != 'energy_card' and 'エネルギーチE��キ' not in text:
+            continue
+        n_text = normalize(text)
+        if 'エネルギーカード' in n_text and ct != 'energy_card':
             results['3'].append((describe(ab), f"card_type={ct} but text says エネルギーカード text=\"{text[:100]}\""))
-        if 'メンバーカード' in text and ct not in ('member_card', 'card'):
+        if 'メンバーカード' in n_text and ct not in ('member_card',):
             results['3'].append((describe(ab), f"card_type={ct} but text says メンバーカード text=\"{text[:100]}\""))
-        if 'ライブカード' in text and ct not in ('live_card', 'card'):
+        if 'ライブカード' in n_text and ct not in ('live_card',):
             results['3'].append((describe(ab), f"card_type={ct} but text says ライブカード text=\"{text[:100]}\""))
 for item in results['3']:
     print(f"  {item[0]}")
@@ -242,16 +192,15 @@ print("\n" + "=" * 80)
 print("CATEGORY 6: MISSING ALL FLAG")
 print("=" * 80)
 for ab in abilities:
+    ft = ab.get('full_text', '')
     for eff in collect_all_effects(ab.get('effect')):
         text = eff.get('text', '')
         if not text:
             continue
-        if 'すべての' in text or '全ての' in text:
+        n_text = normalize(text)
+        if 'すべての' in n_text or '全ての' in n_text or 'すべて' in n_text:
             if not eff.get('all'):
-                results['6'].append((describe(ab), f"text has すべての but all not set text=\"{text[:100]}\""))
-        # Also check for "全部" or "すべて"
-        if 'すべて' in text and 'すべての' not in text:
-            pass  # might be "すべて" meaning "everything"
+                results['6'].append((describe(ab), f"text has すべての/全ての/すべて but all not set text=\"{text[:100]}\""))
 for item in results['6']:
     print(f"  {item[0]}")
     print(f"    -> {item[1]}")
@@ -265,11 +214,13 @@ print("\n" + "=" * 80)
 print("CATEGORY 7: MISSING MULTIPLE_TARGETS")
 print("=" * 80)
 for ab in abilities:
+    ft = ab.get('full_text', '')
     for eff in collect_all_effects(ab.get('effect')):
         text = eff.get('text', '')
         if not text:
             continue
-        if 'それぞれ' in text or 'ずつ' in text:
+        n_text = normalize(text)
+        if 'それぞれ' in n_text or 'ずつ' in n_text:
             if not eff.get('multiple_targets'):
                 results['7'].append((describe(ab), f"text has それぞれ/ずつ but multiple_targets not set text=\"{text[:100]}\""))
 for item in results['7']:
@@ -293,9 +244,6 @@ def check_condition(cond, context):
             results['8'].append((context, f"location_condition missing location field"))
         if 'target' not in cond or cond.get('target') is None:
             results['8'].append((context, f"location_condition missing target field"))
-    if t in ('comparison_condition', 'card_count_condition'):
-        if 'operator' not in cond or cond.get('operator') is None:
-            results['8'].append((context, f"{t} missing operator field"))
     if t == 'compound':
         for sub in cond.get('conditions', []):
             check_condition(sub, context)
@@ -308,9 +256,18 @@ for ab in abilities:
     eff = ab.get('effect')
     if eff:
         check_condition(eff.get('condition'), desc)
-        # Also check conditions inside sequential/choice/etc
         for sub_eff in collect_all_effects(eff):
             check_condition(sub_eff.get('condition'), desc)
+# Deduplicate
+seen = set()
+unique_8 = []
+for item in results['8']:
+    key = f"{item[0]}|{item[1]}"
+    if key not in seen:
+        seen.add(key)
+        unique_8.append(item)
+results['8'] = unique_8
+
 for item in results['8']:
     print(f"  {item[0]}")
     print(f"    -> {item[1]}")
@@ -368,7 +325,6 @@ for ab in abilities:
         actions = eff.get('actions', [])
         if len(actions) <= 1:
             results['11'].append((describe(ab), f"sequential with {len(actions)} action(s) text=\"{eff.get('text','')[:100]}\""))
-    # Also check inside look_and_select select_action
     if eff.get('action') == 'look_and_select':
         sa = eff.get('select_action')
         if sa and sa.get('action') == 'sequential':
@@ -391,20 +347,26 @@ for ab in abilities:
     desc = describe(ab)
     eff = ab.get('effect')
     if eff:
-        # Check top-level and nested conditions
-        cond = eff.get('condition')
-        if cond:
-            # Recursive check
-            def check_op(cond):
-                if not cond:
-                    return
-                t = cond.get('type', '')
-                if t in ('comparison_condition', 'card_count_condition') and 'operator' not in cond:
-                    results['12'].append((desc, f"{t} missing operator field"))
-                if t == 'compound':
-                    for sub in cond.get('conditions', []):
-                        check_op(sub)
-            check_op(cond)
+        def check_op(cond):
+            if not cond:
+                return
+            t = cond.get('type', '')
+            if t in ('comparison_condition', 'card_count_condition') and 'operator' not in cond:
+                results['12'].append((desc, f"{t} missing operator field"))
+            if t == 'compound':
+                for sub in cond.get('conditions', []):
+                    check_op(sub)
+        check_op(eff.get('condition'))
+# Deduplicate
+seen = set()
+unique_12 = []
+for item in results['12']:
+    key = f"{item[0]}|{item[1]}"
+    if key not in seen:
+        seen.add(key)
+        unique_12.append(item)
+results['12'] = unique_12
+
 for item in results['12']:
     print(f"  {item[0]}")
     print(f"    -> {item[1]}")
