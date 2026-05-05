@@ -120,6 +120,8 @@ pub struct AreaInfo {
 
 pub fn setup_game(game_state: &mut GameState) {
     // Rule 6.2: Pre-Game Procedure
+    // Rule 6.2.1.7: Each player moves top 3 cards of energy deck to energy zone
+    crate::turn::TurnEngine::setup_initial_energy(game_state);
     // Start at RockPaperScissors phase - player will choose RPS option
     game_state.current_phase = crate::game_state::Phase::RockPaperScissors;
 }
@@ -352,15 +354,6 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                 action_type: ActionType::ScissorsChoice,
                 parameters: None,
             });
-        }
-        crate::game_state::Phase::LiveStart => {
-            // Live start phase - currently no specific actions
-        }
-        crate::game_state::Phase::LiveSuccess => {
-            // Live success phase - currently no specific actions
-        }
-        crate::game_state::Phase::Cheer => {
-            // Cheer phase - currently no specific actions
         }
         crate::game_state::Phase::ChooseFirstAttacker => {
             // Q16: RPS winner chooses whether to go first or second

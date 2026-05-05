@@ -203,10 +203,6 @@ fn run_single_game(
             crate::game_state::Phase::LiveVictoryDetermination => {
                 turn::TurnEngine::advance_phase(&mut game_state);
             }
-            crate::game_state::Phase::LiveStart | crate::game_state::Phase::LiveSuccess | crate::game_state::Phase::Cheer => {
-                // Handle new phases - skip for now
-                println!("Skipping new phase: {:?}", game_state.current_phase);
-            }
         }
         
         // Handle manual phases with AI

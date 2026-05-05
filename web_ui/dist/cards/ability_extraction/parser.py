@@ -173,7 +173,7 @@ EITHER_CASE_MARKER = 'いずれかの場合'
 ALTERNATIVE_MARKER = '代わりに'
 
 # ============== DURATION PREFIXES ==============
-DURATION_PREFIXES = ['ライブ終了時まで、', 'このターンの間、', 'このライブの間、', 'ライブ終了時まで 、', 'このターンの間 、', 'このライブの間 、']
+DURATION_PREFIXES = ['ライブ終了時まで、', 'ライブ終了まで、', 'このターンの間、', 'このライブの間、', 'ライブ終了時まで 、', 'ライブ終了まで 、', 'このターンの間 、', 'このライブの間 、']
 
 # ============== COST MODIFICATION PATTERNS ==============
 COST_MODIFICATION_PATTERNS = [
@@ -425,10 +425,17 @@ def categorize_quoted_text(quoted_text: List[str]) -> Dict[str, List[str]]:
             result['characters'].append(q)
     return result
 
+def normalize(text: str) -> str:
+    """Canonicalize variant patterns before parsing."""
+    text = re.sub(r"'([^']{1,10})'", r'『\1』', text)
+    text = text.replace('ライブ終了まで', 'ライブ終了時まで')
+    return text
+
 def extract_duration(text: str) -> Optional[str]:
     """Extract duration from effect text."""
     DURATION_MAP = {
         'ライブ終了時まで': 'live_end',
+        'ライブ終了まで': 'live_end',
         'このターンの間': 'this_turn',
         'このライブの間': 'this_live',
     }
@@ -635,6 +642,15 @@ def _try_compound(text):
     if loc: result['location'] = loc
     ct = extract_card_type(text)
     if ct: result['card_type'] = ct
+    # Post-parse enrichment: convert bare comparison_condition to card_count_condition
+    # when sub-condition text contains a people counter ('人')
+    for sub in parsed:
+        if sub.get('type') == 'comparison_condition' and sub.get('count'):
+            sub_text = sub.get('text', '')
+            if '人' in sub_text:
+                sub['type'] = 'card_count_condition'
+                sub['unit'] = '人'
+                sub['card_type'] = 'member_card'
     return result
 
 def _try_distinct(text):
@@ -651,10 +667,12 @@ def _try_distinct(text):
     if 'エリアすべて' in text:
         result['all_areas'] = True
     m = re.search(r'(\d+)(人|枚|つ)以上いる', text)
+    if not m:
+        m = re.search(r'(\d+)人以上', text)
     if m:
         result['count'] = int(m.group(1))
         result['operator'] = '>='
-        result['unit'] = m.group(2)
+        result['unit'] = m.group(2) if len(m.groups()) >= 2 and m.group(2) else '人'
     g = extract_group(text)
     if g:
         result['group'] = g
@@ -668,6 +686,7 @@ def _try_card_count(text):
         (r'(\d+)枚以上ある', '>=', None),
         (r'(\d+)種類以上ある', '>=', 'types'),
         (r'(\d+)枚ある', '=', None),
+        (r'(\d+)人以上', '>=', '人'),
         (r'(\d+)(人|枚|つ)以上いる', '>=', None),
     ]:
         m = re.search(pat, text)
@@ -678,10 +697,13 @@ def _try_card_count(text):
                 result['unit'] = unit
             elif len(m.groups()) >= 2 and m.group(2):
                 result['unit'] = m.group(2)
+            # When counting people, it's always member_card
+            u = result.get('unit', '')
+            if u == '人':
+                result['card_type'] = 'member_card'
             # Extract exclude_self for "このメンバー以外" pattern
             if 'このメンバー以外' in text or 'このカード以外' in text or 'ほかのメンバー' in text:
                 result['exclude_self'] = True
-                # Also set card_type to member_card since "メンバー" is in the text
                 result['card_type'] = 'member_card'
             return result
     return None
@@ -1897,6 +1919,9 @@ def parse_cost(text: str) -> Dict[str, Any]:
         group_names = extract_group_names(text)
         if group_names:
             cost['group_names'] = group_names
+        count = extract_count(text)
+        if count:
+            cost['count'] = count
         return cost
     
     # Extract destination
@@ -2625,22 +2650,9 @@ def _try_conditional_sequential(text):
         fa = parse_action(fp)
         cond = None
 
-    # Process second part
+    # Process second part — use parse_effect to handle sequential sub-actions
     clean = sp.replace(CONDITIONAL_SEQUENTIAL_MARKER, '').strip().lstrip('、')
-    sp_parts = [p.strip() for p in re.split(r'[。]', clean) if p.strip()]
-    sp_parts = [p for p in sp_parts if p not in DURATION_PREFIXES and p.rstrip('、') not in DURATION_PREFIXES]
-    second_actions = []
-    for p in sp_parts:
-        parsed = parse_action(p)
-        if not (parsed.get('action') == 'custom' and not parsed.get('text')):
-            second_actions.append(parsed)
-
-    if len(second_actions) == 1:
-        sa = second_actions[0]
-    elif len(second_actions) > 1:
-        sa = {'action': 'sequential', 'actions': second_actions, 'text': clean}
-    else:
-        sa = parse_action(clean)
+    sa = parse_effect(clean)
 
     # selected_cards reference from select action
     if fa.get('action') == 'select':
@@ -2772,6 +2784,40 @@ def _try_kore_niyori_cascade(text):
     follow = {'condition': cp}; follow.update(rp)
     acts.append(follow)
     return {'text': text, 'action': 'sequential', 'actions': acts}
+
+
+def _try_period_conditional(text):
+    """。場合、 — period-then-conditional patterns.
+    Handles "<action>。<condition>、<action>" where the condition marker
+    follows a sentence boundary (period), ensuring the preceding action
+    isn't lost when the condition marker blocks implicit sequential."""
+    if '。' not in text:
+        return None
+    for keyword in ['場合', 'とき', 'なら']:
+        marker = keyword + '、'
+        if marker in text:
+            period_pos = text.find('。')
+            marker_pos = text.find(marker)
+            if marker_pos > period_pos:
+                first = text[:period_pos].strip()
+                rest = text[period_pos + 1:].strip()
+                fa = parse_effect(first)
+                if fa.get('action', 'custom') == 'custom':
+                    return None
+                cond_result = _try_conditional(rest)
+                if cond_result is None:
+                    return None
+                actions = [fa]
+                ca = cond_result.get('actions', [])
+                if ca:
+                    actions.extend(ca)
+                else:
+                    actions.append(cond_result)
+                result = {'text': text, 'action': 'sequential', 'actions': actions}
+                if cond_result.get('condition'):
+                    result['condition'] = cond_result['condition']
+                return result
+    return None
 
 
 def _try_conditional(text):
@@ -3225,6 +3271,8 @@ def parse_effect(text: str) -> Dict[str, Any]:
 
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
+    triggerless_text = normalize(triggerless_text)
+    
     ability = {
         'triggerless_text': triggerless_text,
     }

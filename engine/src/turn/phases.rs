@@ -156,7 +156,15 @@ impl super::TurnEngine {
 
         let area = stage_area.unwrap_or_else(|| {
             let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
-            *areas.iter().find(|&&a| player.stage.get_area(a).is_none()).unwrap_or(&crate::zones::MemberArea::Center)
+            // Prefer empty areas, but if all occupied, auto-select first for baton touch
+            if let Some(empty) = areas.iter().find(|&&a| player.stage.get_area(a).is_none()) {
+                *empty
+            } else if !use_baton_touch {
+                // No empty areas and baton touch not explicitly requested — try it
+                areas[0]
+            } else {
+                areas[0]
+            }
         });
 
         let card_id = player.hand.cards[idx];

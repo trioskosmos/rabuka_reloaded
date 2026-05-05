@@ -1644,7 +1644,7 @@ def parse_action(text: str) -> Dict[str, Any]:
       lambda t, a: a.update({'resource': 'blade', 'count': t.count('{{icon_blade.png|ブレード}}') or None}))
     R(lambda t: ('{{heart' in t and '得る' in t) or 'ハートを得る' in t or '選んだハート' in t, 'gain_resource',
       lambda t, a: a.update({'resource': 'heart', 'count': len(__import__('re').findall(r'{{heart_\d+\.png\|heart\d+}}', t)) or None}))
-    R(lambda t: 'もう1度ヤル' in t or 'レヤル' in t, 're_yell',
+    R(lambda t: 'もう1度エール' in t or 'エール' in t, 're_yell',
       lambda t, a: a.update({'lose_blade_hearts': True}) if 'できない' not in t else None)
     R(lambda t: ('見る' in t or '見て' in t), 'look_at', 
       lambda t, a: (a.update({'source': 'deck_top' if 'デッキの上' in t else None}), _handle_dynamic_count(t, a), a.update({'action': 'look_at'})))
@@ -1655,7 +1655,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: 'ブレードを得る' in t or '選んだブレード' in t, 'gain_resource',
       lambda t, a: None)  # already matched above, this is fallback
     R(lambda t: 'ハートを得る' in t or '選んだハート' in t, 'gain_resource', None)
-    R(lambda t: 'もう1度ヤル' in t or 'レヤル' in t, 're_yell', None)
+    R(lambda t: 'もう1度エール' in t or 'エール' in t, 're_yell', None)
     R(lambda t: '登場させ' in t, 'appear', None)
     R(lambda t: '起動でき' in t or '起動して' in t, 'activate_ability', None)
     R(lambda t: '無効に' in t, 'invalidate_ability', None)

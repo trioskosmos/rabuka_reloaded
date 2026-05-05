@@ -35,6 +35,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
         let is_self_cost = effect.self_cost.unwrap_or(false);
         let exclude_self = m.exclude_self;
         let is_max = m.max;
+        let is_all = m.all;
         let card_db = self.game_state.card_database.clone();
         let activating_card_id = self.game_state.activating_card;
         let vacated_stage_area = self.game_state.last_vacated_stage_area;
@@ -42,6 +43,34 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
 
         // Extract character name filter from quoted_text
         let character_filter: Option<Vec<String>> = effect.quoted_text.as_ref().map(|qt| vec![qt.text.clone()]);
+
+        // Resolve name_constraint (e.g. "contains_all" from a revealed card)
+        let name_fragments: Option<Vec<String>> = if effect.name_constraint.as_deref() == Some("contains_all")
+            && effect.name_constraint_source.as_deref() == Some("revealed_card")
+        {
+            let fragments: Vec<String> = self.game_state.revealed_cost_cards.iter()
+                .chain(self.game_state.revealed_cards.iter())
+                .filter_map(|&id| {
+                    let card = self.game_state.card_database.get_card(id)?;
+                    Some(card.name.replace('＆', "&").split('&').map(|s| s.to_string()).collect::<Vec<_>>())
+                })
+                .flatten()
+                .collect();
+            if fragments.is_empty() { None } else { Some(fragments) }
+        } else {
+            None
+        };
+
+        let name_filter = |card_db: &crate::card::CardDatabase, card_id: i16| -> bool {
+            match &name_fragments {
+                Some(fragments) => {
+                    if let Some(card) = card_db.get_card(card_id) {
+                        fragments.iter().all(|f| card.name.contains(f.as_str()))
+                    } else { false }
+                }
+                None => true,
+            }
+        };
 
         let mut moved_cards: Vec<i16> = Vec::new();
 
@@ -115,8 +144,10 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
 
                 // Zones with player selection — select cards via matching indices
                 "hand" => {
-                    let idxs = util::matching_indices(&player.hand.cards, &card_db, card_type_filter, group_name, cost_limit);
-                    if idxs.len() < count { vec![] }
+                    let mut idxs = util::matching_indices(&player.hand.cards, &card_db, card_type_filter, group_name, cost_limit, character_filter.as_ref());
+                    idxs.retain(|&i| i < player.hand.cards.len() && name_filter(&card_db, player.hand.cards[i]));
+                    if is_all { idxs.iter().rev().map(|&i| player.hand.cards.remove(i)).collect() }
+                    else if idxs.len() < count { vec![] }
                     else if idxs.len() > count {
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "hand".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
@@ -129,8 +160,11 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     }
                 }
                 "discard" => {
-                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit);
-                    if idxs.len() < count {
+                    let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, card_type_filter, group_name, cost_limit, character_filter.as_ref());
+                    idxs.retain(|&i| i < player.waitroom.cards.len() && name_filter(&card_db, player.waitroom.cards[i]));
+                    let taken: Vec<i16> = if is_all {
+                        idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect()
+                    } else if idxs.len() < count {
                         return Err(format!("Not enough cards in discard: need {}", count));
                     } else if idxs.len() > count {
                         self.pending_choice = Some(Choice::SelectCard {
@@ -139,12 +173,16 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
-                    }
-                    idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect()
+                    } else {
+                        idxs.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect()
+                    };
+                    taken
                 }
                 "energy_zone" => {
-                    let idxs = util::matching_indices(&player.energy_zone.cards, &card_db, card_type_filter, None, None);
-                    if idxs.len() < count {
+                    let idxs = util::matching_indices(&player.energy_zone.cards, &card_db, card_type_filter, None, None, character_filter.as_ref());
+                    let taken: Vec<i16> = if is_all {
+                        idxs.iter().rev().map(|&i| player.energy_zone.cards.remove(i)).collect()
+                    } else if idxs.len() < count {
                         return Err(format!("Not enough cards in energy zone: need {}", count));
                     } else if idxs.len() > count {
                         self.pending_choice = Some(Choice::SelectCard {
@@ -153,11 +191,13 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
-                    }
-                    idxs.iter().rev().map(|&i| player.energy_zone.cards.remove(i)).collect()
+                    } else {
+                        idxs.iter().rev().map(|&i| player.energy_zone.cards.remove(i)).collect()
+                    };
+                    taken
                 }
                 "live_card_zone" => {
-                    let idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, Some("live_card"), group_name, cost_limit);
+                    let idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, Some("live_card"), group_name, cost_limit, character_filter.as_ref());
                     if idxs.len() < count {
                         return Err(format!("Not enough cards in live card zone: need {}", count));
                     } else if idxs.len() > count {
@@ -171,7 +211,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     idxs.iter().rev().map(|&i| player.live_card_zone.cards.remove(i)).collect()
                 }
                 "success_live_zone" => {
-                    let idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, None::<&str>, None::<&str>, None);
+                    let idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, None::<&str>, None::<&str>, None, character_filter.as_ref());
                     if idxs.len() < count {
                         return Err(format!("Not enough cards in success live zone: need {}", count));
                     } else if idxs.len() > count {

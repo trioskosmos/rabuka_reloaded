@@ -451,10 +451,6 @@ pub fn run_headless_game() {
                     actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
             }
-            crate::game_state::Phase::LiveStart | crate::game_state::Phase::LiveSuccess | crate::game_state::Phase::Cheer => {
-                // Handle new phases - skip for now
-                println!("Skipping new phase: {:?}", game_state.current_phase);
-            }
             crate::game_state::Phase::MulliganP1Turn |
             crate::game_state::Phase::MulliganP2Turn => {
                 // Mulligan phase - skip mulligan for now

@@ -132,11 +132,13 @@ pub fn matching_indices(
     card_type_filter: Option<&str>,
     group_name: Option<&str>,
     cost_limit: Option<u32>,
+    characters: Option<&Vec<String>>,
 ) -> Vec<usize> {
     cards.iter().enumerate()
         .filter(|(_, &id)| card_matches_type(card_db, id, card_type_filter)
             && card_matches_group_str(card_db, id, group_name)
-            && card_matches_cost_limit(card_db, id, cost_limit))
+            && card_matches_cost_limit(card_db, id, cost_limit)
+            && card_matches_characters(card_db, id, characters))
         .map(|(i, _)| i)
         .collect()
 }

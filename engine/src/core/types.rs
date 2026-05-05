@@ -42,9 +42,6 @@ pub enum Phase {
     FirstAttackerPerformance,
     SecondAttackerPerformance,
     LiveVictoryDetermination,
-    LiveStart,
-    LiveSuccess,
-    Cheer,
 }
 
 impl std::fmt::Display for Phase {
@@ -63,9 +60,6 @@ impl std::fmt::Display for Phase {
             Phase::FirstAttackerPerformance => write!(f, "FirstAttackerPerformance"),
             Phase::SecondAttackerPerformance => write!(f, "SecondAttackerPerformance"),
             Phase::LiveVictoryDetermination => write!(f, "LiveVictoryDetermination"),
-            Phase::LiveStart => write!(f, "LiveStart"),
-            Phase::LiveSuccess => write!(f, "LiveSuccess"),
-            Phase::Cheer => write!(f, "Cheer"),
         }
     }
 }

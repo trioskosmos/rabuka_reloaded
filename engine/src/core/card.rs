@@ -600,6 +600,9 @@ pub struct AbilityEffect {
     pub self_target: Option<bool>,
     #[serde(default)]
     pub trigger_type: Option<String>,
+    /// "すべての" — apply to ALL cards in zone, not just matching count
+    #[serde(default)]
+    pub all: Option<bool>,
 }
 
 impl AbilityEffect {
@@ -610,24 +613,12 @@ impl AbilityEffect {
             count: self.count.unwrap_or(1),
             card_type: self.card_type.clone(),
             group_name: self.group.as_ref().map(|g| g.name.clone()),
-            group_names: self.group_names.clone(),
             cost_limit: self.cost_limit,
-            optional: self.optional.unwrap_or(false),
             max: self.max.unwrap_or(false),
-            duration: self.duration.clone(),
-            state_change: self.state_change.clone(),
-            per_unit: self.per_unit.unwrap_or(false),
-            per_unit_count: self.per_unit_count.unwrap_or(1),
-            per_unit_type: self.per_unit_type.clone(),
-            dynamic_count: self.dynamic_count.clone(),
-            location: self.location.clone(),
-            state: self.state.clone(),
-            position: self.position.clone(),
-            heart_colors: self.heart_colors.clone(),
+            all: self.all.unwrap_or(false),
             source: self.source.clone(),
             destination: self.destination.clone(),
             exclude_self: self.exclude_self.unwrap_or(false),
-            multiple_targets: self.multiple_targets.unwrap_or(false),
         }
     }
 
@@ -712,24 +703,12 @@ pub struct ActionModifiers {
     pub count: u32,
     pub card_type: Option<String>,
     pub group_name: Option<String>,
-    pub group_names: Option<Vec<String>>,
     pub cost_limit: Option<u32>,
-    pub optional: bool,
     pub max: bool,
-    pub duration: Option<String>,
-    pub state_change: Option<String>,
-    pub per_unit: bool,
-    pub per_unit_count: u32,
-    pub per_unit_type: Option<String>,
-    pub dynamic_count: Option<DynamicCount>,
-    pub location: Option<String>,
-    pub state: Option<String>,
-    pub position: Option<PositionInfo>,
-    pub heart_colors: Option<Vec<String>>,
+    pub all: bool,
     pub source: Option<String>,
     pub destination: Option<String>,
     pub exclude_self: bool,
-    pub multiple_targets: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
