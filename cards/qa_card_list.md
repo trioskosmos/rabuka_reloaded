@@ -71,11 +71,11 @@ Write tests in engine\tests\gameplay_test_process.md
 | 62 | 1 | PL!-bp4-009-R (矢澤にこ (ab#0)) | Q189 | ✓ batch_nico_bp4_hanayo_test | |
 | 63 | 1 | PL!-bp5-004-R＋ (園田海未 (ab#1)) | Q228 | |
 | 64 | 1 | PL!-bp5-007-R (東條 希 (ab#0)) | Q229 | |
-| 65 | 1 | PL!-bp5-009-R (矢澤にこ (ab#0)) | Q209 | |
+| 65 | 1 | PL!-bp5-009-R (矢澤にこ (ab#0)) | Q209 | ✓ nico_recover_test |
 | 66 | 1 | PL!-pb1-008-R (小泉花陽 (ab#0)) | Q183 | ✓ hanayo_test |
 | 67 | 1 | PL!-pb1-009-R (矢澤にこ (ab#1)) | Q180 | ✓ batch3_test | |
 | 68 | 1 | PL!-pb1-013-R (園田海未 (ab#0)) | Q176 | ✓ batch3_test | |
-| 69 | 1 | PL!-pb1-015-R (西木野真姫 (ab#1)) | Q177 | |
+| 69 | 1 | PL!-pb1-015-R (西木野真姫 (ab#1)) | Q177 | ✓ maki_test |
 | 70 | 1 | PL!-pb1-030-L (Cutie Panther (ab#1)) | Q36 | ✓ (phase tests)
 | 71 | 1 | PL!-pb1-031-L (輝夜の城で踊りたい (ab#0)) | Q36 | ✓ (phase tests)
 | 72 | 1 | PL!-pb1-032-L (SENTIMENTAL StepS (ab#0)) | Q36 | ✓ (phase tests)
@@ -157,8 +157,8 @@ Write tests in engine\tests\gameplay_test_process.md
 | 148 | 1 | PL!SP-bp2-025-L (Bubble Rise (ab#0)) | Q36 | ✓ (phase tests)
 | 149 | 1 | PL!SP-bp4-025-L (Special Color (ab#1)) | Q195 | |
 | 150 | 1 | PL!SP-bp5-003-R＋ (嵐 千砂都 (ab#1)) | Q219 | |
-| 151 | 1 | PL!SP-bp5-004-R＋ (平安名すみれ (ab#0)) | Q220 | |
-| 152 | 1 | PL!SP-bp5-006-R (桜小路きな子 (ab#0)) | Q234 | |
+| 151 | 1 | PL!SP-bp5-004-R＋ (平安名すみれ (ab#0)) | Q220 | ✓ sumire_bp5_test |
+| 152 | 1 | PL!SP-bp5-006-R (桜小路きな子 (ab#0)) | Q234 | ✓ kinako_bp5_test |
 | 153 | 1 | PL!SP-bp5-007-R (米女メイ (ab#0)) | Q235 | ✓ mei_bp5_test |
 | 154 | 1 | PL!SP-bp5-009-R (鬼塚夏美 (ab#0)) | Q222 | ✓ natsumi_bp5_test |
 | 155 | 1 | PL!SP-bp5-010-R (ウィーン・マルガレーテ (ab#0)) | Q223 | ✓ wien_bp5_test |

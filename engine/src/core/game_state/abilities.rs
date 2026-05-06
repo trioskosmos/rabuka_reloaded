@@ -21,6 +21,7 @@ impl GameState {
                             card_id,
                             trigger_type,
                             completed: false,
+                            cost_paid: false,
                             pending_choice_result: None,
                             choice_card_no: None,
                             conditional_choice: None,
@@ -91,7 +92,7 @@ impl GameState {
         }
     }
 
-    fn process_current_ability(&mut self) {
+    pub(crate) fn process_current_ability(&mut self) {
         if let Some(entry) = self.ability_queue.current_entry().cloned() {
             self.activating_card = entry.card_id;
 
@@ -105,7 +106,9 @@ impl GameState {
                 (choice, looked_at, ctx, rev, result)
             };
             self.looked_at_cards = looked_at;
-            self.revealed_cost_cards = rev;
+            if !rev.is_empty() {
+                self.revealed_cost_cards = rev;
+            }
 
             if let Err(e) = result {
                 eprintln!("Failed to resolve ability: {}", e);

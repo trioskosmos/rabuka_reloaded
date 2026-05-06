@@ -173,26 +173,41 @@ impl<'a> AbilityResolver<'a> {
 
     pub fn resolve_ability(&mut self, ability: &Ability, activating_card: Option<i16>, ability_index: usize) -> Result<(), String> {
 
-        if let Some(use_limit) = ability.use_limit {
-            if let Some(card_id) = activating_card {
-                let ability_key = format!("{}_{}_{}", card_id, ability_index, self.game_state.turn_number);
-                if self.game_state.turn_limited_abilities_used.contains(&ability_key) {
+        // Check use_limit before cost, but don't insert until after effect runs
+        let ability_key = activating_card.map(|card_id| {
+            format!("{}_{}_{}", card_id, ability_index, self.game_state.turn_number)
+        });
+
+        if let Some(ref key) = ability_key {
+            if let Some(use_limit) = ability.use_limit {
+                if self.game_state.turn_limited_abilities_used.contains(key) {
                     return Err(format!("Ability has already been used this turn (use_limit: {})", use_limit));
                 }
-                self.game_state.turn_limited_abilities_used.insert(ability_key);
             }
         }
 
         self.current_ability = Some(ability.clone());
         self.game_state.activating_card = activating_card;
 
-        if let Some(ref cost) = ability.cost {
-            if let Err(e) = self.pay_cost(cost) {
-                return Err(e);
+        let cost_already_paid = self.game_state.ability_queue.current_entry()
+            .map_or(false, |e| e.cost_paid);
+
+        if !cost_already_paid {
+            if let Some(ref cost) = ability.cost {
+                if let Err(e) = self.pay_cost(cost) {
+                    return Err(e);
+                }
             }
         }
 
         if self.pending_choice.is_some() {
+            // Only mark cost as paid if the choice was created by the cost
+            // (not by a subsequent effect that creates its own choice)
+            if !cost_already_paid && ability.cost.is_some() {
+                if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    entry.cost_paid = true;
+                }
+            }
             self.store_pending_choice();
             return Ok(());
         }
@@ -205,6 +220,13 @@ impl<'a> AbilityResolver<'a> {
             if self.pending_choice.is_some() {
                 self.store_pending_choice();
                 return Ok(());
+            }
+        }
+
+        // Insert use_limit key after effect has fully executed
+        if let Some(key) = ability_key {
+            if ability.use_limit.is_some() {
+                self.game_state.turn_limited_abilities_used.insert(key);
             }
         }
 

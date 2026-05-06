@@ -141,7 +141,7 @@ impl super::TurnEngine {
     pub fn player_perform_live(
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
-        player_id: &str, card_db: &CardDatabase,
+        _player_id: &str, card_db: &CardDatabase,
         blade_modifiers: &ModMap<i32>,
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,

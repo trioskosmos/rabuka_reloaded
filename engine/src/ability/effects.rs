@@ -99,7 +99,11 @@ impl<'a> AbilityResolver<'a> {
 
         if effect.action_by.as_deref() == Some("opponent") {
             if let Some(ref opponent_action) = effect.opponent_action {
-                self.execute_effect(opponent_action)?;
+                let mut modified = opponent_action.clone();
+                if modified.target.is_none() || modified.target.as_deref() == Some("self") {
+                    modified.target = Some("opponent".to_string());
+                }
+                self.execute_effect(&modified)?;
             }
         }
 
@@ -1126,7 +1130,7 @@ impl<'a> AbilityResolver<'a> {
         }
 
         // Determine which positions are already taken by these members
-        let occupied: Vec<usize> = members.iter().map(|&(idx, _)| idx).collect();
+        let _occupied: Vec<usize> = members.iter().map(|&(idx, _)| idx).collect();
 
         // Build choice description showing each member and asking for destinations
         let card_db = self.game_state.card_database.clone();
@@ -1143,7 +1147,7 @@ impl<'a> AbilityResolver<'a> {
         // Store the formation state for sequential resolution
         self.game_state.pending_sequential_actions = Some(Vec::new());
         let mut pending = Vec::new();
-        for &(src_idx, card_id) in &members {
+        for &(src_idx, _card_id) in &members {
             let dest_options: Vec<String> = (0..3).map(|i| match i {
                 0 => "left_side".to_string(),
                 1 => "center".to_string(),

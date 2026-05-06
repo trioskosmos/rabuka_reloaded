@@ -202,6 +202,45 @@ impl Player {
                     }
                 }
             }
+            // Cross-card cost reduction: scan stage members for modify_cost abilities
+            // that apply to the card being played (group match, cost limit match, etc.)
+            if cost_reduction == 0 {
+                for &stage_id in &self.stage.stage {
+                    if stage_id == -1 { continue; }
+                    if let Some(stage_card) = card_db.get_card(stage_id) {
+                        for ability in &stage_card.abilities {
+                            if let Some(ref effect) = ability.effect {
+                                if effect.action == "modify_cost"
+                                    && effect.operation.as_deref() == Some("subtract")
+                                    && effect.location.as_deref() == Some("hand")
+                                {
+                                    // Check group filter: does the played card match?
+                                    let group_matches = effect.group.as_ref()
+                                        .map(|g| crate::ability::util::card_matches_group_str(card_db, card_id, Some(&g.name)))
+                                        .or_else(|| effect.group_names.as_ref().and_then(|gn| {
+                                            gn.first().map(|g| crate::ability::util::card_matches_group_str(card_db, card_id, Some(g)))
+                                        }))
+                                        .unwrap_or(true);
+                                    if !group_matches { continue; }
+                                    // Check cost limit: does the played card's cost match?
+                                    if let Some(limit) = effect.cost_limit {
+                                        if card.cost.map_or(true, |c| c != limit) { continue; }
+                                    }
+                                    // Check card_type filter
+                                    if let Some(ref ct) = effect.card_type {
+                                        if ct != "member_card" && ct != "card" && ct != "member" { continue; }
+                                    }
+                                    // Apply reduction
+                                    let reduction = effect.value.unwrap_or(1);
+                                    cost_reduction = cost_reduction.max(reduction);
+                                    break;  // Take the largest reduction found
+                                }
+                            }
+                        }
+                    }
+                    if cost_reduction > 0 { break; }
+                }
+            }
             // Rule: Cost increase from 常時 abilities (e.g. success_live_zone cards → +cost)
             let mut cost_increase: u32 = 0;
             for ability in &card.abilities {

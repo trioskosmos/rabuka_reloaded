@@ -1,7 +1,7 @@
 use crate::game_state::{GameState, AbilityTrigger};
 
 impl super::TurnEngine {
-    pub(crate) fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, cost_paid: u32, baton_touch_used: bool) {
+    pub(crate) fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, _cost_paid: u32, _baton_touch_used: bool) {
         let player_id_clone = player_id.to_string();
         let card_no_clone = card_no.to_string();
         let mut abilities_to_trigger = Vec::new();

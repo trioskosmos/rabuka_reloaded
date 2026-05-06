@@ -352,7 +352,8 @@ def extract_group(text: str) -> Optional[Dict[str, Any]]:
 def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
     """Extract cost limit."""
     for pat in [r'(\d+)コスト(?:以上|以下|未満|超)', r'コスト(\d+)(?:以上|以下|未満|超)',
-                r'(\d+)\s*以下', r'以下\s*(\d+)', r'(\d+)\s*合計']:
+                r'(\d+)\s*以下', r'以下\s*(\d+)', r'(\d+)\s*合計',
+                r'コスト(\d+)の']:  # e.g. "コスト10の" → limit to cost=10
         m = re.search(pat, text)
         if m:
             return int(m.group(1))
@@ -1636,9 +1637,16 @@ def parse_action(text: str) -> Dict[str, Any]:
     def _handle_cost_modification(text, action):
         """Handle cost modification patterns."""
         if '減る' in text or '減らす' in text or 'マイナス' in text:
-            action['operation'] = 'decrease'
+            action['operation'] = 'subtract'
         elif '増える' in text or '増やす' in text or 'プラス' in text or 'コストを+' in text:
             action['operation'] = 'increase'
+        # Set location for hand-based cost reductions (手札にある/手札から)
+        if '手札' in text:
+            action['location'] = 'hand'
+        # Extract cost limit (e.g. "コスト10の" → limit to cards with cost 10)
+        cl = extract_cost_limit(text)
+        if cl is not None:
+            action['cost_limit'] = cl
         # Extract numeric value from patterns like "コストは2減る" or "コストを+1する"
         value_match = re.search(r'コスト[はがを](\d+)(減る|減らす|増える|増やす)', text)
         if value_match:
@@ -2359,10 +2367,10 @@ def _try_cost_modification(text):
         if len(parts) == 2:
             first, second = parts[0].strip(), parts[1].strip()
             if any(p in second for p in cost_prefixes):
-                op = 'subtract' if 'この能力を起動するためのコストは' in text else 'decrease'
+                op = 'subtract'
                 return {'text': text, 'action': 'sequential',
                         'actions': [parse_action(first), _make_cost_mod_action(second, op)]}
-    return {'action': 'modify_cost', 'operation': 'decrease',
+    return {'action': 'modify_cost', 'operation': 'subtract',
             'text': text, 'count': energy_count}
 
 

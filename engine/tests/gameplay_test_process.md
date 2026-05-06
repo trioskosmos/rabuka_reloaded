@@ -273,6 +273,8 @@ If a LiveSuccess ability creates a pending choice (e.g., "draw 2, discard 1"), `
 | PL!SP-bp1-023-L (START!! True dreams) | Test verifying comparison_condition for score between players (Q66); added `energy_deck` source handler in move_cards | Engine+Test |
 | PL!SP-bp2-015-N (平安名すみれ) | Auto ability test for revealed_cards blade heart check; verified no-cheer = no trigger (Q113) | Test only |
 | All cards | **Phase advancement**: From LiveCardSetP1, LiveVictoryDetermination processing requires 5 passes (P2→FirstAttacker→SecondAttacker→LiveVictoryDet→Processed) | Test fix |
+| PL!-pb1-015-R (西木野真姫) | `cost_paid` flag + `process_current_ability` after cost choice + `process_pending_auto_abilities` after re-entry; `action_by: opponent` → target opponent; `evaluate_state_change_condition` checks target's stage not just activating card | Engine |
+| PL!-bp5-009-R (矢澤にこ) | `resume_queue_with_choice` re-processes ability when `cost_paid`; use_limit moved to after effect; `cost_paid` only set when cost creates choice | Engine |
 
 ## Step 4: Verifying QA Scenarios
 

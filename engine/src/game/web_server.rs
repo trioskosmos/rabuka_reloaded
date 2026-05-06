@@ -459,6 +459,7 @@ fn is_live_card_set_phase(game_state: &GameState) -> bool {
 
 }
 
+#[allow(dead_code)]
 fn is_player2_decision_phase(game_state: &GameState) -> bool {
     match game_state.current_phase {
         crate::game_state::Phase::MulliganP2Turn
@@ -471,6 +472,7 @@ fn is_player2_decision_phase(game_state: &GameState) -> bool {
 
 
 
+#[allow(dead_code)]
 fn execute_player2_ai_action(game_state: &mut GameState) -> Result<bool, String> {
 
     if !is_player2_decision_phase(game_state) {

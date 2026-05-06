@@ -292,7 +292,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             }
                         }
                         self.pending_choice = None;
-                        if let Some(cost) = self.game_state.entry_cost().cloned() {
+                        if let Some(_cost) = self.game_state.entry_cost().cloned() {
                             // Cost-based optional: re-execute the full effect
                             if let Some(effect) = self.game_state.entry_effect().cloned() {
                                 if let Err(e) = self.execute_effect(&effect) {

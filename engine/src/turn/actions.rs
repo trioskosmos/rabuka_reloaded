@@ -158,7 +158,22 @@ impl super::TurnEngine {
             game_state.pending_choice = c.to_frontend_json();
             game_state.ability_queue.pause_for_choice(c);
         }
-        else { game_state.ability_queue.complete_current(); game_state.pending_choice = None; game_state.activating_card = None; }
+        else {
+            let cost_was_paid = game_state.ability_queue.current_entry().map_or(false, |e| e.cost_paid);
+            game_state.pending_choice = None;
+            game_state.activating_card = None;
+            if cost_was_paid {
+                // Cost was paid but effect hasn't run yet — re-process to execute effect
+                game_state.process_current_ability();
+                // Continue processing remaining queue entries (e.g. auto abilities)
+                let player_id = game_state.ability_queue.current_entry()
+                    .map(|e| e.player_id.clone())
+                    .unwrap_or_else(|| "p1".to_string());
+                game_state.process_pending_auto_abilities(&player_id);
+            } else {
+                game_state.ability_queue.complete_current();
+            }
+        }
         Ok(())
     }
 

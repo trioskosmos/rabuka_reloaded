@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-06T03:50:06.059347",
+  "generated_at": "2026-05-06T13:25:42.909191",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -3540,7 +3540,8 @@
         "card_type": "member_card",
         "target": "self",
         "action": "modify_cost",
-        "operation": "decrease",
+        "operation": "subtract",
+        "location": "hand",
         "value": 1
       }
     },
@@ -4078,6 +4079,7 @@
         "text": "コスト10の『Liella!』のメンバーカードを自分の手札から登場させるためのコストは2減る",
         "source": "hand",
         "destination": "stage",
+        "cost_limit": 10,
         "card_type": "member_card",
         "target": "self",
         "group": {
@@ -4087,7 +4089,8 @@
           "Liella!"
         ],
         "action": "modify_cost",
-        "operation": "decrease",
+        "operation": "subtract",
+        "location": "hand",
         "value": 2
       }
     },
@@ -11593,7 +11596,8 @@
         },
         "card_type": "member_card",
         "action": "modify_cost",
-        "operation": "decrease",
+        "operation": "subtract",
+        "location": "hand",
         "value": 2
       }
     },
@@ -12700,6 +12704,7 @@
           "card_type": "member_card",
           "comparison_type": "cost",
           "exclude_self": true,
+          "cost_limit": 11,
           "type": "location_condition"
         },
         "source": "discard",
@@ -13040,7 +13045,8 @@
         "duration": "as_long_as",
         "card_type": "member_card",
         "action": "modify_cost",
-        "operation": "decrease",
+        "operation": "subtract",
+        "location": "hand",
         "value": 2
       }
     },
@@ -22658,7 +22664,8 @@
         "duration": "as_long_as",
         "card_type": "member_card",
         "action": "modify_cost",
-        "operation": "decrease",
+        "operation": "subtract",
+        "location": "hand",
         "value": 2
       }
     },

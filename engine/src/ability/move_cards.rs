@@ -46,7 +46,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
             None
         };
 
-        let name_filter = |card_db: &crate::card::CardDatabase, card_id: i16| -> bool {
+        let _name_filter = |card_db: &crate::card::CardDatabase, card_id: i16| -> bool {
             match &name_fragments {
                 Some(fragments) => {
                     if let Some(card) = card_db.get_card(card_id) {
@@ -146,7 +146,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         name_fragments: name_fragments.as_ref(),
                         ..util::CardFilter::default()
                     };
-                    let mut idxs = util::matching_indices(&player.hand.cards, &card_db, &filter, false);
+                    let idxs = util::matching_indices(&player.hand.cards, &card_db, &filter, false);
                     if is_all { idxs.iter().rev().map(|&i| player.hand.cards.remove(i)).collect() }
                     else if idxs.len() < count { vec![] }
                     else if idxs.len() > count {
@@ -249,7 +249,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         characters: character_filter.as_ref(),
                         ..util::CardFilter::default()
                     };
-                    let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
+                    let idxs = util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
                     if idxs.len() < count { vec![] }
                     else if idxs.len() > count {
                         self.pending_choice = Some(Choice::SelectCard {

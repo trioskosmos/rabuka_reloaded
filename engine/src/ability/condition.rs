@@ -697,30 +697,39 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn evaluate_state_change_condition(&self, condition: &Condition) -> bool {
-        let _text = &condition.text;
         let _during_main_phase = condition.text.contains("main_phase");
         if _during_main_phase && self.game_state.current_phase != Phase::Main {
             return false;
         }
-        // Check from_state / to_state if present
         if let (Some(from), Some(to)) = (condition.from_state.as_deref(), condition.to_state.as_deref()) {
-            // If count is specified, check against the number of members changed
-            // by the preceding effect (e.g. "3+ wait members became active")
             if let Some(target_count) = condition.count {
                 if condition.operator.as_deref() == Some(">=") {
                     let actual = self.game_state.last_state_change_wait_to_active_count;
                     return actual >= target_count;
                 }
             }
-            // Legacy: check the activating card's own orientation change
-            if let Some(card_id) = self.activating_card_id {
-                let current_orientation = self.game_state.get_orientation_modifier(card_id);
+            let target = condition.target.as_deref().unwrap_or("self");
+            let is_opponent = target == "opponent" || condition.text.contains("相手");
+            let player = if is_opponent {
+                self.game_state.resolve_target_player("opponent")
+            } else {
+                self.game_state.resolve_target_player("self")
+            };
+            // Check if any member on the target player's stage has the target orientation
+            let orientation_check = |card_id: i16| -> bool {
+                let o = self.game_state.get_orientation_modifier(card_id);
                 match (from, to) {
-                    ("active", "wait") => return current_orientation.map_or(false, |o| o == "wait"),
-                    ("wait", "active") => return current_orientation.map_or(true, |o| o == "active"),
-                    _ => return false,
+                    ("active", "wait") => o.map_or(false, |s| s == "wait"),
+                    ("wait", "active") => o.map_or(true, |s| s == "active"),
+                    _ => false,
+                }
+            };
+            for &card_id in &player.stage.stage {
+                if card_id != -1 && orientation_check(card_id) {
+                    return true;
                 }
             }
+            return false;
         }
         true
     }
@@ -865,7 +874,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if cid == -1 || !matches_group(cid) { continue; }
                 if let Some(card) = card_db.get_card(cid) {
                     if let Some(ref bh) = card.base_heart {
-                        for (color, val) in &bh.hearts {
+                        for (_color, val) in &bh.hearts {
                             total += val;
                         }
                     }

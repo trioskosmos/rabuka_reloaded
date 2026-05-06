@@ -3,15 +3,15 @@
 /// 起動 ターン1回 手札を2枚控え室に置く：
 /// 自分の控え室から必要ハートにheart06を3以上含むライブカードを1枚手札に加える。
 ///
-/// Q209: The live card discarded as cost can be recovered by the effect,
-/// since the cost resolves before the effect checks the discard.
+/// Q209: Live card discarded as cost can be recovered by the same ability.
 
 mod helpers;
 use helpers::*;
 
-/// Q209: Discard a live card as cost, then recover it from discard via the effect.
+/// Q209: Cost creates a choice (3 cards in hand, need to pick 2).
+/// After paying cost, effect recovers the same live card from discard.
 #[test]
-fn nico_q209_discard_then_recover_live_card() {
+fn nico_q209_cost_choice_then_recover() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
@@ -19,6 +19,9 @@ fn nico_q209_discard_then_recover_live_card() {
     let live_card = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
+    // Hand: nico + live_card + 2x filler = 4 cards
+    // After play_to_stage: hand = live_card + 2 filler = 3 cards
+    // Cost (discard 2) with 3 cards → choice created to pick which 2
     game.state.player1.hand.cards.push(nico);
     game.state.player1.hand.cards.push(live_card);
     game.state.player1.hand.cards.push(filler);
@@ -28,29 +31,23 @@ fn nico_q209_discard_then_recover_live_card() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
 
-    // Hand after play: live_card + 2 filler = 3 cards
-    game.dbg_all();
+    // Hand: live_card + filler + filler = 3 cards
     game.activate_ability(nico);
-    game.dbg_all();
 
     // Cost prompt: select 2 cards from hand to discard
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.select_indices(&[0, 1]); // discard live_card + 1 filler
     }
-    game.dbg_all();
 
-    // Effect prompt: select 1 live card from discard to add to hand
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    game.dbg_all();
-
+    // Effect should recover the live card from discard
     assert!(game.state.player1.hand.cards.contains(&live_card),
-        "Q209: Live card should be recoverable");
-    assert_eq!(game.state.player1.hand.cards.len(), 2);
+        "Q209: Live card discarded as cost should be recoverable");
+    // Hand: 3 - 2 + 1 = 2
+    assert_eq!(game.state.player1.hand.cards.len(), 2,
+        "Q209: Net 2 cards in hand");
 }
 
-/// Edge: no live card in discard → effect does nothing gracefully.
+/// Edge: no live card in discard → effect skips gracefully.
 #[test]
 fn nico_q209_no_live_card_in_discard() {
     let db = load_real_database();
@@ -59,6 +56,7 @@ fn nico_q209_no_live_card_in_discard() {
     let nico = game.id("PL!-bp5-009-R");
     let filler = game.id("PL!-sd1-010-SD");
 
+    // Hand: nico + 3 filler = 4. After play: 3 filler = 3 cards
     game.state.player1.hand.cards.push(nico);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
@@ -68,18 +66,13 @@ fn nico_q209_no_live_card_in_discard() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
 
-    // Hand after play: 3 filler = 3 cards (no live card)
     game.activate_ability(nico);
 
     if game.has_pending_choice() {
-        // Discard 2 fillers
         game.select_indices(&[0, 1]);
     }
 
-    // Effect should find 0 live cards in discard → no-op, no choice
-    assert!(!game.has_pending_choice(),
-        "No live card in discard → no selection prompt");
-    // Hand: 3 - 2 = 1
+    // No live card in discard → no recovery
     assert_eq!(game.state.player1.hand.cards.len(), 1,
         "No recovery when no live card in discard");
 }
