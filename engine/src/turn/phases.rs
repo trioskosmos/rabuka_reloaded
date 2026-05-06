@@ -145,7 +145,6 @@ impl super::TurnEngine {
 
     pub(crate) fn handle_set_live_card(game_state: &mut GameState, card_id: Option<i16>) -> Result<(), String> {
         let cid = card_id.ok_or("No card selected for live card set")?;
-        let card_db = game_state.card_database.clone();
         let player = game_state.active_player_mut();
         let idx = player.get_card_index_by_id(cid).ok_or("Selected card not found in hand")?;
         if !player.hand.cards.is_empty() && idx < player.hand.cards.len() {

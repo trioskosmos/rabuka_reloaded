@@ -436,7 +436,6 @@ pub struct AbilityCost {
     pub count: Option<u32>,
     pub card_type: Option<String>,
     pub target: Option<String>,
-    pub action: Option<String>,
     pub optional: Option<bool>,
     pub energy: Option<u32>,
     pub state_change: Option<String>,
@@ -512,7 +511,6 @@ pub struct AbilityEffect {
     // Fields from parser improvements
     pub choice_options: Option<Vec<String>>,
     pub options: Option<Vec<AbilityEffect>>,
-    pub group: Option<GroupInfo>,
     pub per_unit_count: Option<u32>,
     pub per_unit_type: Option<String>,
     #[serde(alias = "max_repeats")]
@@ -531,7 +529,6 @@ pub struct AbilityEffect {
     pub name_constraint: Option<String>,
     #[serde(default)]
     pub name_constraint_source: Option<String>,
-    pub activation_condition: Option<String>,
     pub activation_condition_parsed: Option<Condition>,
     pub ability_text: Option<String>,
     pub use_limit: Option<u32>,
@@ -641,7 +638,7 @@ impl AbilityEffect {
             target: self.target.as_deref().unwrap_or("self").to_string(),
             count: self.count.unwrap_or(1),
             card_type: self.card_type.clone(),
-            group_name: self.group.as_ref().map(|g| g.name.clone()),
+            group_name: self.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.clone())),
             cost_limit: self.cost_limit,
             max: self.max.unwrap_or(false),
             all: self.all.unwrap_or(false),
@@ -682,8 +679,10 @@ impl AbilityEffect {
         if let Some(limit) = self.cost_limit {
             fields.push(format!("cost_limit: {}", limit));
         }
-        if let Some(ref grp) = self.group {
-            fields.push(format!("group: {}", grp.name));
+        if let Some(ref gn) = self.group_names {
+            if let Some(first) = gn.first() {
+                fields.push(format!("group_names: {}", first));
+            }
         }
         
         format!("AbilityEffect {{ {} }}", fields.join(", "))
@@ -760,7 +759,6 @@ pub struct Condition {
     pub operator: Option<String>,
     pub card_type: Option<String>,
     pub target: Option<String>,
-    pub group: Option<serde_json::Value>,
     pub group_names: Option<Vec<String>>,
     pub characters: Option<Vec<String>>,
     pub state: Option<String>,
@@ -771,7 +769,6 @@ pub struct Condition {
     pub any_of: Option<Vec<String>>,
     pub cost_limit: Option<u32>,
     pub negation: Option<bool>,
-    pub movement_condition: Option<String>,
     pub baton_touch_trigger: Option<bool>,
     pub baton_touch_source: Option<String>,
     pub movement_state: Option<String>,

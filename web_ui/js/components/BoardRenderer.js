@@ -19,12 +19,14 @@ export const BoardRenderer = {
         if (!p0?.success_live_card_zone?.cards) console.warn('[BoardRenderer] p0.success_live_card_zone.cards missing');
         if (!p1?.success_live_card_zone?.cards) console.warn('[BoardRenderer] p1.success_live_card_zone.cards missing');
 
-        // Rust backend format: stage is { left_side, center, right_side }, live_zone is { cards }
+        // Rust backend format: stage is { left_side, center, right_side, left_under, center_under, right_under }
         const myStage = p0.stage ? [p0.stage.left_side, p0.stage.center, p0.stage.right_side] : [];
+        const myUnderCards = p0.stage ? [p0.stage.left_under || [], p0.stage.center_under || [], p0.stage.right_under || []] : [[], [], []];
         const oppStage = p1.stage ? [p1.stage.left_side, p1.stage.center, p1.stage.right_side] : [];
+        const oppUnderCards = p1.stage ? [p1.stage.left_under || [], p1.stage.center_under || [], p1.stage.right_under || []] : [[], [], []];
         
-        CardRenderer.renderStage('my-stage', myStage, true, validTargets.myStage, validTargets.hasSelection);
-        CardRenderer.renderStage('opp-stage', oppStage, true, validTargets.oppStage, validTargets.hasSelection);
+        CardRenderer.renderStage('my-stage', myStage, myUnderCards, true, validTargets.myStage, validTargets.hasSelection);
+        CardRenderer.renderStage('opp-stage', oppStage, oppUnderCards, true, validTargets.oppStage, validTargets.hasSelection);
         
         CardRenderer.renderLiveZone('my-live', p0.live_zone.cards, true, validTargets.myLive, validTargets.hasSelection);
         CardRenderer.renderLiveZone('opp-live', p1.live_zone.cards, true, validTargets.oppLive, validTargets.hasSelection);

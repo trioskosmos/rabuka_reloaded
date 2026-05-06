@@ -92,15 +92,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             }
                             "stage" => {
                                 let mut last_vacated = None;
+                                let card_db = self.game_state.card_database.clone();
                                 {
                                     let player = self.game_state.active_player_mut();
-                                    let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
                                     for &idx in indices.iter().rev() {
-                                        if idx < areas.len() {
-                                            let area = areas[idx];
-                                            if let Some(card_id) = player.stage.get_area(area) {
-                                                player.stage.clear_area(area);
-                                                player.waitroom.add_card(card_id);
+                                        if idx < 3 {
+                                            if player.stage.stage[idx] != -1 {
+                                                player.remove_member_from_stage_with_recycling(idx, &card_db);
                                                 last_vacated = Some(idx);
                                             }
                                         }

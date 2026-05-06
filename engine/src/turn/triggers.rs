@@ -58,10 +58,8 @@ impl super::TurnEngine {
 
         {
             let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
-            eprintln!("[LIVE_START] player={} lcz.len={}", player_id, player.live_card_zone.cards.len());
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
-                    eprintln!("[LIVE_START] checking card_id={} card_no={} has {} abilities type={:?}", card_id, card.card_no, card.abilities.len(), card.card_type);
                     for ability in &card.abilities {
                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);

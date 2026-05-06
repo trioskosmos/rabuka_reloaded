@@ -324,7 +324,7 @@ impl<'a> AbilityResolver<'a> {
         let card_db = self.game_state.card_database.clone();
 
         // If heart_colors is present and resource is heart, this is a choose-and-replace operation
-        if (resource == "heart" || resource == "ハート") && (heart_colors.is_some() || heart_selection) {
+        let single_fixed_heart: Option<String> = if (resource == "heart" || resource == "ハート") && (heart_colors.is_some() || heart_selection) {
             let colors = heart_colors.cloned().unwrap_or_else(|| {
                 vec!["heart01".into(), "heart02".into(), "heart03".into(),
                      "heart04".into(), "heart05".into(), "heart06".into()]
@@ -335,13 +335,18 @@ impl<'a> AbilityResolver<'a> {
                     unique_colors.push(c);
                 }
             }
-            self.pending_choice = Some(Choice::SelectHeartColor {
-                count: count as usize,
-                options: unique_colors,
-                description: "Choose a heart color".to_string(),
-            });
-            return Ok(());
-        }
+            if unique_colors.len() == 1 && !heart_selection {
+                // Single fixed heart color — apply directly, no choice needed
+                Some(unique_colors[0].clone())
+            } else {
+                self.pending_choice = Some(Choice::SelectHeartColor {
+                    count: count as usize,
+                    options: unique_colors,
+                    description: "Choose a heart color".to_string(),
+                });
+                return Ok(());
+            }
+        } else { None };
 
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
@@ -370,7 +375,7 @@ impl<'a> AbilityResolver<'a> {
                 vec![]
             };
 
-            let heart_color_inner = heart_color.map(|s| s.to_string());
+            let heart_color_inner = single_fixed_heart.clone().or_else(|| heart_color.map(|s| s.to_string()));
             let heart_targets: Vec<i16> = if resource == "heart" || resource == "ハート" {
                 util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true)
             } else { vec![] };
@@ -403,8 +408,14 @@ impl<'a> AbilityResolver<'a> {
         if resource == "heart" || resource == "ハート" {
             let color = crate::zones::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
             let heart_to_add = if is_negative { -(final_count as i32) } else { final_count as i32 };
-            for card_id in heart_targets {
-                self.game_state.add_heart_modifier(card_id, color, heart_to_add);
+            if heart_targets.is_empty() {
+                if let Some(card_id) = activating_card_id {
+                    self.game_state.add_heart_modifier(card_id, color, heart_to_add);
+                }
+            } else {
+                for &card_id in &heart_targets {
+                    self.game_state.add_heart_modifier(card_id, color, heart_to_add);
+                }
             }
         }
 
@@ -936,8 +947,14 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
         // Rule 10.5.3: Energy placed under member — track it for recycling
-        // The energy cards are off the energy zone count; when the member leaves,
-        // they should return to the energy deck.
+        let area = match target_index {
+            0 => crate::zones::MemberArea::LeftSide,
+            1 => crate::zones::MemberArea::Center,
+            _ => crate::zones::MemberArea::RightSide,
+        };
+        for card in energy_cards {
+            player.stage.place_under_card(area, card);
+        }
         Ok(())
     }
 
@@ -1040,17 +1057,16 @@ impl<'a> AbilityResolver<'a> {
         });
 
         if let Some(current_idx) = current_index {
-            let card_id = player.stage.stage[current_idx];
-            if player.stage.stage[target_index] != -1 {
-                let occupying_card = player.stage.stage[target_index];
-                player.stage.stage[target_index] = card_id;
-                player.stage.stage[current_idx] = occupying_card;
-                self.game_state.record_card_movement(occupying_card);
-            } else {
-                player.stage.stage[target_index] = card_id;
-                player.stage.stage[current_idx] = -1;
-            }
-            self.game_state.record_card_movement(card_id);
+            let from_area = match current_idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+            let to_area = match target_index { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+            let (target_id, source_id) = (player.stage.stage[target_index], player.stage.stage[current_idx]);
+            if let Ok(_) = player.stage.position_change(from_area, to_area) {
+                let _ = player;
+                self.game_state.record_card_movement(target_id);
+                if source_id != -1 {
+                    self.game_state.record_card_movement(source_id);
+                }
+            } else { return Err(format!("Failed to move member from {:?} to {:?}", from_area, to_area)); }
         } else { return Err(format!("Member not found: {}", target_member)); }
         self.game_state.position_change_occurred_this_turn = true;
         Ok(())
@@ -1103,20 +1119,18 @@ impl<'a> AbilityResolver<'a> {
             if player.stage.stage[source_idx] == -1 {
                 return Ok(());  // no member at source, skip
             }
-            let card_id = player.stage.stage[source_idx];
             if source_idx == target_index {
                 return Ok(());  // same position, no move needed
             }
-            if player.stage.stage[target_index] != -1 {
-                let occupying = player.stage.stage[target_index];
-                player.stage.stage[target_index] = card_id;
-                player.stage.stage[source_idx] = occupying;
-                self.game_state.record_card_movement(occupying);
-            } else {
-                player.stage.stage[target_index] = card_id;
-                player.stage.stage[source_idx] = -1;
+            let from_area2 = match source_idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+            let to_area2 = match target_index { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+            let (target_id2, source_id2) = (player.stage.stage[target_index], player.stage.stage[source_idx]);
+            player.stage.position_change(from_area2, to_area2)?;
+            let _ = player;
+            self.game_state.record_card_movement(target_id2);
+            if source_id2 != -1 {
+                self.game_state.record_card_movement(source_id2);
             }
-            self.game_state.record_card_movement(card_id);
             self.game_state.position_change_occurred_this_turn = true;
             return Ok(());
         }
@@ -1129,17 +1143,15 @@ impl<'a> AbilityResolver<'a> {
 
                 if let Some(current_idx) = current_index {
                     if current_idx == target_index { return Ok(()); }
-                    let card_id = player.stage.stage[current_idx];
-                    if player.stage.stage[target_index] != -1 {
-                        let occupying_card = player.stage.stage[target_index];
-                        player.stage.stage[target_index] = card_id;
-                        player.stage.stage[current_idx] = occupying_card;
-                        self.game_state.record_card_movement(occupying_card);
-                    } else {
-                        player.stage.stage[target_index] = card_id;
-                        player.stage.stage[current_idx] = -1;
+                    let from_area3 = match current_idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+                    let to_area3 = match target_index { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+                    let (target_id3, source_id3) = (player.stage.stage[target_index], player.stage.stage[current_idx]);
+                    player.stage.position_change(from_area3, to_area3)?;
+                    let _ = player;
+                    self.game_state.record_card_movement(target_id3);
+                    if source_id3 != -1 {
+                        self.game_state.record_card_movement(source_id3);
                     }
-                    self.game_state.record_card_movement(card_id);
                 } else { return Err(format!("Activating card {} not found on stage", activating_card_id)); }
             } else { return Err("No activating card for position change".to_string()); }
         }
@@ -1360,14 +1372,16 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_re_yell(&mut self, lose_blade_hearts: bool, target: &str) -> Result<(), String> {
         eprintln!("re_yell: lose_blade_hearts={}", lose_blade_hearts);
-        let player = self.game_state.resolve_target_player_mut(target);
+        let card_db = self.game_state.card_database.clone();
         let mut cards_to_clear_modifiers: Vec<i16> = Vec::new();
-        for i in 0..3 {
-            if player.stage.stage[i] != -1 {
-                let card_id = player.stage.stage[i];
-                player.stage.stage[i] = -1;
-                player.waitroom.add_card(card_id);
-                if lose_blade_hearts { cards_to_clear_modifiers.push(card_id); }
+        {
+            let player = self.game_state.resolve_target_player_mut(target);
+            for i in 0..3 {
+                if player.stage.stage[i] != -1 {
+                    if let Some(card_id) = player.remove_member_from_stage_with_recycling(i, &card_db) {
+                        if lose_blade_hearts { cards_to_clear_modifiers.push(card_id); }
+                    }
+                }
             }
         }
         if lose_blade_hearts {

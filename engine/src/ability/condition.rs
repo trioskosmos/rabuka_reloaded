@@ -351,6 +351,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
     fn evaluate_multi_location_condition(&self, condition: &Condition) -> bool {
         let target = condition.target.as_deref().unwrap_or("self");
+        // When target is "both" and comparison_type is "equality", compare P1 vs P2 counts
+        if target == "both" && condition.comparison_type.as_deref() == Some("equality") {
+            let p1_count = self.get_count_for_target(condition, "self");
+            let p2_count = self.get_count_for_target(condition, "opponent");
+            return compare_counts(condition.operator.as_deref(), p1_count, p2_count);
+        }
+
         let player = self.game_state.resolve_target_player(target);
         let card_db = &self.game_state.card_database;
         let card_type_filter = condition.card_type.as_deref();

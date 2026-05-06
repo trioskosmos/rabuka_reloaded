@@ -89,18 +89,22 @@ pub struct Stage {
     // Has three areas: Left Side, Center, Right Side
     // Use EMPTY_SLOT to indicate empty slot (like old engine)
     pub stage: [i16; STAGE_SIZE],  // [left_side, center, right_side]
+    // Rule 4.5.5: Cards (member or energy) placed under a member card
+    // Index 0 = left side, 1 = center, 2 = right side
+    pub under_cards: [SmallVec<[i16; 4]>; STAGE_SIZE],
 }
 
 impl Stage {
     pub fn new() -> Self {
         Stage {
             stage: [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT],  // [left_side, center, right_side], EMPTY_SLOT indicates empty
+            under_cards: [SmallVec::new(), SmallVec::new(), SmallVec::new()],
         }
     }
 
     /// Invariant check: stage must always have exactly STAGE_SIZE positions
     pub fn invariant(&self) -> bool {
-        self.stage.len() == STAGE_SIZE
+        self.stage.len() == STAGE_SIZE && self.under_cards.len() == STAGE_SIZE
     }
 
     pub fn get_area(&self, area: MemberArea) -> Option<i16> {
@@ -123,6 +127,58 @@ impl Stage {
         };
         self.stage[index] = card_id;
         debug_assert!(self.invariant(), "Stage invariant violated after set");
+    }
+
+    /// Place a card (energy or member) under the member at the given area.
+    /// Rule 4.5.5: Cards can be stacked beneath member cards.
+    /// Swap the contents (member card + under-cards) of two stage slots by index.
+    /// Rule 4.5.5.3: Under-cards move with the member when changing areas.
+    pub fn swap_stage_slots(&mut self, from_idx: usize, to_idx: usize) {
+        if from_idx >= STAGE_SIZE || to_idx >= STAGE_SIZE || from_idx == to_idx { return; }
+        self.stage.swap(from_idx, to_idx);
+        self.under_cards.swap(from_idx, to_idx);
+    }
+
+    pub fn place_under_card(&mut self, area: MemberArea, card_id: i16) {
+        let index = match area {
+            MemberArea::LeftSide => 0,
+            MemberArea::Center => 1,
+            MemberArea::RightSide => 2,
+        };
+        self.under_cards[index].push(card_id);
+    }
+
+    /// Get all cards under the member at the given area.
+    pub fn get_under_cards(&self, area: MemberArea) -> &[i16] {
+        let index = match area {
+            MemberArea::LeftSide => 0,
+            MemberArea::Center => 1,
+            MemberArea::RightSide => 2,
+        };
+        &self.under_cards[index]
+    }
+
+    /// Rule 10.5.3-10.5.4: When a member leaves its area, recycle under-cards:
+    /// - Member cards under → go to waitroom
+    /// - Energy cards under → go to energy deck
+    /// Returns (waitroom_cards, energy_deck_cards)
+    pub fn recycle_under_cards(&mut self, area: MemberArea, card_db: &CardDatabase) -> (SmallVec<[i16; 4]>, SmallVec<[i16; 4]>) {
+        let index = match area {
+            MemberArea::LeftSide => 0,
+            MemberArea::Center => 1,
+            MemberArea::RightSide => 2,
+        };
+        let cards = std::mem::take(&mut self.under_cards[index]);
+        let mut waitroom = SmallVec::new();
+        let mut energy_deck = SmallVec::new();
+        for card_id in cards {
+            if card_db.get_card(card_id).map_or(false, |c| c.is_energy()) {
+                energy_deck.push(card_id);
+            } else {
+                waitroom.push(card_id);
+            }
+        }
+        (waitroom, energy_deck)
     }
 
     pub fn clear_area(&mut self, area: MemberArea) {
@@ -150,6 +206,7 @@ impl Stage {
     pub fn position_change(&mut self, from_area: MemberArea, to_area: MemberArea) -> Result<i16, String> {
         // Rule 11.10: Position Change - move member to different area
         // Rule 11.10.2: If destination has a member, it swaps positions
+        // Rule 4.5.5.3: Under-cards move with the member
         if from_area == to_area {
             return Err("Cannot move to same area".to_string());
         }
@@ -169,6 +226,12 @@ impl Stage {
         if card_id == -1 {
             return Err("No card in source area".to_string());
         }
+
+        // Swap under-cards along with the members (Rule 4.5.5.3)
+        let from_under = std::mem::take(&mut self.under_cards[from_index]);
+        let to_under = std::mem::take(&mut self.under_cards[to_index]);
+        self.under_cards[from_index] = to_under;
+        self.under_cards[to_index] = from_under;
 
         let dest_card_id = self.stage[to_index];
 

@@ -271,10 +271,8 @@ pub fn place_card_in_zone(
             }
             true
         }
-        "deck" => { player.main_deck.cards.insert(0, card_id); true }
-        "deck_top" => { player.main_deck.cards.insert(0, card_id); true }
+        "deck" | "deck_top" => { player.main_deck.cards.insert(0, card_id); true }
         "deck_bottom" => { player.main_deck.cards.push(card_id); true }
-        "deck" => { player.main_deck.cards.insert(0, card_id); true }
         "energy_zone" => { player.energy_zone.cards.push(card_id); true }
         "live_card_zone" => { player.live_card_zone.cards.push(card_id); true }
         "success_live_zone" => { player.success_live_card_zone.cards.push(card_id); true }
@@ -291,6 +289,17 @@ pub fn place_card_in_zone(
                 player.stage.stage[ep] = card_id;
                 player.areas_locked_this_turn.insert(pos_to_area(ep));
             } else { player.hand.add_card(card_id); }
+            true
+        }
+        "under_member" => {
+            // Rule 4.5.5: Place card under a member
+            // Find first non-empty stage slot as fallback
+            let target_idx = if player.stage.stage[1] != -1 { 1 }
+                else if player.stage.stage[0] != -1 { 0 }
+                else if player.stage.stage[2] != -1 { 2 }
+                else { player.waitroom.add_card(card_id); return true; };
+            let area = pos_to_area(target_idx);
+            player.stage.place_under_card(area, card_id);
             true
         }
         _ => { player.hand.add_card(card_id); true }

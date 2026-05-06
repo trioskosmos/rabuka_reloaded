@@ -147,7 +147,20 @@ impl Player {
 
     }
 
-    
+    /// Rule 10.5.3-10.5.4: Remove a member from stage and recycle its under-cards.
+    /// Member cards under → waitroom. Energy cards under → energy deck.
+    /// Returns the removed member card ID.
+    pub fn remove_member_from_stage_with_recycling(&mut self, index: usize, card_db: &CardDatabase) -> Option<i16> {
+        if index >= 3 || self.stage.stage[index] == -1 { return None; }
+        let card_id = self.stage.stage[index];
+        self.stage.stage[index] = crate::constants::EMPTY_SLOT;
+        // Recycle under-cards
+        let area = match index { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+        let (member_under, energy_under) = self.stage.recycle_under_cards(area, card_db);
+        for cid in member_under { self.waitroom.add_card(cid); }
+        for cid in energy_under { self.energy_deck.cards.push(cid); }
+        Some(card_id)
+    }
 
     pub fn move_card_from_hand_to_stage(&mut self, hand_index: usize, stage_area: crate::zones::MemberArea, use_baton_touch: bool, card_db: &CardDatabase) -> Result<(u32, bool, Option<u32>), String> {
 
@@ -363,9 +376,7 @@ impl Player {
 
                 if !baton_touch_used && self.stage.stage[0] != -1 {
 
-                    let existing_member = self.stage.stage[0];
-
-                    self.waitroom.cards.push(existing_member);
+                    self.remove_member_from_stage_with_recycling(0, card_db);
 
                 }
 
@@ -387,9 +398,7 @@ impl Player {
 
                 if !baton_touch_used && self.stage.stage[1] != -1 {
 
-                    let existing_member = self.stage.stage[1];
-
-                    self.waitroom.cards.push(existing_member);
+                    self.remove_member_from_stage_with_recycling(1, card_db);
 
                 }
 
@@ -411,9 +420,7 @@ impl Player {
 
                 if !baton_touch_used && self.stage.stage[2] != -1 {
 
-                    let existing_member = self.stage.stage[2];
-
-                    self.waitroom.cards.push(existing_member);
+                    self.remove_member_from_stage_with_recycling(2, card_db);
 
                 }
 
@@ -449,6 +456,10 @@ impl Player {
                 return Err("Cannot baton touch: member has baton touch discard protection".to_string());
             }
             self.waitroom.cards.push(member_id);
+            // Rule 10.5.3-10.5.4: Recycle under-cards of the replaced member
+            let (member_under, energy_under) = self.stage.recycle_under_cards(stage_area, card_db);
+            for cid in member_under { self.waitroom.add_card(cid); }
+            for cid in energy_under { self.energy_deck.cards.push(cid); }
 
         }
 

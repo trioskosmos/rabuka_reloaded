@@ -358,7 +358,7 @@ export const CardRenderer = {
         });
     },
 
-    renderStage: (containerId, stage, clickable, validActionMap = {}, hasGlobalSelection = false) => {
+    renderStage: (containerId, stage, underCards = [[], [], []], clickable, validActionMap = {}, hasGlobalSelection = false) => {
         const el = DOMUtils.getElement(containerId);
         if (!el) return;
 
@@ -366,6 +366,7 @@ export const CardRenderer = {
         
         for (let i = 0; i < 3; i++) {
             const slot = stage[i];
+            const under = underCards[i] || [];
             const action = validActionMap[i];
             const isValid = action !== undefined;
             const existingArea = existingAreas[i];
@@ -380,6 +381,43 @@ export const CardRenderer = {
                 slotDiv = document.createElement('div');
                 area.appendChild(slotDiv);
                 el.appendChild(area);
+            }
+
+            // Render under-cards (energy or member cards stacked beneath)
+            let underContainer = area.querySelector('.under-cards');
+            if (under.length > 0) {
+                if (!underContainer) {
+                    underContainer = document.createElement('div');
+                    underContainer.className = 'under-cards';
+                    area.appendChild(underContainer);
+                }
+                // Sync under-card count
+                const existingUnder = Array.from(underContainer.children);
+                while (underContainer.children.length < under.length) {
+                    const uc = document.createElement('div');
+                    uc.className = 'under-card';
+                    underContainer.appendChild(uc);
+                }
+                while (underContainer.children.length > under.length) {
+                    underContainer.removeChild(underContainer.lastChild);
+                }
+                under.forEach((card, uIdx) => {
+                    const ucEl = underContainer.children[uIdx];
+                    const imgPath = resolveCardImagePath(card.card_no);
+                    let img = ucEl.querySelector('img');
+                    if (!img) {
+                        img = document.createElement('img');
+                        img.draggable = false;
+                        ucEl.appendChild(img);
+                    }
+                    ImageLoader.loadImage(img, imgPath);
+                    Tooltips.attachCardData(ucEl, card);
+                });
+                underContainer.style.display = '';
+            } else {
+                if (underContainer) {
+                    underContainer.style.display = 'none';
+                }
             }
 
             // Rust backend format: slot is { card_no, name, card_type, orientation }
@@ -419,6 +457,10 @@ export const CardRenderer = {
                 }
             } else {
                 slotDiv.innerHTML = '';
+                // Clear under-cards display when no member in slot
+                if (underContainer) {
+                    underContainer.style.display = 'none';
+                }
                 area.removeAttribute('data-action-id');
                 slotDiv.removeAttribute('data-action-id');
             }

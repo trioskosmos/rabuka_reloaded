@@ -33,7 +33,7 @@ Write tests in engine\tests\gameplay_test_process.md
 | 23 | 2 | PL!N-bp3-030-L (Love U my friends (ab#0)) | Q192, Q36 | ✓ love_u_test |
 | 24 | 2 | PL!-sd1-005-SD (星空 凛 (ab#0)) | Q123, Q79 | ✓ rin_test |
 | 25 | 2 | PL!HS-bp1-002-R (村野さやか (ab#0)) | Q63, Q80 | ✓ sayaka_test |
-| 26 | 2 | PL!HS-bp1-022-L (AWOKE (ab#0)) | Q107, Q36 | ✓ awake_test |
+| 26 | 2 | PL!HS-bp1-022-L (AWOKE (ab#0)) | Q107, Q36 | ✓ awake_test ✓ |
 | 27 | 2 | PL!N-bp1-011-R (ミア・テイラー (ab#0)) | Q102, Q73 | ✓ mia_test |
 | 28 | 2 | PL!N-bp1-026-L (Poppin' Up! (ab#0)) | Q36, Q66 | ✓ poppin_test |
 | 29 | 2 | PL!N-bp3-007-R (優木せつ菜 (ab#0)) | Q157, Q184 | ✓ setsuna_test |
@@ -88,7 +88,7 @@ Write tests in engine\tests\gameplay_test_process.md
 | 78 | 1 | PL!HS-PR-019-PR (百生 吟子 (ab#0)) | Q171 | ✓ (shared QA)
 | 79 | 1 | PL!HS-PR-021-PR (安養寺 姫芽 (ab#0)) | Q171 | ✓ (shared QA)
 | 80 | 1 | PL!HS-bp1-003-R＋ (乙宗 梢 (ab#1)) | Q81 | | ✓ kinako_hs_test
-| 81 | 1 | PL!HS-bp1-004-R＋ (夕霧綴理 (ab#1)) | Q38 | |
+| 81 | 1 | PL!HS-bp1-004-R＋ (夕霧綴理 (ab#1)) | Q38 | ✓ q38_live_card_zone_test |
 | 82 | 1 | PL!HS-bp1-009-R (安養寺 姫芽 (ab#0)) | Q82 | | ✓ himeno_test
 | 83 | 1 | PL!HS-bp1-021-L (Holiday∞Holiday (ab#0)) | Q36 | ✓ (phase tests)
 | 84 | 1 | PL!HS-bp1-023-L (ド！ド！ド！ (ab#0)) | Q36 | ✓ (phase tests)
@@ -97,13 +97,13 @@ Write tests in engine\tests\gameplay_test_process.md
 | 87 | 1 | PL!HS-bp2-014-N (大沢瑠璃乃 (ab#0)) | Q68 | | ✓ totemari_test
 | 88 | 1 | PL!HS-bp2-019-L (Bloom the smile, Bloom the dream! (ab#0)) | Q127 | ✓ (shared QA)
 | 89 | 1 | PL!HS-bp2-024-L (レディバグ (ab#0)) | Q114 | | ✓ ladybug_test
-| 90 | 1 | PL!HS-bp5-007-R (セラス 柳田 リリエンフェルト (ab#1)) | Q209 | |
+| 90 | 1 | PL!HS-bp5-007-R (セラス 柳田 リリエンフェルト (ab#1)) | Q209 |✓ done |
 | 91 | 1 | PL!HS-bp5-017-L (Dream Believers（104期Ver.） (ab#0)) | Q212 | | ✓ dream_believers_test
 | 92 | 1 | PL!HS-bp5-019-L (ハナムスビ (ab#0)) | Q213 | | ✓ hanamusubi_test
 | 93 | 1 | PL!N-bp1-006-R＋ (近江彼方 (ab#0)) | Q77 | ✓ konata_test |
-| 94 | 1 | PL!N-bp1-012-R＋ (鐘 嵐珠 (ab#0)) | Q38 | |
+| 94 | 1 | PL!N-bp1-012-R＋ (鐘 嵐珠 (ab#0)) | Q38 | ✓ q38_live_card_zone_test |
 | 95 | 1 | PL!N-bp1-027-L (Solitude Rain (ab#0)) | Q67 | | ✓ solitude_test
-| 96 | 1 | PL!N-bp1-029-L (Eutopia (ab#0)) | Q38 | |
+| 96 | 1 | PL!N-bp1-029-L (Eutopia (ab#0)) | Q38 | ✓ q38_live_card_zone_test |
 | 97 | 1 | PL!N-bp3-003-R (桜坂しずく (ab#0)) | Q159 | | ✓ shizuku_test
 | 98 | 1 | PL!N-bp3-008-R＋ (エマ・ヴェルデ (ab#1)) | Q163 | | ✓ emma_test
 | 99 | 1 | PL!N-bp3-009-R＋ (天王寺璃奈 (ab#0)) | Q164 | | ✓ rina_bp3_test
@@ -114,12 +114,12 @@ Write tests in engine\tests\gameplay_test_process.md
 | 104 | 1 | PL!N-bp4-025-L (VIVID WORLD (ab#1)) | Q192 | ✓ (shared QA)
 | 105 | 1 | PL!N-bp4-030-L (Daydream Mermaid (ab#0)) | Q191 | | ✓ daydream_test
 | 106 | 1 | PL!N-bp5-003-R (桜坂しずく (ab#0)) | Q214 | | ✓ shizuku_test
-| 107 | 1 | PL!N-bp5-007-R＋ (優木せつ菜 (ab#1)) | Q230 | |
+| 107 | 1 | PL!N-bp5-007-R＋ (優木せつ菜 (ab#1)) | Q230 | ✓ |
 | 108 | 1 | PL!N-bp5-008-R (エマ・ヴェルデ (ab#0)) | Q215 | | ✓ emma_bp5_test
 | 109 | 1 | PL!N-bp5-010-R (三船栞子 (ab#0)) | Q231 | | ✓ mifune_test
 | 110 | 1 | PL!N-bp5-015-N (桜坂しずく (ab#0)) | Q216 | | ✓ tokimeki_test
 | 111 | 1 | PL!N-bp5-021-N (天王寺璃奈 (ab#0)) | Q226 | | ✓ rina_test
-| 112 | 1 | PL!N-pb1-003-R (桜坂しずく (ab#0)) | Q196 | |
+| 112 | 1 | PL!N-pb1-003-R (桜坂しずく (ab#0)) | Q196 | ✓ shizuku_pb1_test |
 | 113 | 1 | PL!N-pb1-005-R (宮下 愛 (ab#0)) | Q197 | |
 | 114 | 1 | PL!N-pb1-007-R (優木せつ菜 (ab#0)) | Q205 | |
 | 115 | 1 | PL!N-pb1-008-R (エマ・ヴェルデ (ab#1)) | Q206 | |
@@ -127,7 +127,7 @@ Write tests in engine\tests\gameplay_test_process.md
 | 117 | 1 | PL!N-pb1-015-R (桜坂しずく (ab#0)) | Q199 | ✓ (shared QA)
 | 118 | 1 | PL!N-pb1-037-L (Cara Tesoro (ab#0)) | Q203 | |
 | 119 | 1 | PL!N-pb1-042-L (Eternalize Love!! (ab#0)) | Q204 | |
-| 120 | 1 | PL!N-sd1-009-SD (天王寺璃奈 (ab#0)) | Q209 | |
+| 120 | 1 | PL!N-sd1-009-SD (天王寺璃奈 (ab#0)) | Q209 |✓ done |
 | 121 | 1 | PL!N-sd1-028-SD (Dream with You (ab#0)) | Q116 | | ✓ dream_with_you_test
 | 122 | 1 | PL!S-PR-016-PR (黒澤ダイヤ (ab#0)) | Q171 | ✓ (shared QA)
 | 123 | 1 | PL!S-bp2-004-R (黒澤ダイヤ (ab#0)) | Q107 | ✓ batch3_test | |
@@ -150,7 +150,7 @@ Write tests in engine\tests\gameplay_test_process.md
 | 140 | 1 | PL!S-pb1-019-L (元気全開DAY！DAY！DAY！ (ab#0)) | Q36 | ✓ (phase tests)
 | 141 | 1 | PL!S-pb1-022-L (逃走迷走メビウスループ (ab#0)) | Q36 | ✓ (phase tests)
 | 142 | 1 | PL!S-pb1-024-L (僕らの走ってきた道は・・・ (ab#0)) | Q36 | ✓ (phase tests)
-| 143 | 1 | PL!SP-bp1-001-R (澁谷かのん (ab#0)) | Q68 | |
+| 143 | 1 | PL!SP-bp1-001-R (澁谷かのん (ab#0)) | Q68 |✓done |
 | 144 | 1 | PL!SP-bp1-024-L (Tiny Stars (ab#1)) | Q36 | ✓ (phase tests)
 | 145 | 1 | PL!SP-bp2-003-R (嵐 千砂都 (ab#0)) | Q126 | | ✓ chisato_move_test
 | 146 | 1 | PL!SP-bp2-006-R＋ (桜小路きな子 (ab#1)) | Q108 | | ✓ kinako_test |

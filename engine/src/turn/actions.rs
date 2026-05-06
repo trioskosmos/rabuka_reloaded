@@ -64,18 +64,30 @@ impl super::TurnEngine {
         let card = card_db.get_card(card_id).ok_or("Card not found in database")?;
         if !card.is_member() { return Err("Only member cards can activate abilities".to_string()); }
         let player = game_state.active_player();
-        let stage_position = player.stage.stage.iter().position(|&id| id == card_id).ok_or("Card not found on stage")?;
-        let stage_area = match stage_position { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
-        if !crate::zones::check_trigger_position(card.abilities.iter().find(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION)).and_then(|a| a.triggers.as_deref()), stage_area) {
-            return Err("Ability cannot be activated from this position".to_string());
-        }
-        // Also check activation_position from parsed effect data
-        if let Some(ability) = card.abilities.iter().find(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION)) {
-            if !crate::zones::check_effect_position(
-                ability.effect.as_ref().and_then(|e| e.activation_position.as_deref()),
-                stage_area,
-            ) {
+        // Check if card activates from hand (activation_condition has location=hand)
+        let is_hand_activation = card.abilities.iter().any(|a| {
+            a.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION)
+                && a.effect.as_ref().and_then(|e| e.activation_condition_parsed.as_ref())
+                    .map_or(false, |c| c.location.as_deref() == Some("hand"))
+        });
+        if is_hand_activation {
+            // Card activates from hand — verify it's in hand, skip stage position checks
+            if !player.hand.cards.contains(&card_id) {
+                return Err("Card not found in hand".to_string());
+            }
+        } else {
+            let stage_position = player.stage.stage.iter().position(|&id| id == card_id).ok_or("Card not found on stage")?;
+            let stage_area = match stage_position { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
+            if !crate::zones::check_trigger_position(card.abilities.iter().find(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION)).and_then(|a| a.triggers.as_deref()), stage_area) {
                 return Err("Ability cannot be activated from this position".to_string());
+            }
+            if let Some(ability) = card.abilities.iter().find(|a| a.triggers.as_ref().map_or(false, |t| t == crate::triggers::ACTIVATION)) {
+                if !crate::zones::check_effect_position(
+                    ability.effect.as_ref().and_then(|e| e.activation_position.as_deref()),
+                    stage_area,
+                ) {
+                    return Err("Ability cannot be activated from this position".to_string());
+                }
             }
         }
         let player_id = game_state.active_player().id.clone();

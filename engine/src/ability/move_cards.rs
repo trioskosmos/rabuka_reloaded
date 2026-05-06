@@ -101,9 +101,13 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                             for i in 0..3 {
                                 if player.stage.stage[i] == activating_id {
                                     self.game_state.last_vacated_stage_area = Some(i);
-                                    cards.push(player.stage.stage[i]);
-                                    player.stage.stage[i] = -1;
-                                    if destination == "same_area" {
+                                    // Only recycle under-cards if the card is actually leaving (not same_area)
+                                    if destination != "same_area" {
+                                        if let Some(cid) = player.remove_member_from_stage_with_recycling(i, &card_db) {
+                                            cards.push(cid);
+                                        }
+                                    } else {
+                                        cards.push(player.stage.stage[i]);
                                         player.stage.stage[i] = activating_id;
                                         self.game_state.last_vacated_stage_area = None;
                                     }
@@ -127,10 +131,8 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
                         }
-                        let cards: Vec<i16> = valid.into_iter().take(count).map(|(i, _)| {
-                            let cid = player.stage.stage[i];
-                            player.stage.stage[i] = -1;
-                            cid
+                        let cards: Vec<i16> = valid.into_iter().take(count).filter_map(|(i, _)| {
+                            player.remove_member_from_stage_with_recycling(i, &card_db)
                         }).collect();
                         cards
                     }
@@ -334,6 +336,32 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         }
                     }
                     player.main_deck.cards.insert(0, card_id);
+                    moved_cards.push(card_id);
+                    continue;
+                }
+                if destination == "under_member" {
+                    // Rule 4.5.5: Place card under the activating member
+                    if let Some(activating_id) = self.game_state.activating_card {
+                        let mut placed = false;
+                        for i in 0..3 {
+                            if player.stage.stage[i] == activating_id {
+                                let area = match i {
+                                    0 => crate::zones::MemberArea::LeftSide,
+                                    1 => crate::zones::MemberArea::Center,
+                                    _ => crate::zones::MemberArea::RightSide,
+                                };
+                                player.stage.place_under_card(area, card_id);
+                                placed = true;
+                                break;
+                            }
+                        }
+                        if !placed {
+                            // Fallback if activating card not found on stage
+                            player.waitroom.add_card(card_id);
+                        }
+                    } else {
+                        player.waitroom.add_card(card_id);
+                    }
                     moved_cards.push(card_id);
                     continue;
                 }

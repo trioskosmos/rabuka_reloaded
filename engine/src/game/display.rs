@@ -41,6 +41,12 @@ pub struct StageDisplay {
     pub left_side: Option<CardDisplay>,
     pub center: Option<CardDisplay>,
     pub right_side: Option<CardDisplay>,
+    #[serde(default)]
+    pub left_under: Vec<CardDisplay>,
+    #[serde(default)]
+    pub center_under: Vec<CardDisplay>,
+    #[serde(default)]
+    pub right_under: Vec<CardDisplay>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -96,6 +102,9 @@ pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase, bla
         left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, None, blade_mod(stage.stage[0])) } else { None },
         center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, None, blade_mod(stage.stage[1])) } else { None },
         right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, None, blade_mod(stage.stage[2])) } else { None },
+        left_under: stage.under_cards[0].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
+        center_under: stage.under_cards[1].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
+        right_under: stage.under_cards[2].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
     }
 }
 
