@@ -66,6 +66,6 @@ fn special_color_q195_parser_fields() {
     assert_eq!(effect.count, Some(3));
     assert_eq!(effect.duration.as_deref(), Some("live_end"));
     assert_eq!(effect.position.as_ref().and_then(|p| p.get_position()), Some("center"));
-    assert_eq!(effect.group.as_ref().map(|g| g.name.as_str()), Some("Liella!"));
+    assert_eq!(effect.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str())), Some("Liella!"));
     assert_eq!(effect.card_type.as_deref(), Some("member_card"));
 }

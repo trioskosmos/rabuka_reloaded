@@ -423,9 +423,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         if condition.all_members.unwrap_or(false) {
             let target = condition.target.as_deref().unwrap_or("self");
             let player = self.game_state.resolve_target_player(target);
-            let group_name = condition.group.as_ref()
-                .and_then(|g| g.get("name").and_then(|n| n.as_str()))
-                .or_else(|| condition.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str())));
+            let group_name = condition.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str()));
             let card_db = &self.game_state.card_database;
             // Every non-empty stage slot must match the group
             return player.stage.stage.iter().filter(|&&id| id != -1).all(|&id| {
@@ -451,8 +449,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         eprintln!("[LOC_COND_ENTER] location={:?} card_type={:?} aggregate={:?} count={:?} operator={:?}",
             location, card_type, condition.aggregate, condition.count, condition.operator);
         let group_names = condition.group_names.as_ref();
-        let group = condition.group.as_ref()
-            .and_then(|g| g.as_object().and_then(|o| o.get("name").and_then(|n| n.as_str())));
+        let group = condition.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str()));
 
         if location == "revealed_cards" {
             let actual = self.game_state.revealed_cards.iter().filter(|&&cid| {
@@ -944,9 +941,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let mut count = 0;
         let card_db = self.game_state.card_database.clone();
 
-        // Use group name from either group_names or group.value.name
-        let group_name = group_filter.and_then(|g| g.first().map(|s| s.as_str()))
-            .or_else(|| condition.group.as_ref().and_then(|g| g.get("name").and_then(|n| n.as_str())));
+        let group_name = group_filter.and_then(|g| g.first().map(|s| s.as_str()));
 
         let is_aggregate = condition.aggregate.as_deref() == Some("total");
 

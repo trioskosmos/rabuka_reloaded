@@ -131,9 +131,14 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
                         }
-                        let cards: Vec<i16> = valid.into_iter().take(count).filter_map(|(i, _)| {
-                            player.remove_member_from_stage_with_recycling(i, &card_db)
+                        let indices: Vec<usize> = valid.into_iter().take(count).map(|(i, _)| i).collect();
+                        let mut vacated: Option<usize> = None;
+                        let cards: Vec<i16> = indices.iter().filter_map(|&i| {
+                            let cid = player.remove_member_from_stage_with_recycling(i, &card_db);
+                            if cid.is_some() { vacated = Some(i); }
+                            cid
                         }).collect();
+                        self.game_state.last_vacated_stage_area = vacated;
                         cards
                     }
                 }

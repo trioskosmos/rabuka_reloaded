@@ -25,6 +25,8 @@ pub fn card_matches_group_str(card_db: &CardDatabase, card_id: i16, group_name: 
         Some(g) => card_db.get_card(card_id).map(|c| {
             c.unit.as_deref() == Some(g)
                 || c.group == g
+                // Check name fragments for multi-name cards (e.g. "にこ" in "矢澤にこ")
+                || card_db.get_card_names(card_id).iter().any(|n| n.contains(g))
                 // For multi-series cards (containing \n), don't match individual series
                 // Multi-name cards' individuals each have their own series but the card
                 // as a whole should not match group conditions (Q212)

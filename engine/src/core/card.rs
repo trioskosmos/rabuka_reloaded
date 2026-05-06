@@ -709,11 +709,6 @@ impl PositionInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GroupInfo {
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DynamicCount {
     #[serde(rename = "type")]
     pub count_type: String,

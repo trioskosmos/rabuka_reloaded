@@ -89,9 +89,6 @@ impl<'a> AbilityResolver<'a> {
                 return false;
             }
         }
-        if let Some(ref _activation_text) = effect.activation_condition {
-            eprintln!("Activation condition: {}", _activation_text);
-        }
         true
     }
 

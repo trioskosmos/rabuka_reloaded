@@ -228,12 +228,9 @@ impl Player {
                                     && effect.location.as_deref() == Some("hand")
                                 {
                                     // Check group filter: does the played card match?
-                                    let group_matches = effect.group.as_ref()
-                                        .map(|g| crate::ability::util::card_matches_group_str(card_db, card_id, Some(&g.name)))
-                                        .or_else(|| effect.group_names.as_ref().and_then(|gn| {
-                                            gn.first().map(|g| crate::ability::util::card_matches_group_str(card_db, card_id, Some(g)))
-                                        }))
-                                        .unwrap_or(true);
+                                    let group_matches = effect.group_names.as_ref().and_then(|gn| {
+                                        gn.first().map(|g| crate::ability::util::card_matches_group_str(card_db, card_id, Some(g)))
+                                    }).unwrap_or(true);
                                     if !group_matches { continue; }
                                     // Check cost limit: does the played card's cost match?
                                     if let Some(limit) = effect.cost_limit {
