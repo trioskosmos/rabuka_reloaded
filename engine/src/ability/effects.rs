@@ -91,8 +91,8 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if let Some(ref condition) = effect.condition {
-            let cond_result = self.evaluate_condition(condition);
-            if !cond_result {
+            let ok = self.evaluate_condition(condition);
+            if !ok {
                 return Ok(());
             }
         }
@@ -173,7 +173,7 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::DiscardCard | EffectAction::MoveCards => self.execute_move_cards(effect),
             EffectAction::GainResource => { let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1)); self.execute_gain_resource(effect.resource.as_deref().unwrap_or(""), count, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.heart_color.as_deref(), effect.heart_colors.as_ref(), effect.resource_icon_count, effect.heart_selection.unwrap_or(false), effect.sign.as_deref()) },
             EffectAction::ChangeState => self.execute_change_state(effect.state_change.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(0), effect.max.unwrap_or(false), effect.card_type.as_deref(), effect.cost_limit, effect.optional.unwrap_or(false), effect.group.as_ref().map(|g| g.name.as_str()), effect.self_cost.unwrap_or(false), effect.source.as_deref(), effect.destination.as_deref()),
-            EffectAction::ModifyScore => self.execute_modify_score(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.effect_constraint.as_deref(), effect.self_target.unwrap_or(false)),
+            EffectAction::ModifyScore => self.execute_modify_score(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group.as_ref().map(|g| g.name.as_str()), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.effect_constraint.as_deref(), effect.self_target.unwrap_or(false), effect.heart_colors.as_ref()),
             EffectAction::ModifyRequiredHearts => self.execute_modify_required_hearts(effect.operation.as_deref().unwrap_or("decrease"), effect.value.unwrap_or(0), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self"), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.group.as_ref(), effect.timing_condition.as_deref(), effect.location.as_deref()),
             EffectAction::SetCost => self.execute_set_cost(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref()),
             EffectAction::SetBladeType => self.execute_set_blade_type(effect.blade_type.as_deref(), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
@@ -182,8 +182,19 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::InvalidateAbility => self.execute_invalidate_ability(),
             EffectAction::GainAbility => self.execute_gain_ability(effect.ability_gain.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
             EffectAction::PlayBatonTouch => self.execute_play_baton_touch(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self")),
-            EffectAction::Reveal => self.execute_reveal(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.heart_colors.as_ref()),
-            EffectAction::Select => self.execute_select(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.distinct.as_deref(), effect.heart_colors.as_ref()),
+            EffectAction::Reveal => {
+                if effect.multiple_targets.unwrap_or(false) && effect.source.as_deref() == Some("deck_top") {
+                    let chosen_type = self.game_state.ability_queue.current_entry()
+                        .and_then(|e| e.conditional_choice.clone())
+                        .or_else(|| effect.card_type.clone());
+                    return self.execute_reveal_until_target(effect.target.as_deref().unwrap_or("self"), chosen_type.as_deref());
+                }
+                self.execute_reveal(effect.source.as_deref().unwrap_or("hand"), effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.heart_colors.as_ref())
+            }
+            EffectAction::Select => {
+    let default_src = if effect.card_type.as_deref() == Some("member_card") { "stage" } else { effect.source.as_deref().unwrap_or("hand") };
+    self.execute_select(default_src, effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.card_type.as_deref(), effect.distinct.as_deref(), effect.heart_colors.as_ref(), effect.or_card_types.clone(), effect.exclude_selected.unwrap_or(false))
+},
             EffectAction::LookAt => self.execute_look_at(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self"), effect.source.as_deref().unwrap_or("deck")),
             EffectAction::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_global(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(1), effect.heart_color.as_deref().unwrap_or("heart00"), effect.target.as_deref().unwrap_or("self")),
             EffectAction::ModifyYellCount => self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count.unwrap_or(0)),
@@ -604,6 +615,7 @@ impl<'a> AbilityResolver<'a> {
         &mut self, operation: &str, value: u32, target: &str, duration: Option<&str>,
         card_type: Option<&str>, group_name: Option<&str>, per_unit: bool, per_unit_count: u32,
         per_unit_type: Option<&str>, effect_constraint: Option<&str>, self_target: bool,
+        heart_colors: Option<&Vec<String>>,
     ) -> Result<(), String> {
         let operation = operation.to_string();
         let target = target.to_string();
@@ -625,10 +637,27 @@ impl<'a> AbilityResolver<'a> {
             };
 
             let final_value = if per_unit {
-                let matching_count = match per_unit_type_str.as_deref() {
-                    Some("hand") => util::count_matching(util::zone_cards(player, "hand"), &card_db, &filter, false) as u32,
-                    Some("stage") => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true) as u32,
-                    _ => 1,
+                let zone = match per_unit_type_str.as_deref() {
+                    Some("hand") => "hand",
+                    Some("stage") | Some("member") => "stage",
+                    _ => "",
+                };
+                let matching_count = if zone.is_empty() { 1u32 } else {
+                    if let Some(hc) = heart_colors {
+                        let cards = util::zone_cards(player, zone).to_vec();
+                        let mut count = 0u32;
+                        for &cid in &cards {
+                            if util::card_matches_type(&card_db, cid, filter.card_type)
+                                && util::card_matches_group_str(&card_db, cid, filter.group)
+                                && util::card_matches_heart_colors(&card_db, cid, Some(hc))
+                            {
+                                count += 1;
+                            }
+                        }
+                        count
+                    } else {
+                        util::count_matching(util::zone_cards(player, zone), &card_db, &filter, zone == "stage") as u32
+                    }
                 };
                 value * matching_count * per_unit_count_val
             } else { value };

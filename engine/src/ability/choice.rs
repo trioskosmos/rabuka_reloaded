@@ -70,7 +70,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }).collect()
                     };
                     for card_id in card_ids {
-                        self.game_state.revealed_cards.insert(card_id);
+                        self.game_state.revealed_cards.push(card_id);
                         self.revealed_cost_cards.push(card_id);
                     }
                     self.pending_choice = None;
@@ -130,7 +130,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 for &idx in indices.iter() {
                                     if idx < self.looked_at_cards.len() {
                                         let card_id = self.looked_at_cards[idx];
-                                        self.game_state.revealed_cards.insert(card_id);
+                                        self.game_state.revealed_cards.push(card_id);
                                     }
                                 }
                                 self.execute_selected_looked_at_cards(indices.as_slice())?;
@@ -170,13 +170,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         for &idx in indices.iter() {
                             if idx < self.looked_at_cards.len() {
                                 let card_id = self.looked_at_cards[idx];
-                                self.game_state.revealed_cards.insert(card_id);
+                                self.game_state.revealed_cards.push(card_id);
                             }
                         }
                         self.execute_selected_looked_at_cards(indices.as_slice())?
                     }
                     "energy_zone" => self.execute_selected_energy_zone_cards(indices.as_slice(), *count)?,
                     _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
+                }
+                // Persist selected_card_ids to queue entry across resolver instances
+                if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    entry.selected_card_ids = self.selected_cards.clone();
                 }
                 self.pending_choice = None;
                 self.resume_execution(context)?;
@@ -264,6 +268,29 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }
                         self.game_state.pending_sequential_actions = None;
                     }
+                    return Ok(());
+                }
+
+                if target == "choice_string" {
+                    // Store the selected option as the chosen card type (from or_card_types on select)
+                    let options_json = self.game_state.entry_conditional_choice();
+                    let chosen = if let Some(json_str) = options_json {
+                        if let Ok(options) = serde_json::from_str::<Vec<String>>(&json_str) {
+                            let idx: usize = selected.parse().unwrap_or(0);
+                            if idx < options.len() {
+                                Some(options[idx].clone())
+                            } else { None }
+                        } else { None }
+                    } else { None };
+                    if let Some(chosen_str) = chosen {
+                        self.game_state.ability_queue.current_entry_mut().map(|e| {
+                            e.conditional_choice = Some(chosen_str);
+                        });
+                    }
+                    self.pending_choice = None;
+                    // Don't process pending_sequential_actions here — let the ability queue
+                    // re-execute the effect from scratch (or_card_types.skip will fire, then
+                    // reveal reads conditional_choice for the chosen type).
                     return Ok(());
                 }
 
@@ -437,6 +464,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     return Ok(());
                 }
 
+                if target == "choice_string" {
+                    // Store the selected option index as the chosen card type string
+                    let options_json = self.game_state.entry_conditional_choice();
+                    if let Some(json_str) = options_json {
+                        if let Ok(options) = serde_json::from_str::<Vec<String>>(&json_str) {
+                            let idx: usize = selected.parse().unwrap_or(0);
+                            if idx < options.len() {
+                                self.game_state.ability_queue.current_entry_mut().map(|e| {
+                                    e.conditional_choice = Some(options[idx].clone());
+                                });
+                            }
+                        }
+                    }
+                }
                 self.pending_choice = None;
                 Ok(())
             }
@@ -585,8 +626,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         if player.stage.stage[pos] != -1 {
                             let card_id = player.stage.stage[pos];
                             if util::card_matches_type(&card_db, card_id, card_type_filter) {
-                                player.stage.stage[pos] = -1;
-                                player.hand.add_card(card_id);
+                                // Track as selected (for exclude_selected in subsequent steps)
+                                self.selected_cards.push(card_id);
+                                // Cards stay on stage — they are just identified, not moved
                             }
                         }
                     }

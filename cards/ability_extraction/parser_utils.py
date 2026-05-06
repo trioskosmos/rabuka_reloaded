@@ -100,6 +100,10 @@ def extract_count(text):
     match = ITEM_PATTERN.search(text)
     if match:
         return int(match.group(1))
+    # Fallback: bare number before 以上 (e.g. "10以上" in "ブレードの合計が10以上")
+    bare = re.search(r'(\d+)以上', text)
+    if bare:
+        return int(bare.group(1))
     return None
 
 

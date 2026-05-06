@@ -57,7 +57,7 @@ impl super::TurnEngine {
                     return;
                 }
                 Phase::FirstAttackerPerformance => {
-                    let blade_heart_count = {
+                    let (blade_heart_count, revealed_ids) = {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = game_state.first_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
@@ -68,11 +68,15 @@ impl super::TurnEngine {
                         let player = game_state.first_attacker_mut();
                         Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };
+                    for cid in revealed_ids { game_state.revealed_cards.push(cid); }
                     game_state.player1_cheer_blade_heart_count = blade_heart_count;
+                    let p1_id = game_state.player1.id.clone();
+                    Self::trigger_auto_abilities_for_player(game_state, &p1_id);
+                    game_state.process_pending_auto_abilities(&p1_id);
                     game_state.current_phase = Phase::SecondAttackerPerformance;
                 }
                 Phase::SecondAttackerPerformance => {
-                    let blade_heart_count = {
+                    let (blade_heart_count, revealed_ids) = {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = game_state.second_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
@@ -83,7 +87,11 @@ impl super::TurnEngine {
                         let player = game_state.second_attacker_mut();
                         Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };
+                    for cid in revealed_ids { game_state.revealed_cards.push(cid); }
                     game_state.player2_cheer_blade_heart_count = blade_heart_count;
+                    let p2_id = game_state.player2.id.clone();
+                    Self::trigger_auto_abilities_for_player(game_state, &p2_id);
+                    game_state.process_pending_auto_abilities(&p2_id);
                     game_state.current_phase = Phase::LiveVictoryDetermination;
                 }
                 Phase::LiveVictoryDetermination => {

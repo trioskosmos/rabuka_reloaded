@@ -270,6 +270,7 @@ pub fn place_card_in_zone(
         }
         "deck_top" => { player.main_deck.cards.insert(0, card_id); true }
         "deck_bottom" => { player.main_deck.cards.push(card_id); true }
+        "deck" => { player.main_deck.cards.insert(0, card_id); true }
         "energy_zone" => { player.energy_zone.cards.push(card_id); true }
         "live_card_zone" => { player.live_card_zone.cards.push(card_id); true }
         "success_live_zone" => { player.success_live_card_zone.cards.push(card_id); true }

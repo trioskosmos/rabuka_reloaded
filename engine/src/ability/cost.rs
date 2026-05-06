@@ -77,7 +77,8 @@ impl<'a> AbilityResolver<'a> {
                     .and_then(|a| a.triggers.as_ref())
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
-                if optional && !is_activation {
+                let same_unit = cost.same_unit_name.unwrap_or(false);
+                if optional && !is_activation && !same_unit {
                     self.pending_choice = Some(Choice::SelectCard {
                         zone: source.to_string(),
                         card_type: card_type.clone(),
@@ -101,6 +102,48 @@ impl<'a> AbilityResolver<'a> {
                         characters: cost.characters.as_ref(),
                         ..util::CardFilter::default()
                     };
+                    let zone_cards = util::zone_cards(player, &source);
+
+                    if same_unit {
+                        // Group source cards by unit, keep only the largest unit group
+                        let mut unit_groups: std::collections::BTreeMap<String, Vec<i16>> = std::collections::BTreeMap::new();
+                        for &cid in zone_cards {
+                            if filter.matches(card_db, cid, false) {
+                                let unit = card_db.get_card(cid).and_then(|c| c.unit.clone()).unwrap_or_default();
+                                unit_groups.entry(unit).or_default().push(cid);
+                            }
+                        }
+                        // Find the largest group
+                        let best = unit_groups.into_iter().max_by_key(|(_, cards)| cards.len());
+                        match best {
+                            Some((_, cards)) if cards.len() >= count => {
+                                // Found a unit with enough cards — modify flow to use only these cards
+                                if cards.len() > count {
+                                    self.pending_choice = Some(Choice::SelectCard {
+                                        zone: "hand".to_string(),
+                                        card_type: cost.card_type.clone(),
+                                        count,
+                                        description: format!("Select {} card(s) from same-unit group ({} available in unit {})", count, cards.len(), card_db.get_card(cards[0]).and_then(|c| c.unit.clone()).unwrap_or_default()),
+                                        allow_skip: false,
+                                    });
+                                    return Ok(());
+                                }
+                                // Exactly match count — auto-select
+                                for &cid in &cards {
+                                    let player = self.game_state.resolve_target_player_mut(target);
+                                    if let Some(idx) = player.hand.cards.iter().position(|&c| c == cid) {
+                                        player.hand.cards.remove(idx);
+                                        player.waitroom.cards.push(cid);
+                                    }
+                                }
+                                return Ok(());
+                            }
+                            _ => {
+                                return Err(format!("Cannot pay cost: no unit has {} cards matching filter", count));
+                            }
+                        }
+                    }
+
                     let matching_count = match source {
                         "deck" | "deck_top" => util::count_matching(util::zone_cards(player, "deck"), card_db, &filter, false) as usize,
                         "hand" => util::count_matching(util::zone_cards(player, "hand"), card_db, &filter, false) as usize,
@@ -146,9 +189,52 @@ impl<'a> AbilityResolver<'a> {
                 }
 
                 if state_change == "wait" {
-                    let card_ids: Vec<i16> = self.game_state.resolve_target_player(target).stage.stage.iter().filter(|&&id| id != -1).copied().collect();
-                    for card_id in card_ids {
-                        self.game_state.add_orientation_modifier(card_id, "wait");
+                    let count = cost.count.unwrap_or(1) as usize;
+                    let exclude_self = cost.exclude_self.unwrap_or(false);
+                    let activating_id = self.game_state.activating_card;
+                    let card_db = &self.game_state.card_database;
+                    let group_names = cost.group_names.as_ref();
+
+                    let stage_cards: Vec<i16> = self.game_state.resolve_target_player(target).stage.stage.iter()
+                        .filter(|&&id| id != -1).copied().collect();
+                    eprintln!("[CHANGE_STATE] stage={:?} card_type={:?} exclude_self={} activating_id={:?} self_cost={:?}",
+                        stage_cards, cost.card_type, exclude_self, activating_id, cost.self_cost);
+                    let candidates: Vec<i16> = stage_cards.into_iter()
+                        .filter(|&id| !(exclude_self && activating_id == Some(id)))
+                        .filter(|&id| {
+                            if !super::util::card_matches_type(card_db, id, cost.card_type.as_deref()) {
+                                eprintln!("[CHANGE_STATE] id={} FAIL type match", id);
+                                return false;
+                            }
+                            let group_ok = match group_names {
+                                Some(gn) => gn.iter().any(|g| super::util::card_matches_group_str(card_db, id, Some(g.as_str()))),
+                                None => true,
+                            };
+                            let name_ok = super::util::card_matches_characters(card_db, id, group_names);
+                            let ok = group_ok || name_ok;
+                            eprintln!("[CHANGE_STATE] id={} group_ok={} name_ok={} ok={}", id, group_ok, name_ok, ok);
+                            ok
+                        })
+                        .collect();
+                    eprintln!("[CHANGE_STATE] candidates={:?}", candidates);
+
+                    if candidates.is_empty() {
+                        return Err("No matching members on stage to change state".to_string());
+                    }
+
+                    if candidates.len() <= count {
+                        for &card_id in &candidates {
+                            self.game_state.add_orientation_modifier(card_id, "wait");
+                        }
+                    } else {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "stage".to_string(),
+                            card_type: cost.card_type.clone(),
+                            count,
+                            description: format!("Select {} stage member(s) to wait", count),
+                            allow_skip: false,
+                        });
+                        return Ok(());
                     }
                 }
                 Ok(())
@@ -226,7 +312,7 @@ impl<'a> AbilityResolver<'a> {
 
                 if has_explicit_count && card_ids.len() <= explicit_count {
                     for card_id in card_ids {
-                        self.game_state.revealed_cards.insert(card_id);
+                        self.game_state.revealed_cards.push(card_id);
                         self.revealed_cost_cards.push(card_id);
                     }
                     Ok(())

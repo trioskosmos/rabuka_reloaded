@@ -93,7 +93,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         // When count is not specified but filters are set, default to 1
         // (checking "at least one matching card exists") instead of 0
         // which would make >= always true.
-        let count_threshold = condition.count.unwrap_or(if condition.cost_limit.is_some() || condition.card_type.is_some() || condition.group_names.is_some() || condition.characters.is_some() || condition.distinct.unwrap_or(false) || condition.appearance.unwrap_or(false) { 1 } else { 0 });
+        let count_threshold = condition.count.unwrap_or(if condition.aggregate.is_some() { 0 } else if condition.cost_limit.is_some() || condition.card_type.is_some() || condition.group_names.is_some() || condition.characters.is_some() || condition.distinct.unwrap_or(false) || condition.appearance.unwrap_or(false) { 1 } else { 0 });
         let distinct = condition.distinct.unwrap_or(false);
         let all_areas = condition.all_areas.unwrap_or(false);
         let no_excess_heart = condition.no_excess_heart.unwrap_or(false);
@@ -121,6 +121,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     if !has_heart00 { return false; }
                 }
                 _ => {}
+            }
+        }
+
+        // Collective heart colors check: all required colors must be present on stage members
+        if let Some(ref req_colors) = condition.heart_colors {
+            if !req_colors.is_empty() {
+                let card_db = &self.game_state.card_database;
+                let player = self.game_state.resolve_target_player(target);
+                let stage_cards: Vec<i16> = player.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+                for color_str in req_colors {
+                    let color = crate::zones::parse_heart_color(color_str);
+                    let found = stage_cards.iter().any(|&id| {
+                        card_db.get_card(id).map_or(false, |c| {
+                            c.base_heart.as_ref().map_or(false, |bh| bh.hearts.contains_key(&color))
+                        })
+                    });
+                    if !found { return false; }
+                }
             }
         }
 
@@ -412,6 +430,30 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let player = self.game_state.resolve_target_player(target);
         let exclude_self = condition.exclude_self.unwrap_or(false);
         let activating_id = self.activating_card_id;
+        let card_db = &self.game_state.card_database;
+
+        let location = condition.location.as_deref().unwrap_or("");
+        let group_names = condition.group_names.as_ref();
+        let group = condition.group.as_ref()
+            .and_then(|g| g.as_object().and_then(|o| o.get("name").and_then(|n| n.as_str())));
+
+        if location == "revealed_cards" {
+            let actual = self.game_state.revealed_cards.iter().filter(|&&cid| {
+                let type_ok = match card_type {
+                    "live_card" => card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false),
+                    "member_card" => card_db.get_card(cid).map(|c| c.is_member()).unwrap_or(false),
+                    "energy_card" => card_db.get_card(cid).map(|c| c.is_energy()).unwrap_or(false),
+                    _ => true,
+                };
+                if !type_ok { return false; }
+                if let Some(g) = group {
+                    crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
+                } else if let Some(gn) = group_names {
+                    gn.iter().any(|g| crate::ability::util::card_matches_group_str(card_db, cid, Some(g)))
+                } else { true }
+            }).count() as u32;
+            return compare_counts(condition.operator.as_deref(), actual, count);
+        }
 
         let stage_member_count = |p: &crate::player::Player| -> usize {
             p.stage.stage.iter().filter(|&&id| id != -1).count()
@@ -438,15 +480,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 let count = match card_type {
                     "live_card" => player.live_card_zone.len(),
                     "member_card" => {
-                        let mut member_count = stage_member_count(player);
-                        if exclude_self {
-                            if let Some(cid) = activating_id {
-                                if player.stage.stage.iter().any(|&id| id == cid) {
-                                    member_count = member_count.saturating_sub(1);
+                        if condition.aggregate.as_deref() == Some("total") {
+                            // Sum blade values across stage members
+                            player.stage.total_blades(card_db, &self.game_state.blade_modifiers) as usize
+                        } else {
+                            let mut member_count = stage_member_count(player);
+                            if exclude_self {
+                                if let Some(cid) = activating_id {
+                                    if player.stage.stage.iter().any(|&id| id == cid) {
+                                        member_count = member_count.saturating_sub(1);
+                                    }
                                 }
                             }
+                            member_count
                         }
-                        member_count
                     }
                     "energy_card" => player.energy_zone.cards.len(),
                     _ => {
@@ -795,6 +842,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 .filter_map(|&id| self.game_state.card_database.get_card(id))
                 .filter_map(|c| c.cost)
                 .sum();
+        }
+        if resource_type == Some("hand_count") {
+            let player = self.game_state.resolve_target_player(target);
+            return player.hand.len() as u32;
         }
         if resource_type == Some("surplus_heart") {
             let player = self.game_state.resolve_target_player(target);

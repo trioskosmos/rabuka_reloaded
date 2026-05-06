@@ -712,6 +712,36 @@ def _try_card_count(text):
             # Detect revealed cards context (yell)
             if 'エールにより公開された' in text:
                 result['location'] = 'revealed_cards'
+            # Extract group from 『』 (e.g. "『蓮ノ空』のメンバーカード")
+            g = extract_group(text)
+            if g:
+                result['group'] = g
+            gns = extract_group_names(text)
+            if gns:
+                result['group_names'] = gns
+            # Extract card_type from "メンバーカード" / "ライブカード"
+            ct = extract_card_type(text)
+            if ct:
+                result['card_type'] = ct
+            # Extract hand count condition (手札がN枚以下の場合 / 手札がN枚以上の場合)
+            hand_m = re.search(r'手札が(\d+)枚以下(の|の場)', text)
+            if hand_m:
+                hand_count = int(hand_m.group(1))
+                hand_cond = {
+                    'type': 'comparison_condition',
+                    'resource_type': 'hand_count',
+                    'location': 'hand',
+                    'count': hand_count,
+                    'operator': '<=',
+                    'text': f'手札が{hand_count}枚以下の場合'
+                }
+                # Promote to compound condition
+                result = {
+                    'type': 'compound',
+                    'operator': 'and',
+                    'conditions': [result, hand_cond],
+                    'text': text
+                }
             return result
     return None
 
@@ -1803,8 +1833,8 @@ def parse_action(text: str) -> Dict[str, Any]:
     if a == 'gain_resource' and 'resource' not in action:
         infer_resource(action, text)
     if a == 'gain_resource':
-        if 'count' not in action: infer_count_from_icons(action, text)
-        if 'count' not in action: action['count'] = 1
+        if action.get('count') is None: infer_count_from_icons(action, text)
+        if action.get('count') is None: action['count'] = 1
     if a == 'gain_resource' and 'duration' not in action:
         dur = extract_duration(text)
         if dur: action['duration'] = dur
@@ -1836,7 +1866,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         action.setdefault('energy_count', 1); action.setdefault('target_member', 'this_member')
     if a == 'move_cards' and action.get('source') in ('revealed_remaining', 'revealed_cards') and 'dynamic_count' not in action:
         action['dynamic_count'] = {'type': 'revealed_cards', 'reference': 'previous_reveal'}
-    if a == 'move_cards' and action.get('source') == 'revealed_card' and 'count' not in action:
+    if a == 'move_cards' and action.get('source') == 'revealed_card' and action.get('count') is None:
         action['count'] = 1
     # Detect すべて/全 (all) — set flag; suppress count when all is set
     if not action.get('all') and re.search(r'すべての|全ての|全部の|全て|全員|全体', text):
@@ -1846,7 +1876,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Detect それぞれ (each/respectively) — multiple targets
     if 'それぞれ' in text or 'ずつ' in text:
         action['multiple_targets'] = True
-    if 'count' not in action and 'dynamic_count' not in action and not action.get('any_number') and not action.get('all'):
+    if action.get('count') is None and 'dynamic_count' not in action and not action.get('any_number') and not action.get('all'):
         extracted = extract_count(text)
         if extracted is not None:
             action['count'] = extracted
@@ -1948,6 +1978,9 @@ def _extract_basic_cost_fields(cost, text):
     # Exclude self / self cost
     if 'このメンバー以外' in text or 'ほかのメンバー' in text:
         cost['exclude_self'] = True
+    # Same unit name
+    if '同じユニット名' in text:
+        cost['same_unit_name'] = True
     if re.search(r'「.+」以外', text):
         cost['exclude_self'] = True
     if 'このメンバー' in text and 'このメンバー以外' not in text and 'ほかのメンバー' not in text:
@@ -2598,6 +2631,51 @@ def _try_look_and_select(text):
         result['select_action'] = _build_look_select_actions(am.group(1).strip())
     return result
 
+
+def _try_reveal_until_chosen_card(text):
+    """ライブカードか...メンバーカードのどちらか1つを選ぶ — type choice + reveal until match."""
+    # Pattern: "ライブカードか" + optional "コストN以上の" + "メンバーカードのどちらか1つを選ぶ"
+    if 'ライブカードか' in text and 'メンバーカードのどちらか' in text and '選んだカードが公開されるまで' in text:
+        cost_limit = None
+        m = re.search(r'コスト(\d+)以上', text)
+        if m:
+            cost_limit = int(m.group(1))
+        action = {
+            'text': text,
+            'action': 'sequential',
+            'actions': [
+                {
+                    'action': 'select',
+                    'or_card_types': ['live_card', 'member_card'],
+                    'count': 1,
+                    'all': False,
+                },
+                {
+                    'action': 'reveal',
+                    'source': 'deck_top',
+                    'count': 1,
+                    'multiple_targets': True,
+                    'all': False,
+                },
+                {
+                    'action': 'move_cards',
+                    'source': 'looked_at',
+                    'destination': 'hand',
+                    'count': 1,
+                    'all': False,
+                },
+                {
+                    'action': 'move_cards',
+                    'source': 'looked_at_remaining',
+                    'destination': 'discard',
+                    'all': True,
+                },
+            ],
+        }
+        if cost_limit is not None:
+            action['actions'][0]['cost_limit'] = cost_limit
+        return action
+    return None
 
 def _try_reveal_until_live(text):
     """ライブカードが公開されるまで — reveal deck until live card found."""
@@ -3308,6 +3386,7 @@ _EFFECT_HANDLERS = [
     _try_opponent_action,
     _try_choose_self_opponent,
     _try_opponent_after_conditional,
+    _try_reveal_until_chosen_card,
     _try_reveal_until_live,
     _try_furthermore,
     _try_kore_niyori_result,
@@ -3621,6 +3700,17 @@ def _normalize_effect_tree(effect, original_text=None):
                 d['group_reference'] = 'same_group_name'
             elif 'グループ名が異なる' in d_ctx or 'グループ名がそれぞれ異なる' in d_ctx:
                 d['group_reference'] = 'different_group_names'
+
+        # Set same_unit_name for cost text containing '同じユニット名'
+        if 'same_unit_name' not in d and '同じユニット名' in (d.get('text', '') or ''):
+            d['same_unit_name'] = True
+
+        # Propagate heart_colors from effect into location_condition for collective heart checks
+        # (also done in _enrich_effect_type; this catches nested sequential sub-actions)
+        if 'heart_colors' in d and 'condition' in d:
+            cond = d['condition']
+            if isinstance(cond, dict) and cond.get('type') == 'location_condition' and 'heart_colors' not in cond:
+                cond['heart_colors'] = d['heart_colors']
 
         # Strip leading comma from text artifacts (e.g. "、{{icon_energy.png|E}}支払ってもよい")
         if d_text and (d_text.startswith('、') or d_text.startswith('，')):

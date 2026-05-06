@@ -324,11 +324,11 @@ impl GameState {
     }
 
     pub fn add_revealed_card(&mut self, card_id: i16) {
-        self.revealed_cards.insert(card_id);
+        self.revealed_cards.push(card_id);
     }
 
     pub fn remove_revealed_card(&mut self, card_id: i16) {
-        self.revealed_cards.remove(&card_id);
+        self.revealed_cards.retain(|&id| id != card_id);
     }
 
     pub fn is_card_revealed(&self, card_id: i16) -> bool {

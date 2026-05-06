@@ -50,6 +50,8 @@ pub struct AbilityQueueEntry {
     pub conditional_choice: Option<String>,
     /// Execution context saved across resolver create/destroy cycles
     pub execution_context: Option<ExecutionContext>,
+    /// Cards selected across sequential steps (for exclude_selected)
+    pub selected_card_ids: Vec<i16>,
 }
 
 /// Unified ability queue with proper state management

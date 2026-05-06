@@ -50,16 +50,12 @@ impl super::TurnEngine {
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
 
-        eprintln!("LIVE_VICTORY: P1_cards={} P1_score={} P2_cards={} P2_score={}", player1_has_cards, player1_score, player2_has_cards, player2_score);
-
         let (player1_won, player2_won) = if !player1_has_cards && !player2_has_cards { (false, false) }
         else if player1_has_cards && !player2_has_cards { (true, false) }
         else if !player1_has_cards && player2_has_cards { (false, true) }
         else {
             (player1_score > player2_score, player2_score > player1_score)
         };
-
-        eprintln!("LIVE_VICTORY_RESULT: P1_won={} P2_won={}", player1_won, player2_won);
 
         if player2_won { game_state.set_opponent_live_success(true); }
 
@@ -146,7 +142,7 @@ impl super::TurnEngine {
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         blade_type_modifiers: &ModMap<BladeColor>,
-    ) -> u32 {
+    ) -> (u32, Vec<i16>) {
         // Rule 8.3.10: Sum blades from active members
         let total_blade = player.stage.total_blades(card_db, blade_modifiers);
         eprintln!("[LIVE] {}: total_blade={}", player.name, total_blade);
@@ -246,11 +242,14 @@ impl super::TurnEngine {
         eprintln!("[LIVE] {}: blades={} cheer_icons={} owned_hearts={:?} live_cards={}",
             player.name, total_blade, cheer_icon_count, owned_hearts.hearts, player.live_card_zone.len());
 
+        // Collect revealed card IDs before moving to waitroom
+        let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
+
         // Move resolution zone cards to waitroom after processing
         for card_id in resolution_zone.cards.drain(..) {
             player.waitroom.add_card(card_id);
         }
 
-        total_blade + cheer_icon_count
+        (total_blade + cheer_icon_count, revealed_ids)
     }
 }

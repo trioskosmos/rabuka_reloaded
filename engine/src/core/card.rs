@@ -448,6 +448,8 @@ pub struct AbilityCost {
     #[serde(default)]
     pub exclude_self: Option<bool>,
     #[serde(default)]
+    pub same_unit_name: Option<bool>,
+    #[serde(default)]
     pub costs: Option<Vec<AbilityCost>>,
     #[serde(default)]
     pub cost_limit: Option<u32>,
@@ -538,6 +540,8 @@ pub struct AbilityEffect {
     pub self_cost: Option<bool>,
     #[serde(default)]
     pub exclude_self: Option<bool>,
+    #[serde(default)]
+    pub exclude_selected: Option<bool>,
     // Effect type for replacement/continuous effects
     #[serde(default)]
     pub effect_type: Option<String>,
@@ -572,6 +576,8 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub heart_type: Option<String>,
     // Parser-only fields that were missing struct fields
+    #[serde(default)]
+    pub or_card_types: Option<Vec<String>>,
     #[serde(default)]
     pub activation_position: Option<String>,
     /// Source position: member AT this position gets moved (e.g. "センターにいる")
@@ -802,6 +808,9 @@ pub struct Condition {
     pub to_state: Option<String>,
     #[serde(default)]
     pub aggregate: Option<String>,
+    /// Heart colors required collectively from stage members (e.g. all 6 colors)
+    #[serde(default)]
+    pub heart_colors: Option<Vec<String>>,
     /// ability_negation flag for "能力を持たない" (does not have ability) conditions
     #[serde(default)]
     pub ability_negation: Option<bool>,

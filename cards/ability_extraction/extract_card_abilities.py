@@ -232,6 +232,11 @@ def _enrich_effect_type(effect, triggerless=""):
             heart_colors.append(h)
     if heart_colors and 'heart_colors' not in effect:
         effect['heart_colors'] = heart_colors
+    # Propagate heart_colors into location_condition for collective heart checks
+    if 'heart_colors' in effect and 'condition' in effect:
+        cond = effect['condition']
+        if isinstance(cond, dict) and cond.get('type') == 'location_condition' and 'heart_colors' not in cond:
+            cond['heart_colors'] = effect['heart_colors']
 
 
 def extract_all_abilities(cards_file: Path) -> dict:

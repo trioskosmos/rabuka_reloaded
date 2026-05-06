@@ -17,12 +17,16 @@ pub struct AbilityResolver<'a> {
     pub is_reveal_cost: bool,
     pub last_draw_count: u32,
     pub looked_at_total_count: usize,
+    pub selected_cards: Vec<i16>,
 }
 
 impl<'a> AbilityResolver<'a> {
     pub fn new(game_state: &'a mut GameState) -> Self {
         let activating_card_id = game_state.activating_card;
         let looked_at_cards = std::mem::take(&mut game_state.looked_at_cards);
+        let selected_cards = game_state.ability_queue.current_entry()
+            .map(|e| e.selected_card_ids.clone())
+            .unwrap_or_default();
         AbilityResolver {
             game_state,
             pending_choice: None,
@@ -36,6 +40,7 @@ impl<'a> AbilityResolver<'a> {
             is_reveal_cost: false,
             last_draw_count: 0,
             looked_at_total_count: 0,
+            selected_cards,
         }
     }
 

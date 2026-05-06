@@ -263,16 +263,18 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     }
                 }
                 "looked_at" => {
-                    // Take cards from looked_at buffer (from reveal_until_live_card etc.)
                     let mut idxs: Vec<usize> = (0..self.looked_at_cards.len()).filter(|&i| {
                         let cid = self.looked_at_cards[i];
                         util::card_matches_type(&card_db, cid, card_type_filter)
                             && util::card_matches_group_str(&card_db, cid, group_name)
                             && util::card_matches_cost_limit(&card_db, cid, cost_limit)
                     }).collect();
-                    // all = true only applies when there's no card_type filter
                     if is_all && card_type_filter.is_none() { idxs = (0..self.looked_at_cards.len()).collect(); }
                     if idxs.is_empty() { vec![] }
+                    else if card_type_filter.is_none() && idxs.len() > count && !is_all {
+                        let taken: Vec<i16> = self.looked_at_cards.drain(..count).collect();
+                        taken
+                    }
                     else if idxs.len() > count && !is_all {
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "looked_at".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
@@ -282,11 +284,11 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         return Ok(());
                     } else {
                         idxs.sort_unstable_by(|a, b| b.cmp(a));
-                        idxs.iter().map(|&i| self.looked_at_cards.remove(i)).collect()
+                        let taken: Vec<i16> = idxs.iter().map(|&i| self.looked_at_cards.remove(i)).collect();
+                        taken
                     }
                 }
                 "looked_at_remaining" => {
-                    // Take all remaining cards in looked_at buffer
                     let cards: Vec<i16> = self.looked_at_cards.drain(..).collect();
                     cards
                 }

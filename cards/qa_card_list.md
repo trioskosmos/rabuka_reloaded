@@ -28,19 +28,19 @@ Write tests in engine\tests\gameplay_test_process.md
 | 18 | 2 | PL!-bp3-025-L (タカラモノズ (ab#0)) | Q142, Q36 | ✓ takaramono_test |
 | 19 | 2 | PL!-bp5-003-R＋ (南 ことり (ab#1)) | Q207, Q208 | ✓ kotori_test |
 |20|2|PL!-bp5-021-L (SUNNY DAY SONG (ab#0))|Q210, Q211|✓ sunny_test|
-| 21 | 2 | PL!-pb1-001-R (高坂穂乃果 (ab#0)) | Q166, Q167 | |
+| 21 | 2 | PL!-pb1-001-R (高坂穂乃果 (ab#0)) | Q166, Q167 | | ✓ honoka_test
 | 22 | 2 | PL!-pb1-028-L (WAO-WAO Powerful day! (ab#0)) | Q178, Q179 | ✓ wao_wao_test |
 | 23 | 2 | PL!N-bp3-030-L (Love U my friends (ab#0)) | Q192, Q36 | ✓ love_u_test |
 | 24 | 2 | PL!-sd1-005-SD (星空 凛 (ab#0)) | Q123, Q79 | ✓ rin_test |
 | 25 | 2 | PL!HS-bp1-002-R (村野さやか (ab#0)) | Q63, Q80 | ✓ sayaka_test |
-| 26 | 2 | PL!HS-bp1-022-L (AWOKE (ab#0)) | Q107, Q36 | |
+| 26 | 2 | PL!HS-bp1-022-L (AWOKE (ab#0)) | Q107, Q36 | ✓ awake_test |
 | 27 | 2 | PL!N-bp1-011-R (ミア・テイラー (ab#0)) | Q102, Q73 | ✓ mia_test |
 | 28 | 2 | PL!N-bp1-026-L (Poppin' Up! (ab#0)) | Q36, Q66 | ✓ poppin_test |
 | 29 | 2 | PL!N-bp3-007-R (優木せつ菜 (ab#0)) | Q157, Q184 | ✓ setsuna_test |
 | 30 | 2 | PL!N-bp3-013-N (上原歩夢 (ab#0)) | Q157, Q184 | | ✓ (same ability as azuna)
 | 31 | 2 | PL!N-bp5-026-L (TOKIMEKI Runners (ab#1)) | Q216, Q232 | |
 | 32 | 2 | PL!N-bp5-027-L (ミラクル STAY TUNE！ (ab#0)) | Q207, Q208 | |
-| 33 | 2 | PL!N-bp5-030-L (繚乱！ビクトリーロード (ab#1)) | Q217, Q227 | |
+| 33 | 2 | PL!N-bp5-030-L (繚乱！ビクトリーロード (ab#1)) | Q217, Q227 | | ✓ victory_road_test
 | 34 | 2 | PL!N-pb1-013-R (上原歩夢 (ab#0)) | Q199, Q200 | ✓ ayumu_pb1_test |
 | 35 | 2 | PL!N-pb1-017-R (宮下 愛 (ab#0)) | Q199, Q201 | ✓ ayumu_pb1_test |
 | 36 | 2 | PL!N-pb1-023-R (ミア・テイラー (ab#0)) | Q199, Q202 | ✓ ayumu_pb1_test |
@@ -54,14 +54,15 @@ Write tests in engine\tests\gameplay_test_process.md
 | 44 | 2 | PL!SP-bp2-020-N (鬼塚夏美 (ab#0)) | Q112, Q113 | ✓ sumire_auto_test |
 |46|2|PL!SP-bp2-021-N (ウィーン・マルガレーテ (ab#0))|Q112, Q113|✓ wien_n_test|
 |47|2|PL!SP-bp4-004-R＋ (平安名すみれ (ab#1))|Q193, Q194|
-|48|2|PL!SP-bp4-023-L (Dazzling Game (ab#1))|Q187, Q192|
+|48|2|PL!SP-bp4-023-L (Dazzling Game (ab#1))|Q187, Q192| ✓ dazzling_test
 |49|2|PL!SP-bp5-005-R＋ (葉月 恋 (ab#1))|Q221, Q233|
 |50|2|PL!SP-pb1-006-R (桜小路きな子 (ab#0))|Q171, Q94|✓ kinako_sakurakoji_test|
 |51|2|PL!SP-pb1-011-R (鬼塚冬毬 (ab#0))|Q63, Q95|
 |52|2|PL!SP-pb1-025-L (Jellyfish (ab#0))|Q98, Q99|✓ jellyfish_test|
 | 53 | 1 | LL-PR-004-PR (愛♡スクリ～ム！ (ab#0)) | Q185 | ✓ gameplay_test (ai_screeam) |
-| 54 | 1 | LL-bp5-001-L (Live with a smile! (ab#0)) | Q224 | |
-| 55 | 1 | LL-bp5-002-L (Bring the LOVE！ (ab#1)) | Q225 | |
+| 54 | 1 | LL-bp5-001-L (Live with a smile! (ab#0)) | Q224 | ✓ smile_test |
+ (ab#0)) | Q224 | | ✓ smile_test
+| 55 | 1 | LL-bp5-002-L (Bring the LOVE！ (ab#1)) | Q225 | | ✓ bring_love_test
 | 56 | 1 | PL!-bp3-002-R (絢瀬絵里 (ab#1)) | Q144 | ✓ eri_bp3_test | | | ✓ b7_constant |
 | 57 | 1 | PL!-bp3-003-R (南ことり (ab#0)) | Q145 | ✓ parse_test | |
 | 58 | 1 | PL!-bp3-004-R＋ (園田海未 (ab#1)) | Q146 | ✓ parse_test | |
@@ -82,42 +83,42 @@ Write tests in engine\tests\gameplay_test_process.md
 | 73 | 1 | PL!-sd1-002-SD (絢瀬 絵里 (ab#0)) | Q79 | ✓ (shared QA)
 | 74 | 1 | PL!-sd1-006-SD (西木野 真姫 (ab#0)) | Q125 | | ✓ batch5_test |
 | 75 | 1 | PL!-sd1-019-SD (START:DASH!! (ab#0)) | Q36 | ✓ batch_nico_bp4_hanayo_test | |
-| 76 | 1 | PL!HS-PR-016-PR (日野下花帆 (ab#0)) | Q175 | |
-| 77 | 1 | PL!HS-PR-017-PR (村野さやか (ab#0)) | Q175 | |
+| 76 | 1 | PL!HS-PR-016-PR (日野下花帆 (ab#0)) | Q175 | | ✓ hanano_test
+| 77 | 1 | PL!HS-PR-017-PR (村野さやか (ab#0)) | Q175 | | ✓ hanano_test
 | 78 | 1 | PL!HS-PR-019-PR (百生 吟子 (ab#0)) | Q171 | ✓ (shared QA)
 | 79 | 1 | PL!HS-PR-021-PR (安養寺 姫芽 (ab#0)) | Q171 | ✓ (shared QA)
-| 80 | 1 | PL!HS-bp1-003-R＋ (乙宗 梢 (ab#1)) | Q81 | |
+| 80 | 1 | PL!HS-bp1-003-R＋ (乙宗 梢 (ab#1)) | Q81 | | ✓ kinako_hs_test
 | 81 | 1 | PL!HS-bp1-004-R＋ (夕霧綴理 (ab#1)) | Q38 | |
 | 82 | 1 | PL!HS-bp1-009-R (安養寺 姫芽 (ab#0)) | Q82 | |
 | 83 | 1 | PL!HS-bp1-021-L (Holiday∞Holiday (ab#0)) | Q36 | ✓ (phase tests)
 | 84 | 1 | PL!HS-bp1-023-L (ド！ド！ド！ (ab#0)) | Q36 | ✓ (phase tests)
 | 85 | 1 | PL!HS-bp2-008-R (徒町 小鈴 (ab#0)) | Q171 | ✓ (shared QA)
 | 86 | 1 | PL!HS-bp2-009-R (安養寺 姫芽 (ab#0)) | Q171 | ✓ (shared QA)
-| 87 | 1 | PL!HS-bp2-014-N (大沢瑠璃乃 (ab#0)) | Q68 | |
+| 87 | 1 | PL!HS-bp2-014-N (大沢瑠璃乃 (ab#0)) | Q68 | | ✓ totemari_test
 | 88 | 1 | PL!HS-bp2-019-L (Bloom the smile, Bloom the dream! (ab#0)) | Q127 | ✓ (shared QA)
-| 89 | 1 | PL!HS-bp2-024-L (レディバグ (ab#0)) | Q114 | |
+| 89 | 1 | PL!HS-bp2-024-L (レディバグ (ab#0)) | Q114 | | ✓ ladybug_test
 | 90 | 1 | PL!HS-bp5-007-R (セラス 柳田 リリエンフェルト (ab#1)) | Q209 | |
 | 91 | 1 | PL!HS-bp5-017-L (Dream Believers（104期Ver.） (ab#0)) | Q212 | |
 | 92 | 1 | PL!HS-bp5-019-L (ハナムスビ (ab#0)) | Q213 | |
 | 93 | 1 | PL!N-bp1-006-R＋ (近江彼方 (ab#0)) | Q77 | | ✓ konata_test |
 | 94 | 1 | PL!N-bp1-012-R＋ (鐘 嵐珠 (ab#0)) | Q38 | |
-| 95 | 1 | PL!N-bp1-027-L (Solitude Rain (ab#0)) | Q67 | |
+| 95 | 1 | PL!N-bp1-027-L (Solitude Rain (ab#0)) | Q67 | | ✓ solitude_test
 | 96 | 1 | PL!N-bp1-029-L (Eutopia (ab#0)) | Q38 | |
-| 97 | 1 | PL!N-bp3-003-R (桜坂しずく (ab#0)) | Q159 | |
-| 98 | 1 | PL!N-bp3-008-R＋ (エマ・ヴェルデ (ab#1)) | Q163 | |
+| 97 | 1 | PL!N-bp3-003-R (桜坂しずく (ab#0)) | Q159 | | ✓ shizuku_test
+| 98 | 1 | PL!N-bp3-008-R＋ (エマ・ヴェルデ (ab#1)) | Q163 | | ✓ emma_test
 | 99 | 1 | PL!N-bp3-009-R＋ (天王寺璃奈 (ab#0)) | Q164 | |
 | 100 | 1 | PL!N-bp3-011-R (ミア・テイラー (ab#0)) | Q171 | ✓ (shared QA)
 | 101 | 1 | PL!N-bp3-031-L (MONSTER GIRLS (ab#0)) | Q36 | ✓ (phase tests)
 | 102 | 1 | PL!N-bp4-011-R＋ (ミア・テイラー (ab#1)) | Q190 | |
 | 103 | 1 | PL!N-bp4-018-N (近江彼方 (ab#0)) | Q188 | |
 | 104 | 1 | PL!N-bp4-025-L (VIVID WORLD (ab#1)) | Q192 | ✓ (shared QA)
-| 105 | 1 | PL!N-bp4-030-L (Daydream Mermaid (ab#0)) | Q191 | |
+| 105 | 1 | PL!N-bp4-030-L (Daydream Mermaid (ab#0)) | Q191 | | ✓ daydream_test
 | 106 | 1 | PL!N-bp5-003-R (桜坂しずく (ab#0)) | Q214 | |
 | 107 | 1 | PL!N-bp5-007-R＋ (優木せつ菜 (ab#1)) | Q230 | |
 | 108 | 1 | PL!N-bp5-008-R (エマ・ヴェルデ (ab#0)) | Q215 | |
-| 109 | 1 | PL!N-bp5-010-R (三船栞子 (ab#0)) | Q231 | |
+| 109 | 1 | PL!N-bp5-010-R (三船栞子 (ab#0)) | Q231 | | ✓ mifune_test
 | 110 | 1 | PL!N-bp5-015-N (桜坂しずく (ab#0)) | Q216 | |
-| 111 | 1 | PL!N-bp5-021-N (天王寺璃奈 (ab#0)) | Q226 | |
+| 111 | 1 | PL!N-bp5-021-N (天王寺璃奈 (ab#0)) | Q226 | | ✓ rina_test
 | 112 | 1 | PL!N-pb1-003-R (桜坂しずく (ab#0)) | Q196 | |
 | 113 | 1 | PL!N-pb1-005-R (宮下 愛 (ab#0)) | Q197 | |
 | 114 | 1 | PL!N-pb1-007-R (優木せつ菜 (ab#0)) | Q205 | |
@@ -131,13 +132,13 @@ Write tests in engine\tests\gameplay_test_process.md
 | 122 | 1 | PL!S-PR-016-PR (黒澤ダイヤ (ab#0)) | Q171 | ✓ (shared QA)
 | 123 | 1 | PL!S-bp2-004-R (黒澤ダイヤ (ab#0)) | Q107 | ✓ batch3_test | |
 | 124 | 1 | PL!S-bp2-005-R＋ (渡辺 曜 (ab#0)) | Q124 | |
-| 125 | 1 | PL!S-bp2-007-R＋ (国木田花丸 (ab#1)) | Q120 | |
+| 125 | 1 | PL!S-bp2-007-R＋ (国木田花丸 (ab#1)) | Q120 | | ✓ hanamaru_test
 | 126 | 1 | PL!S-bp2-008-R＋ (小原鞠莉 (ab#1)) | Q36 | ✓ (phase tests)
 | 127 | 1 | PL!S-bp2-021-L (未体験HORIZON (ab#0)) | Q36 | ✓ (phase tests)
 | 128 | 1 | PL!S-bp2-022-L (未熟DREAMER (ab#0)) | Q36 | ✓ (phase tests)
-| 129 | 1 | PL!S-bp2-023-L (MY舞☆TONIGHT (ab#0)) | Q121 | |
+| 129 | 1 | PL!S-bp2-023-L (MY舞☆TONIGHT (ab#0)) | Q121 | | ✓ mymai_tonight_test
 | 130 | 1 | PL!S-bp3-005-R (渡辺 曜 (ab#0)) | Q153 | | | ✓ batch5_test |
-| 131 | 1 | PL!S-bp3-006-R＋ (津島善子 (ab#0)) | Q154 | |
+| 131 | 1 | PL!S-bp3-006-R＋ (津島善子 (ab#0)) | Q154 | | ✓ yoshiko_test
 | 132 | 1 | PL!S-bp3-008-R (小原鞠莉 (ab#0)) | Q79 | ✓ (shared QA)
 | 133 | 1 | PL!S-bp3-016-N (国木田花丸 (ab#0)) | Q155 | ✓ b7_constant_ability_test | |
 | 134 | 1 | PL!S-bp3-020-L (ダイスキだったらダイジョウブ！ (ab#0)) | Q156 | |
@@ -145,7 +146,7 @@ Write tests in engine\tests\gameplay_test_process.md
 | 136 | 1 | PL!S-pb1-003-R (松浦果南 (ab#0)) | Q36 | ✓ (phase tests)
 | 137 | 1 | PL!S-pb1-006-R (津島善子 (ab#0)) | Q171 | ✓ (shared QA)
 | 138 | 1 | PL!S-pb1-007-R (国木田花丸 (ab#0)) | Q36 | ✓ (phase tests)
-| 139 | 1 | PL!S-pb1-008-R (小原鞠莉 (ab#0)) | Q131 | |
+| 139 | 1 | PL!S-pb1-008-R (小原鞠莉 (ab#0)) | Q131 | | ✓ mari_test
 | 140 | 1 | PL!S-pb1-019-L (元気全開DAY！DAY！DAY！ (ab#0)) | Q36 | ✓ (phase tests)
 | 141 | 1 | PL!S-pb1-022-L (逃走迷走メビウスループ (ab#0)) | Q36 | ✓ (phase tests)
 | 142 | 1 | PL!S-pb1-024-L (僕らの走ってきた道は・・・ (ab#0)) | Q36 | ✓ (phase tests)
