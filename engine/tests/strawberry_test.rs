@@ -68,6 +68,7 @@ fn strawberry_q36_only_fires_in_live_victory_determination() {
     // P2 performed. The live_success abilities are fired here.
     // opponent_live_success_this_turn may be set now if P2 won.
     // Regardless of win state, the ability was evaluated.
+    while game.has_pending_choice() { game.select_indices(&[]); }
 }
 
 /// Q132: First attacker's live_success ability is evaluated during

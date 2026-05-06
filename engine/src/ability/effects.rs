@@ -219,7 +219,7 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::ActivationRestriction => self.execute_activation_restriction(effect.target.as_deref().unwrap_or("self")),
             EffectAction::ChooseRequiredHearts => self.execute_choose_required_hearts(),
             EffectAction::ModifyLimit => self.execute_modify_limit(effect.operation.as_deref().unwrap_or("decrease"), effect.count.unwrap_or(0)),
-            EffectAction::SetBladeCount => self.execute_set_blade_count(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
+            EffectAction::SetBladeCount => self.execute_set_blade_count(effect.value.unwrap_or(effect.count.unwrap_or(0)), effect.target.as_deref().unwrap_or("self")),
             EffectAction::DoNothing => Ok(()),
             EffectAction::SetRequiredHearts => self.execute_set_required_hearts(&effect.heart_colors.clone().unwrap_or_default(), effect.target.as_deref().unwrap_or("self")),
             EffectAction::SetScore => self.execute_set_score(effect.value.unwrap_or(0), effect.target.as_deref().unwrap_or("self")),
@@ -325,20 +325,22 @@ impl<'a> AbilityResolver<'a> {
 
         // If heart_colors is present and resource is heart, this is a choose-and-replace operation
         if (resource == "heart" || resource == "ハート") && (heart_colors.is_some() || heart_selection) {
-            if let Some(colors) = heart_colors {
-                let mut unique_colors: Vec<String> = Vec::new();
-                for c in colors {
-                    if !unique_colors.contains(c) {
-                        unique_colors.push(c.clone());
-                    }
+            let colors = heart_colors.cloned().unwrap_or_else(|| {
+                vec!["heart01".into(), "heart02".into(), "heart03".into(),
+                     "heart04".into(), "heart05".into(), "heart06".into()]
+            });
+            let mut unique_colors: Vec<String> = Vec::new();
+            for c in colors {
+                if !unique_colors.contains(&c) {
+                    unique_colors.push(c);
                 }
-                self.pending_choice = Some(Choice::SelectHeartColor {
-                    count: count as usize,
-                    options: unique_colors,
-                    description: "Choose a heart color to replace this member's original heart".to_string(),
-                });
-                return Ok(());
             }
+            self.pending_choice = Some(Choice::SelectHeartColor {
+                count: count as usize,
+                options: unique_colors,
+                description: "Choose a heart color".to_string(),
+            });
+            return Ok(());
         }
 
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
@@ -355,6 +357,7 @@ impl<'a> AbilityResolver<'a> {
                     Some("stage") | Some("member") | Some("人") => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true),
                     Some("hand") | Some("card") | Some("枚") => util::count_matching(util::zone_cards(player, "hand"), &card_db, &filter, false),
                     Some("discard") => util::count_matching(&player.waitroom.cards, &card_db, &filter, false),
+                    Some("live_card_zone") => util::count_matching(&player.live_card_zone.cards, &card_db, &filter, false),
                     _ => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true),
                 };
                 (matching_count / per_unit_count_val) * count

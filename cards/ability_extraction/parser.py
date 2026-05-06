@@ -687,6 +687,7 @@ def _try_card_count(text):
         (r'(\d+)枚以上ある', '>=', None),
         (r'(\d+)種類以上ある', '>=', 'types'),
         (r'(\d+)枚ある', '=', None),
+        (r'(\d+)枚以上', '>=', None),
         (r'(\d+)人以上', '>=', '人'),
         (r'(\d+)(人|枚|つ)以上いる', '>=', None),
     ]:
@@ -723,6 +724,25 @@ def _try_card_count(text):
             ct = extract_card_type(text)
             if ct:
                 result['card_type'] = ct
+            # Extract location (e.g. 成功ライブカード置き場)
+            loc = extract_location(text)
+            if loc:
+                result['location'] = loc
+            # Detect live_card_zone from "ライブ中のカード" (cards currently in live)
+            if 'ライブ中のカード' in text and not result.get('location'):
+                result['location'] = 'live_card_zone'
+            # Extract target (e.g. 相手の → opponent)
+            tgt = extract_target(text)
+            if tgt:
+                result['target'] = tgt
+            # Also try _try_either_target for "自分か相手の" patterns
+            either_result = _try_either_target(text)
+            if either_result:
+                if 'target' in either_result:
+                    result['target'] = either_result['target']
+                if 'location' in either_result:
+                    result['location'] = either_result['location']
+
             # Extract hand count condition (手札がN枚以下の場合 / 手札がN枚以上の場合)
             hand_m = re.search(r'手札が(\d+)枚以下(の|の場)', text)
             if hand_m:
@@ -859,6 +879,8 @@ def _try_appearance(text):
     result = {'type': 'appearance_condition', 'appearance': True, 'text': text}
     if 'エリアすべて' in text:
         result['all_areas'] = True
+    if 'バトンタッチ' in text:
+        result['baton_touch_trigger'] = True
     return result
 
 def _try_energy_state(text):
@@ -1401,7 +1423,9 @@ def parse_action(text: str) -> Dict[str, Any]:
                 per_unit_count = 1
             # Extract the unit type (e.g., "メンバー")
             per_unit_type = None
-            if 'メンバー' in per_unit_text:
+            if 'ライブ中のカード' in per_unit_text or 'ライブカード置き場' in per_unit_text:
+                per_unit_type = 'live_card_zone'
+            elif 'メンバー' in per_unit_text:
                 per_unit_type = 'member'
             elif 'カード' in per_unit_text:
                 per_unit_type = 'card'
@@ -1525,6 +1549,12 @@ def parse_action(text: str) -> Dict[str, Any]:
     cost_limit = extract_cost_limit(text)
     if cost_limit:
         action['cost_limit'] = cost_limit
+        # Extract cost_limit_operator: 以下(<=), 以上(>=), exact(=), 未満(<), 超(>)
+        if '以下' in text: action['cost_limit_operator'] = '<='
+        elif '以上' in text: action['cost_limit_operator'] = '>='
+        elif '未満' in text: action['cost_limit_operator'] = '<'
+        elif '超' in text: action['cost_limit_operator'] = '>'
+        else: action['cost_limit_operator'] = '='  # bare number → exact match
     
     # Check for card name matching constraints (Q236/Q237 - 日野下花帆 pattern)
     # Pattern: "これにより公開したカードのカード名がすべて含まれる"
@@ -1677,6 +1707,11 @@ def parse_action(text: str) -> Dict[str, Any]:
         cl = extract_cost_limit(text)
         if cl is not None:
             action['cost_limit'] = cl
+            if '以下' in text: action['cost_limit_operator'] = '<='
+            elif '以上' in text: action['cost_limit_operator'] = '>='
+            elif '未満' in text: action['cost_limit_operator'] = '<'
+            elif '超' in text: action['cost_limit_operator'] = '>'
+            else: action['cost_limit_operator'] = '='
         # Extract numeric value from patterns like "コストは2減る" or "コストを+1する"
         value_match = re.search(r'コスト[はがを](\d+)(減る|減らす|増える|増やす)', text)
         if value_match:
@@ -2674,6 +2709,7 @@ def _try_reveal_until_chosen_card(text):
         }
         if cost_limit is not None:
             action['actions'][0]['cost_limit'] = cost_limit
+            action['actions'][0]['cost_limit_operator'] = '>='
         return action
     return None
 
@@ -3392,6 +3428,7 @@ _EFFECT_HANDLERS = [
     _try_kore_niyori_result,
     _try_sequential_duration,
     _try_conditional_sequential,
+    _try_same_action,
     _try_sequential,
     _try_duration_effect,
     _try_sou_shinakatta,
@@ -3405,7 +3442,6 @@ _EFFECT_HANDLERS = [
     _try_choice,
     _try_kore_niyori_cascade,
     _try_baton_touch_effect,
-    _try_same_action,
     _try_global_modifier,
     _try_play_baton_touch,
     _try_energy_under_member,

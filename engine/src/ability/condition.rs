@@ -231,6 +231,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             } else { true }
         };
 
+        // Handle aggregate="total" for blade sum (not card count)
+        if condition.aggregate.as_deref() == Some("total") && location == "stage" {
+            let player = self.game_state.resolve_target_player(target);
+            let total = player.stage.total_blades(card_db, &self.game_state.blade_modifiers);
+            eprintln!("[COND_AGG] aggregate=total total_blade={} threshold={}", total, count_threshold);
+            return compare_counts(operator, total, count_threshold);
+        }
+
         let location_value = match target {
             "either" => {
                 if comparison_type == Some("score") || comparison_type == Some("cost") {
@@ -433,6 +441,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_db = &self.game_state.card_database;
 
         let location = condition.location.as_deref().unwrap_or("");
+        eprintln!("[LOC_COND_ENTER] location={:?} card_type={:?} aggregate={:?} count={:?} operator={:?}",
+            location, card_type, condition.aggregate, condition.count, condition.operator);
         let group_names = condition.group_names.as_ref();
         let group = condition.group.as_ref()
             .and_then(|g| g.as_object().and_then(|o| o.get("name").and_then(|n| n.as_str())));
@@ -459,9 +469,25 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             p.stage.stage.iter().filter(|&&id| id != -1).count()
         };
 
+        // Check for location-based zones first (override card_type mapping)
+        let zone_count = |zone: &str| -> usize {
+            match zone {
+                "live_card_zone" => player.live_card_zone.cards.len(),
+                "success_live_zone" => {
+                    if target == "either" || target == "both" {
+                        self.game_state.player1.success_live_card_zone.cards.len()
+                            + self.game_state.player2.success_live_card_zone.cards.len()
+                    } else {
+                        player.success_live_card_zone.cards.len()
+                    }
+                }
+                "revealed_cards" => self.game_state.revealed_cards.len(),
+                _ => 0,
+            }
+        };
+
         let actual_count = match condition.unit.as_deref() {
             Some("types") => {
-                // Count distinct heart color types among stage members
                 let mut color_types = std::collections::HashSet::new();
                 let card_db = &self.game_state.card_database;
                 for &cid in &player.stage.stage {
@@ -476,13 +502,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
                 color_types.len() as u32
             }
+            _ if condition.location.as_deref().map_or(false, |l| {
+                let zc = zone_count(l);
+                eprintln!("[CARD_COUNT_COND] zone={} count={} threshold={} op={:?}", l, zc, count, condition.operator);
+                zc > 0 || l == "success_live_zone"
+            }) => {
+                let loc = condition.location.as_deref().unwrap_or("");
+                let actual = zone_count(loc) as u32;
+                eprintln!("[CARD_COUNT_COND_RESULT] loc={} actual={} threshold={} op={:?}", loc, actual, count, condition.operator);
+                actual
+            }
             _ => {
                 let count = match card_type {
                     "live_card" => player.live_card_zone.len(),
                     "member_card" => {
                         if condition.aggregate.as_deref() == Some("total") {
-                            // Sum blade values across stage members
-                            player.stage.total_blades(card_db, &self.game_state.blade_modifiers) as usize
+                            let total = player.stage.total_blades(card_db, &self.game_state.blade_modifiers) as usize;
+                            eprintln!("[LOC_COND] aggregate=total total_blade={} threshold={}", total, count);
+                            total
                         } else {
                             let mut member_count = stage_member_count(player);
                             if exclude_self {
@@ -496,14 +533,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }
                     }
                     "energy_card" => player.energy_zone.cards.len(),
-                    _ => {
-                        // Check for special locations
-                        if condition.location.as_deref() == Some("revealed_cards") {
-                            self.game_state.revealed_cards.len() as usize
-                        } else {
-                            0 as usize
-                        }
-                    }
+                    _ => 0 as usize,
                 };
                 count as u32
             }

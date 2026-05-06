@@ -35,7 +35,6 @@ fn dream_with_you_q116_blade_10_score_plus_1() {
     while game.has_pending_choice() { game.select_indices(&[]); }
 
     let mod_val = game.state.get_score_modifier(dream);
-    eprintln!("[DREAM] score_mod={}", mod_val);
     assert_eq!(mod_val, 1, "Blade ≥10 → score +1");
 }
 
@@ -68,8 +67,5 @@ fn dream_with_you_q116_blade_6_no_score() {
 
     let mod_val = game.state.get_score_modifier(dream);
     eprintln!("[DREAM] score_mod={}", mod_val);
-    // Known parser gap: count=10 not extracted, condition silently passes.
-    // If count were extracted, this would be 0.
-    eprintln!("[DREAM] parser gap: count missing from condition JSON");
-    assert!(mod_val >= 0, "score non-negative");
+    assert_eq!(mod_val, 0, "Blade <10 → no score");
 }

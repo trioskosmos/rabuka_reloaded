@@ -1,7 +1,7 @@
 use crate::game_state::{GameState, AbilityTrigger};
 
 impl super::TurnEngine {
-    pub(crate) fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, _cost_paid: u32, _baton_touch_used: bool) {
+    pub(crate) fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, _cost_paid: u32, baton_touch_used: bool) {
         let player_id_clone = player_id.to_string();
         let card_no_clone = card_no.to_string();
         let mut abilities_to_trigger = Vec::new();
@@ -29,6 +29,13 @@ impl super::TurnEngine {
                         if card.card_no == card_no_clone {
                             for ability in &card.abilities {
                                 if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN)) {
+                                    // Skip abilities that require baton touch if baton touch wasn't used
+                                    if !baton_touch_used && ability.effect.as_ref()
+                                        .and_then(|e| e.condition.as_ref())
+                                        .map_or(false, |c| c.baton_touch_trigger.unwrap_or(false))
+                                    {
+                                        continue;
+                                    }
                                     let ability_id = format!("{}_{}", card_no_clone, ability.full_text);
                                     abilities_to_trigger.push((ability_id, card_no_clone.clone()));
                                 }
@@ -51,8 +58,10 @@ impl super::TurnEngine {
 
         {
             let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
+            eprintln!("[LIVE_START] player={} lcz.len={}", player_id, player.live_card_zone.cards.len());
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
+                    eprintln!("[LIVE_START] checking card_id={} card_no={} has {} abilities type={:?}", card_id, card.card_no, card.abilities.len(), card.card_type);
                     for ability in &card.abilities {
                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
@@ -75,7 +84,9 @@ impl super::TurnEngine {
             }
         }
 
+        eprintln!("[LIVE_START_TRIGGER] triggering {} abilities for player {}", abilities_to_trigger.len(), player_id);
         for (ability_id, card_no) in abilities_to_trigger {
+            eprintln!("[LIVE_START_TRIGGER]   ability={} card_no={}", ability_id, card_no);
             game_state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, player_id_clone.clone(), Some(card_no), None);
         }
     }
@@ -86,6 +97,7 @@ impl super::TurnEngine {
 
         {
             let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
+            eprintln!("[AUTO_TRIGGER] checking stage for player {} stage={:?}", player_id, player.stage.stage);
             for &card_id in &player.stage.stage {
                 if card_id == -1 { continue; }
                 if let Some(card) = game_state.card_database.get_card(card_id) {

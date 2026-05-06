@@ -322,6 +322,21 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
 
             // --- STEP 3: Place cards in destination ---
             for card_id in taken {
+                if destination == "deck" {
+                    if let Some(ref pos_info) = effect.position {
+                        if let Some(pos_str) = pos_info.get_position() {
+                            if let Ok(n) = pos_str.parse::<usize>() {
+                                let idx = n.saturating_sub(1).min(player.main_deck.cards.len());
+                                player.main_deck.cards.insert(idx, card_id);
+                                moved_cards.push(card_id);
+                                continue;
+                            }
+                        }
+                    }
+                    player.main_deck.cards.insert(0, card_id);
+                    moved_cards.push(card_id);
+                    continue;
+                }
                 util::place_card_in_zone(player, card_id, destination.as_str(), vacated_stage_area, is_max, count);
                 moved_cards.push(card_id);
             }

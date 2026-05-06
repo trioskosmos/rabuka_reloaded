@@ -101,6 +101,7 @@ impl super::TurnEngine {
         if player1_won && !p1_must_skip && p1_cards > 0 {
             // Move 1 card to success zone
             let card_id = game_state.player1.live_card_zone.cards.remove(p1_cards - 1);
+            eprintln!("[LIVE] REMOVED from p1 lcz: {} (p1_cards={})", card_id, p1_cards);
             if game_state.can_place_card_in_zone(card_id, "success_live_zone", &p1_id) {
                 game_state.player1.success_live_card_zone.cards.push(card_id);
             } else {

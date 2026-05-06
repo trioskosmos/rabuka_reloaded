@@ -26,7 +26,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
             }
-            ExecutionContext::SingleEffect { .. } => {
+            ExecutionContext::SingleEffect { effect_index: _ } => {
                 self.execution_context = ExecutionContext::None;
                 Ok(())
             }

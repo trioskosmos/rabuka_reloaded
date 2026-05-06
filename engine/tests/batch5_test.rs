@@ -33,15 +33,16 @@ fn you_s3_q153_live_success_draw_if_fewer_revealed() {
     let filler = game.id("PL!-sd1-010-SD");
     let member = game.id("PL!-sd1-001-SD");
 
-    game.state.player1.stage.stage = [member, -1, -1];
-    game.state.player1.hand.cards.push(you);
-    for _ in 0..10 {
+    let live_card = game.id("PL!-sd1-019-SD");
+    game.state.player1.stage.stage = [you, member, -1];
+    game.state.player1.hand.cards.push(live_card);
+    for _ in 0..20 {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
     }
 
     for _ in 0..5 { game.pass(); }
-    game.set_live_card(you);
+    game.set_live_card(live_card);
     game.pass(); game.pass(); game.pass(); game.pass(); game.pass();
 
     // LiveSuccess triggers — condition checks if self's revealed count

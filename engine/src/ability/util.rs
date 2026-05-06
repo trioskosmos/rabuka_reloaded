@@ -25,7 +25,10 @@ pub fn card_matches_group_str(card_db: &CardDatabase, card_id: i16, group_name: 
         Some(g) => card_db.get_card(card_id).map(|c| {
             c.unit.as_deref() == Some(g)
                 || c.group == g
-                || card_series_matches_group(&c.series, g)
+                // For multi-series cards (containing \n), don't match individual series
+                // Multi-name cards' individuals each have their own series but the card
+                // as a whole should not match group conditions (Q212)
+                || (!c.series.contains('\n') && card_series_matches_group(&c.series, g))
         }).unwrap_or(false),
         None => true,
     }
@@ -268,6 +271,7 @@ pub fn place_card_in_zone(
             }
             true
         }
+        "deck" => { player.main_deck.cards.insert(0, card_id); true }
         "deck_top" => { player.main_deck.cards.insert(0, card_id); true }
         "deck_bottom" => { player.main_deck.cards.push(card_id); true }
         "deck" => { player.main_deck.cards.insert(0, card_id); true }

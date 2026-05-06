@@ -194,6 +194,7 @@ impl<'a> AbilityResolver<'a> {
         self.current_ability = Some(ability.clone());
         self.game_state.activating_card = activating_card;
 
+        eprintln!("[RESOLVE_ABILITY] ability={:?} cost_already_paid={}", ability.full_text.chars().take(60).collect::<String>(), self.game_state.ability_queue.current_entry().map_or(false, |e| e.cost_paid));
         let cost_already_paid = self.game_state.ability_queue.current_entry()
             .map_or(false, |e| e.cost_paid);
 
