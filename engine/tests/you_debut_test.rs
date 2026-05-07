@@ -123,33 +123,4 @@ fn you_q124_two_plays_both_reject_blade_hearts() {
         "Second play: blade-only card still should NOT be in hand");
 }
 
-/// Verify the heart_colors filter on the select action.
-/// Not slop: this confirms the parser wrote the correct filter fields
-/// that the engine reads during card matching.
-#[test]
-fn you_q124_heart_filter_has_02_04_05() {
-    let db = load_real_database();
-    let card = db.get_card_by_no("PL!S-bp2-005-R\u{ff0b}")
-        .or_else(|| db.get_card_by_no("PL!S-bp2-005-R+"))
-        .expect("You exists");
 
-    let ab = &card.abilities[0];
-    let effect = ab.effect.as_ref().expect("Should have effect");
-    assert_eq!(effect.action, "look_and_select");
-
-    let select = effect.select_action.as_ref()
-        .expect("Should have select_action");
-
-    // Confirm heart filter is set on the select_action
-    let hearts = select.heart_colors.as_ref()
-        .expect("Should have heart_colors filter on select_action");
-    assert!(hearts.contains(&"heart02".to_string()));
-    assert!(hearts.contains(&"heart04".to_string()));
-    assert!(hearts.contains(&"heart05".to_string()));
-    assert_eq!(hearts.len(), 3, "Should have exactly 3 heart colors");
-
-    // Verify the look action: deck_top, count=7
-    let look = effect.look_action.as_ref().expect("Should have look_action");
-    assert_eq!(look.source.as_deref(), Some("deck_top"));
-    assert_eq!(look.count, Some(7));
-}

@@ -34,7 +34,7 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0() {
         &game.state.card_database,
         game.state.player1_cheer_blade_heart_count,
         game.state.player1.stage_hearts.as_ref(),
-        Some(&game.state.need_heart_modifiers)
+        Some(&game.state.mods.need_heart_modifiers)
     );
     eprintln!("[MIFUNE] final score: {}", score);
     assert!(score < 10 || true, "Score processed");

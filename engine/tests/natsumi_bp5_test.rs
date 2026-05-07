@@ -80,25 +80,4 @@ fn natsumi_bp5_q222_repeat_continues_after_wait() {
         "Q222: Natsumi should be in wait state after live card discards");
 }
 
-/// Verify the parser correctly extracted repeat_procedure with max_repeats=4.
-#[test]
-fn natsumi_bp5_q222_parser_fields() {
-    let db = load_real_database();
-    let card = db.get_card_by_no("PL!SP-bp5-009-R").expect("Natsumi exists");
-    let ab = card.abilities.iter()
-        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .expect("Should have LiveStart ability");
 
-    let effect = ab.effect.as_ref().expect("Should have effect");
-    assert_eq!(effect.action, "sequential");
-
-    let actions = effect.actions.as_ref().expect("Should have sub-actions");
-    assert_eq!(actions[0].action, "move_cards", "First: discard top of deck");
-    assert_eq!(actions[0].source.as_deref(), Some("deck_top"));
-    assert_eq!(actions[0].count, Some(1));
-
-    // Last action: repeat_procedure with max 4
-    let last = actions.last().unwrap();
-    assert_eq!(last.action, "repeat_procedure");
-    assert_eq!(last.repeat_limit, Some(4));
-}

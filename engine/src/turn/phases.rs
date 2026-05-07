@@ -61,10 +61,10 @@ impl super::TurnEngine {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = game_state.first_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
-                        let bm = game_state.blade_modifiers.clone();
-                        let ho = game_state.heart_override.clone();
-                        let hm = game_state.heart_modifiers.clone();
-                        let btm = game_state.blade_type_modifiers.clone();
+                        let bm = game_state.mods.blade_modifiers.clone();
+                        let ho = game_state.mods.heart_override.clone();
+                        let hm = game_state.mods.heart_modifiers.clone();
+                        let btm = game_state.mods.blade_type_modifiers.clone();
                         let player = game_state.first_attacker_mut();
                         Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };
@@ -80,10 +80,10 @@ impl super::TurnEngine {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = game_state.second_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
-                        let bm = game_state.blade_modifiers.clone();
-                        let ho = game_state.heart_override.clone();
-                        let hm = game_state.heart_modifiers.clone();
-                        let btm = game_state.blade_type_modifiers.clone();
+                        let bm = game_state.mods.blade_modifiers.clone();
+                        let ho = game_state.mods.heart_override.clone();
+                        let hm = game_state.mods.heart_modifiers.clone();
+                        let btm = game_state.mods.blade_type_modifiers.clone();
                         let player = game_state.second_attacker_mut();
                         Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };

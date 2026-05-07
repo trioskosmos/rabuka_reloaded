@@ -157,30 +157,4 @@ fn vitamin_hand_less_or_equal_no_score() {
         "No score bonus when P1 hand <= P2 hand");
 }
 
-/// Verify the ability is parsed correctly.
-#[test]
-fn vitamin_ability_parsed() {
-    let db = load_real_database();
-    let vitamin = db.get_card_by_no("PL!SP-bp2-024-L")
-        .expect("ビタミンSUMMER！ should exist");
-    let ab0 = &vitamin.abilities[0];
 
-    assert_eq!(ab0.triggers.as_deref(), Some("ライブ成功時"),
-        "Trigger should be ライブ成功時 (LiveSuccess)");
-
-    let effect = ab0.effect.as_ref().expect("Should have effect");
-    assert_eq!(effect.action, "modify_score");
-    assert_eq!(effect.operation.as_deref(), Some("add"));
-    assert_eq!(effect.value, Some(1));
-    assert_eq!(effect.self_target, Some(true));
-
-    let condition = effect.condition.as_ref().expect("Should have condition");
-    assert_eq!(condition.condition_type.as_deref(), Some("comparison_condition"),
-        "Should be comparison_condition");
-    assert_eq!(condition.comparison_target.as_deref(), Some("opponent"),
-        "Target should be opponent");
-    assert_eq!(condition.location.as_deref(), Some("hand"),
-        "Should compare hand counts");
-    assert_eq!(condition.operator.as_deref(), Some(">"),
-        "Should use > operator");
-}

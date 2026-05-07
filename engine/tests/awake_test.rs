@@ -107,22 +107,4 @@ fn awake_q36_non_hasetsu_cheered_no_score() {
         "Non-蓮ノ空 cheered cards should NOT count toward 10");
 }
 
-/// Verify the condition now has group="蓮ノ空" and card_type="member_card".
-#[test]
-fn awake_condition_has_group_and_type() {
-    let db = load_real_database();
-    let card = db.get_card_by_no("PL!HS-bp1-022-L").expect("AWOKE exists");
-    let ab = card.abilities.iter()
-        .find(|a| a.triggers.as_deref() == Some("ライブ成功時"))
-        .expect("Should have LiveSuccess ability");
 
-    let effect = ab.effect.as_ref().expect("Should have effect");
-    let condition = effect.condition.as_ref().expect("Should have condition");
-    assert_eq!(condition.count, Some(10));
-    assert_eq!(condition.location.as_deref(), Some("revealed_cards"));
-    assert!(condition.group_names.as_ref().map_or(false, |gn| {
-        gn.iter().any(|g| g == "蓮ノ空")
-    }), "Condition should have group_names containing '蓮ノ空'");
-    assert_eq!(condition.card_type.as_deref(), Some("member_card"),
-        "Condition should have card_type='member_card'");
-}

@@ -98,8 +98,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                     for &idx in indices.iter().rev() {
                                         if idx < 3 {
                                             if player.stage.stage[idx] != -1 {
-                                                player.remove_member_from_stage_with_recycling(idx, &card_db);
-                                                last_vacated = Some(idx);
+                                                if let Some(card_id) = player.remove_member_from_stage_with_recycling(idx, &card_db) {
+                                                    player.waitroom.add_card(card_id);
+                                                    last_vacated = Some(idx);
+                                                }
                                             }
                                         }
                                     }
@@ -146,15 +148,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }
                     }
                     self.pending_choice = None;
-                    if let Some(effect) = self.game_state.entry_effect().cloned() {
-                        self.current_ability = Some(crate::card::Ability {
-                            effect: Some(effect.clone()),
-                            cost: self.game_state.entry_cost().cloned(),
-                            ..Default::default()
-                        });
-                        let _ = self.execute_effect(&effect);
-                        self.current_ability = None;
-                    }
                     return Ok(());
                 }
 

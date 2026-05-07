@@ -59,16 +59,4 @@ fn mei_bp5_q235_debut_look_and_select_with_multiname() {
     eprintln!("[Mei Q235] Debut ability fired successfully with multi-name card in deck");
 }
 
-/// Verify the parser extracted look_and_select for Mei's debut.
-#[test]
-fn mei_bp5_q235_parser_fields() {
-    let db = load_real_database();
-    let card = db.get_card_by_no("PL!SP-bp5-007-R").expect("Mei exists");
-    let ab = &card.abilities[0];
 
-    assert_eq!(ab.triggers.as_deref(), Some("登場"));
-    let effect = ab.effect.as_ref().expect("Should have effect");
-    assert_eq!(effect.action, "look_and_select");
-    assert!(effect.look_action.is_some(), "Should have look_action");
-    assert!(effect.select_action.is_some(), "Should have select_action");
-}

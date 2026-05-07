@@ -1,8 +1,0 @@
-﻿cargo :    Compiling rabuka_engine v0.1.0 (C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine)
-発生場所 行:1 文字:64
-+ ... \OneDrive\Documents\rabuka_reloaded\engine"; cargo build 2>&1 | Out-F ...
-+                                                  ~~~~~~~~~~~~~~~~
-    + CategoryInfo          : NotSpecified: (   Compiling ra...eloaded\engine):String) [], RemoteException
-    + FullyQualifiedErrorId : NativeCommandError
- 
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.16s

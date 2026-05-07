@@ -478,7 +478,7 @@ impl GameState {
                 "heart_override" => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
-                            self.heart_override.remove(&(card_id as i16));
+                            self.mods.remove_heart_override(card_id as i16);
                             eprintln!("Removed heart override for card {}", card_id);
                         }
                     }
@@ -592,7 +592,7 @@ impl GameState {
             self.player2.live_card_zone.cards.len(),
             self.player2.success_live_card_zone.cards.len(),
             self.player2.stage.stage,
-            self.orientation_modifiers.len(),
+            self.mods.orientation_modifiers.len(),
             self.prohibition_effects.len(),
             self.temporary_effects.len(),
             self.rps_winner

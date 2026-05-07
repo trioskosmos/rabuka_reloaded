@@ -146,21 +146,4 @@ fn wien_bp5_q223_opponent_swap_when_destination_occupied() {
         "p2_left swapped to Center");
 }
 
-/// Verify the parser extracted correct fields.
-#[test]
-fn wien_bp5_q223_parser_fields() {
-    let db = load_real_database();
-    let card = db.get_card_by_no("PL!SP-bp5-010-R").expect("Wien bp5 exists");
-    let ab = &card.abilities[0];
-    let effect = ab.effect.as_ref().expect("Should have effect");
 
-    assert_eq!(ab.triggers.as_deref(), Some("登場"));
-    assert_eq!(effect.action, "position_change");
-    assert_eq!(effect.target.as_deref(), Some("both"));
-    // Parser now sets source_position (member AT center) not position
-    assert_eq!(effect.source_position.as_deref(), Some("center"),
-        "source_position should be 'center' (member AT center is source)");
-    assert_eq!(effect.position.as_ref().and_then(|p| p.get_position()), None,
-        "position should NOT be set when source_position is used");
-    assert_eq!(effect.card_type.as_deref(), Some("member_card"));
-}

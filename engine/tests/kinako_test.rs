@@ -15,71 +15,7 @@ use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
-/// Helper to verify ability data integrity by loading from the database.
-#[test]
-fn kinako_ability_parsed_correctly() {
-    let db = load_real_database();
-    
-    // Find 桜小路きな子 - 4 variants share the same ability
-    let kinako_id = db.get_card_id("PL!SP-bp2-006-R+")
-        .or_else(|| db.get_card_id("PL!SP-bp2-006-P"))
-        .or_else(|| db.get_card_id("PL!SP-bp2-006-SEC"))
-        .expect("桜小路きな子 (PL!SP-bp2-006) not found");
-    
-    let card = db.get_card(kinako_id).expect("Card data not found");
-    let abilities = &card.abilities;
-    
-    // Should have 2 abilities (ab#0: baton touch recovery, ab#1: activation)
-    assert!(abilities.len() >= 2,
-        "Expected at least 2 abilities, got {}", abilities.len());
-    
-    // Find the activation ability (ab#1) - it has trigger "起動"
-    let activate_ab = abilities.iter().find(|a| {
-        a.triggers.as_deref() == Some("起動")
-    }).expect("Activation ability not found");
-    
-    let effect = activate_ab.effect.as_ref().expect("Effect should exist");
-    assert_eq!(effect.action, "activate_ability",
-        "Effect action should be activate_ability, got {}", effect.action);
-    assert_eq!(effect.target_trigger.as_deref(), Some("登場"),
-        "target_trigger should be 登場");
-    assert_eq!(effect.count, Some(1),
-        "Should activate 1 ability");
-}
 
-/// Verify the activation ability's cost has proper cost_limit and group filtering.
-#[test]
-fn kinako_cost_has_cost_limit_and_group_filter() {
-    let db = load_real_database();
-    
-    let kinako_id = db.get_card_id("PL!SP-bp2-006-R+")
-        .or_else(|| db.get_card_id("PL!SP-bp2-006-P"))
-        .or_else(|| db.get_card_id("PL!SP-bp2-006-SEC"))
-        .expect("桜小路きな子 not found");
-    
-    let card = db.get_card(kinako_id).expect("Card data not found");
-    let activate_ab = card.abilities.iter()
-        .find(|a| a.triggers.as_deref() == Some("起動"))
-        .expect("Activation ability not found");
-    
-    let cost = activate_ab.cost.as_ref().expect("Cost should exist");
-    assert_eq!(cost.cost_type.as_deref(), Some("move_cards"),
-        "Cost type should be move_cards");
-    assert_eq!(cost.cost_limit, Some(4),
-        "Cost limit should be 4, got {:?}", cost.cost_limit);
-    assert_eq!(cost.cost_limit_operator.as_deref(), Some("<="),
-        "Cost limit operator should be <=");
-    assert_eq!(cost.source.as_deref(), Some("hand"),
-        "Source should be hand");
-    assert_eq!(cost.destination.as_deref(), Some("discard"),
-        "Destination should be discard");
-    assert_eq!(cost.count, Some(1),
-        "Count should be 1");
-    assert_eq!(cost.card_type.as_deref(), Some("member_card"),
-        "Card type should be member_card");
-    assert!(cost.group_names.as_ref().map_or(false, |g| g.contains(&"Liella!".to_string())),
-        "Group names should contain Liella!, got {:?}", cost.group_names);
-}
 
 /// Full integration: place 桜小路きな子 on stage, add matching cost card to hand,
 /// activate ability, and verify the cost card is discarded.

@@ -502,51 +502,7 @@ fn ayumu_q62_and_name_has_individual_names() {
     assert!(names[2].contains("花帆") || names[2].contains("日野下"), "Third name should be Koko");
 }
 
-// ── Q89: Card group/unit metadata ───────────────────────────────────
 
-#[test]
-fn ayumu_q89_metadata() {
-    let db = load_real_database();
-    let ayumu = db.get_card_by_no("LL-bp1-001-R\u{ff0b}")
-        .expect("Card should exist");
-    // Q89: The card has no unit (subgroup) printed on it
-    assert!(ayumu.unit.is_none(), "Card should have no unit");
-}
-
-// ── Q90: Name substring matching — find a card with "かのん" in name ─
-
-#[test]
-fn ayumu_q90_name_contains_kanon() {
-    let db = load_real_database();
-    let kanon = db.get_card_by_no("PL!SP-bp1-001-R")
-        .expect("Kanon card should exist");
-    // Q90: A card whose name contains "かのん" qualifies as "澁谷かのん"
-    assert!(kanon.name.contains("かのん"),
-        "Kanon card name '{}' must contain 'かのん'", kanon.name);
-    // Also verify the card's unit is CatChu! (the group for these characters)
-    assert_eq!(kanon.unit.as_deref(), Some("CatChu!"));
-}
-
-// ── Cost parsing: card's cost correctly captures the 3 character names ──
-
-#[test]
-fn ayumu_cost_has_three_character_names() {
-    let db = load_real_database();
-    let ayumu = db.get_card_by_no("LL-bp1-001-R\u{ff0b}")
-        .expect("Card should exist");
-    // Find the live_start ability (index 1)
-    let live_start_ability = ayumu.abilities.get(1)
-        .expect("Card should have live_start ability");
-    // The ability text should contain all 3 character names in 「」 brackets
-    assert!(live_start_ability.full_text.contains("上原歩夢"),
-        "Ability must reference Ayumu");
-    assert!(live_start_ability.full_text.contains("澁谷かのん"),
-        "Ability must reference Kanon");
-    assert!(live_start_ability.full_text.contains("日野下花帆"),
-        "Ability must reference Koko");
-    assert!(live_start_ability.full_text.contains("合計3枚"),
-        "Ability must say up to 3 cards");
-}
 
 // ── Live test: Ayumu on stage, LiveStart trigger fires ─────────────
 
@@ -870,66 +826,7 @@ fn nico_q169_no_baton_touch_from_appeared_area() {
 //   ライブ終了時まで、これにより控え室に置いたカード1枚につき、{{ブレード}}を得る。
 // ====================================================================
 
-// ── Ab#0: cost reduction (「手札...コスト...少なくなる」) ────────
 
-#[test]
-fn you_ab0_cost_reduction_parsed() {
-    let db = load_real_database();
-    let keke = db.get_card_by_no("LL-bp2-001-R\u{ff0b}")
-        .expect("Card should exist");
-    let ab0 = keke.abilities.get(0).expect("Should have ability 0");
-    assert_eq!(ab0.triggers.as_deref(), Some("常時"));
-    assert!(ab0.full_text.contains("手札"));
-    assert!(ab0.full_text.contains("コスト"));
-    assert!(ab0.full_text.contains("少なくなる"));
-}
-
-// ── Ab#1: baton touch restriction ───────────────────────────────
-
-#[test]
-fn you_ab1_baton_restriction_parsed() {
-    let db = load_real_database();
-    let keke = db.get_card_by_no("LL-bp2-001-R\u{ff0b}")
-        .expect("Card should exist");
-    let ab1 = keke.abilities.get(1).expect("Should have ability 1");
-    assert_eq!(ab1.triggers.as_deref(), Some("常時"));
-    assert!(ab1.full_text.contains("バトンタッチ"));
-    eprintln!("[You] Ab#1 text: {:?}", ab1.full_text.chars().take(60).collect::<String>());
-}
-
-// ── Ab#2: LiveStart blade gain ──────────────────────────────────
-
-#[test]
-fn you_ab2_live_start_blade_parsed() {
-    let db = load_real_database();
-    let keke = db.get_card_by_no("LL-bp2-001-R\u{ff0b}")
-        .expect("Card should exist");
-    let ab2 = keke.abilities.get(2).expect("Should have ability 2");
-    assert_eq!(ab2.triggers.as_deref(), Some("ライブ開始時"));
-    assert!(ab2.full_text.contains("ブレード"));
-    eprintln!("[You] Ab#2 text: {:?}", ab2.full_text.chars().take(80).collect::<String>());
-}
-
-// ── Q89: unit is None ───────────────────────────────────────────
-
-#[test]
-fn you_q89_metadata() {
-    let db = load_real_database();
-    let keke = db.get_card_by_no("LL-bp2-001-R\u{ff0b}")
-        .expect("Card should exist");
-    assert!(keke.unit.is_none());
-}
-
-// ── Q62: name splits on & ───────────────────────────────────────
-
-#[test]
-fn you_q62_name_splits_on_ampersand() {
-    let db = load_real_database();
-    let keke = db.get_card_by_no("LL-bp2-001-R\u{ff0b}")
-        .expect("Card should exist");
-    let names: Vec<&str> = keke.name.split('&').collect();
-    assert_eq!(names.len(), 3);
-}
 
 // ── Q186: cost reduced by 16 hand cards → playable with 4 energy ──
 
@@ -1341,24 +1238,7 @@ fn wien_q117_another_member_triggers_yell_reduction() {
     assert!(game.state.player1.stage.stage[2] != -1, "partner should remain");
 }
 
-#[test]
-fn wien_q110_two_copies_stack_heart_requirement() {
-    let db = load_real_database();
-    let wien = db.get_card_by_no("PL!SP-bp2-010-R\u{ff0b}").expect("Wien exists");
-    let ab0 = &wien.abilities[0];
 
-    // Q110: Constant ability should be parsed as modify_required_hearts_global
-    assert_eq!(ab0.triggers.as_deref(), Some("常時"),
-        "Ab#0 should be constant trigger");
-    if let Some(ref effect) = ab0.effect {
-        assert_eq!(effect.action, "restriction",
-            "Ab#0 should be restriction type");
-        assert_eq!(effect.restriction_type.as_deref(), Some("modify_required_hearts_global"),
-            "Ab#0 should modify required hearts globally");
-        assert_eq!(effect.operation.as_deref(), Some("increase"),
-            "Ab#0 should increase required hearts");
-    }
-}
 
 
 

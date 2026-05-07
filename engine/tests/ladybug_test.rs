@@ -1,20 +1,19 @@
-/// Tests for レディバグ (PL!HS-bp2-024-L) — LiveStart modify_required_hearts:
+/// Gameplay tests for レディバグ (PL!HS-bp2-024-L) — Q114:
 ///
-/// ライブ開始時 自分のステージに「夕霧綴理」が登場しており、
-/// かつ「夕霧綴理」よりコストの大きい「村野さやか」が登場している場合、
-/// このカードの必要ハートをheart0×3減らす。
+/// {{live_start.png|ライブ開始時}}自分のステージに「徒町小鈴」が登場しており、
+/// かつ「徒町小鈴」よりコストの大きい「村野さやか」が登場している場合、
+/// このカードを成功させるための必要ハートを{{heart_00.png|heart0}}×3減らす。
 ///
-/// Q114: Members just need to be on stage when ability fires,
-/// they don't need to have debuted that turn.
-/// Parser gap: uses appearance_condition(appearance=true) instead of
-/// location_condition, so "on stage since prior turn" fails.
+/// Q114: Members just need to be on stage when the ability fires.
+/// They do NOT need to have debuted that turn.
 
 mod helpers;
 use helpers::*;
-use rabuka_engine::card::HeartColor;
+use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     for _ in 0..5 { game.pass(); }
+    assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
 }
 
 fn advance_to_live_start(game: &mut TestGame) {
@@ -22,46 +21,75 @@ fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
 }
 
-/// Q114: Ability structure has correct conditions parsed.
+/// Both required members on stage (deployed on previous turns).
+/// Heart requirement should be reduced by 3 heart0.
 #[test]
-fn ladybug_q114_ability_parsed() {
+fn ladybug_q114_both_members_on_stage_reduces_hearts() {
     let db = load_real_database();
-    let card = db.get_card_by_no("PL!HS-bp2-024-L").expect("Ladybug exists");
-    let ab = card.abilities.iter().find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .expect("Should have LiveStart ability");
-    let effect = ab.effect.as_ref().expect("Should have effect");
-    assert_eq!(effect.action, "modify_required_hearts");
-    assert!(effect.value == Some(3) || effect.count == Some(3),
-        "Should reduce required hearts by 3 (as value or count)");
-    assert!(effect.operation.as_deref() == Some("decrease") || effect.operation.is_none(),
-        "Should be a decrease operation (or default)");
+    let mut game = TestGame::new(db.clone());
 
-    let cond = effect.condition.as_ref().expect("Should have condition");
-    assert_eq!(cond.condition_type.as_deref(), Some("compound"));
-    assert_eq!(cond.operator.as_deref(), Some("and"));
+    let ladybug = game.id("PL!HS-bp2-024-L");
+    let kosuzu = game.id("PL!HS-sd1-013-SD");   // cost 2
+    let sayaka = game.id("PL!HS-sd1-002-SD");   // cost 11 (> 2)
+    let filler = game.id("PL!-sd1-010-SD");
 
-    // Both sub-conditions should check for specific names on stage
-    let subs = cond.conditions.as_ref().expect("Should have sub-conditions");
-    assert_eq!(subs.len(), 2, "Should have 2 conditions for 2 members");
-    // First mentions 夕霧綴理 (or has characters in its range)
-    let first_ok = subs[0].text.chars().any(|c| c as u32 >= 0x3080 && c as u32 <= 0x30FF);
-    assert!(first_ok, "First condition should contain Japanese text describing the member");
-    // Second mentions cost comparison
-    assert!(subs[1].text.contains("コスト") || subs[1].text.len() > 10,
-        "Second condition should describe cost comparison");
+    // Members already on stage from previous turn
+    game.add_to_stage(MemberArea::LeftSide, kosuzu);
+    game.add_to_stage(MemberArea::Center, sayaka);
+
+    game.state.player1.hand.cards.push(ladybug);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(ladybug);
+    advance_to_live_start(&mut game);
+
+    // LiveStart abilities fire. Ladybug's condition checks for
+    // 小鈴 and さやか on stage (both present).
+    // Verify the engine processed without error and reduced hearts.
+    // The exact reduction is visible in game state need_heart_modifiers.
+    let heart_mods = &game.state.mods.need_heart_modifiers;
+    eprintln!("[LADYBUG] need_heart_modifiers: {:?}", heart_mods);
+    let reduction = heart_mods.get(&ladybug)
+        .and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00))
+        .copied()
+        .unwrap_or(0);
+    let all_mods = heart_mods.get(&ladybug);
+    eprintln!("[LADYBUG] all mods for ladybug: {:?}", all_mods);
+    assert_eq!(reduction, -3,
+        "Q114: Ladybug should reduce heart0 requirement by 3");
 }
 
-/// The modify_required_hearts effect exists with target heart00 and value 3.
+/// Only one member on stage (missing さやか). Condition fails.
 #[test]
-fn ladybug_q114_heart_reduction_parsed() {
+fn ladybug_q114_missing_sayaka_no_reduction() {
     let db = load_real_database();
-    let card = db.get_card_by_no("PL!HS-bp2-024-L").expect("Ladybug exists");
-    let ab = card.abilities.iter()
-        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .expect("Should have LiveStart ability");
-    let effect = ab.effect.as_ref().expect("Should have effect");
-    assert!(effect.heart_color.as_deref() == Some("heart00") || effect.heart_color.is_none(),
-        "Reduces heart00 (or default)");
-    assert!(effect.value == Some(3) || effect.count == Some(3),
-        "Reduce by 3 (as value or count)");
+    let mut game = TestGame::new(db.clone());
+
+    let ladybug = game.id("PL!HS-bp2-024-L");
+    let kosuzu = game.id("PL!HS-sd1-013-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_stage(MemberArea::LeftSide, kosuzu);
+    // No さやか on stage
+
+    game.state.player1.hand.cards.push(ladybug);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(ladybug);
+    advance_to_live_start(&mut game);
+
+    let reduction = game.state.mods.need_heart_modifiers.get(&ladybug)
+        .and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00))
+        .copied()
+        .unwrap_or(0);
+    assert_eq!(reduction, 0,
+        "Q114: Missing さやか → no heart reduction");
 }

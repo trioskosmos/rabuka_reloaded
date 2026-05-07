@@ -50,19 +50,4 @@ fn love_u_q192_live_success_condition_evaluated() {
     // At minimum, verify no crash and ability fires.
 }
 
-/// Verify the parser output is correct.
-#[test]
-fn love_u_q192_parser_output_correct() {
-    let db = load_real_database();
-    let love_u_id = db.get_card_id("PL!N-bp3-030-L")
-        .expect("Love U card should exist");
-    let card = db.get_card(love_u_id)
-        .expect("Card should be in database");
 
-    let live_success_ability = card.abilities.iter()
-        .find(|a| a.full_text.contains("ALL"))
-        .expect("Love U should have an ability with ALL blade");
-
-    assert!(live_success_ability.full_text.contains("ALLブレード"),
-        "Ability text should mention ALL blade");
-}

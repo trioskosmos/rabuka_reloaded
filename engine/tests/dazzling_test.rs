@@ -50,10 +50,10 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
     }
 
     // After both selections, blade gain_resource should add blade to both selected
-    let has_blade = |id: i16| game.state.blade_modifiers.get(id).copied().unwrap_or(0) > 0;
+    let has_blade = |id: i16| game.state.mods.blade_modifiers.get(id).copied().unwrap_or(0) > 0;
     eprintln!("[DAZZLING] kanon blade: {:?}, liella blade: {:?}",
-        game.state.blade_modifiers.get(kanon),
-        game.state.blade_modifiers.get(liella));
+        game.state.mods.blade_modifiers.get(kanon),
+        game.state.mods.blade_modifiers.get(liella));
     // Both should have blade if the sequence completed
     assert!(true, "exclude_selected flow completed without crash");
 }

@@ -2,6 +2,7 @@ use crate::card::{AbilityEffect, PositionInfo};
 use super::types::{Choice, ExecutionContext};
 use super::resolver::AbilityResolver;
 use super::util;
+use super::debug::AbDebug;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EffectAction {
@@ -86,6 +87,8 @@ impl EffectAction {
 
 impl<'a> AbilityResolver<'a> {
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        let mut dbg = AbDebug::new();
+        dbg.effect(effect);
         if !self.can_activate_effect(effect) {
             return Ok(());
         }

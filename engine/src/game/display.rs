@@ -146,8 +146,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.blade_modifiers),
-        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.blade_modifiers),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers),
         pending_choice: game_state.pending_choice.clone(),
     }
 }

@@ -183,6 +183,10 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     } else if idxs.len() < count {
                         vec![]  // No matching cards — effect does nothing gracefully
                     } else if idxs.len() > count {
+                        // Re-set last_vacated_stage_area for the pending choice handler
+                        if vacated_stage_area.is_some() {
+                            self.game_state.last_vacated_stage_area = vacated_stage_area;
+                        }
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "discard".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                             count, description: format!("Select {} card(s) from discard", count), allow_skip: false,

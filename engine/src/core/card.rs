@@ -284,11 +284,6 @@ impl CardDatabase {
     }
 }
 
-#[allow(dead_code)]
-fn default_group_from_series() -> String {
-    String::new()
-}
-
 impl<'de> Deserialize<'de> for Card {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

@@ -31,22 +31,22 @@ impl super::TurnEngine {
         } else {
             game_state.live_success_triggered_this_turn = true;
 
-            let pre_p1 = game_state.score_modifiers.clone();
+            let pre_p1 = game_state.mods.score_modifiers.clone();
             Self::trigger_live_success_abilities(game_state, &player1_id);
             game_state.process_pending_auto_abilities(&player1_id);
             if game_state.pending_choice.is_some() { return; }
-            p1_extra = Self::score_delta_since(&game_state.score_modifiers, &pre_p1, &game_state.player1.live_card_zone.cards);
+            p1_extra = Self::score_delta_since(&game_state.mods.score_modifiers, &pre_p1, &game_state.player1.live_card_zone.cards);
 
-            let pre_p2 = game_state.score_modifiers.clone();
+            let pre_p2 = game_state.mods.score_modifiers.clone();
             Self::trigger_live_success_abilities(game_state, &player2_id);
             game_state.process_pending_auto_abilities(&player2_id);
             if game_state.pending_choice.is_some() { return; }
-            p2_extra = Self::score_delta_since(&game_state.score_modifiers, &pre_p2, &game_state.player2.live_card_zone.cards);
+            p2_extra = Self::score_delta_since(&game_state.mods.score_modifiers, &pre_p2, &game_state.player2.live_card_zone.cards);
         }
 
         // Determine winner (scores may have been modified by live_success abilities)
-        let player1_score = game_state.player1.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player1_cheer_blade_heart_count, game_state.player1.stage_hearts.as_ref(), Some(&game_state.need_heart_modifiers)) + p1_extra;
-        let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count, game_state.player2.stage_hearts.as_ref(), Some(&game_state.need_heart_modifiers)) + p2_extra;
+        let player1_score = game_state.player1.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player1_cheer_blade_heart_count, game_state.player1.stage_hearts.as_ref(), Some(&game_state.mods.need_heart_modifiers)) + p1_extra;
+        let player2_score = game_state.player2.live_card_zone.calculate_live_score(&game_state.card_database, game_state.player2_cheer_blade_heart_count, game_state.player2.stage_hearts.as_ref(), Some(&game_state.mods.need_heart_modifiers)) + p2_extra;
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
 

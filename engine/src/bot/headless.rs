@@ -203,8 +203,8 @@ fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         phase: format!("{:?}", game_state.current_phase),
         turn_phase: format!("{:?}", game_state.current_turn_phase),
         game_result,
-        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.blade_modifiers),
-        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.blade_modifiers),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers),
         resolution_zone_count: game_state.resolution_zone.cards.len(),
         p1_cheer_blade_heart_count: game_state.player1_cheer_blade_heart_count,
         p2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
@@ -772,10 +772,10 @@ fn output_state_and_actions(game_state: &GameState) {
         game_state.turn_number,
         game_state.current_phase,
         game_state.player1.hand.len(),
-        game_state.player1.stage.total_blades(&game_state.card_database, &game_state.blade_modifiers),
+        game_state.player1.stage.total_blades(&game_state.card_database, &game_state.mods.blade_modifiers),
         game_state.player1.success_live_card_zone.len(),
         game_state.player2.hand.len(),
-        game_state.player2.stage.total_blades(&game_state.card_database, &game_state.blade_modifiers),
+        game_state.player2.stage.total_blades(&game_state.card_database, &game_state.mods.blade_modifiers),
         game_state.player2.success_live_card_zone.len(),
         game_setup::generate_possible_actions(game_state).len()
     );

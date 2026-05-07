@@ -1,10 +1,10 @@
-use crate::card::{BladeColor, CardDatabase};
+use crate::card::CardDatabase;
 use crate::constants::DEFAULT_HISTORY_SIZE;
+use crate::core::game_modifiers::GameModifiers;
 use crate::player::Player;
 use crate::zones::ResolutionZone;
 use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
-use std::collections::HashMap;
 
 pub use crate::config::RuleConfig;
 pub use crate::mod_map::ModMap;
@@ -41,20 +41,13 @@ pub struct GameState {
     pub future: Vec<GameState>,
     pub max_history_size: usize,
     pub card_database: Arc<CardDatabase>,
-    pub blade_modifiers: ModMap<i32>,
-    pub blade_type_modifiers: ModMap<BladeColor>,
-    pub heart_modifiers: HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
-    pub heart_override: HashMap<i16, (crate::card::HeartColor, u32)>,
-    pub orientation_modifiers: ModMap<String>,
-    pub cost_modifiers: ModMap<i32>,
+    pub mods: GameModifiers,
     pub revealed_cards: Vec<i16>,
     pub config: RuleConfig,
     pub ability_queue: AbilityQueue,
     pub pending_choice: Option<serde_json::Value>,
     pub activating_card: Option<i16>,
     pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
-    pub score_modifiers: ModMap<i32>,
-    pub need_heart_modifiers: HashMap<i16, HashMap<crate::card::HeartColor, i32>>,
     pub areas_placed_this_turn: std::collections::HashSet<String>,
     pub cards_appeared_this_turn: std::collections::HashSet<i16>,
     pub turn_order_changed: bool,
@@ -86,8 +79,7 @@ pub struct GameState {
     pub game_state_history: Vec<String>,
     pub max_state_history_size: usize,
     pub loop_detected: bool,
-    /// Blade bonuses from 常時 (constant) abilities, tracked so they can be recalculated
-    pub constant_blade_bonuses: HashMap<i16, i32>,
+
     /// Tracks which stage area (0=left,1=center,2=right) was vacated by the last self_cost move
     /// Used for "same_area" destination in move_cards
     pub last_vacated_stage_area: Option<usize>,
@@ -145,19 +137,12 @@ impl GameState {
             future: Vec::new(),
             max_history_size: 50,
             card_database,
-            blade_modifiers: ModMap::new(),
-            blade_type_modifiers: ModMap::new(),
-            heart_modifiers: HashMap::new(),
-            heart_override: HashMap::new(),
-            orientation_modifiers: ModMap::new(),
-            cost_modifiers: ModMap::new(),
+            mods: GameModifiers::new(),
             revealed_cards: Vec::new(),
             config: RuleConfig::default(),
             ability_queue: AbilityQueue::new(),
             pending_choice: None,
             pending_sequential_actions: None,
-            score_modifiers: ModMap::new(),
-            need_heart_modifiers: HashMap::new(),
             areas_placed_this_turn: std::collections::HashSet::new(),
             cards_appeared_this_turn: std::collections::HashSet::new(),
             turn_order_changed: false,
@@ -188,7 +173,6 @@ impl GameState {
             game_state_history: Vec::new(),
             max_state_history_size: DEFAULT_HISTORY_SIZE,
             loop_detected: false,
-            constant_blade_bonuses: HashMap::new(),
             last_vacated_stage_area: None,
             live_success_triggered_this_turn: false,
             last_state_change_wait_to_active_count: 0,

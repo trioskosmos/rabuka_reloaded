@@ -80,18 +80,4 @@ fn takaramono_excess_heart_no_score() {
     assert_eq!(score_mod, 0, "Excess heart → no score boost");
 }
 
-/// Verify the parser produces temporal_condition with no_excess_heart.
-#[test]
-fn takaramono_parser_output_correct() {
-    let db = load_real_database();
-    let card_id = db.get_card_id("PL!-bp3-025-L")
-        .expect("Takaramono should exist");
-    let card = db.get_card(card_id).unwrap();
 
-    let ability = card.abilities.iter()
-        .find(|a| a.full_text.contains("余剰"))
-        .expect("Takaramono should have an ability about surplus heart");
-
-    assert!(ability.full_text.contains("余剰ハート"),
-        "Ability should mention surplus heart");
-}

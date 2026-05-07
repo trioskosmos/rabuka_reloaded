@@ -3,6 +3,7 @@ use crate::game_state::{GameState, Phase};
 use crate::zones::MemberArea;
 use super::types::{Choice, ExecutionContext};
 use super::util;
+use super::debug::AbDebug;
 
 pub struct AbilityResolver<'a> {
     pub game_state: &'a mut GameState,
@@ -84,8 +85,16 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn can_activate_effect(&self, effect: &AbilityEffect) -> bool {
+        let mut dbg = AbDebug::new();
+        dbg.effect(effect);
         if let Some(ref activation_condition) = effect.activation_condition_parsed {
             if !self.evaluate_condition(activation_condition) {
+                return false;
+            }
+        }
+        if let Some(ref condition) = effect.condition {
+            let result = self.evaluate_condition(condition);
+            if !result {
                 return false;
             }
         }
@@ -174,6 +183,16 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn resolve_ability(&mut self, ability: &Ability, activating_card: Option<i16>, ability_index: usize) -> Result<(), String> {
+        let mut dbg = AbDebug::new();
+
+        // Card info for debug
+        let card_name = activating_card
+            .and_then(|id| self.game_state.card_database.get_card(id))
+            .map(|c| c.name.as_str())
+            .unwrap_or("unknown");
+        let card_id_str = activating_card.map(|id| id.to_string()).unwrap_or_default();
+
+        dbg.ability(card_name, &card_id_str, ability);
 
         // Check use_limit before cost, but don't insert until after effect runs
         let ability_key = activating_card.map(|card_id| {
@@ -183,7 +202,9 @@ impl<'a> AbilityResolver<'a> {
         if let Some(ref key) = ability_key {
             if let Some(use_limit) = ability.use_limit {
                 if self.game_state.turn_limited_abilities_used.contains(key) {
-                    return Err(format!("Ability has already been used this turn (use_limit: {})", use_limit));
+                    let msg = format!("Ability already used this turn (use_limit: {})", use_limit);
+                    dbg.p("RESULT", &msg);
+                    return Err(msg);
                 }
             }
         }
@@ -191,21 +212,20 @@ impl<'a> AbilityResolver<'a> {
         self.current_ability = Some(ability.clone());
         self.game_state.activating_card = activating_card;
 
-        eprintln!("[RESOLVE_ABILITY] ability={:?} cost_already_paid={}", ability.full_text.chars().take(60).collect::<String>(), self.game_state.ability_queue.current_entry().map_or(false, |e| e.cost_paid));
         let cost_already_paid = self.game_state.ability_queue.current_entry()
             .map_or(false, |e| e.cost_paid);
 
         if !cost_already_paid {
             if let Some(ref cost) = ability.cost {
                 if let Err(e) = self.pay_cost(cost) {
+                    dbg.p("RESULT", format_args!("COST FAILED: {}", e));
                     return Err(e);
                 }
+                dbg.p("RESULT", "cost paid ✓");
             }
         }
 
         if self.pending_choice.is_some() {
-            // Only mark cost as paid if the choice was created by the cost
-            // (not by a subsequent effect that creates its own choice)
             if !cost_already_paid && ability.cost.is_some() {
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.cost_paid = true;
@@ -217,16 +237,16 @@ impl<'a> AbilityResolver<'a> {
 
         if let Some(ref effect) = ability.effect {
             if let Err(e) = self.execute_effect(effect) {
+                dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
                 return Err(e);
             }
-
             if self.pending_choice.is_some() {
                 self.store_pending_choice();
                 return Ok(());
             }
+            dbg.p("RESULT", "effect applied ✓");
         }
 
-        // Insert use_limit key after effect has fully executed
         if let Some(key) = ability_key {
             if ability.use_limit.is_some() {
                 self.game_state.turn_limited_abilities_used.insert(key);

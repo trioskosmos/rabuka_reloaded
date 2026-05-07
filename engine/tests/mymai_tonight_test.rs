@@ -46,7 +46,7 @@ fn mymai_tonight_q121_blade_given_to_all_stage_members() {
     while game.has_pending_choice() { game.select_indices(&[]); }
 
     // Verify blade modifiers were applied to both stage members
-    let bm = &game.state.blade_modifiers;
+    let bm = &game.state.mods.blade_modifiers;
     eprintln!("[MYMAI] blade modifiers: {:?}", bm);
     let has_a = bm.get(member_a).copied().unwrap_or(0) > 0;
     let has_b = bm.get(member_b).copied().unwrap_or(0) > 0;

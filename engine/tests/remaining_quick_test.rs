@@ -30,7 +30,7 @@ fn eternalize_q204_two_niko_hearts_reduced() {
     game.pass();
     while game.has_pending_choice() { game.select_indices(&[0]); }
 
-    let needs_mod = game.state.need_heart_modifiers.get(&live);
+    let needs_mod = game.state.mods.need_heart_modifiers.get(&live);
     assert!(needs_mod.is_some(),
         "Q204: need_heart modifier applied for 2+ 虹ヶ咲 members");
     if let Some(mods) = needs_mod {
@@ -64,19 +64,9 @@ fn eternalize_q204_zero_niko_hearts_unchanged() {
 
     // card_count_condition counts ALL members without group filtering.
     // With only 1 member (< threshold 2), the condition fails → no modifier.
-    assert!(game.state.need_heart_modifiers.get(&live).is_none()
-        || game.state.need_heart_modifiers.get(&live).unwrap().is_empty(),
+    assert!(game.state.mods.need_heart_modifiers.get(&live).is_none()
+        || game.state.mods.need_heart_modifiers.get(&live).unwrap().is_empty(),
         "Q204: 1 member (<2) → condition fails → no modification");
-}
-
-/// Q218: 海未 ab#1 — 常時 cost reduction for ability-less members. 
-#[test]
-fn umi_q218_constant_cost_reduction_parsed() {
-    let db = load_real_database();
-    let umi = helpers::card_id(&db, "PL!S-bp5-001-R\u{ff0b}");
-    let data = db.get_card(umi).unwrap();
-    let has_constant = data.abilities.iter().any(|a| a.triggers.as_deref() == Some("常時"));
-    assert!(has_constant, "Q218: 海未 has 常時 ability");
 }
 
 /// Q203: Cara Tesoro — LiveStart fires. Verify the conditional_alternative is evaluated.

@@ -1,38 +1,30 @@
 impl GameState {
 
     pub fn add_blade_modifier(&mut self, card_id: i16, delta: i32) {
-        *self.blade_modifiers.entry(card_id).or_insert(0) += delta;
+        self.mods.add_blade_modifier(card_id, delta);
     }
 
     pub fn remove_blade_modifier(&mut self, card_id: i16, delta: i32) {
-        let val = self.blade_modifiers.entry(card_id).or_insert(0);
-        *val -= delta;
-        if *val == 0 {
-            self.blade_modifiers.remove(card_id);
-        }
+        self.mods.remove_blade_modifier(card_id, delta);
     }
 
     pub fn get_blade_modifier(&self, card_id: i16) -> i32 {
-        self.blade_modifiers.get(card_id).copied().unwrap_or(0)
+        self.mods.get_blade_modifier(card_id)
     }
 
-    pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: BladeColor) {
-        self.blade_type_modifiers.set(card_id, blade_color);
+    pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: crate::card::BladeColor) {
+        self.mods.set_blade_type_modifier(card_id, blade_color);
     }
 
-    pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<BladeColor> {
-        self.blade_type_modifiers.get(card_id).copied()
+    pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<crate::card::BladeColor> {
+        self.mods.get_blade_type_modifier(card_id)
     }
 
     pub fn clear_blade_type_modifier(&mut self, card_id: i16) {
-        self.blade_type_modifiers.remove(card_id);
+        self.mods.clear_blade_type_modifier(card_id);
     }
 
-    /// Recalculate all 常時 (constant) ability blade bonuses.
-    /// Evaluates each constant ability's condition against the current game state
-    /// and applies/removes blade modifiers accordingly.
     pub fn recalculate_constant_blade_modifiers(&mut self) {
-        // Collect blade-granting constant abilities from all stage cards
         let mut blade_abilities: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
         for &cid in self.player1.stage.stage.iter().chain(self.player2.stage.stage.iter()) {
             if cid == -1 { continue; }
@@ -48,8 +40,7 @@ impl GameState {
             }
         }
 
-        // Evaluate conditions and sum expected bonuses
-        let mut expected: HashMap<i16, i32> = HashMap::new();
+        let mut expected: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
         {
             let resolver = crate::ability::resolver::AbilityResolver::new(self);
             for &(cid, ref effect) in &blade_abilities {
@@ -61,42 +52,26 @@ impl GameState {
             }
         }
 
-        // Remove old bonuses (clone before mutating self)
-        let old_bonuses = std::mem::take(&mut self.constant_blade_bonuses);
+        let old_bonuses = std::mem::take(&mut self.mods.constant_blade_bonuses);
         for (cid, old) in &old_bonuses { self.remove_blade_modifier(*cid, *old); }
-        // Apply new bonuses
         for (&cid, &new_val) in &expected { self.add_blade_modifier(cid, new_val); }
-        self.constant_blade_bonuses = expected;
+        self.mods.constant_blade_bonuses = expected;
     }
 
     pub fn add_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
-        let colors = self.heart_modifiers.entry(card_id).or_insert_with(std::collections::HashMap::new);
-        *colors.entry(color).or_insert(0) += delta;
+        self.mods.add_heart_modifier(card_id, color, delta);
     }
 
     pub fn remove_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
-        if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
-            if let Some(modifier) = colors.get_mut(&color) {
-                *modifier -= delta;
-                if *modifier == 0 {
-                    colors.remove(&color);
-                }
-            }
-            if colors.is_empty() {
-                self.heart_modifiers.remove(&card_id);
-            }
-        }
+        self.mods.remove_heart_modifier(card_id, color, delta);
     }
 
     pub fn get_heart_modifier(&self, card_id: i16, color: crate::card::HeartColor) -> i32 {
-        self.heart_modifiers.get(&card_id)
-            .and_then(|colors| colors.get(&color))
-            .copied()
-            .unwrap_or(0)
+        self.mods.get_heart_modifier(card_id, color)
     }
 
     pub fn set_heart_override(&mut self, card_id: i16, color: crate::card::HeartColor, count: u32, duration: &str) {
-        self.heart_override.insert(card_id, (color, count));
+        self.mods.set_heart_override(card_id, color, count);
         let mut data = serde_json::Map::new();
         data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
         data.insert("color".to_string(), serde_json::Value::String(format!("{:?}", color)));
@@ -114,27 +89,23 @@ impl GameState {
     }
 
     pub fn add_score_modifier(&mut self, card_id: i16, delta: i32) {
-        *self.score_modifiers.entry(card_id).or_insert(0) += delta;
+        self.mods.add_score_modifier(card_id, delta);
     }
 
     pub fn get_score_modifier(&self, card_id: i16) -> i32 {
-        self.score_modifiers.get(card_id).copied().unwrap_or(0)
+        self.mods.get_score_modifier(card_id)
     }
 
     pub fn set_score_modifier(&mut self, card_id: i16, value: i32) {
-        self.score_modifiers.set(card_id, value);
+        self.mods.set_score_modifier(card_id, value);
     }
 
     pub fn add_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
-        let colors = self.need_heart_modifiers.entry(card_id).or_insert_with(std::collections::HashMap::new);
-        *colors.entry(color).or_insert(0) += delta;
+        self.mods.add_need_heart_modifier(card_id, color, delta);
     }
 
     pub fn get_need_heart_modifier(&self, card_id: i16, color: crate::card::HeartColor) -> i32 {
-        self.need_heart_modifiers.get(&card_id)
-            .and_then(|colors| colors.get(&color))
-            .copied()
-            .unwrap_or(0)
+        self.mods.get_need_heart_modifier(card_id, color)
     }
 
     pub fn record_area_placement(&mut self, player_id: &str, area: &str) {
@@ -284,8 +255,6 @@ impl GameState {
         self.deck_refresh_pending = false;
     }
 
-
-
     pub fn set_live_being_performed(&mut self, performed: bool) {
         self.live_being_performed = performed;
     }
@@ -348,11 +317,7 @@ impl GameState {
     }
 
     pub fn has_gained_ability(&self, card_id: i16, ability_type: &str) -> bool {
-        if let Some(abilities) = self.gained_abilities.get(&card_id) {
-            abilities.iter().any(|a| a == ability_type)
-        } else {
-            false
-        }
+        self.gained_abilities.get(&card_id).map_or(false, |a| a.iter().any(|x| x == ability_type))
     }
 
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {
@@ -360,36 +325,30 @@ impl GameState {
     }
 
     pub fn set_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, value: i32) {
-        self.need_heart_modifiers.entry(card_id).or_default().insert(color, value);
+        self.mods.set_need_heart_modifier(card_id, color, value);
     }
 
     pub fn add_orientation_modifier(&mut self, card_id: i16, orientation: &str) {
-        self.orientation_modifiers.set(card_id, orientation.to_string());
+        self.mods.add_orientation_modifier(card_id, orientation);
     }
 
     pub fn add_cost_modifier(&mut self, card_id: i16, delta: i32) {
-        *self.cost_modifiers.entry(card_id).or_insert(0) += delta;
+        self.mods.add_cost_modifier(card_id, delta);
     }
 
     pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
-        self.cost_modifiers.set(card_id, value);
+        self.mods.set_cost_modifier(card_id, value);
     }
 
     pub fn get_cost_modifier(&self, card_id: i16) -> i32 {
-        self.cost_modifiers.get(card_id).copied().unwrap_or(0)
+        self.mods.get_cost_modifier(card_id)
     }
 
     pub fn get_orientation_modifier(&self, card_id: i16) -> Option<&String> {
-        self.orientation_modifiers.get(card_id)
+        self.mods.get_orientation_modifier(card_id)
     }
 
     pub fn clear_modifiers_for_card(&mut self, card_id: i16) {
-        self.blade_modifiers.remove(card_id);
-        self.heart_modifiers.remove(&card_id);
-        self.heart_override.remove(&card_id);
-        self.score_modifiers.remove(card_id);
-        self.need_heart_modifiers.remove(&card_id);
-        self.orientation_modifiers.remove(card_id);
-        self.cost_modifiers.remove(card_id);
+        self.mods.clear_all_for_card(card_id);
     }
 }

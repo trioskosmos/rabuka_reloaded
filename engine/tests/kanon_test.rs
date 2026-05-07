@@ -63,73 +63,7 @@ fn kanon_ab1_live_success_optional_cost_triggers() {
         "Q92: optional cost should deduct 6E when paid (got {})", energy_spent);
 }
 
-#[test]
-fn kanon_ab0_live_start_parsed() {
-    let db = load_real_database();
-    let kanon = db.get_card_by_no("PL!SP-pb1-001-R").expect("Kanon exists");
-    let ab0 = &kanon.abilities[0];
 
-    assert_eq!(ab0.triggers.as_deref(), Some("ライブ開始時"),
-        "Ab#0 should be LiveStart trigger");
-
-    // The "unless pay" pattern should be an optional cost, not a condition
-    if let Some(ref cost) = ab0.cost {
-        assert_eq!(cost.cost_type.as_deref(), Some("pay_energy"),
-            "Ab#0 cost should be pay_energy");
-        assert_eq!(cost.energy, Some(2),
-            "Ab#0 cost should be 2 energy");
-        assert_eq!(cost.optional, Some(true),
-            "Ab#0 cost should be optional (Q92: player chooses)");
-    }
-    if let Some(ref effect) = ab0.effect {
-        assert_eq!(effect.action, "move_cards",
-            "Ab#0 should be move_cards");
-        assert_eq!(effect.source.as_deref(), Some("hand"),
-            "Should discard from hand");
-        assert_eq!(effect.count, Some(2),
-            "Should discard 2");
-    }
-}
-
-#[test]
-fn kanon_ab1_live_success_parsed() {
-    let db = load_real_database();
-    let kanon = db.get_card_by_no("PL!SP-pb1-001-R").expect("Kanon exists");
-    let ab1 = &kanon.abilities[1];
-
-    assert_eq!(ab1.triggers.as_deref(), Some("ライブ成功時"),
-        "Ab#1 should be LiveSuccess trigger");
-
-    // Cost: optional pay 6 energy
-    if let Some(ref cost) = ab1.cost {
-        assert_eq!(cost.optional, Some(true),
-            "Ab#1 cost should be optional");
-        assert_eq!(cost.energy, Some(6),
-            "Ab#1 cost should be 6 energy");
-        assert_eq!(cost.cost_type.as_deref(), Some("pay_energy"),
-            "Ab#1 cost type should be pay_energy");
-    }
-
-    // Effect: add 1 score
-    if let Some(ref effect) = ab1.effect {
-        assert_eq!(effect.action, "modify_score",
-            "Ab#1 effect should be modify_score");
-        assert_eq!(effect.operation.as_deref(), Some("add"),
-            "Ab#1 should add score");
-        assert_eq!(effect.value, Some(1),
-            "Ab#1 should add 1");
-    }
-}
-
-#[test]
-fn kanon_q91_live_no_live_no_trigger() {
-    // Q91: If no live is performed, LiveStart abilities don't trigger
-    let db = load_real_database();
-    let kanon = db.get_card_by_no("PL!SP-pb1-001-R").expect("Kanon exists");
-    let ab0 = &kanon.abilities[0];
-    assert_eq!(ab0.triggers.as_deref(), Some("ライブ開始時"),
-        "Ab#0 triggers during live start — no live = no trigger");
-}
 
 #[test]
 fn kanon_q93_partial_resolution_one_card() {

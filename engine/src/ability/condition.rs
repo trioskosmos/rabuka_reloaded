@@ -2,34 +2,40 @@ use crate::card::Condition;
 use crate::game_state::Phase;
 use super::util;
 use super::util::compare_counts;
+use super::debug::AbDebug;
 
 impl<'a> super::resolver::AbilityResolver<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
-        let result = match condition.condition_type.as_deref() {
-            Some("compound") => self.evaluate_compound_condition(condition),
-            Some("comparison_condition") => self.evaluate_comparison_condition(condition),
-            Some("location_condition") => self.evaluate_location_condition(condition),
-            Some("card_count_condition") => self.evaluate_card_count_condition(condition),
-            Some("group_condition") => self.evaluate_group_condition(condition),
-            Some("position_condition") => self.evaluate_position_condition(condition),
-            Some("appearance_condition") => self.evaluate_appearance_condition(condition),
-            Some("temporal_condition") => self.evaluate_temporal_condition(condition),
-            Some("state_condition") => self.evaluate_state_condition(condition),
-            Some("energy_state_condition") => self.evaluate_energy_state_condition(condition),
-            Some("movement_condition") => self.evaluate_movement_condition(condition),
-            Some("ability_negation_condition") => self.evaluate_ability_negation_condition(condition),
-            Some("or_condition") => self.evaluate_or_condition(condition),
-            Some("any_of_condition") => self.evaluate_any_of_condition(condition),
-            Some("score_threshold_condition") => self.evaluate_score_threshold_condition(condition),
-            Some("choice_condition") => self.evaluate_choice_condition(condition),
-            Some("position_change_condition") => self.evaluate_position_change_condition(condition),
-            Some("state_change_condition") => self.evaluate_state_change_condition(condition),
-            Some("opponent_choice_condition") => self.evaluate_opponent_choice_condition(condition),
-            Some("opponent_live_success") => self.evaluate_opponent_live_success_condition(condition),
-            Some("complex_condition") => self.evaluate_complex_condition(condition),
-            Some("no_excess_heart") => self.evaluate_no_excess_heart_condition(condition),
+        let dbg = AbDebug::new();
+        let ct = condition.condition_type.as_deref().unwrap_or("?");
+        let result = match ct {
+            "compound" => self.evaluate_compound_condition(condition),
+            "comparison_condition" => self.evaluate_comparison_condition(condition),
+            "location_condition" => self.evaluate_location_condition(condition),
+            "card_count_condition" => self.evaluate_card_count_condition(condition),
+            "group_condition" => self.evaluate_group_condition(condition),
+            "position_condition" => self.evaluate_position_condition(condition),
+            "appearance_condition" => self.evaluate_appearance_condition(condition),
+            "temporal_condition" => self.evaluate_temporal_condition(condition),
+            "state_condition" => self.evaluate_state_condition(condition),
+            "energy_state_condition" => self.evaluate_energy_state_condition(condition),
+            "movement_condition" => self.evaluate_movement_condition(condition),
+            "ability_negation_condition" => self.evaluate_ability_negation_condition(condition),
+            "or_condition" => self.evaluate_or_condition(condition),
+            "any_of_condition" => self.evaluate_any_of_condition(condition),
+            "score_threshold_condition" => self.evaluate_score_threshold_condition(condition),
+            "choice_condition" => self.evaluate_choice_condition(condition),
+            "position_change_condition" => self.evaluate_position_change_condition(condition),
+            "state_change_condition" => self.evaluate_state_change_condition(condition),
+            "opponent_choice_condition" => self.evaluate_opponent_choice_condition(condition),
+            "opponent_live_success" => self.evaluate_opponent_live_success_condition(condition),
+            "complex_condition" => self.evaluate_complex_condition(condition),
+            "no_excess_heart" => self.evaluate_no_excess_heart_condition(condition),
             _ => false,
         };
+
+        let final_result = if condition.negation.unwrap_or(false) { !result } else { result };
+        dbg.condition(condition, if result { 1 } else { 0 }, 1, final_result);
 
         // Check ability_negation field on any condition type
         if condition.ability_negation.unwrap_or(false) {
@@ -37,21 +43,28 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             if !negated { return false; }
         }
 
-        if condition.negation.unwrap_or(false) {
-            !result
-        } else {
-            result
-        }
+        final_result
     }
 
     fn evaluate_compound_condition(&self, condition: &Condition) -> bool {
         if let Some(ref conditions) = condition.conditions {
-            match condition.operator.as_deref() {
-                Some("and") => conditions.iter().all(|c| self.evaluate_condition(c)),
-                Some("or") => conditions.iter().any(|c| self.evaluate_condition(c)),
-                _ => true,
+            let dbg = AbDebug::new();
+            dbg.p("COMPOUND", format_args!("{} sub-conditions, operator={}",
+                conditions.len(), condition.operator.as_deref().unwrap_or("and")));
+            let op = condition.operator.as_deref().unwrap_or("and");
+            let mut results = Vec::new();
+            for c in conditions.iter() {
+                results.push(self.evaluate_condition(c));
             }
+            let all_pass = match op {
+                "and" => results.iter().all(|r| *r),
+                "or" => results.iter().any(|r| *r),
+                _ => true,
+            };
+            dbg.p("COMPOUND", format_args!("→ {}/{} passed = {}", results.iter().filter(|r| **r).count(), results.len(), if all_pass { "PASS" } else { "FAIL" }));
+            all_pass
         } else {
+            eprintln!("[COMPOUND] no conditions array!");
             true
         }
     }
@@ -234,7 +247,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         // Handle aggregate="total" for blade sum (not card count)
         if condition.aggregate.as_deref() == Some("total") && location == "stage" {
             let player = self.game_state.resolve_target_player(target);
-            let total = player.stage.total_blades(card_db, &self.game_state.blade_modifiers);
+            let total = player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers);
             eprintln!("[COND_AGG] aggregate=total total_blade={} threshold={}", total, count_threshold);
             return compare_counts(operator, total, count_threshold);
         }
@@ -446,8 +459,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_db = &self.game_state.card_database;
 
         let location = condition.location.as_deref().unwrap_or("");
-        eprintln!("[LOC_COND_ENTER] location={:?} card_type={:?} aggregate={:?} count={:?} operator={:?}",
-            location, card_type, condition.aggregate, condition.count, condition.operator);
         let group_names = condition.group_names.as_ref();
         let group = condition.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str()));
 
@@ -508,12 +519,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             _ if condition.location.as_deref().map_or(false, |l| {
                 let zc = zone_count(l);
-                eprintln!("[CARD_COUNT_COND] zone={} count={} threshold={} op={:?}", l, zc, count, condition.operator);
                 zc > 0 || l == "success_live_zone"
             }) => {
                 let loc = condition.location.as_deref().unwrap_or("");
                 let actual = zone_count(loc) as u32;
-                eprintln!("[CARD_COUNT_COND_RESULT] loc={} actual={} threshold={} op={:?}", loc, actual, count, condition.operator);
                 actual
             }
             _ => {
@@ -521,8 +530,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     "live_card" => player.live_card_zone.len(),
                     "member_card" => {
                         if condition.aggregate.as_deref() == Some("total") {
-                            let total = player.stage.total_blades(card_db, &self.game_state.blade_modifiers) as usize;
-                            eprintln!("[LOC_COND] aggregate=total total_blade={} threshold={}", total, count);
+                            let total = player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers) as usize;
                             total
                         } else {
                             let mut member_count = stage_member_count(player);
@@ -542,7 +550,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 count as u32
             }
         };
-        compare_counts(condition.operator.as_deref(), actual_count, count)
+        let passed = compare_counts(condition.operator.as_deref(), actual_count, count);
+        let dbg = AbDebug::new();
+        dbg.condition(condition, actual_count, count, passed);
+        passed
     }
 
     fn evaluate_appearance_condition(&self, condition: &Condition) -> bool {
@@ -561,7 +572,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         if appearance {
             match location {
-                "stage" => player.stage.stage.iter().any(|&card_id| card_id != -1),
+                "stage" => {
+                    let stage_ids: Vec<i16> = player.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+                    if stage_ids.is_empty() { return false; }
+                    if let Some(ref chars) = condition.characters {
+                        eprintln!("[APPEARANCE] checking characters: {:?} against stage_ids={:?}", chars, stage_ids);
+                        if chars.is_empty() { return !stage_ids.is_empty(); }
+                        let stage_card_names: Vec<String> = stage_ids.iter().filter_map(|&cid| self.game_state.card_database.get_card(cid).map(|c| c.name.clone())).collect();
+                        eprintln!("[APPEARANCE] stage card names: {:?}", stage_card_names);
+                        let result = chars.iter().all(|name| {
+                            stage_card_names.iter().any(|cname| cname.contains(name.as_str()))
+                        });
+                        eprintln!("[APPEARANCE] result={}", result);
+                        result
+                    } else {
+                        eprintln!("[APPEARANCE] no characters filter, stage_ids={:?}", stage_ids);
+                        !stage_ids.is_empty()
+                    }
+                }
                 "hand" => !player.hand.cards.is_empty(),
                 "discard" => !player.waitroom.cards.is_empty(),
                 _ => true,
@@ -852,7 +880,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
     fn zone_len(&self, player: &crate::player::Player, location: &str) -> u32 {
         match location {
-            "stage" => player.stage.total_blades(&self.game_state.card_database, &self.game_state.blade_modifiers),
+            "stage" => player.stage.total_blades(&self.game_state.card_database, &self.game_state.mods.blade_modifiers),
             "hand" => player.hand.len() as u32,
             "deck" => player.main_deck.len() as u32,
             "discard" => player.waitroom.len() as u32,

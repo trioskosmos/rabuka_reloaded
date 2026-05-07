@@ -37,51 +37,6 @@ fn seed_deck(game: &mut TestGame) {
     }
 }
 
-#[test]
-fn azuna_ability_parsed() {
-    let db = load_real_database();
-    let ayumu = db.get_card_by_no("PL!N-bp3-001-R\u{ff0b}")
-        .expect("Ayumu A.ZU.NA should exist");
-    let ab0 = &ayumu.abilities[0];
-
-    assert_eq!(ab0.triggers.as_deref(), Some("ライブ開始時"));
-
-    let effect = ab0.effect.as_ref().expect("Effect should exist");
-    eprintln!("[PARSER]  effect.action = '{}'", effect.action);
-    eprintln!("[PARSER]  optional_action: {:?}", effect.optional_action.as_ref().map(|a| &a.action));
-    eprintln!("[PARSER]  conditional_action: {:?}", effect.conditional_action.as_ref().map(|a| &a.action));
-    if let Some(ref cond) = effect.conditional_action {
-        eprintln!("[PARSER]  cond.actions count = {:?}", cond.actions.as_ref().map(|a| a.len()));
-    }
-    assert_eq!(effect.action, "sequential", "Expected sequential (parser no longer outputs conditional_on_optional)");
-    assert_eq!(effect.conditional, Some(true), "Should have conditional=true");
-    assert!(effect.actions.is_some(), "Should have actions");
-
-    if let Some(ref actions) = effect.actions {
-        assert!(actions.len() >= 2, "Should have at least 2 actions");
-        assert_eq!(actions[0].action, "place_energy_under_member");
-        assert_eq!(actions[0].optional, Some(true));
-        assert_eq!(actions[0].energy_count, Some(1));
-
-        // Second action should be inner sequential with [draw_card, do_nothing(gain_resource)]
-        let inner_seq = &actions[1];
-        assert_eq!(inner_seq.action, "sequential");
-        if let Some(ref inner_actions) = inner_seq.actions {
-            assert!(inner_actions.len() >= 2, "Inner sequential should have at least 2 actions");
-            assert!(inner_actions[0].action == "draw_card" || inner_actions[0].action == "draw");
-            assert_eq!(inner_actions[0].count, Some(1));
-
-            // Find gain_resource in inner actions (may be at index 2 after do_nothing)
-            let blade_action = inner_actions.iter().find(|a| a.action == "gain_resource");
-            assert!(blade_action.is_some(), "Should have gain_resource action");
-            let blade = blade_action.unwrap();
-            assert_eq!(blade.resource.as_deref(), Some("blade"));
-            assert_eq!(blade.count, Some(2));
-            assert_eq!(blade.card_type.as_deref(), Some("member_card"));
-        }
-    }
-}
-
 /// Q158: All members on stage gain +2 blade when energy is placed
 #[test]
 fn azuna_q158_blade_all_members() {

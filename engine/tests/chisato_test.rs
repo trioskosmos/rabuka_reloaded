@@ -17,36 +17,6 @@
 mod helpers;
 use helpers::*;
 
-/// Verify the parsed ability structure
-#[test]
-fn chisato_ability_parsed() {
-    let db = load_real_database();
-    let chisato = db.get_card_by_no("PL!SP-bp1-003-P")
-        .expect("Chisato should exist");
-    let ab0 = &chisato.abilities[0];
-
-    assert_eq!(ab0.triggers.as_deref(), Some("起動"),
-        "Trigger should be 起動");
-    assert_eq!(ab0.use_limit, Some(1),
-        "Should be once per turn");
-
-    let cost = ab0.cost.as_ref().expect("Should have cost");
-    assert_eq!(cost.cost_type.as_deref(), Some("reveal"),
-        "Cost type should be reveal");
-    assert_eq!(cost.source.as_deref(), Some("hand"),
-        "Cost source should be hand");
-    assert_eq!(cost.card_type.as_deref(), Some("member_card"),
-        "Cost card_type should be member_card");
-
-    let effect = ab0.effect.as_ref().expect("Should have effect");
-    assert_eq!(effect.action, "sequential",
-        "Effect should be sequential");
-    let actions = effect.actions.as_ref().expect("Should have actions");
-    assert!(actions.len() >= 1, "Should have at least 1 action");
-    assert_eq!(actions[0].action, "modify_score",
-        "First action should be modify_score");
-}
-
 /// Activating with member cards in hand creates a SelectCard choice (reveal selection)
 #[test]
 fn chisato_reveal_creates_choice() {

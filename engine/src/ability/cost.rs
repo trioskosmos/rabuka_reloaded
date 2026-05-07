@@ -2,6 +2,7 @@ use crate::card::{AbilityCost, AbilityEffect};
 use super::types::Choice;
 use super::resolver::AbilityResolver;
 use super::util;
+use super::debug::AbDebug;
 
 impl<'a> AbilityResolver<'a> {
     pub fn validate_cost(&self, cost: &AbilityCost) -> Result<(), String> {
@@ -42,6 +43,8 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn pay_cost_inner(&mut self, cost: &AbilityCost) -> Result<(), String> {
+        let mut dbg = AbDebug::new();
+        dbg.cost_pay(cost, true);
         match cost.cost_type.as_deref() {
             Some("sequential_cost") => {
                 if let Some(ref costs) = cost.costs {
@@ -340,7 +343,6 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn pay_cost(&mut self, cost: &AbilityCost) -> Result<(), String> {
-        eprintln!("PAY_COST: cost_type={:?}, source={:?}, destination={:?}, card_type={:?}", cost.cost_type, cost.source, cost.destination, cost.card_type);
         self.pay_cost_inner(cost)
     }
 }

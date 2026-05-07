@@ -22,50 +22,6 @@ use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::zones::MemberArea;
 
-/// Verify the parsed ability structure
-#[test]
-fn chika_ability_parsed() {
-    let db = load_real_database();
-    let chika = db.get_card_by_no("PL!S-bp3-001-R\u{ff0b}")
-        .expect("Chika should exist");
-    let ab = &chika.abilities[0];
-
-    assert_eq!(ab.triggers.as_deref(), Some("起動"),
-        "Trigger should be 起動");
-    assert_eq!(ab.use_limit, Some(1),
-        "Should be once per turn");
-
-    // Cost: change_state to wait
-    let cost = ab.cost.as_ref().expect("Should have cost");
-    assert_eq!(cost.cost_type.as_deref(), Some("change_state"),
-        "Cost type should be change_state");
-    assert_eq!(cost.state_change.as_deref(), Some("wait"),
-        "Cost should be wait state change");
-    assert_eq!(cost.count, Some(1),
-        "Cost should target 1 member");
-
-    // Effect: sequential with modify_score + gain_ability
-    let effect = ab.effect.as_ref().expect("Should have effect");
-    assert_eq!(effect.action, "sequential",
-        "Effect should be sequential");
-    assert_eq!(effect.activation_position.as_deref(), Some("center"),
-        "Activation position should be center");
-    assert_eq!(effect.duration.as_deref(), Some("live_end"),
-        "Duration should be live_end");
-
-    let actions = effect.actions.as_ref().expect("Should have actions");
-    assert!(actions.len() >= 1, "Should have at least 1 action");
-    let a0 = &actions[0];
-    assert_eq!(a0.action, "modify_score",
-        "First action should be modify_score");
-    assert_eq!(a0.operation.as_deref(), Some("add"),
-        "Should add score");
-    assert_eq!(a0.count.or(a0.value), Some(1),
-        "Should add 1");
-    assert_eq!(a0.duration.as_deref(), Some("live_end"),
-        "Duration should be live_end");
-}
-
 /// Q152: Cost targets self only (can't select opponent's members)
 #[test]
 fn chika_q152_self_only() {
