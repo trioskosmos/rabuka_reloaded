@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-07T23:56:08.173903",
+  "generated_at": "2026-05-06T23:47:33.342779",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -397,7 +397,7 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。",
+        "text": "自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く",
         "action": "look_and_select",
         "look_action": {
           "text": "自分のデッキの上からカードを2枚見る。",
@@ -419,7 +419,7 @@
               "source": "looked_at"
             },
             {
-              "text": "残りを控え室に置く。",
+              "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
               "card_type": "card",
@@ -431,11 +431,8 @@
               }
             }
           ],
-          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。"
-        },
-        "parenthetical": [
-          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
-        ]
+          "text": "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
+        }
       }
     },
     {
@@ -462,17 +459,14 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "相手のステージにいるコスト4以下のメンバー1人をウェイトにする。",
+        "text": "相手のステージにいるコスト4以下のメンバー1人をウェイトにする",
         "cost_limit": 4,
         "cost_limit_operator": "<=",
         "state_change": "wait",
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
-        "action": "change_state",
-        "parenthetical": [
-          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
-        ]
+        "action": "change_state"
       }
     },
     {
@@ -748,7 +742,7 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。",
+        "text": "相手のステージにいるコスト4以下のメンバーを2人までウェイトにする",
         "cost_limit": 4,
         "cost_limit_operator": "<=",
         "state_change": "wait",
@@ -756,10 +750,7 @@
         "card_type": "member_card",
         "target": "opponent",
         "max": true,
-        "action": "change_state",
-        "parenthetical": [
-          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
-        ]
+        "action": "change_state"
       }
     },
     {
@@ -1554,7 +1545,6 @@
           "action": "invalidate_ability",
           "all": true
         },
-        "result_condition": null,
         "followup_action": {
           "text": "自分の控え室から『Liella!』のカードを1枚手札に加える",
           "source": "discard",
@@ -1630,16 +1620,13 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "これにより控え室に置いたメンバーカードの{{toujyou.png|登場}}能力1つを発動させる。",
+        "text": "これにより控え室に置いたメンバーカードの{{toujyou.png|登場}}能力1つを発動させる",
         "action": "activate_ability",
         "source_card": "cost_card",
         "target": "これにより控え室に置いたメンバーカードの{{toujyou.png|登場}}能力",
         "target_trigger": "登場",
         "ability_text": "登場_ability",
-        "count": 1,
-        "parenthetical": [
-          "{{toujyou.png|登場}}能力がコストを持つ場合、支払って発動させる。"
-        ]
+        "count": 1
       }
     },
     {
@@ -1691,7 +1678,6 @@
             "card_type": "live_card",
             "target": "opponent",
             "action": "move_cards",
-            "destination": null,
             "all": true
           },
           {
@@ -1937,7 +1923,6 @@
         "text": "これにより控え室に置いたカードがメンバーカードの場合、控え室に置いたカードと同じ名前を持つメンバー1人は、ライブ終了時まで、{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る",
         "action": "conditional_on_result",
         "primary_effect": {
-          "text": "",
           "action": "do_nothing"
         },
         "result_condition": {
@@ -2113,7 +2098,8 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart03"
       }
     },
     {
@@ -2209,7 +2195,7 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。",
+        "text": "これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
         "action": "sequential",
         "actions": [
           {
@@ -2225,16 +2211,6 @@
             "action": "gain_ability"
           }
         ],
-        "parenthetical": [
-          "この能力はセンターエリアに登場している場合のみ起動できる。"
-        ],
-        "activation_condition_parsed": {
-          "type": "appearance_condition",
-          "appearance": true,
-          "text": "この能力はセンターエリアに登場している場合のみ起動できる。",
-          "location": "stage"
-        },
-        "activation_position": "center",
         "duration": "live_end"
       }
     },
@@ -2334,7 +2310,7 @@
         ]
       },
       "effect": {
-        "text": "このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。",
+        "text": "このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる",
         "action": "sequential",
         "actions": [
           {
@@ -2364,16 +2340,6 @@
           }
         ],
         "conditional": true,
-        "parenthetical": [
-          "この能力はセンターエリアに登場している場合のみ起動できる。"
-        ],
-        "activation_condition_parsed": {
-          "type": "appearance_condition",
-          "appearance": true,
-          "text": "この能力はセンターエリアに登場している場合のみ起動できる。",
-          "location": "stage"
-        },
-        "activation_position": "center",
         "exclude_self": true
       }
     },
@@ -2392,7 +2358,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+        "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを1枚引き、ライブ終了時まで、自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "action": "sequential",
         "actions": [
           {
@@ -2417,7 +2383,6 @@
                 "destination": "hand"
               },
               {
-                "text": "",
                 "duration": "live_end",
                 "action": "do_nothing"
               },
@@ -2432,10 +2397,7 @@
             ]
           }
         ],
-        "conditional": true,
-        "parenthetical": [
-          "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
-        ]
+        "conditional": true
       }
     },
     {
@@ -2583,7 +2545,8 @@
             "multiple_targets": true,
             "action": "gain_resource",
             "resource": "heart",
-            "count": 1
+            "count": 1,
+            "heart_color": "heart04"
           }
         ],
         "conditional": true,
@@ -2609,7 +2572,9 @@
         "type": "move_cards",
         "source": "discard",
         "optional": true,
-        "count": 2
+        "count": 2,
+        "card_type": "member_card",
+        "placement_order": "any_order"
       },
       "effect": {
         "text": "カードを1枚引く。合計が8の場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
@@ -2669,7 +2634,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart06"
       }
     },
     {
@@ -2750,11 +2716,7 @@
           "type": "group_condition"
         },
         "action": "position_change",
-        "target": null,
-        "exclude_position": "center",
-        "parenthetical": [
-          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ]
+        "exclude_position": "center"
       }
     },
     {
@@ -2893,7 +2855,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart02"
       }
     },
     {
@@ -3015,6 +2978,7 @@
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
+            "heart_color": "heart04",
             "duration": "live_end"
           }
         ]
@@ -3333,14 +3297,10 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "このメンバーをポジションチェンジしてもよい。",
+        "text": "このメンバーをポジションチェンジしてもよい",
         "card_type": "member_card",
         "optional": true,
-        "action": "position_change",
-        "target": null,
-        "parenthetical": [
-          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ]
+        "action": "position_change"
       }
     },
     {
@@ -3482,7 +3442,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart03"
       }
     },
     {
@@ -3595,33 +3556,17 @@
         "energy": 4
       },
       "effect": {
-        "text": "相手のステージにいるコスト10以下のメンバー1人をウェイトにする。この能力を起動するためのコストは自分のステージにいるメンバーの中のグループ名1種類につき、{{icon_energy.png|E}}減る",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "相手のステージにいるコスト10以下のメンバー1人をウェイトにする",
-            "cost_limit": 10,
-            "cost_limit_operator": "<=",
-            "state_change": "wait",
-            "count": 1,
-            "card_type": "member_card",
-            "target": "opponent",
-            "action": "change_state"
-          },
-          {
-            "text": "{{icon_energy.png|E}}減る",
-            "per_unit": true,
-            "per_unit_count": 1,
-            "per_unit_type": "group_name",
-            "action": "modify_cost",
-            "count": 1,
-            "dynamic_count": {
-              "type": "per_unit",
-              "reference": "unit_count"
-            },
-            "operation": "subtract"
-          }
-        ]
+        "text": "{{icon_energy.png|E}}減る",
+        "per_unit": true,
+        "per_unit_count": 1,
+        "per_unit_type": "group_name",
+        "action": "modify_cost",
+        "count": 1,
+        "dynamic_count": {
+          "type": "per_unit",
+          "reference": "unit_count"
+        },
+        "operation": "subtract"
       }
     },
     {
@@ -3816,6 +3761,7 @@
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
+            "heart_color": "heart01",
             "duration": "live_end"
           },
           {
@@ -3920,6 +3866,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
+        "heart_color": "heart02",
         "duration": "live_end"
       }
     },
@@ -3998,7 +3945,6 @@
             "destination": "hand"
           },
           {
-            "text": "",
             "duration": "live_end",
             "action": "do_nothing"
           },
@@ -4006,7 +3952,8 @@
             "text": "{{heart_01.png|heart01}}を得る",
             "action": "gain_resource",
             "resource": "heart",
-            "count": 1
+            "count": 1,
+            "heart_color": "heart01"
           }
         ]
       }
@@ -4181,7 +4128,6 @@
             "text": "これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、このメンバーをアクティブにする",
             "action": "conditional_on_result",
             "primary_effect": {
-              "text": "",
               "action": "do_nothing"
             },
             "result_condition": {
@@ -4305,7 +4251,6 @@
             "destination": "hand"
           },
           {
-            "text": "",
             "duration": "live_end",
             "action": "do_nothing"
           },
@@ -4313,7 +4258,8 @@
             "text": "{{heart_02.png|heart02}}を得る",
             "action": "gain_resource",
             "resource": "heart",
-            "count": 1
+            "count": 1,
+            "heart_color": "heart02"
           }
         ]
       }
@@ -4575,8 +4521,7 @@
         },
         "count": 1,
         "optional": true,
-        "action": "position_change",
-        "target": null
+        "action": "position_change"
       }
     },
     {
@@ -4607,6 +4552,7 @@
         "card_type": "member_card",
         "action": "gain_resource",
         "resource": "heart",
+        "heart_color": "heart01",
         "group_reference": "same_group_name"
       }
     },
@@ -4635,8 +4581,7 @@
           "Aqours",
           "SaintSnow"
         ],
-        "action": "position_change",
-        "target": null
+        "action": "position_change"
       }
     },
     {
@@ -4967,7 +4912,6 @@
             "text": "これによりライブカードを控え室に置いた場合、カードを1枚引く",
             "action": "conditional_on_result",
             "primary_effect": {
-              "text": "",
               "action": "do_nothing"
             },
             "result_condition": {
@@ -5424,7 +5368,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart03"
       }
     },
     {
@@ -5504,7 +5449,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "以下から1つを選ぶ。\n・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。\n・自分のステージにいる『SaintSnow』のメンバー1人をポジションチェンジさせる。",
+        "text": "以下から1つを選ぶ。\n・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。\n・自分のステージにいる『SaintSnow』のメンバー1人をポジションチェンジさせる",
         "action": "sequential",
         "actions": [
           {
@@ -5535,9 +5480,6 @@
             ],
             "action": "position_change"
           }
-        ],
-        "parenthetical": [
-          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
         ],
         "exclude_self": true
       }
@@ -5897,16 +5839,13 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がちょうど4つのメンバー1人をウェイトにする。",
+        "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数がちょうど4つのメンバー1人をウェイトにする",
         "state_change": "wait",
         "count": 1,
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "original_value": true,
-        "parenthetical": [
-          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
-        ]
+        "original_value": true
       }
     },
     {
@@ -6112,8 +6051,7 @@
               "type": "comparison_condition"
             },
             "effect_constraint": "minimum_value:0",
-            "action": "modify_score",
-            "operation": null
+            "action": "modify_score"
           }
         ]
       }
@@ -6225,13 +6163,9 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "このメンバーはポジションチェンジする。",
+        "text": "このメンバーはポジションチェンジする",
         "card_type": "member_card",
-        "action": "position_change",
-        "target": null,
-        "parenthetical": [
-          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ]
+        "action": "position_change"
       }
     },
     {
@@ -6420,7 +6354,6 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "",
                 "action": "do_nothing"
               },
               {
@@ -6437,7 +6370,6 @@
             "text": "これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする",
             "action": "conditional_on_result",
             "primary_effect": {
-              "text": "",
               "action": "do_nothing"
             },
             "result_condition": {
@@ -6477,14 +6409,11 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分と相手は、自身のステージのセンターにいるメンバーをポジションチェンジする。",
+        "text": "自分と相手は、自身のステージのセンターにいるメンバーをポジションチェンジする",
         "card_type": "member_card",
         "target": "both",
         "action": "position_change",
-        "source_position": "center",
-        "parenthetical": [
-          "センターにいるメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはセンターエリアに移動させる。"
-        ]
+        "source_position": "center"
       }
     },
     {
@@ -6504,7 +6433,8 @@
         "text": "{{heart_02.png|heart02}}{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3
+        "count": 3,
+        "heart_color": "heart02"
       }
     },
     {
@@ -6525,7 +6455,8 @@
         "position": "center",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3
+        "count": 3,
+        "heart_color": "heart03"
       }
     },
     {
@@ -6545,7 +6476,8 @@
         "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{heart_05.png|heart05}}を得る",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 3
+        "count": 3,
+        "heart_color": "heart05"
       }
     },
     {
@@ -6628,7 +6560,8 @@
           "duration": "live_end",
           "action": "gain_resource",
           "resource": "heart",
-          "count": 1
+          "count": 1,
+          "heart_color": "heart05"
         },
         "original_value": true
       }
@@ -6658,7 +6591,8 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart01"
       }
     },
     {
@@ -7111,6 +7045,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
+        "heart_color": "heart01",
         "duration": "live_end"
       }
     },
@@ -7224,6 +7159,9 @@
             "text": "{{heart_04.png|heart04}}を得る",
             "condition": {
               "text": "それらがすべて{{heart_04.png|heart04}}を持つメンバーカードの場合",
+              "heart_colors": [
+                "heart04"
+              ],
               "card_type": "member_card",
               "count": 1,
               "operator": ">=",
@@ -7232,6 +7170,7 @@
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
+            "heart_color": "heart04",
             "duration": "live_end"
           }
         ]
@@ -7294,6 +7233,9 @@
             "text": "{{heart_01.png|heart01}}を得る",
             "condition": {
               "text": "それらがすべて{{heart_01.png|heart01}}を持つメンバーカードの場合",
+              "heart_colors": [
+                "heart01"
+              ],
               "card_type": "member_card",
               "count": 1,
               "operator": ">=",
@@ -7302,6 +7244,7 @@
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
+            "heart_color": "heart01",
             "duration": "live_end"
           }
         ]
@@ -8278,7 +8221,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+        "text": "このメンバーが登場か、エリアを移動するたび、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "blade",
@@ -8300,10 +8243,7 @@
             }
           ],
           "text": "このメンバーが登場か、エリアを移動する"
-        },
-        "parenthetical": [
-          "対戦相手のカードの効果でも発動する。"
-        ]
+        }
       }
     },
     {
@@ -8775,7 +8715,8 @@
         },
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart03"
       }
     },
     {
@@ -9238,6 +9179,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 2,
+        "heart_color": "heart01",
         "duration": "live_end"
       }
     },
@@ -9738,13 +9680,24 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "カードを1枚引き、手札を1枚控え室に置く。",
-        "source": "deck",
-        "destination": "hand",
-        "count": 1,
-        "action": "draw_card",
-        "parenthetical": [
-          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
+        "text": "カードを1枚引き、手札を1枚控え室に置く",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを1枚引き",
+            "count": 1,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
+          },
+          {
+            "text": "手札を1枚控え室に置く",
+            "source": "hand",
+            "destination": "discard",
+            "count": 1,
+            "action": "move_cards",
+            "card_type": "card"
+          }
         ]
       }
     },
@@ -9815,7 +9768,7 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "自分の控え室から『μ's』のメンバーカードを1枚手札に加える。",
+        "text": "自分の控え室から『μ's』のメンバーカードを1枚手札に加える",
         "source": "discard",
         "destination": "hand",
         "count": 1,
@@ -9824,10 +9777,7 @@
         "group_names": [
           "μ's"
         ],
-        "action": "move_cards",
-        "parenthetical": [
-          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -10297,7 +10247,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分の控え室にあるコスト4以下の『虹ヶ咲』のメンバーカードを1枚選ぶ。そのカードの{{toujyou.png|登場}}能力1つを発動させる。",
+        "text": "自分の控え室にあるコスト4以下の『虹ヶ咲』のメンバーカードを1枚選ぶ。そのカードの{{toujyou.png|登場}}能力1つを発動させる",
         "action": "sequential",
         "actions": [
           {
@@ -10321,9 +10271,6 @@
             "ability_text": "登場_ability",
             "count": 1
           }
-        ],
-        "parenthetical": [
-          "{{toujyou.png|登場}}能力がコストを持つ場合、支払って発動させる。"
         ]
       }
     },
@@ -10384,14 +10331,11 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "このメンバーをウェイトにする。",
+        "text": "このメンバーをウェイトにする",
         "state_change": "wait",
         "card_type": "member_card",
         "action": "change_state",
-        "count": 1,
-        "parenthetical": [
-          "ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。"
-        ]
+        "count": 1
       }
     },
     {
@@ -10425,7 +10369,7 @@
         ]
       },
       "effect": {
-        "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く。",
+        "text": "自分の手札からコスト13以下の「優木せつ菜」のメンバーカードを1枚、このメンバーがいたエリアに登場させる。その後、自分のエネルギー置き場にあるエネルギー1枚をそのメンバーの下に置く",
         "action": "sequential",
         "actions": [
           {
@@ -10452,9 +10396,6 @@
             "action": "place_energy_under_member",
             "energy_count": 1
           }
-        ],
-        "parenthetical": [
-          "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
         ]
       }
     },
@@ -10720,7 +10661,6 @@
               "member_card"
             ],
             "count": 1,
-            "all": false,
             "cost_limit": 10,
             "cost_limit_operator": ">=",
             "exclude_self": true
@@ -10730,7 +10670,6 @@
             "source": "deck_top",
             "count": 1,
             "multiple_targets": true,
-            "all": false,
             "exclude_self": true
           },
           {
@@ -10738,7 +10677,6 @@
             "source": "looked_at",
             "destination": "hand",
             "count": 1,
-            "all": false,
             "exclude_self": true
           },
           {
@@ -10809,6 +10747,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart06",
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
@@ -10864,7 +10803,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。2枚以上ある場合、代わりに「{{jyouji.png|常時}}ライブの合計スコアを+2する。」を得る。",
+        "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。2枚以上ある場合、代わりに「{{jyouji.png|常時}}ライブの合計スコアを+2する。」を得る",
         "action": "conditional_alternative",
         "primary_effect": {
           "text": "自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ's』のカードが1枚ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。2枚以上ある場合、",
@@ -10876,25 +10815,14 @@
           "group_names": [
             "μ's"
           ],
-          "action": "move_cards",
-          "destination": null
+          "action": "move_cards"
         },
         "alternative_effect": {
-          "text": "「{{jyouji.png|常時}}ライブの合計スコアを+2する。」を得る。",
+          "text": "「{{jyouji.png|常時}}ライブの合計スコアを+2する。」を得る",
           "action": "modify_score",
           "operation": "add",
           "value": 2
         },
-        "parenthetical": [
-          "この能力はセンターエリアに登場した場合のみ発動する。"
-        ],
-        "activation_condition_parsed": {
-          "type": "appearance_condition",
-          "appearance": true,
-          "text": "この能力はセンターエリアに登場した場合のみ発動する。",
-          "location": "stage"
-        },
-        "activation_position": "center",
         "position": "center"
       }
     },
@@ -10992,41 +10920,20 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "自分のステージにほかの『lilywhite』のメンバーがいる場合、自分の控え室から『μ's』のライブカードを1枚手札に加える。この能力を起動するためのコストは、自分の成功ライブカード置き場にあるカード1枚につき、控え室に置く手札の数が1枚減る",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "自分のステージにほかの『lilywhite』のメンバーがいる場合、自分の控え室から『μ's』のライブカードを1枚手札に加える",
-            "source": "discard",
-            "destination": "hand",
-            "count": 1,
-            "card_type": "member_card",
-            "target": "self",
-            "group_names": [
-              "lilywhite",
-              "μ's"
-            ],
-            "action": "move_cards",
-            "exclude_self": true
-          },
-          {
-            "text": "控え室に置く手札の数が1枚減る",
-            "per_unit": true,
-            "per_unit_count": 1,
-            "per_unit_type": "live_card_zone",
-            "source": "hand",
-            "destination": "discard",
-            "count": 1,
-            "action": "modify_cost",
-            "card_type": "card",
-            "dynamic_count": {
-              "type": "per_unit",
-              "reference": "unit_count"
-            },
-            "operation": "subtract"
-          }
-        ],
-        "exclude_self": true
+        "text": "控え室に置く手札の数が1枚減る",
+        "per_unit": true,
+        "per_unit_count": 1,
+        "per_unit_type": "live_card_zone",
+        "source": "hand",
+        "destination": "discard",
+        "count": 1,
+        "action": "modify_cost",
+        "card_type": "card",
+        "dynamic_count": {
+          "type": "per_unit",
+          "reference": "unit_count"
+        },
+        "operation": "subtract"
       }
     },
     {
@@ -11295,23 +11202,11 @@
         "type": "change_state"
       },
       "effect": {
-        "text": "相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。",
-        "action_by": "opponent",
-        "opponent_action": {
-          "text": "自身のステージにいるアクティブ状態のメンバー1人をウェイトにする",
-          "state_change": "wait",
-          "count": 1,
-          "card_type": "member_card",
-          "action": "change_state"
-        },
-        "parenthetical": [
-          "この能力はセンターエリアにいる場合のみ発動する。"
-        ],
-        "activation_condition_parsed": {
-          "type": "position_condition",
-          "text": "この能力はセンターエリアにいる場合のみ発動する。"
-        },
-        "activation_position": "center"
+        "text": "相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "member_card",
+        "action": "change_state"
       }
     },
     {
@@ -11471,7 +11366,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。",
+        "text": "自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる",
         "source": "discard",
         "destination": "stage",
         "cost_limit": 2,
@@ -11481,10 +11376,7 @@
         "card_type": "member_card",
         "target": "both",
         "multiple_targets": true,
-        "action": "move_cards",
-        "parenthetical": [
-          "この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -11573,8 +11465,7 @@
           "count": 5,
           "card_type": "live_card",
           "target": "self",
-          "action": "move_cards",
-          "destination": null
+          "action": "move_cards"
         },
         "select_action": {
           "action": "sequential",
@@ -11814,7 +11705,6 @@
         "actions": [
           {
             "text": "自分は、そのプレイヤーのデッキの一番上のカードを見る",
-            "source": null,
             "count": 1,
             "action": "look_at"
           },
@@ -12152,21 +12042,25 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "カードを2枚引き、手札を2枚控え室に置く。",
-        "source": "deck",
-        "destination": "hand",
-        "count": 2,
-        "action": "draw_card",
-        "parenthetical": [
-          "この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。"
-        ],
-        "activation_condition_parsed": {
-          "type": "appearance_condition",
-          "appearance": true,
-          "text": "この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。",
-          "location": "stage"
-        },
-        "activation_position": "left_side"
+        "text": "カードを2枚引き、手札を2枚控え室に置く",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを2枚引き",
+            "count": 2,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand"
+          },
+          {
+            "text": "手札を2枚控え室に置く",
+            "source": "hand",
+            "destination": "discard",
+            "count": 2,
+            "action": "move_cards",
+            "card_type": "card"
+          }
+        ]
       }
     },
     {
@@ -12434,7 +12328,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "ライブの合計スコアを+1する。",
+        "text": "ライブの合計スコアを+1する",
         "condition": {
           "type": "card_count_condition",
           "count": 2,
@@ -12445,10 +12339,7 @@
         "duration": "as_long_as",
         "action": "modify_score",
         "operation": "add",
-        "value": 1,
-        "parenthetical": [
-          "メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻す。"
-        ]
+        "value": 1
       }
     },
     {
@@ -12568,8 +12459,7 @@
               {
                 "text": "このメンバーはポジションチェンジする",
                 "card_type": "member_card",
-                "action": "position_change",
-                "target": null
+                "action": "position_change"
               }
             ]
           },
@@ -12743,7 +12633,6 @@
             "destination": "hand"
           },
           {
-            "text": "",
             "duration": "live_end",
             "action": "do_nothing"
           },
@@ -12751,7 +12640,8 @@
             "text": "{{heart_03.png|heart03}}{{heart_05.png|heart05}}{{heart_06.png|heart06}}を得る",
             "action": "gain_resource",
             "resource": "heart",
-            "count": 3
+            "count": 3,
+            "heart_color": "heart03"
           }
         ]
       }
@@ -12842,7 +12732,7 @@
         "type": "place_energy_under_member"
       },
       "effect": {
-        "text": "自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える。",
+        "text": "自分の控え室から『虹ヶ咲』のライブカードを1枚手札に加える",
         "source": "discard",
         "destination": "hand",
         "count": 1,
@@ -12851,10 +12741,7 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards",
-        "parenthetical": [
-          "メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに戻す。"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -13543,6 +13430,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart05",
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
@@ -13723,7 +13611,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart05"
       }
     },
     {
@@ -13950,6 +13839,7 @@
         "action": "gain_resource",
         "max": true,
         "resource": "heart",
+        "heart_color": "heart05",
         "self_target": true,
         "per_unit": true,
         "per_unit_count": 1,
@@ -14094,7 +13984,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "数1つを選ぶ。自分のデッキの一番上のカードを公開する。公開したカードがメンバーカードで、かつコストが選んだ数以上の場合、公開したカードを手札に加える。選んだ数以下の場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+        "text": "数1つを選ぶ。自分のデッキの一番上のカードを公開する。公開したカードがメンバーカードで、かつコストが選んだ数以上の場合、公開したカードを手札に加える。選んだ数以下の場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "action": "sequential",
         "actions": [
           {
@@ -14124,9 +14014,6 @@
             "count": 2,
             "duration": "live_end"
           }
-        ],
-        "parenthetical": [
-          "公開したカードがメンバーカード以外の場合、何も起こらない。"
         ]
       }
     },
@@ -14143,7 +14030,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにいるほかの『みらくらぱーく！』のメンバーがいるエリアにポジションチェンジしてもよい。そうした場合、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
+        "text": "自分のステージにいるほかの『みらくらぱーく！』のメンバーがいるエリアにポジションチェンジしてもよい。そうした場合、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
         "action": "sequential",
         "actions": [
           {
@@ -14166,9 +14053,6 @@
           }
         ],
         "conditional": true,
-        "parenthetical": [
-          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ],
         "exclude_self": true
       }
     },
@@ -14261,7 +14145,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart06"
       }
     },
     {
@@ -14594,7 +14479,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart01"
       }
     },
     {
@@ -14644,7 +14530,6 @@
         "action": "sequential",
         "actions": [
           {
-            "text": "",
             "duration": "live_end",
             "action": "do_nothing",
             "exclude_self": true
@@ -14653,7 +14538,8 @@
             "text": "{{heart_06.png|heart06}}を得る",
             "action": "gain_resource",
             "resource": "heart",
-            "count": 1
+            "count": 1,
+            "heart_color": "heart06"
           }
         ],
         "exclude_self": true
@@ -15279,7 +15165,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart02"
       }
     },
     {
@@ -15294,7 +15181,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "直前のターンに相手がライブをし、それが成功していない場合、相手にエマパンチ打つ？と聞いてもよい。\n回答がお願いしますの場合、自分は相手にエマパンチする。ライブ終了時まで、相手のステージにいるすべてのメンバーは、{{icon_blade.png|ブレード}}を得る。\n回答がそれ以外の場合、何もしない。",
+        "text": "直前のターンに相手がライブをし、それが成功していない場合、相手にエマパンチ打つ？と聞いてもよい。\n回答がお願いしますの場合、自分は相手にエマパンチする。ライブ終了時まで、相手のステージにいるすべてのメンバーは、{{icon_blade.png|ブレード}}を得る。\n回答がそれ以外の場合、何もしない",
         "action": "choice",
         "choice_type": "answer_based",
         "question": "直前のターンに相手がライブをし、それが成功していない場合、相手にエマパンチ打つ？と聞いてもよい",
@@ -15320,9 +15207,6 @@
           }
         ],
         "choice_maker": "opponent",
-        "parenthetical": [
-          "相手を傷つけないよう、やさしく、愛をこめて魔法のパンチをすること。"
-        ],
         "all": true
       }
     },
@@ -15427,7 +15311,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart02"
       }
     },
     {
@@ -15520,7 +15405,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart02"
       }
     },
     {
@@ -15623,7 +15509,8 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart01"
       }
     },
     {
@@ -15729,7 +15616,7 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "「{{jyouji.png|常時}}ライブの合計スコアを+3する。」を得る。",
+        "text": "「{{jyouji.png|常時}}ライブの合計スコアを+3する。」を得る",
         "action": "sequential",
         "actions": [
           {
@@ -15743,9 +15630,6 @@
             "text": "」を得る",
             "action": "gain_ability"
           }
-        ],
-        "parenthetical": [
-          "手札のこのカードもこの効果で控え室に置ける。"
         ],
         "duration": "live_end"
       }
@@ -15779,10 +15663,7 @@
         ],
         "action": "move_cards",
         "source": "discard",
-        "card_type": "card",
-        "parenthetical": [
-          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
-        ]
+        "card_type": "card"
       }
     },
     {
@@ -15797,7 +15678,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを+1する。",
+        "text": "自分のステージにいる『虹ヶ咲』のメンバーが持つ{{heart_01.png|heart01}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_06.png|heart06}}のうち1色につき、このカードのスコアを+1する",
         "action": "modify_score",
         "operation": "add",
         "value": 1,
@@ -15809,9 +15690,6 @@
         ],
         "location": "stage",
         "target": "self",
-        "parenthetical": [
-          "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ],
         "per_unit_count": 1
       }
     },
@@ -15846,10 +15724,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "parenthetical": [
-          "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ]
+        "self_target": true
       }
     },
     {
@@ -15876,10 +15751,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 2,
-        "self_target": true,
-        "parenthetical": [
-          "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ]
+        "self_target": true
       }
     },
     {
@@ -15909,10 +15781,7 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "move_cards",
-        "parenthetical": [
-          "エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -16014,10 +15883,7 @@
         "count": 1,
         "action": "draw_card",
         "source": "deck",
-        "destination": "hand",
-        "parenthetical": [
-          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
-        ]
+        "destination": "hand"
       }
     },
     {
@@ -16067,10 +15933,7 @@
           "heart06"
         ],
         "count": 6,
-        "self_target": true,
-        "parenthetical": [
-          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
-        ]
+        "self_target": true
       }
     },
     {
@@ -16096,10 +15959,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "parenthetical": [
-          "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ]
+        "self_target": true
       }
     },
     {
@@ -16114,7 +15974,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。",
+        "text": "エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える",
         "destination": "hand",
         "count": 1,
         "card_type": "live_card",
@@ -16123,10 +15983,7 @@
           "蓮ノ空"
         ],
         "action": "move_cards",
-        "source": "discard",
-        "parenthetical": [
-          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
-        ]
+        "source": "discard"
       }
     },
     {
@@ -16157,10 +16014,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "parenthetical": [
-          "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ]
+        "self_target": true
       }
     },
     {
@@ -16210,10 +16064,7 @@
         "count": 1,
         "card_type": "energy_card",
         "target": "self",
-        "action": "move_cards",
-        "parenthetical": [
-          "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -16388,7 +16239,8 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart04"
       }
     },
     {
@@ -16417,10 +16269,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "parenthetical": [
-          "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ]
+        "self_target": true
       }
     },
     {
@@ -16458,7 +16307,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "手札からコスト4以下の『Liella!』のメンバーカードを1枚ステージに登場させてもよい。",
+        "text": "手札からコスト4以下の『Liella!』のメンバーカードを1枚ステージに登場させてもよい",
         "source": "hand",
         "cost_limit": 4,
         "cost_limit_operator": "<=",
@@ -16468,10 +16317,7 @@
           "Liella!"
         ],
         "optional": true,
-        "action": "appear",
-        "parenthetical": [
-          "この効果で既にメンバーがいるエリアにも登場できる。ただし、このターンにステージに登場したメンバーがいるエリアには登場できない。"
-        ]
+        "action": "appear"
       }
     },
     {
@@ -16663,10 +16509,7 @@
         "action": "modify_score",
         "operation": "add",
         "value": 1,
-        "self_target": true,
-        "parenthetical": [
-          "エールをすべて行った後、エールで出た{{icon_draw.png|ドロー}}1つにつき、カードを1枚引く。"
-        ]
+        "self_target": true
       }
     },
     {
@@ -16885,7 +16728,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "このメンバーがエリアを移動するたび、カードを1枚引く。",
+        "text": "このメンバーがエリアを移動するたび、カードを1枚引く",
         "count": 1,
         "action": "draw_card",
         "source": "deck",
@@ -16895,10 +16738,7 @@
           "type": "movement_condition",
           "text": "このメンバーがエリアを移動する",
           "movement": "moves"
-        },
-        "parenthetical": [
-          "対戦相手のカードの効果でも発動する。"
-        ]
+        }
       }
     },
     {
@@ -17168,6 +17008,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart06",
         "duration": "live_end"
       }
     },
@@ -17195,6 +17036,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart02",
         "duration": "live_end"
       }
     },
@@ -17222,6 +17064,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart03",
         "duration": "live_end"
       }
     },
@@ -17546,8 +17389,7 @@
             "text": "次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る",
             "count": 1,
             "card_type": "live_card",
-            "action": "move_cards",
-            "destination": null
+            "action": "move_cards"
           }
         ]
       }
@@ -17779,16 +17621,13 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "これによって控え室に置いた枚数1枚につき、{{icon_blade.png|ブレード}}を得る。",
+        "text": "これによって控え室に置いた枚数1枚につき、{{icon_blade.png|ブレード}}を得る",
         "action": "gain_resource",
         "resource": "blade",
         "count": 1,
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "discard",
-        "parenthetical": [
-          "手札のこのカードもこの効果で控え室に置ける。"
-        ],
         "duration": "live_end"
       }
     },
@@ -17992,6 +17831,9 @@
           "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合",
           "target": "self",
           "location": "stage",
+          "heart_colors": [
+            "heart02"
+          ],
           "card_type": "member_card",
           "count": 6,
           "operator": ">=",
@@ -18037,6 +17879,9 @@
           "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_04.png|heart04}}が合計10個以上ある場合",
           "target": "self",
           "location": "stage",
+          "heart_colors": [
+            "heart04"
+          ],
           "card_type": "member_card",
           "count": 10,
           "operator": ">=",
@@ -18073,6 +17918,9 @@
               "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_05.png|heart05}}が合計4個以上",
               "target": "self",
               "location": "stage",
+              "heart_colors": [
+                "heart05"
+              ],
               "card_type": "member_card",
               "count": 4,
               "operator": ">=",
@@ -18657,7 +18505,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを2枚引く。",
+        "text": "自分のエネルギー置き場にあるエネルギー1枚をこのメンバーの下に置いてもよい。そうした場合、カードを2枚引く",
         "action": "sequential",
         "actions": [
           {
@@ -18678,10 +18526,7 @@
             "destination": "hand"
           }
         ],
-        "conditional": true,
-        "parenthetical": [
-          "メンバーの下に置かれているエネルギーカードではコストを支払えない。メンバーがステージから離れたとき、下に置かれているエネルギーカードはエネルギーデッキに置く。"
-        ]
+        "conditional": true
       }
     },
     {
@@ -18771,7 +18616,6 @@
             "target": "self",
             "optional": true,
             "action": "move_cards",
-            "destination": null,
             "any_number": true
           },
           {
@@ -18805,7 +18649,6 @@
           "card_type": "live_card",
           "target": "self",
           "action": "move_cards",
-          "destination": null,
           "self_target": true,
           "count": 1
         },
@@ -18836,6 +18679,9 @@
           "conditions": [
             {
               "text": "このターン、自分が余剰ハートに{{heart_04.png|heart04}}を1つ以上持っており、",
+              "heart_colors": [
+                "heart04"
+              ],
               "resource_type": "surplus_heart",
               "count": 1,
               "operator": ">=",
@@ -18942,7 +18788,8 @@
           "津島善子",
           "天王寺璃奈"
         ],
-        "count": 6
+        "count": 6,
+        "target": "self"
       },
       "effect": {
         "text": "エネルギーを6枚までアクティブにする",
@@ -19299,7 +19146,8 @@
         "target": "self",
         "exclude_self": true,
         "action": "gain_resource",
-        "resource": "heart"
+        "resource": "heart",
+        "heart_color": "heart01"
       }
     },
     {
@@ -19443,7 +19291,6 @@
         "card_type": "live_card",
         "target": "self",
         "action": "move_cards",
-        "destination": null,
         "self_target": true,
         "count": 1
       }
@@ -19609,6 +19456,9 @@
           "text": "自分が余剰ハートに{{heart_01.png|heart01}}を1つ以上持つ場合",
           "count": 1,
           "resource_type": "surplus_heart",
+          "heart_colors": [
+            "heart01"
+          ],
           "operator": ">=",
           "type": "comparison_condition"
         },
@@ -19778,6 +19628,14 @@
         "condition": {
           "text": "エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がある場合",
           "target": "self",
+          "heart_colors": [
+            "heart01",
+            "heart02",
+            "heart03",
+            "heart04",
+            "heart05",
+            "heart06"
+          ],
           "card_type": "member_card",
           "group_names": [
             "虹ヶ咲"
@@ -19823,8 +19681,7 @@
             "text": "次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る",
             "count": 1,
             "card_type": "live_card",
-            "action": "move_cards",
-            "destination": null
+            "action": "move_cards"
           }
         ],
         "conditional": true,
@@ -19975,7 +19832,6 @@
             "self_target": true
           },
           {
-            "text": "",
             "duration": "live_end",
             "action": "do_nothing"
           },
@@ -20026,7 +19882,6 @@
             },
             "action": "conditional_alternative",
             "primary_effect": {
-              "text": "",
               "action": "do_nothing"
             },
             "alternative_effect": {
@@ -20129,7 +19984,8 @@
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart02"
       }
     },
     {
@@ -20144,14 +20000,10 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "このメンバーをポジションチェンジしてもよい。",
+        "text": "このメンバーをポジションチェンジしてもよい",
         "card_type": "member_card",
         "optional": true,
-        "action": "position_change",
-        "target": null,
-        "parenthetical": [
-          "このメンバーを今いるエリア以外のエリアに移動させる。そのエリアにメンバーがいる場合、そのメンバーはこのメンバーがいたエリアに移動させる。"
-        ]
+        "action": "position_change"
       }
     },
     {
@@ -20166,11 +20018,12 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれるたび、ライブ終了時まで、{{heart_06.png|heart06}}を得る。",
+        "text": "カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれるたび、ライブ終了時まで、{{heart_06.png|heart06}}を得る",
         "duration": "live_end",
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart06",
         "trigger_type": "each_time",
         "trigger_condition": {
           "text": "カードの効果によって自分のエネルギー置き場にエネルギーカードが置かれる",
@@ -20178,10 +20031,7 @@
           "location": "energy_zone",
           "card_type": "energy_card",
           "type": "location_condition"
-        },
-        "parenthetical": [
-          "相手のカードの効果でも発動する。"
-        ]
+        }
       }
     },
     {
@@ -20209,15 +20059,7 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "duration": "live_end",
-        "parenthetical": [
-          "この能力は左サイドエリアにいる場合のみ発動する。"
-        ],
-        "activation_condition_parsed": {
-          "type": "position_condition",
-          "text": "この能力は左サイドエリアにいる場合のみ発動する。"
-        },
-        "activation_position": "left_side"
+        "duration": "live_end"
       }
     },
     {
@@ -20276,15 +20118,7 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "duration": "live_end",
-        "parenthetical": [
-          "この能力は右サイドエリアにいる場合のみ発動する。"
-        ],
-        "activation_condition_parsed": {
-          "type": "position_condition",
-          "text": "この能力は右サイドエリアにいる場合のみ発動する。"
-        },
-        "activation_position": "right_side"
+        "duration": "live_end"
       }
     },
     {
@@ -20310,7 +20144,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart06"
       }
     },
     {
@@ -20446,7 +20281,6 @@
         "action": "sequential",
         "actions": [
           {
-            "text": "",
             "duration": "live_end",
             "action": "do_nothing"
           },
@@ -20608,10 +20442,7 @@
         "target": "self",
         "optional": true,
         "action": "formation_change",
-        "multiple_targets": true,
-        "parenthetical": [
-          "メンバーをそれぞれ好きなエリアに移動させる。この効果で1つのエリアに2人以上のメンバーを移動させることはできない。"
-        ]
+        "multiple_targets": true
       }
     },
     {
@@ -20855,6 +20686,7 @@
         ],
         "action": "gain_resource",
         "resource": "heart",
+        "heart_color": "heart06",
         "duration": "live_end"
       }
     },
@@ -21151,7 +20983,6 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "",
                 "duration": "live_end",
                 "action": "do_nothing"
               },
@@ -21159,7 +20990,8 @@
                 "text": "{{heart_03.png|heart03}}を得る",
                 "action": "gain_resource",
                 "resource": "heart",
-                "count": 1
+                "count": 1,
+                "heart_color": "heart03"
               }
             ]
           },
@@ -21278,6 +21110,9 @@
           "text": "自分のステージにいるメンバーが持つハートに{{heart_02.png|heart02}}が合計5つ以上ある場合",
           "target": "self",
           "location": "stage",
+          "heart_colors": [
+            "heart02"
+          ],
           "card_type": "member_card",
           "count": 5,
           "operator": ">=",
@@ -21291,8 +21126,7 @@
             "count": 1,
             "card_type": "live_card",
             "target": "opponent",
-            "action": "move_cards",
-            "destination": null
+            "action": "move_cards"
           },
           {
             "text": "成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
@@ -21320,6 +21154,9 @@
           "text": "自分のステージにいるメンバーが持つハートに{{heart_05.png|heart05}}が合計5つ以上ある場合",
           "target": "self",
           "location": "stage",
+          "heart_colors": [
+            "heart05"
+          ],
           "card_type": "member_card",
           "count": 5,
           "operator": ">=",
@@ -21333,8 +21170,7 @@
             "count": 1,
             "card_type": "live_card",
             "target": "opponent",
-            "action": "move_cards",
-            "destination": null
+            "action": "move_cards"
           },
           {
             "text": "成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
@@ -21362,6 +21198,9 @@
           "text": "自分のライブカード置き場にあるカードの必要ハートに含まれる{{heart_04.png|heart04}}の合計が4以上の場合",
           "target": "self",
           "location": "live_card_zone",
+          "heart_colors": [
+            "heart04"
+          ],
           "card_type": "live_card",
           "count": 4,
           "operator": ">=",
@@ -21371,6 +21210,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart04",
         "duration": "live_end"
       }
     },
@@ -21440,6 +21280,9 @@
           "text": "自分のライブカード置き場にあるカードの必要ハートに含まれる{{heart_05.png|heart05}}の合計が4以上の場合",
           "target": "self",
           "location": "live_card_zone",
+          "heart_colors": [
+            "heart05"
+          ],
           "card_type": "live_card",
           "count": 4,
           "operator": ">=",
@@ -21449,6 +21292,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart05",
         "duration": "live_end"
       }
     },
@@ -21532,6 +21376,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
+        "heart_color": "heart01",
         "duration": "live_end"
       }
     },
@@ -21552,6 +21397,14 @@
           "text": "自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある場合",
           "target": "self",
           "location": "stage",
+          "heart_colors": [
+            "heart01",
+            "heart02",
+            "heart03",
+            "heart04",
+            "heart05",
+            "heart06"
+          ],
           "card_type": "member_card",
           "type": "location_condition"
         },
@@ -21618,6 +21471,14 @@
           "text": "自分のステージにいるメンバーが持つハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がすべてある場合",
           "target": "self",
           "location": "stage",
+          "heart_colors": [
+            "heart01",
+            "heart02",
+            "heart03",
+            "heart04",
+            "heart05",
+            "heart06"
+          ],
           "card_type": "member_card",
           "type": "location_condition"
         },
@@ -21724,6 +21585,9 @@
           "location": "stage",
           "count": 4,
           "resource_type": "heart_02",
+          "heart_colors": [
+            "heart02"
+          ],
           "card_type": "member_card",
           "operator": ">=",
           "type": "comparison_condition"
@@ -21901,7 +21765,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart03"
       }
     },
     {
@@ -22046,7 +21911,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart06"
       }
     },
     {
@@ -22432,7 +22298,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart06"
       }
     },
     {
@@ -22598,6 +22465,7 @@
         "action": "gain_resource",
         "resource": "heart",
         "heart_selection": true,
+        "heart_color": "heart01",
         "original_value": true
       }
     },
@@ -22929,8 +22797,7 @@
         ],
         "optional": true,
         "max": true,
-        "action": "move_cards",
-        "destination": null
+        "action": "move_cards"
       }
     },
     {
@@ -23154,7 +23021,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 1
+        "count": 1,
+        "heart_color": "heart04"
       }
     },
     {
@@ -23318,6 +23186,9 @@
             "text": "{{heart_05.png|heart05}}を得る",
             "condition": {
               "text": "それらがすべて{{heart_05.png|heart05}}を持つメンバーカードの場合",
+              "heart_colors": [
+                "heart05"
+              ],
               "card_type": "member_card",
               "count": 1,
               "operator": ">=",
@@ -23326,6 +23197,7 @@
             "action": "gain_resource",
             "resource": "heart",
             "count": 1,
+            "heart_color": "heart05",
             "duration": "live_end"
           }
         ]
@@ -23504,6 +23376,7 @@
         "count": 2,
         "action": "gain_resource",
         "resource": "heart",
+        "heart_color": "heart02",
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "枚",
@@ -23698,7 +23571,7 @@
         "type": "move_cards"
       },
       "effect": {
-        "text": "自分の控え室からコスト2以下の『Aqours』のメンバーカードを1枚、メンバーのいないエリアに登場させる。",
+        "text": "自分の控え室からコスト2以下の『Aqours』のメンバーカードを1枚、メンバーのいないエリアに登場させる",
         "source": "discard",
         "destination": "empty_area",
         "cost_limit": 2,
@@ -23709,10 +23582,7 @@
         "group_names": [
           "Aqours"
         ],
-        "action": "move_cards",
-        "parenthetical": [
-          "この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。"
-        ]
+        "action": "move_cards"
       }
     },
     {
@@ -23776,11 +23646,9 @@
               "reference": "previous_reveal"
             },
             "action": "move_cards",
-            "destination": null,
             "card_type": "card"
           },
           {
-            "text": "",
             "duration": "live_end",
             "action": "do_nothing"
           },
@@ -24075,7 +23943,8 @@
         "duration": "as_long_as",
         "action": "gain_resource",
         "resource": "heart",
-        "count": 2
+        "count": 2,
+        "heart_color": "heart01"
       }
     },
     {
@@ -24135,6 +24004,7 @@
         ],
         "action": "gain_resource",
         "resource": "heart",
+        "heart_color": "heart04",
         "duration": "live_end"
       }
     },
@@ -24246,7 +24116,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにいるコスト10以上の『DOLLCHESTRA』のメンバー1人を選ぶ。そのメンバーの{{live_start.png|ライブ開始時}}能力1つを発動させてもよい。",
+        "text": "自分のステージにいるコスト10以上の『DOLLCHESTRA』のメンバー1人を選ぶ。そのメンバーの{{live_start.png|ライブ開始時}}能力1つを発動させてもよい",
         "action": "sequential",
         "actions": [
           {
@@ -24269,9 +24139,6 @@
             "ability_text": "ライブ開始時_ability",
             "count": 1
           }
-        ],
-        "parenthetical": [
-          "{{live_start.png|ライブ開始時}}能力がコストを持つ場合、支払って発動させる。"
         ]
       }
     },
@@ -24365,6 +24232,7 @@
             ],
             "action": "gain_resource",
             "resource": "heart",
+            "heart_color": "heart06",
             "duration": "live_end",
             "distinct": "card_name"
           }

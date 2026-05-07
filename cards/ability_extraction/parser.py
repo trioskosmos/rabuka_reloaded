@@ -1,4 +1,5 @@
 """Parser for ability extraction - structural approach based on actual data analysis."""
+import json
 import re
 from typing import Dict, Any, Optional, Tuple, List, Union
 from parser_utils import (
@@ -1128,6 +1129,12 @@ def _extract_generic_fields(condition, text):
                         break
                 else:
                     condition['resource_type'] = 'heart'
+    # Extract heart_colors from any condition text with {{heart_XX.png}} icons
+    # Used by location_condition to check collective presence of specific heart colors
+    hm = re.findall(r'{{heart_(\d+)\.png\|heart\d+}}', text)
+    if hm:
+        colors = sorted(set(f'heart{m.zfill(2)}' for m in hm))
+        condition['heart_colors'] = colors
 
     # Energy count
     if 'エネルギー' in text and '枚' in text:
@@ -1897,6 +1904,9 @@ def parse_action(text: str) -> Dict[str, Any]:
     if a == 'gain_resource':
         if action.get('count') is None: infer_count_from_icons(action, text)
         if action.get('count') is None: action['count'] = 1
+        if action.get('resource') in ('heart', None) and 'heart_color' not in action and 'heart_colors' not in action:
+            hm = re.search(r'{{heart_(\d+)\.png\|heart\d+}}', text)
+            if hm: action['heart_color'] = f'heart{hm.group(1).zfill(2)}'
     if a == 'gain_resource' and 'duration' not in action:
         dur = extract_duration(text)
         if dur: action['duration'] = dur
@@ -2130,6 +2140,12 @@ def parse_cost(text: str) -> Dict[str, Any]:
         if gns: cost['group_names'] = gns
         cnt = extract_count(text)
         if cnt: cost['count'] = cnt
+        ct = extract_card_type(text)
+        if ct: cost['card_type'] = ct
+        tgt = extract_target(text)
+        if tgt: cost['target'] = tgt
+        if '好きな順番で' in text:
+            cost['placement_order'] = 'any_order'
         return cost
     
     # Extract common fields
@@ -2482,8 +2498,10 @@ def _try_cost_modification(text):
             first, second = parts[0].strip(), parts[1].strip()
             if any(p in second for p in cost_prefixes):
                 op = 'subtract'
-                return {'text': text, 'action': 'sequential',
-                        'actions': [parse_action(first), _make_cost_mod_action(second, op)]}
+                # Return ONLY the modify_cost action — the cost reduction is a passive modifier,
+                # not a sibling action that runs alongside the main effect.
+                # The main effect (first part) will be handled by subsequent handlers or parse_action fallback.
+                return _make_cost_mod_action(second, op)
     return {'action': 'modify_cost', 'operation': 'subtract',
             'text': text, 'count': energy_count}
 
@@ -3842,16 +3860,69 @@ def _normalize_effect_tree(effect, original_text=None):
     return _walk(effect, original_text)
 
 
+def _strip_parenthetical(text):
+    """Remove parenthetical notes (rule clarifications) before parsing."""
+    text = re.sub(r'（[^）]*）', '', text)
+    text = re.sub(r'\([^)]*\)', '', text)
+    return text.strip()
+
+
+def _clean(obj):
+    """Recursively remove null/false/0/empty fields from dicts/lists."""
+    if isinstance(obj, dict):
+        return {k: _clean(v) for k, v in obj.items()
+                if v is not None and v is not False and v != 0 and v != [] and v != {} and v != ''}
+    if isinstance(obj, list):
+        cleaned = [_clean(item) for item in obj]
+        return [x for x in cleaned if x is not None and x != {}]
+    return obj
+
+
+# Required field validators per action type
+_VALIDATORS = {
+    'gain_resource': {'required': ['resource', 'count']},
+    'move_cards': {'required': ['source', 'destination']},
+    'draw_card': {'required': ['count']},
+    'modify_score': {'required': ['operation', 'value']},
+    'modify_required_hearts': {'required': ['heart_color', 'count']},
+    'change_state': {'required': ['state_change']},
+}
+
+
+def _validate_effect(eff, context=''):
+    """Check required fields for each action type. Non-fatal warnings."""
+    if not isinstance(eff, dict):
+        return
+    action = eff.get('action', eff.get('type', ''))
+    rules = _VALIDATORS.get(action)
+    if rules:
+        for field in rules['required']:
+            if field not in eff or eff[field] is None:
+                import sys
+                print(f'[VALIDATION] {context} {action} missing required field: {field}', file=sys.stderr)
+    for sub_key in ('actions', 'options', 'primary_effect', 'followup_action',
+                    'optional_action', 'conditional_action',
+                    'look_action', 'select_action', 'opponent_action'):
+        sub = eff.get(sub_key)
+        if isinstance(sub, dict):
+            _validate_effect(sub, context)
+        elif isinstance(sub, list):
+            for item in sub:
+                _validate_effect(item, context)
+
+
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
-    triggerless_text = normalize(triggerless_text)
+    triggerless_text = normalize(triggerless_text.strip())
+    # Strip parenthetical rule clarifications before parsing
+    clean_text = _strip_parenthetical(triggerless_text)
     
     ability = {
         'triggerless_text': triggerless_text,
     }
     
     # Split cost and effect
-    cost_text, effect_text = split_cost_effect(triggerless_text)
+    cost_text, effect_text = split_cost_effect(clean_text)
     
     # Parse cost
     if cost_text:
@@ -3860,13 +3931,16 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     # Parse effect
     if effect_text:
         effect = parse_effect(effect_text)
-        # If the effect handler embedded a cost (e.g. "unless pay N energy"),
-        # lift it to the ability level (Q92: player chooses whether to pay)
         if isinstance(effect, dict) and 'cost' in effect:
             ability['cost'] = effect.pop('cost')
-        # Run post-processing normalizer on the parsed effect
         effect = _normalize_effect_tree(effect, triggerless_text)
+        effect = _clean(effect)
+        _validate_effect(effect, triggerless_text[:40])
         ability['effect'] = effect
+    
+    # Clean cost too
+    if 'cost' in ability:
+        ability['cost'] = _clean(ability['cost'])
     
     return ability
 

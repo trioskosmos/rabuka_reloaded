@@ -203,13 +203,29 @@ impl Player {
             // Card was already removed from hand, so add 1 to get true hand count
             let hand_count = self.hand.cards.len() + 1;
             let mut cost_reduction: u32 = 0;
+            // Helper: find modify_cost effects inside ability effects, including nested in sequential
+            fn find_modify_cost<'a>(effect: &'a crate::card::AbilityEffect, op: &str, loc: &str) -> Option<&'a crate::card::AbilityEffect> {
+                if effect.action == "modify_cost"
+                    && effect.operation.as_deref() == Some(op)
+                    && effect.location.as_deref() == Some(loc)
+                {
+                    return Some(effect);
+                }
+                if effect.action == "sequential" {
+                    if let Some(ref actions) = effect.actions {
+                        for sub in actions {
+                            if let Some(found) = find_modify_cost(sub, op, loc) {
+                                return Some(found);
+                            }
+                        }
+                    }
+                }
+                None
+            }
             for ability in &card.abilities {
                 if let Some(ref effect) = ability.effect {
-                    if effect.action == "modify_cost"
-                        && effect.operation.as_deref() == Some("subtract")
-                        && effect.location.as_deref() == Some("hand")
-                    {
-                        let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
+                    if let Some(_mod) = find_modify_cost(effect, "subtract", "hand") {
+                        let per_unit = _mod.per_unit_count.unwrap_or(1) as usize;
                         cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
                         break;
                     }
@@ -373,7 +389,9 @@ impl Player {
 
                 if !baton_touch_used && self.stage.stage[0] != -1 {
 
-                    self.remove_member_from_stage_with_recycling(0, card_db);
+                    if let Some(old_card) = self.remove_member_from_stage_with_recycling(0, card_db) {
+                        self.waitroom.cards.push(old_card);
+                    }
 
                 }
 
@@ -395,7 +413,9 @@ impl Player {
 
                 if !baton_touch_used && self.stage.stage[1] != -1 {
 
-                    self.remove_member_from_stage_with_recycling(1, card_db);
+                    if let Some(old_card) = self.remove_member_from_stage_with_recycling(1, card_db) {
+                        self.waitroom.cards.push(old_card);
+                    }
 
                 }
 
@@ -417,7 +437,9 @@ impl Player {
 
                 if !baton_touch_used && self.stage.stage[2] != -1 {
 
-                    self.remove_member_from_stage_with_recycling(2, card_db);
+                    if let Some(old_card) = self.remove_member_from_stage_with_recycling(2, card_db) {
+                        self.waitroom.cards.push(old_card);
+                    }
 
                 }
 

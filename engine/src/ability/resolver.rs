@@ -1,4 +1,4 @@
-use crate::card::{Ability, AbilityEffect, Keyword};
+use crate::card::{Ability, AbilityCost, AbilityEffect, Keyword};
 use crate::game_state::{GameState, Phase};
 use crate::zones::MemberArea;
 use super::types::{Choice, ExecutionContext};
@@ -217,7 +217,10 @@ impl<'a> AbilityResolver<'a> {
 
         if !cost_already_paid {
             if let Some(ref cost) = ability.cost {
-                if let Err(e) = self.pay_cost(cost) {
+                // Check for modify_cost effects in the ability's own effect tree
+                // (cost reduction per group name, hand size, etc.)
+                let cost = self.apply_modify_cost_to_ability_cost(cost, ability);
+                if let Err(e) = self.pay_cost(&cost) {
                     dbg.p("RESULT", format_args!("COST FAILED: {}", e));
                     return Err(e);
                 }
@@ -268,5 +271,54 @@ impl<'a> AbilityResolver<'a> {
 
     pub fn card_matches_cost_limit(&self, card_id: i16, cost_limit: Option<u32>) -> bool {
         util::card_matches_cost_limit(&self.game_state.card_database, card_id, cost_limit)
+    }
+
+    /// Walk the ability's effect tree to find modify_cost sub-actions and adjust the cost.
+    /// Handles patterns like "コストはグループ名1種類につきE減る" (cost reduced per group name).
+    fn apply_modify_cost_to_ability_cost(&self, cost: &AbilityCost, ability: &Ability) -> AbilityCost {
+        fn find_modify_cost(effect: &AbilityEffect) -> Option<&AbilityEffect> {
+            if effect.action == "modify_cost" { return Some(effect); }
+            if effect.action == "sequential" {
+                if let Some(ref actions) = effect.actions {
+                    for sub in actions {
+                        if let Some(found) = find_modify_cost(sub) {
+                            return Some(found);
+                        }
+                    }
+                }
+            }
+            None
+        }
+
+        let mut cost = cost.clone();
+        if let Some(ref effect) = ability.effect {
+            if let Some(mod_cost) = find_modify_cost(effect) {
+                if mod_cost.operation.as_deref() == Some("subtract") {
+                    if mod_cost.per_unit.unwrap_or(false) {
+                        if mod_cost.per_unit_type.as_deref() == Some("group_name") {
+                            // Count distinct group names on self's stage
+                            let player = self.game_state.resolve_target_player("self");
+                            let card_db = &self.game_state.card_database;
+                            let mut groups = std::collections::HashSet::new();
+                            for &cid in &player.stage.stage {
+                                if cid == -1 { continue; }
+                                if let Some(card) = card_db.get_card(cid) {
+                                    if let Some(ref unit) = card.unit {
+                                        groups.insert(unit.clone());
+                                    }
+                                }
+                            }
+                            let per_unit_count = mod_cost.per_unit_count.unwrap_or(1) as u32;
+                            let reduction = (groups.len() as u32 / per_unit_count) * mod_cost.count.unwrap_or(1);
+                            if cost.cost_type.as_deref() == Some("pay_energy") {
+                                let new_energy = cost.energy.unwrap_or(0).saturating_sub(reduction);
+                                cost.energy = Some(new_energy);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        cost
     }
 }

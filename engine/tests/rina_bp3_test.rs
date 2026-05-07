@@ -41,7 +41,6 @@ fn rina_bp3_q164_select_from_own_discard() {
     game.pass();
 
     // LiveStart fires: optional cost → select 2 members from discard
-    if game.has_pending_choice() { game.select_indices(&[0]); } // pay or skip
     if game.has_pending_choice() { game.select_indices(&[0, 1]); } // pick 2 cards
 
     let deck = &game.state.player1.main_deck.cards;
