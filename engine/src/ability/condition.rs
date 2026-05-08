@@ -31,6 +31,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             "opponent_live_success" => self.evaluate_opponent_live_success_condition(condition),
             "complex_condition" => self.evaluate_complex_condition(condition),
             "no_excess_heart" => self.evaluate_no_excess_heart_condition(condition),
+            "otherwise_condition" => true,  // "otherwise" = catch-all, always true when reached
             _ => false,
         };
 

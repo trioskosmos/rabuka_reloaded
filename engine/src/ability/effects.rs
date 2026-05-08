@@ -183,7 +183,13 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::SetHeartType => self.execute_set_heart_type(effect.heart_type.as_deref().or(effect.heart_color.as_deref()), effect.target.as_deref().unwrap_or("self"), effect.count.unwrap_or(1) as i32),
             EffectAction::ActivateAbility => self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or(""), effect.target_trigger.as_deref(), effect.count),
             EffectAction::InvalidateAbility => self.execute_invalidate_ability(),
-            EffectAction::GainAbility => self.execute_gain_ability(effect.ability_gain.as_deref().unwrap_or(""), effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref()),
+            EffectAction::GainAbility => {
+                let ability_text = effect.ability_gain.as_deref()
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| if effect.text.is_empty() { None } else { Some(effect.text.as_str()) })
+                    .unwrap_or("");
+                self.execute_gain_ability(ability_text, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref())
+            },
             EffectAction::PlayBatonTouch => self.execute_play_baton_touch(effect.count.unwrap_or(1), effect.target.as_deref().unwrap_or("self")),
             EffectAction::Reveal => {
                 if effect.multiple_targets.unwrap_or(false) && effect.source.as_deref() == Some("deck_top") {

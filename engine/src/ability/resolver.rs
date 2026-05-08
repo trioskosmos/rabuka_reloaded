@@ -238,6 +238,28 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
 
+        // Check position keywords (Center/LeftSide/RightSide) AFTER cost payment.
+        // Position checks gate the effect, not the cost — the test expects cost to still be paid.
+        if let Some(card_id) = activating_card {
+            let position = self.game_state.player1.stage.stage.iter().position(|&id| id == card_id)
+                .or_else(|| self.game_state.player2.stage.stage.iter().position(|&id| id == card_id))
+                .map(|idx| match idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide });
+            if let Some(ref kws) = ability.keywords {
+                for kw in kws {
+                    let pos_ok = match kw {
+                        Keyword::Center => position == Some(crate::zones::MemberArea::Center),
+                        Keyword::LeftSide => position == Some(crate::zones::MemberArea::LeftSide),
+                        Keyword::RightSide => position == Some(crate::zones::MemberArea::RightSide),
+                        _ => true,
+                    };
+                    if !pos_ok {
+                        dbg.p("RESULT", "position requirement not met — effect skipped");
+                        return Ok(());
+                    }
+                }
+            }
+        }
+
         if let Some(ref effect) = ability.effect {
             if let Err(e) = self.execute_effect(effect) {
                 dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));

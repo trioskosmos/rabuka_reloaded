@@ -13,8 +13,38 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
         let count = m.count as usize;
         let source = m.source.as_deref().unwrap_or("").to_string();
         let destination = m.destination.as_deref().unwrap_or("").to_string();
-        let card_type_filter = m.card_type.as_deref();
         let group_name = m.group_name.as_deref();
+
+        // Handle or_card_types: let the player pick which type to search for
+        let card_type_filter: Option<&str> = if let Some(ref or_types) = effect.or_card_types {
+            if !or_types.is_empty() {
+                // Check if the player already chose a type
+                let chosen = self.game_state.ability_queue.current_entry()
+                    .and_then(|e| e.conditional_choice.as_ref());
+                match chosen {
+                    Some(choice_str) => {
+                        // Use the chosen type as filter
+                        Some(choice_str.as_str())
+                    }
+                    None => {
+                        // First call: prompt the player to choose a type
+                        self.pending_choice = Some(Choice::SelectTarget {
+                            target: "choice_string".to_string(),
+                            description: format!("Pick card type: {:?}", or_types),
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        self.game_state.ability_queue.current_entry_mut().map(|e| {
+                            e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
+                        });
+                        return Ok(());
+                    }
+                }
+            } else {
+                m.card_type.as_deref()
+            }
+        } else {
+            m.card_type.as_deref()
+        };
         let tgt = m.target.clone();
         let cost_limit = m.cost_limit;
         let is_self_cost = effect.self_cost.unwrap_or(false);

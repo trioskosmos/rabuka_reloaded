@@ -906,6 +906,11 @@ def _try_appearance(text):
     # Propagate target from text
     tgt = extract_target(text)
     if tgt: result['target'] = tgt
+    # Extract position (左サイド/右サイド/センター)
+    for kw, pos in POSITION_KEYWORDS.items():
+        if kw in text:
+            result['position'] = pos
+            break
     return result
 
 def _try_energy_state(text):
@@ -1659,9 +1664,12 @@ def parse_action(text: str) -> Dict[str, Any]:
     
     if is_ability_gain:
         action['action'] = 'gain_ability'
+        # Populate ability_gain with the actual ability text
         if quoted_text:
             categorized = categorize_quoted_text(quoted_text)
-            if categorized['characters']:
+            if categorized['abilities']:
+                action['ability_gain'] = categorized['abilities'][0]
+            elif categorized['characters']:
                 # These are likely character names or card names
                 # Convert to QuotedText struct format (text, quoted_type)
                 # Only set if single character - Rust expects single QuotedText, not array
@@ -1864,7 +1872,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: 'デッキの上に置き' in t or 'デッキの上に置く' in t, 'move_cards',
       lambda t, a: a.update({'destination': 'deck_top', 'placement_order': 'any_order'} if '好きな順番で' in t else {'destination': 'deck_top'}))
     R(lambda t: ('エール' in t and ('枚数' in t or '数' in t)), 'modify_yell_count', None)
-    R('得る', 'gain_ability', None)
+    R('得る', 'gain_ability', lambda t, a: a.update({'ability_gain': re.sub(r'\{\{[^}]+\}\}', '', t).replace('「', '').replace('」', '').strip()}) if a.get('ability_gain') is None else None)
     R(lambda t: ('セット' in t or '設定' in t) and 'コスト' not in t, 'set_card_identity', None)
     R('必要ハートを選ぶ', 'choose_required_hearts', None)
     R('好きな順番で', 'move_cards', lambda t, a: a.update({'placement_order': 'any_order'}))
@@ -3570,6 +3578,24 @@ def parse_effect(text: str) -> Dict[str, Any]:
     # Extract parenthetical notes
     parenthetical = extract_parenthetical(text)
     text = strip_parenthetical(text)
+    
+    # Also check the full original text for activation condition patterns (e.g.
+    # "（この能力はセンターエリアに登場している場合のみ起動できる。）") that
+    # may have been in parenthetical notes. Extract them early so they can be
+    # propagated to the effect even if _merge_parenthetical fails.
+    extra_activation_cond = None
+    extra_activation_pos = None
+    if parenthetical:
+        import sys; print(f"[PAREN] {len(parenthetical)} note(s), first={parenthetical[0][:40]}", file=sys.stderr)
+    for note in parenthetical:
+        if '起動できる' in note or '発動する' in note:
+            if 'センター' in note or 'サイド' in note or 'エリアにいる場合' in note:
+                cond_parsed = parse_condition(note)
+                if cond_parsed and cond_parsed.get('type') != 'custom':
+                    extra_activation_cond = cond_parsed
+            if 'センターエリア' in note: extra_activation_pos = 'center'
+            elif '左サイドエリア' in note or '左サイド' in note: extra_activation_pos = 'left_side'
+            elif '右サイドエリア' in note or '右サイド' in note: extra_activation_pos = 'right_side'
 
     # Try all handlers in priority order
     for handler in _EFFECT_HANDLERS:
@@ -3608,6 +3634,11 @@ def parse_effect(text: str) -> Dict[str, Any]:
             #  card_type/target/etc from the condition into the effect)
             effect = result
             _merge_parenthetical(effect, parenthetical)
+            if extra_activation_cond and 'activation_condition_parsed' not in effect:
+                import sys; print(f"[ACTIVATION] setting activation_condition_parsed on effect", file=sys.stderr)
+                effect['activation_condition_parsed'] = extra_activation_cond
+            if extra_activation_pos and 'activation_position' not in effect:
+                effect['activation_position'] = extra_activation_pos
             return effect
 
     # No handler matched: fallback to parse_action
@@ -3618,6 +3649,10 @@ def parse_effect(text: str) -> Dict[str, Any]:
     effect.update(action)
 
     _merge_parenthetical(effect, parenthetical)
+    if extra_activation_cond and 'activation_condition_parsed' not in effect:
+        effect['activation_condition_parsed'] = extra_activation_cond
+    if extra_activation_pos and 'activation_position' not in effect:
+        effect['activation_position'] = extra_activation_pos
 
     # Post-fallback exact text matches
     normalized = re.sub(r'\s+', '', fallback_text)
@@ -3914,15 +3949,14 @@ def _validate_effect(eff, context=''):
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
     triggerless_text = normalize(triggerless_text.strip())
-    # Strip parenthetical rule clarifications before parsing
-    clean_text = _strip_parenthetical(triggerless_text)
     
     ability = {
         'triggerless_text': triggerless_text,
     }
     
-    # Split cost and effect
-    cost_text, effect_text = split_cost_effect(clean_text)
+    # Split cost and effect (no need to pre-strip parenthetical — 
+    # the activation conditions in （...） are needed for later processing)
+    cost_text, effect_text = split_cost_effect(triggerless_text)
     
     # Parse cost
     if cost_text:

@@ -60,8 +60,25 @@ impl<'a> AbilityResolver<'a> {
     }
     pub fn execute_reveal(&mut self, source: &str, count: u32, target: &str, card_type: Option<&str>, heart_colors: Option<&Vec<String>>) -> Result<(), String> {
         let card_db = self.game_state.card_database.clone();
+        let any_number = self.current_effect.as_ref().map_or(false, |e| e.any_number.unwrap_or(false));
+        let player = self.game_state.resolve_target_player_mut(target);
+
+        // Support player selection for reveal: when count allows choice, prompt instead of auto-revealing all
+        if source == "hand" {
+            let available = player.hand.cards.len();
+            if (any_number || count == 0 || count < available as u32) && available > 0 {
+                let choices_count = if any_number { available } else { count as usize };
+                self.pending_choice = Some(Choice::SelectCard {
+                    zone: "hand".to_string(), card_type: card_type.map(|s| s.to_string()),
+                    count: choices_count, description: format!("Select card(s) to reveal from hand"),
+                    allow_skip: any_number,
+                });
+                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                return Ok(());
+            }
+        }
+
         let card_ids: Vec<i16> = {
-            let player = self.game_state.resolve_target_player_mut(target);
             match source {
                 "hand" => player.hand.cards.iter().copied().collect(),
                 "deck" => player.main_deck.cards.iter().take(count as usize).copied().collect(),

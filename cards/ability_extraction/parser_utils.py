@@ -1,9 +1,10 @@
 """
 Parser utilities for ability extraction.
 This module contains pure utility functions for text processing, regex extraction,
-and normalization used across the parsing pipeline.
+pattern lists, and normalization used across the parsing pipeline.
 """
 import re
+from typing import Dict, List, Tuple
 
 # Precompiled regex patterns for performance
 DIGIT_PATTERN = re.compile(r'(\d+)')
@@ -306,3 +307,92 @@ def annotate_tree(value, text):
         for item in value:
             annotate_tree(item, text)
     return value
+
+
+# ============== SHARED PATTERN LISTS ==============
+# These are used by both parser.py and external tools.
+# They live here so they can be imported without loading the full parser.
+
+SOURCE_PATTERNS: List[Tuple[str, str]] = [
+    ('エネルギーデッキから', 'energy_deck'),
+    ('控え室から', 'discard'),
+    ('控え室か ら', 'discard'),
+    ('控え室にある', 'discard'),
+    ('手札から', 'hand'),
+    ('デッキから', 'deck'),
+    ('デッキの上から', 'deck_top'),
+    ('山札から', 'deck'),
+    ('ステージから', 'stage'),
+    ('エネルギー置き場から', 'energy_zone'),
+    ('ライブカード置き場から', 'live_card_zone'),
+    ('成功ライブカード置き場から', 'success_live_zone'),
+    ('からライブカード', 'discard'),
+    ('デッキの一番下から', 'deck_bottom'),
+    ('相手の控え室から', 'discard'),
+    ('相手の控え室にある', 'discard'),
+]
+
+DESTINATION_PATTERNS: List[Tuple[str, str]] = [
+    ('控え室に置く', 'discard'),
+    ('控え室に置いて', 'discard'),
+    ('控え室に置き', 'discard'),
+    ('手札に加える', 'hand'),
+    ('手札に加えて', 'hand'),
+    ('手札に置く', 'hand'),
+    ('ステージに置く', 'stage'),
+    ('ステージに登場させる', 'stage'),
+    ('エネルギー置き場に置く', 'energy_zone'),
+    ('エネルギーゾーンに置く', 'energy_zone'),
+    ('ライブカード置き場に置く', 'live_card_zone'),
+    ('成功ライブカード置き場に置く', 'success_live_zone'),
+    ('デッキの上に置く', 'deck_top'),
+    ('デッキの一番上に置く', 'deck_top'),
+    ('デッキの下に置く', 'deck_bottom'),
+    ('デッキの一番下に置く', 'deck_bottom'),
+    ('デッキの一番下に置いて', 'deck_bottom'),
+    ('デッキの一番上から4枚目に置く', 'deck_position_4'),
+    ('デッキに置く', 'deck'),
+    ('成功ライブカード置き場に置く', 'success_live_zone'),
+    ('メンバーのいないエリア', 'empty_area'),
+    ('そのメンバーがいたエリア', 'same_area'),
+    ('このメンバーの下に置く', 'under_member'),
+    ('このメンバーの下に置いて', 'under_member'),
+    ('枚控え室に置く', 'discard'),
+    ('枚控え室に置いて', 'discard'),
+]
+
+STATE_CHANGE_PATTERNS: List[Tuple[str, str]] = [
+    ('ウェイトにする', 'wait'),
+    ('ウェイトにしてもよい', 'wait'),
+    ('ウェイトにし', 'wait'),
+    ('ウェイト状態で置く', 'wait'),
+    ('ウェイト状態で登場させる', 'wait'),
+    ('アクティブにする', 'active'),
+]
+
+LOCATION_PATTERNS: List[Tuple[str, str]] = [
+    ('成功ライブカード置き場', 'success_live_card_zone'),
+    ('ライブカード置き場', 'live_card_zone'),
+    ('控え室', 'discard'),
+    ('手札', 'hand'),
+    ('ステージ', 'stage'),
+    ('デッキ', 'deck'),
+    ('エネルギーデッキ', 'energy_deck'),
+    ('エネルギー置き場', 'energy_zone'),
+]
+
+CARD_TYPE_PATTERNS: List[Tuple[str, str]] = [
+    ('メンバーカード', 'member_card'),
+    ('メンバー', 'member_card'),
+    ('ライブカード', 'live_card'),
+    ('エネルギーカード', 'energy_card'),
+]
+
+OPERATOR_PATTERNS: List[Tuple[str, str]] = [
+    ('以上', '>='),
+    ('以下', '<='),
+    ('より少ない', '<'),
+    ('より多い', '>'),
+    ('未満', '<'),
+    ('超', '>'),
+]
