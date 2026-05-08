@@ -422,6 +422,12 @@ impl GameState {
                 }
                 Duration::Permanent => false,
                 Duration::AsLongAs => {
+                    // AsLongAs effects persist as long as their condition is true.
+                    // For now, treat as ThisLive (expire when live ends) since
+                    // condition re-evaluation is not yet implemented.
+                    self.current_turn_phase != TurnPhase::Live
+                }
+                Duration::Unless => {
                     self.current_turn_phase != TurnPhase::Live
                 }
             };

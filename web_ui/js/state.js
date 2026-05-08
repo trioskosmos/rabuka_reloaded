@@ -13,6 +13,7 @@ const stateInternal = {
 
     data: null,
     rawData: null,
+    _forceRender: false,
 
     roomCode: null,
     sessionToken: null,

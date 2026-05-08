@@ -68,17 +68,25 @@ function initDomCache() {
 }
 
 export const Rendering = {
+    _lastStateId: null,
+
     render: () => {
         if (State.renderRequested) return;
+
+        // Dirty-check: skip full re-render if state_id hasn't changed (unless forced)
+        const stateId = State.data?.state_id ?? State.data?.turn_number ?? null;
+        if (stateId !== null && stateId === Rendering._lastStateId && !State._forceRender) {
+            return;
+        }
+        Rendering._lastStateId = stateId;
+        State._forceRender = false;
+
         State.renderRequested = true;
-        
-        // Initial fade-in - REMOVED for snappiness
         State.firstRenderDone = true;
 
         requestAnimationFrame(() => {
             try {
                 initDomCache();
-                // initAccessibility(); // Missing in codebase, causes ReferenceError
                 Rendering.renderInternal();
             } catch (error) {
                 console.error('Fatal Rendering Error:', error);

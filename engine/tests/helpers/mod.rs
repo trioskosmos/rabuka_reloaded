@@ -8,6 +8,7 @@
 
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
@@ -20,12 +21,15 @@ use rabuka_engine::zones::MemberArea;
 
 /// Load the real card database from `cards/cards.json` + `cards/abilities.json`.
 /// This includes ALL real cards (both the tested ability cards and filler cards).
+/// The database is loaded once per process and cached via `OnceLock`.
 pub fn load_real_database() -> Arc<CardDatabase> {
-    let cards_path = Path::new("../cards/cards.json");
-    let cards = CardLoader::load_cards_from_file(cards_path)
-        .expect("Failed to load real cards from ../cards/cards.json");
-    let db = CardDatabase::load_or_create(cards);
-    Arc::new(db)
+    static DB: OnceLock<Arc<CardDatabase>> = OnceLock::new();
+    DB.get_or_init(|| {
+        let cards_path = Path::new("../cards/cards.json");
+        let cards = CardLoader::load_cards_from_file(cards_path)
+            .expect("Failed to load real cards from ../cards/cards.json");
+        Arc::new(CardDatabase::load_or_create(cards))
+    }).clone()
 }
 
 /// Get a card's database ID by its card_no string.

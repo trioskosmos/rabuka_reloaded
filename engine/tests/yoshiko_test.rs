@@ -6,11 +6,7 @@
 
 mod helpers;
 use helpers::*;
-use rabuka_engine::zones::MemberArea;
 
-fn advance_to_live_set(game: &mut TestGame) {
-    for _ in 0..5 { game.pass(); }
-}
 
 /// Activate Yoshiko's ability with enough energy, no matching Aqours member in deck.
 /// The ability should search, find nothing, and end without addition.

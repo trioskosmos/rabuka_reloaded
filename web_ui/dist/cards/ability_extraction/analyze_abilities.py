@@ -231,7 +231,7 @@ for ab in abilities_list:
         if eff.get('card_type'): filter_counts[f"eff.card_type={eff['card_type']}"] += 1
         if eff.get('cost_limit'): filter_counts['eff.cost_limit'] += 1
         if eff.get('total_cost_limit'): filter_counts['eff.total_cost_limit'] += 1
-        if eff.get('group'): filter_counts['eff.group'] += 1
+        if eff.get('group_names'): filter_counts['eff.group_names'] += 1
         if eff.get('heart_color'): filter_counts['eff.heart_color'] += 1
         if eff.get('characters'): filter_counts['eff.characters'] += 1
 

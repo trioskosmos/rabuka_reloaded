@@ -1,4 +1,5 @@
 """Parser for ability extraction - structural approach based on actual data analysis."""
+import json
 import re
 from typing import Dict, Any, Optional, Tuple, List, Union
 from parser_utils import (
@@ -37,6 +38,7 @@ SOURCE_PATTERNS = [
 DESTINATION_PATTERNS = [
     ('控え室に置く', 'discard'),
     ('控え室に置いて', 'discard'),  # Handle te-form
+    ('控え室に置き', 'discard'),  # Handle continuative form (e.g. "置き、")
     # Removed overly broad ('控え室', 'discard') - it was matching source locations
     ('手札に加える', 'hand'),
     ('手札に加えて', 'hand'),  # Handle te-form
@@ -246,7 +248,7 @@ def extract_source(text: str) -> Optional[str]:
         return 'success_live_zone'
     if '自分の控え室にある' in text or '控え室からライブカード' in text:
         return 'discard'
-    if '手札を' in text or '手札から' in text:
+    if '手札を' in text or '手札から' in text or '手札の' in text:
         return 'hand'
     if 'デッキの一番下から' in text:
         return 'deck_bottom'
@@ -338,16 +340,6 @@ def extract_target(text: str) -> Optional[str]:
 def extract_operator(text: str) -> Optional[str]:
     """Extract comparison operator."""
     return extract_by_pattern(text, OPERATOR_PATTERNS)
-
-def extract_group(text: str) -> Optional[Dict[str, Any]]:
-    """Extract group information from text."""
-    if '『' in text:
-        group = extract_group_name(text)
-        if group:
-            return {
-                'name': group
-            }
-    return None
 
 def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
     """Extract cost limit."""
@@ -674,9 +666,6 @@ def _try_distinct(text):
         result['count'] = int(m.group(1))
         result['operator'] = '>='
         result['unit'] = m.group(2) if len(m.groups()) >= 2 and m.group(2) else '人'
-    g = extract_group(text)
-    if g:
-        result['group'] = g
     gns = extract_group_names(text)
     if gns:
         result['group_names'] = gns
@@ -713,54 +702,67 @@ def _try_card_count(text):
             # Detect revealed cards context (yell)
             if 'エールにより公開された' in text:
                 result['location'] = 'revealed_cards'
-            # Extract group from 『』 (e.g. "『蓮ノ空』のメンバーカード")
-            g = extract_group(text)
-            if g:
-                result['group'] = g
-            gns = extract_group_names(text)
-            if gns:
-                result['group_names'] = gns
-            # Extract card_type from "メンバーカード" / "ライブカード"
+            # Extract card_type, location, target
             ct = extract_card_type(text)
-            if ct:
-                result['card_type'] = ct
-            # Extract location (e.g. 成功ライブカード置き場)
+            if ct: result['card_type'] = ct
             loc = extract_location(text)
-            if loc:
-                result['location'] = loc
-            # Detect live_card_zone from "ライブ中のカード" (cards currently in live)
+            if loc: result['location'] = loc
+            tgt = extract_target(text)
+            if tgt: result['target'] = tgt
+            # Detect live_card_zone from "ライブ中のカード"
             if 'ライブ中のカード' in text and not result.get('location'):
                 result['location'] = 'live_card_zone'
-            # Extract target (e.g. 相手の → opponent)
-            tgt = extract_target(text)
-            if tgt:
-                result['target'] = tgt
             # Also try _try_either_target for "自分か相手の" patterns
             either_result = _try_either_target(text)
             if either_result:
-                if 'target' in either_result:
-                    result['target'] = either_result['target']
-                if 'location' in either_result:
-                    result['location'] = either_result['location']
+                if 'target' in either_result: result['target'] = either_result['target']
+                if 'location' in either_result: result['location'] = either_result['location']
+            # Extract group from 『』 — skip when を含む (includes) is present since
+            # the group is a subset qualifier, not a filter on all counted cards
+            gns = extract_group_names(text)
+            if gns and 'を含む' not in text:
+                result['group_names'] = gns
 
-            # Extract hand count condition (手札がN枚以下の場合 / 手札がN枚以上の場合)
+                # Extract hand count condition (手札がN枚以下の場合 / 手札がN枚以上の場合)
             hand_m = re.search(r'手札が(\d+)枚以下(の|の場)', text)
             if hand_m:
                 hand_count = int(hand_m.group(1))
+                # Find split at condition marker before "手札" — handles prefix like "自分の"
+                split_pos = hand_m.start()
+                for marker in ['とき、', '場合、', 'なら、']:
+                    pos = text.rfind(marker, 0, hand_m.start())
+                    if pos >= 0:
+                        split_pos = pos + len(marker)
+                        break
+                first_text = text[:split_pos].strip()
+                second_text = text[split_pos:].rstrip('、。，').strip()
                 hand_cond = {
                     'type': 'comparison_condition',
                     'resource_type': 'hand_count',
                     'location': 'hand',
                     'count': hand_count,
                     'operator': '<=',
-                    'text': f'手札が{hand_count}枚以下の場合'
+                    'text': second_text
                 }
-                # Promote to compound condition
+                # Re-parse first condition from its own text to avoid field leakage
+                full_text = text
+                if first_text and first_text != text:
+                    first_cond = parse_condition(first_text)
+                    if first_cond and first_cond.get('type') not in ('custom', None):
+                        result = first_cond
+                    else:
+                        result['text'] = first_text
+                        # Clear contaminated fields then re-extract from first_text only
+                        for k in ('card_type', 'location', 'target', 'group_names', 'card_property', 'exclude_self'):
+                            result.pop(k, None)
+                        # Re-extract from first_text using helper
+                        _extract_generic_fields(result, first_text)
+                # Promote to compound condition with original full text
                 result = {
                     'type': 'compound',
                     'operator': 'and',
                     'conditions': [result, hand_cond],
-                    'text': text
+                    'text': full_text
                 }
             return result
     return None
@@ -798,8 +800,8 @@ def _try_baton_touch(text):
     if m: result['baton_touch_source'] = m.group(1)
     m = re.search(r'『([^』]+)』からバトンタッチ', text)
     if m: result['baton_touch_group'] = m.group(1)
-    g = extract_group(text)
-    if g: result['group'] = g
+    gns = extract_group_names(text)
+    if gns: result['group_names'] = gns
     if 'コスト' in text:
         if '低い' in text:
             result['comparison_type'] = 'cost'; result['operator'] = '<'
@@ -865,10 +867,14 @@ def _try_either_target(text):
     return None
 
 def _try_movement(text):
-    if '移動した' not in text and '移動している' not in text:
+    if '移動した' not in text and '移動している' not in text and '移動する' not in text:
         return None
-    result = {'type': 'movement_condition', 'movement': 'moved',
-              'movement_state': 'has_moved', 'text': text}
+    result = {'type': 'movement_condition', 'text': text}
+    if '移動する' in text and '移動した' not in text and '移動している' not in text:
+        result['movement'] = 'moves'
+    else:
+        result['movement'] = 'moved'
+        result['movement_state'] = 'has_moved'
     if '移動していない' in text:
         result['negation'] = True
     return result
@@ -877,10 +883,34 @@ def _try_appearance(text):
     if '登場' not in text:
         return None
     result = {'type': 'appearance_condition', 'appearance': True, 'text': text}
+    # Default to stage since abilities almost always check member appearance
+    result['location'] = 'stage'
+    # Extract subject character (the one before が/を登場)
+    # Pattern: 「X」が登場 → X is the subject
+    # Pattern: 「A」よりコストの(大きい|高い)「B」が登場 → B is the subject
+    subject = None
+    m = re.search(r'「([^」]+)」[がを]登場', text)
+    if m:
+        subject = m.group(1)
+    else:
+        # Try to find the last quoted name before 登場 (the subject)
+        quoted = re.findall(r'「([^」]+)」', text[:text.find('登場')])
+        if quoted:
+            subject = quoted[-1]
+    if subject:
+        result['characters'] = [subject]
     if 'エリアすべて' in text:
         result['all_areas'] = True
     if 'バトンタッチ' in text:
         result['baton_touch_trigger'] = True
+    # Propagate target from text
+    tgt = extract_target(text)
+    if tgt: result['target'] = tgt
+    # Extract position (左サイド/右サイド/センター)
+    for kw, pos in POSITION_KEYWORDS.items():
+        if kw in text:
+            result['position'] = pos
+            break
     return result
 
 def _try_energy_state(text):
@@ -1023,6 +1053,13 @@ def _try_state_change(text):
 
     return result
 
+def _try_otherwise(text):
+    """それ以外の場合 — else/otherwise condition."""
+    if 'それ以外の場合' not in text:
+        return None
+    return {'type': 'otherwise_condition', 'text': text}
+
+
 def _try_heart_possession(text):
     if not re.search(r'{{icon_([^}]+)\.png\|[^}}]+}}(?:[^持]*)(持たない|を持つ)', text) and not ('ハート' in text and ('持たない' in text or 'を持つ' in text)):
         return None
@@ -1063,6 +1100,7 @@ def _try_live_mid(text):
 
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
+    # Use positional check for non-contiguous comparison patterns
     # Target
     tgt = extract_target(text)
     if tgt: condition['target'] = tgt
@@ -1097,6 +1135,12 @@ def _extract_generic_fields(condition, text):
                         break
                 else:
                     condition['resource_type'] = 'heart'
+    # Extract heart_colors from any condition text with {{heart_XX.png}} icons
+    # Used by location_condition to check collective presence of specific heart colors
+    hm = re.findall(r'{{heart_(\d+)\.png\|heart\d+}}', text)
+    if hm:
+        colors = sorted(set(f'heart{m.zfill(2)}' for m in hm))
+        condition['heart_colors'] = colors
 
     # Energy count
     if 'エネルギー' in text and '枚' in text:
@@ -1119,8 +1163,17 @@ def _extract_generic_fields(condition, text):
     if op: condition['operator'] = op
 
     # Comparison targets/operators/types
+    # Handle both contiguous "相手より" and non-contiguous "相手が...より"
     for tgt_text, tgt in COMPARISON_TARGETS.items():
-        if tgt_text in text:
+        if tgt_text.endswith('より') and len(tgt_text) >= 4:
+            noun = tgt_text[:-2]  # Remove 2-char marker 'より'
+            if noun in text and 'より' in text:
+                noun_pos = text.find(noun)
+                marker_pos = text.find('より', noun_pos + len(noun))
+                if noun_pos >= 0 and marker_pos > noun_pos:
+                    condition['comparison_target'] = tgt
+                    break
+        elif tgt_text in text:
             condition['comparison_target'] = tgt
             break
     for op_text, op in COMPARISON_OPERATORS.items():
@@ -1155,10 +1208,8 @@ def _extract_generic_fields(condition, text):
     # Movement
     if '移動した' in text:
         condition['movement'] = 'moved'
-        condition['movement_condition'] = 'moved'
     elif '移動する' in text:
         condition['movement'] = 'moves'
-        condition['movement_condition'] = 'moves'
     if '移動している' in text:
         condition['movement_state'] = 'has_moved'
 
@@ -1192,14 +1243,11 @@ def _extract_generic_fields(condition, text):
             condition['values'] = [int(v) for v in re.findall(r'\d+', vm.group(0))]
 
     # Group
-    g = extract_group(text)
-    if g:
-        condition['group'] = g
-    if not g or not g.get('name'):
-        gns = extract_group_names(text)
-        if gns: condition['group_names'] = gns
+    gns = extract_group_names(text)
+    if gns:
+        condition['group_names'] = gns
     # Detect "のみ" (only/all members must match the group)
-    if g or gns:
+    if gns:
         if 'のみの場合' in text or ('のみ' in text and ('ステージ' in text or 'メンバー' in text)):
             condition['all_members'] = True
 
@@ -1218,7 +1266,6 @@ def _extract_generic_fields(condition, text):
 
 def _infer_condition_type(condition, text):
     """Determine condition type from extracted fields (mutates condition in place)."""
-    group = condition.get('group')
     group_names = condition.get('group_names')
     location = condition.get('location')
     card_type = condition.get('card_type')
@@ -1226,7 +1273,7 @@ def _infer_condition_type(condition, text):
     operator = condition.get('operator')
     position = condition.get('position')
 
-    if group or group_names:
+    if group_names:
         condition['type'] = 'group_condition'
         if 'コスト' in text and ('低い' in text or '高い' in text):
             condition['comparison_type'] = 'cost'
@@ -1254,7 +1301,7 @@ def _infer_condition_type(condition, text):
         condition.setdefault('count', 1)
         condition.setdefault('operator', '>=')
         condition['type'] = 'card_count_condition'
-    elif text.strip() and any(k in condition for k in ('operator', 'count', 'location', 'card_type', 'target', 'comparison_type', 'group', 'group_names')):
+    elif text.strip() and any(k in condition for k in ('operator', 'count', 'location', 'card_type', 'target', 'comparison_type', 'group_names')):
         condition.setdefault('count', 1)
         condition.setdefault('operator', '>=')
         condition.setdefault('target', 'self')
@@ -1294,17 +1341,23 @@ def parse_condition(text: str) -> Dict[str, Any]:
         _try_position_change,
         _try_position,
         _try_ability_negation,
+        _try_otherwise,
         _try_heart_possession,
         _try_live_mid,
     ]:
         result = handler(text)
         if result is not None:
             # Add scope/aggregate fields for "自分と相手" conditions
-            # that were returned early (before _extract_generic_fields)
             if 'scope' not in result and '自分と相手' in text:
                 result['scope'] = 'both'
             if 'aggregate' not in result and '合計' in text:
                 result['aggregate'] = 'total'
+            # Add position for ALL condition types (not just appearance_condition)
+            if 'position' not in result:
+                for kw, pos in POSITION_KEYWORDS.items():
+                    if kw in text:
+                        result['position'] = pos
+                        break
             return result
 
     # Fall-through: generic field extraction + type inference
@@ -1395,6 +1448,124 @@ def infer_count_from_icons(d, text):
         d['count'] = int(count_match.group(1))
 
 
+def _fill_defaults(action, text):
+    """Consolidated post-dispatch normalization. Fills defaults every action needs."""
+    a = action.get('action')
+    if a == 'draw':
+        action['action'] = 'draw_card'; a = 'draw_card'
+    if a == 'draw_card':
+        action.setdefault('source', 'deck'); action.setdefault('destination', 'hand')
+    if action.get('source') == 'selected_cards':
+        action.setdefault('count', 1)
+    if a == 'gain_resource' and 'resource' not in action:
+        infer_resource(action, text)
+    if a == 'gain_resource':
+        if action.get('count') is None: infer_count_from_icons(action, text)
+        if action.get('count') is None: action['count'] = 1
+        if action.get('resource') in ('heart', None) and 'heart_color' not in action and 'heart_colors' not in action:
+            hm = re.search(r'{{heart_(\d+)\.png\|heart\d+}}', text)
+            if hm: action['heart_color'] = f'heart{hm.group(1).zfill(2)}'
+    if a == 'gain_resource' and 'duration' not in action:
+        dur = extract_duration(text)
+        if dur: action['duration'] = dur
+    if a == 'modify_score' and 'value' not in action:
+        vm = re.search(r'[+＋](\d+)', text)
+        if vm: action['value'] = int(vm.group(1))
+    if a == 'modify_required_hearts' and 'heart_color' not in action:
+        hm = re.search(r'{{heart_(\d+)\.png\|heart\d+}}', text)
+        if hm: action['heart_color'] = f'heart{hm.group(1).zfill(2)}'
+    if 'original_value' not in action and ('元々持つ' in text or '元々' in text):
+        action['original_value'] = True
+    if 'このカード' in text:
+        action['self_target'] = True
+    # Position from text (for ALL action types, not just appearance_condition)
+    if 'position' not in action and 'exclude_position' not in action and 'source_position' not in action:
+        for kw, pos in POSITION_KEYWORDS.items():
+            if kw in text:
+                action['position'] = pos
+                break
+    if a == 'move_cards' and action.get('destination') == 'hand' and 'source' not in action:
+        action['source'] = 'discard'
+    if a == 'move_cards':
+        if 'source' not in action:
+            s = extract_source(text)
+            if s: action['source'] = s
+        if 'destination' not in action:
+            d = extract_destination(text)
+            if d: action['destination'] = d
+        if 'card_type' not in action:
+            ct = _infer_card_type(text, action)
+            if ct: action['card_type'] = ct
+        if 'state_change' not in action and 'ウェイト状態' in text:
+            action['state_change'] = 'wait'
+        card_type_kws = [('live_card', 'ライブカード'), ('member_card', 'メンバーカード'), ('energy_card', 'エネルギーカード')]
+        if action.get('card_type') and re.search(r'(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)', text):
+            or_types = [t for t, kw in card_type_kws if kw in text]
+            if len(or_types) >= 2:
+                action['or_card_types'] = or_types
+                action.pop('card_type', None)
+    # OR card types for ALL action types (not just move_cards/select)
+    if a not in ('move_cards', 'select') and 'or_card_types' not in action:
+        card_type_kws = [('live_card', 'ライブカード'), ('member_card', 'メンバーカード'), ('energy_card', 'エネルギーカード')]
+        if re.search(r'(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)', text):
+            or_types = [t for t, kw in card_type_kws if kw in text]
+            if len(or_types) >= 2:
+                action['or_card_types'] = or_types
+    if action.get('source') == 'under_member' and a != 'place_energy_under_member':
+        action['action'] = 'place_energy_under_member'; a = 'place_energy_under_member'
+        action.setdefault('energy_count', 1); action.setdefault('target_member', 'this_member')
+    if a == 'move_cards' and action.get('source') in ('revealed_remaining', 'revealed_cards') and 'dynamic_count' not in action:
+        action['dynamic_count'] = {'type': 'revealed_cards', 'reference': 'previous_reveal'}
+    if a == 'move_cards' and action.get('source') == 'revealed_card' and action.get('count') is None:
+        action['count'] = 1
+    if not action.get('all') and re.search(r'すべての|全ての|全部の|全て|全員|全体', text):
+        action['all'] = True
+    if action.get('all'):
+        action.pop('count', None)
+    if 'それぞれ' in text or 'ずつ' in text:
+        action['multiple_targets'] = True
+    if action.get('count') is None and 'dynamic_count' not in action and not action.get('any_number') and not action.get('all'):
+        extracted = extract_count(text)
+        if extracted is not None:
+            action['count'] = extracted
+        else:
+            icon_count = _count_resource_icons(text)
+            if icon_count > 0: action['count'] = icon_count
+            elif a in ('move_cards', 'draw_card', 'gain_resource', 'reveal', 'look_at', 'change_state', 'restriction'):
+                if a == 'change_state' and action.get('group_names'):
+                    pass
+                else:
+                    action['count'] = 1
+    if 'optional' not in action and extract_optional(text):
+        action['optional'] = True
+    if 'max' not in action and extract_max(text):
+        action['max'] = True
+    if '好きな枚数' in text or '好きな枚数まで' in text:
+        action['any_number'] = True
+        action.pop('count', None)
+    if action.get('original_value') and '元々の' in text:
+        cnt = extract_count(text)
+        if cnt is not None:
+            action['original_count'] = cnt
+        op = extract_operator(text)
+        if op: action['original_operator'] = op
+    if a == 'select' and 'のどちらか' in text:
+        or_types = []
+        for t, kw in [('live_card', 'ライブカード'), ('member_card', 'メンバーカード'), ('energy_card', 'エネルギーカード')]:
+            if kw in text:
+                or_types.append(t)
+                if t == 'member_card':
+                    cl = extract_cost_limit(text)
+                    if cl: action['cost_limit'] = cl
+        if len(or_types) >= 2:
+            action['or_card_types'] = or_types
+            action.pop('card_type', None)
+    if action.get('per_unit') and 'dynamic_count' not in action:
+        action['dynamic_count'] = {'type': 'per_unit', 'reference': 'unit_count'}
+        if 'count' in action and action['count'] is None:
+            del action['count']
+
+
 def parse_action(text: str) -> Dict[str, Any]:
     """Parse an action text."""
     # Check for optional draw action "カードを1枚引いてもよい" - CHECK THIS FIRST
@@ -1466,6 +1637,12 @@ def parse_action(text: str) -> Dict[str, Any]:
     action = {'text': text}
     if dur_code:
         action['duration'] = dur_code
+    # Also check for duration keywords embedded in text
+    if 'duration' not in action:
+        if 'ライブ終了時まで' in text:
+            action['duration'] = 'live_end'
+        elif 'このターンの間' in text:
+            action['duration'] = 'this_turn'
     
     # Strip parenthetical notes for the rest of processing
     text = strip_parenthetical(text)
@@ -1601,11 +1778,6 @@ def parse_action(text: str) -> Dict[str, Any]:
         if quoted_exclusions:
             categorized = categorize_quoted_text(quoted_exclusions)
     
-    # Extract group
-    group = extract_group(text)
-    if group:
-        action['group'] = group
-    
     # Extract group names from 『』 brackets
     group_names = extract_group_names(text)
     if group_names:
@@ -1625,9 +1797,12 @@ def parse_action(text: str) -> Dict[str, Any]:
     
     if is_ability_gain:
         action['action'] = 'gain_ability'
+        # Populate ability_gain with the actual ability text
         if quoted_text:
             categorized = categorize_quoted_text(quoted_text)
-            if categorized['characters']:
+            if categorized['abilities']:
+                action['ability_gain'] = categorized['abilities'][0]
+            elif categorized['characters']:
                 # These are likely character names or card names
                 # Convert to QuotedText struct format (text, quoted_type)
                 # Only set if single character - Rust expects single QuotedText, not array
@@ -1735,7 +1910,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: '入れ替える' in t or '入れ替えて' in t, 'position_change', None)
     R(lambda t: 'フォーメーションチェンジ' in t, 'formation_change',
       lambda t, a: a.update({'optional': extract_optional(t), 'multiple_targets': True}))
-    R(lambda t: '{{icon_energy.png|E}}' in t and '支払う' in t, 'pay_energy', 
+    R(lambda t: '{{icon_energy.png|E}}' in t and ('支払う' in t or '支払って' in t) and '選び' not in t, 'pay_energy', 
       lambda t, a: a.update({'energy': t.count('{{icon_energy.png|E}}'), 'optional': 'もよい' in t or 'してもよい' in t}) or None)
     R(lambda t, a: destination == 'under_member' and ('エネルギー' in t or 'energy_card' in t), 'place_energy_under_member',
       lambda t, a: a.update({'energy_count': count or 1}))
@@ -1777,7 +1952,7 @@ def parse_action(text: str) -> Dict[str, Any]:
       )[-1])
     R(lambda t: '移動させ' in t and 'エリア' in t, 'position_change', None)
     R(lambda t: '移動させ' in t and 'エリア' not in t, 'move_cards', None)
-    R(lambda t: '置く' in t or '置いて' in t, 'move_cards',
+    R(lambda t: '置く' in t or '置いて' in t or '置き' in t, 'move_cards',
       lambda t, a: a.update({'destination': extract_destination(t)}) if 'destination' not in a else None)
     R(lambda t: 'ブレードを得る' in t or '選んだブレード' in t, 'gain_resource',
       lambda t, a: a.update({'resource': 'blade', 'count': _ic(t, '{{icon_blade.png|ブレード}}')}))
@@ -1792,7 +1967,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R('公開する', 'reveal', lambda t, a: a.update({'source': source or 'hand'}))
     R(lambda t: '1枚ずつ公開' in t or '枚ずつ公開' in t, 'reveal', 
       lambda t, a: (a.update({'per_unit': True, 'per_unit_count': 1, 'multiple_targets': True}), None))
-    R(lambda t: '選ぶ' in t or '選ん' in t, 'select', None)
+    R(lambda t: '選ぶ' in t or '選ん' in t or '選び' in t, 'select', None)
     R(lambda t: 'ブレードを得る' in t or '選んだブレード' in t, 'gain_resource',
       lambda t, a: None)  # already matched above, this is fallback
     R(lambda t: 'ハートを得る' in t or '選んだハート' in t, 'gain_resource', None)
@@ -1830,7 +2005,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: 'デッキの上に置き' in t or 'デッキの上に置く' in t, 'move_cards',
       lambda t, a: a.update({'destination': 'deck_top', 'placement_order': 'any_order'} if '好きな順番で' in t else {'destination': 'deck_top'}))
     R(lambda t: ('エール' in t and ('枚数' in t or '数' in t)), 'modify_yell_count', None)
-    R('得る', 'gain_ability', None)
+    R('得る', 'gain_ability', lambda t, a: a.update({'ability_gain': re.sub(r'\{\{[^}]+\}\}', '', t).replace('「', '').replace('」', '').strip()}) if a.get('ability_gain') is None else None)
     R(lambda t: ('セット' in t or '設定' in t) and 'コスト' not in t, 'set_card_identity', None)
     R('必要ハートを選ぶ', 'choose_required_hearts', None)
     R('好きな順番で', 'move_cards', lambda t, a: a.update({'placement_order': 'any_order'}))
@@ -1857,104 +2032,7 @@ def parse_action(text: str) -> Dict[str, Any]:
                 except: pass
             break
 
-    # ---- Post-dispatch normalization (was normalize_action) ----
-    a = action.get('action')
-    if a == 'draw':
-        action['action'] = 'draw_card'; a = 'draw_card'
-    if a == 'draw_card':
-        action.setdefault('source', 'deck'); action.setdefault('destination', 'hand')
-    if action.get('source') == 'selected_cards':
-        action.setdefault('count', 1)
-    if a == 'gain_resource' and 'resource' not in action:
-        infer_resource(action, text)
-    if a == 'gain_resource':
-        if action.get('count') is None: infer_count_from_icons(action, text)
-        if action.get('count') is None: action['count'] = 1
-    if a == 'gain_resource' and 'duration' not in action:
-        dur = extract_duration(text)
-        if dur: action['duration'] = dur
-    if a == 'modify_score' and 'value' not in action:
-        vm = re.search(r'[+＋](\d+)', text)
-        if vm: action['value'] = int(vm.group(1))
-    # Mark original_value for 元々持つ/元々 patterns
-    if 'original_value' not in action and ('元々持つ' in text or '元々' in text):
-        action['original_value'] = True
-    if 'このカード' in text:
-        action['self_target'] = True
-    # Infer source for recovery: move_cards to hand with no source → discard
-    if a == 'move_cards' and action.get('destination') == 'hand' and 'source' not in action:
-        action['source'] = 'discard'
-    if a == 'move_cards':
-        if 'source' not in action:
-            s = extract_source(text)
-            if s: action['source'] = s
-        if 'destination' not in action:
-            d = extract_destination(text)
-            if d: action['destination'] = d
-        if 'card_type' not in action:
-            ct = _infer_card_type(text, action)
-            if ct: action['card_type'] = ct
-        if 'state_change' not in action and 'ウェイト状態' in text:
-            action['state_change'] = 'wait'
-    if action.get('source') == 'under_member' and a != 'place_energy_under_member':
-        action['action'] = 'place_energy_under_member'; a = 'place_energy_under_member'
-        action.setdefault('energy_count', 1); action.setdefault('target_member', 'this_member')
-    if a == 'move_cards' and action.get('source') in ('revealed_remaining', 'revealed_cards') and 'dynamic_count' not in action:
-        action['dynamic_count'] = {'type': 'revealed_cards', 'reference': 'previous_reveal'}
-    if a == 'move_cards' and action.get('source') == 'revealed_card' and action.get('count') is None:
-        action['count'] = 1
-    # Detect すべて/全 (all) — set flag; suppress count when all is set
-    if not action.get('all') and re.search(r'すべての|全ての|全部の|全て|全員|全体', text):
-        action['all'] = True
-    if action.get('all'):
-        action.pop('count', None)
-    # Detect それぞれ (each/respectively) — multiple targets
-    if 'それぞれ' in text or 'ずつ' in text:
-        action['multiple_targets'] = True
-    if action.get('count') is None and 'dynamic_count' not in action and not action.get('any_number') and not action.get('all'):
-        extracted = extract_count(text)
-        if extracted is not None:
-            action['count'] = extracted
-        else:
-            icon_count = _count_resource_icons(text)
-            if icon_count > 0: action['count'] = icon_count
-            elif a in ('move_cards', 'draw_card', 'gain_resource', 'reveal', 'look_at', 'change_state', 'restriction'):
-                # For change_state with group filter, no count means "all matching"
-                if a == 'change_state' and (action.get('group') or action.get('group_names')):
-                    pass  # No count = change all matching
-                else:
-                    action['count'] = 1
-    if 'optional' not in action and extract_optional(text):
-        action['optional'] = True
-    if 'max' not in action and extract_max(text):
-        action['max'] = True
-
-    # Extract original value constraints (e.g. "元々のブレードの数が1つ以下")
-    if action.get('original_value') and '元々の' in text:
-        cnt = extract_count(text)
-        if cnt is not None:
-            action['original_count'] = cnt
-        op = extract_operator(text)
-        if op: action['original_operator'] = op
-    
-    # Detect OR card types in select: "AかBのどちらか"
-    if a == 'select' and 'のどちらか' in text:
-        or_types = []
-        for t, kw in [('live_card', 'ライブカード'), ('member_card', 'メンバーカード'), ('energy_card', 'エネルギーカード')]:
-            if kw in text:
-                or_types.append(t)
-                if t == 'member_card':
-                    cl = extract_cost_limit(text)
-                    if cl: action['cost_limit'] = cl
-        if len(or_types) >= 2:
-            action['or_card_types'] = or_types
-            action.pop('card_type', None)  # Remove single card_type, use or_card_types instead
-    
-    if action.get('per_unit') and 'dynamic_count' not in action:
-        action['dynamic_count'] = {'type': 'per_unit', 'reference': 'unit_count'}
-        if 'count' in action and action['count'] is None:
-            del action['count']
-
+    _fill_defaults(action, text)
     return action
 
 
@@ -2056,7 +2134,6 @@ def parse_cost(text: str) -> Dict[str, Any]:
     # Reveal cost (公開する/公開し)
     if '公開する' in text or '公開し' in text:
         cost['type'] = 'reveal'
-        cost['action'] = 'reveal'
         if '手札' in text: cost['source'] = 'hand'
         cm = re.search(REGEX_COUNT_CARDS, text)
         if cm: cost['count'] = int(cm.group(1))
@@ -2079,7 +2156,6 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if any(kw in text for kw in deck_bottom_kw):
         cost['destination'] = 'deck_bottom'
         cost['type'] = 'move_cards'
-        cost['action'] = 'move_cards'
         # Extract common fields that were previously extracted before this check
         src = extract_source(text)
         if src: cost['source'] = src
@@ -2091,6 +2167,12 @@ def parse_cost(text: str) -> Dict[str, Any]:
         if gns: cost['group_names'] = gns
         cnt = extract_count(text)
         if cnt: cost['count'] = cnt
+        ct = extract_card_type(text)
+        if ct: cost['card_type'] = ct
+        tgt = extract_target(text)
+        if tgt: cost['target'] = tgt
+        if '好きな順番で' in text:
+            cost['placement_order'] = 'any_order'
         return cost
     
     # Extract common fields
@@ -2193,7 +2275,9 @@ def _try_per_unit(text):
                     cond_text = per_text[:t_pos + 2].rstrip('、').strip()
                     remaining = per_text[t_pos + len(mark):].strip()
                     if cond_text and remaining:
-                        result['raw_condition'] = cond_text
+                        cond = parse_condition(cond_text)
+                        if cond and cond.get('type') != 'custom':
+                            result['condition'] = cond
                         per_text = remaining
                     break
     # Also check for 時、pattern (any form, kanji) at a position not inside ライブ終了時まで
@@ -2203,7 +2287,9 @@ def _try_per_unit(text):
             cond_text = per_text[:t_pos + 1].strip()  # Include 時
             remaining = per_text[t_pos + 2:].strip()
             if cond_text and remaining:
-                result['raw_condition'] = cond_text
+                cond = parse_condition(cond_text)
+                if cond and cond.get('type') != 'custom':
+                    result['condition'] = cond
                 per_text = remaining
 
     # Extract duration from per_text (e.g., "ライブ終了時まで、カード1枚につき")
@@ -2232,7 +2318,7 @@ def _try_per_unit(text):
         result['per_unit_type'] = 'discard'
 
     gm = re.search(r'『([^』]+)』', per_text)
-    if gm: result['group'] = {'name': gm.group(1)}
+    if gm: result['group_names'] = [gm.group(1)]
     if '名前の異なる' in per_text or 'カード名の異なる' in per_text:
         result['distinct'] = 'card_name'
 
@@ -2320,18 +2406,18 @@ def _try_per_unit(text):
 
 def _propagate(src, dst):
     """Copy common per-unit fields from src to dst (overwrites existing)."""
-    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct',
+    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group_names', 'distinct',
               'timing_condition', 'state', 'location', 'cost_limit', 'cost_limit_operator',
-              'duration', 'condition', 'raw_condition', 'target'):
+              'duration', 'condition', 'target'):
         if k in src:
             dst[k] = src[k]
 
 
 def _propagate_if_missing(src, dst):
     """Copy common per-unit fields from src to dst only if not already present."""
-    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group', 'distinct',
+    for k in ('per_unit', 'per_unit_count', 'per_unit_type', 'group_names', 'distinct',
               'timing_condition', 'state', 'location', 'cost_limit', 'cost_limit_operator',
-              'duration', 'condition', 'raw_condition', 'target'):
+              'duration', 'condition', 'target'):
         if k in src and k not in dst:
             dst[k] = src[k]
 
@@ -2400,7 +2486,7 @@ def _try_activation_suffix(text):
     cond_text = 'この能力は、' + m.group(1).strip() + '場合のみ' + suffix
     action_text = text.replace(cond_text, '').strip().rstrip('。')
     action = parse_action(action_text)
-    result = {'text': text, 'activation_condition': cond_text}
+    result = {'text': text}
     result.update(action)
     cond_parsed = parse_condition(m.group(1).strip() + '場合')
     if cond_parsed.get('type') != 'custom':
@@ -2439,8 +2525,10 @@ def _try_cost_modification(text):
             first, second = parts[0].strip(), parts[1].strip()
             if any(p in second for p in cost_prefixes):
                 op = 'subtract'
-                return {'text': text, 'action': 'sequential',
-                        'actions': [parse_action(first), _make_cost_mod_action(second, op)]}
+                # Return ONLY the modify_cost action — the cost reduction is a passive modifier,
+                # not a sibling action that runs alongside the main effect.
+                # The main effect (first part) will be handled by subsequent handlers or parse_action fallback.
+                return _make_cost_mod_action(second, op)
     return {'action': 'modify_cost', 'operation': 'subtract',
             'text': text, 'count': energy_count}
 
@@ -2502,11 +2590,15 @@ def _try_each_time(text):
     sub = parse_effect(rest)
     sub['trigger_type'] = 'each_time'
     sub['text'] = text
-    # Try to parse OR condition in the trigger text (e.g., "登場か、エリアを移動するたび")
+    # Parse the trigger condition text
     if 'か、' in trigger_text:
         or_cond = _try_or(trigger_text)
         if or_cond:
             sub['trigger_condition'] = or_cond
+    else:
+        trigger_cond = parse_condition(trigger_text)
+        if trigger_cond and trigger_cond.get('type') != 'custom':
+            sub['trigger_condition'] = trigger_cond
     return sub
 
 
@@ -2628,6 +2720,10 @@ def _build_look_select_actions(select_text):
                 act = _build_reveal_add_discard(fp, parts[1].strip(), select_text)
                 if act: _enrich_from_text(act, select_text); return act
             fa = parse_action(fp)
+            if fa.get('action') == 'custom' and ('{{heart_' in fp or 'ハートに' in fp):
+                fa['action'] = 'select'
+                ct = extract_card_type(fp)
+                if ct: fa['card_type'] = ct
             if fa.get('action') == 'move_cards': fa['destination'] = 'hand'; fa['source'] = 'looked_at'
             sa = parse_action(parts[1].strip())
             if sa.get('action') == 'move_cards':
@@ -2654,6 +2750,15 @@ def _build_look_select_actions(select_text):
     if act.get('action') == 'custom':
         if '手札に加える' in select_text: act['action'] = 'move_cards'; act['destination'] = 'hand'
         elif '控え室に置く' in select_text: act['action'] = 'move_cards'; act['destination'] = 'discard'
+        # Detect heart-color filter criteria (e.g. "ハートに{{heart_04.png|heart04}}を2個以上持つメンバーカードか")
+        elif 'ハートに{{heart_' in select_text or '{{heart_' in select_text:
+            act['action'] = 'select'
+            if act.get('card_type') is None:
+                ct = extract_card_type(select_text)
+                if ct: act['card_type'] = ct
+            if act.get('count') is None:
+                cnt = extract_count(select_text)
+                if cnt: act['count'] = cnt
     return act
 
 
@@ -2793,7 +2898,6 @@ def _try_compound_select(text):
     sel2 = {'action': 'select', 'count': 1, 'card_type': 'member_card',
             'exclude_selected': True}
     if group_names:
-        sel2['group'] = {'name': group_names[0]}
         sel2['group_names'] = group_names
     actions.append(sel2)
     # Check if the action is gain_resource
@@ -3019,11 +3123,7 @@ def _try_conditional(text):
             ct = text[:t_pos + 1].strip()
             at = text[t_pos + 2:].strip()
             cond = parse_condition(ct)
-            if cond.get('type') == 'custom':
-                # Store as raw_condition if parse_condition doesn't recognize it
-                result = {'text': text, 'raw_condition': ct}
-            else:
-                result = {'text': text, 'condition': cond}
+            result = {'text': text, 'condition': cond}
             at = at.lstrip('、')
             at, dur = _strip_duration_prefix(at)
             at = strip_suffix_period(at)
@@ -3144,8 +3244,11 @@ def _try_baton_touch_effect(text):
 
 
 def _try_kore_niyori_result(text):
-    """これにより～した場合 — conditional on result (invalidation follow-up)."""
-    if 'これにより無効にした場合' not in text and 'これにより控え室に置いた場合' not in text:
+    """これにより～した場合 — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
+    if 'これにより' not in text or '場合' not in text:
+        return None
+    m = re.search(r'これにより(.+?)場合', text)
+    if not m:
         return None
     parts = text.split('これにより', 1)
     sp = 'これにより' + parts[1].strip()
@@ -3157,7 +3260,7 @@ def _try_kore_niyori_result(text):
     if cond.get('type') == 'custom':
         cond = None
     return {'text': text, 'action': 'conditional_on_result',
-            'primary_action': parse_action(parts[0].strip()),
+            'primary_effect': parse_action(parts[0].strip()),
             'result_condition': cond,
             'followup_action': parse_action(fp.strip())}
 
@@ -3463,17 +3566,14 @@ def _merge_parenthetical(target, parenthetical):
     target['parenthetical'] = parenthetical
     for note in parenthetical:
         if '起動できる' in note or '発動する' in note:
-            target['activation_condition'] = note
             # Only parse positional conditions from parenthetical notes
             # (e.g. "センターエリアにいる場合のみ発動できる").
             # Informational notes like "対戦相手のカードの効果でも発動する"
-            # should NOT be parsed into activation_condition_parsed.
+            # are stored in text, not parsed.
             if 'センター' in note or 'サイド' in note or 'エリアにいる場合' in note:
                 cond_parsed = parse_condition(note)
                 if cond_parsed and cond_parsed.get('type') != 'custom':
                     target['activation_condition_parsed'] = cond_parsed
-            else:
-                target['activation_condition_parsed'] = None
             if 'センターエリア' in note: target['activation_position'] = 'center'
             elif '左サイドエリア' in note or '左サイド' in note: target['activation_position'] = 'left_side'
             elif '右サイドエリア' in note or '右サイド' in note: target['activation_position'] = 'right_side'
@@ -3497,6 +3597,24 @@ def parse_effect(text: str) -> Dict[str, Any]:
     # Extract parenthetical notes
     parenthetical = extract_parenthetical(text)
     text = strip_parenthetical(text)
+    
+    # Also check the full original text for activation condition patterns (e.g.
+    # "（この能力はセンターエリアに登場している場合のみ起動できる。）") that
+    # may have been in parenthetical notes. Extract them early so they can be
+    # propagated to the effect even if _merge_parenthetical fails.
+    extra_activation_cond = None
+    extra_activation_pos = None
+    if parenthetical:
+        import sys; print(f"[PAREN] {len(parenthetical)} note(s), first={parenthetical[0][:40]}", file=sys.stderr)
+    for note in parenthetical:
+        if '起動できる' in note or '発動する' in note:
+            if 'センター' in note or 'サイド' in note or 'エリアにいる場合' in note:
+                cond_parsed = parse_condition(note)
+                if cond_parsed and cond_parsed.get('type') != 'custom':
+                    extra_activation_cond = cond_parsed
+            if 'センターエリア' in note: extra_activation_pos = 'center'
+            elif '左サイドエリア' in note or '左サイド' in note: extra_activation_pos = 'left_side'
+            elif '右サイドエリア' in note or '右サイド' in note: extra_activation_pos = 'right_side'
 
     # Try all handlers in priority order
     for handler in _EFFECT_HANDLERS:
@@ -3507,22 +3625,42 @@ def parse_effect(text: str) -> Dict[str, Any]:
             if 'duration' in effect and 'duration' not in result:
                 result['duration'] = effect['duration']
             # Propagate duration to sub-actions in sequential/choice/conditional_alternative effects
-            if result.get('duration'):
+            dur = result.get('duration')
+            if dur:
                 if result.get('action') in ('sequential', 'conditional_alternative'):
                     for sub in result.get('actions', []):
                         if 'duration' not in sub and sub.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
-                            sub['duration'] = result['duration']
+                            sub['duration'] = dur
                     for key in ('primary_effect', 'alternative_effect'):
                         sub = result.get(key)
                         if sub and 'duration' not in sub and sub.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
-                            sub['duration'] = result['duration']
-                if result.get('action') == 'choice':
-                    for opt in result.get('options', []):
-                        if 'duration' not in opt and opt.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
-                            opt['duration'] = result['duration']
-            return result
+                            sub['duration'] = dur
+            # Handle choice and conditional_on_result results with early return
+            dur = result.get('duration')
+            if result.get('action') == 'choice':
+                for opt in result.get('options', []):
+                    if dur and 'duration' not in opt and opt.get('action') in ('gain_resource', 'modify_score', 'change_state', 'set_blade_count'):
+                        opt['duration'] = dur
+                return result
+            if result.get('action') == 'conditional_on_result':
+                for key in ('primary_effect', 'followup_action'):
+                    sub = result.get(key)
+                    if sub and dur and 'duration' not in sub:
+                        sub['duration'] = dur
+                return result
+            # For all other handlers, use the result as the effect directly
+            # (do NOT run parse_action on the full text — that would leak
+            #  card_type/target/etc from the condition into the effect)
+            effect = result
+            _merge_parenthetical(effect, parenthetical)
+            if extra_activation_cond and 'activation_condition_parsed' not in effect:
+                import sys; print(f"[ACTIVATION] setting activation_condition_parsed on effect", file=sys.stderr)
+                effect['activation_condition_parsed'] = extra_activation_cond
+            if extra_activation_pos and 'activation_position' not in effect:
+                effect['activation_position'] = extra_activation_pos
+            return effect
 
-    # Fallback: parse as single action
+    # No handler matched: fallback to parse_action
     effect.pop('_rest', None)
     fallback_text = text
 
@@ -3530,6 +3668,10 @@ def parse_effect(text: str) -> Dict[str, Any]:
     effect.update(action)
 
     _merge_parenthetical(effect, parenthetical)
+    if extra_activation_cond and 'activation_condition_parsed' not in effect:
+        effect['activation_condition_parsed'] = extra_activation_cond
+    if extra_activation_pos and 'activation_position' not in effect:
+        effect['activation_position'] = extra_activation_pos
 
     # Post-fallback exact text matches
     normalized = re.sub(r'\s+', '', fallback_text)
@@ -3653,7 +3795,6 @@ def _normalize_effect_tree(effect, original_text=None):
                     pos = _has_position_keywords(note)
                     if pos:
                         d['activation_position'] = pos
-                        d['activation_condition'] = note
                         break
 
         # Propagate exclude_self from text context to sub-actions
@@ -3773,15 +3914,67 @@ def _normalize_effect_tree(effect, original_text=None):
     return _walk(effect, original_text)
 
 
+def _strip_parenthetical(text):
+    """Remove parenthetical notes (rule clarifications) before parsing."""
+    text = re.sub(r'（[^）]*）', '', text)
+    text = re.sub(r'\([^)]*\)', '', text)
+    return text.strip()
+
+
+def _clean(obj):
+    """Recursively remove null/false/0/empty fields from dicts/lists."""
+    if isinstance(obj, dict):
+        return {k: _clean(v) for k, v in obj.items()
+                if v is not None and v is not False and v != 0 and v != [] and v != {} and v != ''}
+    if isinstance(obj, list):
+        cleaned = [_clean(item) for item in obj]
+        return [x for x in cleaned if x is not None and x != {}]
+    return obj
+
+
+# Required field validators per action type
+_VALIDATORS = {
+    'gain_resource': {'required': ['resource', 'count']},
+    'move_cards': {'required': ['source', 'destination']},
+    'draw_card': {'required': ['count']},
+    'modify_score': {'required': ['operation', 'value']},
+    'modify_required_hearts': {'required': ['heart_color', 'count']},
+    'change_state': {'required': ['state_change']},
+}
+
+
+def _validate_effect(eff, context=''):
+    """Check required fields for each action type. Non-fatal warnings."""
+    if not isinstance(eff, dict):
+        return
+    action = eff.get('action', eff.get('type', ''))
+    rules = _VALIDATORS.get(action)
+    if rules:
+        for field in rules['required']:
+            if field not in eff or eff[field] is None:
+                import sys
+                print(f'[VALIDATION] {context} {action} missing required field: {field}', file=sys.stderr)
+    for sub_key in ('actions', 'options', 'primary_effect', 'followup_action',
+                    'optional_action', 'conditional_action',
+                    'look_action', 'select_action', 'opponent_action'):
+        sub = eff.get(sub_key)
+        if isinstance(sub, dict):
+            _validate_effect(sub, context)
+        elif isinstance(sub, list):
+            for item in sub:
+                _validate_effect(item, context)
+
+
 def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     """Parse a complete ability text."""
-    triggerless_text = normalize(triggerless_text)
+    triggerless_text = normalize(triggerless_text.strip())
     
     ability = {
         'triggerless_text': triggerless_text,
     }
     
-    # Split cost and effect
+    # Split cost and effect (no need to pre-strip parenthetical — 
+    # the activation conditions in （...） are needed for later processing)
     cost_text, effect_text = split_cost_effect(triggerless_text)
     
     # Parse cost
@@ -3791,13 +3984,16 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
     # Parse effect
     if effect_text:
         effect = parse_effect(effect_text)
-        # If the effect handler embedded a cost (e.g. "unless pay N energy"),
-        # lift it to the ability level (Q92: player chooses whether to pay)
         if isinstance(effect, dict) and 'cost' in effect:
             ability['cost'] = effect.pop('cost')
-        # Run post-processing normalizer on the parsed effect
         effect = _normalize_effect_tree(effect, triggerless_text)
+        effect = _clean(effect)
+        _validate_effect(effect, triggerless_text[:40])
         ability['effect'] = effect
+    
+    # Clean cost too
+    if 'cost' in ability:
+        ability['cost'] = _clean(ability['cost'])
     
     return ability
 

@@ -44,31 +44,19 @@ export const GameService = {
         try {
             if (State.replayMode) return;
 
-            // Simple state machine: get current state and actions
-            const [stateRes, actionsRes] = await Promise.all([
-                fetch('api/game-state'),
-                fetch('api/actions')
-            ]);
-
-            if (!stateRes.ok) {
-                throw new Error(`State fetch failed: ${stateRes.status}`);
+            const res = await fetch('api/game-state');
+            if (!res.ok) {
+                throw new Error(`State fetch failed: ${res.status}`);
             }
 
-            const data = await stateRes.json();
-            console.log('DEBUG: Frontend received state:', data.phase, data.legal_actions?.length || 0, 'actions');
-
-            // Get actions if available
-            let legalActions = [];
-            if (actionsRes.ok) {
-                const actionsData = await actionsRes.json();
-                legalActions = actionsData.actions.map((action, index) => ({
+            const data = await res.json();
+            if (data.legal_actions) {
+                data.legal_actions = data.legal_actions.map((action, index) => ({
                     ...action,
                     index: action.index !== undefined ? action.index : index
                 }));
-                console.log('DEBUG: Frontend received actions:', legalActions);
             }
 
-            data.legal_actions = legalActions;
             updateStateData(data);
             State.gameHasStarted = true;
 
@@ -125,7 +113,6 @@ export const GameService = {
         if (networkFacade?.clearPlannerData) networkFacade.clearPlannerData();
 
         try {
-            // Updated endpoint to match current backend
             const res = await fetch('api/init', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
@@ -148,21 +135,12 @@ export const GameService = {
             State.lastStateJson = text;
             const data = JSON.parse(text);
 
-            // Fetch legal actions after reset
-            let legalActions = [];
-            try {
-                const actionsRes = await fetch('api/actions');
-                if (actionsRes.ok) {
-                    const actionsData = await actionsRes.json();
-                    legalActions = (actionsData.actions || []).map((action, index) => ({
-                        ...action,
-                        index: action.index !== undefined ? action.index : index
-                    }));
-                }
-            } catch (e) {
-                console.warn('Failed to fetch legal actions:', e);
+            if (data.legal_actions) {
+                data.legal_actions = data.legal_actions.map((action, index) => ({
+                    ...action,
+                    index: action.index !== undefined ? action.index : index
+                }));
             }
-            data.legal_actions = legalActions;
 
             updateStateData(data);
             window.lastShownPerformanceHash = "";

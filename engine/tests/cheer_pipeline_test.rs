@@ -31,8 +31,8 @@ fn cheer_pipeline_draw_and_score_icons() {
         game.state.player1.main_deck.cards.push(filler);
     }
 
-    let hand_before = game.state.player1.hand.len();
-    let deck_before = game.state.player1.main_deck.len();
+    let _hand_before = game.state.player1.hand.len();
+    let _deck_before = game.state.player1.main_deck.len();
 
     // Advance to live start
     advance_to_live_card_set_p1(&mut game);

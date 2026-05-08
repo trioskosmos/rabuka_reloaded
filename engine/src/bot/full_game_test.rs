@@ -191,7 +191,7 @@ pub fn test_full_game() {
             &chosen_action.action_type,
             chosen_action.parameters.as_ref().and_then(|p| p.card_id),
             chosen_action.parameters.as_ref().and_then(|p| p.card_indices.as_ref()).cloned(),
-            chosen_action.parameters.as_ref().and_then(|p| p.stage_area),
+            chosen_action.parameters.as_ref().and_then(|p| p.stage_area_member()),
             chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
         );
 

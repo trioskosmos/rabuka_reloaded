@@ -151,7 +151,7 @@ fn vitamin_hand_less_or_equal_no_score() {
     game.pass();
     game.pass();
 
-    let score_mod = game.state.get_score_modifier(vitamin);
+    let _score_mod = game.state.get_score_modifier(vitamin);
     let score_mod = game.state.get_score_modifier(vitamin);
     assert_eq!(score_mod, 0,
         "No score bonus when P1 hand <= P2 hand");

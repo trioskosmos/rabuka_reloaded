@@ -248,8 +248,8 @@ def check_condition(cond, context):
         for sub in cond.get('conditions', []):
             check_condition(sub, context)
     if t == 'group_condition':
-        if 'group' not in cond or cond.get('group') is None:
-            results['8'].append((context, f"group_condition missing group field"))
+        if 'group_names' not in cond or not cond.get('group_names'):
+            results['8'].append((context, f"group_condition missing group_names field"))
 
 for ab in abilities:
     desc = describe(ab)

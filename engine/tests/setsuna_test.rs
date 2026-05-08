@@ -11,8 +11,6 @@
 
 mod helpers;
 use helpers::*;
-use rabuka_engine::zones::MemberArea;
-
 /// Q157: Wait-energy can be placed under the member.
 /// Cost paid with active energy; placement pops wait-energy from zone.
 #[test]

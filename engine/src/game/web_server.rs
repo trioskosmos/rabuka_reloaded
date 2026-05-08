@@ -1,105 +1,33 @@
 use actix_web::{web, App, HttpResponse, HttpServer, Responder};
 use actix_files as fs;
 use actix_cors::Cors;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
-
-
 use crate::game_state::GameState;
-
 use crate::player::Player;
-
 use crate::card_loader;
-
 use crate::card::CardDatabase;
-
 use crate::deck_parser;
-
 use crate::deck_builder;
-
+use crate::game_setup::{ActionParameters, ActionType};
 use crate::ability::resolver::AbilityResolver;
-
-
+use crate::display;
 
 pub use crate::display::{CardDisplay, ZoneDisplay, PlayerDisplay, StageDisplay, GameStateDisplay};
 
 
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-
-pub struct ActionParameters {
-
-    pub card_id: Option<i16>, // Database card ID - reliable identifier
-
-    pub card_index: Option<usize>, // Array position - kept for backward compatibility
-
-    pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
-
-    pub stage_area: Option<String>,
-
-    pub use_baton_touch: Option<bool>, // Whether to use baton touch cost reduction
-
-    // Card grouping information for improved UI
-
-    pub card_name: Option<String>,
-
-    pub card_no: Option<String>,
-
-    pub base_cost: Option<u32>,
-
-    pub final_cost: Option<u32>,
-
-    pub available_areas: Option<Vec<WebAreaInfo>>,
-
-}
-
-
-
 #[derive(Serialize, Deserialize, Clone, Debug)]
-
-pub struct WebAreaInfo {
-
-    pub area: String,
-
-    pub available: bool,
-
-    pub cost: u32,
-
-    pub is_baton_touch: bool,
-
-    pub existing_member_name: Option<String>,
-
-}
-
-
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-
-pub struct Action {
-
+pub struct ActionIndex {
     pub description: String,
-
     pub action_type: String,
-
     pub parameters: Option<ActionParameters>,
-
     pub index: usize,
-
-}
-
-
-
-#[derive(Serialize, Deserialize)]
-
-pub struct ActionsResponse {
-
-    pub actions: Vec<Action>,
-
 }
 
 
@@ -166,7 +94,7 @@ pub struct Room {
 
     #[allow(dead_code)]
 
-    pub game_state: Option<Arc<Mutex<GameState>>>, // Per-room game state
+    pub game_state: Option<Arc<RwLock<GameState>>>, // Per-room game state
 
 }
 
@@ -276,43 +204,29 @@ impl Default for UiConfig {
 
 pub struct AppState {
 
-    pub game_state: Arc<Mutex<GameState>>,
+    pub game_state: Arc<RwLock<GameState>>,
 
     pub rooms: Arc<Mutex<HashMap<String, Room>>>,
 
     pub ui_config: Arc<Mutex<UiConfig>>,
 
+    pub card_database: Arc<CardDatabase>,
+
+    pub deck_lists: Arc<Vec<deck_parser::DeckList>>,
+
+    pub card_registry: Arc<serde_json::Value>,
+
 }
 
 
 
-pub fn card_to_display(card_id: i16, card_db: &crate::card::CardDatabase, orientation: Option<crate::zones::Orientation>, blade_modifier: i32) -> Option<CardDisplay> {
-    crate::display::card_to_display(card_id, card_db, orientation, blade_modifier)
-}
-
-pub fn zone_to_display_from_card_ids(cards: &[i16], card_db: &crate::card::CardDatabase) -> ZoneDisplay {
-    crate::display::zone_to_display(cards, card_db)
-}
-
-pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &crate::card::CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> StageDisplay {
-    crate::display::stage_to_display(stage, card_db, blade_modifiers)
-}
-
-pub fn player_to_display(player: &crate::player::Player, card_db: &crate::card::CardDatabase, blade_modifiers: &crate::mod_map::ModMap<i32>) -> PlayerDisplay {
-    crate::display::player_to_display(player, card_db, blade_modifiers)
-}
-
-pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
-    crate::display::game_state_to_display(game_state)
-}
-
-fn display_with_ui_state(display: GameStateDisplay, ui_config: &UiConfig) -> serde_json::Value {
+fn display_with_ui_state(display: display::GameStateDisplay, ui_config: &UiConfig) -> serde_json::Value {
     let mut json = serde_json::to_value(display).unwrap();
     json["ui_config"] = serde_json::to_value(ui_config).unwrap();
     json
 }
 
-fn resolve_game_state_arc(data: &AppState) -> Arc<Mutex<GameState>> {
+fn resolve_game_state_arc(data: &AppState) -> Arc<RwLock<GameState>> {
     let rooms = data.rooms.lock().unwrap();
     if rooms.is_empty() {
         return data.game_state.clone();
@@ -321,102 +235,63 @@ fn resolve_game_state_arc(data: &AppState) -> Arc<Mutex<GameState>> {
     latest.game_state.as_ref().unwrap_or(&data.game_state).clone()
 }
 
+macro_rules! lock_state {
+    ($arc:expr, $mode:ident) => {{
+        match ($arc).$mode() {
+            Ok(guard) => guard,
+            Err(e) => {
+                eprintln!("Lock poisoned: {}", e);
+                return HttpResponse::InternalServerError().json("Internal error");
+            }
+        }
+    }};
+}
+
 async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
     let gs_arc = resolve_game_state_arc(&data);
-    let game_state = match gs_arc.lock() {
-        Ok(guard) => guard,
-        Err(e) => {
-            eprintln!("Mutex poisoned in get_game_state: {}", e);
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-        }
-    };
-
-    let display = game_state_to_display(&game_state);
+    let game_state = lock_state!(gs_arc, read);
+    let display = crate::display::game_state_to_display(&game_state);
+    let actions = crate::game_setup::generate_possible_actions(&game_state).into_iter().enumerate().map(|(i, a)| ActionIndex {
+        description: a.description,
+        action_type: a.action_type.to_string(),
+        parameters: a.parameters,
+        index: i,
+    }).collect::<Vec<_>>();
     drop(game_state);
 
+    let mut json = serde_json::to_value(display).unwrap();
+    json["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
+
     let ui_config = data.ui_config.lock().unwrap();
-    let response = display_with_ui_state(display, &ui_config);
+    json["ui_config"] = serde_json::to_value(&*ui_config).unwrap();
 
-    HttpResponse::Ok().json(response)
-
+    HttpResponse::Ok().json(json)
 }
 
 
 
 async fn get_actions(data: web::Data<AppState>) -> impl Responder {
     let gs_arc = resolve_game_state_arc(&data);
-    let game_state = match gs_arc.lock() {
-        Ok(guard) => guard,
-        Err(e) => {
-            eprintln!("Mutex poisoned in get_actions: {}", e);
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-        }
-    };
-
-    let actions = generate_possible_actions(&game_state);
-    HttpResponse::Ok().json(ActionsResponse { actions })
-
+    let game_state = lock_state!(gs_arc, read);
+    let actions = crate::game_setup::generate_possible_actions(&game_state).into_iter().enumerate().map(|(i, a)| ActionIndex {
+        description: a.description,
+        action_type: a.action_type.to_string(),
+        parameters: a.parameters,
+        index: i,
+    }).collect::<Vec<_>>();
+    HttpResponse::Ok().json(serde_json::json!({ "actions": actions }))
 }
 
 
 
 
-fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
-
-    // Delegate to the engine's generate_possible_actions which handles both
-    // normal phase actions and pending choice actions
-    let setup_actions = crate::game_setup::generate_possible_actions(game_state);
-
-    
-
-    // Convert game_setup Action to web_server Action with proper indexing
-
-    setup_actions.into_iter().enumerate().map(|(index, sa)| Action {
-
-        description: sa.description,
-
-        action_type: sa.action_type.to_string(),
-
-        parameters: sa.parameters.map(|p| ActionParameters {
-
-            card_id: p.card_id,
-
-            card_index: p.card_index,
-
-            card_indices: p.card_indices,
-
-            stage_area: p.stage_area.map(|a| a.to_string()),
-
-            use_baton_touch: p.use_baton_touch,
-
-            card_name: p.card_name,
-
-            card_no: p.card_no,
-
-            base_cost: p.base_cost,
-
-            final_cost: p.final_cost,
-
-            available_areas: p.available_areas.map(|areas| areas.into_iter().map(|ai| WebAreaInfo {
-
-                area: ai.area.to_string(),
-
-                available: ai.available,
-
-                cost: ai.cost,
-
-                is_baton_touch: ai.is_baton_touch,
-
-                existing_member_name: ai.existing_member_name,
-
-            }).collect()),
-
-        }),
-
-        index: index,
-
+fn actions_with_index(game_state: &GameState) -> Vec<ActionIndex> {
+    crate::game_setup::generate_possible_actions(game_state).into_iter().enumerate().map(|(i, a)| ActionIndex {
+        description: a.description,
+        action_type: a.action_type.to_string(),
+        parameters: a.parameters,
+        index: i,
     }).collect()
-
 }
 
 
@@ -529,7 +404,7 @@ fn execute_player2_ai_action(game_state: &mut GameState) -> Result<bool, String>
 
             .cloned(),
 
-        chosen_action.parameters.as_ref().and_then(|p| p.stage_area),
+        chosen_action.parameters.as_ref().and_then(|p| p.stage_area_member()),
 
         chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
 
@@ -582,161 +457,62 @@ fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> 
 
 
 async fn execute_action(
-
     data: web::Data<AppState>,
-
     req: web::Json<ExecuteActionRequest>,
-
 ) -> impl Responder {
-
     let gs_arc = resolve_game_state_arc(&data);
-    let mut game_state = match gs_arc.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in execute_action: {}", e);
-
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
-        }
-
-    };
-
-    
-
-    // Parse action type from request
+    let mut game_state = lock_state!(gs_arc, write);
 
     let action_type = req.action_type.as_ref()
+        .and_then(|t| t.parse::<ActionType>().ok())
+        .unwrap_or(ActionType::Pass);
 
-        .and_then(|t| t.parse::<crate::game_setup::ActionType>().ok())
-
-        .unwrap_or_else(|| crate::game_setup::ActionType::Pass);
-
-    
-
-    // Save undo snapshot before executing
     game_state.save_state();
 
-    // Execute the action
-
     let result = crate::turn::TurnEngine::execute_main_phase_action(
-
         &mut game_state,
-
         &action_type,
-
         req.card_id,
-
         req.card_indices.as_ref().cloned(),
-
         req.stage_area.as_ref()
-
             .and_then(|s| s.parse::<crate::zones::MemberArea>().ok()),
-
         req.use_baton_touch,
-
     );
 
-    
-
-        
-
     match result {
-
         Ok(_) => {
-
-            // For human decision phases like ChooseFirstAttacker, the phase transition 
-
-            // happens in the action handler itself, not in settle_single_player_state
-
             if let Err(e) = settle_single_player_state(&mut game_state) {
-
-                return HttpResponse::BadRequest().json(serde_json::json!({
-
-                    "error": e
-
-                }));
-
+                return HttpResponse::BadRequest().json(serde_json::json!({ "error": e }));
             }
 
-
-
-            let display = game_state_to_display(&game_state);
-
-            
-
-            // Include legal actions in the response
-
-            let actions = generate_possible_actions(&game_state);
-
-            let mut response = serde_json::to_value(&display).unwrap_or_default();
-
+            let display = crate::display::game_state_to_display(&game_state);
+            let actions = actions_with_index(&game_state);
+            let mut response = serde_json::to_value(display).unwrap_or_default();
             response["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
-
             HttpResponse::Ok().json(response)
-
         }
-
         Err(e) => {
-
-                        HttpResponse::BadRequest().json(serde_json::json!({
-
-                "error": e
-
-            }))
-
+            HttpResponse::BadRequest().json(serde_json::json!({ "error": e }))
         }
-
     }
-
 }
 
 
 
 async fn get_status(data: web::Data<AppState>) -> impl Responder {
-
-    let game_state = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in get_status: {}", e);
-
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
-        }
-
-    };
-
-    let members = game_state.card_database.cards.len();
-
+    let members = data.card_database.cards.len();
     HttpResponse::Ok().json(serde_json::json!({
-
         "status": "rust_server",
-
         "members": members,
-
         "lives": 0,
-
         "instance_id": 1
-
     }))
-
 }
 
 
 
 async fn set_ui_config(data: web::Data<AppState>, req: web::Json<SetUiConfigRequest>) -> impl Responder {
-    let mut ui_config = match data.ui_config.lock() {
-        Ok(guard) => guard,
-        Err(e) => {
-            eprintln!("Mutex poisoned in set_ui_config: {}", e);
-            return HttpResponse::InternalServerError().json(serde_json::json!({"error": "Mutex poisoned"}));
-        }
-    };
+    let mut ui_config = data.ui_config.lock().unwrap();
 
     if let Some(lang) = &req.current_lang {
         ui_config.current_lang = lang.clone();
@@ -778,134 +554,64 @@ async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) 
 
 
 async fn undo(data: web::Data<AppState>) -> impl Responder {
-
     let gs_arc = resolve_game_state_arc(&data);
-    let mut game_state = match gs_arc.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in undo: {}", e);
-
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
-        }
-
-    };
-
-    
+    let mut game_state = lock_state!(gs_arc, write);
 
     match game_state.undo() {
-
         Ok(_) => {
-
             if let Err(e) = settle_single_player_state(&mut game_state) {
-
                 eprintln!("Single-player settle error after undo: {}", e);
-
                 return HttpResponse::BadRequest().json(serde_json::json!({"error": e}));
-
             }
-
-            let display = game_state_to_display(&game_state);
+            let display = crate::display::game_state_to_display(&game_state);
             drop(game_state);
-            
+
             let ui_config = data.ui_config.lock().unwrap();
             let response = display_with_ui_state(display, &ui_config);
-            
+
             HttpResponse::Ok().json(response)
-            
         }
-        
         Err(e) => {
-            
             HttpResponse::BadRequest().json(e)
-            
         }
-        
     }
-    
 }
 
 
 
 
 async fn redo(data: web::Data<AppState>) -> impl Responder {
-
     let gs_arc = resolve_game_state_arc(&data);
-    let mut game_state = match gs_arc.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in redo: {}", e);
-
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
-        }
-
-    };
-
-
+    let mut game_state = lock_state!(gs_arc, write);
 
     match game_state.redo() {
-
         Ok(_) => {
-
             if let Err(e) = settle_single_player_state(&mut game_state) {
-
                 eprintln!("Single-player settle error after redo: {}", e);
-
                 return HttpResponse::BadRequest().json(serde_json::json!({"error": e}));
-
             }
-
-            let display = game_state_to_display(&game_state);
+            let display = crate::display::game_state_to_display(&game_state);
             drop(game_state);
-            
+
             let ui_config = data.ui_config.lock().unwrap();
             let response = display_with_ui_state(display, &ui_config);
-            
+
             HttpResponse::Ok().json(response)
-            
         }
-        
         Err(e) => {
-            
             HttpResponse::BadRequest().json(e)
-            
         }
-        
     }
-    
 }
 
 
 
 
 async fn exec_code(
-
     data: web::Data<AppState>,
-
     req: web::Json<ExecCodeRequest>,
-
 ) -> impl Responder {
-
-    let mut game_state = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in exec_code: {}", e);
-
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
-        }
-
-    };
+    let mut game_state = lock_state!(data.game_state, write);
 
 
 
@@ -1029,172 +735,59 @@ async fn exec_code(
 
 
 
-    let display = game_state_to_display(&game_state);
-
-    let actions = generate_possible_actions(&game_state);
-
-    let mut response = serde_json::to_value(&display).unwrap_or_default();
-
+    let display = crate::display::game_state_to_display(&game_state);
+    let actions = actions_with_index(&game_state);
+    let mut response = serde_json::to_value(display).unwrap_or_default();
     response["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
 
     HttpResponse::Ok().json(serde_json::json!({
-
         "success": true,
-
         "state": response
-
     }))
-
 }
 
 
 
 async fn debug_rewind(data: web::Data<AppState>) -> impl Responder {
-
     let gs_arc = resolve_game_state_arc(&data);
-    let mut game_state = match gs_arc.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in debug_rewind: {}", e);
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
-
-        }
-
-    };
-
-    
-
+    let mut game_state = lock_state!(gs_arc, write);
     match game_state.undo() {
-
-        Ok(_) => {
-
-            HttpResponse::Ok().json(serde_json::json!({"success": true}))
-
-        }
-
-        Err(e) => {
-
-            HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e}))
-
-        }
-
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({"success": true})),
+        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e})),
     }
-
 }
 
 
 
 async fn debug_redo(data: web::Data<AppState>) -> impl Responder {
-
     let gs_arc = resolve_game_state_arc(&data);
-    let mut game_state = match gs_arc.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in debug_redo: {}", e);
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
-
-        }
-
-    };
-
-    
-
+    let mut game_state = lock_state!(gs_arc, write);
     match game_state.redo() {
-
-        Ok(_) => {
-
-            HttpResponse::Ok().json(serde_json::json!({"success": true}))
-
-        }
-
-        Err(e) => {
-
-            HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e}))
-
-        }
-
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({"success": true})),
+        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e})),
     }
-
 }
 
 
 
 async fn debug_snapshot(data: web::Data<AppState>) -> impl Responder {
-
-    let game_state = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in debug_snapshot: {}", e);
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
-
-        }
-
-    };
-
-    
-
-    let display = game_state_to_display(&game_state);
-
+    let game_state = lock_state!(data.game_state, read);
+    let display = crate::display::game_state_to_display(&game_state);
     HttpResponse::Ok().json(serde_json::json!({"success": true, "state": display}))
-
 }
 
 
 
 async fn debug_dump_state(data: web::Data<AppState>) -> impl Responder {
-
-    let game_state = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in debug_dump_state: {}", e);
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
-
-        }
-
-    };
-
-    
-
-    let display = game_state_to_display(&game_state);
-
+    let game_state = lock_state!(data.game_state, read);
+    let display = crate::display::game_state_to_display(&game_state);
     HttpResponse::Ok().json(serde_json::json!({"success": true, "state": display}))
-
 }
 
 
 
 async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
-
-    let game_state = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in debug_conditions: {}", e);
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false, "error": "Mutex poisoned"}));
-
-        }
-
-    };
-
+    let game_state = lock_state!(data.game_state, read);
     let mut results = Vec::new();
 
     let card_db = &game_state.card_database;
@@ -1306,169 +899,90 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
 
 
 async fn export_game(data: web::Data<AppState>) -> impl Responder {
-
-    let game_state = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in export_game: {}", e);
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
-
-        }
-
-    };
-
-    
-
-    let display = game_state_to_display(&game_state);
-
+    let game_state = lock_state!(data.game_state, read);
+    let display = crate::display::game_state_to_display(&game_state);
     HttpResponse::Ok().json(serde_json::json!({"success": true, "game_state": display}))
-
 }
 
 
+
+fn deck_files() -> Vec<PathBuf> {
+    let decks_dir = PathBuf::from("../web_ui/decks");
+    let mut files = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&decks_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map(|e| e == "txt").unwrap_or(false) {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    files
+}
+
+fn deck_name_from_path(path: &PathBuf) -> String {
+    path.file_stem()
+        .and_then(|s| s.to_str())
+        .map(|s| {
+            s.split('_')
+                .map(|w| {
+                    let mut c = w.chars();
+                    c.next().map(|f| f.to_uppercase().to_string() + c.as_str()).unwrap_or_default()
+                })
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .unwrap_or_default()
+}
 
 async fn get_decks(_data: web::Data<AppState>) -> impl Responder {
-
-    let decks = vec![
-
-        "Aqours Cup".to_string(),
-
-        "Muse Cup".to_string(),
-
-        "Nijigaku Cup".to_string(),
-
-        "Liella Cup".to_string(),
-
-        "Hasunosora Cup".to_string(),
-
-        "Fade Deck".to_string(),
-
-    ];
-
-    HttpResponse::Ok().json(serde_json::json!({"success": true, "decks": decks}))
-
+    let decks: Vec<serde_json::Value> = deck_files().into_iter().map(|path| {
+        let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
+        let name = deck_name_from_path(&path);
+        let content = std::fs::read_to_string(&path).unwrap_or_default();
+        let card_count = content.lines()
+            .filter(|l| !l.trim().is_empty())
+            .filter_map(|l| l.split(" x ").nth(1))
+            .filter_map(|q| q.trim().parse::<u32>().ok())
+            .sum::<u32>();
+        serde_json::json!({
+            "id": id,
+            "name": name,
+            "card_count": card_count,
+            "content": content,
+            "main": [],
+            "energy": [],
+        })
+    }).collect();
+    HttpResponse::Ok().json(serde_json::json!({ "success": true, "decks": decks }))
 }
-
-
 
 async fn get_random_deck(_data: web::Data<AppState>) -> impl Responder {
-
-    let decks = vec![
-
-        "Aqours Cup".to_string(),
-
-        "Muse Cup".to_string(),
-
-        "Nijigaku Cup".to_string(),
-
-        "Liella Cup".to_string(),
-
-        "Hasunosora Cup".to_string(),
-
-        "Fade Deck".to_string(),
-
-    ];
-
+    let files = deck_files();
+    if files.is_empty() {
+        return HttpResponse::NotFound().json(serde_json::json!({ "success": false, "error": "No decks found" }));
+    }
     use rand::seq::SliceRandom;
-
-    let random_deck = decks.choose(&mut rand::thread_rng()).unwrap_or(&decks[0]);
-
-    HttpResponse::Ok().json(serde_json::json!({"success": true, "deck": random_deck}))
-
+    let chosen = files.choose(&mut rand::thread_rng()).unwrap();
+    let content = std::fs::read_to_string(chosen).unwrap_or_default();
+    HttpResponse::Ok().json(serde_json::json!({ "success": true, "content": content, "energy": [] }))
 }
 
-
-
 async fn get_test_deck(_data: web::Data<AppState>) -> impl Responder {
+    let path = PathBuf::from("../web_ui/decks/aqours_cup.txt");
+    let content = std::fs::read_to_string(&path).unwrap_or_default();
+    HttpResponse::Ok().json(serde_json::json!({ "success": true, "content": content }))
+}
 
-    HttpResponse::Ok().json(serde_json::json!({"success": true, "deck": "Aqours Cup"}))
-
+async fn set_deck(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) -> impl Responder {
+    HttpResponse::Ok().json(serde_json::json!({ "success": true, "status": "ok" }))
 }
 
 
 
 async fn get_card_registry(data: web::Data<AppState>) -> impl Responder {
-
-    let game_state = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in get_card_registry: {}", e);
-
-            return HttpResponse::InternalServerError().json(serde_json::json!({"success": false}));
-
-        }
-
-    };
-
-    
-
-    let members = game_state.card_database.cards.len();
-
-    
-
-    // Create a vector of card data with abilities
-
-    let mut cards_with_abilities = Vec::new();
-
-    
-
-    for (card_id, card) in game_state.card_database.cards.iter() {
-
-        let card_data = serde_json::json!({
-
-            "id": card_id,
-
-            "name": card.name,
-
-            "card_no": card.card_no,
-
-            "card_type": format!("{:?}", card.card_type),
-
-            "blade": card.blade,
-
-            "abilities": card.abilities.iter().map(|ability| {
-
-                serde_json::json!({
-
-                    "text": ability.full_text,
-
-                    "trigger": format!("{:?}", ability.triggers),
-
-                    "triggers": ability.triggers,
-
-                    "use_limit": ability.use_limit,
-
-                    "is_null": ability.is_null
-
-                })
-
-            }).collect::<Vec<_>>()
-
-        });
-
-        cards_with_abilities.push(card_data);
-
-    }
-
-    
-
-    HttpResponse::Ok().json(serde_json::json!({
-
-        "success": true, 
-
-        "count": members,
-
-        "cards": cards_with_abilities
-
-    }))
-
+    HttpResponse::Ok().json(&*data.card_registry)
 }
 
 
@@ -1541,17 +1055,7 @@ async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomReques
 
     // Initialize FRESH game state for the room with proper setup
 
-    // Get card database from app state
-
-    let card_database = {
-
-        let app_state = data.game_state.lock().unwrap();
-
-        app_state.card_database.clone()
-
-    };
-
-    
+    let card_database = data.card_database.clone();
 
     // Create default players
 
@@ -1567,7 +1071,7 @@ async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomReques
 
     println!("DEBUG: Fresh room game state initialized with phase: {:?}", fresh_game_state.current_phase);
 
-    let room_game_state = Arc::new(Mutex::new(fresh_game_state));
+    let room_game_state = Arc::new(RwLock::new(fresh_game_state));
 
     
 
@@ -1943,55 +1447,8 @@ async fn rooms_leave(data: web::Data<AppState>, req: web::Json<serde_json::Value
 
 async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequest>>) -> impl Responder {
 
-    // Load cards from cards.json
-
-    let cards_path = PathBuf::from("../cards/cards.json");
-
-    let cards = match card_loader::CardLoader::load_cards_from_file(&cards_path) {
-
-        Ok(cards) => {
-
-            let mut card_map = std::collections::HashMap::new();
-
-            for card in cards {
-
-                card_map.insert(card.card_no.clone(), card);
-
-            }
-
-            card_map
-
-        }
-
-        Err(e) => {
-
-            eprintln!("Failed to load cards: {}", e);
-
-            return HttpResponse::InternalServerError().json("Failed to load cards");
-
-        }
-
-    };
-
-
-
-    // Load deck lists
-
-    let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
-
-        Ok(decks) => decks,
-
-        Err(e) => {
-
-            eprintln!("Failed to load decks: {}", e);
-
-            return HttpResponse::InternalServerError().json("Failed to load decks");
-
-        }
-
-    };
-
-
+    let card_database = data.card_database.clone();
+    let deck_lists = data.deck_lists.clone();
 
     // Map frontend deck names to deck file names
 
@@ -2054,16 +1511,6 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
 
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
-
-
-
-    // Create CardDatabase from loaded cards - convert HashMap values to Vec
-
-    let card_vec: Vec<crate::card::Card> = cards.into_values().collect();
-
-    let card_database = Arc::new(crate::card::CardDatabase::load_or_create(card_vec));
-
-
 
     let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
 
@@ -2153,86 +1600,86 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
 
     println!("DEBUG: init_game complete, phase: {:?}", game_state.current_phase);
 
-    
-
-    // Replace the game state in the mutex
-
-    let mut state_guard = match data.game_state.lock() {
-
-        Ok(guard) => guard,
-
-        Err(e) => {
-
-            eprintln!("Mutex poisoned in init_game: {}", e);
-
-            return HttpResponse::InternalServerError().json("Game state mutex poisoned");
-
-        }
-
-    };
-
+    let mut state_guard = lock_state!(data.game_state, write);
     *state_guard = game_state;
 
-    
-
-    let display = game_state_to_display(&state_guard);
+    let display = crate::display::game_state_to_display(&state_guard);
+    let actions = actions_with_index(&state_guard);
     drop(state_guard);
 
-    let ui_config = data.ui_config.lock().unwrap();
-    let response = display_with_ui_state(display, &ui_config);
+    let mut json = serde_json::to_value(display).unwrap();
+    json["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
 
-    HttpResponse::Ok().json(response)
+    let ui_config = data.ui_config.lock().unwrap();
+    json["ui_config"] = serde_json::to_value(&*ui_config).unwrap();
+
+    HttpResponse::Ok().json(json)
 
 }
 
-
+fn build_cached_card_registry(card_database: &CardDatabase) -> serde_json::Value {
+    let mut cards_with_abilities = Vec::new();
+    for (card_id, card) in card_database.cards.iter() {
+        let card_data = serde_json::json!({
+            "id": card_id,
+            "name": card.name,
+            "card_no": card.card_no,
+            "card_type": format!("{:?}", card.card_type),
+            "blade": card.blade,
+            "abilities": card.abilities.iter().map(|ability| {
+                serde_json::json!({
+                    "text": ability.full_text,
+                    "trigger": format!("{:?}", ability.triggers),
+                    "triggers": ability.triggers,
+                    "use_limit": ability.use_limit,
+                    "is_null": ability.is_null
+                })
+            }).collect::<Vec<_>>()
+        });
+        cards_with_abilities.push(card_data);
+    }
+    serde_json::json!({
+        "success": true,
+        "count": card_database.cards.len(),
+        "cards": cards_with_abilities
+    })
+}
 
 pub async fn run_web_server() -> std::io::Result<()> {
 
     let rooms = Arc::new(Mutex::new(HashMap::new()));
 
-    
-
-    // Initialize card database
-
+    // Initialize card database (only loaded once at startup)
     let cards_path = PathBuf::from("../cards/cards.json");
-
     let card_database = match card_loader::CardLoader::load_cards_from_file(&cards_path) {
-
         Ok(cards) => Arc::new(CardDatabase::load_or_create(cards)),
-
         Err(e) => {
-
             eprintln!("Failed to load cards: {}", e);
-
             Arc::new(CardDatabase::new())
-
         }
-
     };
 
-    
+    // Load deck lists once at startup and cache them
+    let deck_lists = Arc::new(
+        deck_parser::DeckParser::parse_all_decks().unwrap_or_default()
+    );
+
+    // Build card registry JSON once at startup
+    let card_registry = Arc::new(build_cached_card_registry(&card_database));
 
     // Create default players
-
     let player1 = Player::new("0".to_string(), "Player 1".to_string(), true);
-
     let player2 = Player::new("1".to_string(), "Player 2".to_string(), false);
 
-    
-
-    let game_state = Arc::new(Mutex::new(GameState::new(player1.clone(), player2.clone(), card_database.clone())));
-
-    
+    let game_state = Arc::new(RwLock::new(GameState::new(player1.clone(), player2.clone(), card_database.clone())));
 
     let app_state = web::Data::new(AppState {
-
         game_state: game_state.clone(),
-
         rooms: rooms.clone(),
-
         ui_config: Arc::new(Mutex::new(UiConfig::default())),
-
+        card_database: card_database.clone(),
+        deck_lists: deck_lists.clone(),
+        card_registry: card_registry.clone(),
     });
 
     println!("Game UI: http://127.0.0.1:8080");
@@ -2266,9 +1713,11 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/get_random_deck", web::get().to(get_random_deck))
             .route("/api/get_test_deck", web::get().to(get_test_deck))
             .route("/api/get_card_registry", web::get().to(get_card_registry))
+            .route("/api/set_deck", web::post().to(set_deck))
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
+            .service(fs::Files::new("/engine", "../engine"))
             .service(fs::Files::new("/", "../web_ui/dist").index_file("index.html"))
     })
 

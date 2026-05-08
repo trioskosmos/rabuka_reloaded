@@ -617,9 +617,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         if player.stage.stage[pos] != -1 {
                             let card_id = player.stage.stage[pos];
                             if util::card_matches_type(&card_db, card_id, card_type_filter) {
-                                // Track as selected (for exclude_selected in subsequent steps)
                                 self.selected_cards.push(card_id);
-                                // Cards stay on stage — they are just identified, not moved
                             }
                         }
                     }

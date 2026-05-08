@@ -114,19 +114,19 @@ Write tests in engine\tests\gameplay_test_process.md
 | 104 | 1 | PL!N-bp4-025-L (VIVID WORLD (ab#1)) | Q192 | ✓ (shared QA)
 | 105 | 1 | PL!N-bp4-030-L (Daydream Mermaid (ab#0)) | Q191 | | ✓ daydream_test
 | 106 | 1 | PL!N-bp5-003-R (桜坂しずく (ab#0)) | Q214 | | ✓ shizuku_test
-| 107 | 1 | PL!N-bp5-007-R＋ (優木せつ菜 (ab#1)) | Q230 | ✓ setsuna_bp5_test |
+| 107 | 1 | PL!N-bp5-007-R＋ (優木せつ菜 (ab#1)) | Q230 | ✓ |
 | 108 | 1 | PL!N-bp5-008-R (エマ・ヴェルデ (ab#0)) | Q215 | | ✓ emma_bp5_test
 | 109 | 1 | PL!N-bp5-010-R (三船栞子 (ab#0)) | Q231 | | ✓ mifune_test
 | 110 | 1 | PL!N-bp5-015-N (桜坂しずく (ab#0)) | Q216 | | ✓ tokimeki_test
 | 111 | 1 | PL!N-bp5-021-N (天王寺璃奈 (ab#0)) | Q226 | | ✓ rina_test
-| 112 | 1 | PL!N-pb1-003-R (桜坂しずく (ab#0)) | Q196 | |
-| 113 | 1 | PL!N-pb1-005-R (宮下 愛 (ab#0)) | Q197 | |
-| 114 | 1 | PL!N-pb1-007-R (優木せつ菜 (ab#0)) | Q205 | |
-| 115 | 1 | PL!N-pb1-008-R (エマ・ヴェルデ (ab#1)) | Q206 | |
-| 116 | 1 | PL!N-pb1-012-R (鐘 嵐珠 (ab#1)) | Q198 | |
+| 112 | 1 | PL!N-pb1-003-R (桜坂しずく (ab#0)) | Q196 | ✓ shizuku_pb1_test |
+| 113 | 1 | PL!N-pb1-005-R (宮下 愛 (ab#0)) | Q197 | ✓ miyashita_ai_pb1_test |
+| 114 | 1 | PL!N-pb1-007-R (優木せつ菜 (ab#0)) | Q205 | ✓ setsuna_pb1_test |
+| 115 | 1 | PL!N-pb1-008-R (エマ・ヴェルデ (ab#1)) | Q206 | ✓ batch_pb1_test |
+| 116 | 1 | PL!N-pb1-012-R (鐘 嵐珠 (ab#1)) | Q198 | ✓ batch_pb1_test |
 | 117 | 1 | PL!N-pb1-015-R (桜坂しずく (ab#0)) | Q199 | ✓ (shared QA)
-| 118 | 1 | PL!N-pb1-037-L (Cara Tesoro (ab#0)) | Q203 | |
-| 119 | 1 | PL!N-pb1-042-L (Eternalize Love!! (ab#0)) | Q204 | |
+| 118 | 1 | PL!N-pb1-037-L (Cara Tesoro (ab#0)) | Q203 | ✓ remaining_quick_test |
+| 119 | 1 | PL!N-pb1-042-L (Eternalize Love!! (ab#0)) | Q204 | ✓ remaining_quick_test |
 | 120 | 1 | PL!N-sd1-009-SD (天王寺璃奈 (ab#0)) | Q209 |✓ done |
 | 121 | 1 | PL!N-sd1-028-SD (Dream with You (ab#0)) | Q116 | | ✓ dream_with_you_test
 | 122 | 1 | PL!S-PR-016-PR (黒澤ダイヤ (ab#0)) | Q171 | ✓ (shared QA)
@@ -141,8 +141,8 @@ Write tests in engine\tests\gameplay_test_process.md
 | 131 | 1 | PL!S-bp3-006-R＋ (津島善子 (ab#0)) | Q154 | | ✓ yoshiko_test
 | 132 | 1 | PL!S-bp3-008-R (小原鞠莉 (ab#0)) | Q79 | ✓ (shared QA)
 | 133 | 1 | PL!S-bp3-016-N (国木田花丸 (ab#0)) | Q155 | ✓ b7_constant_ability_test | |
-| 134 | 1 | PL!S-bp3-020-L (ダイスキだったらダイジョウブ！ (ab#0)) | Q156 | |
-| 135 | 1 | PL!S-bp5-001-R＋ (高海千歌 (ab#1)) | Q218 | |
+| 134 | 1 | PL!S-bp3-020-L (ダイスキだったらダイジョウブ！ (ab#0)) | Q156 | ✓ daisuki_test |
+| 135 | 1 | PL!S-bp5-001-R＋ (高海千歌 (ab#1)) | Q218 | ✓ remaining_quick_test |
 | 136 | 1 | PL!S-pb1-003-R (松浦果南 (ab#0)) | Q36 | ✓ (phase tests)
 | 137 | 1 | PL!S-pb1-006-R (津島善子 (ab#0)) | Q171 | ✓ (shared QA)
 | 138 | 1 | PL!S-pb1-007-R (国木田花丸 (ab#0)) | Q36 | ✓ (phase tests)

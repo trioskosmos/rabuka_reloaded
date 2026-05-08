@@ -94,12 +94,12 @@ pub struct Action {
     pub parameters: Option<ActionParameters>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ActionParameters {
     pub card_id: Option<i16>, // Database card ID - reliable identifier
     pub card_index: Option<usize>, // Array position - kept for backward compatibility
     pub card_indices: Option<Vec<usize>>, // For selecting multiple cards (e.g., live cards)
-    pub stage_area: Option<MemberArea>, // "left", "center", "right"
+    pub stage_area: Option<String>, // "left", "center", "right"
     pub use_baton_touch: Option<bool>, // Whether to use baton touch cost reduction
     // Card grouping information for improved UI
     pub card_name: Option<String>,
@@ -109,13 +109,19 @@ pub struct ActionParameters {
     pub available_areas: Option<Vec<AreaInfo>>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AreaInfo {
-    pub area: MemberArea,
+    pub area: String,
     pub available: bool,
     pub cost: u32,
     pub is_baton_touch: bool,
     pub existing_member_name: Option<String>,
+}
+
+impl ActionParameters {
+    pub fn stage_area_member(&self) -> Option<MemberArea> {
+        self.stage_area.as_ref().and_then(|s| s.parse::<MemberArea>().ok())
+    }
 }
 
 pub fn setup_game(game_state: &mut GameState) {
@@ -286,13 +292,12 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         "right" | "right_side" | "右サイドエリア" => Some("right".to_string()),
                         _ => Some(area.to_string()),
                     };
-                    let area_parsed = stage_area_str.as_deref().and_then(|s| s.parse::<MemberArea>().ok());
                     actions.push(Action {
                         description: format!("Place at {}: {}", area, description),
                         action_type: ActionType::ChoicePosition,
                         parameters: Some(ActionParameters {
                             card_id: None, card_index: None, card_indices: None,
-                            stage_area: area_parsed, use_baton_touch: None,
+                            stage_area: stage_area_str.clone(), use_baton_touch: None,
                             card_name: None, card_no: Some("select".to_string()),
                             base_cost: None, final_cost: None, available_areas: None,
                         }),
@@ -431,7 +436,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                         card_id: Some(*card_id),
                         card_index: Some(hand_index),
                         card_indices: None,
-                        stage_area: Some(MemberArea::LeftSide),
+                        stage_area: Some("left".to_string()),
                         use_baton_touch: None,
                         card_name: None,
                         card_no: None,
@@ -524,9 +529,9 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                             active_player.stage.stage[2],
                         ];
                         
-                        for (area_idx, (area, _area_name)) in areas.iter().enumerate() {
+                        for (area_idx, (area, area_name)) in areas.iter().enumerate() {
                             let mut area_info = AreaInfo {
-                                area: *area,
+                                area: area_name.to_string(),
                                 available: false,
                                 cost: card_cost,
                                 is_baton_touch: false,
@@ -581,10 +586,11 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                             let mut cost_details = Vec::with_capacity(available_areas.len());
                             for area in &available_areas {
                                 if area.available {
-                                    let area_name = match area.area {
-                                        crate::zones::MemberArea::LeftSide => "Left",
-                                        crate::zones::MemberArea::Center => "Center",
-                                        crate::zones::MemberArea::RightSide => "Right",
+                                    let area_name = match area.area.as_str() {
+                                        "left" => "Left",
+                                        "center" => "Center",
+                                        "right" => "Right",
+                                        other => other,
                                     };
                                     if area.is_baton_touch {
                                         cost_details.push(format!("{}: {} (baton touch from {})", area_name, area.cost, area.existing_member_name.as_deref().unwrap_or("existing")));
@@ -679,7 +685,7 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
                                         card_id: Some(card_id),
                                         card_index: None,
                                         card_indices: None,
-                                        stage_area: area_name.parse::<MemberArea>().ok(),
+                                        stage_area: Some(area_name.to_string()),
                                         use_baton_touch: None,
                                         card_name: Some(card.name.clone()),
                                         card_no: Some(card.card_no.clone()),

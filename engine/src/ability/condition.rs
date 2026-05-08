@@ -910,6 +910,22 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             let player = self.game_state.resolve_target_player(target);
             return player.hand.len() as u32;
         }
+        if let Some(rt) = resource_type {
+            if rt.starts_with("heart") && rt.len() == 7 {
+                // Count specific heart icons on stage members (e.g. heart_02)
+                let color = crate::zones::parse_heart_color(rt);
+                let player = self.game_state.resolve_target_player(target);
+                let card_db = &self.game_state.card_database;
+                let count: u32 = player.stage.stage.iter()
+                    .filter(|&&id| id != -1)
+                    .map(|&id| card_db.get_card(id)
+                        .and_then(|c| c.base_heart.as_ref())
+                        .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
+                        .unwrap_or(0))
+                    .sum();
+                return count;
+            }
+        }
         if resource_type == Some("surplus_heart") {
             let player = self.game_state.resolve_target_player(target);
             let card_db = &self.game_state.card_database;

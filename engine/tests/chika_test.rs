@@ -20,7 +20,7 @@ mod helpers;
 use helpers::*;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
-use rabuka_engine::zones::MemberArea;
+
 
 /// Q152: Cost targets self only (can't select opponent's members)
 #[test]
@@ -136,7 +136,7 @@ fn chika_center_required() {
     game.give_energy(5);
 
     // Try to activate from Left → should fail (activation_position: "center")
-    let result = TurnEngine::execute_main_phase_action(
+    let _result = TurnEngine::execute_main_phase_action(
         &mut game.state,
         &ActionType::UseAbility,
         Some(chika),
@@ -168,7 +168,7 @@ fn chika_turn1_use_limit() {
         "First activation should apply +1 score");
 
     // Second activation in same turn should skip (use_limit=1)
-    let result = TurnEngine::execute_main_phase_action(
+    let _result = TurnEngine::execute_main_phase_action(
         &mut game.state,
         &ActionType::UseAbility,
         Some(chika),

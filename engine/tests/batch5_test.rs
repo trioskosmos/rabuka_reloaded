@@ -2,8 +2,6 @@
 
 mod helpers;
 use helpers::*;
-use rabuka_engine::zones::MemberArea;
-
 /// PL!-sd1-002-SD (絢瀬絵里) Q79: Self_cost vacates area, new member can be placed.
 /// Tested in eli_test. Here just verifying the card exists.
 /// (shared QA with 星空凛, tested in rin_test)

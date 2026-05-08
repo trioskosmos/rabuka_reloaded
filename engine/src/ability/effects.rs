@@ -431,7 +431,7 @@ impl<'a> AbilityResolver<'a> {
         if is_temporary {
             self.game_state.temporary_effects.push(crate::game_state::TemporaryEffect {
                 effect_type: format!("gain_{}", resource),
-                duration: match duration.as_deref() { Some("this_turn") => crate::game_state::Duration::ThisTurn, Some("live_end") => crate::game_state::Duration::LiveEnd, _ => crate::game_state::Duration::ThisLive },
+                duration: match duration.as_deref() { Some("this_turn") => crate::game_state::Duration::ThisTurn, Some("live_end") => crate::game_state::Duration::LiveEnd, Some("as_long_as") => crate::game_state::Duration::AsLongAs, _ => crate::game_state::Duration::ThisLive },
                 created_turn: self.game_state.turn_number,
                 created_phase: self.game_state.current_phase.clone(),
                 target_player_id: target.clone(),
@@ -735,6 +735,7 @@ impl<'a> AbilityResolver<'a> {
                     "this_turn" => crate::game_state::Duration::ThisTurn,
                     "this_live" => crate::game_state::Duration::ThisLive,
                     "live_end" => crate::game_state::Duration::LiveEnd,
+                    "as_long_as" => crate::game_state::Duration::AsLongAs,
                     _ => crate::game_state::Duration::ThisLive,
                 };
                 self.game_state.temporary_effects.push(crate::game_state::TemporaryEffect {
@@ -824,7 +825,7 @@ impl<'a> AbilityResolver<'a> {
                     "this_turn" => crate::game_state::Duration::ThisTurn,
                     "this_live" => crate::game_state::Duration::ThisLive,
                     "permanent" => crate::game_state::Duration::Permanent,
-                    "as_long_as" => crate::game_state::Duration::ThisLive,
+                    "as_long_as" => crate::game_state::Duration::AsLongAs,
                     _ => crate::game_state::Duration::ThisLive,
                 }).unwrap_or(crate::game_state::Duration::ThisLive),
                 created_turn: current_turn, created_phase: current_phase.clone(),
@@ -874,7 +875,7 @@ impl<'a> AbilityResolver<'a> {
         }
         let temp_effect = crate::game_state::TemporaryEffect {
             effect_type: format!("gain_ability:{}", ability_text),
-            duration: match duration { Some("this_turn") => crate::game_state::Duration::ThisTurn, Some("live_end") => crate::game_state::Duration::LiveEnd, _ => crate::game_state::Duration::ThisLive },
+            duration: match duration { Some("this_turn") => crate::game_state::Duration::ThisTurn, Some("live_end") => crate::game_state::Duration::LiveEnd, Some("as_long_as") => crate::game_state::Duration::AsLongAs, _ => crate::game_state::Duration::ThisLive },
             created_turn: self.game_state.turn_number, created_phase: self.game_state.current_phase.clone(),
             target_player_id: target.to_string(),
             description: format!("Gained ability: {}", ability_text),
@@ -979,6 +980,7 @@ impl<'a> AbilityResolver<'a> {
                     "live_end" => crate::game_state::Duration::LiveEnd,
                     "this_turn" => crate::game_state::Duration::ThisTurn,
                     "this_live" => crate::game_state::Duration::ThisLive,
+                    "as_long_as" => crate::game_state::Duration::AsLongAs,
                     _ => crate::game_state::Duration::ThisLive,
                 };
                 self.game_state.temporary_effects.push(crate::game_state::TemporaryEffect {

@@ -147,7 +147,7 @@ pub fn run_interactive_headless() {
                     &action.action_type,
                     actions[index].parameters.as_ref().and_then(|p| p.card_id),
                     action.parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    action.parameters.as_ref().and_then(|p| p.stage_area),
+                    action.parameters.as_ref().and_then(|p| p.stage_area_member()),
                     action.parameters.as_ref().and_then(|p| p.use_baton_touch),
                 ) {
                     Ok(_) => {

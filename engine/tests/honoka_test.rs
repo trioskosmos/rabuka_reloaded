@@ -41,6 +41,7 @@ fn activate_and_choose_live(game: &mut TestGame, honoka: i16) {
 }
 
 /// Live card ID (not a member, member_card filter skips it)
+#[allow(dead_code)]
 const LIVE_FILLER: &str = "PL!-sd1-019-SD";
 /// Member card ID (not a live, live_card filter skips it)
 const MEMBER_FILLER: &str = "PL!-sd1-010-SD";

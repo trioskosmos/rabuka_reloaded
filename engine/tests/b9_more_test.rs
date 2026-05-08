@@ -2,8 +2,6 @@
 
 mod helpers;
 use helpers::*;
-use rabuka_engine::zones::MemberArea;
-
 /// PL!-pb1-030-L (Cutie Panther) Q36: LiveStart — reduce required hearts
 /// if wait members on stage.
 #[test]

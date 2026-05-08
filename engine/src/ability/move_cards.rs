@@ -148,28 +148,44 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                             cards
                         } else { return Err("Self-cost required but no activating card".into()); }
                     } else {
-                        let valid: Vec<(usize, i16)> = (0..3).filter_map(|i| {
-                            let c = player.stage.stage[i];
-                            if c == -1 || (exclude_self && activating_card_id == Some(c)) { None } else { Some((i, c)) }
-                        }).collect();
-                        if valid.len() < count { return Err(format!("Not enough cards on stage: need {}, have {}", count, valid.len())); }
-                        if valid.len() > count {
+                        let filter = util::CardFilter {
+                            card_type: card_type_filter,
+                            group: group_name,
+                            cost_limit,
+                            characters: character_filter.as_ref(),
+                            name_fragments: name_fragments.as_ref(),
+                            exclude_self: if exclude_self { activating_card_id } else { None },
+                            ..util::CardFilter::default()
+                        };
+                        let idxs = util::matching_indices(&player.stage.stage, &card_db, &filter, true);
+                        if is_all {
+                            let mut vacated: Option<usize> = None;
+                            let cards: Vec<i16> = idxs.iter().rev().filter_map(|&i| {
+                                let cid = player.remove_member_from_stage_with_recycling(i, &card_db);
+                                if cid.is_some() { vacated = Some(i); }
+                                cid
+                            }).collect();
+                            self.game_state.last_vacated_stage_area = vacated;
+                            cards
+                        } else if idxs.len() < count {
+                            vec![]
+                        } else if idxs.len() > count {
                             self.pending_choice = Some(Choice::SelectCard {
                                 zone: "stage".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                                 count, description: format!("Select {} card(s) from stage", count), allow_skip: false,
                             });
                             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
+                        } else {
+                            let mut vacated: Option<usize> = None;
+                            let cards: Vec<i16> = idxs.iter().rev().filter_map(|&i| {
+                                let cid = player.remove_member_from_stage_with_recycling(i, &card_db);
+                                if cid.is_some() { vacated = Some(i); }
+                                cid
+                            }).collect();
+                            self.game_state.last_vacated_stage_area = vacated;
+                            cards
                         }
-                        let indices: Vec<usize> = valid.into_iter().take(count).map(|(i, _)| i).collect();
-                        let mut vacated: Option<usize> = None;
-                        let cards: Vec<i16> = indices.iter().filter_map(|&i| {
-                            let cid = player.remove_member_from_stage_with_recycling(i, &card_db);
-                            if cid.is_some() { vacated = Some(i); }
-                            cid
-                        }).collect();
-                        self.game_state.last_vacated_stage_area = vacated;
-                        cards
                     }
                 }
 

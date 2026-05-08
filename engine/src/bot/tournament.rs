@@ -217,7 +217,7 @@ fn run_single_game(
                     &actions[0].action_type,
                     actions[0].parameters.as_ref().and_then(|p| p.card_id),
                     actions[0].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[0].parameters.as_ref().and_then(|p| p.stage_area),
+                    actions[0].parameters.as_ref().and_then(|p| p.stage_area_member()),
                     actions[0].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
                 
@@ -237,7 +237,7 @@ fn run_single_game(
                     &actions[chosen_index].action_type,
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area_member()),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
                 
@@ -258,7 +258,7 @@ fn run_single_game(
                     &actions[chosen_index].action_type,
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_id),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.card_indices.clone()),
-                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area),
+                    actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area_member()),
                     actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch),
                 );
                 
@@ -287,7 +287,7 @@ fn run_single_game(
                                 let available: Vec<_> = available_areas.iter().filter(|a| a.available).collect();
                                 if !available.is_empty() {
                                     let chosen = available[rng.gen_range(0..available.len())];
-                                    (Some(chosen.area), params.use_baton_touch)
+                                    (chosen.area.parse::<crate::zones::MemberArea>().ok(), params.use_baton_touch)
                                 } else {
                                     (None, None)
                                 }
@@ -298,7 +298,7 @@ fn run_single_game(
                             (None, None)
                         }
                     } else {
-                        (actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch))
+                        (actions[chosen_index].parameters.as_ref().and_then(|p| p.stage_area_member()), actions[chosen_index].parameters.as_ref().and_then(|p| p.use_baton_touch))
                     };
                     
                     // Execute action with error handling

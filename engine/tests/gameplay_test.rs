@@ -58,6 +58,7 @@ fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
 }
 
+#[allow(dead_code)]
 fn assert_score(game: &TestGame, expected: i32) {
     let live_card_id = game.state.player1.live_card_zone.cards[0];
     assert_eq!(game.state.get_score_modifier(live_card_id), expected);

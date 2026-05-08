@@ -9,7 +9,7 @@ fn bring_love_q225_multiname_counts_as_one_member() {
     let mut game = TestGame::new(db);
 
     let multi = game.id("LL-bp1-001-R\u{ff0b}"); // 上原歩夢&澁谷かのん&日野下花帆
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage = [multi, -1, -1];
 

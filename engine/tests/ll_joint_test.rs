@@ -12,10 +12,6 @@
 mod helpers;
 use helpers::*;
 
-fn card_id_by_no(db: &std::sync::Arc<rabuka_engine::card::CardDatabase>, no: &str) -> i16 {
-    db.get_card_id(no).unwrap_or_else(|| panic!("Card {no} not found"))
-}
-
 /// Without 6+ cards in discard, the ability creates no choice prompt
 #[test]
 fn ll_joint_requires_6_cards() {

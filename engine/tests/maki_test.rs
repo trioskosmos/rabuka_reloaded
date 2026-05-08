@@ -69,7 +69,7 @@ fn maki_edge_cost5_opponent_draws_nothing() {
 
     for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
 
-    let hand_before = game.state.player1.hand.cards.len();
+    let _hand_before = game.state.player1.hand.cards.len();
 
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(maki, rabuka_engine::zones::MemberArea::Center);

@@ -3728,7 +3728,8 @@
         "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする",
         "condition": {
           "type": "position_condition",
-          "text": "{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合"
+          "text": "{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合",
+          "position": "left_side"
         },
         "state_change": "wait",
         "card_type": "member_card",
@@ -7567,7 +7568,8 @@
         "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
           "type": "position_condition",
-          "text": "ステージのセンターエリアにいる場合"
+          "text": "ステージのセンターエリアにいる場合",
+          "position": "center"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -8783,7 +8785,8 @@
         "text": "{{heart_03.png|heart03}}を得る",
         "condition": {
           "type": "position_condition",
-          "text": "自分のステージにいるメンバーのうち、センターエリアにいるメンバーが最も大きいコストを持つ場合"
+          "text": "自分のステージにいるメンバーのうち、センターエリアにいるメンバーが最も大きいコストを持つ場合",
+          "position": "center"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -9541,7 +9544,7 @@
           "text": "相手のエネルギーが自分より多い場合",
           "target": "opponent",
           "operator": ">",
-          "comparison_target": "self",
+          "comparison_target": "opponent",
           "type": "comparison_condition"
         },
         "action": "gain_resource",
@@ -10054,6 +10057,7 @@
           "text": "エールにより公開された自分のカードの枚数が、相手がエールによって公開したカードの枚数より少ない場合",
           "target": "self",
           "operator": "<",
+          "comparison_target": "opponent",
           "type": "comparison_condition"
         },
         "count": 1,
@@ -11306,7 +11310,8 @@
         ],
         "activation_condition_parsed": {
           "type": "position_condition",
-          "text": "この能力はセンターエリアにいる場合のみ発動する。"
+          "text": "この能力はセンターエリアにいる場合のみ発動する。",
+          "position": "center"
         },
         "activation_position": "center"
       }
@@ -14589,6 +14594,7 @@
           "text": "このメンバーの正面のエリアにいる相手のメンバーのコストが、このメンバーのコストより高いかぎり",
           "target": "opponent",
           "card_type": "member_card",
+          "comparison_target": "opponent",
           "operator": ">",
           "comparison_type": "cost",
           "type": "comparison_condition"
@@ -18429,6 +18435,7 @@
           "location": "stage",
           "card_type": "member_card",
           "operator": ">",
+          "comparison_target": "opponent",
           "type": "location_condition"
         },
         "action": "modify_score",
@@ -18595,7 +18602,8 @@
         "text": "以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいるコスト4以下のメンバー1人をウェイトにする",
         "condition": {
           "type": "position_condition",
-          "text": "自分のステージのセンターエリアにコスト9以上の『Aqours』のメンバーがいる場合"
+          "text": "自分のステージのセンターエリアにコスト9以上の『Aqours』のメンバーがいる場合",
+          "position": "center"
         },
         "action": "sequential",
         "actions": [
@@ -19610,7 +19618,8 @@
         "text": "このカードのスコアを+2する",
         "condition": {
           "type": "position_condition",
-          "text": "自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合"
+          "text": "自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合",
+          "position": "center"
         },
         "action": "modify_score",
         "operation": "add",
@@ -20250,7 +20259,8 @@
         ],
         "activation_condition_parsed": {
           "type": "position_condition",
-          "text": "この能力は左サイドエリアにいる場合のみ発動する。"
+          "text": "この能力は左サイドエリアにいる場合のみ発動する。",
+          "position": "left_side"
         },
         "activation_position": "left_side"
       }
@@ -20317,7 +20327,8 @@
         ],
         "activation_condition_parsed": {
           "type": "position_condition",
-          "text": "この能力は右サイドエリアにいる場合のみ発動する。"
+          "text": "この能力は右サイドエリアにいる場合のみ発動する。",
+          "position": "right_side"
         },
         "activation_position": "right_side"
       }
@@ -20454,7 +20465,8 @@
         "text": "このカードのスコアを+1する",
         "condition": {
           "type": "position_condition",
-          "text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合"
+          "text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合",
+          "position": "center"
         },
         "action": "modify_score",
         "operation": "add",
@@ -20477,7 +20489,8 @@
         "text": "そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
           "type": "position_condition",
-          "text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合"
+          "text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合",
+          "position": "left_side"
         },
         "action": "sequential",
         "actions": [
@@ -20539,7 +20552,8 @@
             "type": "has_moved"
           },
           "text": "自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "position": "center"
         },
         "action": "modify_score",
         "operation": "add",
@@ -21122,7 +21136,8 @@
         "per_unit_type": "つ",
         "condition": {
           "type": "position_condition",
-          "text": "自分のセンターエリアに『μ's』のメンバーがいる場合"
+          "text": "自分のセンターエリアに『μ's』のメンバーがいる場合",
+          "position": "center"
         },
         "position": "center"
       }
@@ -21457,6 +21472,7 @@
           "target": "both",
           "location": "stage",
           "card_type": "member_card",
+          "comparison_target": "opponent",
           "operator": ">",
           "comparison_type": "cost",
           "type": "location_condition"
@@ -22940,6 +22956,7 @@
           "target": "both",
           "card_type": "live_card",
           "operator": ">",
+          "comparison_target": "opponent",
           "type": "comparison_condition"
         },
         "action": "modify_score",

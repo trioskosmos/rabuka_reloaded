@@ -79,6 +79,7 @@ pub enum Duration {
     ThisLive,
     Permanent,
     AsLongAs,
+    Unless,
 }
 
 #[derive(Debug, Clone)]

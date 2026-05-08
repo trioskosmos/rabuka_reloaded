@@ -11,7 +11,7 @@ fn umi_q228_four_unique_groups_cost_zero() {
 
     let umi = game.id("PL!-bp5-004-R\u{ff0b}");
     let multi = game.id("LL-bp1-001-R\u{ff0b}");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage = [umi, multi, -1]; // exactly 2 cards, no filler
 

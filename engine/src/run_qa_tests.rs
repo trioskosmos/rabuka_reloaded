@@ -90,7 +90,7 @@ fn test_q23_member_card_to_stage_procedure() {
         &play_action.action_type,
         play_action.parameters.as_ref().and_then(|p| p.card_id),
         None,
-        Some(available_area.area),
+        available_area.area.parse::<MemberArea>().ok(),
         Some(false),
     );
     
@@ -144,7 +144,7 @@ fn test_q24_baton_touch_procedure() {
         &play_action.action_type,
         play_action.parameters.as_ref().and_then(|p| p.card_id),
         None,
-        Some(available_area.area),
+        available_area.area.parse::<MemberArea>().ok(),
         Some(false),
     ).expect("Should play card to stage");
     
@@ -188,7 +188,7 @@ fn test_q24_baton_touch_procedure() {
         &play_action.action_type,
         play_action.parameters.as_ref().and_then(|p| p.card_id),
         None,
-        Some(baton_area.area),
+        baton_area.area.parse::<MemberArea>().ok(),
         Some(true),
     ).expect("Should baton touch");
     
@@ -275,7 +275,7 @@ fn test_q25_baton_touch_same_or_lower_cost() {
         &action.action_type,
         action_params.card_id,
         None,
-        Some(area.area),
+        area.area.parse::<MemberArea>().ok(),
         Some(true), // use_baton_touch
     );
     
@@ -364,7 +364,7 @@ fn test_q26_baton_touch_lower_cost_no_energy_gain() {
         &action.action_type,
         action_params.card_id,
         None,
-        Some(area.area),
+        area.area.parse::<MemberArea>().ok(),
         Some(true), // use_baton_touch
     );
     
@@ -463,7 +463,7 @@ fn test_q27_baton_touch_only_one_member() {
             &action.action_type,
             action_params.card_id,
             None,
-            Some(selected_area.area),
+            selected_area.area.parse::<MemberArea>().ok(),
             Some(true),
         );
         
@@ -543,7 +543,7 @@ fn test_q28_play_without_baton_touch_full_cost() {
     
     // Find non-baton touch option for the occupied area
     let non_baton_area = available_areas.iter()
-        .find(|a| a.available && !a.is_baton_touch && a.area == MemberArea::Center);
+        .find(|a| a.available && !a.is_baton_touch && a.area == "center");
     
     // Q28: The engine may not provide non-baton touch options for occupied areas
     // This is an engine limitation - for now, skip this test if the option isn't available
@@ -564,7 +564,7 @@ fn test_q28_play_without_baton_touch_full_cost() {
         &action.action_type,
         action_params.card_id,
         None,
-        Some(area.area),
+        area.area.parse::<MemberArea>().ok(),
         Some(false), // no baton touch
     );
     
@@ -626,7 +626,7 @@ fn test_q29_cannot_baton_touch_same_turn() {
     let action = play_action.unwrap();
     let action_params = action.parameters.as_ref().unwrap();
     let available_areas = action_params.available_areas.as_ref().unwrap();
-    let center_area = available_areas.iter().find(|a| a.available && a.area == MemberArea::Center);
+    let center_area = available_areas.iter().find(|a| a.available && a.area == "center");
     
     assert!(center_area.is_some(), "Should have Center area available");
     
@@ -635,7 +635,7 @@ fn test_q29_cannot_baton_touch_same_turn() {
         &action.action_type,
         action_params.card_id,
         None,
-        Some(center_area.unwrap().area),
+        center_area.unwrap().area.parse::<MemberArea>().ok(),
         Some(false),
     );
     
@@ -654,7 +654,7 @@ fn test_q29_cannot_baton_touch_same_turn() {
         
         // Check if baton touch is available for the occupied area
         let baton_area = available_areas2.iter()
-            .find(|a| a.available && a.is_baton_touch && a.area == MemberArea::Center);
+            .find(|a| a.available && a.is_baton_touch && a.area == "center");
         
         // Q29: Baton touch should NOT be available for a member placed in the same turn
         if baton_area.is_some() {
@@ -716,7 +716,7 @@ fn test_q30_can_play_same_card_multiple_times() {
     let action = play_action.unwrap();
     let action_params = action.parameters.as_ref().unwrap();
     let available_areas = action_params.available_areas.as_ref().unwrap();
-    let left_area = available_areas.iter().find(|a| a.available && a.area == MemberArea::LeftSide);
+    let left_area = available_areas.iter().find(|a| a.available && a.area == "left");
     
     assert!(left_area.is_some(), "Should have LeftSide area available");
     
@@ -725,7 +725,7 @@ fn test_q30_can_play_same_card_multiple_times() {
         &action.action_type,
         action_params.card_id,
         None,
-        Some(left_area.unwrap().area),
+        left_area.unwrap().area.parse::<MemberArea>().ok(),
         Some(false),
     );
     
@@ -744,7 +744,7 @@ fn test_q30_can_play_same_card_multiple_times() {
     let action2 = play_action2.unwrap();
     let action_params2 = action2.parameters.as_ref().unwrap();
     let available_areas2 = action_params2.available_areas.as_ref().unwrap();
-    let center_area = available_areas2.iter().find(|a| a.available && a.area == MemberArea::Center);
+    let center_area = available_areas2.iter().find(|a| a.available && a.area == "center");
     
     assert!(center_area.is_some(), "Should have Center area available for second card");
     
@@ -754,7 +754,7 @@ fn test_q30_can_play_same_card_multiple_times() {
         &action2.action_type,
         action_params2.card_id,
         None,
-        Some(center_area.unwrap().area),
+        center_area.unwrap().area.parse::<MemberArea>().ok(),
         Some(false),
     );
     
