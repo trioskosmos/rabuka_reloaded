@@ -1270,7 +1270,7 @@ fn test_ability_optional_cost_user_choice() {
     player1.waitroom.cards.push(nijigasaki_id);
     
     let mut game_state = GameState::new(player1, player2, card_database.clone());
-    game_state.config.optional_cost_behavior = "always_pay".to_string();
+    std::sync::Arc::make_mut(&mut game_state.config).optional_cost_behavior = "always_pay".to_string();
     
     // Verify that when optional cost is set to always_pay, the ability can be activated
     // (This test verifies the optional cost behavior flag is respected)

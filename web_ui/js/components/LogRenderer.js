@@ -16,9 +16,16 @@ export const LogRenderer = {
         const ruleLogEl = document.getElementById(containerId);
         if (!ruleLogEl) return;
 
+        const state = State.data;
+        if (!state) return;
+
+        const logData = state.rule_log || [];
+        const logHash = logData.length + '|' + (logData.length > 0 ? logData[logData.length - 1] : '') + '|' + (State.selectedTurn || -1);
+        if (logHash === LogRenderer._lastLogHash && !State.showingFullLog) return;
+        LogRenderer._lastLogHash = logHash;
+
         PerformanceMonitor.startPerfMeasure();
 
-        const state = State.data;
         const currentLang = State.currentLang;
         const showFriendlyAbilities = State.showFriendlyAbilities;
         const selectedTurn = State.selectedTurn || -1;
@@ -304,8 +311,11 @@ export const LogRenderer = {
         return icons[eventType] || '•';
     },
 
+    _lastLogHash: '',
+
     renderRuleLogSection: (state, currentLang, showFriendlyAbilities, selectedTurn) => {
         let logData = state.rule_log || [];
+        if (logData.length > 200) logData = logData.slice(-200);
 
         if (selectedTurn !== -1) {
             const turnStr = `[Turn ${selectedTurn}]`;

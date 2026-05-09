@@ -30,6 +30,16 @@ pub struct ActionIndex {
     pub index: usize,
 }
 
+#[derive(Serialize)]
+struct GameStateResponse {
+    #[serde(flatten)]
+    game_state: display::GameStateDisplay,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    legal_actions: Option<Vec<ActionIndex>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ui_config: Option<UiConfig>,
+}
+
 
 
 #[derive(Deserialize)]
@@ -216,15 +226,13 @@ pub struct AppState {
 
     pub card_registry: Arc<serde_json::Value>,
 
+    pub history: Arc<Mutex<Vec<GameState>>>,
+
+    pub future: Arc<Mutex<Vec<GameState>>>,
+
 }
 
 
-
-fn display_with_ui_state(display: display::GameStateDisplay, ui_config: &UiConfig) -> serde_json::Value {
-    let mut json = serde_json::to_value(display).unwrap();
-    json["ui_config"] = serde_json::to_value(ui_config).unwrap();
-    json
-}
 
 fn resolve_game_state_arc(data: &AppState) -> Arc<RwLock<GameState>> {
     let rooms = data.rooms.lock().unwrap();
@@ -259,13 +267,8 @@ async fn get_game_state(data: web::Data<AppState>) -> impl Responder {
     }).collect::<Vec<_>>();
     drop(game_state);
 
-    let mut json = serde_json::to_value(display).unwrap();
-    json["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
-
-    let ui_config = data.ui_config.lock().unwrap();
-    json["ui_config"] = serde_json::to_value(&*ui_config).unwrap();
-
-    HttpResponse::Ok().json(json)
+    let ui_config = data.ui_config.lock().unwrap().clone();
+    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: Some(actions), ui_config: Some(ui_config) })
 }
 
 
@@ -461,13 +464,12 @@ async fn execute_action(
     req: web::Json<ExecuteActionRequest>,
 ) -> impl Responder {
     let gs_arc = resolve_game_state_arc(&data);
+    let snapshot = lock_state!(gs_arc, read).clone();
     let mut game_state = lock_state!(gs_arc, write);
 
     let action_type = req.action_type.as_ref()
         .and_then(|t| t.parse::<ActionType>().ok())
         .unwrap_or(ActionType::Pass);
-
-    game_state.save_state();
 
     let result = crate::turn::TurnEngine::execute_main_phase_action(
         &mut game_state,
@@ -485,11 +487,12 @@ async fn execute_action(
                 return HttpResponse::BadRequest().json(serde_json::json!({ "error": e }));
             }
 
+            data.history.lock().unwrap().push(snapshot);
+            data.future.lock().unwrap().clear();
+
             let display = crate::display::game_state_to_display(&game_state);
             let actions = actions_with_index(&game_state);
-            let mut response = serde_json::to_value(display).unwrap_or_default();
-            response["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
-            HttpResponse::Ok().json(response)
+            HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: Some(actions), ui_config: None })
         }
         Err(e) => {
             HttpResponse::BadRequest().json(serde_json::json!({ "error": e }))
@@ -554,54 +557,49 @@ async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) 
 
 
 async fn undo(data: web::Data<AppState>) -> impl Responder {
+    let snapshot = {
+        let mut history = data.history.lock().unwrap();
+        if let Some(prev) = history.pop() {
+            prev
+        } else {
+            return HttpResponse::BadRequest().json("No history to undo");
+        }
+    };
     let gs_arc = resolve_game_state_arc(&data);
     let mut game_state = lock_state!(gs_arc, write);
+    data.future.lock().unwrap().push(game_state.clone());
+    *game_state = snapshot;
 
-    match game_state.undo() {
-        Ok(_) => {
-            if let Err(e) = settle_single_player_state(&mut game_state) {
-                eprintln!("Single-player settle error after undo: {}", e);
-                return HttpResponse::BadRequest().json(serde_json::json!({"error": e}));
-            }
-            let display = crate::display::game_state_to_display(&game_state);
-            drop(game_state);
-
-            let ui_config = data.ui_config.lock().unwrap();
-            let response = display_with_ui_state(display, &ui_config);
-
-            HttpResponse::Ok().json(response)
-        }
-        Err(e) => {
-            HttpResponse::BadRequest().json(e)
-        }
+    if let Err(e) = settle_single_player_state(&mut game_state) {
+        eprintln!("Single-player settle error after undo: {}", e);
     }
+    let display = crate::display::game_state_to_display(&game_state);
+    drop(game_state);
+    let ui_config = data.ui_config.lock().unwrap().clone();
+    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: None, ui_config: Some(ui_config) })
 }
 
-
-
-
 async fn redo(data: web::Data<AppState>) -> impl Responder {
+    let snapshot = {
+        let mut future = data.future.lock().unwrap();
+        if let Some(next) = future.pop() {
+            next
+        } else {
+            return HttpResponse::BadRequest().json("No future to redo");
+        }
+    };
     let gs_arc = resolve_game_state_arc(&data);
     let mut game_state = lock_state!(gs_arc, write);
+    data.history.lock().unwrap().push(game_state.clone());
+    *game_state = snapshot;
 
-    match game_state.redo() {
-        Ok(_) => {
-            if let Err(e) = settle_single_player_state(&mut game_state) {
-                eprintln!("Single-player settle error after redo: {}", e);
-                return HttpResponse::BadRequest().json(serde_json::json!({"error": e}));
-            }
-            let display = crate::display::game_state_to_display(&game_state);
-            drop(game_state);
-
-            let ui_config = data.ui_config.lock().unwrap();
-            let response = display_with_ui_state(display, &ui_config);
-
-            HttpResponse::Ok().json(response)
-        }
-        Err(e) => {
-            HttpResponse::BadRequest().json(e)
-        }
+    if let Err(e) = settle_single_player_state(&mut game_state) {
+        eprintln!("Single-player settle error after redo: {}", e);
     }
+    let display = crate::display::game_state_to_display(&game_state);
+    drop(game_state);
+    let ui_config = data.ui_config.lock().unwrap().clone();
+    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: None, ui_config: Some(ui_config) })
 }
 
 
@@ -749,26 +747,36 @@ async fn exec_code(
 
 
 async fn debug_rewind(data: web::Data<AppState>) -> impl Responder {
+    let snapshot = {
+        let mut history = data.history.lock().unwrap();
+        if let Some(prev) = history.pop() {
+            prev
+        } else {
+            return HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": "No history"}));
+        }
+    };
     let gs_arc = resolve_game_state_arc(&data);
     let mut game_state = lock_state!(gs_arc, write);
-    match game_state.undo() {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({"success": true})),
-        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e})),
-    }
+    data.future.lock().unwrap().push(game_state.clone());
+    *game_state = snapshot;
+    HttpResponse::Ok().json(serde_json::json!({"success": true}))
 }
-
-
 
 async fn debug_redo(data: web::Data<AppState>) -> impl Responder {
+    let snapshot = {
+        let mut future = data.future.lock().unwrap();
+        if let Some(next) = future.pop() {
+            next
+        } else {
+            return HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": "No future"}));
+        }
+    };
     let gs_arc = resolve_game_state_arc(&data);
     let mut game_state = lock_state!(gs_arc, write);
-    match game_state.redo() {
-        Ok(_) => HttpResponse::Ok().json(serde_json::json!({"success": true})),
-        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": e})),
-    }
+    data.history.lock().unwrap().push(game_state.clone());
+    *game_state = snapshot;
+    HttpResponse::Ok().json(serde_json::json!({"success": true}))
 }
-
-
 
 async fn debug_snapshot(data: web::Data<AppState>) -> impl Responder {
     let game_state = lock_state!(data.game_state, read);
@@ -1602,18 +1610,15 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
 
     let mut state_guard = lock_state!(data.game_state, write);
     *state_guard = game_state;
+    data.history.lock().unwrap().clear();
+    data.future.lock().unwrap().clear();
 
     let display = crate::display::game_state_to_display(&state_guard);
     let actions = actions_with_index(&state_guard);
     drop(state_guard);
 
-    let mut json = serde_json::to_value(display).unwrap();
-    json["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
-
-    let ui_config = data.ui_config.lock().unwrap();
-    json["ui_config"] = serde_json::to_value(&*ui_config).unwrap();
-
-    HttpResponse::Ok().json(json)
+    let ui_config = data.ui_config.lock().unwrap().clone();
+    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: Some(actions), ui_config: Some(ui_config) })
 
 }
 
@@ -1680,6 +1685,8 @@ pub async fn run_web_server() -> std::io::Result<()> {
         card_database: card_database.clone(),
         deck_lists: deck_lists.clone(),
         card_registry: card_registry.clone(),
+        history: Arc::new(Mutex::new(Vec::new())),
+        future: Arc::new(Mutex::new(Vec::new())),
     });
 
     println!("Game UI: http://127.0.0.1:8080");

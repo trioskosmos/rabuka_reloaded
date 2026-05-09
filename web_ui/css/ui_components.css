@@ -105,8 +105,7 @@
     display: none; /* Only show when active */
     flex-direction: column;
     padding: var(--space-sm);
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.06);
     border: 1px solid var(--border);
     border-left: 4px solid var(--accent-pink);
     border-radius: var(--radius-md);

@@ -1,11 +1,11 @@
 impl GameState {
 
     pub fn add_blade_modifier(&mut self, card_id: i16, delta: i32) {
-        self.mods.add_blade_modifier(card_id, delta);
+        Arc::make_mut(&mut self.mods).add_blade_modifier(card_id, delta);
     }
 
     pub fn remove_blade_modifier(&mut self, card_id: i16, delta: i32) {
-        self.mods.remove_blade_modifier(card_id, delta);
+        Arc::make_mut(&mut self.mods).remove_blade_modifier(card_id, delta);
     }
 
     pub fn get_blade_modifier(&self, card_id: i16) -> i32 {
@@ -13,7 +13,7 @@ impl GameState {
     }
 
     pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: crate::card::BladeColor) {
-        self.mods.set_blade_type_modifier(card_id, blade_color);
+        Arc::make_mut(&mut self.mods).set_blade_type_modifier(card_id, blade_color);
     }
 
     pub fn get_blade_type_modifier(&self, card_id: i16) -> Option<crate::card::BladeColor> {
@@ -21,7 +21,7 @@ impl GameState {
     }
 
     pub fn clear_blade_type_modifier(&mut self, card_id: i16) {
-        self.mods.clear_blade_type_modifier(card_id);
+        Arc::make_mut(&mut self.mods).clear_blade_type_modifier(card_id);
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {
@@ -52,18 +52,18 @@ impl GameState {
             }
         }
 
-        let old_bonuses = std::mem::take(&mut self.mods.constant_blade_bonuses);
+        let old_bonuses = std::mem::take(&mut Arc::make_mut(&mut self.mods).constant_blade_bonuses);
         for (cid, old) in &old_bonuses { self.remove_blade_modifier(*cid, *old); }
         for (&cid, &new_val) in &expected { self.add_blade_modifier(cid, new_val); }
-        self.mods.constant_blade_bonuses = expected;
+        Arc::make_mut(&mut self.mods).constant_blade_bonuses = expected;
     }
 
     pub fn add_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
-        self.mods.add_heart_modifier(card_id, color, delta);
+        Arc::make_mut(&mut self.mods).add_heart_modifier(card_id, color, delta);
     }
 
     pub fn remove_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
-        self.mods.remove_heart_modifier(card_id, color, delta);
+        Arc::make_mut(&mut self.mods).remove_heart_modifier(card_id, color, delta);
     }
 
     pub fn get_heart_modifier(&self, card_id: i16, color: crate::card::HeartColor) -> i32 {
@@ -71,7 +71,7 @@ impl GameState {
     }
 
     pub fn set_heart_override(&mut self, card_id: i16, color: crate::card::HeartColor, count: u32, duration: &str) {
-        self.mods.set_heart_override(card_id, color, count);
+        Arc::make_mut(&mut self.mods).set_heart_override(card_id, color, count);
         let mut data = serde_json::Map::new();
         data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
         data.insert("color".to_string(), serde_json::Value::String(format!("{:?}", color)));
@@ -89,7 +89,7 @@ impl GameState {
     }
 
     pub fn add_score_modifier(&mut self, card_id: i16, delta: i32) {
-        self.mods.add_score_modifier(card_id, delta);
+        Arc::make_mut(&mut self.mods).add_score_modifier(card_id, delta);
     }
 
     pub fn get_score_modifier(&self, card_id: i16) -> i32 {
@@ -97,11 +97,11 @@ impl GameState {
     }
 
     pub fn set_score_modifier(&mut self, card_id: i16, value: i32) {
-        self.mods.set_score_modifier(card_id, value);
+        Arc::make_mut(&mut self.mods).set_score_modifier(card_id, value);
     }
 
     pub fn add_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
-        self.mods.add_need_heart_modifier(card_id, color, delta);
+        Arc::make_mut(&mut self.mods).add_need_heart_modifier(card_id, color, delta);
     }
 
     pub fn get_need_heart_modifier(&self, card_id: i16, color: crate::card::HeartColor) -> i32 {
@@ -325,19 +325,19 @@ impl GameState {
     }
 
     pub fn set_need_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, value: i32) {
-        self.mods.set_need_heart_modifier(card_id, color, value);
+        Arc::make_mut(&mut self.mods).set_need_heart_modifier(card_id, color, value);
     }
 
     pub fn add_orientation_modifier(&mut self, card_id: i16, orientation: &str) {
-        self.mods.add_orientation_modifier(card_id, orientation);
+        Arc::make_mut(&mut self.mods).add_orientation_modifier(card_id, orientation);
     }
 
     pub fn add_cost_modifier(&mut self, card_id: i16, delta: i32) {
-        self.mods.add_cost_modifier(card_id, delta);
+        Arc::make_mut(&mut self.mods).add_cost_modifier(card_id, delta);
     }
 
     pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
-        self.mods.set_cost_modifier(card_id, value);
+        Arc::make_mut(&mut self.mods).set_cost_modifier(card_id, value);
     }
 
     pub fn get_cost_modifier(&self, card_id: i16) -> i32 {
@@ -349,6 +349,6 @@ impl GameState {
     }
 
     pub fn clear_modifiers_for_card(&mut self, card_id: i16) {
-        self.mods.clear_all_for_card(card_id);
+        Arc::make_mut(&mut self.mods).clear_all_for_card(card_id);
     }
 }

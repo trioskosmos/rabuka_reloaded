@@ -22,12 +22,9 @@ const POLL_DELAYS = {
 };
 
 let initialized = false;
-let pollingTimeout = null;
 let healthCheckInterval = null;
 let heartbeat = 0;
 let isTabActive = true;
-let currentDelay = POLL_DELAYS.idle;
-let burstCounter = 0;
 
 const debugElements = {
     sync: null, room: null, session: null, view: null, poll: null, delay: null,
@@ -70,12 +67,6 @@ function updateDebugOverlay() {
         [DOM_IDS.DEBUG_DELAY]: `${getPollingMode()} (${currentDelay}ms)`,
     });
     if (debugElements.sync) debugElements.sync.style.color = isSynced ? '#00ff00' : COLORS.ACCENT_RED;
-}
-
-function schedulePoll(delay) {
-    if (pollingTimeout) clearTimeout(pollingTimeout);
-    currentDelay = delay;
-    pollingTimeout = window.setTimeout(AppController.pollOnce, delay);
 }
 
 function syncRoomDisplay() {
@@ -232,25 +223,16 @@ export const AppController = {
         };
 
         await loadTranslations(State.currentLang);
-        // Load static card database for fallback card resolution
         await State.loadStaticCardDatabase();
-        AppController.restartPolling();
         
         const syncRoomState = () => syncRoomDisplay();
         State.on('roomUpdate', syncRoomState);
         State.on('room-change', syncRoomState);
         
         // Adaptive Polling: Listen for state changes to accelerate
-        State.on('change-detected', () => {
-            console.log("[App] State change detected! Accelerating polling...");
-            burstCounter = 5; // Fast poll for the next few cycles to catch follow-ups
-            schedulePoll(POLL_DELAYS.burst);
-        });
-
         document.addEventListener('click', handleDelegatedClick);
         document.addEventListener('visibilitychange', () => {
             isTabActive = !document.hidden;
-            if (isTabActive) AppController.pollOnce();
         });
 
         window.onRoomUpdate = () => { syncRoomDisplay(); Network.triggerRoomUpdate(); };
@@ -279,6 +261,10 @@ export const AppController = {
             healthCheckInterval = window.setInterval(() => {
                 if (isTabActive) Network.checkSystemStatus();
             }, POLL_DELAYS.healthCheck);
+            window.addEventListener('beforeunload', () => {
+                clearInterval(healthCheckInterval);
+                healthCheckInterval = null;
+            });
         }
 
         const savedScale = localStorage.getItem('lovelive_board_scale');
@@ -287,12 +273,6 @@ export const AppController = {
 
     restartPolling() {
         heartbeat = 0;
-        schedulePoll(0);
-    },
-
-    async pollOnce() {
-        // Disabled polling for simple state machine game
-        // Game now works on event-driven updates only
-        return;
+        Network.fetchState();
     },
 };

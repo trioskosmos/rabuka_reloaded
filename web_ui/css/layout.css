@@ -432,8 +432,7 @@
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(4px);
+        background: rgba(0, 0, 0, 0.75);
         z-index: calc(var(--z-modal) - 1);
         cursor: pointer;
         animation: fade-in 0.3s ease-out;

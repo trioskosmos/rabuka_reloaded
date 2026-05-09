@@ -484,7 +484,7 @@ impl GameState {
                 "heart_override" => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
-                            self.mods.remove_heart_override(card_id as i16);
+                            Arc::make_mut(&mut self.mods).remove_heart_override(card_id as i16);
                             eprintln!("Removed heart override for card {}", card_id);
                         }
                     }
@@ -612,48 +612,5 @@ impl GameState {
 
     pub fn is_loop_detected(&self) -> bool {
         self.loop_detected
-    }
-
-    pub fn save_state(&mut self) {
-        self.future.clear();
-        self.history.push(self.clone());
-
-        if self.history.len() > self.max_history_size {
-            self.history.drain(..1);
-        }
-    }
-
-    pub fn undo(&mut self) -> Result<(), String> {
-        if self.history.is_empty() {
-            return Err("No history to undo".to_string());
-        }
-
-        self.future.push(self.clone());
-
-        let previous = self.history.pop().unwrap();
-        *self = previous;
-
-        Ok(())
-    }
-
-    pub fn redo(&mut self) -> Result<(), String> {
-        if self.future.is_empty() {
-            return Err("No future to redo".to_string());
-        }
-
-        self.history.push(self.clone());
-
-        let next = self.future.pop().unwrap();
-        *self = next;
-
-        Ok(())
-    }
-
-    pub fn can_undo(&self) -> bool {
-        !self.history.is_empty()
-    }
-
-    pub fn can_redo(&self) -> bool {
-        !self.future.is_empty()
     }
 }

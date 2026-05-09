@@ -63,7 +63,7 @@
     /* --- Glassmorphism & Effects --- */
     --glass-bg: rgba(255, 255, 255, 0.03);
     --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-blur: blur(12px);
+    --glass-blur: none;
     
     --glow-pink: 0 0 15px rgba(255, 85, 170, 0.5), 0 0 5px rgba(255, 85, 170, 0.3);
     --glow-gold: 0 0 15px rgba(245, 158, 11, 0.5), 0 0 5px rgba(245, 158, 11, 0.3);

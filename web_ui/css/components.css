@@ -20,7 +20,6 @@
     border: 1px solid var(--border);
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.4));
     color: var(--text);
-    backdrop-filter: blur(4px);
     position: relative;
     overflow: hidden;
     gap: var(--space-xs);
@@ -328,8 +327,7 @@
 .floating-tooltip {
     position: fixed;
     z-index: var(--z-tooltip);
-    background: rgba(15, 20, 30, 0.9);
-    backdrop-filter: blur(8px);
+    background: rgba(15, 20, 30, 0.95);
     border: 1px solid var(--accent-blue);
     padding: var(--space-sm) var(--space-md);
     border-radius: var(--radius-sm);

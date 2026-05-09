@@ -248,8 +248,6 @@ def extract_source(text: str) -> Optional[str]:
         return 'success_live_zone'
     if '自分の控え室にある' in text or '控え室からライブカード' in text:
         return 'discard'
-    if '手札を' in text or '手札から' in text or '手札の' in text:
-        return 'hand'
     if 'デッキの一番下から' in text:
         return 'deck_bottom'
     if '控え室を' in text:
@@ -266,6 +264,10 @@ def extract_source(text: str) -> Optional[str]:
         return 'live_card_zone'
     if 'エネルギー置き場から' in text:
         return 'energy_zone'
+    # Prefer explicit source phrases over broad nouns. "手札に加える" should not
+    # be read as a hand source unless the text actually says "手札を/手札から/手札の".
+    if '手札を' in text or '手札から' in text or '手札の' in text:
+        return 'hand'
     return extract_by_pattern(text, SOURCE_PATTERNS)
 
 def extract_destination(text: str) -> Optional[str]:

@@ -54,6 +54,12 @@ impl GameState {
         self.reset_change_flags();
         self.cheer_check_completed = false;
         self.reset_loop_detection();
+        self.player1.areas_locked_this_turn.clear();
+        self.player2.areas_locked_this_turn.clear();
+        self.baton_touch_count = 0;
+        self.baton_touch_zero_cost = false;
+        self.baton_touch_replaced_member_cost = None;
+        self.clear_area_placement_tracking();
     }
 
     pub fn perform_cheer_check(&mut self, player_id: &str, blade_count: u32) -> Result<(), String> {

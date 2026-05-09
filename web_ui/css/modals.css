@@ -10,7 +10,6 @@
     align-items: center;
     justify-content: center;
     z-index: var(--z-modal);
-    backdrop-filter: blur(4px);
     padding: 10px;
 }
 

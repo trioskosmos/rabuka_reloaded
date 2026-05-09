@@ -8,10 +8,17 @@ import { RpsView } from './RpsView.js';
 import { ChoiceView } from './ChoiceView.js';
 import { ActionListView } from './ActionListView.js';
 
+let _lastActionsHash = '';
+
 export const ActionMenu = {
     renderActions: () => {
         const state = State.data;
         if (!state || state.game_over) return;
+
+        const legalActions = state.legal_actions || [];
+        const newHash = (state.phase || '') + '|' + (state.pending_choice?.title || '') + '|' + legalActions.map(a => a.action_type + ':' + a.index).join(',');
+        if (newHash === _lastActionsHash) return;
+        _lastActionsHash = newHash;
 
         const perspectivePlayer = State.perspectivePlayer;
 
