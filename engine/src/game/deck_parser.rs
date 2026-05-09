@@ -82,6 +82,64 @@ impl DeckParser {
         Self::parse_all_decks_from_directory(decks_path)
     }
     
+    /// Parse deck content from HTML or plain text input.
+    /// Strips HTML tags, then extracts card identifiers from each line.
+    pub fn parse_deck_content(content: &str) -> Vec<String> {
+        // Strip HTML tags (rough but effective for deck table rows)
+        let cleaned = content
+            .replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
+            .replace("</tr>", "\n").replace("</div>", "\n")
+            .replace("<td>", " ").replace("</td>", " ")
+            .replace("<th>", " ").replace("</th>", " ");
+        let stripped = cleaned.chars().fold(String::new(), |mut acc, c| {
+            if c == '<' {
+                acc.push('\n');
+                acc
+            } else if c == '>' {
+                acc
+            } else if acc.ends_with('\n') && c == '\n' {
+                acc
+            } else {
+                acc.push(c);
+                acc
+            }
+        });
+
+        let mut card_numbers = Vec::new();
+        for line in stripped.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with("//") { continue; }
+            // Try "card_no x quantity" format
+            if let Some(card_no) = Self::parse_line(line) {
+                card_numbers.push(card_no);
+            }
+        }
+        card_numbers
+    }
+
+    fn parse_line(line: &str) -> Option<String> {
+        let line = line.trim();
+        let parts: Vec<&str> = line.split(" x ").collect();
+        if parts.len() == 2 {
+            let card_no = if let Ok(_q) = parts[0].trim().parse::<u32>() {
+                parts[1].trim()
+            } else if let Ok(_q) = parts[1].trim().parse::<u32>() {
+                parts[0].trim()
+            } else {
+                return None;
+            };
+            // Validate card_no looks like a card identifier (has a dash)
+            if card_no.contains('-') {
+                return Some(card_no.to_string());
+            }
+        }
+        // Single identifier per line
+        if line.contains('-') && !line.contains(' ') {
+            return Some(line.to_string());
+        }
+        None
+    }
+
     pub fn deck_list_to_card_numbers(deck: &DeckList) -> Vec<String> {
         let mut card_numbers = Vec::new();
         

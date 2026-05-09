@@ -52,6 +52,8 @@ pub struct Player {
 
     pub debut_count_this_turn: u32,
 
+    pub last_resolution_cards: Vec<i16>,
+
 }
 
 impl Player {
@@ -89,6 +91,8 @@ impl Player {
             stage_hearts: None,
 
             debut_count_this_turn: 0,
+
+            last_resolution_cards: Vec::new(),
 
         }
 
@@ -212,7 +216,7 @@ impl Player {
                     return Some(effect);
                 }
                 if effect.action == "sequential" {
-                    if let Some(ref actions) = effect.actions {
+                    if let Some(ref actions) = effect.compound.actions {
                         for sub in actions {
                             if let Some(found) = find_modify_cost(sub, op, loc) {
                                 return Some(found);
@@ -272,7 +276,7 @@ impl Player {
             for ability in &card.abilities {
                 if let Some(ref effect) = ability.effect {
                     if effect.action == "modify_cost"
-                        && effect.operation.as_deref() == Some("increase")
+                        && matches!(effect.operation.as_deref(), Some("increase") | Some("add"))
                         && effect.location.as_deref() == Some("success_live_zone")
                     {
                         let per_unit_count = effect.per_unit_count.unwrap_or(1) as usize;
@@ -576,7 +580,7 @@ impl Player {
 
 
 
-        self.live_card_zone.add_card(card_id, false, card_db)?;
+        self.live_card_zone.add_card(card_id, card_db)?;
 
         Ok(())
 

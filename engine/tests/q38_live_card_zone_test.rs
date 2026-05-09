@@ -111,7 +111,7 @@ fn rainbow_q38_member_on_stage_per_live_card_blade() {
     while game.has_pending_choice() { game.select_indices(&[0]); }
 
     // 1 live card in zone → per_unit → gain blade
-    eprintln!("[RAINBOW] blade_mod = {:?}", game.state.mods.blade_modifiers.get(rainbow));
+    eprintln!("[RAINBOW] blade_mod = {:?}", game.state.mods.blade_modifiers.get(&rainbow));
     assert!(game.state.get_blade_modifier(rainbow) >= 1,
         "Q38: 1 live card in zone, Rainbow on stage → blade gained");
 }

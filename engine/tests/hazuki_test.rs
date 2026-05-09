@@ -30,7 +30,7 @@ fn hazuki_activate_two_liella_discarded_gain_2_blade() {
         Some(hazuki), None, None, None,
     ).expect("activate");
 
-    let blade_val = game.state.mods.blade_modifiers.get(hazuki).copied().unwrap_or(0);
+    let blade_val = game.state.mods.blade_modifiers.get(&hazuki).copied().unwrap_or(0);
     assert_eq!(blade_val, 2,
         "2 Liella! members discarded → 2 blade on activating card");
 }
@@ -55,7 +55,7 @@ fn hazuki_activate_no_liella_discarded_gain_0_blade() {
         Some(hazuki), None, None, None,
     ).expect("activate");
 
-    let blade_val = game.state.mods.blade_modifiers.get(hazuki).copied().unwrap_or(0);
+    let blade_val = game.state.mods.blade_modifiers.get(&hazuki).copied().unwrap_or(0);
     assert_eq!(blade_val, 0,
         "0 Liella! members discarded → 0 blade");
 }
@@ -77,7 +77,7 @@ fn hazuki_activate_not_enough_deck_no_blade() {
         Some(hazuki), None, None, None,
     );
 
-    let blade_val = game.state.mods.blade_modifiers.get(hazuki).copied().unwrap_or(0);
+    let blade_val = game.state.mods.blade_modifiers.get(&hazuki).copied().unwrap_or(0);
     assert_eq!(blade_val, 0,
         "Cost failed → no blade applied");
 }

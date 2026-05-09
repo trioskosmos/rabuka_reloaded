@@ -85,7 +85,7 @@ impl CardLoader {
                             }
                         }
                         // Fix nested actions - rebuild the actions array with count set
-                        if let Some(ref actions) = effect.actions.clone() {
+                        if let Some(ref actions) = effect.compound.actions.clone() {
                             let fixed_actions: Vec<crate::card::AbilityEffect> = actions.iter().map(|action| {
                                 let mut fixed_action = action.clone();
                                 if (fixed_action.action == "draw" || fixed_action.action == "draw_card") && fixed_action.count.is_none() {
@@ -93,7 +93,7 @@ impl CardLoader {
                                 }
                                 fixed_action
                             }).collect();
-                            effect.actions = Some(fixed_actions);
+                            effect.compound.actions = Some(fixed_actions);
                         }
                     }
                     

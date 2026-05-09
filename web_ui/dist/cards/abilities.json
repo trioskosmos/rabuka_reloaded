@@ -169,9 +169,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -320,20 +320,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -411,20 +411,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く。",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -884,7 +884,8 @@
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -1040,7 +1041,8 @@
           "count": 11,
           "operator": ">=",
           "text": "自分のエネルギーが11枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "source": "discard",
         "destination": "hand",
@@ -1068,7 +1070,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -1314,7 +1317,13 @@
               "card_type": "member_card",
               "max": true,
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "heart_colors": [
+                "heart02",
+                "heart04",
+                "heart05"
+              ],
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -1329,9 +1338,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -1444,20 +1453,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -1512,6 +1521,11 @@
         "action": "conditional_alternative",
         "primary_effect": {
           "text": "自分のステージのエリアすべてに『Aqours』のメンバーが登場しており、かつ名前が異なる場合、「{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上ある場合、ライブの合計スコアを+1する。ライブカードが3枚以上ある場合、",
+          "source": "revealed_cards",
+          "dynamic_count": {
+            "type": "revealed_cards",
+            "reference": "previous_reveal"
+          },
           "count": 1,
           "card_type": "member_card",
           "target": "self",
@@ -1688,22 +1702,10 @@
       "cost": null,
       "effect": {
         "text": "相手のライブカード置き場にあるすべてのライブカードは、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "相手のライブカード置き場にあるすべてのライブカードは",
-            "card_type": "live_card",
-            "target": "opponent",
-            "action": "move_cards",
-            "all": true
-          },
-          {
-            "text": "成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
-            "action": "modify_required_hearts",
-            "heart_color": "heart00",
-            "count": 1
-          }
-        ],
+        "action": "restriction",
+        "restriction_type": "modify_required_hearts_global",
+        "operation": "increase",
+        "target": "opponent",
         "all": true
       }
     },
@@ -1792,7 +1794,7 @@
           "comparison_target": "self",
           "operator": ">",
           "comparison_type": "cost",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -2144,7 +2146,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 13,
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "count": 1,
         "action": "draw_card",
@@ -2761,6 +2763,7 @@
           ],
           "type": "group_condition"
         },
+        "card_type": "member_card",
         "action": "position_change",
         "exclude_position": "center",
         "parenthetical": [
@@ -2845,6 +2848,7 @@
             "destination": "deck_top",
             "placement_order": "any_order",
             "action": "move_cards",
+            "source": "hand",
             "card_type": "card",
             "count": 1
           }
@@ -2898,6 +2902,7 @@
           "operator": ">=",
           "text": "自分と相手のエネルギーの合計が15枚以上あるかぎり",
           "target": "both",
+          "location": "energy_zone",
           "scope": "both",
           "aggregate": "total"
         },
@@ -3120,6 +3125,7 @@
             "source": "discard",
             "destination": "hand",
             "count": 1,
+            "card_type": "live_card",
             "target": "self",
             "group_names": [
               "虹ヶ咲"
@@ -3231,7 +3237,8 @@
               "count": 7,
               "operator": ">=",
               "text": "自分のエネルギーが7枚以上ある場合",
-              "target": "self"
+              "target": "self",
+              "location": "energy_zone"
             }
           ],
           "text": "『Liella!』のメンバーからバトンタッチして登場しており、かつ自分のエネルギーが7枚以上ある場合",
@@ -3268,7 +3275,8 @@
           "count": 10,
           "operator": ">=",
           "text": "自分のエネルギーが10枚以上あるかぎり",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "duration": "as_long_as",
         "action": "gain_resource",
@@ -3330,7 +3338,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -3453,9 +3462,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -3567,9 +3576,9 @@
                 "text": "残りを控え室に置く",
                 "destination": "discard",
                 "action": "move_cards",
+                "source": "looked_at_remaining",
                 "card_type": "card",
                 "count": 1,
-                "source": "looked_at_remaining",
                 "dynamic_count": {
                   "type": "remaining_looked_at",
                   "reference": "previous_look"
@@ -3871,7 +3880,8 @@
             },
             "state_change": "active",
             "count": 2,
-            "action": "change_state"
+            "action": "change_state",
+            "card_type": "energy_card"
           },
           {
             "text": "カードを1枚引く",
@@ -4039,13 +4049,14 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
-        "source": "energy_deck",
+        "source": "under_member",
         "destination": "energy_zone",
         "state_change": "wait",
         "card_type": "member_card",
         "target": "self",
-        "action": "move_cards",
-        "count": 1
+        "action": "place_energy_under_member",
+        "energy_count": 1,
+        "target_member": "this_member"
       }
     },
     {
@@ -4133,7 +4144,8 @@
         "text": "エネルギーを1枚アクティブにする",
         "state_change": "active",
         "count": 1,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -4577,6 +4589,7 @@
           "type": "location_condition"
         },
         "count": 1,
+        "card_type": "member_card",
         "optional": true,
         "action": "position_change"
       }
@@ -4662,7 +4675,8 @@
           "count": 8,
           "operator": "=",
           "text": "自分のエネルギーがちょうど8枚あるかぎり",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "duration": "as_long_as",
         "action": "modify_score",
@@ -4839,7 +4853,8 @@
               "count": 1,
               "card_type": "live_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -4854,9 +4869,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -4893,13 +4908,17 @@
       },
       "effect": {
         "text": "エールにより公開された自分のカードの中から、コスト2以下のメンバーカードか、スコア2以下のライブカードを1枚手札に加える",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "cost_limit": 2,
         "cost_limit_operator": "<=",
         "count": 1,
         "target": "self",
         "action": "move_cards",
-        "source": "discard",
         "or_card_types": [
           "live_card",
           "member_card"
@@ -4926,7 +4945,8 @@
           "count": 7,
           "operator": ">=",
           "text": "自分のエネルギーが7枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "count": 1,
         "action": "draw_card",
@@ -5058,9 +5078,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -5185,7 +5205,7 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         }
       }
     },
@@ -5245,7 +5265,8 @@
                 "μ's"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -5260,9 +5281,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -5304,7 +5325,7 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -5420,7 +5441,7 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "duration": "as_long_as",
         "action": "gain_resource",
@@ -5600,7 +5621,8 @@
                 "Aqours"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -5615,9 +5637,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -5662,7 +5684,11 @@
               "count": 1,
               "card_type": "member_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "heart_colors": [
+                "heart04"
+              ],
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -5677,9 +5703,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -5957,6 +5983,7 @@
           "type": "location_condition"
         },
         "state_change": "wait",
+        "card_type": "member_card",
         "action": "change_state",
         "count": 1
       }
@@ -5984,7 +6011,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -6043,7 +6071,8 @@
                 "虹ヶ咲"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -6058,9 +6087,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -6164,6 +6193,7 @@
             "source": "discard",
             "destination": "hand",
             "count": 2,
+            "card_type": "live_card",
             "target": "self",
             "action": "move_cards"
           }
@@ -6357,7 +6387,8 @@
                 "Liella!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -6372,9 +6403,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -6785,7 +6816,8 @@
                 "蓮ノ空"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -6800,9 +6832,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -6853,7 +6885,8 @@
               "count": 1,
               "card_type": "member_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -6868,9 +6901,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -6909,6 +6942,7 @@
           "type": "location_condition"
         },
         "count": 1,
+        "card_type": "member_card",
         "optional": true,
         "action": "change_state",
         "state_change": "active"
@@ -7013,9 +7047,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -7370,7 +7404,8 @@
         },
         "state_change": "active",
         "count": 1,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -7616,7 +7651,8 @@
               ],
               "max": true,
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -7631,9 +7667,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -7773,7 +7809,8 @@
                 "Liella!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -7788,9 +7825,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -7956,7 +7993,8 @@
                 "みらくらぱーく！"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -7971,9 +8009,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -8023,7 +8061,8 @@
               "count": 1,
               "card_type": "live_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -8038,9 +8077,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -8165,7 +8204,8 @@
           "count": 12,
           "operator": ">=",
           "text": "自分のエネルギーが12枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "action": "modify_score",
         "operation": "add",
@@ -8197,6 +8237,7 @@
           "all_members": true,
           "type": "group_condition"
         },
+        "card_type": "member_card",
         "position": "center",
         "multiple_targets": true,
         "action": "position_change"
@@ -8335,7 +8376,8 @@
         "text": "エネルギーを2枚アクティブにする",
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -8436,11 +8478,12 @@
           "count": 10,
           "operator": ">=",
           "text": "自分のエネルギーが10枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "card_type": "member_card",
         "action": "modify_cost",
-        "operation": "increase",
+        "operation": "add",
         "value": 4
       }
     },
@@ -8626,12 +8669,16 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい。",
+          "source": "revealed_cards",
+          "dynamic_count": {
+            "type": "revealed_cards",
+            "reference": "previous_reveal"
+          },
           "destination": "discard",
           "card_type": "live_card",
           "target": "self",
           "optional": true,
           "action": "move_cards",
-          "count": 1,
           "all": true
         },
         "result_condition": {
@@ -8710,7 +8757,8 @@
               "cost_limit_operator": ">=",
               "count": 1,
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -8725,9 +8773,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -8831,7 +8879,8 @@
                 "Liella!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -8846,9 +8895,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -8901,7 +8950,8 @@
                 "Liella!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -8916,9 +8966,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -9115,20 +9165,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -9285,20 +9335,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -9517,13 +9567,17 @@
       "effect": {
         "text": "このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える",
         "duration": "live_end",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
         "action": "move_cards",
-        "original_value": true,
-        "source": "discard"
+        "original_value": true
       }
     },
     {
@@ -9651,20 +9705,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -10008,7 +10062,8 @@
               "count": 1,
               "card_type": "member_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -10023,9 +10078,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -10156,11 +10211,12 @@
               "group_names": [
                 "Aqours"
               ],
-              "type": "group_condition"
+              "type": "comparison_condition"
             },
             "state_change": "active",
             "count": 4,
-            "action": "change_state"
+            "action": "change_state",
+            "card_type": "energy_card"
           }
         ]
       }
@@ -10205,7 +10261,8 @@
                 "Aqours"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -10220,9 +10277,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -10544,7 +10601,8 @@
               "card_type": "member_card",
               "comparison_type": "equality",
               "operator": "=",
-              "type": "comparison_condition"
+              "type": "card_count_condition",
+              "count": 1
             },
             "action": "gain_resource",
             "resource": "blade",
@@ -10594,7 +10652,8 @@
                 "虹ヶ咲"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -10609,9 +10668,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -10666,6 +10725,7 @@
                   "count": 1,
                   "max": true,
                   "action": "move_cards",
+                  "source": "hand",
                   "card_type": "card"
                 },
                 "per_unit": true,
@@ -10805,6 +10865,7 @@
         },
         "state_change": "wait",
         "count": 1,
+        "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
         "original_value": true
@@ -10860,6 +10921,7 @@
         "state_change": "active",
         "count": 1,
         "action": "change_state",
+        "card_type": "energy_card",
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
@@ -10895,7 +10957,7 @@
           "group_names": [
             "μ's"
           ],
-          "action": "move_cards",
+          "action": "gain_ability",
           "ability_gain": "{{jyouji.png|常時}}ライブの合計スコアを+1する。"
         },
         "alternative_effect": {
@@ -11381,7 +11443,8 @@
                 "lilywhite"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -11396,9 +11459,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -11512,7 +11575,7 @@
           "operator": "<",
           "comparison_type": "cost",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "count": 1,
         "action": "draw_card",
@@ -11547,11 +11610,12 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -11588,7 +11652,8 @@
                 "μ's"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -11603,9 +11668,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -11704,12 +11769,12 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "duration": "as_long_as",
         "card_type": "member_card",
         "action": "modify_cost",
-        "operation": "increase",
+        "operation": "add",
         "value": 3
       }
     },
@@ -11760,7 +11825,7 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "count": 1,
         "action": "draw_card",
@@ -11824,6 +11889,7 @@
             "destination": "discard",
             "optional": true,
             "action": "move_cards",
+            "source": "hand",
             "card_type": "card",
             "count": 1
           }
@@ -11960,7 +12026,7 @@
           "operator": "<",
           "comparison_type": "cost",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "action": "sequential",
         "actions": [
@@ -12010,7 +12076,7 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "duration": "as_long_as",
         "action": "modify_score",
@@ -12052,7 +12118,8 @@
               "count": 7,
               "operator": ">=",
               "text": "自分のエネルギーが7枚以上ある場合",
-              "target": "self"
+              "target": "self",
+              "location": "energy_zone"
             }
           ],
           "text": "自分のステージにいるメンバーが『Liella!』のみで、かつ自分のエネルギーが7枚以上ある場合",
@@ -12109,7 +12176,8 @@
                 "Liella!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -12124,9 +12192,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -12215,6 +12283,11 @@
             "Liella!"
           ]
         },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "card_type": "live_card",
@@ -12222,8 +12295,7 @@
         "group_names": [
           "Liella!"
         ],
-        "action": "move_cards",
-        "source": "discard"
+        "action": "move_cards"
       }
     },
     {
@@ -12282,7 +12354,7 @@
           "operator": "<",
           "comparison_type": "cost",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "duration": "as_long_as",
         "action": "gain_resource",
@@ -12359,7 +12431,7 @@
           "comparison_type": "cost",
           "exclude_self": true,
           "cost_limit": 11,
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "source": "discard",
         "destination": "hand",
@@ -12442,7 +12514,8 @@
           "count": 2,
           "operator": ">=",
           "text": "このメンバーの下にエネルギーカードが2枚以上置かれているかぎり",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "location": "energy_zone"
         },
         "duration": "as_long_as",
         "action": "modify_score",
@@ -12582,6 +12655,7 @@
             },
             "destination": "discard",
             "action": "move_cards",
+            "source": "hand",
             "card_type": "card",
             "count": 1
           }
@@ -12637,7 +12711,8 @@
         "text": "エネルギーを1枚アクティブにする",
         "state_change": "active",
         "count": 1,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -12783,7 +12858,8 @@
             "text": "・エネルギーを1枚アクティブにする",
             "state_change": "active",
             "count": 1,
-            "action": "change_state"
+            "action": "change_state",
+            "card_type": "energy_card"
           },
           {
             "text": "・自分の控え室にある『虹ヶ咲』のライブカードを2枚まで好きな順番でデッキの上に置く",
@@ -12903,6 +12979,11 @@
       "cost": null,
       "effect": {
         "text": "エールにより公開された自分のカードの中から、『虹ヶ咲』のメンバーカードを1枚手札に加える",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "card_type": "member_card",
@@ -12910,8 +12991,7 @@
         "group_names": [
           "虹ヶ咲"
         ],
-        "action": "move_cards",
-        "source": "discard"
+        "action": "move_cards"
       }
     },
     {
@@ -13054,7 +13134,8 @@
                 "quoted_type": "character"
               },
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -13069,9 +13150,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -13151,7 +13232,8 @@
                 "quoted_type": "character"
               },
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -13166,9 +13248,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -13300,7 +13382,8 @@
                 "quoted_type": "character"
               },
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -13315,9 +13398,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -13439,7 +13522,8 @@
                 "quoted_type": "character"
               },
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -13454,9 +13538,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -13514,9 +13598,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -13660,9 +13744,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -13780,7 +13864,8 @@
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -13865,7 +13950,8 @@
             "text": "エネルギーを2枚アクティブにする",
             "state_change": "active",
             "count": 2,
-            "action": "change_state"
+            "action": "change_state",
+            "card_type": "energy_card"
           }
         ],
         "conditional": true,
@@ -14407,12 +14493,13 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 10,
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "cost_limit": 4,
         "cost_limit_operator": "<=",
         "state_change": "wait",
         "count": 1,
+        "card_type": "member_card",
         "target": "opponent",
         "action": "change_state"
       }
@@ -14492,20 +14579,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -14538,7 +14625,7 @@
           "comparison_target": "self",
           "operator": ">",
           "comparison_type": "cost",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "count": 1,
         "action": "draw_card",
@@ -14572,6 +14659,7 @@
           "type": "group_condition"
         },
         "count": 1,
+        "card_type": "member_card",
         "target": "opponent",
         "action": "position_change"
       }
@@ -14693,6 +14781,7 @@
         "source": "discard",
         "destination": "hand",
         "count": 1,
+        "card_type": "live_card",
         "target": "self",
         "action": "move_cards"
       }
@@ -14815,7 +14904,8 @@
                 "μ's"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -14830,9 +14920,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -15024,20 +15114,20 @@
           "actions": [
             {
               "text": "好きな枚数を好きな順番でデッキの上に置き",
+              "destination": "deck_top",
               "placement_order": "any_order",
               "action": "move_cards",
-              "destination": "deck_top",
+              "source": "looked_at",
               "card_type": "card",
-              "any_number": true,
-              "source": "looked_at"
+              "any_number": true
             },
             {
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -15212,11 +15302,12 @@
               "operator": ">=",
               "comparison_type": "score",
               "aggregate": "total",
-              "type": "location_condition"
+              "type": "comparison_condition"
             },
             "state_change": "active",
             "count": 2,
-            "action": "change_state"
+            "action": "change_state",
+            "card_type": "energy_card"
           }
         ]
       }
@@ -15503,6 +15594,7 @@
         "cost_limit_operator": "<=",
         "state_change": "wait",
         "count": 1,
+        "card_type": "member_card",
         "target": "opponent",
         "action": "change_state"
       }
@@ -15787,6 +15879,11 @@
           "aggregate": "total",
           "type": "comparison_condition"
         },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "target": "self",
@@ -15794,7 +15891,6 @@
           "虹ヶ咲"
         ],
         "action": "move_cards",
-        "source": "discard",
         "card_type": "card",
         "parenthetical": [
           "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
@@ -16107,7 +16203,8 @@
           "count": 12,
           "operator": ">=",
           "text": "自分のエネルギーが12枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "action": "modify_score",
         "operation": "add",
@@ -16131,6 +16228,11 @@
       "cost": null,
       "effect": {
         "text": "エールにより公開された自分のカードの中から、『蓮ノ空』のライブカードを1枚手札に加える。",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "card_type": "live_card",
@@ -16139,7 +16241,6 @@
           "蓮ノ空"
         ],
         "action": "move_cards",
-        "source": "discard",
         "parenthetical": [
           "必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。"
         ]
@@ -16265,7 +16366,8 @@
               ],
               "max": true,
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -16280,9 +16382,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -16618,9 +16720,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -16676,7 +16778,8 @@
           "count": 9,
           "operator": ">=",
           "text": "自分のエネルギーが9枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "action": "modify_score",
         "operation": "add",
@@ -16725,7 +16828,8 @@
                 "CatChu!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -16740,9 +16844,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -16793,7 +16897,8 @@
                 "KALEIDOSCORE"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -16808,9 +16913,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -16861,7 +16966,8 @@
                 "5yncri5e!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -16876,9 +16982,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -16952,7 +17058,8 @@
             "state_change": "active",
             "count": 6,
             "max": true,
-            "action": "change_state"
+            "action": "change_state",
+            "card_type": "energy_card"
           },
           {
             "text": "このカードのスコアを+1する",
@@ -17045,6 +17152,11 @@
       "cost": null,
       "effect": {
         "text": "エールにより公開された自分のカードの中から、ライブカードを1枚までデッキの一番下に置く",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "deck_bottom",
         "count": 1,
         "card_type": "live_card",
@@ -17270,7 +17382,7 @@
           "card_type": "live_card",
           "operator": "<",
           "comparison_target": "opponent",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "action": "modify_score",
         "operation": "add",
@@ -17301,11 +17413,15 @@
           "operator": ">=",
           "unit": "人"
         },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "target": "self",
         "action": "move_cards",
-        "source": "discard",
         "card_type": "card"
       }
     },
@@ -17339,7 +17455,8 @@
               "count": 1,
               "card_type": "member_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -17354,9 +17471,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -17400,7 +17517,8 @@
               "count": 1,
               "card_type": "live_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -17415,9 +17533,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -17567,7 +17685,8 @@
             "text": "次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る",
             "count": 1,
             "card_type": "live_card",
-            "action": "move_cards"
+            "action": "modify_limit",
+            "operation": "decrease"
           }
         ]
       }
@@ -18436,7 +18555,7 @@
           "card_type": "member_card",
           "operator": ">",
           "comparison_target": "opponent",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "action": "modify_score",
         "operation": "add",
@@ -18459,7 +18578,7 @@
         "text": "自分の成功ライブカード置き場にあるカード1枚につき、ステージにいるこのメンバーのコストを+1する",
         "card_type": "member_card",
         "action": "modify_cost",
-        "operation": "increase",
+        "operation": "add",
         "value": 1,
         "per_unit": true,
         "per_unit_count": 1,
@@ -18536,6 +18655,7 @@
             "destination": "discard",
             "optional": true,
             "action": "move_cards",
+            "source": "hand",
             "card_type": "card",
             "count": 1,
             "all": true
@@ -18798,10 +18918,13 @@
         "actions": [
           {
             "text": "自分のステージにいるメンバー1人の下にあるエネルギーカードを、好きな枚数エネルギーデッキに置いてもよい。",
+            "source": "under_member",
             "card_type": "member_card",
             "target": "self",
             "optional": true,
-            "action": "move_cards",
+            "action": "place_energy_under_member",
+            "energy_count": 1,
+            "target_member": "this_member",
             "any_number": true
           },
           {
@@ -18835,9 +18958,10 @@
           "text": "自分の成功ライブカード置き場にスコアが1か5のカードがある場合、このカードのスコアを+1する。それらが両方ある場合、",
           "card_type": "live_card",
           "target": "self",
-          "action": "move_cards",
+          "action": "modify_score",
           "self_target": true,
-          "count": 1
+          "operation": "add",
+          "value": 1
         },
         "alternative_effect": {
           "text": "スコアを+2する",
@@ -18983,7 +19107,8 @@
         "state_change": "active",
         "count": 6,
         "max": true,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -19186,6 +19311,11 @@
       },
       "effect": {
         "text": "エールにより公開された自分のカードの中から、『μ's』のメンバーカードを1枚手札に加える",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "card_type": "member_card",
@@ -19193,8 +19323,7 @@
         "group_names": [
           "μ's"
         ],
-        "action": "move_cards",
-        "source": "discard"
+        "action": "move_cards"
       }
     },
     {
@@ -19271,7 +19400,7 @@
           "operator": ">=",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         }
       }
     },
@@ -19421,7 +19550,7 @@
           "operator": ">",
           "comparison_type": "score",
           "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "duration": "as_long_as",
         "action": "gain_resource",
@@ -19507,6 +19636,7 @@
           "type": "group_condition"
         },
         "count": 1,
+        "card_type": "member_card",
         "target": "self",
         "optional": true,
         "action": "position_change"
@@ -19578,7 +19708,7 @@
               "operator": ">=",
               "comparison_type": "score",
               "aggregate": "total",
-              "type": "location_condition"
+              "type": "comparison_condition"
             },
             "action": "modify_required_hearts",
             "heart_color": "heart00",
@@ -19869,7 +19999,8 @@
             "text": "次のライブカードセットフェイズで自分がライブカード置き場に置けるカード枚数の上限が1枚減る",
             "count": 1,
             "card_type": "live_card",
-            "action": "move_cards"
+            "action": "modify_limit",
+            "operation": "decrease"
           }
         ],
         "conditional": true,
@@ -20608,7 +20739,8 @@
           "count": 11,
           "operator": ">=",
           "text": "自分のエネルギーが11枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "action": "sequential",
         "actions": [
@@ -20654,6 +20786,7 @@
           "all_members": true,
           "type": "group_condition"
         },
+        "card_type": "member_card",
         "target": "self",
         "optional": true,
         "action": "formation_change",
@@ -20716,7 +20849,8 @@
               "count": 1,
               "card_type": "member_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -20731,9 +20865,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -21079,7 +21213,12 @@
               "count": 1,
               "card_type": "member_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "heart_colors": [
+                "heart05",
+                "heart06"
+              ],
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -21094,9 +21233,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -21324,36 +21463,18 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
+        "text": "相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
         "condition": {
-          "text": "自分のステージにいるメンバーが持つハートに{{heart_02.png|heart02}}が合計5つ以上ある場合",
-          "target": "self",
-          "location": "stage",
-          "heart_colors": [
-            "heart02"
-          ],
-          "card_type": "member_card",
-          "count": 5,
+          "text": "相手のライブ開始時",
+          "target": "opponent",
+          "count": 1,
           "operator": ">=",
-          "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "相手のライブカード置き場にあるライブカード1枚は",
-            "count": 1,
-            "card_type": "live_card",
-            "target": "opponent",
-            "action": "move_cards"
-          },
-          {
-            "text": "成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
-            "action": "modify_required_hearts",
-            "heart_color": "heart00",
-            "count": 1
-          }
-        ]
+        "action": "restriction",
+        "restriction_type": "modify_required_hearts_global",
+        "operation": "increase",
+        "target": "opponent"
       }
     },
     {
@@ -21368,36 +21489,18 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "相手のライブ開始時、相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
+        "text": "相手のライブカード置き場にあるライブカード1枚は、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
         "condition": {
-          "text": "自分のステージにいるメンバーが持つハートに{{heart_05.png|heart05}}が合計5つ以上ある場合",
-          "target": "self",
-          "location": "stage",
-          "heart_colors": [
-            "heart05"
-          ],
-          "card_type": "member_card",
-          "count": 5,
+          "text": "相手のライブ開始時",
+          "target": "opponent",
+          "count": 1,
           "operator": ">=",
-          "aggregate": "total",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "相手のライブカード置き場にあるライブカード1枚は",
-            "count": 1,
-            "card_type": "live_card",
-            "target": "opponent",
-            "action": "move_cards"
-          },
-          {
-            "text": "成功させるための必要ハートが{{heart_00.png|heart0}}多くなる",
-            "action": "modify_required_hearts",
-            "heart_color": "heart00",
-            "count": 1
-          }
-        ]
+        "action": "restriction",
+        "restriction_type": "modify_required_hearts_global",
+        "operation": "increase",
+        "target": "opponent"
       }
     },
     {
@@ -21475,7 +21578,7 @@
           "comparison_target": "opponent",
           "operator": ">",
           "comparison_type": "cost",
-          "type": "location_condition"
+          "type": "comparison_condition"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -21538,13 +21641,17 @@
           "location": "success_live_zone",
           "target": "either"
         },
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 2,
         "card_type": "member_card",
         "target": "self",
         "max": true,
-        "action": "move_cards",
-        "source": "discard"
+        "action": "move_cards"
       }
     },
     {
@@ -21916,6 +22023,7 @@
           "negation": true,
           "heart_type": "all"
         },
+        "card_type": "member_card",
         "action": "gain_ability",
         "ability_gain": "そのメンバーはを得る",
         "count": 1,
@@ -22030,7 +22138,8 @@
                 "Liella!"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -22045,9 +22154,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -22127,7 +22236,8 @@
           "count": 10,
           "operator": ">=",
           "text": "自分のエネルギーが10枚以上あるかぎり",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "duration": "as_long_as",
         "action": "gain_resource",
@@ -22215,7 +22325,8 @@
           "count": 6,
           "operator": ">=",
           "text": "自分のエネルギーが6枚以上ある場合",
-          "target": "self"
+          "target": "self",
+          "location": "energy_zone"
         },
         "source": "energy_deck",
         "destination": "energy_zone",
@@ -22752,7 +22863,7 @@
             "EdelNote"
           ],
           "cost_limit": 9,
-          "type": "group_condition"
+          "type": "comparison_condition"
         },
         "action": "sequential",
         "actions": [
@@ -22837,6 +22948,7 @@
           "location": "stage",
           "target": "self"
         },
+        "card_type": "member_card",
         "target": "self",
         "position": "center",
         "action": "gain_ability",
@@ -23084,11 +23196,12 @@
             "蓮ノ空"
           ],
           "cost_limit": 10,
-          "type": "group_condition"
+          "type": "comparison_condition"
         },
         "state_change": "active",
         "count": 2,
-        "action": "change_state"
+        "action": "change_state",
+        "card_type": "energy_card"
       }
     },
     {
@@ -23127,7 +23240,11 @@
               "count": 1,
               "card_type": "member_card",
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "heart_colors": [
+                "heart05"
+              ],
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -23142,9 +23259,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -23670,7 +23787,8 @@
                 "Aqours"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -23685,9 +23803,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -23728,6 +23846,7 @@
             "placement_order": "any_order",
             "count": 2,
             "action": "move_cards",
+            "source": "hand",
             "card_type": "card"
           }
         ],
@@ -23921,6 +24040,11 @@
       "cost": null,
       "effect": {
         "text": "エールにより公開された自分のカードの中から、『Aqours』のライブカードを1枚手札に加える",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
         "destination": "hand",
         "count": 1,
         "card_type": "live_card",
@@ -23928,8 +24052,7 @@
         "group_names": [
           "Aqours"
         ],
-        "action": "move_cards",
-        "source": "discard"
+        "action": "move_cards"
       }
     },
     {
@@ -24038,7 +24161,8 @@
                 "DOLLCHESTRA"
               ],
               "action": "reveal",
-              "source": "looked_at"
+              "source": "looked_at",
+              "optional": true
             },
             {
               "text": "手札に加えてもよい",
@@ -24053,9 +24177,9 @@
               "text": "残りを控え室に置く",
               "destination": "discard",
               "action": "move_cards",
+              "source": "looked_at_remaining",
               "card_type": "card",
               "count": 1,
-              "source": "looked_at_remaining",
               "dynamic_count": {
                 "type": "remaining_looked_at",
                 "reference": "previous_look"
@@ -24224,6 +24348,7 @@
           ]
         },
         "count": 1,
+        "card_type": "member_card",
         "target": "self",
         "group_names": [
           "蓮ノ空"

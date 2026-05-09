@@ -88,6 +88,7 @@ impl<'a> AbilityResolver<'a> {
                         count,
                         description: format!("Select card(s) to pay optional cost (or skip): {}", text),
                         allow_skip: true,
+                        cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                     });
                     return Ok(());
                 }
@@ -128,6 +129,7 @@ impl<'a> AbilityResolver<'a> {
                                         count,
                                         description: format!("Select {} card(s) from same-unit group ({} available in unit {})", count, cards.len(), card_db.get_card(cards[0]).and_then(|c| c.unit.clone()).unwrap_or_default()),
                                         allow_skip: false,
+                                        cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                                     });
                                     return Ok(());
                                 }
@@ -236,6 +238,7 @@ impl<'a> AbilityResolver<'a> {
                             count,
                             description: format!("Select {} stage member(s) to wait", count),
                             allow_skip: false,
+                            cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                         });
                         return Ok(());
                     }
@@ -326,6 +329,7 @@ impl<'a> AbilityResolver<'a> {
                         count: if has_explicit_count { explicit_count } else { 0 },
                         description: "Select cards to reveal from hand".to_string(),
                         allow_skip: true,
+                        cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                     });
                     Ok(())
                 }

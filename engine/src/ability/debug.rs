@@ -102,7 +102,7 @@ impl AbDebug {
     pub fn effect(&mut self, effect: &AbilityEffect) {
         let a = &effect.action;
         let msg = match a.as_str() {
-            "sequential" => format!("multi-step ({} sub-actions)", effect.actions.as_ref().map(|v| v.len()).unwrap_or(0)),
+            "sequential" => format!("multi-step ({} sub-actions)", effect.compound.actions.as_ref().map(|v| v.len()).unwrap_or(0)),
             "draw_card" => format!("draw {} card(s){}",
                 effect.count.unwrap_or(1),
                 effect.optional.unwrap_or(false).then(|| " (optional)").unwrap_or("")),

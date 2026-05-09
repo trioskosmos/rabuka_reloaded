@@ -1,8 +1,7 @@
 use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, Keyword};
-use crate::mod_map::ModMap;
+use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 use smallvec::SmallVec;
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Orientation {
@@ -265,12 +264,12 @@ impl Stage {
         Ok(())
     }
 
-    pub fn total_blades(&self, card_db: &CardDatabase, blade_modifiers: &ModMap<i32>) -> u32 {
+    pub fn total_blades(&self, card_db: &CardDatabase, blade_modifiers: &HashMap<i16, i32>) -> u32 {
         let mut total = 0;
         for &card_id in &self.stage {
             if card_id != -1 {
                 if let Some(card) = card_db.get_card(card_id) {
-                    let mod_val = blade_modifiers.get(card_id).copied().unwrap_or(0);
+                    let mod_val = blade_modifiers.get(&card_id).copied().unwrap_or(0);
                     total += (card.blade as i32 + mod_val).max(0) as u32;
                 }
             }
@@ -378,7 +377,7 @@ impl LiveCardZone {
         true
     }
 
-    pub fn add_card(&mut self, card_id: i16, _face_down: bool, _card_db: &CardDatabase) -> Result<(), String> {
+    pub fn add_card(&mut self, card_id: i16, _card_db: &CardDatabase) -> Result<(), String> {
         if !self.can_place_card(_card_db, card_id) {
             if let Some(card) = _card_db.get_card(card_id) {
                 return Err(format!("Cannot place energy card '{}' in live card zone", card.name));
@@ -503,26 +502,6 @@ impl EnergyZone {
         self.cards.iter().filter_map(|&card_id| card_db.get_card(card_id)).map(|c| c.blade).sum()
     }
 
-    pub fn can_pay_blades(&self, card_db: &CardDatabase, amount: u32) -> bool {
-        // Rule 8.2.5: Check if Energy Zone has enough blades to pay cost
-        self.total_blades(card_db) >= amount
-    }
-
-    pub fn pay_blades(&mut self, card_db: &CardDatabase, amount: u32) -> bool {
-        // Rule 8.2.6: Pay blades by deactivating energy cards
-        if !self.can_pay_blades(card_db, amount) {
-            return false;
-        }
-
-        // Decrement active energy count
-        if self.active_energy_count >= amount as usize {
-            self.active_energy_count -= amount as usize;
-            true
-        } else {
-            false
-        }
-    }
-    
     pub fn can_pay_energy(&self, amount: usize) -> bool {
         // Rule 5.9: Check if player has enough active energy cards
         self.active_energy_count >= amount

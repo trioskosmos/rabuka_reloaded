@@ -244,16 +244,8 @@ export const AppController = {
         syncRoomDisplay();
         await Network.checkSystemStatus();
 
-        const shouldStartLocalGame =
-            !State.offlineMode &&
-            !State.replayMode &&
-            window.Actions &&
-            window.Actions.startGame;
-
-        if (shouldStartLocalGame) {
-            await window.Actions.startGame('pve');
-        } else {
-            await Network.fetchState();
+        if (!State.replayMode) {
+            Modals.openLobby();
         }
         DragDrop.init();
 

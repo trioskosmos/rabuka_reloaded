@@ -27,15 +27,15 @@ fn main() {
             if ability.effect.is_some() { complexity += 1; }
             
             if let Some(ref effect) = ability.effect {
-                if effect.look_action.is_some() { complexity += 2; }
-                if effect.select_action.is_some() { complexity += 2; }
-                if let Some(ref actions) = effect.actions {
+                if effect.compound.look_action.is_some() { complexity += 2; }
+                if effect.compound.select_action.is_some() { complexity += 2; }
+                if let Some(ref actions) = effect.compound.actions {
                     complexity += actions.len();
                 }
                 if effect.condition.is_some() { complexity += 2; }
-                if effect.primary_effect.is_some() { complexity += 2; }
-                if effect.alternative_condition.is_some() { complexity += 2; }
-                if effect.alternative_effect.is_some() { complexity += 2; }
+                if effect.compound.primary_effect.is_some() { complexity += 2; }
+                if effect.compound.alternative_condition.is_some() { complexity += 2; }
+                if effect.compound.alternative_effect.is_some() { complexity += 2; }
             }
             
             if let Some(ref cost) = ability.cost {
@@ -59,10 +59,10 @@ fn main() {
                             println!("\n=== look_and_select #{} ===", look_and_select_count);
                             println!("Card: {}", card.name);
                             println!("Ability: {}", ability.full_text);
-                            if let Some(ref look) = effect.look_action {
+                            if let Some(ref look) = effect.compound.look_action {
                                 println!("Look: {}", look.text);
                             }
-                            if let Some(ref select) = effect.select_action {
+                            if let Some(ref select) = effect.compound.select_action {
                                 println!("Select action: {}", select.action);
                             }
                         }
@@ -81,7 +81,7 @@ fn main() {
                             println!("\n=== sequential #{} ===", sequential_count);
                             println!("Card: {}", card.name);
                             println!("Ability: {}", ability.full_text);
-                            if let Some(ref actions) = effect.actions {
+                            if let Some(ref actions) = effect.compound.actions {
                                 println!("Actions: {}", actions.len());
                             }
                         }

@@ -47,137 +47,16 @@ fn main() {
             "web-server" => {
                 run_web_server();
             }
-            "headless" => {
-                bot::headless::run_headless_game();
-            }
-            "interactive" => {
-                bot::interactive_headless::run_interactive_headless();
-            }
-            "tournament" => {
-                bot::tournament::run_tournament();
-            }
-            "automated" => {
-                bot::headless::run_interactive_headless();
-            }
             _ => {
                 eprintln!("Unknown command: {}", args[1]);
             }
         }
     } else {
-        // Default: run full game initialization
-        run_game();
+        initialize_game();
     }
 }
 
-fn run_game() {
-    println!("Love Live! Card Game Engine");
-    
-    // Load cards from cards.json
-    let cards_path = std::path::Path::new("../cards/cards.json");
-    let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
-        Ok(cards) => {
-            println!("Loaded {} cards", cards.len());
-            // Convert Vec<Card> to HashMap<String, Card>
-            let mut card_map = std::collections::HashMap::new();
-            for card in cards {
-                card_map.insert(card.card_no.clone(), card);
-            }
-            card_map
-        }
-        Err(e) => {
-            eprintln!("Failed to load cards: {}", e);
-            return;
-        }
-    };
-    
-    // Load sample decks from game/decks
-    let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
-        Ok(decks) => {
-            println!("Loaded {} sample decks:", decks.len());
-            for deck in &decks {
-                println!("  - {}", deck.name);
-            }
-            decks
-        }
-        Err(e) => {
-            eprintln!("Failed to load decks: {}", e);
-            return;
-        }
-    };
-    
-    // Let players choose decks
-    let deck1 = choose_deck(&deck_lists, "Player 1");
-    let deck2 = choose_deck(&deck_lists, "Player 2");
-    
-    // Build decks from chosen deck lists
-    let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck1);
-    let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
-    
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers1) {
-        Ok(mut deck) => {
-            deck.shuffle_main_deck();
-            deck.shuffle_energy_deck();
-            deck
-        }
-        Err(e) => {
-            eprintln!("Failed to build deck for Player 1: {}", e);
-            return;
-        }
-    };
-    
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_card_map(&cards, card_numbers2) {
-        Ok(mut deck) => {
-            deck.shuffle_main_deck();
-            deck.shuffle_energy_deck();
-            deck
-        }
-        Err(e) => {
-            eprintln!("Failed to build deck for Player 2: {}", e);
-            return;
-        }
-    };
-    
-    // Add default energy cards if needed
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player1_deck, &cards);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards(&mut player2_deck, &cards);
-    
-    println!("Player 1 deck: {}", deck1.name);
-    println!("  Main deck: {} cards", player1_deck.main_deck.len());
-    println!("  Energy deck: {} cards", player1_deck.energy_deck.len());
-    
-    println!("Player 2 deck: {}", deck2.name);
-    println!("  Main deck: {} cards", player2_deck.main_deck.len());
-    println!("  Energy deck: {} cards", player2_deck.energy_deck.len());
-    
-    // Initialize players with decks
-    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
-    let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
-    
-    player1.set_main_deck(player1_deck.main_deck);
-    player1.set_energy_deck(player1_deck.energy_deck);
-    
-    player2.set_main_deck(player2_deck.main_deck);
-    player2.set_energy_deck(player2_deck.energy_deck);
-    
-    // Initialize game state
-    let card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(
-        cards.values().cloned().collect()
-    ));
-    let mut game_state = GameState::new(player1, player2, card_database);
-    
-    println!("Game initialized");
-    println!("Turn: {}", game_state.turn_number);
-    println!("Phase: {:?}", game_state.current_phase);
-    
-    // Game setup (Rule 6.2)
-    game_setup::setup_game(&mut game_state);
-    
-    println!("Game setup complete");
-    println!("Player 1 hand: {} cards", game_state.player1.hand.len());
-    println!("Player 2 hand: {} cards", game_state.player2.hand.len());
-    println!("Player 1 energy: {} cards", game_state.player1.energy_zone.cards.len());
-    println!("Player 2 energy: {} cards", game_state.player2.energy_zone.cards.len());
-}
+
 
 fn output_game_state() {
     let game_state = GAME_STATE.lock().unwrap();

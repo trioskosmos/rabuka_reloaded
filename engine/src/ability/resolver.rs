@@ -73,6 +73,7 @@ impl<'a> AbilityResolver<'a> {
             self.pending_choice = Some(Choice::SelectCard {
                 zone: zone_name.to_string(), card_type: card_type.map(|s| s.to_string()),
                 count, description: prompt_desc.to_string(), allow_skip: false,
+                cost_limit: None, cost_limit_operator: None, group: None, characters: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);
@@ -301,7 +302,7 @@ impl<'a> AbilityResolver<'a> {
         fn find_modify_cost(effect: &AbilityEffect) -> Option<&AbilityEffect> {
             if effect.action == "modify_cost" { return Some(effect); }
             if effect.action == "sequential" {
-                if let Some(ref actions) = effect.actions {
+                if let Some(ref actions) = effect.compound.actions {
                     for sub in actions {
                         if let Some(found) = find_modify_cost(sub) {
                             return Some(found);

@@ -461,6 +461,18 @@
     min-height: 80px;
 }
 
+#resolution-zone-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    min-height: 60px;
+}
+
+#resolution-zone-cards .card-mini {
+    width: 60px;
+}
+
 .looked-cards-meta,
 .looked-cards-header,
 .looked-cards-subtitle {

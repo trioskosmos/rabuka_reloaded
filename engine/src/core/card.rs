@@ -455,6 +455,35 @@ pub struct AbilityCost {
     pub group_names: Option<Vec<String>>,
 }
 
+/// Grouped sub-effect fields used by compound action handlers
+/// (Sequential, ConditionalAlternative, ConditionalOnResult, ConditionalOnOptional, LookAndSelect).
+/// Flattened into AbilityEffect via `#[serde(flatten)]` for JSON backward compat.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CompoundBranch {
+    #[serde(default)]
+    pub look_action: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub select_action: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub actions: Option<Vec<AbilityEffect>>,
+    #[serde(default)]
+    pub primary_effect: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub alternative_condition: Option<Condition>,
+    #[serde(default)]
+    pub alternative_effect: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub result_condition: Option<Condition>,
+    #[serde(default)]
+    pub followup_action: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub optional_action: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub conditional_action: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub conditional_negation: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
@@ -468,9 +497,6 @@ pub struct AbilityEffect {
     pub card_type: Option<String>,
     pub target: Option<String>,
     pub duration: Option<String>,
-    pub look_action: Option<Box<AbilityEffect>>,
-    pub select_action: Option<Box<AbilityEffect>>,
-    pub actions: Option<Vec<AbilityEffect>>,
     pub resource: Option<String>,
     pub position: Option<PositionInfo>,
     pub state_change: Option<String>,
@@ -482,24 +508,22 @@ pub struct AbilityEffect {
     pub quoted_text: Option<QuotedText>,
     pub per_unit: Option<bool>,
     pub condition: Option<Condition>,
-    pub primary_effect: Option<Box<AbilityEffect>>,
-    pub alternative_condition: Option<Condition>,
-    pub alternative_effect: Option<Box<AbilityEffect>>,
-    #[serde(default)]
-    pub result_condition: Option<Condition>,
-    #[serde(default)]
-    pub followup_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
-    pub optional_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
-    pub conditional_action: Option<Box<AbilityEffect>>,
-    #[serde(default)]
-    pub conditional_negation: Option<bool>,
+    /// Compound sub-effects (sequential, conditional, look_and_select branches).
+    /// Flat fields in JSON are collected here via `#[serde(flatten)]`.
+    #[serde(flatten)]
+    pub compound: CompoundBranch,
     pub operation: Option<String>,
     pub value: Option<u32>,
-    // Subvariable fields for ability effects
-    pub heart_color: Option<String>,
-    pub heart_colors: Option<Vec<String>>,
+    /// Heart colors specification.
+    /// Semantics depend on action:
+    /// - gain_resource: choice options (len>1) or fixed single color (len==1)
+    /// - modify_required_hearts: which color's requirement to modify (uses first)
+    /// - set_required_hearts: each color's requirement is set individually
+    /// - select/reveal/look_and_select: filter — card must match ANY listed color
+    /// - modify_score (per_unit): count cards matching ANY listed color
+    /// - Empty: use default (heart00 for single-value ops, no filter for filter ops)
+    #[serde(default)]
+    pub heart_colors: Vec<String>,
     pub blade_type: Option<String>,
     pub energy_count: Option<u32>,
     pub target_member: Option<String>,
@@ -516,6 +540,8 @@ pub struct AbilityEffect {
     pub dynamic_count: Option<DynamicCount>,
     pub placement_order: Option<String>,
     pub cost_limit: Option<u32>,
+    #[serde(default)]
+    pub cost_limit_operator: Option<String>,
     #[serde(default)]
     pub any_number: Option<bool>,
     pub distinct: Option<String>,
@@ -627,6 +653,26 @@ pub struct AbilityEffect {
 }
 
 impl AbilityEffect {
+    /// Returns the target player string, defaulting to "self".
+    pub fn target_name(&self) -> &str { self.target.as_deref().unwrap_or("self") }
+
+    /// Returns the source zone string with a static default.
+    pub fn source_or(&self, default: &'static str) -> &str { self.source.as_deref().unwrap_or(default) }
+
+    /// Returns the count with a caller-provided default.
+    pub fn count_or(&self, n: u32) -> u32 { self.count.unwrap_or(n) }
+
+    /// Returns the first group name, if any.
+    pub fn group_name(&self) -> Option<&str> {
+        self.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str()))
+    }
+
+    /// Returns the first heart color as a string reference, or a static default.
+    /// For single-color operations like modify_required_hearts.
+    pub fn heart_color_or(&self, default: &'static str) -> &str {
+        self.heart_colors.first().map(|s| s.as_str()).unwrap_or(default)
+    }
+
     /// Extract shared execution modifiers from this ability effect.
     pub fn extract_modifiers(&self) -> ActionModifiers {
         ActionModifiers {
@@ -635,11 +681,13 @@ impl AbilityEffect {
             card_type: self.card_type.clone(),
             group_name: self.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.clone())),
             cost_limit: self.cost_limit,
+            cost_limit_operator: self.cost_limit_operator.clone(),
             max: self.max.unwrap_or(false),
             all: self.all.unwrap_or(false),
             source: self.source.clone(),
             destination: self.destination.clone(),
             exclude_self: self.exclude_self.unwrap_or(false),
+            self_target: self.self_target.unwrap_or(false),
             characters: self.quoted_text.as_ref().map(|qt| vec![qt.text.clone()]),
         }
     }
@@ -723,11 +771,13 @@ pub struct ActionModifiers {
     pub card_type: Option<String>,
     pub group_name: Option<String>,
     pub cost_limit: Option<u32>,
+    pub cost_limit_operator: Option<String>,
     pub max: bool,
     pub all: bool,
     pub source: Option<String>,
     pub destination: Option<String>,
     pub exclude_self: bool,
+    pub self_target: bool,
     pub characters: Option<Vec<String>>,
 }
 

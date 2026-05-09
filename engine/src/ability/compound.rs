@@ -11,7 +11,7 @@ impl<'a> AbilityResolver<'a> {
 
         if is_further { eprintln!("Further conditional effect (さらに) - executing additional actions"); }
 
-        if let Some(ref actions) = effect.actions {
+        if let Some(ref actions) = effect.compound.actions {
             let has_repeat = actions.last().map_or(false, |a| a.action == "repeat_procedure");
             let repeat_max = if has_repeat {
                 actions.last().and_then(|a| a.repeat_limit).unwrap_or(1)
@@ -75,34 +75,34 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn execute_conditional_alternative(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let has_primary = effect.primary_effect.is_some();
-        let has_alternative = effect.alternative_effect.is_some();
+        let has_primary = effect.compound.primary_effect.is_some();
+        let has_alternative = effect.compound.alternative_effect.is_some();
 
         if has_primary && has_alternative {
-            let primary_text = effect.primary_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Primary effect");
-            let alternative_text = effect.alternative_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Alternative effect");
+            let primary_text = effect.compound.primary_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Primary effect");
+            let alternative_text = effect.compound.alternative_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Alternative effect");
             let description = format!("Choose effect:\nPrimary: {}\nAlternative: {}", primary_text, alternative_text);
             self.pending_choice = Some(Choice::SelectTarget { target: "primary|alternative".to_string(), description });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(());
         }
 
-        if let Some(ref alt_condition) = effect.alternative_condition {
+        if let Some(ref alt_condition) = effect.compound.alternative_condition {
             if self.evaluate_condition(alt_condition) {
-                if let Some(ref alt_effect) = effect.alternative_effect {
+                if let Some(ref alt_effect) = effect.compound.alternative_effect {
                     return self.execute_effect(alt_effect);
                 }
             }
         }
 
-        if let Some(ref primary_effect) = effect.primary_effect {
+        if let Some(ref primary_effect) = effect.compound.primary_effect {
             self.execute_effect(primary_effect)
         } else { Ok(()) }
     }
 
     pub fn execute_repeat_procedure(&mut self, effect: &AbilityEffect, repeat_limit: u32) -> Result<(), String> {
         let repeat_limit = repeat_limit as usize;
-        if let Some(ref actions) = effect.actions {
+        if let Some(ref actions) = effect.compound.actions {
             for _ in 0..repeat_limit {
                 for action in actions {
                     self.execute_effect(action)?;
@@ -113,9 +113,9 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn execute_conditional_on_result(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let primary_action = effect.primary_effect.as_ref();
-        let result_condition = effect.result_condition.as_ref();
-        let followup_action = effect.followup_action.as_ref();
+        let primary_action = effect.compound.primary_effect.as_ref();
+        let result_condition = effect.compound.result_condition.as_ref();
+        let followup_action = effect.compound.followup_action.as_ref();
 
         if let Some(ref primary) = primary_action {
             if let Err(e) = self.execute_effect(primary) {
@@ -137,9 +137,9 @@ impl<'a> AbilityResolver<'a> {
     }
 
     pub fn execute_conditional_on_optional(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        let optional_action = effect.optional_action.as_ref();
-        let conditional_action = effect.conditional_action.as_ref();
-        let is_negation = effect.conditional_negation.unwrap_or(false);
+        let optional_action = effect.compound.optional_action.as_ref();
+        let conditional_action = effect.compound.conditional_action.as_ref();
+        let is_negation = effect.compound.conditional_negation.unwrap_or(false);
 
         if optional_action.is_some() && conditional_action.is_some() {
             let desc = optional_action.as_ref().map(|a| a.text.as_str()).unwrap_or("Perform optional action");

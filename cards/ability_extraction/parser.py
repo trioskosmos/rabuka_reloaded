@@ -47,14 +47,21 @@ DESTINATION_PATTERNS = [
     ('ステージに登場させる', 'stage'),
     ('エネルギー置き場に置く', 'energy_zone'),
     ('エネルギーゾーンに置く', 'energy_zone'),
+    ('エネルギー・デッキに置く', 'energy_deck'),
+    ('エネルギー・デッキに置いてもよい', 'energy_deck'),
     ('ライブカード置き場に置く', 'live_card_zone'),
     ('成功ライブカード置き場に置く', 'success_live_zone'),
     ('デッキの上に置く', 'deck_top'),
+    ('デッキの上に置き', 'deck_top'),  # Handle continuative form (e.g. "置き、")
     ('デッキの一番上に置く', 'deck_top'),
+    ('デッキの一番上に置き', 'deck_top'),  # Handle continuative form
     ('デッキの下に置く', 'deck_bottom'),
+    ('デッキの下に置き', 'deck_bottom'),  # Handle continuative form
     ('デッキの一番下に置く', 'deck_bottom'),
     ('デッキの一番下に置いて', 'deck_bottom'),  # Handle te-form
+    ('デッキの一番下に置き', 'deck_bottom'),  # Handle continuative form
     ('デッキの一番上から4枚目に置く', 'deck_position_4'),  # Q226: 4th from top
+    ('デッキの一番上から4枚目に置き', 'deck_position_4'),  # Handle continuative form
     ('デッキの一番上から(\d+)枚目に置く', 'deck_position'),  # Q226: General deck position pattern
     ('デッキに置く', 'deck'),  # Q226: General deck placement
     ('成功ライブカード置き場に置く', 'success_live_zone'),
@@ -62,6 +69,7 @@ DESTINATION_PATTERNS = [
     ('そのメンバーがいたエリア', 'same_area'),
     ('このメンバーの下に置く', 'under_member'),
     ('このメンバーの下に置いて', 'under_member'),  # Handle te-form
+    ('このメンバーの下に置き', 'under_member'),  # Handle continuative form
     # Handle "手札を1枚控え室に置く" - destination is discard
     ('枚控え室に置く', 'discard'),
     ('枚控え室に置いて', 'discard'),  # Handle te-form
@@ -246,6 +254,10 @@ def extract_source(text: str) -> Optional[str]:
         return 'revealed_card'
     if '自分の成功ライブカード置き場にある' in text:
         return 'success_live_zone'
+    if 'エールにより公開された' in text:
+        return 'revealed_cards'
+    if 'メンバーの下にある' in text or 'メンバー1人の下にある' in text:
+        return 'under_member'
     if '自分の控え室にある' in text or '控え室からライブカード' in text:
         return 'discard'
     if 'デッキの一番下から' in text:
@@ -714,6 +726,9 @@ def _try_card_count(text):
             # Detect live_card_zone from "ライブ中のカード"
             if 'ライブ中のカード' in text and not result.get('location'):
                 result['location'] = 'live_card_zone'
+            # Detect energy_zone from energy count context (energy cards in energy zone)
+            if 'エネルギー' in text and not result.get('location') and not result.get('resource_type'):
+                result['location'] = 'energy_zone'
             # Also try _try_either_target for "自分か相手の" patterns
             either_result = _try_either_target(text)
             if either_result:
@@ -1275,21 +1290,26 @@ def _infer_condition_type(condition, text):
     operator = condition.get('operator')
     position = condition.get('position')
 
-    if group_names:
+    # comparison_target (directional: self vs opponent) takes priority over location/card_type
+    # comparison_type with "equality" should NOT override — the engine handles equality
+    # in location_condition via target="both" logic
+    if condition.get('comparison_target'):
+        condition['type'] = 'comparison_condition'
+    elif condition.get('comparison_type') and condition.get('comparison_type') != 'equality':
+        condition['type'] = 'comparison_condition'
+    elif condition.get('resource_type'):
+        condition['type'] = 'comparison_condition'
+    elif group_names:
         condition['type'] = 'group_condition'
         if 'コスト' in text and ('低い' in text or '高い' in text):
             condition['comparison_type'] = 'cost'
             condition['operator'] = '<' if '低い' in text else '>'
             cm = extract_cost_modification(text)
             if cm: condition.update(cm)
-    elif condition.get('resource_type'):
-        condition['type'] = 'comparison_condition'
     elif location and card_type:
         condition['type'] = 'location_condition'
     elif location and position:
         condition['type'] = 'position_condition'
-    elif condition.get('comparison_target') or condition.get('comparison_type'):
-        condition['type'] = 'comparison_condition'
     elif condition.get('operator') and condition.get('target'):
         condition['type'] = 'comparison_condition'
     elif condition.get('aggregate') == 'total':
@@ -1492,6 +1512,17 @@ def _fill_defaults(action, text):
         if 'source' not in action:
             s = extract_source(text)
             if s: action['source'] = s
+        if 'source' not in action:
+            # Fallback: infer source from destination common patterns
+            dest = action.get('destination', '')
+            if dest in ('deck_top', 'deck_bottom', 'deck'):
+                if 'メンバー' not in text:
+                    action['source'] = 'hand'
+            elif dest in ('discard',):
+                if 'このカード' in text:
+                    action['source'] = 'deck_top'
+                elif 'エネルギー' not in text:
+                    action['source'] = 'hand'
         if 'destination' not in action:
             d = extract_destination(text)
             if d: action['destination'] = d
@@ -1500,6 +1531,16 @@ def _fill_defaults(action, text):
             if ct: action['card_type'] = ct
         if 'state_change' not in action and 'ウェイト状態' in text:
             action['state_change'] = 'wait'
+        # If after inference source and destination are both missing/None,
+        # or destination is a zone-only reference without source,
+        # this isn't really a move_cards — demote to custom
+        has_source = action.get('source') is not None
+        has_dest = action.get('destination') is not None
+        dest_val = action.get('destination', '')
+        zone_only_dest = dest_val in ('live_card_zone', 'success_live_zone', 'stage') and not has_source
+        if (not has_source and not has_dest) or zone_only_dest:
+            action['action'] = 'custom'
+            a = 'custom'
         card_type_kws = [('live_card', 'ライブカード'), ('member_card', 'メンバーカード'), ('energy_card', 'エネルギーカード')]
         if action.get('card_type') and re.search(r'(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)', text):
             or_types = [t for t, kw in card_type_kws if kw in text]
@@ -1538,6 +1579,26 @@ def _fill_defaults(action, text):
                     pass
                 else:
                     action['count'] = 1
+    # Fix remaining custom actions that have enough parsed info
+    if action.get('action') == 'custom':
+        if action.get('ability_gain'):
+            action['action'] = 'gain_ability'
+        elif re.search(r'枚数.*\d*枚増やす', text) or re.search(r'枚数.*\d*枚増え', text):
+            action['action'] = 'modify_limit'
+            action.setdefault('operation', 'increase')
+            cnt = extract_count(text)
+            if cnt: action['count'] = cnt
+        elif re.search(r'枚数.*\d*枚減らす', text) or re.search(r'枚数.*\d*枚減る', text):
+            action['action'] = 'modify_limit'
+            action.setdefault('operation', 'decrease')
+            cnt = extract_count(text)
+            if cnt: action['count'] = cnt
+        elif re.search(r'スコアを[+＋]\d+する', text):
+            action['action'] = 'modify_score'
+            action.setdefault('operation', 'add')
+            vm = re.search(r'([+＋])(\d+)', text)
+            if vm: action['value'] = int(vm.group(2))
+
     if 'optional' not in action and extract_optional(text):
         action['optional'] = True
     if 'max' not in action and extract_max(text):
@@ -1876,7 +1937,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         if '減る' in text or '減らす' in text or 'マイナス' in text:
             action['operation'] = 'subtract'
         elif '増える' in text or '増やす' in text or 'プラス' in text or 'コストを+' in text:
-            action['operation'] = 'increase'
+            action['operation'] = 'add'
         # Set location for hand-based cost reductions (手札にある/手札から)
         if '手札' in text:
             action['location'] = 'hand'
@@ -1932,10 +1993,11 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t, a: state_change and state_change != '', 'change_state',
       lambda t, a: (
           a.update({'target': extract_target(t)}) if extract_target(t) else None,
-          a.update({'card_type': 'member_card'}) if 'このメンバー' in t or ('メンバー' in t and 'ウェイト' in t) else None,
+          a.update({'card_type': 'energy_card'}) if 'エネルギー' in t and 'メンバー' not in t else None,
+          a.update({'card_type': 'member_card'}) if 'このメンバー' in t or ('メンバー' in t and ('ウェイト' in t or 'レスト' in t or 'アクティブ' in t)) else None,
       )[-1])
     R(lambda t: 'アクティブにしてもよい' in t or 'アクティブにする' in t, 'change_state',
-      lambda t, a: a.update({'state_change': 'active'}) or (a.update({'optional': True}) if 'してもよい' in t else None))
+      lambda t, a: a.update({'state_change': 'active', 'card_type': 'energy_card' if 'エネルギー' in t else 'member_card'}) or (a.update({'optional': True}) if 'してもよい' in t else None))
     R(lambda t: 'のみ起動できる' in t or 'のみ発動する' in t, 'activation_restriction', lambda t, a: a.update({'restriction_type': 'only'}))
     R('支払って発動させる', 'activate_ability',
       lambda t, a: a.update({'activation_type': 'pay_to_activate'}))
@@ -2684,7 +2746,9 @@ def _try_kore_niyori_case(text):
 
 
 def _build_reveal_add_discard(fp, sa_text, select_text):
-    """Build sequential for 'reveal → add → discard' pattern."""
+    """Build sequential for 'reveal → add → discard' pattern.
+    Propagates heart_colors/card_type/count/max/optional from select_text
+    into the reveal sub-action so the engine can filter by them."""
     rm = re.search(r'(.+?)公開して(.+)', fp)
     if not rm:
         return None
@@ -2696,6 +2760,15 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     if sa.get('action') == 'move_cards':
         sa['source'] = 'looked_at_remaining'; sa['destination'] = 'discard'
         sa['dynamic_count'] = {'type': 'remaining_looked_at', 'reference': 'previous_look'}
+    # Propagate selection criteria from select_text into reveal sub-action
+    hc = list(dict.fromkeys(f'heart{m.zfill(2)}' for m in re.findall(r'heart_(\d+)', select_text)))
+    if hc: ra['heart_colors'] = hc
+    ct = extract_card_type(select_text)
+    if ct and 'card_type' not in ra: ra['card_type'] = ct
+    cnt = extract_count(select_text)
+    if cnt: ra.setdefault('count', cnt)
+    if extract_max(select_text): ra['max'] = True
+    if extract_optional(select_text): ra['optional'] = True
     return {'action': 'sequential', 'actions': [ra, aa, sa], 'text': select_text}
 
 
@@ -3180,8 +3253,6 @@ def _try_conditional(text):
         if 'text' in action: result['text'] = action['text']
     else:
         result.update(action)
-    if cond.get('card_type') and result.get('card_type') and cond['card_type'] == result['card_type']:
-        del result['card_type']
     return result if (result.get('action') or result.get('actions')) else None
 
 
@@ -4014,6 +4085,38 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
     return data
 
 
+def _validate_semantic(abilities):
+    """Quick semantic validation: checks parsed JSON against text patterns."""
+    issues = []
+    for i, entry in enumerate(abilities):
+        t = entry.get('triggerless_text', '')
+        eff = entry.get('effect') or {}
+        if not t:
+            continue
+        # change_state: energy needs card_type=energy_card
+        if eff.get('action') == 'change_state' and 'エネルギー' in t and 'メンバー' not in t:
+            if eff.get('card_type') != 'energy_card':
+                issues.append(f'  #{i}: energy activation without card_type=energy_card')
+        # move_cards: cost_limit in text but not in effect
+        if eff.get('action') == 'move_cards' and re.search(r'コスト\d+', t):
+            if eff.get('cost_limit') is None:
+                issues.append(f'  #{i}: cost_limit in text but not in effect')
+        # look_and_select: heart_colors on select parent but not on reveal sub-action
+        if eff.get('action') == 'look_and_select':
+            sa = eff.get('select_action')
+            if sa and isinstance(sa, dict):
+                for act in sa.get('actions', []):
+                    if isinstance(act, dict) and act.get('action') == 'reveal' and not act.get('heart_colors'):
+                        if sa.get('heart_colors'):
+                            issues.append(f'  #{i}: heart_colors on select parent but not on reveal sub-action')
+    if issues:
+        print(f'[Semantic] {len(issues)} issues:')
+        for issue in issues[:15]:
+            print(issue)
+        if len(issues) > 15:
+            print(f'  ... and {len(issues)-15} more')
+
+
 if __name__ == '__main__':
     import json
     from pathlib import Path
@@ -4029,3 +4132,6 @@ if __name__ == '__main__':
         json.dump(result, f, ensure_ascii=False, indent=2)
     
     print("Normalized abilities.json with parser.py")
+    
+    # Run semantic validation on the output
+    _validate_semantic(data['unique_abilities'])

@@ -9,6 +9,10 @@ pub enum Choice {
         count: usize,
         description: String,
         allow_skip: bool,
+        cost_limit: Option<u32>,
+        cost_limit_operator: Option<String>,
+        group: Option<String>,
+        characters: Option<Vec<String>>,
     },
     SelectTarget {
         target: String,

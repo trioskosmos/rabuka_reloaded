@@ -4,7 +4,6 @@ pub mod config;
 pub mod constants;
 pub mod game_modifiers;
 pub mod game_state;
-pub mod mod_map;
 pub mod player;
 pub mod types;
 pub mod zones;

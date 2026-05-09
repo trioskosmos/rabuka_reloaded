@@ -30,18 +30,6 @@ impl GameState {
         }
     }
 
-    pub fn can_activate_center_ability(&self, player_id: &str, card_no: &str) -> bool {
-        self.can_activate_area_ability(player_id, card_no, crate::zones::MemberArea::Center)
-    }
-
-    pub fn can_activate_left_side_ability(&self, player_id: &str, card_no: &str) -> bool {
-        self.can_activate_area_ability(player_id, card_no, crate::zones::MemberArea::LeftSide)
-    }
-
-    pub fn can_activate_right_side_ability(&self, player_id: &str, card_no: &str) -> bool {
-        self.can_activate_area_ability(player_id, card_no, crate::zones::MemberArea::RightSide)
-    }
-
     pub fn reset_keyword_tracking(&mut self) {
         self.turn1_abilities_played.clear();
         self.turn2_abilities_played.clear();
@@ -49,6 +37,8 @@ impl GameState {
         self.player2_cheer_blade_heart_count = 0;
         self.player1.debut_count_this_turn = 0;
         self.player2.debut_count_this_turn = 0;
+        self.player1.last_resolution_cards.clear();
+        self.player2.last_resolution_cards.clear();
         self.clear_card_appearance_tracking();
         self.clear_auto_ability_trigger_tracking();
         self.reset_change_flags();

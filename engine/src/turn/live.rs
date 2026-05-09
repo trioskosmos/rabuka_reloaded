@@ -1,14 +1,13 @@
 use crate::card::{BladeColor, CardDatabase, HeartColor};
 use crate::game_state::GameState;
-use crate::mod_map::ModMap;
 use std::collections::HashMap;
 
 impl super::TurnEngine {
-    fn score_delta_since(current: &ModMap<i32>, snapshot: &ModMap<i32>, zone_cards: &[i16]) -> u32 {
+    fn score_delta_since(current: &HashMap<i16, i32>, snapshot: &HashMap<i16, i32>, zone_cards: &[i16]) -> u32 {
         let mut total = 0i32;
         for &cid in zone_cards {
-            let cur = current.get(cid).copied().unwrap_or(0);
-            let prev = snapshot.get(cid).copied().unwrap_or(0);
+            let cur = current.get(&cid).copied().unwrap_or(0);
+            let prev = snapshot.get(&cid).copied().unwrap_or(0);
             total += (cur - prev).max(0);
         }
         total as u32
@@ -139,10 +138,10 @@ impl super::TurnEngine {
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
         _player_id: &str, card_db: &CardDatabase,
-        blade_modifiers: &ModMap<i32>,
+        blade_modifiers: &HashMap<i16, i32>,
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
-        blade_type_modifiers: &ModMap<BladeColor>,
+        blade_type_modifiers: &HashMap<i16, BladeColor>,
     ) -> (u32, Vec<i16>) {
         // Rule 8.3.10: Sum blades from active members
         let total_blade = player.stage.total_blades(card_db, blade_modifiers);
@@ -172,7 +171,7 @@ impl super::TurnEngine {
         };
         let override_color = (0..3).filter_map(|i| {
             let cid = player.stage.stage[i];
-            if cid == -1 { None } else { blade_type_modifiers.get(cid).copied().map(blade_to_heart) }
+            if cid == -1 { None } else { blade_type_modifiers.get(&cid).copied().map(blade_to_heart) }
         }).next();
 
         // Process resolution zone card blade hearts: contribute colors to owned hearts
@@ -243,8 +242,9 @@ impl super::TurnEngine {
         eprintln!("[LIVE] {}: blades={} cheer_icons={} owned_hearts={:?} live_cards={}",
             player.name, total_blade, cheer_icon_count, owned_hearts.hearts, player.live_card_zone.len());
 
-        // Collect revealed card IDs before moving to waitroom
+        // Save revealed card IDs for frontend display before moving to waitroom
         let revealed_ids: Vec<i16> = resolution_zone.cards.iter().copied().collect();
+        player.last_resolution_cards = revealed_ids.clone();
 
         // Move resolution zone cards to waitroom after processing
         for card_id in resolution_zone.cards.drain(..) {

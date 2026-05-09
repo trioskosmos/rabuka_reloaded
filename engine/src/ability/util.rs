@@ -78,24 +78,19 @@ pub fn card_matches_cost_limit_op(card_db: &CardDatabase, card_id: i16, cost_lim
     }
 }
 
-pub fn card_matches_heart_colors(card_db: &CardDatabase, card_id: i16, heart_colors: Option<&Vec<String>>) -> bool {
-    match heart_colors {
-        Some(colors) if !colors.is_empty() => {
-            let result = card_db.get_card(card_id).map_or(true, |card| {
-                colors.iter().any(|color| {
-                    let hc = parse_heart_color(color);
-                    let r = card.base_heart.as_ref().map_or(
-                        card.need_heart.as_ref().map_or(false, |need| need.hearts.contains_key(&hc)),
-                        |base| base.hearts.contains_key(&hc),
-                    );
-                    r
-                })
-            });
-            eprintln!("[HEART_COLORS] card_id={} result={}", card_id, result);
-            result
-        }
-        _ => true,
-    }
+pub fn card_matches_heart_colors(card_db: &CardDatabase, card_id: i16, heart_colors: &[String]) -> bool {
+    if heart_colors.is_empty() { return true; }
+    let result = card_db.get_card(card_id).map_or(true, |card| {
+        heart_colors.iter().any(|color| {
+            let hc = parse_heart_color(color);
+            card.base_heart.as_ref().map_or(
+                card.need_heart.as_ref().map_or(false, |need| need.hearts.contains_key(&hc)),
+                |base| base.hearts.contains_key(&hc),
+            )
+        })
+    });
+    eprintln!("[HEART_COLORS] card_id={} result={}", card_id, result);
+    result
 }
 
 pub fn card_matches_name_constraint(card_db: &CardDatabase, card_id: i16, name_constraint: Option<&str>) -> bool {
@@ -115,7 +110,7 @@ pub struct CardFilter<'a> {
     pub cost_limit: Option<u32>,
     pub cost_operator: Option<&'a str>,
     pub characters: Option<&'a Vec<String>>,
-    pub heart_colors: Option<&'a Vec<String>>,
+    pub heart_colors: &'a [String],
     pub name_fragments: Option<&'a Vec<String>>,
     pub distinct: Option<&'a str>,
     pub exclude_self: Option<i16>,
@@ -133,7 +128,7 @@ impl<'a> CardFilter<'a> {
         if let Some(g) = self.group { if !card_matches_group_str(db, id, Some(g)) { return false; } }
         if let Some(lim) = self.cost_limit { if !card_matches_cost_limit_op(db, id, Some(lim), self.cost_operator) { return false; } }
         if let Some(ch) = self.characters { if !card_matches_characters(db, id, Some(ch)) { return false; } }
-        if let Some(hc) = self.heart_colors { if !card_matches_heart_colors(db, id, Some(hc)) { return false; } }
+        if !self.heart_colors.is_empty() { if !card_matches_heart_colors(db, id, self.heart_colors) { return false; } }
         if let Some(name) = self.name_fragments { if !card_matches_name_fragments(db, id, name) { return false; } }
         if let Some(ex_id) = self.exclude_self { if id == ex_id { return false; } }
         if let Some(bl) = self.original_blade_limit {

@@ -230,6 +230,8 @@ pub struct AppState {
 
     pub future: Arc<Mutex<Vec<GameState>>>,
 
+    pub custom_decks: Arc<Mutex<HashMap<i32, Vec<String>>>>,
+
 }
 
 
@@ -334,98 +336,16 @@ fn is_live_card_set_phase(game_state: &GameState) -> bool {
             | crate::game_state::Phase::LiveCardSetP2Turn
 
     )
-
-}
-
-#[allow(dead_code)]
-fn is_player2_decision_phase(game_state: &GameState) -> bool {
-    match game_state.current_phase {
-        crate::game_state::Phase::MulliganP2Turn
-        | crate::game_state::Phase::LiveCardSetP2Turn => true,
-        crate::game_state::Phase::Main => game_state.active_player().id == game_state.player2.id,
-        _ => false,
-    }
-
-}
-
-
-
-#[allow(dead_code)]
-fn execute_player2_ai_action(game_state: &mut GameState) -> Result<bool, String> {
-
-    if !is_player2_decision_phase(game_state) {
-
-        return Ok(false);
-
-    }
-
-
-
-    let actions = crate::game_setup::generate_possible_actions(game_state);
-
-    if actions.is_empty() {
-
-        return Err(format!(
-
-            "Player 2 reached {:?} with no legal actions",
-
-            game_state.current_phase
-
-        ));
-
-    }
-
-
-
-    let ai = crate::bot::ai::AIPlayer::new("Player2AI".to_string());
-
-    let chosen_index = ai.choose_action(&actions);
-
-    let chosen_action = actions
-
-        .get(chosen_index)
-
-        .ok_or_else(|| format!("Player 2 chose invalid action index {}", chosen_index))?;
-
-
-
-    crate::turn::TurnEngine::execute_main_phase_action(
-
-        game_state,
-
-        &chosen_action.action_type,
-
-        chosen_action.parameters.as_ref().and_then(|p| p.card_id),
-
-        chosen_action
-
-            .parameters
-
-            .as_ref()
-
-            .and_then(|p| p.card_indices.as_ref())
-
-            .cloned(),
-
-        chosen_action.parameters.as_ref().and_then(|p| p.stage_area_member()),
-
-        chosen_action.parameters.as_ref().and_then(|p| p.use_baton_touch),
-
-    )?;
-
-
-
-    Ok(true)
-
 }
 
 
 
 fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> {
 
-    // Keep auto-advancing until we reach a human decision phase
-
     loop {
+
+        // If the player needs to make a choice, stop and wait for their input
+        if game_state.pending_choice.is_some() { break; }
 
         if is_automatic_phase(game_state) {
 
@@ -836,9 +756,9 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
 
                                 ("condition", &effect.condition),
 
-                                ("alternative_condition", &effect.alternative_condition),
+                                ("alternative_condition", &effect.compound.alternative_condition),
 
-                                ("result_condition", &effect.result_condition),
+                                ("result_condition", &effect.compound.result_condition),
 
                             ];
 
@@ -944,6 +864,24 @@ fn deck_name_from_path(path: &PathBuf) -> String {
         .unwrap_or_default()
 }
 
+fn parse_deck_text(content: &str) -> Vec<String> {
+    content.lines()
+        .filter(|l| !l.trim().is_empty())
+        .flat_map(|l| {
+            let parts: Vec<&str> = l.split(" x ").collect();
+            if parts.len() != 2 { return Vec::new(); }
+            let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
+                (parts[1].trim().to_string(), q)
+            } else if let Ok(q) = parts[1].trim().parse::<u32>() {
+                (parts[0].trim().to_string(), q)
+            } else { return Vec::new(); };
+            if card_no.contains('-') {
+                std::iter::repeat(card_no).take(quantity as usize).collect()
+            } else { Vec::new() }
+        })
+        .collect()
+}
+
 async fn get_decks(_data: web::Data<AppState>) -> impl Responder {
     let decks: Vec<serde_json::Value> = deck_files().into_iter().map(|path| {
         let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
@@ -954,12 +892,13 @@ async fn get_decks(_data: web::Data<AppState>) -> impl Responder {
             .filter_map(|l| l.split(" x ").nth(1))
             .filter_map(|q| q.trim().parse::<u32>().ok())
             .sum::<u32>();
+        let main = parse_deck_text(&content);
         serde_json::json!({
             "id": id,
             "name": name,
             "card_count": card_count,
             "content": content,
-            "main": [],
+            "main": main,
             "energy": [],
         })
     }).collect();
@@ -983,8 +922,36 @@ async fn get_test_deck(_data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "content": content }))
 }
 
-async fn set_deck(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) -> impl Responder {
+async fn set_deck(data: web::Data<AppState>, req: web::Json<serde_json::Value>) -> impl Responder {
+    let player = req.get("player").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
+    let card_numbers: Vec<String> = if let Some(arr) = req.get("deck").and_then(|v| v.as_array()) {
+        arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+    } else {
+        let deck_content = req.get("deck").and_then(|v| v.as_str()).unwrap_or("");
+        if deck_content.is_empty() {
+            Vec::new()
+        } else {
+            deck_parser::DeckParser::parse_deck_content(deck_content)
+        }
+    };
+    if !card_numbers.is_empty() {
+        data.custom_decks.lock().unwrap().insert(player, card_numbers);
+    }
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "status": "ok" }))
+}
+
+async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
+    let rooms = data.rooms.lock().unwrap();
+    let public_rooms: Vec<serde_json::Value> = rooms.values()
+        .filter(|r| r.public)
+        .map(|r| serde_json::json!({
+            "room_id": r.room_id,
+            "mode": r.mode,
+            "player_count": r.sessions.len(),
+            "created_at": r.created_at,
+        }))
+        .collect();
+    HttpResponse::Ok().json(serde_json::json!({ "success": true, "rooms": public_rooms }))
 }
 
 
@@ -1502,23 +1469,18 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
 
 
 
-    let deck1 = if let Some(idx) = deck_index {
-
-        &deck_lists[idx]
-
-    } else {
-
-        &deck_lists[0]
-
+    // Check for custom decks set via set_deck endpoint
+    let (card_numbers1, card_numbers2) = {
+        let mut custom = data.custom_decks.lock().unwrap();
+        if custom.contains_key(&0) || custom.contains_key(&1) {
+            let p0 = custom.remove(&0).unwrap_or_default();
+            let p1 = custom.remove(&1).unwrap_or_else(|| p0.clone());
+            (p0, p1)
+        } else {
+            let deck = if let Some(idx) = deck_index { &deck_lists[idx] } else { &deck_lists[0] };
+            (deck_parser::DeckParser::deck_list_to_card_numbers(deck), deck_parser::DeckParser::deck_list_to_card_numbers(deck))
+        }
     };
-
-    let deck2 = deck1; // Use same deck for both players
-
-
-
-    let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(deck1);
-
-    let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(deck2);
 
     let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
 
@@ -1687,6 +1649,7 @@ pub async fn run_web_server() -> std::io::Result<()> {
         card_registry: card_registry.clone(),
         history: Arc::new(Mutex::new(Vec::new())),
         future: Arc::new(Mutex::new(Vec::new())),
+        custom_decks: Arc::new(Mutex::new(HashMap::new())),
     });
 
     println!("Game UI: http://127.0.0.1:8080");
@@ -1721,6 +1684,7 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/get_test_deck", web::get().to(get_test_deck))
             .route("/api/get_card_registry", web::get().to(get_card_registry))
             .route("/api/set_deck", web::post().to(set_deck))
+            .route("/api/rooms/list", web::get().to(rooms_list))
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))

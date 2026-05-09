@@ -7,7 +7,6 @@ use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
 
 pub use crate::config::RuleConfig;
-pub use crate::mod_map::ModMap;
 pub use crate::types::{AbilityTrigger, Duration, GameResult, Phase, ReplacementEffect, TemporaryEffect, TurnPhase};
 
 #[derive(Debug, Clone)]

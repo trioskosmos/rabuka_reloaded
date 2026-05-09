@@ -6,11 +6,11 @@ impl<'a> AbilityResolver<'a> {
     pub fn execute_look_and_select(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         self.current_effect = Some(effect.clone());
 
-        if let Some(ref look_action) = effect.look_action {
+        if let Some(ref look_action) = effect.compound.look_action {
             self.execute_effect(look_action)?;
         }
 
-        if let Some(ref select_action) = effect.select_action {
+        if let Some(ref select_action) = effect.compound.select_action {
             let placement_order = select_action.placement_order.as_deref();
             let count = select_action.count.unwrap_or(1);
             let optional = select_action.optional.unwrap_or(false);
@@ -18,9 +18,8 @@ impl<'a> AbilityResolver<'a> {
 
             let card_db = &self.game_state.card_database;
             let card_type_filter = select_action.card_type.as_deref();
-            let heart_colors_filter = select_action.heart_colors.as_ref();
-            let has_filter = card_type_filter.is_some()
-                || heart_colors_filter.map_or(false, |c| !c.is_empty());
+            let heart_colors_filter = &select_action.heart_colors;
+            let has_filter = card_type_filter.is_some() || !heart_colors_filter.is_empty();
             if has_filter {
                 self.looked_at_cards = self.looked_at_cards.iter().filter(|&&card_id| {
                     super::util::card_matches_type(card_db, card_id, card_type_filter)
@@ -47,6 +46,7 @@ impl<'a> AbilityResolver<'a> {
             let choice = Choice::SelectCard {
                 zone: "looked_at".to_string(), card_type: select_action.card_type.clone(), count: max_select,
                 description, allow_skip: optional || any_number || available_count == 0,
+                cost_limit: None, cost_limit_operator: None, group: None, characters: None,
             };
             self.pending_choice = Some(choice);
             self.execution_context = ExecutionContext::LookAndSelect {
@@ -58,7 +58,7 @@ impl<'a> AbilityResolver<'a> {
         self.current_effect = None;
         Ok(())
     }
-    pub fn execute_reveal(&mut self, source: &str, count: u32, target: &str, card_type: Option<&str>, heart_colors: Option<&Vec<String>>) -> Result<(), String> {
+    pub fn execute_reveal(&mut self, source: &str, count: u32, target: &str, card_type: Option<&str>, heart_colors: &[String]) -> Result<(), String> {
         let card_db = self.game_state.card_database.clone();
         let any_number = self.current_effect.as_ref().map_or(false, |e| e.any_number.unwrap_or(false));
         let player = self.game_state.resolve_target_player_mut(target);
@@ -72,6 +72,7 @@ impl<'a> AbilityResolver<'a> {
                     zone: "hand".to_string(), card_type: card_type.map(|s| s.to_string()),
                     count: choices_count, description: format!("Select card(s) to reveal from hand"),
                     allow_skip: any_number,
+                    cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -93,7 +94,7 @@ impl<'a> AbilityResolver<'a> {
         for card_id in &card_ids { self.game_state.revealed_cards.push(*card_id); }
         Ok(())
     }
-    pub fn execute_select(&mut self, source: &str, count: u32, target: &str, card_type: Option<&str>, distinct: Option<&str>, heart_colors: Option<&Vec<String>>, or_card_types: Option<Vec<String>>, exclude_selected: bool) -> Result<(), String> {
+    pub fn execute_select(&mut self, source: &str, count: u32, target: &str, card_type: Option<&str>, distinct: Option<&str>, heart_colors: &[String], or_card_types: Option<Vec<String>>, exclude_selected: bool) -> Result<(), String> {
 
         // Handle or_card_types (type choice, e.g. Honoka: pick live_card or member_card)
         if let Some(ref or_types) = or_card_types {
@@ -154,6 +155,7 @@ impl<'a> AbilityResolver<'a> {
             count: count as usize,
             description: format!("Select {} card(s) from {}", count, source),
             allow_skip: false,
+            cost_limit: None, cost_limit_operator: None, group: None, characters: None,
         });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
@@ -206,59 +208,13 @@ impl<'a> AbilityResolver<'a> {
         }
         Ok(())
     }
-    pub fn execute_reveal_until_live_card(&mut self, target: &str) -> Result<(), String> {
+    /// Draw from deck until `termination_check` passes, refreshing from waitroom if deck empties.
+    fn reveal_until<F>(&mut self, target: &str, termination_check: F) -> (Vec<i16>, Option<usize>)
+    where
+        F: Fn(&crate::card::CardDatabase, i16) -> bool,
+    {
         let card_db = self.game_state.card_database.clone();
-        let mut all_revealed: Vec<i16> = Vec::new();
-
-        loop {
-            let card_id = {
-                let player = self.game_state.resolve_target_player_mut(target);
-                player.main_deck.draw()
-            };
-            match card_id {
-                Some(cid) => {
-                    all_revealed.push(cid);
-                    self.game_state.revealed_cards.push(cid);
-                    let is_live = card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false);
-                    if is_live {
-                        break;
-                    }
-                }
-                None => {
-                    // Deck exhausted — try refresh
-                    let player = self.game_state.resolve_target_player_mut(target);
-                    let refresh_count = player.waitroom.cards.len();
-                    if refresh_count == 0 {
-                        break; // Nothing to refresh with
-                    }
-                    for _ in 0..refresh_count {
-                        if let Some(card) = player.waitroom.cards.pop() {
-                            player.main_deck.cards.push(card);
-                        }
-                    }
-                    player.main_deck.shuffle();
-                    // After refresh, try drawing again
-                    if let Some(cid) = player.main_deck.draw() {
-                        all_revealed.push(cid);
-                        self.game_state.revealed_cards.push(cid);
-                        let is_live = card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false);
-                        if is_live {
-                            break;
-                        }
-                    } else {
-                        break; // Still nothing
-                    }
-                }
-            }
-        }
-
-        self.looked_at_cards = all_revealed;
-        Ok(())
-    }
-
-    pub fn execute_reveal_until_target(&mut self, target: &str, card_type: Option<&str>) -> Result<(), String> {
-        let card_db = self.game_state.card_database.clone();
-        let mut all_revealed: Vec<i16> = Vec::new();
+        let mut all_revealed = Vec::new();
         let mut matched_idx = None;
 
         loop {
@@ -270,8 +226,7 @@ impl<'a> AbilityResolver<'a> {
                 Some(cid) => {
                     all_revealed.push(cid);
                     self.game_state.revealed_cards.push(cid);
-                    let is_match = super::util::card_matches_type(&card_db, cid, card_type);
-                    if is_match {
+                    if termination_check(&card_db, cid) {
                         matched_idx = Some(all_revealed.len() - 1);
                         break;
                     }
@@ -279,9 +234,7 @@ impl<'a> AbilityResolver<'a> {
                 None => {
                     let player = self.game_state.resolve_target_player_mut(target);
                     let refresh_count = player.waitroom.cards.len();
-                    if refresh_count == 0 {
-                        break;
-                    }
+                    if refresh_count == 0 { break; }
                     for _ in 0..refresh_count {
                         if let Some(card) = player.waitroom.cards.pop() {
                             player.main_deck.cards.push(card);
@@ -291,20 +244,32 @@ impl<'a> AbilityResolver<'a> {
                     if let Some(cid) = player.main_deck.draw() {
                         all_revealed.push(cid);
                         self.game_state.revealed_cards.push(cid);
-                        let is_match = super::util::card_matches_type(&card_db, cid, card_type);
-                        if is_match {
+                        if termination_check(&card_db, cid) {
                             matched_idx = Some(all_revealed.len() - 1);
                             break;
                         }
-                    } else {
-                        break;
-                    }
+                    } else { break; }
                 }
             }
         }
 
-        // Put the matched card at the FRONT of looked_at_cards so move_cards from looked_at (count=1) takes it
-        // If no match was found, clear looked_at so move_cards doesn't take anything
+        (all_revealed, matched_idx)
+    }
+
+    pub fn execute_reveal_until_live_card(&mut self, target: &str) -> Result<(), String> {
+        let (all_revealed, _) = self.reveal_until(target, |card_db, cid| {
+            card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
+        });
+        self.looked_at_cards = all_revealed;
+        Ok(())
+    }
+
+    pub fn execute_reveal_until_target(&mut self, target: &str, card_type: Option<&str>) -> Result<(), String> {
+        let card_type_owned = card_type.map(|s| s.to_string());
+        let (mut all_revealed, matched_idx) = self.reveal_until(target, move |card_db, cid| {
+            super::util::card_matches_type(card_db, cid, card_type_owned.as_deref())
+        });
+
         if let Some(idx) = matched_idx {
             let matched = all_revealed.remove(idx);
             self.looked_at_cards = std::iter::once(matched).chain(all_revealed).collect();

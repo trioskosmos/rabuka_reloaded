@@ -92,275 +92,243 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn evaluate_location_condition(&self, condition: &Condition) -> bool {
-        // Handle multiple locations (e.g. "stage and waitroom")
         if let Some(ref locs) = condition.locations {
             if locs.len() >= 2 {
                 return self.evaluate_multi_location_condition(condition);
             }
         }
-        let location = condition.location.as_deref().unwrap_or("");
-        let target = condition.target.as_deref().unwrap_or("self");
-        let card_type_filter = condition.card_type.as_deref();
-        let comparison_type = condition.comparison_type.as_deref();
+
+        if !self.check_location_heart_type(condition) { return false; }
+        if !self.check_location_heart_colors(condition) { return false; }
+        if !self.check_location_card_property(condition) { return false; }
+        if let Some(result) = self.check_location_baton_touch(condition) { return result; }
+        if let Some(result) = self.check_location_aggregate(condition) { return result; }
+
+        let location_value = self.calculate_location_value(condition);
+        if !self.check_location_distinct(condition) { return false; }
+        if !self.check_location_no_excess_heart(condition) { return false; }
+
         let operator = condition.operator.as_deref();
-        let original_value = condition.original_value.unwrap_or(false);
-        // When count is not specified but filters are set, default to 1
-        // (checking "at least one matching card exists") instead of 0
-        // which would make >= always true.
-        let count_threshold = condition.count.unwrap_or(if condition.aggregate.is_some() { 0 } else if condition.cost_limit.is_some() || condition.card_type.is_some() || condition.group_names.is_some() || condition.characters.is_some() || condition.distinct.unwrap_or(false) || condition.appearance.unwrap_or(false) { 1 } else { 0 });
-        let distinct = condition.distinct.unwrap_or(false);
-        let all_areas = condition.all_areas.unwrap_or(false);
-        let no_excess_heart = condition.no_excess_heart.unwrap_or(false);
-        let baton_touch_trigger = condition.baton_touch_trigger.unwrap_or(false);
-        let cost_limit = condition.cost_limit;
-        let group_names = condition.group_names.as_ref();
-        let _characters = condition.characters.as_ref();
-        let heart_type = condition.heart_type.as_deref();
-        let card_property = condition.card_property.as_deref();
+        let count_threshold = condition.count.unwrap_or(
+            if condition.aggregate.is_some() { 0 }
+            else if condition.cost_limit.is_some() || condition.card_type.is_some()
+                || condition.group_names.is_some() || condition.characters.is_some()
+                || condition.distinct.unwrap_or(false) || condition.appearance.unwrap_or(false) { 1 }
+            else { 0 }
+        );
+        compare_counts(operator, location_value, count_threshold)
+    }
 
-        // Heart type check (e.g., heart_type = "all" means check for heart00/ALL heart)
-        if let Some(ht) = heart_type {
-            match ht {
-                "all" => {
-                    let card_db = &self.game_state.card_database;
-                    let player = self.game_state.resolve_target_player(target);
-                    let has_heart00 = player.stage.stage.iter().any(|&id| {
-                        if id == -1 { false } else {
-                            card_db.get_card(id).map_or(false, |c| {
-                                c.base_heart.as_ref().map_or(false, |bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
-                            })
-                        }
-                    });
-                    // negation is checked separately below, so we return the raw result
-                    if !has_heart00 { return false; }
-                }
-                _ => {}
-            }
+    fn check_location_heart_type(&self, condition: &Condition) -> bool {
+        let ht = match condition.heart_type.as_deref() { Some(h) => h, None => return true };
+        if ht != "all" { return true; }
+        let target = condition.target.as_deref().unwrap_or("self");
+        let card_db = &self.game_state.card_database;
+        let player = self.game_state.resolve_target_player(target);
+        let has_heart00 = player.stage.stage.iter().any(|&id| {
+            id != -1 && card_db.get_card(id).map_or(false, |c| {
+                c.base_heart.as_ref().map_or(false, |bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
+            })
+        });
+        has_heart00
+    }
+
+    fn check_location_heart_colors(&self, condition: &Condition) -> bool {
+        let req_colors = match condition.heart_colors.as_ref() { Some(c) if !c.is_empty() => c, _ => return true };
+        let target = condition.target.as_deref().unwrap_or("self");
+        let card_db = &self.game_state.card_database;
+        let player = self.game_state.resolve_target_player(target);
+        let stage_cards: Vec<i16> = player.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+        req_colors.iter().all(|color_str| {
+            let color = crate::zones::parse_heart_color(color_str);
+            stage_cards.iter().any(|&id| {
+                card_db.get_card(id).map_or(false, |c| {
+                    c.base_heart.as_ref().map_or(false, |bh| bh.hearts.contains_key(&color))
+                })
+            })
+        })
+    }
+
+    fn check_location_card_property(&self, condition: &Condition) -> bool {
+        let prop = match condition.card_property.as_deref() { Some(p) => p, None => return true };
+        if prop != "has_blade_heart" { return true; }
+        let target = condition.target.as_deref().unwrap_or("self");
+        let location = condition.location.as_deref().unwrap_or("");
+        let card_db = &self.game_state.card_database;
+        let player = self.game_state.resolve_target_player(target);
+        let cards: Vec<i16> = match location {
+            "revealed_cards" => self.game_state.revealed_cards.iter().copied().collect(),
+            "stage" => player.stage.stage.iter().filter(|&&id| id != -1).copied().collect(),
+            _ => return true,
+        };
+        cards.is_empty() || cards.iter().any(|&id| {
+            card_db.get_card(id).map_or(false, |c| c.has_blade_heart())
+        })
+    }
+
+    fn check_location_baton_touch(&self, condition: &Condition) -> Option<bool> {
+        if !condition.baton_touch_trigger.unwrap_or(false) { return None; }
+        if self.game_state.baton_touch_count == 0 { return Some(false); }
+        if let Some(source_name) = condition.baton_touch_source.as_deref() {
+            let source_found = self.game_state.player1.waitroom.cards.iter()
+                .chain(self.game_state.player2.waitroom.cards.iter())
+                .any(|&id| self.game_state.card_database.get_card(id)
+                    .map_or(false, |c| c.name.contains(source_name)));
+            if !source_found { return Some(false); }
         }
-
-        // Collective heart colors check: all required colors must be present on stage members
-        if let Some(ref req_colors) = condition.heart_colors {
-            if !req_colors.is_empty() {
-                let card_db = &self.game_state.card_database;
-                let player = self.game_state.resolve_target_player(target);
-                let stage_cards: Vec<i16> = player.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
-                for color_str in req_colors {
-                    let color = crate::zones::parse_heart_color(color_str);
-                    let found = stage_cards.iter().any(|&id| {
-                        card_db.get_card(id).map_or(false, |c| {
-                            c.base_heart.as_ref().map_or(false, |bh| bh.hearts.contains_key(&color))
-                        })
-                    });
-                    if !found { return false; }
-                }
-            }
-        }
-
-        // Card property check (e.g., "has_blade_heart")
-        if let Some(prop) = card_property {
-            match prop {
-                "has_blade_heart" => {
-                    let card_db = &self.game_state.card_database;
-                    let player = self.game_state.resolve_target_player(target);
-                    let cards: Vec<i16> = match location {
-                        "revealed_cards" => self.game_state.revealed_cards.iter().copied().collect(),
-                        "stage" => player.stage.stage.iter().filter(|&&id| id != -1).copied().collect(),
-                        _ => vec![],
-                    };
-                    if !cards.is_empty() {
-                        let has_property = cards.iter().any(|&id| {
-                            card_db.get_card(id).map_or(false, |c| c.has_blade_heart())
-                        });
-                        if !has_property { return false; }
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        if baton_touch_trigger {
-            if self.game_state.baton_touch_count == 0 {
-                return false;
-            }
-            // Check specific baton_touch_source if specified
-            if let Some(source_name) = condition.baton_touch_source.as_deref() {
-                let source_found = self.game_state.player1.waitroom.cards.iter()
-                    .chain(self.game_state.player2.waitroom.cards.iter())
-                    .any(|&id| self.game_state.card_database.get_card(id)
-                        .map_or(false, |c| c.name.contains(source_name)));
-                if !source_found {
-                    return false;
-                }
-            }
-            // Cost comparison: e.g. operator "<" means replaced cost < new card cost
-            if comparison_type == Some("cost") {
-                if let Some(replaced_cost) = self.game_state.baton_touch_replaced_member_cost {
-                    if let Some(activating_id) = self.game_state.activating_card {
-                        if let Some(card) = self.game_state.card_database.get_card(activating_id) {
-                            if let Some(current_cost) = card.cost {
-                                if !compare_counts(operator, replaced_cost, current_cost) {
-                                    return false;
-                                }
+        if condition.comparison_type.as_deref() == Some("cost") {
+            if let Some(replaced_cost) = self.game_state.baton_touch_replaced_member_cost {
+                if let Some(activating_id) = self.game_state.activating_card {
+                    if let Some(card) = self.game_state.card_database.get_card(activating_id) {
+                        if let Some(current_cost) = card.cost {
+                            if !compare_counts(condition.operator.as_deref(), replaced_cost, current_cost) {
+                                return Some(false);
                             }
                         }
                     }
                 }
             }
-            // operator/comparison_type consumed by baton touch, skip compare_counts
-            return true;
         }
+        Some(true)
+    }
 
+    fn check_location_aggregate(&self, condition: &Condition) -> Option<bool> {
+        if condition.aggregate.as_deref() != Some("total") { return None; }
+        if condition.location.as_deref() != Some("stage") { return None; }
+        let target = condition.target.as_deref().unwrap_or("self");
+        let player = self.game_state.resolve_target_player(target);
+        let total = player.stage.total_blades(
+            &self.game_state.card_database,
+            &self.game_state.mods.blade_modifiers,
+        );
+        let threshold = condition.count.unwrap_or(0);
+        Some(compare_counts(condition.operator.as_deref(), total, threshold))
+    }
+
+    fn check_original_blade_filter(&self, condition: &Condition, card_id: i16) -> bool {
+        if !condition.original_value.unwrap_or(false) { return true; }
+        if let Some(op) = condition.operator.as_deref() {
+            let threshold = condition.count.unwrap_or(0) as u32;
+            let card_blade = self.game_state.card_database.get_card(card_id).map(|c| c.blade).unwrap_or(0);
+            compare_counts(Some(op), card_blade, threshold)
+        } else { true }
+    }
+
+    fn calculate_location_value(&self, condition: &Condition) -> u32 {
+        let location = condition.location.as_deref().unwrap_or("");
+        let target = condition.target.as_deref().unwrap_or("self");
+        let card_type_filter = condition.card_type.as_deref();
+        let comparison_type = condition.comparison_type.as_deref();
+        let operator = condition.operator.as_deref();
+        let all_areas = condition.all_areas.unwrap_or(false);
+        let cost_limit = condition.cost_limit;
+        let group_names = condition.group_names.as_ref();
         let card_db = &self.game_state.card_database;
 
-        let check_distinct_names = |card_ids: &[i16]| -> bool {
-            let mut names = std::collections::HashSet::new();
-            for &card_id in card_ids {
-                if card_id == -1 { continue; }
-                if let Some(card) = card_db.get_card(card_id) {
-                    let card_names = card_db.get_card_names(card_id);
-                    for name in &card_names {
-                        if !names.insert(name.clone()) {
-                            eprintln!("[DISTINCT] duplicate name '{}' found for card_id={} ({})",
-                                name, card_id, card.name);
-                            return false;
-                        }
-                    }
-                }
-            }
-            eprintln!("[DISTINCT] all names unique: {:?} total={}", names, card_ids.iter().filter(|&&id| id != -1).count());
-            true
-        };
-
-        // Collect both players' cards for targets that need cross-player comparison
         let p1_cards: &[i16] = util::zone_cards(&self.game_state.player1, location);
         let p2_cards: &[i16] = util::zone_cards(&self.game_state.player2, location);
-        fn player_cards_for_target<'b>(p1: &'b [i16], p2: &'b [i16], is_p1: bool) -> &'b [i16] { if is_p1 { p1 } else { p2 } }
 
-        let original_blade_filter = |card_id: i16| -> bool {
-            if !original_value { return true; }
-            if let Some(op) = operator {
-                let threshold = condition.count.unwrap_or(0) as u32;
-                let card_blade = card_db.get_card(card_id).map(|c| c.blade).unwrap_or(0);
-                compare_counts(Some(op), card_blade, threshold)
-            } else { true }
-        };
+        let group = group_names.and_then(|g| g.first().map(|s| s.as_str()));
 
-        // Handle aggregate="total" for blade sum (not card count)
-        if condition.aggregate.as_deref() == Some("total") && location == "stage" {
-            let player = self.game_state.resolve_target_player(target);
-            let total = player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers);
-            eprintln!("[COND_AGG] aggregate=total total_blade={} threshold={}", total, count_threshold);
-            return compare_counts(operator, total, count_threshold);
-        }
-
-        let location_value = match target {
+        match target {
             "either" => {
                 if comparison_type == Some("score") || comparison_type == Some("cost") {
-                    let v1 = self.get_count_for_target(condition, "self");
-                    let v2 = self.get_count_for_target(condition, "opponent");
-                    v1.max(v2)
-                } else {
-                    let c1 = util::count_matching_with_blade(p1_cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter);
-                    let c2 = util::count_matching_with_blade(p2_cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter);
-                    if all_areas {
-                        let p1_stage: &[i16] = &self.game_state.player1.stage.stage;
-                        let p2_stage: &[i16] = &self.game_state.player2.stage.stage;
-                        if p1_stage.iter().filter(|&&c| c != -1).count() != 3
-                            && p2_stage.iter().filter(|&&c| c != -1).count() != 3 {
-                            return false;
-                        }
-                    }
-                    c1.max(c2)
+                    return self.get_count_for_target(condition, "self")
+                        .max(self.get_count_for_target(condition, "opponent"));
                 }
+                let c1 = util::count_matching_with_blade(p1_cards, card_db, card_type_filter, group,
+                    cost_limit, operator, &|cid| self.check_original_blade_filter(condition, cid));
+                let c2 = util::count_matching_with_blade(p2_cards, card_db, card_type_filter, group,
+                    cost_limit, operator, &|cid| self.check_original_blade_filter(condition, cid));
+                if all_areas {
+                    let p1_stage: &[i16] = &self.game_state.player1.stage.stage;
+                    let p2_stage: &[i16] = &self.game_state.player2.stage.stage;
+                    if p1_stage.iter().filter(|&&c| c != -1).count() != 3
+                        && p2_stage.iter().filter(|&&c| c != -1).count() != 3 { return 0; }
+                }
+                c1.max(c2)
             }
             "both" => {
-                let blade_count = |cards: &[i16]| -> u32 {
-                    util::count_matching_with_blade(cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter)
-                };
-                if let Some(op) = operator {
-                    let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
-                    let self_count = blade_count(player_cards_for_target(p1_cards, p2_cards, self_is_p1));
-                    let opp_count = blade_count(player_cards_for_target(p1_cards, p2_cards, !self_is_p1));
-                    return compare_counts(Some(op), self_count, opp_count);
-                }
                 let self_is_p1 = std::ptr::eq(self.game_state.resolve_target_player("self"), &self.game_state.player1);
-                blade_count(player_cards_for_target(p1_cards, p2_cards, self_is_p1))
+                let p1p2 = |is_p1: bool| -> &[i16] { if is_p1 { p1_cards } else { p2_cards } };
+                let self_count = util::count_matching_with_blade(p1p2(self_is_p1), card_db, card_type_filter, group,
+                    cost_limit, operator, &|cid| self.check_original_blade_filter(condition, cid));
+                let opp_count = util::count_matching_with_blade(p1p2(!self_is_p1), card_db, card_type_filter, group,
+                    cost_limit, operator, &|cid| self.check_original_blade_filter(condition, cid));
+                if operator.is_some() { return if compare_counts(operator, self_count, opp_count) { 1 } else { 0 }; }
+                self_count
             }
             _ => {
                 let player = self.game_state.resolve_target_player(target);
                 let revealed_vec: Vec<i16> = if location == "revealed_cards" {
                     self.game_state.revealed_cards.iter().copied().collect()
                 } else { vec![] };
-                let cards: &[i16] = if location == "revealed_cards" { &revealed_vec } else { util::zone_cards(player, location) };
+                let cards: &[i16] = if location == "revealed_cards" { &revealed_vec }
+                    else { util::zone_cards(player, location) };
                 if comparison_type == Some("score") || comparison_type == Some("cost") || comparison_type == Some("energy") {
-                    self.get_count_for_target(condition, target)
-                } else {
-                    let c = util::count_matching_with_blade(cards, &card_db, card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), cost_limit, operator, original_blade_filter);
-                    if all_areas {
-                        let stage_slice: &[i16] = &player.stage.stage;
-                        if stage_slice.iter().filter(|&&c| c != -1).count() != 3 {
-                            return false;
-                        }
-                    }
-                    c
+                    return self.get_count_for_target(condition, target);
                 }
+                let c = util::count_matching_with_blade(cards, card_db, card_type_filter, group,
+                    cost_limit, operator, &|cid| self.check_original_blade_filter(condition, cid));
+                if all_areas {
+                    if player.stage.stage.iter().filter(|&&c| c != -1).count() != 3 { return 0; }
+                }
+                c
             }
+        }
+    }
+
+    fn check_location_distinct(&self, condition: &Condition) -> bool {
+        if !condition.distinct.unwrap_or(false) { return true; }
+        let target = condition.target.as_deref().unwrap_or("self");
+        let location = condition.location.as_deref().unwrap_or("");
+        let group_names = condition.group_names.as_ref();
+        let card_db = &self.game_state.card_database;
+
+        eprintln!("[DISTINCT] check: target={target} location={location} group_names={group_names:?}");
+        let player = self.game_state.resolve_target_player(if target == "either" { "self" } else { target });
+        let mut card_ids: Vec<i16> = match location {
+            "stage" => player.stage.stage.to_vec(),
+            "hand" => player.hand.cards.to_vec(),
+            "deck" => player.main_deck.cards.to_vec(),
+            "discard" | "waitroom" => player.waitroom.cards.to_vec(),
+            "energy_zone" => player.energy_zone.cards.to_vec(),
+            "live_card_zone" => player.live_card_zone.cards.to_vec(),
+            "success_live_zone" => player.success_live_card_zone.cards.to_vec(),
+            _ => vec![],
         };
-
-        if distinct {
-            eprintln!("[DISTINCT] check: target={target} location={location} group_names={group_names:?}");
-            let player = self.game_state.resolve_target_player(if target == "either" { "self" } else { target });
-            let mut card_ids: Vec<i16> = match location {
-                "stage" => player.stage.stage.to_vec(),
-                "hand" => player.hand.cards.to_vec(),
-                "deck" => player.main_deck.cards.to_vec(),
-                "discard" | "waitroom" => player.waitroom.cards.to_vec(),
-                "energy_zone" => player.energy_zone.cards.to_vec(),
-                "live_card_zone" => player.live_card_zone.cards.to_vec(),
-                "success_live_zone" => player.success_live_card_zone.cards.to_vec(),
-                _ => vec![],
-            };
-            // When group_names is set, only check distinctness among group members
-            if let Some(ref grp_names) = group_names {
-                if let Some(first_group) = grp_names.first() {
-                    let before_count = card_ids.iter().filter(|&&id| id != -1).count();
-                    card_ids = card_ids.into_iter().filter(|&id| {
-                        id != -1 && card_db.get_card(id).map(|c| {
-                            c.unit.as_deref() == Some(first_group.as_str()) || c.group == *first_group
-                        }).unwrap_or(false)
-                    }).collect();
-                    let after_count = card_ids.iter().filter(|&&id| id != -1).count();
-                    eprintln!("[DISTINCT] group filter '{}': {} stage cards -> {} group members",
-                        first_group, before_count, after_count);
-                    for &id in &card_ids {
-                        if id != -1 {
-                            if let Some(c) = card_db.get_card(id) {
-                                eprintln!("[DISTINCT]   group member: card_id={} name={} group={}", id, c.name, c.group);
-                            }
-                        }
-                    }
-                }
-            }
-            if !check_distinct_names(&card_ids) {
-                return false;
+        if let Some(ref grp_names) = group_names {
+            if let Some(first_group) = grp_names.first() {
+                card_ids = card_ids.into_iter().filter(|&id| {
+                    id != -1 && card_db.get_card(id).map(|c| {
+                        c.unit.as_deref() == Some(first_group.as_str()) || c.group == *first_group
+                    }).unwrap_or(false)
+                }).collect();
             }
         }
-
-        if no_excess_heart {
-            let opponent = self.game_state.resolve_target_player(if target == "self" { "opponent" } else { "self" });
-            let total_hearts: u32 = opponent.stage.stage.iter()
-                .filter(|&&card_id| card_id != -1)
-                .map(|&card_id| card_db.get_card(card_id).map(|c| c.total_hearts()).unwrap_or(0))
-                .sum();
-            let needed_hearts: u32 = opponent.live_card_zone.cards.iter()
-                .map(|&card_id| card_db.get_card(card_id).map(|c| c.total_hearts()).unwrap_or(0))
-                .sum();
-            if total_hearts > needed_hearts {
-                return false;
+        let mut names = std::collections::HashSet::new();
+        for &card_id in &card_ids {
+            if card_id == -1 { continue; }
+            for name in card_db.get_card_names(card_id) {
+                if !names.insert(name) { return false; }
             }
         }
+        true
+    }
 
-        compare_counts(operator, location_value, count_threshold)
+    fn check_location_no_excess_heart(&self, condition: &Condition) -> bool {
+        if !condition.no_excess_heart.unwrap_or(false) { return true; }
+        let target = condition.target.as_deref().unwrap_or("self");
+        let card_db = &self.game_state.card_database;
+        let opponent = self.game_state.resolve_target_player(if target == "self" { "opponent" } else { "self" });
+        let total_hearts: u32 = opponent.stage.stage.iter()
+            .filter(|&&id| id != -1)
+            .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
+            .sum();
+        let needed_hearts: u32 = opponent.live_card_zone.cards.iter()
+            .map(|&id| card_db.get_card(id).map(|c| c.total_hearts()).unwrap_or(0))
+            .sum();
+        total_hearts <= needed_hearts
     }
 
     fn evaluate_multi_location_condition(&self, condition: &Condition) -> bool {
@@ -498,6 +466,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
                 "revealed_cards" => self.game_state.revealed_cards.len(),
+                "energy_zone" => player.energy_zone.cards.len(),
                 _ => 0,
             }
         };

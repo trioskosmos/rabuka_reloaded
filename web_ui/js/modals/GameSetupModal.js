@@ -96,61 +96,38 @@ export const GameSetupModal = {
                 return;
             }
 
-            const payload = {
-                mode: Modals.setupMode,
-                card_set: cardSet,
-                p0_deck: p0Deck.main,
-                p0_energy: p0Deck.energy,
-                public: true
-            };
-
-            // Only send P1 deck if NOT in manual PVP mode (Host sets it for PvE or Hotseat)
-            // Hotseat is currently handled via 'pve' mode with toggle-hotseat,
-            // but if we ever use 'pvp' for hotseat this might need adjustment.
+            // Store custom decks via set_deck, then init the game
+            await fetch('api/set_deck', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ player: 0, deck: p0Deck.main })
+            });
             if (Modals.setupMode !== 'pvp') {
-                payload.p1_deck = p1Deck.main;
-                payload.p1_energy = p1Deck.energy;
+                await fetch('api/set_deck', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ player: 1, deck: p1Deck.main })
+                });
             }
 
-            const res = await fetch('api/rooms/create', {
-                method: 'POST',
-                headers: Network.getHeaders(),
-                body: JSON.stringify(payload)
+            const initRes = await fetch('api/init', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
             });
 
-            if (!res.ok) {
-                const errorData = await res.json().catch(() => ({ error: "Server error" }));
-                throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+            if (!initRes.ok) {
+                const errorData = await initRes.json().catch(() => ({ error: "Server error" }));
+                throw new Error(errorData.error || `HTTP error! status: ${initRes.status}`);
             }
 
-            const data = await res.json();
-            if (data.success) {
-                State.roomCode = data.room_id;
-                State.cardSet = cardSet;
-                State.offlineMode = false;
-                if (data.session) {
-                    Network.saveSession(data.room_id, data.session);
-                }
-                localStorage.setItem('lovelive_room_code', State.roomCode);
+            const data = await initRes.json();
+            State.offlineMode = false;
 
-                const waitingHint = document.getElementById('room-waiting-hint');
-                if (waitingHint && Modals.setupMode === 'pvp') {
-                    waitingHint.textContent = `Waiting for an opponent. Room code: ${State.roomCode}`;
-                }
-
-                if (Modals.setupMode === 'pvp') {
-                    ModalManager.show(DOM_IDS.MODAL_ROOM);
-                } else {
-                    ModalManager.hide(DOM_IDS.MODAL_ROOM);
-                }
-
-                GameSetupModal.closeSetupModal();
-
-                window.onRoomUpdate?.();
-                await Network.fetchState();
+            if (Modals.setupMode === 'pvp') {
+                ModalManager.show(DOM_IDS.MODAL_ROOM);
             } else {
-                alert("Failed to create game: " + data.error);
+                ModalManager.hide(DOM_IDS.MODAL_ROOM);
             }
+            GameSetupModal.closeSetupModal();
+            await Network.fetchState();
         } catch (e) {
             console.error(e);
             alert("Network error: " + e.message);
