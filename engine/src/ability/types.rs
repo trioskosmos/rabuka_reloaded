@@ -17,10 +17,12 @@ pub enum Choice {
     SelectTarget {
         target: String,
         description: String,
+        allow_skip: bool,
     },
     SelectPosition {
         position: String,
         description: String,
+        allow_skip: bool,
     },
     SelectHeartColor {
         count: usize,
@@ -78,17 +80,50 @@ impl Choice {
                     }
                 }
             }
-            Choice::SelectTarget { description, .. } => {
+            Choice::SelectTarget { target: _, description, allow_skip } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectTarget") {
                         if let Some(mut fields) = inner.as_object().cloned() {
                             fields.insert("title".into(), Value::String(description.clone()));
+                            fields.insert("allow_skip".into(), Value::Bool(*allow_skip));
                             *obj = fields;
                         }
                     }
                 }
             }
-            _ => {}
+            Choice::SelectPosition { position: _, description, allow_skip } => {
+                if let Some(obj) = json.as_object_mut() {
+                    if let Some(inner) = obj.remove("SelectPosition") {
+                        if let Some(mut fields) = inner.as_object().cloned() {
+                            fields.insert("title".into(), Value::String(description.clone()));
+                            fields.insert("allow_skip".into(), Value::Bool(*allow_skip));
+                            *obj = fields;
+                        }
+                    }
+                }
+            }
+            Choice::SelectHeartColor { options, description, .. } => {
+                if let Some(obj) = json.as_object_mut() {
+                    if let Some(inner) = obj.remove("SelectHeartColor") {
+                        if let Some(mut fields) = inner.as_object().cloned() {
+                            fields.insert("title".into(), Value::String(description.clone()));
+                            fields.insert("options".into(), serde_json::to_value(options).unwrap_or_default());
+                            *obj = fields;
+                        }
+                    }
+                }
+            }
+            Choice::SelectHeartType { options, description, .. } => {
+                if let Some(obj) = json.as_object_mut() {
+                    if let Some(inner) = obj.remove("SelectHeartType") {
+                        if let Some(mut fields) = inner.as_object().cloned() {
+                            fields.insert("title".into(), Value::String(description.clone()));
+                            fields.insert("options".into(), serde_json::to_value(options).unwrap_or_default());
+                            *obj = fields;
+                        }
+                    }
+                }
+            }
         }
         Some(json)
     }

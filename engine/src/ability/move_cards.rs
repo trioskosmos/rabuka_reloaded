@@ -46,6 +46,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                         self.pending_choice = Some(Choice::SelectTarget {
                             target: "choice_string".to_string(),
                             description: format!("Pick card type: {:?}", or_types),
+                            allow_skip: false,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         self.game_state.ability_queue.current_entry_mut().map(|e| {
@@ -327,10 +328,13 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
 
             // --- STEP 2: Any-order deck placement (before consuming taken) ---
             if source == "discard" && destination == "deck" && effect.placement_order.as_deref() == Some("any_order") && taken.len() > 1 {
+                let taken_count = taken.len();
                 for &c in &taken { moved_cards.push(c); }
-                self.looked_at_cards = taken;
+                self.looked_at_cards = taken.clone();
                 self.pending_choice = Some(Choice::SelectTarget {
-                    target: "order".to_string(), description: "Choose order for cards on deck".to_string(),
+                    target: "order".to_string(),
+                    description: format!("Choose order for cards on deck ({} cards)", taken_count),
+                    allow_skip: false,
                 });
                 self.execution_context = ExecutionContext::LookAndSelect { step: LookAndSelectStep::Finalize { destination: "deck".to_string() } };
                 return Ok(());

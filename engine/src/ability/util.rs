@@ -121,6 +121,15 @@ pub struct CardFilter<'a> {
 impl<'a> CardFilter<'a> {
     pub fn new() -> Self { Self::default() }
 
+    pub fn card_type(mut self, ct: &'a str) -> Self { self.card_type = Some(ct); self }
+    pub fn card_type_opt(mut self, ct: Option<&'a str>) -> Self { self.card_type = ct; self }
+    pub fn group(mut self, g: &'a str) -> Self { self.group = Some(g); self }
+    pub fn group_opt(mut self, g: Option<&'a str>) -> Self { self.group = g; self }
+    pub fn heart_colors(mut self, hc: &'a [String]) -> Self { self.heart_colors = hc; self }
+    pub fn distinct(mut self, d: &'a str) -> Self { self.distinct = Some(d); self }
+    pub fn exclude_self(mut self, id: i16) -> Self { self.exclude_self = Some(id); self }
+    pub fn exclude_self_opt(mut self, id: Option<i16>) -> Self { self.exclude_self = id; self }
+
     /// Check whether a single card matches ALL present filter fields.
     pub fn matches(&self, db: &CardDatabase, id: i16, skip_empty: bool) -> bool {
         if skip_empty && id == -1 { return false; }
@@ -136,6 +145,18 @@ impl<'a> CardFilter<'a> {
             if !compare_counts(self.original_blade_operator, card_blade, bl) { return false; }
         }
         true
+    }
+
+    pub fn matches_card(&self, db: &CardDatabase, id: i16) -> bool {
+        self.matches(db, id, false)
+    }
+
+    pub fn find_ids(&self, cards: &[i16], db: &CardDatabase) -> Vec<i16> {
+        cards.iter().filter(|&&id| self.matches(db, id, false)).copied().collect()
+    }
+
+    pub fn count(&self, cards: &[i16], db: &CardDatabase) -> u32 {
+        cards.iter().filter(|&&id| self.matches(db, id, false)).count() as u32
     }
 }
 
@@ -312,5 +333,57 @@ fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
 
 fn pos_to_area(pos: usize) -> crate::zones::MemberArea {
     match pos { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide }
+}
+
+// ============== PER-UNIT CALCULATION ==============
+
+pub fn calculate_per_unit_multiplier(
+    per_unit: bool,
+    per_unit_type: Option<&str>,
+    player: &crate::player::Player,
+) -> u32 {
+    if !per_unit {
+        return 1;
+    }
+    match per_unit_type {
+        Some("member") | Some("人") | Some("members") => {
+            player.stage.stage.iter().filter(|&&c| c != -1).count() as u32
+        }
+        Some("hand") | Some("card") | Some("枚") => player.hand.cards.len() as u32,
+        Some("energy") => player.energy_zone.cards.len() as u32,
+        Some("live_card_zone") => player.live_card_zone.cards.len() as u32,
+        Some("discard") => player.waitroom.cards.len() as u32,
+        _ => 1,
+    }
+}
+
+// ============== DISTINCT FILTERING ==============
+
+pub fn apply_distinct_filter(cards: &[i16], distinct: Option<&str>, card_db: &CardDatabase) -> Vec<i16> {
+    let should = matches!(distinct, Some("card_name") | Some("true") | Some("distinct"));
+    if !should {
+        return cards.to_vec();
+    }
+    let mut seen = std::collections::HashSet::new();
+    cards.iter()
+        .filter(|&&id| card_db.get_card(id).map(|c| seen.insert(c.name.clone())).unwrap_or(true))
+        .copied()
+        .collect()
+}
+
+// ============== ZONE CARD COUNT ==============
+
+pub fn get_zone_card_count(player: &crate::player::Player, zone: &str) -> usize {
+    match zone {
+        "stage" => player.stage.stage.iter().filter(|&&c| c != -1).count(),
+        "hand" => player.hand.cards.len(),
+        "deck" | "deck_top" => player.main_deck.cards.len(),
+        "discard" | "waitroom" => player.waitroom.cards.len(),
+        "energy_zone" => player.energy_zone.cards.len(),
+        "energy_deck" => player.energy_deck.cards.len(),
+        "live_card_zone" => player.live_card_zone.cards.len(),
+        "success_live_zone" => player.success_live_card_zone.cards.len(),
+        _ => 0,
+    }
 }
 

@@ -82,7 +82,7 @@ impl<'a> AbilityResolver<'a> {
             let primary_text = effect.compound.primary_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Primary effect");
             let alternative_text = effect.compound.alternative_effect.as_ref().map(|e| e.text.as_str()).unwrap_or("Alternative effect");
             let description = format!("Choose effect:\nPrimary: {}\nAlternative: {}", primary_text, alternative_text);
-            self.pending_choice = Some(Choice::SelectTarget { target: "primary|alternative".to_string(), description });
+            self.pending_choice = Some(Choice::SelectTarget { target: "primary|alternative".to_string(), description, allow_skip: false });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(());
         }
@@ -146,6 +146,7 @@ impl<'a> AbilityResolver<'a> {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "conditional_optional".to_string(),
                 description: format!("{}?", desc),
+                allow_skip: true,
             });
             return Ok(());
         }

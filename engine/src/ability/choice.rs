@@ -281,6 +281,51 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             return self.handle_conditional_optional(selected);
         }
 
+        if target == "draw_any_number" {
+            return self.handle_draw_any_number(selected);
+        }
+
+        if target == "order" {
+            return self.handle_order_selection(selected);
+        }
+
+        self.pending_choice = None;
+        Ok(())
+    }
+
+    fn handle_draw_any_number(&mut self, selected: &str) -> Result<(), String> {
+        let count: usize = selected.parse().unwrap_or(0);
+        if let Some(effect) = self.game_state.entry_effect().cloned() {
+            let source = effect.source.as_deref().unwrap_or("deck");
+            let destination = effect.destination.as_deref().unwrap_or("hand");
+            let card_type = effect.card_type.as_deref();
+            let card_db = self.game_state.card_database.clone();
+            let target = effect.target.as_deref().unwrap_or("self");
+            let player = self.game_state.resolve_target_player_mut(target);
+            if count > 0 {
+                crate::ability::effects::draw_cards_for_player(
+                    player, count as u32, source, destination, card_type, false, None, &card_db, None
+                )?;
+            }
+        }
+        self.pending_choice = None;
+        Ok(())
+    }
+
+    fn handle_order_selection(&mut self, selected: &str) -> Result<(), String> {
+        let ctx = self.execution_context.clone();
+        if let ExecutionContext::LookAndSelect { step } = ctx {
+            if let LookAndSelectStep::Finalize { destination } = step {
+                if destination == "deck" {
+                    if let Ok(idx) = selected.parse::<usize>() {
+                        if idx < self.looked_at_cards.len() {
+                            let card = self.looked_at_cards.remove(idx);
+                            self.looked_at_cards.insert(0, card);
+                        }
+                    }
+                }
+            }
+        }
         self.pending_choice = None;
         Ok(())
     }

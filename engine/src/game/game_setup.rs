@@ -168,12 +168,37 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
 
 fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> Vec<Action> {
     match choice {
-        Choice::SelectTarget { target, description } => {
+        Choice::SelectTarget { target, description, .. } => {
             if target == "pay_optional_cost:skip_optional_cost" {
                 return vec![
                     make_action_params(ActionType::ChoiceDecision, "Pay optional cost", ActionParameters { card_id: Some(1), card_no: Some("pay_optional_cost".to_string()), ..make_params() }),
                     make_action_params(ActionType::ChoiceDecision, "Skip optional cost", ActionParameters { card_id: Some(0), card_no: Some("skip_optional_cost".to_string()), ..make_params() }),
                 ];
+            }
+            if target == "position|destination" {
+                return vec![
+                    make_action_params(ActionType::ChoicePosition, "Move to Left", ActionParameters { card_id: Some(0), stage_area: Some("left".to_string()), card_no: Some("select".to_string()), ..make_params() }),
+                    make_action_params(ActionType::ChoicePosition, "Move to Center", ActionParameters { card_id: Some(1), stage_area: Some("center".to_string()), card_no: Some("select".to_string()), ..make_params() }),
+                    make_action_params(ActionType::ChoicePosition, "Move to Right", ActionParameters { card_id: Some(2), stage_area: Some("right".to_string()), card_no: Some("select".to_string()), ..make_params() }),
+                ];
+            }
+            if target == "draw_any_number" {
+                let max_count = description.matches(char::is_numeric).last()
+                    .and_then(|s| s.parse::<i16>().ok())
+                    .unwrap_or(5);
+                return (0..=max_count).map(|n| {
+                    let label = if n == 0 { "Draw 0 (skip)".to_string() } else { format!("Draw {}", n) };
+                    make_action_params(ActionType::ChoiceDecision, &label, ActionParameters { card_id: Some(n as i16), card_no: Some(n.to_string()), ..make_params() })
+                }).collect();
+            }
+            if target == "order" {
+                let count = description.matches(char::is_numeric).last()
+                    .and_then(|s| s.parse::<usize>().ok())
+                    .unwrap_or(3);
+                return (0..count).map(|n| {
+                    let label = format!("Move card {} to top", n + 1);
+                    make_action_params(ActionType::ChoiceDecision, &label, ActionParameters { card_id: Some(n as i16), card_no: Some(n.to_string()), ..make_params() })
+                }).collect();
             }
             if target == "choice" {
                 return description.split(" / ").enumerate().map(|(i, opt)|
@@ -184,6 +209,18 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 return vec![
                     make_action_params(ActionType::ChoiceOption, &format!("Primary: {}", description), ActionParameters { card_id: Some(0), card_no: Some("primary".to_string()), ..make_params() }),
                     make_action_params(ActionType::ChoiceOption, &format!("Alternative: {}", description), ActionParameters { card_id: Some(1), card_no: Some("alternative".to_string()), ..make_params() }),
+                ];
+            }
+            if target == "apply_replacement" {
+                return vec![
+                    make_action_params(ActionType::ChoiceOption, "Apply replacement", ActionParameters { card_id: Some(1), card_no: Some("yes".to_string()), ..make_params() }),
+                    make_action_params(ActionType::ChoiceOption, "Don't apply", ActionParameters { card_id: Some(0), card_no: Some("no".to_string()), ..make_params() }),
+                ];
+            }
+            if target == "choice_string" || target == "conditional_optional" {
+                return vec![
+                    make_action_params(ActionType::ChoiceOption, &format!("Yes — {}", description), ActionParameters { card_id: Some(1), card_no: Some("yes".to_string()), ..make_params() }),
+                    make_action_params(ActionType::ChoiceOption, &format!("No — {}", description), ActionParameters { card_id: Some(0), card_no: Some("no".to_string()), ..make_params() }),
                 ];
             }
             vec![
@@ -225,7 +262,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             }
             actions
         }
-        Choice::SelectPosition { position, description } => {
+        Choice::SelectPosition { position, description, .. } => {
             position.split(',').map(|a| a.trim()).map(|area| {
                 let stage_area_str = match area {
                     "left" | "left_side" | "左サイドエリア" => Some("left".to_string()),
