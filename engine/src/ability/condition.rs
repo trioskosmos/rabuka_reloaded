@@ -375,13 +375,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             eprintln!("[MULTI] distinct_names={} threshold={}", count, count_threshold);
             compare_counts(operator, count, count_threshold)
         } else {
-            let filter = util::CardFilter {
-                card_type: card_type_filter,
-                group: group_names.and_then(|g| g.first().map(|s| s.as_str())),
-                cost_limit: condition.cost_limit,
-                cost_operator: operator,
-                ..util::CardFilter::default()
-            };
+            let filter = util::filter_from_parts(card_type_filter, group_names.and_then(|g| g.first().map(|s| s.as_str())), condition.cost_limit, operator, None, None);
             let matching_count = util::count_matching(&combined, card_db, &filter, false);
             compare_counts(operator, matching_count, count_threshold)
         }

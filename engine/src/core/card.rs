@@ -453,6 +453,10 @@ pub struct AbilityCost {
     pub characters: Option<Vec<String>>,
     #[serde(default)]
     pub group_names: Option<Vec<String>>,
+    #[serde(default)]
+    pub placement_order: Option<String>,
+    #[serde(default)]
+    pub shuffle: Option<bool>,
 }
 
 /// Grouped sub-effect fields used by compound action handlers
@@ -525,6 +529,7 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub heart_colors: Vec<String>,
     pub blade_type: Option<String>,
+    #[serde(alias = "energy")]
     pub energy_count: Option<u32>,
     pub target_member: Option<String>,
     // Fields from parser improvements
@@ -594,6 +599,15 @@ pub struct AbilityEffect {
     #[serde(default)]
     #[serde(alias = "heart_color")]
     pub heart_type: Option<String>,
+    /// parenthetical annotations (e.g. rule clarifications in parentheses)
+    #[serde(default)]
+    pub parenthetical: Option<Vec<String>>,
+    /// characters filter for card selection
+    #[serde(default)]
+    pub characters: Option<Vec<String>>,
+    /// source_card reference (e.g. "cost_card" for activate_ability)
+    #[serde(default)]
+    pub source_card: Option<String>,
     // Parser-only fields that were missing struct fields
     #[serde(default)]
     pub or_card_types: Option<Vec<String>>,
@@ -778,6 +792,9 @@ pub struct Condition {
     /// "元々持つ" — compare against original/natural value, not current modified value
     #[serde(default)]
     pub original_value: Option<bool>,
+    /// scope: "both" for conditions that check both players (e.g. energy total of both)
+    #[serde(default)]
+    pub scope: Option<String>,
     /// "のみ" — ALL members on stage must match the group (not just any)
     #[serde(default)]
     pub all_members: Option<bool>,

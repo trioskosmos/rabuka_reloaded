@@ -19,11 +19,13 @@ fn activate_and_choose_member(game: &mut TestGame, honoka: i16) {
         &mut game.state, &ActionType::UseAbility,
         Some(honoka), None, None, None,
     ).expect("activate");
+    // Cost is auto-resolved (no prompt). First pending choice is card type selection.
     if game.has_pending_choice() {
-        game.select_indices(&[0]);
+        game.select_option(1); // 1 = member_card
     }
-    if game.has_pending_choice() {
-        game.select_option(1);
+    // Handle subsequent choices (e.g., card selection from looked_at)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
 }
 
@@ -32,11 +34,13 @@ fn activate_and_choose_live(game: &mut TestGame, honoka: i16) {
         &mut game.state, &ActionType::UseAbility,
         Some(honoka), None, None, None,
     ).expect("activate");
+    // Cost is auto-resolved (no prompt). First pending choice is card type selection.
     if game.has_pending_choice() {
-        game.select_indices(&[0]);
+        game.select_option(0); // 0 = live_card
     }
-    if game.has_pending_choice() {
-        game.select_option(0);
+    // Handle subsequent choices (e.g., card selection from looked_at)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
 }
 
@@ -195,14 +199,16 @@ fn honoka_q166_no_member_in_deck_refresh() {
 
     game.state.player1.stage.stage[1] = honoka;
     game.state.player1.hand.cards.push(live_in_hand);
-    game.state.player1.hand.cards.push(live_in_hand);
     for _ in 0..8 { game.state.player1.main_deck.cards.push(filler); }
 
     game.give_energy(13);
     activate_and_choose_member(&mut game, honoka);
 
-    assert_eq!(game.state.player1.hand.cards.len(), 1,
-        "Only the non-discarded filler remains");
+    // Cost: hand card discarded. Reveal: all deck cards revealed (no match), go to discard.
+    // After refresh, new deck cards also revealed (no match), go to discard.
+    // No card added to hand.
+    assert_eq!(game.state.player1.hand.cards.len(), 0,
+        "Hand empty after cost discard and no matching card found");
 }
 
 /// Deck exhausted mid-reveal.

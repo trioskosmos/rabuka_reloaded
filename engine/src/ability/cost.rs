@@ -102,12 +102,7 @@ impl<'a> AbilityResolver<'a> {
 
                     let player = &*self.game_state.resolve_target_player(target);
                     let card_db = &self.game_state.card_database;
-                    let filter = util::CardFilter {
-                        card_type: card_type_filter,
-                        cost_limit,
-                        characters: cost.characters.as_ref(),
-                        ..util::CardFilter::default()
-                    };
+                    let filter = util::filter_from_parts(card_type_filter, None, cost_limit, None, cost.characters.as_ref(), None);
                     let zone_cards = util::zone_cards(player, &source);
 
                     if same_unit {

@@ -39,6 +39,10 @@ harness = false
 name = "run_qa_tests"
 path = "src/run_qa_tests.rs"
 
+[[bin]]
+name = "test_failing"
+path = "src/bin/test_failing.rs"
+
 # [[bin]]
 # name = "analyze_common_voters"
 # path = "src/bin/analyze_common_voters.rs"

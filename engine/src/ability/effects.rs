@@ -316,7 +316,46 @@ impl<'a> AbilityResolver<'a> {
             return self.execute_gain_ability(text, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref());
         }
 
+        // 4) reveal_until_chosen_card: handle the reveal and card movement logic
+        if action_str.contains("reveal_until_chosen_card") || action_str.contains("公開されるまで") {
+            return self.execute_reveal_until_chosen_card(effect);
+        }
+
         eprintln!("Unhandled custom action: {}", action_str);
+        Ok(())
+    }
+
+    fn execute_reveal_until_chosen_card(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        // Get the chosen card type from the effect or from the current ability queue entry
+        let chosen_card_type = self.game_state.ability_queue.current_entry()
+            .and_then(|e| e.conditional_choice.clone())
+            .or_else(|| effect.card_type.clone());
+
+        if let Some(card_type) = chosen_card_type {
+            // Use the existing reveal_until_target functionality
+            self.execute_reveal_until_target(effect.target_name(), Some(&card_type))?;
+            
+            // After reveal, we need to move the chosen card to hand and others to discard
+            // The looked_at_cards should contain: [chosen_card, other_revealed_cards...]
+            if !self.looked_at_cards.is_empty() {
+                let chosen_card = self.looked_at_cards[0];
+                let other_cards = self.looked_at_cards[1..].to_vec();
+                
+                // Move chosen card to hand
+                let player = self.game_state.resolve_target_player_mut(effect.target_name());
+                player.hand.cards.push(chosen_card);
+                
+                // Move other cards to discard
+                player.waitroom.cards.extend(other_cards);
+                
+                // Clear looked_at_cards
+                self.looked_at_cards.clear();
+            }
+        } else {
+            // If no card type was chosen, just clear any looked_at_cards
+            self.looked_at_cards.clear();
+        }
+        
         Ok(())
     }
 
@@ -501,20 +540,10 @@ impl<'a> AbilityResolver<'a> {
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::CardFilter {
-                card_type: card_type_filter.as_deref(),
-                group: group_filter.as_deref(),
-                ..util::CardFilter::default()
-            };
+            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), None, None, None, None);
 
             let final_count = if per_unit {
-                let matching_count = match per_unit_type_str.as_deref() {
-                    Some("stage") | Some("member") | Some("人") => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true),
-                    Some("hand") | Some("card") | Some("枚") => util::count_matching(util::zone_cards(player, "hand"), &card_db, &filter, false),
-                    Some("discard") => util::count_matching(&player.waitroom.cards, &card_db, &filter, false),
-                    Some("live_card_zone") => util::count_matching(&player.live_card_zone.cards, &card_db, &filter, false),
-                    _ => util::count_matching(util::zone_cards(player, "stage"), &card_db, &filter, true),
-                };
+                let matching_count = util::resolve_per_unit_count(true, per_unit_type_str.as_deref(), player, &card_db, &filter, &[]);
                 (matching_count / per_unit_count_val) * count
             } else { count };
 
@@ -557,15 +586,14 @@ impl<'a> AbilityResolver<'a> {
                     self.game_state.add_heart_modifier(card_id, heart_color_val, heart_to_add);
                 }
                 if is_temporary {
-                    self.game_state.temporary_effects.push(crate::game_state::TemporaryEffect {
-                        effect_type: format!("gain_{}", resource),
-                        duration: match duration.as_deref() { Some("this_turn") => crate::game_state::Duration::ThisTurn, Some("live_end") => crate::game_state::Duration::LiveEnd, Some("as_long_as") => crate::game_state::Duration::AsLongAs, _ => crate::game_state::Duration::ThisLive },
-                        created_turn: self.game_state.turn_number,
-                        created_phase: self.game_state.current_phase.clone(),
-                        target_player_id: target.clone(),
-                        description: format!("Gain {} {}", final_count, resource),
-                        creation_order: 0, effect_data,
-                    });
+                    util::push_temporary_effect(
+                        &mut self.game_state,
+                        &format!("gain_{}", resource),
+                        duration.as_deref(),
+                        &target,
+                        &format!("Gain {} {}", final_count, resource),
+                        effect_data,
+                    );
                 }
                 return Ok(());
             }
@@ -618,15 +646,14 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if is_temporary {
-            self.game_state.temporary_effects.push(crate::game_state::TemporaryEffect {
-                effect_type: format!("gain_{}", resource),
-                duration: match duration.as_deref() { Some("this_turn") => crate::game_state::Duration::ThisTurn, Some("live_end") => crate::game_state::Duration::LiveEnd, Some("as_long_as") => crate::game_state::Duration::AsLongAs, _ => crate::game_state::Duration::ThisLive },
-                created_turn: self.game_state.turn_number,
-                created_phase: self.game_state.current_phase.clone(),
-                target_player_id: target.clone(),
-                description: format!("Gain {} {}", final_count, resource),
-                creation_order: 0, effect_data,
-            });
+            util::push_temporary_effect(
+                &mut self.game_state,
+                &format!("gain_{}", resource),
+                duration.as_deref(),
+                &target,
+                &format!("Gain {} {}", final_count, resource),
+                effect_data,
+            );
         }
         Ok(())
     }
@@ -677,12 +704,7 @@ impl<'a> AbilityResolver<'a> {
             let card_db = self.game_state.card_database.clone();
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::CardFilter {
-                card_type: card_type_filter.as_deref(),
-                group: group_filter.as_deref(),
-                cost_limit,
-                ..util::CardFilter::default()
-            };
+            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), cost_limit, None, None, None);
             let mut candidates: Vec<(usize, i16)> = Vec::new();
             for (i, slot_id) in player.stage.stage.iter().enumerate() {
                 if *slot_id == -1 { continue; }
@@ -742,12 +764,7 @@ impl<'a> AbilityResolver<'a> {
         let (wait_cards, deactivate_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::CardFilter {
-                card_type: card_type_filter.as_deref(),
-                group: group_filter.as_deref(),
-                cost_limit,
-                ..util::CardFilter::default()
-            };
+            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), cost_limit, None, None, None);
             let valid_indices = util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
 
             // When max=true, cap count to available cards (no error, no prompt)
@@ -850,35 +867,10 @@ impl<'a> AbilityResolver<'a> {
         let (live_card_ids, final_value) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::CardFilter {
-                card_type: card_type_filter.as_deref(),
-                group: group_filter.as_deref(),
-                ..util::CardFilter::default()
-            };
+            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), None, None, None, None);
 
             let final_value = if per_unit {
-                let zone = match per_unit_type_str.as_deref() {
-                    Some("hand") => "hand",
-                    Some("stage") | Some("member") => "stage",
-                    _ => "",
-                };
-                let matching_count = if zone.is_empty() { 1u32 } else {
-                    if !heart_colors.is_empty() {
-                        let cards = util::zone_cards(player, zone).to_vec();
-                        let mut count = 0u32;
-                        for &cid in &cards {
-                            if util::card_matches_type(&card_db, cid, filter.card_type)
-                                && util::card_matches_group_str(&card_db, cid, filter.group)
-                                && util::card_matches_heart_colors(&card_db, cid, heart_colors)
-                            {
-                                count += 1;
-                            }
-                        }
-                        count
-                    } else {
-                        util::count_matching(util::zone_cards(player, zone), &card_db, &filter, zone == "stage") as u32
-                    }
-                };
+                let matching_count = util::resolve_per_unit_count(true, per_unit_type_str.as_deref(), player, &card_db, &filter, heart_colors);
                 value * matching_count * per_unit_count_val
             } else { value };
 
@@ -926,25 +918,14 @@ impl<'a> AbilityResolver<'a> {
             count_applied += 1;
         }
 
-        if let Some(duration_str) = &duration {
-            if duration_str != "permanent" {
-                let duration_enum = match duration_str.as_str() {
-                    "this_turn" => crate::game_state::Duration::ThisTurn,
-                    "this_live" => crate::game_state::Duration::ThisLive,
-                    "live_end" => crate::game_state::Duration::LiveEnd,
-                    "as_long_as" => crate::game_state::Duration::AsLongAs,
-                    _ => crate::game_state::Duration::ThisLive,
-                };
-                self.game_state.temporary_effects.push(crate::game_state::TemporaryEffect {
-                    effect_type: format!("modify_score_{}", operation),
-                    duration: duration_enum, created_turn: self.game_state.turn_number,
-                    created_phase: self.game_state.current_phase.clone(),
-                    target_player_id: target.clone(),
-                    description: format!("Modify score by {} {} (applied to {} cards)", operation, final_value, count_applied),
-                    creation_order: 0, effect_data: None,
-                });
-            }
-        }
+        util::push_temporary_effect(
+            &mut self.game_state,
+            &format!("modify_score_{}", operation),
+            duration.as_deref(),
+            &target,
+            &format!("Modify score by {} {} (applied to {} cards)", operation, final_value, count_applied),
+            None,
+        );
         Ok(())
     }
 
@@ -1003,9 +984,6 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_set_blade_type(&mut self, blade_type: Option<&str>, target: &str, duration: Option<&str>) -> Result<(), String> {
-        let current_turn = self.game_state.turn_number;
-        let current_phase = self.game_state.current_phase.clone();
-        let effect_duration = duration.map(|s| s.to_string());
         let card_db = self.game_state.card_database.clone();
         let stage_card_ids: Vec<(i16, String)> = {
             let player = self.game_state.resolve_target_player(target);
@@ -1015,22 +993,14 @@ impl<'a> AbilityResolver<'a> {
             }).collect()
         };
         for (card_id, pid) in stage_card_ids {
-            let temp_effect = crate::game_state::TemporaryEffect {
-                effect_type: format!("set_blade_type:{}", blade_type.unwrap_or("")),
-                duration: effect_duration.as_deref().map(|d| match d {
-                    "live_end" => crate::game_state::Duration::LiveEnd,
-                    "this_turn" => crate::game_state::Duration::ThisTurn,
-                    "this_live" => crate::game_state::Duration::ThisLive,
-                    "permanent" => crate::game_state::Duration::Permanent,
-                    "as_long_as" => crate::game_state::Duration::AsLongAs,
-                    _ => crate::game_state::Duration::ThisLive,
-                }).unwrap_or(crate::game_state::Duration::ThisLive),
-                created_turn: current_turn, created_phase: current_phase.clone(),
-                target_player_id: pid,
-                description: format!("Set blade type to {} for {}", blade_type.unwrap_or(""), card_db.get_card(card_id).map(|c| c.name.as_str()).unwrap_or("unknown")),
-                creation_order: 0, effect_data: None,
-            };
-            self.game_state.temporary_effects.push(temp_effect);
+            util::push_temporary_effect(
+                &mut self.game_state,
+                &format!("set_blade_type:{}", blade_type.unwrap_or("")),
+                duration,
+                &pid,
+                &format!("Set blade type to {} for {}", blade_type.unwrap_or(""), card_db.get_card(card_id).map(|c| c.name.as_str()).unwrap_or("unknown")),
+                None,
+            );
         }
         Ok(())
     }
@@ -1070,15 +1040,14 @@ impl<'a> AbilityResolver<'a> {
         if let Some(card_id) = self.game_state.activating_card {
             self.game_state.gained_abilities.entry(card_id).or_default().push(ability_text.to_string());
         }
-        let temp_effect = crate::game_state::TemporaryEffect {
-            effect_type: format!("gain_ability:{}", ability_text),
-            duration: match duration { Some("this_turn") => crate::game_state::Duration::ThisTurn, Some("live_end") => crate::game_state::Duration::LiveEnd, Some("as_long_as") => crate::game_state::Duration::AsLongAs, _ => crate::game_state::Duration::ThisLive },
-            created_turn: self.game_state.turn_number, created_phase: self.game_state.current_phase.clone(),
-            target_player_id: target.to_string(),
-            description: format!("Gained ability: {}", ability_text),
-            creation_order: 0, effect_data: None,
-        };
-        self.game_state.temporary_effects.push(temp_effect);
+        util::push_temporary_effect(
+            &mut self.game_state,
+            &format!("gain_ability:{}", ability_text),
+            duration,
+            target,
+            &format!("Gained ability: {}", ability_text),
+            None,
+        );
         Ok(())
     }
 
@@ -1172,24 +1141,14 @@ impl<'a> AbilityResolver<'a> {
             "self" | "opponent" => { self.game_state.prohibition_effects.push(prohibition_text); }
             _ => {}
         }
-        if let Some(duration_str) = duration {
-            if duration_str != "permanent" {
-                let duration_enum = match duration_str {
-                    "live_end" => crate::game_state::Duration::LiveEnd,
-                    "this_turn" => crate::game_state::Duration::ThisTurn,
-                    "this_live" => crate::game_state::Duration::ThisLive,
-                    "as_long_as" => crate::game_state::Duration::AsLongAs,
-                    _ => crate::game_state::Duration::ThisLive,
-                };
-                self.game_state.temporary_effects.push(crate::game_state::TemporaryEffect {
-                    effect_type: format!("activation_cost_{}_{}", operation, value),
-                    duration: duration_enum, created_turn: self.game_state.turn_number,
-                    created_phase: self.game_state.current_phase.clone(), target_player_id: target.to_string(),
-                    description: format!("Modify activation cost by {} {}", operation, value),
-                    creation_order: 0, effect_data: None,
-                });
-            }
-        }
+        util::push_temporary_effect(
+            &mut self.game_state,
+            &format!("activation_cost_{}_{}", operation, value),
+            duration,
+            target,
+            &format!("Modify activation cost by {} {}", operation, value),
+            None,
+        );
         Ok(())
     }
 

@@ -30,7 +30,9 @@ impl GameState {
                             filtered_looked_at_indices: None,
                         };
 
-                        self.ability_queue.enqueue(entry);
+                        if !self.ability_queue.has_entry_with_id(&entry.id) {
+                            self.ability_queue.enqueue(entry);
+                        }
                         break;
                     }
                 }

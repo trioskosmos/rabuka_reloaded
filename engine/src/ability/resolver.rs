@@ -63,7 +63,7 @@ impl<'a> AbilityResolver<'a> {
         cost_limit: Option<u32>,
         zone_name: &str, _prompt_desc: &str,
     ) -> Result<Option<Vec<usize>>, String> {
-        let filter = util::CardFilter { card_type, group: group_name, cost_limit, ..util::CardFilter::default() };
+        let filter = util::filter_from_parts(card_type, group_name, cost_limit, None, None, None);
         let idxs = util::matching_indices(cards, card_db, &filter, false);
         if idxs.is_empty() || idxs.len() < count {
             return Err(format!("Not enough cards in {}: need {}", zone_name, count));
@@ -350,4 +350,5 @@ impl<'a> AbilityResolver<'a> {
         }
         cost
     }
-}
+
+    }

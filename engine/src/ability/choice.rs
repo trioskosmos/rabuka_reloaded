@@ -61,8 +61,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         self.pending_choice = None;
         self.resume_execution(context.clone())?;
         if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-            for action in pending {
+            for (i, action) in pending.iter().enumerate() {
                 self.execute_effect(action)?;
+                if self.pending_choice.is_some() {
+                    let remaining = pending[i + 1..].to_vec();
+                    self.game_state.pending_sequential_actions = if remaining.is_empty() { None } else { Some(remaining) };
+                    return Ok(());
+                }
             }
             self.game_state.pending_sequential_actions = None;
         }
@@ -399,8 +404,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
         self.pending_choice = None;
         if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-            for action in pending {
+            for (i, action) in pending.iter().enumerate() {
                 self.execute_effect(action)?;
+                if self.pending_choice.is_some() {
+                    let remaining = pending[i + 1..].to_vec();
+                    self.game_state.pending_sequential_actions = if remaining.is_empty() { None } else { Some(remaining) };
+                    return Ok(());
+                }
             }
             self.game_state.pending_sequential_actions = None;
         }

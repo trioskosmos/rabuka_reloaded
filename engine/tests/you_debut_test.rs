@@ -126,7 +126,7 @@ fn you_q124_two_plays_both_reject_blade_hearts() {
 fn fill_deck_to_40(game: &mut TestGame, top_cards: Vec<i16>) {
     game.state.player1.main_deck.cards.extend(top_cards);
     let filler = game.id("PL!-sd1-010-SD");
-    while game.state.player1.main_deck.cards.len() < 40 {
+    while game.state.player1.main_deck.cards.len() < 80 {
         game.state.player1.main_deck.cards.push(filler);
     }
 }

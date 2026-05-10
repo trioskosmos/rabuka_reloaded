@@ -1,5 +1,6 @@
 use crate::card::CardDatabase;
 use crate::zones::parse_heart_color;
+use crate::game_state::Duration;
 
 // ============== INDIVIDUAL CARD PREDICATES ==============
 
@@ -166,6 +167,41 @@ fn card_matches_name_fragments(db: &CardDatabase, id: i16, fragments: &[String])
     })
 }
 
+// ============== FILTER CONSTRUCTION HELPERS ==============
+
+/// Build a CardFilter from common fields used across effect/cost handlers.
+pub fn filter_from_parts<'a>(
+    card_type: Option<&'a str>,
+    group: Option<&'a str>,
+    cost_limit: Option<u32>,
+    cost_operator: Option<&'a str>,
+    characters: Option<&'a Vec<String>>,
+    exclude_self: Option<i16>,
+) -> CardFilter<'a> {
+    CardFilter {
+        card_type, group, cost_limit, cost_operator, characters,
+        exclude_self,
+        ..CardFilter::default()
+    }
+}
+
+pub fn filter_from_parts_full<'a>(
+    card_type: Option<&'a str>,
+    group: Option<&'a str>,
+    cost_limit: Option<u32>,
+    cost_operator: Option<&'a str>,
+    characters: Option<&'a Vec<String>>,
+    name_fragments: Option<&'a Vec<String>>,
+    distinct: Option<&'a str>,
+    exclude_self: Option<i16>,
+) -> CardFilter<'a> {
+    CardFilter {
+        card_type, group, cost_limit, cost_operator, characters,
+        name_fragments, distinct, exclude_self,
+        ..CardFilter::default()
+    }
+}
+
 // ============== QUERY FUNCTIONS ==============
 
 /// Return indices into `cards` where cards match the filter.
@@ -217,6 +253,16 @@ pub fn zone_cards<'a>(player: &'a crate::player::Player, zone: &str) -> &'a [i16
         "success_live_zone" => &player.success_live_card_zone.cards,
         _ => &[],
     }
+}
+
+/// Return owned card IDs from a named zone (avoids borrow issues).
+pub fn zone_card_ids(player: &crate::player::Player, zone: &str) -> Vec<i16> {
+    zone_cards(player, zone).to_vec()
+}
+
+/// Count cards matching filter in a zone for a given player.
+pub fn count_in_zone(player: &crate::player::Player, zone: &str, filter: &CardFilter, card_db: &CardDatabase) -> u32 {
+    count_matching(zone_cards(player, zone), card_db, filter, zone == "stage")
 }
 
 pub fn zone_card_count(cards: &[i16], card_db: &CardDatabase, card_type_filter: Option<&str>) -> u32 {
@@ -357,6 +403,36 @@ pub fn calculate_per_unit_multiplier(
     }
 }
 
+/// Resolve per-unit count with optional card type / group / heart color filtering.
+/// Returns the effective count multiplier.
+pub fn resolve_per_unit_count(
+    per_unit: bool,
+    per_unit_type: Option<&str>,
+    player: &crate::player::Player,
+    card_db: &CardDatabase,
+    filter: &CardFilter,
+    heart_colors: &[String],
+) -> u32 {
+    if !per_unit {
+        return 1;
+    }
+    let zone = match per_unit_type {
+        Some("stage") | Some("member") | Some("人") | Some("members") => "stage",
+        Some("hand") | Some("card") | Some("枚") => "hand",
+        Some("discard") => "waitroom",
+        Some("live_card_zone") => "live_card_zone",
+        _ => return 1,
+    };
+    let cards = zone_cards(player, zone);
+    if heart_colors.is_empty() {
+        count_matching(cards, card_db, filter, zone == "stage")
+    } else {
+        cards.iter()
+            .filter(|&&id| filter.matches(card_db, id, zone == "stage") && card_matches_heart_colors(card_db, id, heart_colors))
+            .count() as u32
+    }
+}
+
 // ============== DISTINCT FILTERING ==============
 
 pub fn apply_distinct_filter(cards: &[i16], distinct: Option<&str>, card_db: &CardDatabase) -> Vec<i16> {
@@ -384,6 +460,43 @@ pub fn get_zone_card_count(player: &crate::player::Player, zone: &str) -> usize 
         "live_card_zone" => player.live_card_zone.cards.len(),
         "success_live_zone" => player.success_live_card_zone.cards.len(),
         _ => 0,
+    }
+}
+
+// ============== DURATION HELPERS ==============
+
+pub fn parse_duration(s: &str) -> Duration {
+    match s {
+        "this_turn" => Duration::ThisTurn,
+        "live_end" => Duration::LiveEnd,
+        "as_long_as" => Duration::AsLongAs,
+        "permanent" => Duration::Permanent,
+        "this_live" => Duration::ThisLive,
+        _ => Duration::ThisLive,
+    }
+}
+
+pub fn push_temporary_effect(
+    game_state: &mut crate::game_state::GameState,
+    effect_type: &str,
+    duration: Option<&str>,
+    target_player_id: &str,
+    description: &str,
+    effect_data: Option<serde_json::Value>,
+) {
+    if let Some(d) = duration {
+        if d != "permanent" {
+            game_state.temporary_effects.push(crate::game_state::TemporaryEffect {
+                effect_type: effect_type.to_string(),
+                duration: parse_duration(d),
+                created_turn: game_state.turn_number,
+                created_phase: game_state.current_phase.clone(),
+                target_player_id: target_player_id.to_string(),
+                description: description.to_string(),
+                creation_order: 0,
+                effect_data,
+            });
+        }
     }
 }
 
