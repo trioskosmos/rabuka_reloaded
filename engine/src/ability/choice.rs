@@ -518,9 +518,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             if let Some(card_id) = self.game_state.activating_card {
                 self.game_state.set_heart_override(card_id, color, count.max(1), "live_end");
             }
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.conditional_choice = Some(chosen.clone());
+            }
         }
         self.pending_choice = None;
-        self.resume_execution(self.execution_context.clone())
+        self.finalize_choice(&self.execution_context.clone())
     }
 
     fn clear_choice_meta(&mut self) {

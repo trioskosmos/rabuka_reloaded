@@ -2031,7 +2031,8 @@ def parse_action(text: str) -> Dict[str, Any]:
     R('公開する', 'reveal', lambda t, a: a.update({'source': source or 'hand'}))
     R(lambda t: '1枚ずつ公開' in t or '枚ずつ公開' in t, 'reveal', 
       lambda t, a: (a.update({'per_unit': True, 'per_unit_count': 1, 'multiple_targets': True}), None))
-    R(lambda t: '選ぶ' in t or '選ん' in t or '選び' in t, 'select', None)
+    R(lambda t: '選ぶ' in t or '選ん' in t or '選び' in t, 'select',
+      lambda t, a: a.update({'heart_colors': [m.group(1) for m in re.finditer(r'\|(heart\d{2})}', t)]}) if not a.get('source') and not a.get('card_type') and '{{heart_' in t else None)
     R(lambda t: 'ブレードを得る' in t or '選んだブレード' in t, 'gain_resource',
       lambda t, a: None)  # already matched above, this is fallback
     R(lambda t: 'ハートを得る' in t or '選んだハート' in t, 'gain_resource', None)

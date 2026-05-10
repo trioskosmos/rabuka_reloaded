@@ -387,3 +387,22 @@ pub fn get_zone_card_count(player: &crate::player::Player, zone: &str) -> usize 
     }
 }
 
+pub fn extract_heart_colors_from_text(text: &str) -> Vec<String> {
+    let mut colors: Vec<String> = Vec::new();
+    let mut pos = 0;
+    while let Some(start) = text[pos..].find("heart_") {
+        let nums_start = pos + start + 6;
+        let end = nums_start + text[nums_start..].chars().take_while(|c| c.is_ascii_digit()).count();
+        if end > nums_start {
+            if let Ok(n) = text[nums_start..end].parse::<u32>() {
+                let color = format!("heart{:02}", n);
+                if !colors.contains(&color) {
+                    colors.push(color);
+                }
+            }
+        }
+        pos = end.max(nums_start);
+    }
+    colors
+}
+

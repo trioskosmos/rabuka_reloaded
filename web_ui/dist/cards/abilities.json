@@ -605,7 +605,12 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart03",
+              "heart06"
+            ]
           },
           {
             "text": "自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る",
@@ -2181,7 +2186,12 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart03",
+              "heart06"
+            ]
           },
           {
             "text": "選んだハートを1つ得る",
@@ -3776,7 +3786,12 @@
           {
             "text": "{{heart_03.png|heart03}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart03",
+              "heart04",
+              "heart05"
+            ]
           },
           {
             "text": "自分のステージにいるこのターンに登場したメンバーのうち、『Aqours』以外のすべてのメンバーは選んだハートを1つ得る",
@@ -14860,7 +14875,12 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart03",
+              "heart06"
+            ]
           },
           {
             "text": "選んだハートを1つ得る",
@@ -18434,7 +18454,12 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart03",
+              "heart06"
+            ]
           },
           {
             "text": "自分のステージにいる『μ's』のメンバー1人は、選んだハートを1つ得る",
@@ -18853,7 +18878,12 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_04.png|heart04}}のうち1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart03",
+              "heart04"
+            ]
           },
           {
             "text": "このメンバーが元々持つハートは選んだハートになる",
@@ -18886,7 +18916,12 @@
           {
             "text": "{{heart_02.png|heart02}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart02",
+              "heart05",
+              "heart06"
+            ]
           },
           {
             "text": "このメンバーが元々持つハートは選んだハートになる",
@@ -20901,7 +20936,12 @@
           {
             "text": "{{heart_03.png|heart03}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}のうち1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart03",
+              "heart04",
+              "heart05"
+            ]
           },
           {
             "text": "このメンバーが元々持つハートは選んだハートになる",
@@ -20934,7 +20974,12 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart02",
+              "heart06"
+            ]
           },
           {
             "text": "このメンバーが元々持つハートは選んだハートになる",
@@ -21138,7 +21183,12 @@
           {
             "text": "{{heart_04.png|heart04}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart04",
+              "heart05",
+              "heart06"
+            ]
           },
           {
             "text": "自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る",
@@ -22402,7 +22452,12 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart02",
+              "heart06"
+            ]
           },
           {
             "text": "自分のステージにいる、このターン中にエリアを移動しているすべてのメンバーは、選んだハートを1つ得る",
@@ -23479,7 +23534,13 @@
           {
             "text": "{{heart_01.png|heart01}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}か{{heart_06.png|heart06}}のうち、1つを選ぶ",
             "count": 1,
-            "action": "select"
+            "action": "select",
+            "heart_colors": [
+              "heart01",
+              "heart04",
+              "heart05",
+              "heart06"
+            ]
           },
           {
             "text": "自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、選んだハートを2つ得る",

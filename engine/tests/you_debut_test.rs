@@ -123,4 +123,112 @@ fn you_q124_two_plays_both_reject_blade_hearts() {
         "Second play: blade-only card still should NOT be in hand");
 }
 
+fn fill_deck_to_40(game: &mut TestGame, top_cards: Vec<i16>) {
+    game.state.player1.main_deck.cards.extend(top_cards);
+    let filler = game.id("PL!-sd1-010-SD");
+    while game.state.player1.main_deck.cards.len() < 40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+}
+
+/// Test that You's ability ends properly after all selections and that
+/// the discard pile grows only via the final "残りを控え室に置く" move.
+#[test]
+fn you_ability_ends_and_discard_only_grows_at_end() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let you = game.id("PL!S-bp2-005-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.hand.cards.push(you);
+    game.state.player1.hand.cards.push(filler);
+
+    // Top 7 fillers will be looked at; below1/below2 sit below the look zone.
+    let below1 = game.id("PL!S-sd1-001-SD");
+    let below2 = game.id("PL!-sd1-010-SD");
+    fill_deck_to_40(&mut game, vec![filler, filler, filler, filler, filler, filler, filler, below1, below2]);
+
+    let initial_discard = game.state.player1.waitroom.cards.len();
+    game.give_energy(13);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(you, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // [Choice 1] Optional: discard 1 card for cost — skip
+    if game.has_pending_choice() { game.select_indices(&[0]); }
+    // [Choice 2] look_and_select — skip the optional reveal step
+    if game.has_pending_choice() { game.select_indices(&[]); }
+    // [Choice 3] Optional: move revealed to hand — skip
+    if game.has_pending_choice() { game.select_indices(&[]); }
+
+    // No more choices — ability should be done
+    assert!(!game.has_pending_choice(),
+        "Ability should have ended; had pending: {:?}", game.state.ability_queue.is_waiting_for_choice());
+
+    // Only the 7 looked-at fillers should be in discard.
+    let final_discard = game.state.player1.waitroom.cards.len();
+    assert_eq!(final_discard - initial_discard, 7,
+        "Expected 7 looked-at cards in discard, got {}", final_discard - initial_discard);
+    assert_eq!(game.state.player1.main_deck.cards.len(), 33,
+        "Deck should have 33 cards (40 total minus 7 looked at)");
+}
+
+/// Play You, select 3 heart-color cards through all optional steps,
+/// then verify ability ends, selected cards reach hand, and the rest
+/// go to discard.
+#[test]
+fn you_ability_select_3_cards_all_optional_steps() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let you = game.id("PL!S-bp2-005-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let qualifying = game.id("PL!S-sd1-001-SD");
+
+    game.state.player1.hand.cards.push(you);
+    game.state.player1.hand.cards.push(filler);
+
+    // Top 7: [qualifying, filler×6]; below sits below the look zone.
+    let below = game.id("PL!-sd1-010-SD");
+    fill_deck_to_40(&mut game, {
+        let mut top = vec![qualifying];
+        top.extend(std::iter::repeat(filler).take(6));
+        top.push(below);
+        top
+    });
+
+    let initial_discard = game.state.player1.waitroom.cards.len();
+    let initial_hand = game.state.player1.hand.cards.len();
+
+    game.give_energy(13);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(you, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // [Choice 1] Optional discard cost — skip
+    if game.has_pending_choice() { game.select_indices(&[0]); }
+    // [Choice 2] look_and_select — select qualifying card
+    if game.has_pending_choice() { game.select_indices(&[0]); }
+    // [Choice 3] Reveal selected cards — confirm
+    if game.has_pending_choice() { game.select_indices(&[0]); }
+    // [Choice 4] Move to hand — confirm
+    if game.has_pending_choice() { game.select_indices(&[0]); }
+
+    // Ability should be complete
+    assert!(!game.has_pending_choice(),
+        "Ability should have ended, had pending: {:?}", game.state.ability_queue.is_waiting_for_choice());
+
+    // qualifying card should be in hand
+    assert!(game.state.player1.hand.cards.contains(&qualifying),
+        "Qualifying card should be in hand");
+    // below-zone card stays in deck
+    assert!(game.state.player1.main_deck.cards.contains(&below),
+        "Below-zone card should still be in deck");
+    // 7 looked-at - 1 selected = 6 remaining → all 6 go to discard
+    let final_discard = game.state.player1.waitroom.cards.len();
+    assert_eq!(final_discard - initial_discard, 6,
+        "Expected 6 fillers in discard, got {}", final_discard - initial_discard);
+    assert_eq!(game.state.player1.hand.cards.len(), initial_hand + 1,
+        "Hand should have 1 new card (qualifying)");
+}
+
 

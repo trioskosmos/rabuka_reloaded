@@ -229,7 +229,24 @@ impl<'a> AbilityResolver<'a> {
                 }
                 self.execute_reveal(effect.source_or("hand"), effect.count_or(1), effect.target_name(), effect.card_type.as_deref(), &effect.heart_colors)
             }
-            EffectAction::Select => self.execute_select(if effect.card_type.as_deref() == Some("member_card") { "stage" } else { effect.source_or("hand") }, effect.count_or(1), effect.target_name(), effect.card_type.as_deref(), effect.distinct.as_deref(), &effect.heart_colors, effect.or_card_types.clone(), effect.exclude_selected.unwrap_or(false)),
+            EffectAction::Select => {
+                let has_heart_colors = !effect.heart_colors.is_empty();
+                let has_heart_icons = effect.text.contains("heart_");
+                if effect.source.is_none() && effect.card_type.is_none() && (has_heart_colors || has_heart_icons) {
+                    let heart_colors = if !effect.heart_colors.is_empty() {
+                        effect.heart_colors.clone()
+                    } else {
+                        crate::ability::util::extract_heart_colors_from_text(&effect.text)
+                    };
+                    if !heart_colors.is_empty() {
+                        self.execute_select_heart_color(effect.count_or(1), &heart_colors, effect.target_name())
+                    } else {
+                        self.execute_select(if effect.card_type.as_deref() == Some("member_card") { "stage" } else { effect.source_or("hand") }, effect.count_or(1), effect.target_name(), effect.card_type.as_deref(), effect.distinct.as_deref(), &effect.heart_colors, effect.or_card_types.clone(), effect.exclude_selected.unwrap_or(false))
+                    }
+                } else {
+                    self.execute_select(if effect.card_type.as_deref() == Some("member_card") { "stage" } else { effect.source_or("hand") }, effect.count_or(1), effect.target_name(), effect.card_type.as_deref(), effect.distinct.as_deref(), &effect.heart_colors, effect.or_card_types.clone(), effect.exclude_selected.unwrap_or(false))
+                }
+            }
             EffectAction::LookAt => self.execute_look_at(effect.count_or(1), effect.target_name(), effect.source_or("deck")),
             EffectAction::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_global(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(1), effect.heart_color_or("heart00"), effect.target_name()),
             EffectAction::ModifyYellCount => self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count_or(0)),
@@ -407,6 +424,27 @@ impl<'a> AbilityResolver<'a> {
         self.execute_draw(&AbilityEffect::default(), to_draw as u32, target, "deck", destination, None, false, 1, None)
     }
 
+    fn execute_select_heart_color(&mut self, count: u32, heart_colors: &[String], target: &str) -> Result<(), String> {
+        let mut unique_colors: Vec<String> = Vec::new();
+        for c in heart_colors {
+            if !unique_colors.contains(c) {
+                unique_colors.push(c.clone());
+            }
+        }
+        if unique_colors.len() == 1 {
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.conditional_choice = Some(unique_colors[0].clone());
+            }
+            return Ok(());
+        }
+        self.pending_choice = Some(Choice::SelectHeartColor {
+            count: count as usize,
+            options: unique_colors,
+            description: "Choose a heart color".to_string(),
+        });
+        Ok(())
+    }
+
     fn execute_gain_resource(
         &mut self, effect: &AbilityEffect, resource: &str, count: u32, target: &str, duration: Option<&str>,
         card_type: Option<&str>, group_name: Option<&str>, per_unit: bool, per_unit_count: u32,
@@ -424,12 +462,16 @@ impl<'a> AbilityResolver<'a> {
         let activating_card_id = self.game_state.activating_card;
         let card_db = self.game_state.card_database.clone();
         let is_self_target = effect.self_target.unwrap_or(false);
-        let is_all = effect.all.unwrap_or(false);
+        let is_all = effect.all.unwrap_or(false) || (effect.source.is_none() && effect.card_type.as_deref() == Some("member_card") && target == "self" && !is_self_target);
 
-        let single_fixed_heart: Option<String> = if (resource == "heart" || resource == "ハート") && (!heart_colors.is_empty() || heart_selection) {
+        let single_fixed_heart: Option<String> = if (resource == "heart" || resource == "ハート") && (!heart_colors.is_empty() || heart_selection || effect.heart_type.is_some()) {
             let colors = if heart_colors.is_empty() {
-                vec!["heart01".into(), "heart02".into(), "heart03".into(),
-                     "heart04".into(), "heart05".into(), "heart06".into()]
+                if let Some(ref ht) = effect.heart_type {
+                    vec![ht.clone()]
+                } else {
+                    vec!["heart01".into(), "heart02".into(), "heart03".into(),
+                         "heart04".into(), "heart05".into(), "heart06".into()]
+                }
             } else { heart_colors.to_vec() };
             let mut unique_colors: Vec<String> = Vec::new();
             for c in colors {
@@ -448,6 +490,13 @@ impl<'a> AbilityResolver<'a> {
                 return Ok(());
             }
         } else { None };
+
+        let single_fixed_heart = single_fixed_heart.or_else(|| {
+            if resource == "heart" || resource == "ハート" {
+                self.game_state.ability_queue.current_entry()
+                    .and_then(|e| e.conditional_choice.clone())
+            } else { None }
+        });
 
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
@@ -532,14 +581,20 @@ impl<'a> AbilityResolver<'a> {
                     for card_id in stage_ids {
                         self.game_state.add_blade_modifier(card_id, blades_to_add);
                     }
+                    if is_temporary {
+                        let mut data = serde_json::Map::new();
+                        data.insert("all_cards".to_string(), serde_json::Value::Bool(true));
+                        data.insert("amount".to_string(), serde_json::Value::Number(blades_to_add.into()));
+                        effect_data = Some(serde_json::Value::Object(data));
+                    }
                 } else if let Some(card_id) = activating_card_id {
                     self.game_state.add_blade_modifier(card_id, blades_to_add);
-                }
-                if is_temporary {
-                    let mut data = serde_json::Map::new();
-                    data.insert("all_cards".to_string(), serde_json::Value::Bool(true));
-                    data.insert("amount".to_string(), serde_json::Value::Number(blades_to_add.into()));
-                    effect_data = Some(serde_json::Value::Object(data));
+                    if is_temporary {
+                        let mut data = serde_json::Map::new();
+                        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
+                        data.insert("amount".to_string(), serde_json::Value::Number(blades_to_add.into()));
+                        effect_data = Some(serde_json::Value::Object(data));
+                    }
                 }
             } else {
                 let targets = if is_all { blade_targets.clone() } else { blade_targets.into_iter().take(final_count as usize).collect() };

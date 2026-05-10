@@ -592,6 +592,7 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub choice_type: Option<String>,
     #[serde(default)]
+    #[serde(alias = "heart_color")]
     pub heart_type: Option<String>,
     // Parser-only fields that were missing struct fields
     #[serde(default)]
