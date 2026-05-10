@@ -9,9 +9,23 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             ExecutionContext::LookAndSelect { step } => {
                 match step {
                     LookAndSelectStep::Select { count: _ } => {
-                        let select_action = self.current_effect.as_ref().and_then(|e| e.compound.select_action.clone());
-                        if let Some(action) = select_action {
-                            self.execute_effect(&action)?;
+                        if let Some(ref select_action) = self.current_effect.as_ref().and_then(|e| e.compound.select_action.clone()) {
+                            if select_action.action == "sequential" {
+                                self.pending_choice = None;
+                                self.execution_context = ExecutionContext::None;
+                                if let Some(ref actions) = select_action.compound.actions {
+                                    if actions.len() == 3 {
+                                        if let Some(last_action) = actions.last() {
+                                            if last_action.action == "move_cards" && last_action.source.as_deref() == Some("looked_at_remaining") {
+                                                let mut discard_only = last_action.clone();
+                                                discard_only.source = Some("looked_at".to_string());
+                                                return self.execute_effect(&discard_only);
+                                            }
+                                        }
+                                    }
+                                }
+                                return self.execute_effect(&select_action);
+                            }
                         }
                         self.execution_context = ExecutionContext::None;
                         Ok(())
@@ -29,18 +43,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             ExecutionContext::SingleEffect { effect_index: _ } => {
                 self.execution_context = ExecutionContext::None;
                 Ok(())
-            }
-            ExecutionContext::SequentialEffects { current_index, effects } => {
-                if current_index + 1 < effects.len() {
-                    self.execution_context = ExecutionContext::SequentialEffects {
-                        current_index: current_index + 1,
-                        effects: effects.clone(),
-                    };
-                    self.execute_effect(&effects[current_index + 1])
-                } else {
-                    self.execution_context = ExecutionContext::None;
-                    Ok(())
-                }
             }
         }
     }
@@ -79,8 +81,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let choice = self.pending_choice.clone();
         let context = self.execution_context.clone();
         match (&choice, result) {
-            (Some(Choice::SelectCard { zone, card_type, count, description: _, allow_skip, cost_limit, cost_limit_operator, group, characters }), ChoiceResult::CardSelected { indices }) => {
-                self.handle_select_card(zone, card_type, *count, *allow_skip, &indices, context, *cost_limit, cost_limit_operator.clone(), group.clone(), characters.clone())
+            (Some(Choice::SelectCard { zone, card_type, count, description: _, allow_skip, cost_limit, cost_limit_operator, group, characters, filtered_indices }), ChoiceResult::CardSelected { indices }) => {
+                self.handle_select_card(zone, card_type, *count, *allow_skip, &indices, context, *cost_limit, cost_limit_operator.clone(), group.clone(), characters.clone(), filtered_indices.clone())
             }
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
                 self.pending_choice = None;
@@ -101,7 +103,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn handle_select_card(&mut self, zone: &str, card_type: &Option<String>, count: usize, allow_skip: bool, indices: &[usize], context: ExecutionContext,
-        cost_limit: Option<u32>, cost_limit_operator: Option<String>, group: Option<String>, characters: Option<Vec<String>>) -> Result<(), String> {
+        cost_limit: Option<u32>, cost_limit_operator: Option<String>, group: Option<String>, characters: Option<Vec<String>>,
+        filtered_indices: Option<Vec<usize>>) -> Result<(), String> {
         if self.game_state.entry_cost().and_then(|c| c.cost_type.as_deref()) == Some("reveal") {
             let card_ids: Vec<i16> = {
                 let player = self.game_state.active_player();
@@ -166,8 +169,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 "discard" => self.execute_selected_cards_from_discard(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?,
                 "deck" => self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?,
                 "looked_at" => {
-                    self.reveal_selected_looked_at(indices);
-                    self.execute_selected_looked_at_cards(indices)?;
+                    let mapped_indices: Vec<usize> = if let Some(ref fidx) = filtered_indices {
+                        indices.iter().filter_map(|&i| fidx.get(i).copied()).collect()
+                    } else {
+                        indices.to_vec()
+                    };
+                    self.reveal_selected_looked_at(&mapped_indices);
+                    self.execute_selected_looked_at_cards(&mapped_indices)?;
                     return self.finalize_choice(&context);
                 }
                 "revealed_cards" => {
@@ -390,6 +398,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             self.game_state.ability_queue.current_entry_mut().map(|e| e.conditional_choice = Some(s));
         }
         self.pending_choice = None;
+        if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
+            for action in pending {
+                self.execute_effect(action)?;
+            }
+            self.game_state.pending_sequential_actions = None;
+        }
         Ok(())
     }
 

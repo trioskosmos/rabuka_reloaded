@@ -13,6 +13,7 @@ const ENERGY_CARD: &str = "LL-E-001-SD";
 const LIVE_CARD: &str = "PL!-sd1-019-SD";
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Scenario {
     index: usize,
     card_no: String,
@@ -25,6 +26,7 @@ struct Scenario {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Setup {
     stage: bool,
     live_phase: bool,
@@ -35,6 +37,7 @@ struct Setup {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Expected {
     action: String,
     source: Option<String>,
@@ -49,6 +52,7 @@ struct Expected {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Checks {
     has_energy_in_text: bool,
     has_member_in_text: bool,
@@ -138,9 +142,9 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
     // (needed when exclude_self=true removes card_id and filler doesn't match group)
     let same_series_member = if card_id >= 0 {
         db.get_card(card_id).and_then(|c| {
-            let series = &c.series;
+            let _series = &c.series;
             db.cards.iter().find(|(id, other)| {
-                **id != card_id && other.is_member() && &other.series == series
+                **id != card_id && other.is_member() && &other.series == _series
             }).map(|(id, _)| *id)
         }).unwrap_or(filler)
     } else { filler };
@@ -150,7 +154,7 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
     //   - series containing common group keywords
     let stage0_card = if card_id >= 0 {
         db.get_card(card_id).and_then(|c| {
-            let series = &c.series;
+            let _series = &c.series;
             db.cards.iter().find(|(id, other)| {
                 **id != card_id && other.is_member() && other.cost.map_or(false, |c| c <= 2)
                     && other.unit.as_deref() == Some("Printemps")
@@ -163,11 +167,11 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
     } else { filler };
 
     // Find a same-series member for exclude_self scenarios (indices 61, 62)
-    let same_series_member = if card_id >= 0 {
+    let _same_series_member = if card_id >= 0 {
         db.get_card(card_id).and_then(|c| {
-            let series = &c.series;
+            let _series = &c.series;
             db.cards.iter().find(|(id, other)| {
-                **id != card_id && other.is_member() && &other.series == series
+                **id != card_id && other.is_member() && &other.series == _series
             }).map(|(id, _)| *id)
         }).unwrap_or(filler)
     } else { filler };

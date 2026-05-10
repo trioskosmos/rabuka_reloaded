@@ -673,64 +673,6 @@ impl AbilityEffect {
     pub fn heart_color_or(&self, default: &'static str) -> &str {
         self.heart_colors.first().map(|s| s.as_str()).unwrap_or(default)
     }
-
-    /// Extract shared execution modifiers from this ability effect.
-    pub fn extract_modifiers(&self) -> ActionModifiers {
-        ActionModifiers {
-            target: self.target.as_deref().unwrap_or("self").to_string(),
-            count: self.count.unwrap_or(1),
-            card_type: self.card_type.clone(),
-            group_name: self.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.clone())),
-            cost_limit: self.cost_limit,
-            cost_limit_operator: self.cost_limit_operator.clone(),
-            max: self.max.unwrap_or(false),
-            all: self.all.unwrap_or(false),
-            source: self.source.clone(),
-            destination: self.destination.clone(),
-            exclude_self: self.exclude_self.unwrap_or(false),
-            self_target: self.self_target.unwrap_or(false),
-            characters: self.quoted_text.as_ref().map(|qt| vec![qt.text.clone()]),
-        }
-    }
-
-    /// Get compact debug string showing only non-None fields
-    pub fn compact_debug(&self) -> String {
-        let mut fields = vec![
-            format!("action: {}", self.action),
-        ];
-        
-        if !self.text.is_empty() {
-            fields.push(format!("text: {}", self.text));
-        }
-        if let Some(ref src) = self.source {
-            fields.push(format!("src: {}", src));
-        }
-        if let Some(ref dst) = self.destination {
-            fields.push(format!("dst: {}", dst));
-        }
-        if let Some(cnt) = self.count {
-            fields.push(format!("count: {}", cnt));
-        }
-        if let Some(ref ct) = self.card_type {
-            fields.push(format!("card_type: {}", ct));
-        }
-        if let Some(ref tgt) = self.target {
-            fields.push(format!("target: {}", tgt));
-        }
-        if self.max.unwrap_or(false) {
-            fields.push("max: true".to_string());
-        }
-        if let Some(limit) = self.cost_limit {
-            fields.push(format!("cost_limit: {}", limit));
-        }
-        if let Some(ref gn) = self.group_names {
-            if let Some(first) = gn.first() {
-                fields.push(format!("group_names: {}", first));
-            }
-        }
-        
-        format!("AbilityEffect {{ {} }}", fields.join(", "))
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -761,25 +703,6 @@ pub struct DynamicCount {
     pub base_reference: Option<String>,
     pub calculation: Option<String>,
     pub calculation_value: Option<u32>,
-}
-
-/// Extracted common parameters for move_cards and card selection.
-/// Each effect handler reads from `AbilityEffect` directly for its specific fields.
-#[derive(Debug, Clone, Default)]
-pub struct ActionModifiers {
-    pub target: String,
-    pub count: u32,
-    pub card_type: Option<String>,
-    pub group_name: Option<String>,
-    pub cost_limit: Option<u32>,
-    pub cost_limit_operator: Option<String>,
-    pub max: bool,
-    pub all: bool,
-    pub source: Option<String>,
-    pub destination: Option<String>,
-    pub exclude_self: bool,
-    pub self_target: bool,
-    pub characters: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -937,16 +860,7 @@ impl Card {
             // No heart requirement
             true
         }
-    }
-    
-    pub fn get_live_score(&self) -> u32 {
-        // Rule 9.2.1: Get live score for live cards
-        self.score.unwrap_or(0)
-    }
-
-    pub fn total_blades(&self) -> u32 {
-        self.blade
-    }
+}
 
     pub fn get_score(&self) -> u32 {
         self.score.unwrap_or(0)

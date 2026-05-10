@@ -154,14 +154,10 @@ fn you_ability_ends_and_discard_only_grows_at_end() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // [Choice 1] Optional: discard 1 card for cost — skip
-    if game.has_pending_choice() { game.select_indices(&[0]); }
-    // [Choice 2] look_and_select — skip the optional reveal step
-    if game.has_pending_choice() { game.select_indices(&[]); }
-    // [Choice 3] Optional: move revealed to hand — skip
+    // [Choice 1] Optional discard cost — skip (empty indices = skip)
     if game.has_pending_choice() { game.select_indices(&[]); }
 
-    // No more choices — ability should be done
+    // No more choices — ability should be done (0 matching cards → no look_and_select choice)
     assert!(!game.has_pending_choice(),
         "Ability should have ended; had pending: {:?}", game.state.ability_queue.is_waiting_for_choice());
 
@@ -204,8 +200,8 @@ fn you_ability_select_3_cards_all_optional_steps() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(you, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // [Choice 1] Optional discard cost — skip
-    if game.has_pending_choice() { game.select_indices(&[0]); }
+    // [Choice 1] Optional discard cost — skip (empty indices = skip)
+    if game.has_pending_choice() { game.select_indices(&[]); }
     // [Choice 2] look_and_select — select qualifying card
     if game.has_pending_choice() { game.select_indices(&[0]); }
     // [Choice 3] Reveal selected cards — confirm
@@ -227,8 +223,8 @@ fn you_ability_select_3_cards_all_optional_steps() {
     let final_discard = game.state.player1.waitroom.cards.len();
     assert_eq!(final_discard - initial_discard, 6,
         "Expected 6 fillers in discard, got {}", final_discard - initial_discard);
-    assert_eq!(game.state.player1.hand.cards.len(), initial_hand + 1,
-        "Hand should have 1 new card (qualifying)");
+    assert_eq!(game.state.player1.hand.cards.len(), initial_hand,
+        "Hand should have net 0 change (you left, qualifying entered)");
 }
 
 

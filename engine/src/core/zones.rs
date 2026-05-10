@@ -497,11 +497,6 @@ impl EnergyZone {
         self.active_energy_count
     }
 
-    pub fn total_blades(&self, card_db: &CardDatabase) -> u32 {
-        // Rule 8.2.4: Calculate total blades from all energy cards in Energy Zone
-        self.cards.iter().filter_map(|&card_id| card_db.get_card(card_id)).map(|c| c.blade).sum()
-    }
-
     pub fn can_pay_energy(&self, amount: usize) -> bool {
         // Rule 5.9: Check if player has enough active energy cards
         self.active_energy_count >= amount

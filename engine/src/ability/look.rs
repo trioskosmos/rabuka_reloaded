@@ -47,6 +47,7 @@ impl<'a> AbilityResolver<'a> {
                 zone: "looked_at".to_string(), card_type: select_action.card_type.clone(), count: max_select,
                 description, allow_skip: optional || any_number || available_count == 0,
                 cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+                filtered_indices: None,
             };
             self.pending_choice = Some(choice);
             self.execution_context = ExecutionContext::LookAndSelect {
@@ -73,6 +74,7 @@ impl<'a> AbilityResolver<'a> {
                     count: choices_count, description: format!("Select card(s) to reveal from hand"),
                     allow_skip: any_number,
                     cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+                    filtered_indices: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -157,6 +159,7 @@ impl<'a> AbilityResolver<'a> {
             description: format!("Select {} card(s) from {}", count, source),
             allow_skip: false,
             cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+            filtered_indices: None,
         });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())

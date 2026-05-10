@@ -27,6 +27,7 @@ impl GameState {
                             conditional_choice: None,
                             execution_context: None,
                             selected_card_ids: Vec::new(),
+                            filtered_looked_at_indices: None,
                         };
 
                         self.ability_queue.enqueue(entry);

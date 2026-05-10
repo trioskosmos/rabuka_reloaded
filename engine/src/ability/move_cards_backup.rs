@@ -32,8 +32,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
         let count = effect.count.unwrap_or(0) as usize;
         let source = effect.source.as_deref().unwrap_or("").to_string();
         let destination = effect.destination.as_deref().unwrap_or("").to_string();
-        let group_name_owned = effect.group_name();
-        let group_name = group_name_owned.as_deref();
+        let group_name = effect.group_name().as_deref();
 
         // Handle or_card_types: let the player pick which type to search for
         let card_type_owned: Option<String> = if let Some(ref or_types) = effect.or_card_types {
@@ -81,7 +80,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                 .chain(self.game_state.revealed_cards.iter())
                 .filter_map(|&id| {
                     let card = self.game_state.card_database.get_card(id)?;
-                    Some(card.name.replace("\u{FF06}", "&").split('&').map(|s| s.to_string()).collect::<Vec<_>>())
+                    Some(card.name.replace('＆', "&").split('&').map(|s| s.to_string()).collect::<Vec<_>>())
                 })
                 .flatten()
                 .collect();
@@ -111,7 +110,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
             };
 
             // --- STEP 1: Get cards from source ---
-            let source_str = if source.is_empty() { "" } else { source.as_str() };
+            let source_str = source.as_ref().map(|s| s.as_str()).unwrap_or("");
         let mut taken: Vec<i16> = match source_str {
                 // Deck → anything (sequential draw, no selection prompt)
                 "deck" | "deck_top" => {
@@ -407,7 +406,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                     moved_cards.push(card_id);
                     continue;
                 }
-                util::place_card_in_zone(player, card_id, destination.as_str(), vacated_stage_area, is_max, count);
+                util::place_card_in_zone(player, card_id, destination.as_ref().map(|s| s.as_str()).unwrap_or(""), vacated_stage_area, is_max, count);
                 moved_cards.push(card_id);
             }
         } // player borrow ends here
@@ -418,7 +417,7 @@ pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), Strin
                 for card_id in &moved_cards { self.game_state.add_orientation_modifier(*card_id, "wait"); }
                 if destination == "energy_zone" {
                     {
-                        let p = match tgt.as_deref().unwrap_or("self") {
+                        let p = match tgt.as_ref().map(|s| s.as_str()).unwrap_or("self") {
                             "self" => &mut self.game_state.player1,
                             "opponent" => &mut self.game_state.player2,
                             _ => &mut self.game_state.player1,

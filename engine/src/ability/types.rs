@@ -1,4 +1,3 @@
-use crate::card::AbilityEffect;
 use serde_json::Value;
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -13,6 +12,8 @@ pub enum Choice {
         cost_limit_operator: Option<String>,
         group: Option<String>,
         characters: Option<Vec<String>>,
+        #[serde(default)]
+        filtered_indices: Option<Vec<usize>>,
     },
     SelectTarget {
         target: String,
@@ -46,17 +47,14 @@ pub enum ChoiceResult {
     Skip,
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExecutionContext {
     None,
     SingleEffect { effect_index: usize },
-    SequentialEffects { current_index: usize, effects: Vec<AbilityEffect> },
     LookAndSelect { step: LookAndSelectStep },
 }
 
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LookAndSelectStep {
     LookAt { count: usize, source: String },
     Select { count: usize },

@@ -61,8 +61,7 @@ impl<'a> AbilityResolver<'a> {
         card_type: Option<&str>,
         group_name: Option<&str>,
         cost_limit: Option<u32>,
-        zone_name: &str,
-        prompt_desc: &str,
+        zone_name: &str, _prompt_desc: &str,
     ) -> Result<Option<Vec<usize>>, String> {
         let filter = util::CardFilter { card_type, group: group_name, cost_limit, ..util::CardFilter::default() };
         let idxs = util::matching_indices(cards, card_db, &filter, false);
@@ -71,9 +70,16 @@ impl<'a> AbilityResolver<'a> {
         }
         if idxs.len() > count {
             self.pending_choice = Some(Choice::SelectCard {
-                zone: zone_name.to_string(), card_type: card_type.map(|s| s.to_string()),
-                count, description: prompt_desc.to_string(), allow_skip: false,
-                cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+                zone: zone_name.to_string(),
+                card_type: None,
+                count: 0,
+                description: format!("Select {} card(s) to {} for cost", count, zone_name),
+                allow_skip: true,
+                cost_limit: None,
+                cost_limit_operator: None,
+                group: None,
+                characters: None,
+                filtered_indices: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);

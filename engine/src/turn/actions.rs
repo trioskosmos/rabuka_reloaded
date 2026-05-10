@@ -149,9 +149,14 @@ impl super::TurnEngine {
         let saved_ctx = game_state.ability_queue.current_entry()
             .and_then(|e| e.execution_context.clone())
             .unwrap_or(crate::ability::types::ExecutionContext::None);
+        // Capture whether pending sequential actions exist BEFORE choice resolution.
+        // True  = effect execution was paused mid-way (pending sequential actions saved).
+        // False = cost payment created the choice (effect hasn't started), or no sequential effect.
+        let had_pending_sequential = game_state.pending_sequential_actions.as_ref()
+            .map(|v| !v.is_empty()).unwrap_or(false);
         let (new_choice, looked_at, ctx, rev, res) = {
             let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
-            resolver.execution_context = saved_ctx;
+            resolver.execution_context = saved_ctx.clone();
             resolver.pending_choice = Some(choice);
             let res = resolver.provide_choice_result(result);
             let new_choice = resolver.get_pending_choice().cloned();
@@ -174,10 +179,19 @@ impl super::TurnEngine {
             let cost_was_paid = game_state.ability_queue.current_entry().map_or(false, |e| e.cost_paid);
             game_state.pending_choice = None;
             game_state.activating_card = None;
-            if cost_was_paid {
-                // Cost was paid but effect hasn't run yet — re-process to execute effect
+            if cost_was_paid && !had_pending_sequential {
+                // Cost was paid, no pending sequential actions existed before this choice
+                // resolution — effect hasn't started yet → start it.
                 game_state.process_current_ability();
-                // Continue processing remaining queue entries (e.g. auto abilities)
+                let player_id = game_state.ability_queue.current_entry()
+                    .map(|e| e.player_id.clone())
+                    .unwrap_or_else(|| "p1".to_string());
+                game_state.process_pending_auto_abilities(&player_id);
+            } else if cost_was_paid {
+                // Cost was paid and pending sequential actions existed before this choice
+                // resolution — they were just processed by the choice handler (e.g.
+                // handle_choice_string_store). The ability effect is now complete.
+                game_state.ability_queue.complete_current();
                 let player_id = game_state.ability_queue.current_entry()
                     .map(|e| e.player_id.clone())
                     .unwrap_or_else(|| "p1".to_string());

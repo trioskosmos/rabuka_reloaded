@@ -424,7 +424,7 @@ impl<'a> AbilityResolver<'a> {
         self.execute_draw(&AbilityEffect::default(), to_draw as u32, target, "deck", destination, None, false, 1, None)
     }
 
-    fn execute_select_heart_color(&mut self, count: u32, heart_colors: &[String], target: &str) -> Result<(), String> {
+    fn execute_select_heart_color(&mut self, count: u32, heart_colors: &[String], _target: &str) -> Result<(), String> {
         let mut unique_colors: Vec<String> = Vec::new();
         for c in heart_colors {
             if !unique_colors.contains(c) {
@@ -717,6 +717,7 @@ impl<'a> AbilityResolver<'a> {
                     cost_limit,
                     cost_limit_operator: cost_limit_operator.clone(),
                     group: group_filter.clone(),
+                    filtered_indices: None,
                     characters: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
@@ -774,6 +775,7 @@ impl<'a> AbilityResolver<'a> {
                     description: format!("Select {} energy card(s) to deactivate (set to wait)", effective_count),
                     allow_skip: false,
                     cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+                    filtered_indices: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -1523,6 +1525,7 @@ impl<'a> AbilityResolver<'a> {
             description: format!("Discard {} cards from hand (target: {} cards in hand)", cards_to_discard, target_count),
             allow_skip: false,
             cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+            filtered_indices: None,
         });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
