@@ -19,8 +19,13 @@ fn activate_and_choose_member(game: &mut TestGame, honoka: i16) {
         &mut game.state, &ActionType::UseAbility,
         Some(honoka), None, None, None,
     ).expect("activate");
-    // Cost is auto-resolved (no prompt). First pending choice is card type selection.
+    // Handle choices in order: cost (discard from hand), then card type, then looked_at
     if game.has_pending_choice() {
+        // First choice is hand discard cost (select index 0 to discard the filler card)
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        // Second choice is card type selection
         game.select_option(1); // 1 = member_card
     }
     // Handle subsequent choices (e.g., card selection from looked_at)
@@ -202,7 +207,16 @@ fn honoka_q166_no_member_in_deck_refresh() {
     for _ in 0..8 { game.state.player1.main_deck.cards.push(filler); }
 
     game.give_energy(13);
-    activate_and_choose_member(&mut game, honoka);
+    TurnEngine::execute_main_phase_action(
+        &mut game.state, &ActionType::UseAbility,
+        Some(honoka), None, None, None,
+    ).expect("activate");
+    // Cost is auto-resolved (non-optional exact match)
+    // First choice: card type selection
+    if game.has_pending_choice() {
+        game.select_option(1); // 1 = member_card
+    }
+    // After reveal with no match, no looked_at choice should appear
 
     // Cost: hand card discarded. Reveal: all deck cards revealed (no match), go to discard.
     // After refresh, new deck cards also revealed (no match), go to discard.

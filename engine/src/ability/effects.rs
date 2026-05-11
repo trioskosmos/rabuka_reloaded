@@ -20,7 +20,7 @@ enum EffectAction {
     ModifyRequiredHeartsSuccess, SetCostToUse, AllBladeTiming,
     SetCardIdentityAllRegions, Shuffle, RevealPerGroup,
     ConditionalOnResult, ConditionalOnOptional, ModifyCost,
-    RevealUntilLiveCard, Custom,
+    RevealUntilLiveCard, SelectCards, Custom,
 }
 
 impl EffectAction {
@@ -80,6 +80,7 @@ impl EffectAction {
             "conditional_on_optional" => Self::ConditionalOnOptional,
             "modify_cost" => Self::ModifyCost,
             "reveal_until_live_card" => Self::RevealUntilLiveCard,
+            "select_cards" => Self::SelectCards,
             "custom" => Self::Custom,
             _ => { eprintln!("Unknown effect action: '{}'", s); Self::DoNothing }
         }
@@ -208,6 +209,7 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::Sequential => self.execute_sequential_effect(effect, effect.conditional.unwrap_or(false), effect.is_further.unwrap_or(false)),
             EffectAction::ConditionalAlternative => self.execute_conditional_alternative(effect),
             EffectAction::LookAndSelect => self.execute_look_and_select(effect),
+            EffectAction::SelectCards => self.execute_select_cards(effect),
             EffectAction::Draw | EffectAction::DrawCard => self.execute_draw(effect, effect.count_or(1), effect.target_name(), effect.source_or("deck"), effect.destination.as_deref().unwrap_or("hand"), effect.card_type.as_deref(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref()),
             EffectAction::DrawUntilCount => self.execute_draw_until_count(effect.target_count.unwrap_or(0), effect.target_name(), effect.destination.as_deref().unwrap_or("hand")),
             EffectAction::DiscardCard | EffectAction::MoveCards => self.execute_move_cards(effect),
@@ -1053,6 +1055,9 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_play_baton_touch(&mut self, count: u32, target: &str) -> Result<(), String> {
         eprintln!("play_baton_touch: count={}, target={}", count, target);
+        if self.game_state.baton_touch_count == 0 {
+            return Err("Baton touch condition not met: card was not played via baton touch".to_string());
+        }
         self.game_state.prohibition_effects.push(format!("baton_touch_allowed:{}", count));
         Ok(())
     }

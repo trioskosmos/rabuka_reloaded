@@ -82,19 +82,41 @@ impl<'a> AbilityResolver<'a> {
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
                 let same_unit = cost.same_unit_name.unwrap_or(false);
-                if optional && !is_activation && !same_unit {
-                    self.pending_choice = Some(Choice::SelectCard {
-                        zone: source.to_string(),
-                        card_type: card_type.clone(),
-                        count,
-                        description: format!("Select card(s) to pay optional cost (or skip): {}", text),
-                        allow_skip: true,
-                        cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-                        filtered_indices: None,
-                    });
-                    return Ok(());
-                }
+                let is_from_hand = source == "hand" && !same_unit;
+                if is_from_hand {
+                    let target_str = cost.target.as_deref().unwrap_or("self");
+                    let pl = self.game_state.resolve_target_player(target_str);
+                    let card_db = &self.game_state.card_database;
+                    let cost_limit = cost.cost_limit;
+                    let card_type_filter = card_type.as_deref();
+                    let filter = util::filter_from_parts(card_type_filter, None, cost_limit, None, cost.characters.as_ref(), None);
+                    let matching_indices: Vec<usize> = pl.hand.cards.iter().enumerate()
+                        .filter(|(_, &cid)| filter.matches(card_db, cid, false))
+                        .map(|(i, _)| i).collect();
+                    let is_optional = optional && !is_activation;
 
+                    if !is_optional && matching_indices.len() >= count as usize && matching_indices.len() <= count as usize {
+                        // Non-optional exact match: auto-select (fall through to old behavior)
+                    } else if is_optional && matching_indices.is_empty() {
+                        // Optional cost with no matching cards: skip silently
+                        return Ok(());
+                    } else if !matching_indices.is_empty() {
+                        // Choice needed: multiple matches, or optional with some cards
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: source.to_string(),
+                            card_type: card_type.clone(),
+                            count,
+                            description: format!("Select {} card(s) from hand{}", count,
+                                if is_optional { " (or skip)" } else { "" }),
+                            allow_skip: is_optional,
+                            cost_limit: cost.cost_limit, cost_limit_operator: cost.cost_limit_operator.clone(),
+                            group: cost.group_names.clone().map(|v| v.join(",")),
+                            characters: cost.characters.clone(),
+                            filtered_indices: None,
+                        });
+                        return Ok(());
+                    }
+                }
                 if !source.is_empty() {
                     let target = cost.target.as_deref().unwrap_or("self");
                     let cost_limit = cost.cost_limit;

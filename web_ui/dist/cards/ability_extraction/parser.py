@@ -2126,9 +2126,13 @@ def _extract_basic_cost_fields(cost, text):
     # Source
     if '手札を' in text or '手札の' in text:
         cost['source'] = 'hand'
+        cost['zone'] = 'hand'  # Add zone for choice creation
     src = extract_source(text)
     if src and 'source' not in cost:
         cost['source'] = src
+        # Set zone based on source if not already set
+        if 'zone' not in cost:
+            cost['zone'] = src
     # Destination
     dst = extract_destination(text)
     if dst:
@@ -2137,7 +2141,7 @@ def _extract_basic_cost_fields(cost, text):
         cost['destination'] = 'energy_deck'
     # Infer destination from source if missing
     if 'source' in cost and 'destination' not in cost:
-        if cost['source'] == 'hand' and '控え室に置く' in text:
+        if cost['source'] == 'hand' and ('控え室に置く' in text or '控え室に置いて' in text):
             cost['destination'] = 'discard'
         elif cost['source'] == 'discard' and '手札に加える' in text:
             cost['destination'] = 'hand'
@@ -2189,9 +2193,15 @@ def _extract_basic_cost_fields(cost, text):
 def parse_cost(text: str) -> Dict[str, Any]:
     """Parse a cost text."""
     cost = {'text': text}
+    print(f"DEBUG: parse_cost called with text: {repr(text)}")
     
-    # Combined cost: energy icons at start + distinct action
-    if '{{icon_energy.png|E}}' in text and text.strip().startswith('{{icon_energy.png|E}}'):
+    # Extract basic fields first for all cost types
+    _extract_basic_cost_fields(cost, text)
+    
+    # Energy cost: count energy icons at start + distinct action (more specific)
+    import re
+    # Only match if text starts with energy icons, not contains them anywhere
+    if text.strip().startswith('{{icon_energy.png|E}}'):
         energy_end = text.find('}}', text.rfind('{{icon_energy.png|E}}')) + 2
         energy_text = text[:energy_end].strip()
         other_text = text[energy_end:].strip()
@@ -2200,6 +2210,14 @@ def parse_cost(text: str) -> Dict[str, Any]:
             if other_cost.get('type') not in (None, 'custom'):
                 return {'text': text, 'type': 'sequential_cost',
                         'costs': [parse_cost(energy_text), other_cost]}
+        else:
+            # Simple energy cost without additional actions
+            energy_count = text.count('{{icon_energy.png|E}}')
+            cost['type'] = 'pay_energy'
+            cost['energy'] = energy_count
+            cost['zone'] = 'energy_zone'  # Energy costs target energy zone
+            cost['count'] = energy_count  # Energy count as count
+        return cost
     
     # Sequential cost (～し、～ or ～て、～)
     if '、' in text:
@@ -2285,6 +2303,37 @@ def parse_cost(text: str) -> Dict[str, Any]:
             cost['type'] = 'move_cards'
         else:
             cost['type'] = 'custom'
+    # Hand discard cost pattern (手札をX枚控え室に置く/置いてもよい)
+    if re.match(r'手札を\d+枚控え室に置(いて|く)もよい', text):
+        cost['type'] = 'move_cards'
+        cost['source'] = 'hand'
+        cost['zone'] = 'hand'
+        cost['destination'] = 'discard'
+        cost['count'] = extract_count(text)
+        cost['optional'] = True
+        return cost
+    
+    # Hand discard cost pattern with conditions (手札の[条件]カードをX枚控え室に置く/置いて)
+    if re.match(r'手札の.*カードを\d+枚控え室に置(いて|く)', text):
+        cost['type'] = 'move_cards'
+        cost['source'] = 'hand'
+        cost['zone'] = 'hand'
+        cost['destination'] = 'discard'
+        cost['count'] = extract_count(text)
+        # Extract group names from 『』
+        group_matches = re.findall(r'『([^』]+)』', text)
+        if group_matches:
+            cost['group_names'] = group_matches
+        # Extract card type
+        if 'メンバーカード' in text:
+            cost['card_type'] = 'member_card'
+        elif 'ライブカード' in text:
+            cost['card_type'] = 'live_card'
+        # Check if optional
+        if 'もよい' in text:
+            cost['optional'] = True
+        return cost
+    
     else:
         cost['type'] = 'custom'
     
@@ -2764,30 +2813,22 @@ def _try_kore_niyori_case(text):
 
 
 def _build_reveal_add_discard(fp, sa_text, select_text):
-    """Build sequential for 'reveal → add → discard' pattern.
-    Propagates heart_colors/card_type/count/max/optional from select_text
-    into the reveal sub-action so the engine can filter by them."""
-    rm = re.search(r'(.+?)公開して(.+)', fp)
-    if not rm:
-        return None
-    ra = parse_action(rm.group(1).strip() + '公開する')
-    aa = parse_action(rm.group(2).strip())
-    if aa.get('action') == 'move_cards': aa['destination'] = 'hand'
-    ra['source'] = 'looked_at'; aa['source'] = 'looked_at'
-    sa = parse_action(sa_text)
-    if sa.get('action') == 'move_cards':
-        sa['source'] = 'looked_at_remaining'; sa['destination'] = 'discard'
-        sa['dynamic_count'] = {'type': 'remaining_looked_at', 'reference': 'previous_look'}
-    # Propagate selection criteria from select_text into reveal sub-action
-    hc = list(dict.fromkeys(f'heart{m.zfill(2)}' for m in re.findall(r'heart_(\d+)', select_text)))
-    if hc: ra['heart_colors'] = hc
-    ct = extract_card_type(select_text)
-    if ct and 'card_type' not in ra: ra['card_type'] = ct
+    """Build select_cards for 'reveal → add → discard' pattern."""
+    result = {
+        'action': 'select_cards',
+        'destination': 'hand',
+        'discard_remaining': True,
+        'reveal': True,
+    }
     cnt = extract_count(select_text)
-    if cnt: ra.setdefault('count', cnt)
-    if extract_max(select_text): ra['max'] = True
-    if extract_optional(select_text): ra['optional'] = True
-    return {'action': 'sequential', 'actions': [ra, aa, sa], 'text': select_text}
+    if cnt: result['count'] = cnt
+    ct = extract_card_type(select_text)
+    if ct: result['card_type'] = ct
+    hc = list(dict.fromkeys(f'heart{m.zfill(2)}' for m in re.findall(r'heart_(\d+)', select_text)))
+    if hc: result['heart_colors'] = hc
+    if extract_max(select_text): result['max'] = True
+    if extract_optional(select_text): result['optional'] = True
+    return result
 
 
 def _enrich_from_text(d, text):
@@ -2804,55 +2845,52 @@ def _enrich_from_text(d, text):
 
 def _build_look_select_actions(select_text):
     """Build the select_action for その中から patterns."""
-    # Reveal + add + discard patterns
+    result = {'action': 'select_cards', 'discard_remaining': True}
+
+    # Pattern: reveal → add → discard
     if '手札に加え' in select_text and '残りを控え室に置く' in select_text:
         parts = re.split(r'[、。]', select_text)
         if len(parts) >= 2:
             fp = parts[0].strip()
             if '公開して' in fp:
                 act = _build_reveal_add_discard(fp, parts[1].strip(), select_text)
-                if act: _enrich_from_text(act, select_text); return act
-            fa = parse_action(fp)
-            if fa.get('action') == 'custom' and ('{{heart_' in fp or 'ハートに' in fp):
-                fa['action'] = 'select'
-                ct = extract_card_type(fp)
-                if ct: fa['card_type'] = ct
-            if fa.get('action') == 'move_cards': fa['destination'] = 'hand'; fa['source'] = 'looked_at'
-            sa = parse_action(parts[1].strip())
-            if sa.get('action') == 'move_cards':
-                sa['source'] = 'looked_at_remaining'; sa['destination'] = 'discard'
-                sa['dynamic_count'] = {'type': 'remaining_looked_at', 'reference': 'previous_look'}
-            act = {'action': 'sequential', 'actions': [fa, sa], 'text': select_text}
-            _enrich_from_text(act, select_text); return act
-
-    # "好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く"
-    if '好きな枚数を好きな順番でデッキの上に置き' in select_text and '残りを控え室に置く' in select_text:
-        parts = select_text.split('、', SPLIT_LIMIT)
-        if len(parts) == 2:
-            fa = parse_action(parts[0].strip())
-            if fa.get('action') == 'move_cards':
-                fa['destination'] = 'deck_top'; fa['any_number'] = True; fa['source'] = 'looked_at'
-            sa = parse_action(parts[1].strip())
-            if sa.get('action') == 'move_cards':
-                sa['source'] = 'looked_at_remaining'; sa['destination'] = 'discard'
-                sa['dynamic_count'] = {'type': 'remaining_looked_at', 'reference': 'previous_look'}
-            return {'action': 'sequential', 'actions': [fa, sa], 'text': select_text}
-
-    # Default
-    act = parse_action(select_text)
-    if act.get('action') == 'custom':
-        if '手札に加える' in select_text: act['action'] = 'move_cards'; act['destination'] = 'hand'
-        elif '控え室に置く' in select_text: act['action'] = 'move_cards'; act['destination'] = 'discard'
-        # Detect heart-color filter criteria (e.g. "ハートに{{heart_04.png|heart04}}を2個以上持つメンバーカードか")
-        elif 'ハートに{{heart_' in select_text or '{{heart_' in select_text:
-            act['action'] = 'select'
-            if act.get('card_type') is None:
-                ct = extract_card_type(select_text)
-                if ct: act['card_type'] = ct
-            if act.get('count') is None:
+                if act: return act
+            if '公開して' not in fp:
+                result['destination'] = 'hand'
                 cnt = extract_count(select_text)
-                if cnt: act['count'] = cnt
-    return act
+                if cnt: result['count'] = cnt
+                hc = list(dict.fromkeys(f'heart{m.zfill(2)}' for m in re.findall(r'heart_(\d+)', select_text)))
+                if hc: result['heart_colors'] = hc
+                ct = extract_card_type(select_text)
+                if ct: result['card_type'] = ct
+                if extract_optional(select_text): result['optional'] = True
+                return result
+
+    # Pattern: any number → deck_top → discard remaining
+    if '好きな枚数を好きな順番でデッキの上に置き' in select_text and '残りを控え室に置く' in select_text:
+        result['destination'] = 'deck_top'
+        result['placement_order'] = 'any_order'
+        result['any_number'] = True
+        result['reveal'] = False
+        return result
+
+    # Default: detect destination from text
+    result['reveal'] = False
+    if '手札に加える' in select_text or '手札に加え' in select_text:
+        result['destination'] = 'hand'
+    elif '控え室に置く' in select_text:
+        result['destination'] = 'discard'
+    elif 'デッキの上に置く' in select_text or 'デッキの上に' in select_text:
+        result['destination'] = 'deck_top'
+
+    # Propagate selection criteria
+    _enrich_from_text(result, select_text)
+
+    # Handle heart-color filter in default case
+    if result.get('destination') is None and ('{{heart_' in select_text or 'ハートに' in select_text):
+        result['destination'] = 'hand'
+
+    return result
 
 
 def _try_look_and_select(text):

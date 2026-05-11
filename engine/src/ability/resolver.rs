@@ -23,8 +23,12 @@ pub struct AbilityResolver<'a> {
 
 impl<'a> AbilityResolver<'a> {
     pub fn new(game_state: &'a mut GameState) -> Self {
+        static mut RESOLVER_COUNT: u32 = 0;
+        let count = unsafe { RESOLVER_COUNT += 1; RESOLVER_COUNT };
         let activating_card_id = game_state.activating_card;
-        let looked_at_cards = std::mem::take(&mut game_state.looked_at_cards);
+        // DON'T take from game_state - just use empty, reference game_state.looked_at_cards when needed
+        let looked_at_cards = Vec::new();
+        println!("DEBUG: Resolver new #{} - using empty looked_at_cards (will access game_state directly)", count);
         let selected_cards = game_state.ability_queue.current_entry()
             .map(|e| e.selected_card_ids.clone())
             .unwrap_or_default();

@@ -7,7 +7,9 @@ impl<'a> AbilityResolver<'a> {
         self.current_effect = Some(effect.clone());
 
         if let Some(ref look_action) = effect.compound.look_action {
+            println!("DEBUG: Executing look_action: {:?}", look_action);
             self.execute_effect(look_action)?;
+            println!("DEBUG: After look_action - looked_at_cards.len(): {}", self.looked_at_cards.len());
         }
 
         if let Some(ref select_action) = effect.compound.select_action {
@@ -21,27 +23,43 @@ impl<'a> AbilityResolver<'a> {
             let heart_colors_filter = &select_action.heart_colors;
             let has_filter = card_type_filter.is_some() || !heart_colors_filter.is_empty();
             if has_filter {
+                println!("DEBUG: Filtering looked_at_cards - before: {}", self.looked_at_cards.len());
                 let (matching, non_matching): (Vec<_>, Vec<_>) = self.looked_at_cards.iter()
                     .partition(|&&card_id| {
                         super::util::card_matches_type(card_db, card_id, card_type_filter)
                             && super::util::card_matches_heart_colors(card_db, card_id, heart_colors_filter)
                     });
+                println!("DEBUG: Filtering results - matching: {}, non_matching: {}", matching.len(), non_matching.len());
                 self.looked_at_cards = matching;
                 let player = self.game_state.resolve_target_player_mut("self");
                 for &card_id in &non_matching {
                     player.waitroom.add_card(card_id);
                 }
+                println!("DEBUG: After filtering - looked_at_cards.len(): {}", self.looked_at_cards.len());
+                // Sync to game_state so subsequent resolvers can access them
+                self.game_state.looked_at_cards = self.looked_at_cards.clone();
+                println!("DEBUG: Synced to game_state.looked_at_cards.len(): {}", self.game_state.looked_at_cards.len());
             }
 
             let available_count = self.looked_at_cards.len();
-            let max_select = if any_number { available_count } else { std::cmp::min(count as usize, available_count) };
-
+            let is_max = select_action.max.unwrap_or(false);
+            let max_select = if any_number { 
+                available_count 
+            } else if is_max || optional {
+                // When max: true or optional: true, allow up to count cards
+                std::cmp::min(count as usize, available_count)
+            } else {
+                // When neither max nor optional, require exactly count cards
+                std::cmp::min(count as usize, available_count)
+            };
+            
+            
             let description = if available_count == 0 {
                 "No eligible cards found among looked-at cards".to_string()
             } else if any_number {
                 format!("Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
                     available_count, placement_order.unwrap_or("default"))
-            } else if optional {
+            } else if is_max || optional {
                 format!("Select up to {} card(s) from the {} looked-at cards (or skip) (placement_order: {})",
                     max_select, available_count, placement_order.unwrap_or("default"))
             } else {
@@ -51,14 +69,20 @@ impl<'a> AbilityResolver<'a> {
 
             let choice = Choice::SelectCard {
                 zone: "looked_at".to_string(), card_type: select_action.card_type.clone(), count: max_select,
-                description, allow_skip: optional || any_number || available_count == 0,
+                description: description.clone(), allow_skip: optional || is_max || any_number || available_count == 0,
                 cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                 filtered_indices: None,
             };
+            println!("DEBUG: Creating choice - available_count: {}, max_select: {}, description: {}", available_count, max_select, description);
             self.pending_choice = Some(choice);
             self.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Select { count: max_select },
             };
+            println!("DEBUG: Choice created and stored - pending_choice.is_some(): {}", self.pending_choice.is_some());
+            
+            // Sequential actions will be stored after user makes the choice
+            // Don't store them immediately to prevent premature execution
+            
             return Ok(());
         }
 
@@ -71,20 +95,47 @@ impl<'a> AbilityResolver<'a> {
         let player = self.game_state.resolve_target_player_mut(target);
 
         // Support player selection for reveal: when count allows choice, prompt instead of auto-revealing all
-        if source == "hand" {
-            let available = player.hand.cards.len();
-            if (any_number || count == 0 || count < available as u32) && available > 0 {
+        let available = match source {
+            "hand" => player.hand.cards.len(),
+            "looked_at" => self.looked_at_cards.len(),
+            _ => 0,
+        };
+        
+        println!("DEBUG: execute_reveal - source: {}, available: {}, count: {}, any_number: {}", source, available, count, any_number);
+        
+        if (source == "hand" || source == "looked_at") && available > 0 {
+            let current_effect = self.current_effect.as_ref();
+            let is_max = current_effect.map_or(false, |e| e.max.unwrap_or(false));
+            let is_optional = current_effect.map_or(false, |e| e.optional.unwrap_or(false));
+            
+            println!("DEBUG: is_max: {}, is_optional: {}", is_max, is_optional);
+            
+            // Create choice if max=true (up to X cards) or optional, or if count < available
+            if is_max || is_optional || count == 0 || count < available as u32 {
                 let choices_count = if any_number { available } else { count as usize };
+                let allow_skip = any_number || is_optional || is_max;
+                
+                println!("DEBUG: Creating choice - choices_count: {}, allow_skip: {}", choices_count, allow_skip);
+                
                 self.pending_choice = Some(Choice::SelectCard {
-                    zone: "hand".to_string(), card_type: card_type.map(|s| s.to_string()),
-                    count: choices_count, description: format!("Select card(s) to reveal from hand"),
-                    allow_skip: any_number,
-                    cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+                    zone: source.to_string(), 
+                    card_type: card_type.map(|s| s.to_string()),
+                    count: choices_count, 
+                    description: format!("Select card(s) to reveal from {}", source),
+                    allow_skip,
+                    cost_limit: None, 
+                    cost_limit_operator: None, 
+                    group: None, 
+                    characters: None,
                     filtered_indices: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
+            } else {
+                println!("DEBUG: Not creating choice - conditions not met");
             }
+        } else {
+            println!("DEBUG: Not creating choice - source not supported or no available cards");
         }
 
         let card_ids: Vec<i16> = {
@@ -168,6 +219,10 @@ impl<'a> AbilityResolver<'a> {
             filtered_indices: None,
         });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+        Ok(())
+    }
+    pub fn execute_select_cards(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        self.current_effect = Some(effect.clone());
         Ok(())
     }
     pub fn execute_look_at(&mut self, count: u32, target: &str, source: &str) -> Result<(), String> {

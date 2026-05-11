@@ -79,6 +79,16 @@
     min-height: var(--card-w) !important; 
 }
 
+/* Fix: Allow hand-group to show landscape cards that extend beyond container */
+.hand-group:has(.card.orientation-landscape) {
+    overflow: visible !important;
+}
+
+/* Fallback for browsers without :has() support - ensure hand can show landscape cards */
+.hand-row {
+    overflow: visible !important;
+}
+
 /* Image-level rotation logic */
 .card.rotate-img-90 img {
     position: absolute;
@@ -124,7 +134,7 @@
 /* --- Hand Row Refined --- */
 .hand-row {
     height: auto;
-    min-height: calc(var(--card-h) + 12px);
+    min-height: calc(max(var(--card-h), var(--card-w)) + 12px);
     overflow: visible;
     display: flex;
     align-items: center;

@@ -549,6 +549,10 @@ pub struct AbilityEffect {
     pub cost_limit_operator: Option<String>,
     #[serde(default)]
     pub any_number: Option<bool>,
+    #[serde(default)]
+    pub discard_remaining: Option<bool>,
+    #[serde(default)]
+    pub reveal: Option<bool>,
     pub distinct: Option<String>,
     // Card name matching constraints
     #[serde(default)]

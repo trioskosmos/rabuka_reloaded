@@ -199,12 +199,24 @@ impl<'a> AbilityResolver<'a> {
                     if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.hand.cards.len() && player.hand.cards[i] == aid); } }
                     match classify_selection(&idxs, count, is_all, InsufficientBehavior::Silent)? {
                         SelectionOutcome::Exact(indices) => remove_cards_from_hand(player, &indices),
-                        SelectionOutcome::Prompt => {
-                            // Auto-select first 'count' cards for cost payment to avoid prompts
-                            let auto_indices: Vec<usize> = idxs.iter().take(count as usize).copied().collect();
-                            remove_cards_from_hand(player, &auto_indices)
-                        },
-                        SelectionOutcome::Skip => vec![],
+                        SelectionOutcome::Prompt | SelectionOutcome::Skip => {
+                            // Always prompt for hand selection - optional determines if skip is allowed
+                            let is_optional = _effect.optional.unwrap_or(false);
+                            self.pending_choice = Some(Choice::SelectCard {
+                                zone: "hand".to_string(),
+                                card_type: card_type_filter.map(|s| s.to_string()),
+                                count,
+                                description: format!("Select {} card(s) from hand", count),
+                                allow_skip: is_optional,
+                                cost_limit,
+                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                group: group_name.map(|s| s.to_string()),
+                                characters: character_filter.clone(),
+                                filtered_indices: None,
+                            });
+                            self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                            return Ok(());
+                        }
                     }
                 }
                 "discard" => {
@@ -267,7 +279,11 @@ impl<'a> AbilityResolver<'a> {
                     if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.waitroom.cards.len() && player.waitroom.cards[i] == aid); } }
                     match classify_selection(&idxs, count, false, InsufficientBehavior::Silent)? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect(),
-                        SelectionOutcome::Prompt => { self.prompt_choice("discard", card_type_filter, count, cost_limit, _effect.cost_limit_operator.clone(), group_name.map(|s| s.to_string()), character_filter.clone()); return Ok(()); }
+                        SelectionOutcome::Prompt => {
+                            if vacated_stage_area.is_some() { self.game_state.last_vacated_stage_area = vacated_stage_area; }
+                            self.prompt_choice("discard", card_type_filter, count, cost_limit, _effect.cost_limit_operator.clone(), group_name.map(|s| s.to_string()), character_filter.clone());
+                            return Ok(());
+                        }
                         SelectionOutcome::Skip => vec![],
                     }
                 }
@@ -294,7 +310,7 @@ impl<'a> AbilityResolver<'a> {
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     } else {
-                        // For Honoka's ability, we want to move the first card (chosen card) regardless of filters
+                        // For You's ability, we want to move the first card (chosen card) regardless of filters
                         // So if no filters are specified, just take the first card
                         if card_type_filter.is_none() && group_name.is_none() && cost_limit.is_none() {
                             let taken: Vec<i16> = if self.looked_at_cards.len() > 0 {
@@ -302,7 +318,6 @@ impl<'a> AbilityResolver<'a> {
                             } else {
                                 vec![]  // No card available
                             };
-                            for &card in &taken { moved_cards.push(card); }
                             taken
                         } else {
                             // Apply filters as usual
