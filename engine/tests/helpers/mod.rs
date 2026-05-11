@@ -140,6 +140,18 @@ impl TestGame {
         .expect("activate_ability failed");
     }
 
+    /// Try to activate ability, returning Result for error handling
+    pub fn try_activate_ability(&mut self, stage_card_id: i16) -> Result<(), String> {
+        TurnEngine::execute_main_phase_action(
+            &mut self.state,
+            &ActionType::UseAbility,
+            Some(stage_card_id),
+            None,
+            None,
+            None,
+        )
+    }
+
     /// Set a live card from hand during LiveCardSet phase.
     pub fn set_live_card(&mut self, card_id: i16) {
         TurnEngine::execute_main_phase_action(

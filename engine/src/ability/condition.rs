@@ -491,7 +491,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             _ => {
                 let count = match card_type {
-                    "live_card" => player.live_card_zone.len(),
+                    "live_card" => {
+                        // When checking for live cards without a specific location,
+                        // check recently moved cards if available, otherwise check discard pile
+                        if let Some(ref moved_cards) = self.game_state.recently_moved_cards {
+                            moved_cards.iter().filter(|&&cid| {
+                                card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
+                            }).count()
+                        } else {
+                            // Fallback: check discard pile (waitroom) for live cards
+                            player.waitroom.cards.iter().filter(|&&cid| {
+                                card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
+                            }).count()
+                        }
+                    },
                     "member_card" => {
                         if condition.aggregate.as_deref() == Some("total") {
                             let total = player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers) as usize;

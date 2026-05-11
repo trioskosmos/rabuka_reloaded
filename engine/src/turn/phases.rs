@@ -57,7 +57,7 @@ impl super::TurnEngine {
                     return;
                 }
                 Phase::FirstAttackerPerformance => {
-                    let (blade_heart_count, revealed_ids) = {
+                    let perf_data = {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = game_state.first_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
@@ -68,15 +68,21 @@ impl super::TurnEngine {
                         let player = game_state.first_attacker_mut();
                         Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };
-                    for cid in revealed_ids { game_state.revealed_cards.push(cid); }
-                    game_state.player1_cheer_blade_heart_count = blade_heart_count;
+                    let player_id = game_state.player1.id.clone();
+                    let turn = game_state.turn_number;
+                    let note_icons = perf_data.note_icons;
+                    for cid in &perf_data.revealed_ids { game_state.revealed_cards.push(*cid); }
+                    for cid in &perf_data.revealed_ids { game_state.player1_cheer_revealed_cards.push(*cid); }
+                    game_state.player1_cheer_blade_heart_count = perf_data.yell_count + note_icons;
+                    let snap = crate::turn::live::build_snapshot(turn, &player_id, &perf_data, &game_state.card_database, &game_state.player1, note_icons);
+                    game_state.performance_snapshots.push(snap);
                     let p1_id = game_state.player1.id.clone();
                     Self::trigger_auto_abilities_for_player(game_state, &p1_id);
                     game_state.process_pending_auto_abilities(&p1_id);
                     game_state.current_phase = Phase::SecondAttackerPerformance;
                 }
                 Phase::SecondAttackerPerformance => {
-                    let (blade_heart_count, revealed_ids) = {
+                    let perf_data = {
                         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
                         let player_id = game_state.second_attacker().id.clone();
                         let card_db = game_state.card_database.clone();
@@ -87,8 +93,14 @@ impl super::TurnEngine {
                         let player = game_state.second_attacker_mut();
                         Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
                     };
-                    for cid in revealed_ids { game_state.revealed_cards.push(cid); }
-                    game_state.player2_cheer_blade_heart_count = blade_heart_count;
+                    let player_id = game_state.player2.id.clone();
+                    let turn = game_state.turn_number;
+                    let note_icons = perf_data.note_icons;
+                    for cid in &perf_data.revealed_ids { game_state.revealed_cards.push(*cid); }
+                    for cid in &perf_data.revealed_ids { game_state.player2_cheer_revealed_cards.push(*cid); }
+                    game_state.player2_cheer_blade_heart_count = perf_data.yell_count + note_icons;
+                    let snap = crate::turn::live::build_snapshot(turn, &player_id, &perf_data, &game_state.card_database, &game_state.player2, note_icons);
+                    game_state.performance_snapshots.push(snap);
                     let p2_id = game_state.player2.id.clone();
                     Self::trigger_auto_abilities_for_player(game_state, &p2_id);
                     game_state.process_pending_auto_abilities(&p2_id);
@@ -97,6 +109,9 @@ impl super::TurnEngine {
                 Phase::LiveVictoryDetermination => {
                     Self::execute_live_victory_determination(game_state);
                     if game_state.pending_choice.is_some() { return; }
+                    game_state.clear_revealed_cards();
+                    game_state.revealed_cost_cards.clear();
+                    game_state.turn_limited_abilities_used.clear();
                     game_state.turn_number += 1;
                     game_state.current_turn_phase = crate::game_state::TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;

@@ -13,6 +13,29 @@ export const ActionListView = {
         const listDiv = document.createElement('div');
         listDiv.className = 'action-list';
 
+        // Show card/ability context when a choice is pending
+        const pc = state.pending_choice;
+        if (pc) {
+            const ctxDiv = document.createElement('div');
+            ctxDiv.className = 'pending-choice-context';
+            ctxDiv.style.cssText = 'padding:6px 8px; margin-bottom:8px; border-left:3px solid #9966ff; background:rgba(153,102,255,0.08); border-radius:4px; font-size:0.85em;';
+
+            let ctxHTML = '';
+            if (pc.card_name) {
+                ctxHTML += `<strong style="color:#cc88ff;">${pc.card_name}</strong>`;
+                if (pc.card_no) ctxHTML += ` <span style="opacity:0.5; font-size:0.85em;">[${pc.card_no}]</span>`;
+                if (pc.trigger_type) ctxHTML += ` <span style="opacity:0.6; font-size:0.8em;">(${pc.trigger_type})</span>`;
+            }
+            if (pc.ability_text) {
+                const shortAbility = pc.ability_text.length > 120 ? pc.ability_text.substring(0, 120) + '…' : pc.ability_text;
+                ctxHTML += `<div style="color:rgba(255,255,255,0.7); margin-top:3px; line-height:1.4;">${shortAbility}</div>`;
+            }
+            if (ctxHTML) {
+                ctxDiv.innerHTML = ctxHTML;
+                listDiv.appendChild(ctxDiv);
+            }
+        }
+
         const playActionsByHand = {};
         const mulliganActions = {};
         const abilityActions = [];

@@ -3,6 +3,7 @@ use crate::game_state::GameState;
 use crate::player::Player;
 use crate::zones::Orientation;
 use crate::ability::debug::AbDebug;
+use crate::types::PerformanceSnapshot;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -39,6 +40,8 @@ pub struct PlayerDisplay {
     pub last_resolution_cards: Vec<CardDisplay>,
     #[serde(default)]
     pub score_modifiers: std::collections::HashMap<i16, i32>,
+    #[serde(default)]
+    pub total_hearts: Vec<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -65,6 +68,10 @@ pub struct GameStateDisplay {
     pub looked_cards: ZoneDisplay,
     #[serde(default)]
     pub rule_log: Vec<String>,
+    #[serde(default)]
+    pub performance_results: Option<std::collections::HashMap<String, PerformanceSnapshot>>,
+    #[serde(default)]
+    pub performance_history: Vec<PerformanceSnapshot>,
 }
 
 pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option<Orientation>, blade_modifier: i32) -> Option<CardDisplay> {
@@ -117,7 +124,7 @@ pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase, bla
     }
 }
 
-pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, score_modifiers: &std::collections::HashMap<i16, i32>) -> PlayerDisplay {
+pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, score_modifiers: &std::collections::HashMap<i16, i32>, heart_modifiers: &std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player.energy_zone.cards.iter()
         .enumerate()
         .map(|(i, &card_id)| {
@@ -138,6 +145,53 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
 
     let waitroom_display = zone_to_display(&player.waitroom.cards, card_db);
 
+    // Calculate total hearts including modifiers (7 elements: heart00-heart06)
+    let mut total_hearts = vec![0u32; 7];
+    
+    // Add base hearts from stage cards
+    for &card_id in &player.stage.stage {
+        if card_id != -1 {
+            if let Some(card) = card_db.get_card(card_id) {
+                if let Some(ref base_heart) = card.base_heart {
+                    for (color, count) in &base_heart.hearts {
+                        let index = match color {
+                            crate::card::HeartColor::Heart00 => 0,
+                            crate::card::HeartColor::Heart01 => 1,
+                            crate::card::HeartColor::Heart02 => 2,
+                            crate::card::HeartColor::Heart03 => 3,
+                            crate::card::HeartColor::Heart04 => 4,
+                            crate::card::HeartColor::Heart05 => 5,
+                            crate::card::HeartColor::Heart06 => 6,
+                            _ => continue,
+                        };
+                        total_hearts[index] += count;
+                    }
+                }
+            }
+        }
+    }
+    
+    // Add heart modifiers from stage cards
+    for &card_id in &player.stage.stage {
+        if card_id != -1 {
+            if let Some(card_heart_modifiers) = heart_modifiers.get(&card_id) {
+                for (color, modifier) in card_heart_modifiers {
+                    let index = match color {
+                        crate::card::HeartColor::Heart00 => 0,
+                        crate::card::HeartColor::Heart01 => 1,
+                        crate::card::HeartColor::Heart02 => 2,
+                        crate::card::HeartColor::Heart03 => 3,
+                        crate::card::HeartColor::Heart04 => 4,
+                        crate::card::HeartColor::Heart05 => 5,
+                        crate::card::HeartColor::Heart06 => 6,
+                        _ => continue,
+                    };
+                    total_hearts[index] = (total_hearts[index] as i32 + modifier).max(0) as u32;
+                }
+            }
+        }
+    }
+
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display(&player.hand.cards, card_db),
@@ -151,6 +205,7 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
         last_resolution_cards: player.last_resolution_cards.iter()
             .filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
         score_modifiers: score_modifiers.clone(),
+        total_hearts,
     }
 }
 
@@ -174,13 +229,26 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let mut rule_log = game_state.rule_log.clone();
     AbDebug::flush_to_rule_log(&mut rule_log);
 
+    // Build performance results (grouped by player_id)
+    let perf_history = game_state.performance_snapshots.clone();
+    let mut perf_results: Option<std::collections::HashMap<String, PerformanceSnapshot>> = None;
+    if !perf_history.is_empty() {
+        let mut map = std::collections::HashMap::new();
+        for snap in &perf_history {
+            map.insert(snap.player_id.clone(), snap.clone());
+        }
+        perf_results = Some(map);
+    }
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers),
-        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers),
         pending_choice: game_state.pending_choice.clone(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
         rule_log,
+        performance_results: perf_results,
+        performance_history: perf_history,
     }
 }

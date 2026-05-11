@@ -173,7 +173,11 @@ impl super::TurnEngine {
             if let Some(e) = game_state.ability_queue.current_entry_mut() {
                 e.execution_context = Some(ctx);
             }
-            game_state.pending_choice = c.to_frontend_json();
+            let mut choice_json = c.to_frontend_json();
+            if let Some(ref mut j) = choice_json {
+                game_state.inject_choice_ability_context(j);
+            }
+            game_state.pending_choice = choice_json;
             game_state.ability_queue.pause_for_choice(c);
         }
         else {
@@ -232,8 +236,30 @@ impl super::TurnEngine {
     pub fn check_victory_condition(game_state: &mut GameState) {
         let p1_success_count = game_state.player1.success_live_card_zone.cards.len();
         let p2_success_count = game_state.player2.success_live_card_zone.cards.len();
-        if p1_success_count >= crate::constants::VICTORY_CARD_COUNT { game_state.game_result = crate::game_state::GameResult::FirstAttackerWins; }
-        else if p2_success_count >= crate::constants::VICTORY_CARD_COUNT { game_state.game_result = crate::game_state::GameResult::SecondAttackerWins; }
+        
+        // Rule 1.2.1.1: Player wins with 3+ cards when opponent has 2- cards
+        // Rule 1.2.1.2: Draw if both players have 3+ cards simultaneously
+        if p1_success_count >= crate::constants::VICTORY_CARD_COUNT && p2_success_count >= crate::constants::VICTORY_CARD_COUNT {
+            // Both players have 3+ cards - draw
+            game_state.game_result = crate::game_state::GameResult::Draw;
+            game_state.game_ended = true;
+        } else if p1_success_count >= crate::constants::VICTORY_CARD_COUNT && p2_success_count <= 2 {
+            // Player 1 has 3+ cards, player 2 has 2- cards - player 1 wins
+            game_state.game_result = if game_state.player1.is_first_attacker {
+                crate::game_state::GameResult::FirstAttackerWins
+            } else {
+                crate::game_state::GameResult::SecondAttackerWins
+            };
+            game_state.game_ended = true;
+        } else if p2_success_count >= crate::constants::VICTORY_CARD_COUNT && p1_success_count <= 2 {
+            // Player 2 has 3+ cards, player 1 has 2- cards - player 2 wins
+            game_state.game_result = if game_state.player2.is_first_attacker {
+                crate::game_state::GameResult::FirstAttackerWins
+            } else {
+                crate::game_state::GameResult::SecondAttackerWins
+            };
+            game_state.game_ended = true;
+        }
     }
 
     fn check_invalid_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {

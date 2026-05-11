@@ -204,7 +204,15 @@ impl<'a> AbilityResolver<'a> {
                     eprintln!("[CHANGE_STATE] stage={:?} card_type={:?} exclude_self={} activating_id={:?} self_cost={:?}",
                         stage_cards, cost.card_type, exclude_self, activating_id, cost.self_cost);
                     let candidates: Vec<i16> = stage_cards.into_iter()
-                        .filter(|&id| !(exclude_self && activating_id == Some(id)))
+                        .filter(|&id| {
+                            // When self_cost is true, only include the activating card
+                            if cost.self_cost.unwrap_or(false) {
+                                activating_id == Some(id)
+                            } else {
+                                // When exclude_self is true, exclude the activating card
+                                !(exclude_self && activating_id == Some(id))
+                            }
+                        })
                         .filter(|&id| {
                             if !super::util::card_matches_type(card_db, id, cost.card_type.as_deref()) {
                                 eprintln!("[CHANGE_STATE] id={} FAIL type match", id);

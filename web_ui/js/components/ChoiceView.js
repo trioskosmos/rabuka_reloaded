@@ -17,8 +17,10 @@ export const ChoiceView = {
 
         choiceDiv.style.borderLeft = `4px solid ${headerColor}`;
 
-        const cardId = choice.card_id !== undefined ? choice.card_id : (choice.source_card_id !== undefined ? choice.source_card_id : -1);
-        let cardName = choice.source_member;
+        // Use the new backend-injected fields first, fall back to legacy WASM fields
+        let cardName = choice.card_name || choice.source_member;
+        let cardId = choice.card_id !== undefined ? choice.card_id : (choice.source_card_id !== undefined ? choice.source_card_id : -1);
+        let abilityText = choice.ability_text || "";
 
         if (!cardName || cardName === 'Unknown Source' || cardName === 'Unknown Card' || cardName.startsWith('Card ')) {
             const resolvedCard = State.resolveCardData(cardId);
@@ -30,21 +32,24 @@ export const ChoiceView = {
         }
 
         let headerText = cardName;
-        if (cardId >= 0) {
+        if (choice.card_no) {
+            headerText += ` <span style="opacity:0.5; font-size:0.8em;">[${choice.card_no}]</span>`;
+        } else if (cardId >= 0) {
             headerText += ` <span style="opacity:0.6; font-size:0.8em;">(ID: ${cardId})</span>`;
         }
 
         let content = `<div class="choice-header" style="color:${headerColor};">${headerText}</div>`;
 
-        let abilityText = "";
-        if (cardId >= 0) {
-            const card = State.resolveCardData(cardId);
-            const naturalText = Tooltips.extractRelevantAbility(card, choice.trigger_label, choice.ability_index);
-            if (naturalText && !Tooltips.isGenericInstruction(naturalText)) {
-                abilityText = naturalText;
+        // Fallback to legacy ability text extraction if backend didn't provide it
+        if (!abilityText || abilityText.length < 5) {
+            if (cardId >= 0) {
+                const card = State.resolveCardData(cardId);
+                const naturalText = Tooltips.extractRelevantAbility(card, choice.trigger_label, choice.ability_index);
+                if (naturalText && !Tooltips.isGenericInstruction(naturalText)) {
+                    abilityText = naturalText;
+                }
             }
         }
-
         if (!abilityText || abilityText.length < 5) {
             const fallback = choice.source_ability || "";
             const isGenericChoice = Tooltips.isGenericInstruction(choice.choice_text);

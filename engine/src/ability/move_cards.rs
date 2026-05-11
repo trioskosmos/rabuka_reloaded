@@ -145,9 +145,9 @@ impl<'a> AbilityResolver<'a> {
                 // Stage → anything
                 "stage" => {
                     if is_self_cost {
+                        let mut cards = Vec::new();
+                        let mut found = false;
                         if let Some(activating_id) = activating_card_id {
-                            let mut found = false;
-                            let mut cards = Vec::new();
                             for i in 0..3 {
                                 if player.stage.stage[i] == activating_id {
                                     self.game_state.last_vacated_stage_area = Some(i);
@@ -164,9 +164,9 @@ impl<'a> AbilityResolver<'a> {
                                     found = true; break;
                                 }
                             }
-                            if !found { return Err(format!("Activating card {} not found at stage", activating_id)); }
-                            cards
-                        } else { return Err("Self-cost required but no activating card".into()); }
+                        }
+                        if !found { return Err("Activating card not found at stage".to_string()); }
+                        cards
                     } else {
                         let filter = util::filter_from_parts_full(card_type_filter, group_name, cost_limit, None, character_filter.as_ref(), name_fragments.as_ref(), None, if exclude_self { activating_card_id } else { None });
                         let mut idxs = util::matching_indices(&player.stage.stage, &card_db, &filter, true);
@@ -324,10 +324,20 @@ impl<'a> AbilityResolver<'a> {
                     cards
                 }
                 "revealed_cards" => {
-                    let cards: Vec<i16> = self.game_state.revealed_cards.drain(..).collect();
+                    let is_self = tgt.as_ref().map(|s| s.as_str()).unwrap_or("self") == "self";
+                    let cards: Vec<i16> = if is_self && !self.game_state.player1_cheer_revealed_cards.is_empty() {
+                        self.game_state.player1_cheer_revealed_cards.drain(..).collect()
+                    } else if !is_self && !self.game_state.player2_cheer_revealed_cards.is_empty() {
+                        self.game_state.player2_cheer_revealed_cards.drain(..).collect()
+                    } else {
+                        self.game_state.revealed_cards.drain(..).collect()
+                    };
                     if cards.len() > count {
-                        // Put back and prompt
-                        for &c in &cards { self.game_state.revealed_cards.push(c); }
+                        for &c in &cards {
+                            if is_self { self.game_state.player1_cheer_revealed_cards.push(c); }
+                            else { self.game_state.player2_cheer_revealed_cards.push(c); }
+                            self.game_state.revealed_cards.push(c);
+                        }
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "revealed_cards".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                             count, description: format!("Select {} card(s) from revealed cards", count), allow_skip: false,
@@ -419,6 +429,12 @@ impl<'a> AbilityResolver<'a> {
 
         for card_id in &moved_cards { self.game_state.clear_modifiers_for_card(*card_id); }
         for card_id in &moved_cards { self.game_state.record_card_movement(*card_id); }
+        
+        // Set recently_moved_cards for condition checking when destination is discard
+        if destination == "discard" {
+            self.game_state.recently_moved_cards = Some(moved_cards.clone());
+        }
+        
         Ok(())
     }
 

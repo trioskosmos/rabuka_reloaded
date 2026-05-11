@@ -18,6 +18,8 @@ export const HeaderStats = {
         player2Hearts: null,
         player1Blades: null,
         player2Blades: null,
+        player1Energy: null,
+        player2Energy: null,
         p1: { deck: null, energy: null, discard: null },
         p2: { deck: null, energy: null, discard: null }
     },
@@ -34,6 +36,8 @@ export const HeaderStats = {
         HeaderStats.cache.player2Hearts = document.getElementById('player2-hearts-summary');
         HeaderStats.cache.player1Blades = document.getElementById('player1-blades-summary');
         HeaderStats.cache.player2Blades = document.getElementById('player2-blades-summary');
+        HeaderStats.cache.player1Energy = document.getElementById('player1-energy');
+        HeaderStats.cache.player2Energy = document.getElementById('player2-energy');
         HeaderStats.cache.p1.deck = document.getElementById('h-p1-deck');
         HeaderStats.cache.p1.energy = document.getElementById('h-p1-energy');
         HeaderStats.cache.p1.discard = document.getElementById('h-p1-discard');
@@ -82,11 +86,18 @@ export const HeaderStats = {
             HeaderStats.cache.player2Score.textContent = `${p1BaseScore} +${p1Bonus}`;
         }
 
-        if (HeaderStats.cache.energy && p0) {
-            // Engine sends orientation in each energy card - calculate active count
+        // P1 Energy
+        if (HeaderStats.cache.player1Energy && p0) {
             const active = p0.energy.cards.filter(e => e && e.orientation === 'Active').length;
             const total = p0.energy.cards.length;
-            HeaderStats.cache.energy.textContent = `${active}/${total}`;
+            HeaderStats.cache.player1Energy.textContent = `${active}/${total}`;
+        }
+
+        // P2 Energy
+        if (HeaderStats.cache.player2Energy && p1) {
+            const active = p1.energy.cards.filter(e => e && e.orientation === 'Active').length;
+            const total = p1.energy.cards.length;
+            HeaderStats.cache.player2Energy.textContent = `${active}/${total}`;
         }
 
         // P1 Hearts and Blades

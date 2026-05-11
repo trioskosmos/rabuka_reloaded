@@ -7,7 +7,10 @@ use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
 
 pub use crate::config::RuleConfig;
-pub use crate::types::{AbilityTrigger, Duration, GameResult, Phase, ReplacementEffect, TemporaryEffect, TurnPhase};
+pub use crate::types::{AbilityTrigger, Duration, GameResult, Phase, ReplacementEffect, TemporaryEffect, TurnPhase,
+    PerformanceSnapshot, LiveCardResult, MemberContribution, YellCardResult, Breakdown,
+    HeartSource, BladeSource, Allocation, EffectEntry, ScoreLine, TriggeredAbility, Adjustment, AbilityBonus,
+    LivePerformanceData};
 
 #[derive(Debug, Clone)]
 pub struct GameState {
@@ -44,7 +47,10 @@ pub struct GameState {
     pub replacement_effects: Vec<ReplacementEffect>,
     pub revealed_cards: Vec<i16>,
     pub revealed_cost_cards: Vec<i16>,
+    pub player1_cheer_revealed_cards: Vec<i16>,
+    pub player2_cheer_revealed_cards: Vec<i16>,
     pub looked_at_cards: Vec<i16>,
+    pub recently_moved_cards: Option<Vec<i16>>,
     pub last_vacated_stage_area: Option<usize>,
     // --- 4-byte aligned (u32, Option<i32>) ---
     pub turn_number: u32,
@@ -83,6 +89,7 @@ pub struct GameState {
     pub loop_detected: bool,
     pub live_success_triggered_this_turn: bool,
     pub self_no_excess_heart_this_turn: bool,
+    pub performance_snapshots: Vec<PerformanceSnapshot>,
 }
 
 impl GameState {
@@ -134,7 +141,10 @@ impl GameState {
             replacement_effects: Vec::new(),
             revealed_cards: Vec::new(),
             revealed_cost_cards: Vec::new(),
+            player1_cheer_revealed_cards: Vec::new(),
+            player2_cheer_revealed_cards: Vec::new(),
             looked_at_cards: Vec::new(),
+            recently_moved_cards: None,
             last_vacated_stage_area: None,
             // 4-byte aligned
             turn_number: 1,
@@ -173,6 +183,7 @@ impl GameState {
             loop_detected: false,
             live_success_triggered_this_turn: false,
             self_no_excess_heart_this_turn: false,
+            performance_snapshots: Vec::new(),
         };
         debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
         state

@@ -174,16 +174,17 @@ impl<'a> AbilityResolver<'a> {
     fn store_pending_choice(&mut self) {
         if let Some(ref choice) = self.pending_choice {
             let mut json = choice.to_frontend_json();
-            if let Some(entry) = self.game_state.ability_queue.current_entry() {
-                if let Some(ref effect) = entry.ability.effect {
-                    if let Some(ref maker) = effect.choice_maker {
-                        if let Some(ref mut j) = json {
+            if let Some(ref mut j) = json {
+                if let Some(entry) = self.game_state.ability_queue.current_entry() {
+                    if let Some(ref effect) = entry.ability.effect {
+                        if let Some(ref maker) = effect.choice_maker {
                             if let Some(obj) = j.as_object_mut() {
                                 obj.insert("choice_maker".to_string(), serde_json::Value::String(maker.clone()));
                             }
                         }
                     }
                 }
+                self.game_state.inject_choice_ability_context(j);
             }
             self.game_state.pending_choice = json;
         }

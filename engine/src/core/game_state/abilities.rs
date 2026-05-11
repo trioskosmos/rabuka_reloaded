@@ -158,6 +158,24 @@ impl GameState {
         self.ability_queue.current_entry().and_then(|e| e.conditional_choice.clone())
     }
 
+    /// Inject card and ability identity into the pending_choice JSON so the frontend
+    /// can display which card+ability is responsible for the current choice prompt.
+    pub fn inject_choice_ability_context(&self, json: &mut serde_json::Value) {
+        if let Some(obj) = json.as_object_mut() {
+            if let Some(entry) = self.ability_queue.current_entry() {
+                obj.insert("card_no".into(), serde_json::Value::String(entry.card_no.clone()));
+                obj.insert("ability_text".into(), serde_json::Value::String(entry.ability.full_text.clone()));
+                obj.insert("trigger_type".into(), serde_json::Value::String(format!("{:?}", entry.trigger_type)));
+                if let Some(cid) = entry.card_id {
+                    obj.insert("card_id".into(), serde_json::Value::Number(serde_json::Number::from(cid as i64)));
+                    if let Some(card) = self.card_database.get_card(cid) {
+                        obj.insert("card_name".into(), serde_json::Value::String(card.name.clone()));
+                    }
+                }
+            }
+        }
+    }
+
     /// Resolve which player "self" refers to based on the ability master's player_id.
     /// The ability queue entry stores which player activated this ability.
     fn ability_master_id(&self) -> Option<String> {

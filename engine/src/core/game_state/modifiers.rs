@@ -306,6 +306,8 @@ impl GameState {
 
     pub fn clear_revealed_cards(&mut self) {
         self.revealed_cards.clear();
+        self.player1_cheer_revealed_cards.clear();
+        self.player2_cheer_revealed_cards.clear();
     }
 
     pub fn add_gained_ability(&mut self, card_id: i16, ability_type: String) {
