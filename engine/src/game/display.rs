@@ -2,6 +2,7 @@ use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::zones::Orientation;
+use crate::ability::debug::AbDebug;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -36,6 +37,8 @@ pub struct PlayerDisplay {
     pub energy_deck_count: usize,
     #[serde(default)]
     pub last_resolution_cards: Vec<CardDisplay>,
+    #[serde(default)]
+    pub score_modifiers: std::collections::HashMap<i16, i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -60,6 +63,8 @@ pub struct GameStateDisplay {
     pub pending_choice: Option<serde_json::Value>,
     #[serde(default)]
     pub looked_cards: ZoneDisplay,
+    #[serde(default)]
+    pub rule_log: Vec<String>,
 }
 
 pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option<Orientation>, blade_modifier: i32) -> Option<CardDisplay> {
@@ -112,7 +117,7 @@ pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase, bla
     }
 }
 
-pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>) -> PlayerDisplay {
+pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, score_modifiers: &std::collections::HashMap<i16, i32>) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player.energy_zone.cards.iter()
         .enumerate()
         .map(|(i, &card_id)| {
@@ -145,11 +150,12 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
         energy_deck_count: player.energy_deck.cards.len(),
         last_resolution_cards: player.last_resolution_cards.iter()
             .filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
+        score_modifiers: score_modifiers.clone(),
     }
 }
 
 pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
-    // Collect looked-at cards: looked_at_cards + revealed_cards + pending_choice selection_cards
+    // Collect looked-at cards: looked_at_cards + revealed_cards + pending_choice selection cards
     let mut looked_ids: Vec<i16> = game_state.looked_at_cards.clone();
     looked_ids.extend(&game_state.revealed_cards);
     if let Some(ref pc) = game_state.pending_choice {
@@ -164,12 +170,17 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     looked_ids.sort();
     looked_ids.dedup();
 
+    // Create a mutable copy of rule_log to add ability debug logs
+    let mut rule_log = game_state.rule_log.clone();
+    AbDebug::flush_to_rule_log(&mut rule_log);
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers),
-        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers),
         pending_choice: game_state.pending_choice.clone(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
+        rule_log,
     }
 }

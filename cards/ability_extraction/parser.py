@@ -16,30 +16,44 @@ SPLIT_LIMIT = 1
 
 # ============== SOURCE PATTERNS (FROM) ==============
 SOURCE_PATTERNS = [
-    ('エネルギーデッキから', 'energy_deck'),
-    ('控え室から', 'discard'),
-    ('控え室か ら', 'discard'),  # Q226: Handle unusual spacing
-    ('控え室にある', 'discard'),  # Handle "cards in discard pile"
-    ('手札から', 'hand'),
+    ('デッキの一番下から', 'deck_bottom'),  # Must be before デッキから
+    ('デッキの上から', 'deck_top'),  # Must be before デッキから
     ('デッキから', 'deck'),
-    ('デッキの上から', 'deck_top'),
     ('山札から', 'deck'),
-    ('ステージから', 'stage'),
+    ('エネルギーデッキから', 'energy_deck'),
     ('エネルギー置き場から', 'energy_zone'),
+    ('控え室か ら', 'discard'),  # Q226: Handle unusual spacing
+    ('控え室にある', 'discard'),
+    ('控え室から', 'discard'),
+    ('相手の控え室にある', 'discard'),
+    ('相手の控え室から', 'discard'),
+    ('からライブカード', 'discard'),  # Q226: Handle "～からライブカード" pattern
+    ('手札から', 'hand'),
+    ('ステージから', 'stage'),
     ('ライブカード置き場から', 'live_card_zone'),
     ('成功ライブカード置き場から', 'success_live_zone'),
-    ('からライブカード', 'discard'),  # Q226: Handle "～からライブカード" pattern
-    ('デッキの一番下から', 'deck_bottom'),
-    ('相手の控え室から', 'discard'),
-    ('相手の控え室にある', 'discard'),
 ]
 
 # ============== DESTINATION PATTERNS (TO) ==============
 DESTINATION_PATTERNS = [
+    # More specific deck position patterns first
+    ('デッキの一番上から4枚目に置く', 'deck_position_4'),  # Q226: 4th from top
+    ('デッキの一番上から4枚目に置き', 'deck_position_4'),  # Handle continuative form
+    ('デッキの一番上に置く', 'deck_top'),
+    ('デッキの一番上に置き', 'deck_top'),  # Handle continuative form
+    ('デッキの上に置く', 'deck_top'),
+    ('デッキの上に置き', 'deck_top'),  # Handle continuative form
+    ('デッキの一番下に置く', 'deck_bottom'),
+    ('デッキの一番下に置いて', 'deck_bottom'),  # Handle te-form
+    ('デッキの一番下に置き', 'deck_bottom'),  # Handle continuative form
+    ('デッキの下に置く', 'deck_bottom'),
+    ('デッキの下に置き', 'deck_bottom'),  # Handle continuative form
+    ('デッキに置く', 'deck'),  # Q226: General deck placement
     ('控え室に置く', 'discard'),
     ('控え室に置いて', 'discard'),  # Handle te-form
-    ('控え室に置き', 'discard'),  # Handle continuative form (e.g. "置き、")
-    # Removed overly broad ('控え室', 'discard') - it was matching source locations
+    ('控え室に置き', 'discard'),  # Handle continuative form
+    ('枚控え室に置く', 'discard'),
+    ('枚控え室に置いて', 'discard'),  # Handle te-form
     ('手札に加える', 'hand'),
     ('手札に加えて', 'hand'),  # Handle te-form
     ('手札に置く', 'hand'),
@@ -51,28 +65,11 @@ DESTINATION_PATTERNS = [
     ('エネルギー・デッキに置いてもよい', 'energy_deck'),
     ('ライブカード置き場に置く', 'live_card_zone'),
     ('成功ライブカード置き場に置く', 'success_live_zone'),
-    ('デッキの上に置く', 'deck_top'),
-    ('デッキの上に置き', 'deck_top'),  # Handle continuative form (e.g. "置き、")
-    ('デッキの一番上に置く', 'deck_top'),
-    ('デッキの一番上に置き', 'deck_top'),  # Handle continuative form
-    ('デッキの下に置く', 'deck_bottom'),
-    ('デッキの下に置き', 'deck_bottom'),  # Handle continuative form
-    ('デッキの一番下に置く', 'deck_bottom'),
-    ('デッキの一番下に置いて', 'deck_bottom'),  # Handle te-form
-    ('デッキの一番下に置き', 'deck_bottom'),  # Handle continuative form
-    ('デッキの一番上から4枚目に置く', 'deck_position_4'),  # Q226: 4th from top
-    ('デッキの一番上から4枚目に置き', 'deck_position_4'),  # Handle continuative form
-    ('デッキの一番上から(\d+)枚目に置く', 'deck_position'),  # Q226: General deck position pattern
-    ('デッキに置く', 'deck'),  # Q226: General deck placement
-    ('成功ライブカード置き場に置く', 'success_live_zone'),
     ('メンバーのいないエリア', 'empty_area'),
     ('そのメンバーがいたエリア', 'same_area'),
     ('このメンバーの下に置く', 'under_member'),
     ('このメンバーの下に置いて', 'under_member'),  # Handle te-form
     ('このメンバーの下に置き', 'under_member'),  # Handle continuative form
-    # Handle "手札を1枚控え室に置く" - destination is discard
-    ('枚控え室に置く', 'discard'),
-    ('枚控え室に置いて', 'discard'),  # Handle te-form
 ]
 
 # ============== ACTION PATTERNS ==============
@@ -931,9 +928,13 @@ def _try_appearance(text):
     return result
 
 def _try_energy_state(text):
-    if 'エネルギーがある' not in text:
+    has_positive = 'エネルギーがある' in text
+    has_negative = 'エネルギーがない' in text
+    if not has_positive and not has_negative:
         return None
     result = {'type': 'energy_state_condition', 'text': text}
+    if has_negative:
+        result['negation'] = True
     if 'アクティブ状態' in text:
         result['state'] = 'active'
     return result
@@ -953,10 +954,13 @@ def _try_state(text):
     return None
 
 def _try_revealed(text):
-    if 'エールにより公開された自分のカードの中に' not in text or 'ない' not in text:
+    if 'エールにより公開された自分のカードの中に' not in text:
         return None
+    has_negation = 'ない' in text
     result = {'type': 'location_condition', 'location': 'revealed_cards',
-              'target': 'self', 'negation': True, 'text': text}
+              'target': 'self', 'text': text}
+    if has_negation:
+        result['negation'] = True
     if 'ブレードハートを持つ' in text or 'ブレードハートを持たない' in text:
         result['card_property'] = 'has_blade_heart'
     # "持たないカードが0枚" = cards WITHOUT property = 0.
@@ -1477,6 +1481,22 @@ def _fill_defaults(action, text):
         action['action'] = 'draw_card'; a = 'draw_card'
     if a == 'draw_card':
         action.setdefault('source', 'deck'); action.setdefault('destination', 'hand')
+    # Shuffle is always combined with a move action (shuffle then place).
+    # If dispatch matched shuffle but text also has a destination pattern, emit move_cards with shuffle flag.
+    if a == 'shuffle':
+        dest = extract_destination(text)
+        if dest:
+            action['action'] = 'move_cards'
+            action['shuffle'] = True
+            action['destination'] = dest
+            if 'source' not in action:
+                s = extract_source(text)
+                if s: action['source'] = s
+            if 'card_type' not in action:
+                ct = _infer_card_type(text, action)
+                if ct: action['card_type'] = ct
+            a = 'move_cards'
+
     if action.get('source') == 'selected_cards':
         action.setdefault('count', 1)
     if a == 'gain_resource' and 'resource' not in action:
@@ -1603,7 +1623,7 @@ def _fill_defaults(action, text):
         action['optional'] = True
     if 'max' not in action and extract_max(text):
         action['max'] = True
-    if '好きな枚数' in text or '好きな枚数まで' in text:
+    if '好きな枚数' in text or '好きな枚数まで' in text or '任意の枚数' in text:
         action['any_number'] = True
         action.pop('count', None)
     if action.get('original_value') and '元々の' in text:
@@ -1776,10 +1796,6 @@ def parse_action(text: str) -> Dict[str, Any]:
     # Check for "好きな順番で" (in any order) placement
     if '好きな順番で' in text:
         action['placement_order'] = 'any_order'
-    # Check for deck_bottom with shuffle pattern
-    if 'デッキの一番下に置く' in text and 'シャッフルする' in text:
-        action['shuffle'] = True
-    
     # Extract deck position (Q226: 一番上から4枚目)
     deck_position = extract_deck_position_for_action(text)
     if deck_position:
@@ -1968,7 +1984,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     def R(cond, act, setter=None):
         _R.append((cond, act, setter))
     
-    R(lambda t: 'シャッフルする' in t or 'シャッフルして' in t, 'shuffle',
+    R(lambda t: 'シャッフルする' in t or 'シャッフルして' in t or ('シャッフルし' in t and '、' in t), 'shuffle',
       lambda t, a: a.update({'target': 'deck' if 'デッキ' in t else 'energy_deck'}))
     R(lambda t: '入れ替える' in t or '入れ替えて' in t, 'position_change', None)
     R(lambda t: 'フォーメーションチェンジ' in t, 'formation_change',
@@ -1982,7 +1998,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: '枚になるまで' in t and ('控え室に置く' in t or '控え室に置き' in t), 'discard_until_count',
       lambda t, a: a.update({'target_count': int(re.search(r'(\d+)枚になるまで', t).group(1))}))
     R('カードを1枚引いてもよい', 'draw_card', lambda t, a: a.update({'count': 1, 'optional': True, 'source': 'deck', 'destination': 'hand'}))
-    R(lambda t: '引く' in t or '引き' in t, 'draw_card', lambda t, a: a.update({'source': 'deck', 'destination': 'hand'}))
+    R(lambda t: '引く' in t or '引き' in t or '引い' in t, 'draw_card', lambda t, a: a.update({'source': 'deck', 'destination': 'hand'}))
     R(lambda t: '引いてもよい' in t, 'draw_card', lambda t, a: a.update({'source': 'deck', 'destination': 'hand', 'optional': True}))
     # Check for cost modification BEFORE general move_cards (which also matches source+dest)
     R(lambda t: re.search(r'コスト[はが](\d+)(減る|減らす|増える|増やす)', t) 
@@ -2026,8 +2042,8 @@ def parse_action(text: str) -> Dict[str, Any]:
       lambda t, a: a.update({'resource': 'heart', 'count': len(re.findall(r'{{heart_\d+\.png\|heart\d+}}', t)) or None}))
     R(lambda t: 'もう一度エール' in t or 'もう1度エール' in t, 're_yell',
       lambda t, a: a.update({'lose_blade_hearts': True}) if 'できない' not in t else None)
-    R(lambda t: ('見る' in t or '見て' in t), 'look_at', 
-      lambda t, a: (a.update({'source': 'deck_top' if 'デッキの上' in t else None}), _handle_dynamic_count(t, a), a.update({'action': 'look_at'})))
+    R(lambda t: ('見る' in t or '見て' in t or t.endswith('見')), 'look_at', 
+      lambda t, a: (a.update({'source': 'deck_top'}) if 'デッキの上' in t else None, _handle_dynamic_count(t, a), a.update({'action': 'look_at'})))
     R('公開する', 'reveal', lambda t, a: a.update({'source': source or 'hand'}))
     R(lambda t: '1枚ずつ公開' in t or '枚ずつ公開' in t, 'reveal', 
       lambda t, a: (a.update({'per_unit': True, 'per_unit_count': 1, 'multiple_targets': True}), None))
@@ -2185,13 +2201,14 @@ def parse_cost(text: str) -> Dict[str, Any]:
                 return {'text': text, 'type': 'sequential_cost',
                         'costs': [parse_cost(energy_text), other_cost]}
     
-    # Sequential te-form cost (～し、～)
+    # Sequential cost (～し、～ or ～て、～)
     if '、' in text:
         parts = text.split('、')
-        if len(parts) >= 2 and parts[0].strip().endswith('し'):
+        first_ends_with = parts[0].strip()[-1] if parts[0].strip() else ''
+        if len(parts) >= 2 and (first_ends_with in ('し', 'て') or parts[0].strip().endswith('し') or parts[0].strip().endswith('て')):
             cost_parts = []
             for i, part in enumerate(parts):
-                if i == 0 and not part.strip().endswith('し'):
+                if i == 0 and not part.strip().endswith('し') and not part.strip().endswith('て'):
                     part = part.strip() + 'し'
                 cost_parts.append(parse_cost(part.strip()))
             return {'text': text, 'type': 'sequential_cost', 'costs': cost_parts}
@@ -2224,21 +2241,21 @@ def parse_cost(text: str) -> Dict[str, Any]:
         # Extract common fields that were previously extracted before this check
         src = extract_source(text)
         if src: cost['source'] = src
-        if 'シャッフルする' in text or 'シャッフルして' in text: cost['shuffle'] = True
-        names = re.findall(r'「([^」]+)」', text)
-        if names: cost['characters'] = names
-        if 'もよい' in text or 'てもよい' in text: cost['optional'] = True
-        gns = extract_group_names(text)
-        if gns: cost['group_names'] = gns
-        cnt = extract_count(text)
-        if cnt: cost['count'] = cnt
-        ct = extract_card_type(text)
-        if ct: cost['card_type'] = ct
-        tgt = extract_target(text)
-        if tgt: cost['target'] = tgt
-        if '好きな順番で' in text:
-            cost['placement_order'] = 'any_order'
-        return cost
+    if 'シャッフルする' in text or 'シャッフルして' in text or 'シャッフルし' in text: cost['shuffle'] = True
+    names = re.findall(r'「([^」]+)」', text)
+    if names: cost['characters'] = names
+    if 'もよい' in text or 'てもよい' in text: cost['optional'] = True
+    gns = extract_group_names(text)
+    if gns: cost['group_names'] = gns
+    cnt = extract_count(text)
+    if cnt: cost['count'] = cnt
+    ct = extract_card_type(text)
+    if ct: cost['card_type'] = ct
+    tgt = extract_target(text)
+    if tgt: cost['target'] = tgt
+    if '好きな順番で' in text:
+        cost['placement_order'] = 'any_order'
+    return cost
     
     # Extract common fields
     _extract_basic_cost_fields(cost, text)
@@ -3614,11 +3631,11 @@ _EFFECT_HANDLERS = [
     _try_sou_shinakatta,
     _try_period_conditional,
     _try_compound_select,
+    _try_shi_sequential,
+    _try_te_sequential,
     _try_implicit_sequential,
     _try_conditional,
     _try_ability_activation,
-    _try_shi_sequential,
-    _try_te_sequential,
     _try_choice,
     _try_kore_niyori_cascade,
     _try_baton_touch_effect,

@@ -141,17 +141,17 @@ Cost types in Engine: 8
 ## SECTION 4: UTILITY FUNCTION ANALYSIS
 
 
-  ability\choice.rs uses util: {'place_card_in_zone', 'card_matches_type', 'card_matches_characters', 'card_matches_cost_limit_op', 'card_matches_group_str'}
+  ability\choice.rs uses util: {'card_matches_characters', 'card_matches_cost_limit_op', 'place_card_in_zone', 'card_matches_type', 'card_matches_group_str'}
 
-  ability\condition.rs uses util: {'zone_cards', 'count_matching_with_blade', 'card_matches_type', 'count_matching', 'compare_counts', 'filter_from_parts', 'card_matches_group_str'}
+  ability\condition.rs uses util: {'count_matching', 'count_matching_with_blade', 'filter_from_parts', 'compare_counts', 'card_matches_type', 'zone_cards', 'card_matches_group_str'}
 
-  ability\cost.rs uses util: {'zone_cards', 'card_matches_type', 'count_matching', 'card_matches_characters', 'filter_from_parts', 'card_matches_group_str'}
+  ability\cost.rs uses util: {'count_matching', 'card_matches_characters', 'filter_from_parts', 'card_matches_type', 'zone_cards', 'card_matches_group_str'}
 
-  ability\effects.rs uses util: {'place_card_in_zone', 'resolve_per_unit_count', 'apply_distinct_filter', 'zone_cards', 'card_matches_type', 'matching_indices', 'filter_from_parts', 'CardFilter', 'matching_ids', 'get_zone_card_count', 'push_temporary_effect', 'card_matches_group_str', 'extract_heart_colors_from_text', 'calculate_per_unit_multiplier'}
+  ability\effects.rs uses util: {'CardFilter', 'matching_ids', 'zone_cards', 'apply_distinct_filter', 'resolve_per_unit_count', 'get_zone_card_count', 'place_card_in_zone', 'filter_from_parts', 'extract_heart_colors_from_text', 'push_temporary_effect', 'card_matches_type', 'matching_indices', 'calculate_per_unit_multiplier', 'card_matches_group_str'}
 
-  ability\move_cards.rs uses util: {'place_card_in_zone', 'card_matches_type', 'matching_indices', 'filter_from_parts_full', 'filter_from_parts', 'card_matches_cost_limit', 'card_matches_group_str'}
+  ability\move_cards.rs uses util: {'card_matches_cost_limit', 'place_card_in_zone', 'filter_from_parts', 'filter_from_parts_full', 'card_matches_type', 'matching_indices', 'card_matches_group_str'}
 
-  ability\resolver.rs uses util: {'card_matches_type', 'matching_indices', 'filter_from_parts', 'card_matches_cost_limit', 'card_matches_group'}
+  ability\resolver.rs uses util: {'card_matches_cost_limit', 'card_matches_group', 'filter_from_parts', 'card_matches_type', 'matching_indices'}
 
 
 ## SECTION 5: GAPS SUMMARY

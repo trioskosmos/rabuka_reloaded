@@ -358,15 +358,26 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         if stage_card_ids[area_idx] != -1 {
                             let existing_member_id = stage_card_ids[area_idx];
                             if !active_player.areas_locked_this_turn.contains(area) && game_state.baton_touch_count < 1 {
-                                let member_cost = game_state.card_database.get_card(existing_member_id)
-                                    .and_then(|c| c.cost).unwrap_or(0);
-                                let cost_to_pay = effective_cost.saturating_sub(member_cost);
-                                if (active_energy_count as u32) >= cost_to_pay {
-                                    area_info.available = true;
-                                    area_info.cost = cost_to_pay;
-                                    area_info.is_baton_touch = true;
-                                    area_info.existing_member_name = game_state.card_database.get_card(existing_member_id).map(|c| c.name.clone());
-                                    has_any_available = true;
+                                // Check if existing member has cannot_baton_touch restriction
+                                let has_baton_touch_protection = game_state.card_database.get_card(existing_member_id).map_or(false, |existing_card| {
+                                    existing_card.abilities.iter().any(|a| {
+                                        a.effect.as_ref().map_or(false, |ef| {
+                                            ef.restriction_type.as_deref() == Some("cannot_baton_touch")
+                                        })
+                                    })
+                                });
+                                
+                                if !has_baton_touch_protection {
+                                    let member_cost = game_state.card_database.get_card(existing_member_id)
+                                        .and_then(|c| c.cost).unwrap_or(0);
+                                    let cost_to_pay = effective_cost.saturating_sub(member_cost);
+                                    if (active_energy_count as u32) >= cost_to_pay {
+                                        area_info.available = true;
+                                        area_info.cost = cost_to_pay;
+                                        area_info.is_baton_touch = true;
+                                        area_info.existing_member_name = game_state.card_database.get_card(existing_member_id).map(|c| c.name.clone());
+                                        has_any_available = true;
+                                    }
                                 }
                             }
                         } else if (active_energy_count as u32) >= effective_cost {

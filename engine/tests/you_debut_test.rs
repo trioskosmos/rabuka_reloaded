@@ -126,7 +126,7 @@ fn you_q124_two_plays_both_reject_blade_hearts() {
 fn fill_deck_to_40(game: &mut TestGame, top_cards: Vec<i16>) {
     game.state.player1.main_deck.cards.extend(top_cards);
     let filler = game.id("PL!-sd1-010-SD");
-    while game.state.player1.main_deck.cards.len() < 80 {
+    while game.state.player1.main_deck.cards.len() < 40 {
         game.state.player1.main_deck.cards.push(filler);
     }
 }
@@ -156,8 +156,10 @@ fn you_ability_ends_and_discard_only_grows_at_end() {
 
     // [Choice 1] Optional discard cost — skip (empty indices = skip)
     if game.has_pending_choice() { game.select_indices(&[]); }
+    // [Choice 2] No eligible cards found — skip
+    if game.has_pending_choice() { game.select_indices(&[]); }
 
-    // No more choices — ability should be done (0 matching cards → no look_and_select choice)
+    // No more choices — ability should be done
     assert!(!game.has_pending_choice(),
         "Ability should have ended; had pending: {:?}", game.state.ability_queue.is_waiting_for_choice());
 

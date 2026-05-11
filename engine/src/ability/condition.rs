@@ -6,7 +6,7 @@ use super::debug::AbDebug;
 
 impl<'a> super::resolver::AbilityResolver<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
-        let dbg = AbDebug::new();
+        let mut dbg = AbDebug::new();
         let ct = condition.condition_type.as_deref().unwrap_or("?");
         let result = match ct {
             "compound" => self.evaluate_compound_condition(condition),
@@ -49,7 +49,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
     fn evaluate_compound_condition(&self, condition: &Condition) -> bool {
         if let Some(ref conditions) = condition.conditions {
-            let dbg = AbDebug::new();
+            let mut dbg = AbDebug::new();
             dbg.p("COMPOUND", format_args!("{} sub-conditions, operator={}",
                 conditions.len(), condition.operator.as_deref().unwrap_or("and")));
             let op = condition.operator.as_deref().unwrap_or("and");
@@ -515,7 +515,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
         };
         let passed = compare_counts(condition.operator.as_deref(), actual_count, count);
-        let dbg = AbDebug::new();
+        let mut dbg = AbDebug::new();
         dbg.condition(condition, actual_count, count, passed);
         passed
     }

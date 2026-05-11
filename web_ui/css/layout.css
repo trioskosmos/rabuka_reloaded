@@ -117,6 +117,44 @@
     flex-shrink: 0;
 }
 
+.score-stats .score-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.score-stats .score-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    white-space: nowrap;
+    color: var(--text-dim);
+}
+
+.score-stats .score-row .stat-label {
+    font-weight: 600;
+    min-width: 20px;
+}
+
+.score-stats .score-row strong {
+    color: var(--text);
+    font-weight: 700;
+    margin-right: 8px;
+}
+
+.score-stats .score-row .summary-pips {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.score-stats .score-row .summary-pips div {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
 .stat {
     display: flex;
     align-items: center;

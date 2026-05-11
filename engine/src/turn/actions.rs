@@ -1,6 +1,7 @@
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::game_state::Phase;
+use crate::ability::types::ExecutionContext;
 
 impl super::TurnEngine {
     pub fn execute_main_phase_action(game_state: &mut GameState, action: &crate::game_setup::ActionType, card_id: Option<i16>, card_indices: Option<Vec<usize>>, stage_area: Option<crate::zones::MemberArea>, use_baton_touch: Option<bool>) -> Result<(), String> {
@@ -179,9 +180,9 @@ impl super::TurnEngine {
             let cost_was_paid = game_state.ability_queue.current_entry().map_or(false, |e| e.cost_paid);
             game_state.pending_choice = None;
             game_state.activating_card = None;
-            if cost_was_paid && !had_pending_sequential {
+            if cost_was_paid && !had_pending_sequential && saved_ctx == ExecutionContext::None {
                 // Cost was paid, no pending sequential actions existed before this choice
-                // resolution — effect hasn't started yet → start it.
+                // resolution, and the effect hadn't started yet → start it now.
                 game_state.process_current_ability();
                 let player_id = game_state.ability_queue.current_entry()
                     .map(|e| e.player_id.clone())

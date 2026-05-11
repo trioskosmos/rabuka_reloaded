@@ -66,14 +66,28 @@
 
             <!-- Group: Score & Progress -->
             <div class="stat-group score-stats">
-                <span class="stat" title="Score"><span class="stat-icon"></span> <span class="stat-label"
-                        data-i18n="score">スコア</span> <strong id="score">0 - 0</strong></span>
-                <span class="stat summary-pips" title="Hearts">
-                    <div id="total-hearts-summary"></div>
-                </span>
-                <span class="stat summary-pips" title="Blades">
-                    <div id="total-blades-summary"></div>
-                </span>
+                <div class="score-rows">
+                    <div class="score-row player1-row">
+                        <span class="stat-label" data-i18n="player1">P1</span>
+                        <strong id="player1-score">0 +0</strong>
+                        <span class="stat summary-pips" title="P1 Hearts">
+                            <div id="player1-hearts-summary"></div>
+                        </span>
+                        <span class="stat summary-pips" title="P1 Blades">
+                            <div id="player1-blades-summary"></div>
+                        </span>
+                    </div>
+                    <div class="score-row player2-row">
+                        <span class="stat-label" data-i18n="player2">P2</span>
+                        <strong id="player2-score">0 +0</strong>
+                        <span class="stat summary-pips" title="P2 Hearts">
+                            <div id="player2-hearts-summary"></div>
+                        </span>
+                        <span class="stat summary-pips" title="P2 Blades">
+                            <div id="player2-blades-summary"></div>
+                        </span>
+                    </div>
+                </div>
             </div>
 
             <!-- Group: Energy -->

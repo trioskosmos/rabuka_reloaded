@@ -78,6 +78,10 @@ def extract_trigger(text: str) -> tuple[list, str, str]:
         # Check if there's any non-trigger text before this match
         before = text[pos:match_start]
         if before.strip() and before.strip() != '：':
+            # If the only non-trigger text is a slash prefix (from /{{trigger}}), skip it
+            if before.strip() == '/':
+                pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+                continue
             # Found non-trigger text, stop here
             break
         
@@ -87,7 +91,7 @@ def extract_trigger(text: str) -> tuple[list, str, str]:
             continue
         
         # Check if this is a use limit (turn restriction)
-        if any(use_limit_pattern in icon_file for use_limit_pattern in use_limit_patterns):
+        if any(use_limit_pattern in icon_text for use_limit_pattern in use_limit_patterns):
             use_limit_text = icon_text
             # Convert Japanese turn limit text to integer
             if use_limit_text == "ターン1回":
@@ -114,6 +118,10 @@ def extract_trigger(text: str) -> tuple[list, str, str]:
             pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
             continue
         
+        # Skip if this trigger was already extracted (e.g. via slash prefix)
+        if icon_text in triggers:
+            pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+            continue
         triggers.append(icon_text)
         # Remove this trigger icon from effect
         trigger_pattern = f"{{{{{icon_file}|{icon_text}}}}}"

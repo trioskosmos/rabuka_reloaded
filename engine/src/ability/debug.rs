@@ -2,10 +2,14 @@
 /// Every line shows WHAT is being checked, WHAT the expected value is,
 /// and WHAT the actual game state value is — all in one self-contained line.
 use crate::card::{Ability, AbilityCost, AbilityEffect, Condition};
+use std::sync::Mutex;
 
 // Toggle: change to `false` to silence all ability debug output.
 // Could also be a runtime flag or #[cfg(debug_assertions)] later.
 const ABILITY_DEBUG: bool = true;
+
+// Global buffer to collect debug logs between game state updates
+static ABILITY_LOG_BUFFER: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 pub struct AbDebug {
     indent: usize,
@@ -16,10 +20,24 @@ impl AbDebug {
         AbDebug { indent: 0 }
     }
 
-    pub fn p(&self, tag: &str, msg: impl std::fmt::Display) {
+    pub fn flush_to_rule_log(rule_log: &mut Vec<String>) {
+        if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
+            rule_log.extend(buffer.drain(..));
+        }
+    }
+
+    pub fn p(&mut self, tag: &str, msg: impl std::fmt::Display) {
         if !ABILITY_DEBUG { return; }
         let pad = "  ".repeat(self.indent);
-        eprintln!("[AB]{pad}{tag} {msg}");
+        let log_entry = format!("[AB]{pad}{tag} {msg}");
+        
+        // Print to terminal for backward compatibility
+        eprintln!("{}", log_entry);
+        
+        // Add to global buffer for later collection
+        if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
+            buffer.push(log_entry);
+        }
     }
 
     pub fn ability(&mut self, card_name: &str, card_id: &str, ability: &Ability) {
@@ -36,7 +54,7 @@ impl AbDebug {
         }
     }
 
-    pub fn condition(&self, cond: &Condition, actual: u32, threshold: u32, passed: bool) {
+    pub fn condition(&mut self, cond: &Condition, actual: u32, threshold: u32, passed: bool) {
         let ct = cond.condition_type.as_deref().unwrap_or("?");
         let loc = cond.location.as_deref().unwrap_or("");
         let tgt = cond.target.as_deref().unwrap_or("");

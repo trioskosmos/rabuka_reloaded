@@ -30,9 +30,7 @@ impl GameState {
                             filtered_looked_at_indices: None,
                         };
 
-                        if !self.ability_queue.has_entry_with_id(&entry.id) {
-                            self.ability_queue.enqueue(entry);
-                        }
+                        self.ability_queue.enqueue(entry);
                         break;
                     }
                 }
@@ -350,6 +348,11 @@ impl GameState {
         player: &Player,
     ) -> Vec<&'a crate::card::Ability> {
         card.abilities.iter().filter(|ability| {
+            // Skip abilities with null triggers - they should not auto-trigger during any phase
+            if ability.triggers.is_none() {
+                return false;
+            }
+            
             match trigger {
                 AbilityTrigger::Activation => {
                     let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::ACTIVATION));

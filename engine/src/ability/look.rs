@@ -21,10 +21,16 @@ impl<'a> AbilityResolver<'a> {
             let heart_colors_filter = &select_action.heart_colors;
             let has_filter = card_type_filter.is_some() || !heart_colors_filter.is_empty();
             if has_filter {
-                self.looked_at_cards = self.looked_at_cards.iter().filter(|&&card_id| {
-                    super::util::card_matches_type(card_db, card_id, card_type_filter)
-                        && super::util::card_matches_heart_colors(card_db, card_id, heart_colors_filter)
-                }).copied().collect();
+                let (matching, non_matching): (Vec<_>, Vec<_>) = self.looked_at_cards.iter()
+                    .partition(|&&card_id| {
+                        super::util::card_matches_type(card_db, card_id, card_type_filter)
+                            && super::util::card_matches_heart_colors(card_db, card_id, heart_colors_filter)
+                    });
+                self.looked_at_cards = matching;
+                let player = self.game_state.resolve_target_player_mut("self");
+                for &card_id in &non_matching {
+                    player.waitroom.add_card(card_id);
+                }
             }
 
             let available_count = self.looked_at_cards.len();

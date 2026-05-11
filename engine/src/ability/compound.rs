@@ -29,14 +29,22 @@ impl<'a> AbilityResolver<'a> {
                 for (i, action) in repeat_actions.iter().enumerate() {
                     eprintln!("[ABILITY]  >> sub-action[{}]: action={} has_condition={} card_id={:?}", i, action.action, action.condition.is_some(), self.activating_card_id);
                     let mut action_to_execute = action.clone();
-                    if action_to_execute.per_unit.is_none() && effect.per_unit.is_some() {
-                        action_to_execute.per_unit = effect.per_unit;
-                    }
-                    if action_to_execute.per_unit_count.is_none() && effect.per_unit_count.is_some() {
-                        action_to_execute.per_unit_count = effect.per_unit_count;
-                    }
-                    if action_to_execute.per_unit_type.is_none() && effect.per_unit_type.is_some() {
-                        action_to_execute.per_unit_type = effect.per_unit_type.clone();
+                    // Only inherit per_unit properties for actions that support them
+                    // Discard/move_cards actions should not inherit per_unit multipliers
+                    let supports_per_unit = matches!(action.action.as_str(), 
+                        "draw" | "draw_card" | "gain_resource" | "modify_score" | 
+                        "modify_required_hearts" | "gain_ability" | "set_blade_count"
+                    );
+                    if supports_per_unit {
+                        if action_to_execute.per_unit.is_none() && effect.per_unit.is_some() {
+                            action_to_execute.per_unit = effect.per_unit;
+                        }
+                        if action_to_execute.per_unit_count.is_none() && effect.per_unit_count.is_some() {
+                            action_to_execute.per_unit_count = effect.per_unit_count;
+                        }
+                        if action_to_execute.per_unit_type.is_none() && effect.per_unit_type.is_some() {
+                            action_to_execute.per_unit_type = effect.per_unit_type.clone();
+                        }
                     }
 
                     match self.execute_effect(&action_to_execute) {
