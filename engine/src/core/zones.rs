@@ -264,10 +264,15 @@ impl Stage {
         Ok(())
     }
 
-    pub fn total_blades(&self, card_db: &CardDatabase, blade_modifiers: &HashMap<i16, i32>) -> u32 {
+    pub fn total_blades(&self, card_db: &CardDatabase, blade_modifiers: &HashMap<i16, i32>, orientation_modifiers: &HashMap<i16, String>) -> u32 {
         let mut total = 0;
         for &card_id in &self.stage {
             if card_id != -1 {
+                // Rule 5.1 / QA line 1784-1785: Wait-state members' blades
+                // do NOT count toward yell/cheer card count.
+                if orientation_modifiers.get(&card_id).map(|o| o == "wait").unwrap_or(false) {
+                    continue;
+                }
                 if let Some(card) = card_db.get_card(card_id) {
                     let mod_val = blade_modifiers.get(&card_id).copied().unwrap_or(0);
                     total += (card.blade as i32 + mod_val).max(0) as u32;

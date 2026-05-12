@@ -14,6 +14,8 @@ pub enum Choice {
         characters: Option<Vec<String>>,
         #[serde(default)]
         filtered_indices: Option<Vec<usize>>,
+        #[serde(default)]
+        is_select_action: bool,
     },
     SelectTarget {
         target: String,

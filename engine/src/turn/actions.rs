@@ -111,7 +111,12 @@ impl super::TurnEngine {
     fn build_choice_result(choice: &crate::ability_resolver::Choice, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<crate::ability_resolver::ChoiceResult, String> {
         match choice {
             crate::ability_resolver::Choice::SelectCard { .. } => {
-                Ok(crate::ability_resolver::ChoiceResult::CardSelected { indices: card_indices.unwrap_or_default() })
+                let indices = card_indices.unwrap_or_else(|| {
+                    // Allow select_option(0) to produce indices [0] for SelectCard choices
+                    // (instead of requiring card_indices to be explicitly passed)
+                    card_id.map(|id| vec![id as usize]).unwrap_or_default()
+                });
+                Ok(crate::ability_resolver::ChoiceResult::CardSelected { indices })
             }
             crate::ability_resolver::Choice::SelectTarget { target, .. } => {
                 let selected = match target.as_str() {

@@ -214,8 +214,9 @@ impl super::TurnEngine {
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         blade_type_modifiers: &HashMap<i16, BladeColor>,
+        orientation_modifiers: &HashMap<i16, String>,
     ) -> LivePerformanceData {
-        let total_blade = player.stage.total_blades(card_db, blade_modifiers);
+        let total_blade = player.stage.total_blades(card_db, blade_modifiers, orientation_modifiers);
 
         // Capture member contributions (base values + modifiers)
         let mut member_contributions = Vec::new();

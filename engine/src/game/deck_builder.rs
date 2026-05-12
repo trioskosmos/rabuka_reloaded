@@ -35,15 +35,18 @@ impl DeckBuilder {
         let mut member_count = 0;
         let mut live_count = 0;
         let mut energy_count = 0;
+        let mut missing_cards: Vec<String> = Vec::new();
 
         let mut card_number_counts: HashMap<String, u32> = HashMap::new();
 
         for card_no in card_numbers {
-            // Card number limit check removed for testing purposes
             let count = card_number_counts.entry(card_no.clone()).or_insert(0);
             *count += 1;
 
-            if let Some(card_id) = card_db.get_card_id(&card_no) {
+            // Try to find card with flexible matching (case-insensitive, fullwidth normalization)
+            let card_id = card_db.get_card_id(&card_no);
+            
+            if let Some(card_id) = card_id {
                 if let Some(card) = card_db.get_card(card_id) {
                     match card.card_type {
                         crate::card::CardType::Member => {
@@ -60,16 +63,23 @@ impl DeckBuilder {
                         }
                     }
                 }
+            } else {
+                missing_cards.push(card_no.clone());
+            }
+        }
+
+        // Log missing cards for debugging
+        if !missing_cards.is_empty() {
+            eprintln!("Warning: {} cards not found in database:", missing_cards.len());
+            for card_no in &missing_cards {
+                eprintln!("  - {}", card_no);
             }
         }
 
         // Validate deck composition with priority on 12 live + 48 member
-        // Rule 6.1.1: Main deck must have exactly 60 cards (48 member + 12 live)
-        // Be lenient if cards are missing from database
         let total_main = member_count + live_count;
         if total_main < 60 {
             eprintln!("Warning: Main deck has {} cards (expected 60): {} member + {} live", total_main, member_count, live_count);
-            // Allow decks with fewer cards due to missing cards in database
         }
 
         if live_count < 12 {
@@ -80,7 +90,6 @@ impl DeckBuilder {
             eprintln!("Warning: Main deck has {} member cards (expected 48)", member_count);
         }
 
-        // Rule 6.1.1.3: Energy deck must have exactly 12 energy cards
         if energy_count != 12 {
             eprintln!("Warning: Energy deck has {} energy cards (expected 12)", energy_count);
         }
@@ -100,25 +109,30 @@ impl DeckBuilder {
     }
     
     pub fn add_default_energy_cards_from_database(deck: &mut Deck, card_db: &Arc<CardDatabase>) -> Result<(), String> {
-        if deck.energy_deck.is_empty() {
-            // Add default energy cards
+        let current_count = deck.energy_deck.len();
+        let needed = if current_count < 12 { 12 - current_count } else { 0 };
+        
+        if needed > 0 {
             let mut energy_card_ids: Vec<i16> = Vec::new();
             for (card_id, card) in card_db.cards.iter() {
                 if card.is_energy() {
                     energy_card_ids.push(*card_id);
-                    if energy_card_ids.len() >= 12 {
+                    if energy_card_ids.len() >= needed {
                         break;
                     }
                 }
             }
 
-            if energy_card_ids.len() < 12 {
-                return Err(format!("Not enough energy cards available: found {}", energy_card_ids.len()));
+            if energy_card_ids.len() < needed {
+                // If not enough unique energy cards, reuse the ones we found
+                eprintln!("Warning: Only found {} energy cards, need {}", energy_card_ids.len(), needed);
             }
 
             for card_id in energy_card_ids {
                 deck.energy_deck.push_back(card_id);
             }
+        } else {
+            eprintln!("Energy deck already has {} cards (12 required)", deck.energy_deck.len());
         }
         Ok(())
     }

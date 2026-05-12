@@ -232,6 +232,8 @@ pub struct AppState {
 
     pub custom_decks: Arc<Mutex<HashMap<i32, Vec<String>>>>,
 
+    pub custom_energy_decks: Arc<Mutex<HashMap<i32, Vec<String>>>>,
+
 }
 
 
@@ -937,6 +939,15 @@ async fn set_deck(data: web::Data<AppState>, req: web::Json<serde_json::Value>) 
     if !card_numbers.is_empty() {
         data.custom_decks.lock().unwrap().insert(player, card_numbers);
     }
+    // Also store energy deck separately if provided
+    if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
+        let energy_cards: Vec<String> = energy_arr.iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect();
+        if !energy_cards.is_empty() {
+            data.custom_energy_decks.lock().unwrap().insert(player, energy_cards);
+        }
+    }
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "status": "ok" }))
 }
 
@@ -1470,15 +1481,19 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
 
 
     // Check for custom decks set via set_deck endpoint
-    let (card_numbers1, card_numbers2) = {
+    let (card_numbers1, card_numbers2, energy_nos1, energy_nos2) = {
         let mut custom = data.custom_decks.lock().unwrap();
+        let mut custom_energy = data.custom_energy_decks.lock().unwrap();
         if custom.contains_key(&0) || custom.contains_key(&1) {
             let p0 = custom.remove(&0).unwrap_or_default();
             let p1 = custom.remove(&1).unwrap_or_else(|| p0.clone());
-            (p0, p1)
+            let e0 = custom_energy.remove(&0).unwrap_or_default();
+            let e1 = custom_energy.remove(&1).unwrap_or_else(|| e0.clone());
+            (p0, p1, e0, e1)
         } else {
             let deck = if let Some(idx) = deck_index { &deck_lists[idx] } else { &deck_lists[0] };
-            (deck_parser::DeckParser::deck_list_to_card_numbers(deck), deck_parser::DeckParser::deck_list_to_card_numbers(deck))
+            let nos = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
+            (nos.clone(), nos, Vec::new(), Vec::new())
         }
     };
 
@@ -1528,10 +1543,19 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
 
     };
 
-
+    // Merge separately-provided energy cards into decks
+    {
+        let deck_refs = [(&mut player1_deck, &energy_nos1), (&mut player2_deck, &energy_nos2)];
+        for (deck, energy_ids) in deck_refs {
+            for eid in energy_ids {
+                if let Some(card_id) = card_database.get_card_id(eid) {
+                    deck.energy_deck.push_back(card_id);
+                }
+            }
+        }
+    }
 
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
-
     let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
 
 
@@ -1650,6 +1674,7 @@ pub async fn run_web_server() -> std::io::Result<()> {
         history: Arc::new(Mutex::new(Vec::new())),
         future: Arc::new(Mutex::new(Vec::new())),
         custom_decks: Arc::new(Mutex::new(HashMap::new())),
+        custom_energy_decks: Arc::new(Mutex::new(HashMap::new())),
     });
 
     println!("Game UI: http://127.0.0.1:8080");

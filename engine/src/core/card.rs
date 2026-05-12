@@ -253,7 +253,28 @@ impl CardDatabase {
     }
 
     pub fn get_card_id(&self, card_no: &str) -> Option<i16> {
-        self.card_no_to_id.get(card_no).copied()
+        // Try exact match first
+        if let Some(&id) = self.card_no_to_id.get(card_no) {
+            return Some(id);
+        }
+        // Normalize: uppercase + convert fullwidth characters to halfwidth
+        let normalized = Self::normalize_card_no(card_no);
+        for (key, &id) in &self.card_no_to_id {
+            if Self::normalize_card_no(key) == normalized {
+                return Some(id);
+            }
+        }
+        None
+    }
+    
+    /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth
+    fn normalize_card_no(card_no: &str) -> String {
+        card_no
+            .to_uppercase()
+            .replace('＋', "+")
+            .replace('－', "-")
+            .replace('＊', "*")
+            .replace('＃', "#")
     }
 
     /// Check if a card's name contains the given name fragment

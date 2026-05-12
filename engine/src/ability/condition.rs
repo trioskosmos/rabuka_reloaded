@@ -200,6 +200,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let total = player.stage.total_blades(
             &self.game_state.card_database,
             &self.game_state.mods.blade_modifiers,
+            &self.game_state.mods.orientation_modifiers,
         );
         let threshold = condition.count.unwrap_or(0);
         Some(compare_counts(condition.operator.as_deref(), total, threshold))
@@ -507,7 +508,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     },
                     "member_card" => {
                         if condition.aggregate.as_deref() == Some("total") {
-                            let total = player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers) as usize;
+                            let total = player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers, &self.game_state.mods.orientation_modifiers) as usize;
                             total
                         } else {
                             let mut member_count = stage_member_count(player);
@@ -857,7 +858,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
     fn zone_len(&self, player: &crate::player::Player, location: &str) -> u32 {
         match location {
-            "stage" => player.stage.total_blades(&self.game_state.card_database, &self.game_state.mods.blade_modifiers),
+            "stage" => player.stage.total_blades(&self.game_state.card_database, &self.game_state.mods.blade_modifiers, &self.game_state.mods.orientation_modifiers),
             "hand" => player.hand.len() as u32,
             "deck" => player.main_deck.len() as u32,
             "discard" => player.waitroom.len() as u32,

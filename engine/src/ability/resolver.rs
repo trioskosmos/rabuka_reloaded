@@ -84,6 +84,7 @@ impl<'a> AbilityResolver<'a> {
                 group: None,
                 characters: None,
                 filtered_indices: None,
+                is_select_action: false,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);

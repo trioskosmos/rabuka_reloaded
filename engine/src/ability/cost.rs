@@ -112,8 +112,9 @@ impl<'a> AbilityResolver<'a> {
                             cost_limit: cost.cost_limit, cost_limit_operator: cost.cost_limit_operator.clone(),
                             group: cost.group_names.clone().map(|v| v.join(",")),
                             characters: cost.characters.clone(),
-                            filtered_indices: None,
-                        });
+                    filtered_indices: None,
+                    is_select_action: false,
+                });
                         return Ok(());
                     }
                 }
@@ -149,8 +150,9 @@ impl<'a> AbilityResolver<'a> {
                                         description: format!("Select {} card(s) from same-unit group ({} available in unit {})", count, cards.len(), card_db.get_card(cards[0]).and_then(|c| c.unit.clone()).unwrap_or_default()),
                                         allow_skip: false,
                                         cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-                                        filtered_indices: None,
-                                    });
+                    filtered_indices: None,
+                    is_select_action: false,
+                });
                                     return Ok(());
                                 }
                                 // Exactly match count — auto-select
@@ -268,8 +270,9 @@ impl<'a> AbilityResolver<'a> {
                             description: format!("Select {} stage member(s) to wait", count),
                             allow_skip: false,
                             cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-                            filtered_indices: None,
-                        });
+                    filtered_indices: None,
+                    is_select_action: false,
+                });
                         return Ok(());
                     }
                 }
@@ -362,6 +365,7 @@ impl<'a> AbilityResolver<'a> {
                         allow_skip: true,
                         cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                         filtered_indices: None,
+                        is_select_action: false,
                     });
                     Ok(())
                 }

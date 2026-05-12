@@ -182,8 +182,9 @@ impl<'a> AbilityResolver<'a> {
                                     zone: "stage".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                                     count, description: format!("Select {} card(s) from stage", count), allow_skip: false,
                                     cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
-                                    filtered_indices: None,
-                                });
+                    filtered_indices: None,
+                    is_select_action: false,
+                });
                                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                                 return Ok(());
                             }
@@ -212,8 +213,9 @@ impl<'a> AbilityResolver<'a> {
                                 cost_limit_operator: _effect.cost_limit_operator.clone(),
                                 group: group_name.map(|s| s.to_string()),
                                 characters: character_filter.clone(),
-                                filtered_indices: None,
-                            });
+                    filtered_indices: None,
+                    is_select_action: false,
+                });
                             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
                         }
@@ -255,8 +257,9 @@ impl<'a> AbilityResolver<'a> {
                                 zone: "live_card_zone".to_string(), card_type: Some("live_card".to_string()),
                                 count, description: format!("Select {} card(s) from live card zone", count), allow_skip: false,
                                 cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-                                filtered_indices: None,
-                            });
+                    filtered_indices: None,
+                    is_select_action: false,
+                });
                             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
                         }
@@ -306,6 +309,7 @@ impl<'a> AbilityResolver<'a> {
                             count, description: format!("Select {} card(s) from looked-at cards", count), allow_skip: false,
                             cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
                             filtered_indices: None,
+                            is_select_action: false,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
@@ -338,6 +342,40 @@ impl<'a> AbilityResolver<'a> {
                     for &card in &cards { player.waitroom.add_card(card); }
                     cards
                 }
+                "selected_cards" => {
+                    // Cards previously selected by a "select" action, stored in entry.selected_card_ids.
+                    // Find and remove them from whatever zone they're in, then move to destination.
+                    let selected = self.selected_cards.clone();
+                    if selected.len() < count {
+                        vec![]
+                    } else if selected.len() > count {
+                        self.pending_choice = Some(Choice::SelectCard {
+                            zone: "selected_cards".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
+                            count, description: format!("Select {} card(s) from selected cards", count), allow_skip: false,
+                            cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(),
+                            group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
+                            filtered_indices: None,
+                            is_select_action: false,
+                        });
+                        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                        return Ok(());
+                    } else {
+                        // Move from their actual locations to destination
+                        let taken: Vec<i16> = selected.iter().copied().collect();
+                        for &card_id in &taken {
+                            // Remove from whatever zone it's in
+                            if let Some(idx) = player.hand.cards.iter().position(|&c| c == card_id) {
+                                player.hand.cards.remove(idx);
+                            } else if let Some(idx) = player.waitroom.cards.iter().position(|&c| c == card_id) {
+                                player.waitroom.cards.remove(idx);
+                            } else if let Some(idx) = player.stage.stage.iter().position(|&c| c == card_id) {
+                                player.stage.stage[idx] = -1;
+                            }
+                            moved_cards.push(card_id);
+                        }
+                        taken
+                    }
+                }
                 "revealed_cards" => {
                     let is_self = tgt.as_ref().map(|s| s.as_str()).unwrap_or("self") == "self";
                     let cards: Vec<i16> = if is_self && !self.game_state.player1_cheer_revealed_cards.is_empty() {
@@ -358,6 +396,7 @@ impl<'a> AbilityResolver<'a> {
                             count, description: format!("Select {} card(s) from revealed cards", count), allow_skip: false,
                             cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
                             filtered_indices: None,
+                            is_select_action: false,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
@@ -461,6 +500,7 @@ impl<'a> AbilityResolver<'a> {
             count, description: format!("Select {} card(s) from {}", count, zone), allow_skip: false,
             cost_limit, cost_limit_operator, group, characters,
             filtered_indices: None,
+            is_select_action: false,
         });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }

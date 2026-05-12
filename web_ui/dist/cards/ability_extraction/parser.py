@@ -2208,15 +2208,19 @@ def parse_cost(text: str) -> Dict[str, Any]:
         if energy_text and other_text:
             other_cost = parse_cost(other_text)
             if other_cost.get('type') not in (None, 'custom'):
-                return {'text': text, 'type': 'sequential_cost',
-                        'costs': [parse_cost(energy_text), other_cost]}
-        else:
-            # Simple energy cost without additional actions
-            energy_count = text.count('{{icon_energy.png|E}}')
-            cost['type'] = 'pay_energy'
-            cost['energy'] = energy_count
-            cost['zone'] = 'energy_zone'  # Energy costs target energy zone
-            cost['count'] = energy_count  # Energy count as count
+                result = {'text': text, 'type': 'sequential_cost',
+                          'costs': [parse_cost(energy_text), other_cost]}
+                if 'もよい' in text or 'てもよい' in text:
+                    result['optional'] = True
+                return result
+        # Always set energy fields for energy costs (whether simple or with other text)
+        energy_count = text.count('{{icon_energy.png|E}}')
+        cost['type'] = 'pay_energy'
+        cost['energy'] = energy_count
+        cost['zone'] = 'energy_zone'
+        cost['count'] = energy_count
+        if 'もよい' in text or 'てもよい' in text:
+            cost['optional'] = True
         return cost
     
     # Sequential cost (～し、～ or ～て、～)
@@ -2273,70 +2277,25 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if tgt: cost['target'] = tgt
     if '好きな順番で' in text:
         cost['placement_order'] = 'any_order'
-    return cost
-    
-    # Extract common fields
-    _extract_basic_cost_fields(cost, text)
-    
-    # Determine type
-    if '{{icon_energy.png|E}}' in text:
-        cost['type'] = 'pay_energy'
-        cost['energy'] = text.count('{{icon_energy.png|E}}')
-    elif 'エネルギー' in text and 'エネルギーデッキに置く' in text:
-        cost['type'] = 'energy_condition'
-    elif '公開してもよい' in text:
-        cost['type'] = 'reveal_condition'
-    elif '下に置く' in text and 'エネルギー' in text:
-        cost['type'] = 'place_energy_under_member'
-    elif cost.get('source') and cost.get('destination'):
-        cost['type'] = 'move_cards'
-    elif 'ウェイトにする' in text or 'ウェイト状態で置く' in text or 'ウェイト状態で登場させる' in text or 'アクティブにする' in text:
-        cost['type'] = 'change_state'
-    elif cost.get('state_change'):
-        cost['type'] = 'change_state'
-    elif cost.get('source'):
-        if cost['source'] == 'hand' and ('控え室に置く' in text or '控え室に置いて' in text):
-            cost['destination'] = 'discard'
+    # If cost not yet typed, classify it now
+    if 'type' not in cost:
+        if cost.get('source') and cost.get('destination'):
             cost['type'] = 'move_cards'
-        elif cost['source'] == 'discard' and '手札に加える' in text:
-            cost['destination'] = 'hand'
-            cost['type'] = 'move_cards'
+        elif 'ウェイトにする' in text or 'ウェイト状態で置く' in text or 'ウェイト状態で登場させる' in text or 'アクティブにする' in text:
+            cost['type'] = 'change_state'
+        elif cost.get('state_change'):
+            cost['type'] = 'change_state'
+        elif cost.get('source'):
+            if cost['source'] == 'hand' and ('控え室に置く' in text or '控え室に置いて' in text):
+                cost['destination'] = 'discard'
+                cost['type'] = 'move_cards'
+            elif cost['source'] == 'discard' and '手札に加える' in text:
+                cost['destination'] = 'hand'
+                cost['type'] = 'move_cards'
+            else:
+                cost['type'] = 'custom'
         else:
             cost['type'] = 'custom'
-    # Hand discard cost pattern (手札をX枚控え室に置く/置いてもよい)
-    if re.match(r'手札を\d+枚控え室に置(いて|く)もよい', text):
-        cost['type'] = 'move_cards'
-        cost['source'] = 'hand'
-        cost['zone'] = 'hand'
-        cost['destination'] = 'discard'
-        cost['count'] = extract_count(text)
-        cost['optional'] = True
-        return cost
-    
-    # Hand discard cost pattern with conditions (手札の[条件]カードをX枚控え室に置く/置いて)
-    if re.match(r'手札の.*カードを\d+枚控え室に置(いて|く)', text):
-        cost['type'] = 'move_cards'
-        cost['source'] = 'hand'
-        cost['zone'] = 'hand'
-        cost['destination'] = 'discard'
-        cost['count'] = extract_count(text)
-        # Extract group names from 『』
-        group_matches = re.findall(r'『([^』]+)』', text)
-        if group_matches:
-            cost['group_names'] = group_matches
-        # Extract card type
-        if 'メンバーカード' in text:
-            cost['card_type'] = 'member_card'
-        elif 'ライブカード' in text:
-            cost['card_type'] = 'live_card'
-        # Check if optional
-        if 'もよい' in text:
-            cost['optional'] = True
-        return cost
-    
-    else:
-        cost['type'] = 'custom'
-    
     return cost
 
 # ============== EFFECT HANDLER CASCADE ==============
@@ -2734,20 +2693,25 @@ def _try_each_time(text):
 
 
 def _try_opponent_action(text):
-    """相手は、 — opponent action patterns."""
+    """相手は — opponent action patterns (with or without comma).
+
+    When there is follow-up text (e.g. "これにより...手札に加える"), returns a
+    sequential so the opponent's choice and the follow-up are naturally chained
+    by the engine's sequence handler — no need for complex merged-dict hacks.
+    """
     if not text.startswith('相手は'):
         return None
-    om = re.match(r'相手は、(.+?)。', text)
+    om = re.match(r'相手は[、]?(.+?)。', text)
     if not om:
         return None
     oa_text = om.group(0)
     rest = text[len(oa_text):].strip()
     oa = parse_action(om.group(1).strip())
-    result = {'text': text, 'action_by': 'opponent', 'opponent_action': oa}
+    opp_action = {'text': oa_text, 'action_by': 'opponent', 'opponent_action': oa}
     if rest:
         re_eff = parse_effect(rest)
-        result.update(re_eff)
-    return result
+        return {'text': text, 'action': 'sequential', 'actions': [opp_action, re_eff]}
+    return opp_action
 
 
 def _try_choose_self_opponent(text):
@@ -3104,14 +3068,24 @@ def _try_conditional_sequential(text):
     # Process second part — use parse_effect to handle sequential sub-actions
     clean = sp.replace(CONDITIONAL_SEQUENTIAL_MARKER, '').strip().lstrip('、')
     sa = parse_effect(clean)
-
     # selected_cards reference from select action
     if fa.get('action') == 'select':
         if isinstance(sa, dict) and 'actions' in sa:
             for sub in sa.get('actions', []):
-                if sub.get('action') == 'move_cards': sub['source'] = 'selected_cards'
+                if sub.get('action') == 'move_cards':
+                    sub['source'] = 'selected_cards'
+                if sub.get('action_by') == 'opponent':
+                    oa = sub.setdefault('opponent_action', {})
+                    if 'source' not in oa:
+                        oa['source'] = 'selected_cards'
         elif isinstance(sa, dict):
-            sa['source'] = 'selected_cards'
+            # For merged opponent_action format, set source on the opponent_action
+            if sa.get('action_by') == 'opponent':
+                oa = sa.setdefault('opponent_action', {})
+                if 'source' not in oa:
+                    oa['source'] = 'selected_cards'
+            else:
+                sa['source'] = 'selected_cards'
 
     result = {'text': text, 'action': 'sequential', 'actions': [fa, sa],
               'conditional': True}

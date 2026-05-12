@@ -2693,20 +2693,25 @@ def _try_each_time(text):
 
 
 def _try_opponent_action(text):
-    """相手は、 — opponent action patterns."""
+    """相手は — opponent action patterns (with or without comma).
+
+    When there is follow-up text (e.g. "これにより...手札に加える"), returns a
+    sequential so the opponent's choice and the follow-up are naturally chained
+    by the engine's sequence handler — no need for complex merged-dict hacks.
+    """
     if not text.startswith('相手は'):
         return None
-    om = re.match(r'相手は、(.+?)。', text)
+    om = re.match(r'相手は[、]?(.+?)。', text)
     if not om:
         return None
     oa_text = om.group(0)
     rest = text[len(oa_text):].strip()
     oa = parse_action(om.group(1).strip())
-    result = {'text': text, 'action_by': 'opponent', 'opponent_action': oa}
+    opp_action = {'text': oa_text, 'action_by': 'opponent', 'opponent_action': oa}
     if rest:
         re_eff = parse_effect(rest)
-        result.update(re_eff)
-    return result
+        return {'text': text, 'action': 'sequential', 'actions': [opp_action, re_eff]}
+    return opp_action
 
 
 def _try_choose_self_opponent(text):
@@ -3063,14 +3068,24 @@ def _try_conditional_sequential(text):
     # Process second part — use parse_effect to handle sequential sub-actions
     clean = sp.replace(CONDITIONAL_SEQUENTIAL_MARKER, '').strip().lstrip('、')
     sa = parse_effect(clean)
-
     # selected_cards reference from select action
     if fa.get('action') == 'select':
         if isinstance(sa, dict) and 'actions' in sa:
             for sub in sa.get('actions', []):
-                if sub.get('action') == 'move_cards': sub['source'] = 'selected_cards'
+                if sub.get('action') == 'move_cards':
+                    sub['source'] = 'selected_cards'
+                if sub.get('action_by') == 'opponent':
+                    oa = sub.setdefault('opponent_action', {})
+                    if 'source' not in oa:
+                        oa['source'] = 'selected_cards'
         elif isinstance(sa, dict):
-            sa['source'] = 'selected_cards'
+            # For merged opponent_action format, set source on the opponent_action
+            if sa.get('action_by') == 'opponent':
+                oa = sa.setdefault('opponent_action', {})
+                if 'source' not in oa:
+                    oa['source'] = 'selected_cards'
+            else:
+                sa['source'] = 'selected_cards'
 
     result = {'text': text, 'action': 'sequential', 'actions': [fa, sa],
               'conditional': True}

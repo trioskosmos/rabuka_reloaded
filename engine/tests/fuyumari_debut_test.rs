@@ -5,30 +5,32 @@
 ///   選択した場合、相手はそのカードのうち1枚を選ぶ。
 ///   相手に選ばれたカードを自分の手札に加える。
 ///
+/// Flow:
+///   1. Player selects 2 live cards with DIFFERENT names from discard
+///   2. Opponent selects 1 of those 2
+///   3. The opponent's chosen card goes to player's hand
+///
 /// Q118: 1枚しか選べない場合、相手が選んで手札に加えられるか？
 /// Answer: いいえ。2枚選べないと効果は不発。
 
 mod helpers;
 use helpers::*;
 
-/// 2 different-named live cards in discard. Debut fires → player selects 2 →
-/// opponent picks 1 → that card goes to hand.
+/// Two different-named live cards in discard. Full sequence:
+/// player picks both → opponent picks first (index 0) → that card is in hand.
 #[test]
-fn fuyumari_q118_two_distinct_live_cards_opponent_chooses() {
+fn fuyumari_q118_opponent_picks_first_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let fuyumari = game.id("PL!SP-bp2-011-R");
     let filler = game.id("PL!-sd1-010-SD");
-    // Two different-named live cards
-    let live_a = game.id("PL!-sd1-019-SD");  // START:DASH!!
-    let live_b = game.id("PL!-sd1-020-SD");  // other live card
+    let live_a = game.id("PL!-sd1-019-SD");
+    let live_b = game.id("PL!-sd1-020-SD");
 
-    // Fuyumari in hand
     game.state.player1.hand.cards.push(fuyumari);
     game.state.player1.hand.cards.push(filler);
-
-    // Two different-named live cards in discard
+    // Order in discard: live_a at index 0, live_b at index 1
     game.state.player1.waitroom.cards.push(live_a);
     game.state.player1.waitroom.cards.push(live_b);
 
@@ -36,25 +38,64 @@ fn fuyumari_q118_two_distinct_live_cards_opponent_chooses() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // Debut fires: select 2 distinct live cards from discard
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);  // select both live cards
-    }
+    // Step 1: Player selects 2 distinct live cards from discard (indices 0 and 1)
+    assert!(game.has_pending_choice(), "Should have select choice");
+    game.select_indices(&[0, 1]);
 
-    // Opponent chooses 1 of the 2
-    if game.has_pending_choice() {
-        game.select_option(0);  // opponent picks first card
-    }
+    // Step 2: Opponent picks a card from the selected ones
+    // The opponent select choice has source "selected_cards" with the 2 cards.
+    // The choice presents indices 0 and 1 (live_a, live_b).
+    // Opponent picks index 0 (live_a).
+    assert!(game.has_pending_choice(), "Should have opponent select choice");
+    game.select_option(0);
 
-    // One live card should be in hand (the one opponent chose)
-    let in_hand = game.state.player1.hand.cards.contains(&live_a)
-        || game.state.player1.hand.cards.contains(&live_b);
-    assert!(in_hand,
-        "Q118: Opponent-chosen live card should be in P1 hand");
+    // Step 3: Only the opponent-chosen card (live_a) should be in hand
+    assert!(game.state.player1.hand.cards.contains(&live_a),
+        "Opponent-chosen card (live_a) should be in hand");
+    assert!(!game.state.player1.hand.cards.contains(&live_b),
+        "live_b was not chosen by opponent, should NOT be in hand");
+    // live_a moved from discard to hand, live_b stays in discard
+    assert!(game.state.player1.waitroom.cards.contains(&live_b),
+        "live_b should still be in discard");
 }
 
-/// Only 1 live card in discard → can't select 2 → effect doesn't trigger.
-/// No card added to hand.
+/// Opponent picks the SECOND card (index 1) — verify opponent's choice actually matters.
+#[test]
+fn fuyumari_q118_opponent_picks_second_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let fuyumari = game.id("PL!SP-bp2-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_a = game.id("PL!-sd1-019-SD");
+    let live_b = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.hand.cards.push(fuyumari);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(live_a);
+    game.state.player1.waitroom.cards.push(live_b);
+
+    game.give_energy(11);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // Step 1: Player selects both
+    game.select_indices(&[0, 1]);
+
+    // Step 2: Opponent picks the SECOND card (index 1 = live_b)
+    assert!(game.has_pending_choice(), "Should have opponent select choice");
+    game.select_option(1);
+
+    // Step 3: Only live_b should be in hand
+    assert!(game.state.player1.hand.cards.contains(&live_b),
+        "Opponent-chosen card (live_b) should be in hand");
+    assert!(!game.state.player1.hand.cards.contains(&live_a),
+        "live_a was not chosen, should NOT be in hand");
+    assert!(game.state.player1.waitroom.cards.contains(&live_a),
+        "live_a should still be in discard");
+}
+
+/// Only 1 unique live card available → can't select 2 → effect does nothing.
 #[test]
 fn fuyumari_q118_only_one_live_card_no_effect() {
     let db = load_real_database();
@@ -66,21 +107,61 @@ fn fuyumari_q118_only_one_live_card_no_effect() {
 
     game.state.player1.hand.cards.push(fuyumari);
     game.state.player1.hand.cards.push(filler);
-    // Only 1 live card in discard
     game.state.player1.waitroom.cards.push(live);
-    // Also a non-live card in discard (won't match card_type filter)
     game.state.player1.waitroom.cards.push(filler);
 
     game.give_energy(11);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // With only 1 live card, ability tries to select 2 but can't.
-    // Q118: No card added when fewer than 2 available.
-    // Handle any pending choice from the select attempt
-    if game.has_pending_choice() {
-        game.select_indices(&[]);  // dismiss the choice
+    // Fewer than 2 distinct live cards → select creates no choice → effect ends
+    // Consume any remaining choice
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
     }
     assert!(!game.state.player1.hand.cards.contains(&live),
-        "Q118: No live card should be added when <2 available");
+        "No live card should be added when <2 available");
+}
+
+/// Card count integrity: total cards across all zones unchanged.
+#[test]
+fn fuyumari_q118_card_count_integrity() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let fuyumari = game.id("PL!SP-bp2-011-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_a = game.id("PL!-sd1-019-SD");
+    let live_b = game.id("PL!-sd1-020-SD");
+
+    game.state.player1.hand.cards.push(fuyumari);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(live_a);
+    game.state.player1.waitroom.cards.push(live_b);
+
+    game.give_energy(11);
+    let total_before = total_cards(&game.state.player1);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
+
+    game.select_indices(&[0, 1]);
+    if game.has_pending_choice() {
+        game.select_option(0);
+    }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let total_after = total_cards(&game.state.player1);
+    assert_eq!(total_after, total_before, "Total card count unchanged");
+}
+
+fn total_cards(p: &rabuka_engine::player::Player) -> usize {
+    p.hand.cards.len()
+        + p.main_deck.cards.len()
+        + p.waitroom.cards.len()
+        + p.stage.stage.iter().filter(|&&id| id != -1).count()
+        + p.energy_zone.cards.len()
+        + p.live_card_zone.cards.len()
+        + p.success_live_card_zone.cards.len()
 }

@@ -36,10 +36,11 @@ impl<'a> AbilityResolver<'a> {
                     player.waitroom.add_card(card_id);
                 }
                 println!("DEBUG: After filtering - looked_at_cards.len(): {}", self.looked_at_cards.len());
-                // Sync to game_state so subsequent resolvers can access them
-                self.game_state.looked_at_cards = self.looked_at_cards.clone();
-                println!("DEBUG: Synced to game_state.looked_at_cards.len(): {}", self.game_state.looked_at_cards.len());
             }
+
+            // Always sync to game_state so handle_select_cards_looked_at can access them
+            self.game_state.looked_at_cards = self.looked_at_cards.clone();
+            println!("DEBUG: Synced to game_state.looked_at_cards.len(): {}", self.game_state.looked_at_cards.len());
 
             let available_count = self.looked_at_cards.len();
             let is_max = select_action.max.unwrap_or(false);
@@ -72,6 +73,7 @@ impl<'a> AbilityResolver<'a> {
                 description: description.clone(), allow_skip: optional || is_max || any_number || available_count == 0,
                 cost_limit: None, cost_limit_operator: None, group: None, characters: None,
                 filtered_indices: None,
+                is_select_action: false,
             };
             println!("DEBUG: Creating choice - available_count: {}, max_select: {}, description: {}", available_count, max_select, description);
             self.pending_choice = Some(choice);
@@ -128,6 +130,7 @@ impl<'a> AbilityResolver<'a> {
                     group: None, 
                     characters: None,
                     filtered_indices: None,
+                    is_select_action: false,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -189,6 +192,7 @@ impl<'a> AbilityResolver<'a> {
             "discard" => player.waitroom.cards.iter().copied().collect(),
             "stage" => player.stage.stage.iter().filter(|&&id| id != -1).copied().collect(),
             "looked_at" => self.looked_at_cards.clone(),
+            "selected_cards" => self.selected_cards.clone(),
             _ => vec![],
         };
 
@@ -217,6 +221,7 @@ impl<'a> AbilityResolver<'a> {
             allow_skip: false,
             cost_limit: None, cost_limit_operator: None, group: None, characters: None,
             filtered_indices: None,
+            is_select_action: true,
         });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())

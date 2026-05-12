@@ -84,8 +84,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             for (i, action) in pending.iter().enumerate() {
                 self.execute_effect(action)?;
                 if self.pending_choice.is_some() {
-                    let remaining = pending[i + 1..].to_vec();
-                    self.game_state.pending_sequential_actions = if remaining.is_empty() { None } else { Some(remaining) };
+                    if self.game_state.pending_sequential_actions.is_none() {
+                        let remaining = pending[i + 1..].to_vec();
+                        self.game_state.pending_sequential_actions = if remaining.is_empty() { None } else { Some(remaining) };
+                    }
                     return Ok(());
                 }
             }
@@ -107,9 +109,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let context = self.execution_context.clone();
         println!("DEBUG: provide_choice_result - choice: {:?}, result: {:?}", choice, result);
         match (&choice, result) {
-            (Some(Choice::SelectCard { zone, card_type, count, description: _, allow_skip, cost_limit, cost_limit_operator, group, characters, filtered_indices }), ChoiceResult::CardSelected { indices }) => {
+            (Some(Choice::SelectCard { zone, card_type, count, description: _, allow_skip, cost_limit, cost_limit_operator, group, characters, filtered_indices, is_select_action }), ChoiceResult::CardSelected { indices }) => {
                 println!("DEBUG: Processing SelectCard choice - zone: '{}', card_type: {:?}, count: {}, indices: {:?}", zone, card_type, count, indices);
-                self.handle_select_card(zone, card_type, *count, *allow_skip, &indices, context, *cost_limit, cost_limit_operator.clone(), group.clone(), characters.clone(), filtered_indices.clone())
+                self.handle_select_card(zone, card_type, *count, *allow_skip, &indices, context, *cost_limit, cost_limit_operator.clone(), group.clone(), characters.clone(), filtered_indices.clone(), *is_select_action)
             }
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
                 self.pending_choice = None;
@@ -131,7 +133,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
     fn handle_select_card(&mut self, zone: &str, card_type: &Option<String>, count: usize, allow_skip: bool, indices: &[usize], context: ExecutionContext,
         cost_limit: Option<u32>, cost_limit_operator: Option<String>, group: Option<String>, characters: Option<Vec<String>>,
-        filtered_indices: Option<Vec<usize>>) -> Result<(), String> {
+        filtered_indices: Option<Vec<usize>>, is_select_action: bool) -> Result<(), String> {
         println!("DEBUG: handle_select_card - zone: '{}', indices: {:?}, context: {:?}", zone, indices, context);
         if self.game_state.entry_cost().and_then(|c| c.cost_type.as_deref()) == Some("reveal") {
             let card_ids: Vec<i16> = {
@@ -194,7 +196,23 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }
                     }
                 }
-                "discard" => self.execute_selected_cards_from_discard(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?,
+            "discard" => {
+                if is_select_action {
+                    let player = self.game_state.active_player_mut();
+                    let mut cards: Vec<i16> = Vec::new();
+                    for &i in indices.iter() {
+                        if i < player.waitroom.cards.len() {
+                            let cid = player.waitroom.cards[i];
+                            if validate_card(cid) {
+                                cards.push(cid);
+                            }
+                        }
+                    }
+                    self.selected_cards = cards;
+                    } else {
+                        self.execute_selected_cards_from_discard(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?;
+                    }
+                }
                 "deck" => self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?,
                 "looked_at" => {
                     let mapped_indices: Vec<usize> = if let Some(ref fidx) = filtered_indices {
@@ -215,6 +233,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
                     if is_select_cards {
                         self.handle_select_cards_looked_at(&mapped_indices)?;
+                        // Return early only for order prompts (any_order), not for multi-selection
+                        if matches!(self.pending_choice, Some(Choice::SelectTarget { ref target, .. }) if target == "order") {
+                            return Ok(());
+                        }
                     } else if let ExecutionContext::LookAndSelect { .. } = self.execution_context {
                         if let Some(ref select_action) = entry_effect_sa() {
                             if let Some(ref actions) = select_action.compound.actions {
@@ -248,6 +270,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 group: None,
                                 characters: None,
                                 filtered_indices: None,
+                                is_select_action: false,
                             });
                             self.execution_context = context.clone();
                             return Ok(());
@@ -280,8 +303,21 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         match zone {
             "hand" => self.execute_selected_cards_from_hand(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?,
             "deck" => self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?,
-            "discard" => self.execute_selected_cards_from_discard(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?,
-            "stage" => self.execute_selected_cards_from_stage(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?,
+            "discard" => {
+                if is_select_action {
+                    // Just store card IDs without moving
+                    let player = self.game_state.active_player_mut();
+                    let mut cards: Vec<i16> = Vec::new();
+                    for &i in indices.iter() {
+                        if i < player.waitroom.cards.len() {
+                            cards.push(player.waitroom.cards[i]);
+                        }
+                    }
+                    self.selected_cards = cards;
+                } else {
+                    self.execute_selected_cards_from_discard(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?;
+                }
+            },
             "looked_at" => {
                 self.reveal_selected_looked_at(indices);
                 let is_select_cards = self.game_state.ability_queue.current_entry()
@@ -318,6 +354,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "energy_zone" => self.execute_selected_energy_zone_cards(indices, count)?,
+            "selected_cards" => {
+                let mut cards = Vec::new();
+                for &i in indices.iter() {
+                    if i < self.selected_cards.len() {
+                        cards.push(self.selected_cards[i]);
+                    }
+                }
+                self.selected_cards = cards;
+            }
             _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
         }
         if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
@@ -433,11 +478,18 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             if let LookAndSelectStep::Finalize { destination } = step {
                 if destination == "deck" {
                     if let Ok(idx) = selected.parse::<usize>() {
-                        if idx < self.looked_at_cards.len() {
-                            let card = self.looked_at_cards.remove(idx);
-                            self.looked_at_cards.insert(0, card);
+                        if idx < self.game_state.looked_at_cards.len() {
+                            let card = self.game_state.looked_at_cards.remove(idx);
+                            self.game_state.looked_at_cards.insert(0, card);
                         }
                     }
+                    let card_ids: Vec<i16> = self.game_state.looked_at_cards.iter().rev().copied().collect();
+                    let player = self.game_state.active_player_mut();
+                    for card_id in card_ids {
+                        player.main_deck.cards.insert(0, card_id);
+                    }
+                    self.game_state.looked_at_cards.clear();
+                    self.looked_at_cards.clear();
                 }
             }
         }
@@ -801,10 +853,11 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let discard_remaining = select_action.as_ref()
             .and_then(|sa| sa.discard_remaining)
             .unwrap_or(true);
+        let placement_order = select_action.as_ref()
+            .and_then(|sa| sa.placement_order.clone());
+        println!("DEBUG: handle_select_cards_looked_at - destination: {}, discard_remaining: {}, placement_order: {:?}", destination, discard_remaining, placement_order);
 
-        println!("DEBUG: handle_select_cards_looked_at - destination: {}, discard_remaining: {}", destination, discard_remaining);
-
-        // Use game_state.looked_at_cards directly (constructor no longer takes from game_state)
+        // Use game_state.looked_at_cards directly
         let looked_at = &mut self.game_state.looked_at_cards;
         let mut indices_sorted: Vec<usize> = indices.iter().copied().collect();
         indices_sorted.sort_by(|a, b| b.cmp(a));
@@ -813,7 +866,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let mut selected_cards: Vec<i16> = Vec::new();
         for i in indices_sorted {
             if i < looked_at.len() {
-                selected_cards.push(looked_at.remove(i));
+                selected_cards.insert(0, looked_at.remove(i));
             }
         }
         let selected_count = selected_cards.len();
@@ -822,6 +875,32 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         // Extract remaining cards
         let remaining_cards: Vec<i16> = looked_at.drain(..).collect();
         println!("DEBUG: Remaining {} cards: {:?}", remaining_cards.len(), remaining_cards);
+
+        // Handle any_order: if placing 2+ cards on deck, prompt for order
+        let is_deck_dest = destination == "deck_top" || destination == "deck";
+        let needs_order = is_deck_dest
+            && placement_order.as_deref() == Some("any_order")
+            && selected_cards.len() > 1;
+
+        if needs_order {
+            self.looked_at_cards = selected_cards;
+            let player = self.game_state.active_player_mut();
+            if discard_remaining {
+                for card_id in remaining_cards { player.waitroom.add_card(card_id); }
+            } else {
+                for card_id in remaining_cards { player.main_deck.cards.push(card_id); }
+            }
+            let card_count = self.looked_at_cards.len();
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "order".to_string(),
+                description: format!("Choose order for cards on deck ({} cards)", card_count),
+                allow_skip: false,
+            });
+            self.execution_context = ExecutionContext::LookAndSelect {
+                step: LookAndSelectStep::Finalize { destination: "deck".to_string() },
+            };
+            return Ok(());
+        }
 
         // Move selected cards to destination
         let player = self.game_state.active_player_mut();
@@ -849,7 +928,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
         }
 
-        // Check for multi-selection: if count > selected_count and there are remaining looked_at cards
+        // Check for multi-selection
         let max_select = select_action.as_ref()
             .and_then(|sa| sa.count)
             .unwrap_or(1) as usize;
@@ -868,6 +947,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 group: None,
                 characters: None,
                 filtered_indices: None,
+                is_select_action: false,
             });
             return Ok(());
         }

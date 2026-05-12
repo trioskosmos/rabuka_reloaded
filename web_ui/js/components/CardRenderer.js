@@ -82,8 +82,40 @@ export const ImageLoader = {
 // Consistent image path resolution across all card displays
 export function resolveCardImagePath(cardNo) {
     if (!cardNo) return '';
+    
+    // 1. Direct mapping lookup
     const mapped = State.cardImageMapping?.[cardNo];
     if (mapped) return fixImgPath(mapped);
+    
+    // 2. Try ＋/+, → 2 variant in mapping (webp uses PR2 not PR＋)
+    if (cardNo.includes('＋') || cardNo.endsWith('+')) {
+        const with2 = cardNo.replace(/＋/g, '2').replace(/\+$/, '2');
+        const mapped2 = State.cardImageMapping?.[with2];
+        if (mapped2) return fixImgPath(mapped2);
+    }
+    
+    // 3. Try compressed name in mapping (PL!HS-PR-017-PR → PL!HS-017-PR)
+    const stripped = cardNo.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
+    if (stripped !== cardNo) {
+        const compressedMapped = State.cardImageMapping?.[stripped];
+        if (compressedMapped) return fixImgPath(compressedMapped);
+    }
+    
+    // 4. Compressed ＋/+, → 2
+    if (cardNo.includes('＋')) {
+        const normalized = cardNo.replace(/＋/g, '2');
+        const stripped2 = normalized.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
+        if (stripped2 !== normalized) {
+            const mapped2 = State.cardImageMapping?.[stripped2];
+            if (mapped2) return fixImgPath(mapped2);
+        }
+    }
+    
+    // 5. Fallback: try direct webp path (also try ＋→2 variant)
+    if (cardNo.includes('＋')) {
+        const with2 = cardNo.replace(/＋/g, '2');
+        return fixImgPath(`img/cards_webp/${with2}.webp`);
+    }
     return fixImgPath(`img/cards_webp/${cardNo}.webp`);
 }
 

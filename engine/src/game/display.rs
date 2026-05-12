@@ -112,19 +112,23 @@ pub fn zone_to_display(card_ids: &[i16], card_db: &CardDatabase) -> ZoneDisplay 
     }
 }
 
-pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>) -> StageDisplay {
+pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, orientation_modifiers: &std::collections::HashMap<i16, String>) -> StageDisplay {
     let blade_mod = |cid: i16| blade_modifiers.get(&cid).copied().unwrap_or(0);
+    let orientation = |cid: i16| orientation_modifiers.get(&cid).map(|o| match o.as_str() {
+        "wait" => Orientation::Wait,
+        _ => Orientation::Active,
+    });
     StageDisplay {
-        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, None, blade_mod(stage.stage[0])) } else { None },
-        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, None, blade_mod(stage.stage[1])) } else { None },
-        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, None, blade_mod(stage.stage[2])) } else { None },
+        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, orientation(stage.stage[0]), blade_mod(stage.stage[0])) } else { None },
+        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, orientation(stage.stage[1]), blade_mod(stage.stage[1])) } else { None },
+        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, orientation(stage.stage[2]), blade_mod(stage.stage[2])) } else { None },
         left_under: stage.under_cards[0].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
         center_under: stage.under_cards[1].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
         right_under: stage.under_cards[2].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
     }
 }
 
-pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, score_modifiers: &std::collections::HashMap<i16, i32>, heart_modifiers: &std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>) -> PlayerDisplay {
+pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, score_modifiers: &std::collections::HashMap<i16, i32>, heart_modifiers: &std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, orientation_modifiers: &std::collections::HashMap<i16, String>) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player.energy_zone.cards.iter()
         .enumerate()
         .map(|(i, &card_id)| {
@@ -195,7 +199,7 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display(&player.hand.cards, card_db),
-        stage: stage_to_display(&player.stage, card_db, blade_modifiers),
+        stage: stage_to_display(&player.stage, card_db, blade_modifiers, orientation_modifiers),
         live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
         success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards, card_db),
         waitroom: waitroom_display.clone(),
@@ -243,8 +247,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers),
-        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers),
+        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers, &game_state.mods.orientation_modifiers),
+        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers, &game_state.mods.orientation_modifiers),
         pending_choice: game_state.pending_choice.clone(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
         rule_log,

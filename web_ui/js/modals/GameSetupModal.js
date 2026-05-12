@@ -76,7 +76,38 @@ export const GameSetupModal = {
                 energy: data.energy || []
             };
         } else if (config.type === 'manual') {
-            return { main: [], energy: [] };
+            // Parse deck content from paste textarea
+            const content = config.content || '';
+            if (!content.trim()) {
+                console.warn("Manual deck is empty");
+                return { main: [], energy: [] };
+            }
+            // Parse: each line can be "ID x Count" or just "ID"
+            const lines = content.split(/\r?\n/);
+            const main = [];
+            const energy = [];
+            for (let line of lines) {
+                line = line.trim();
+                if (!line || line.startsWith('#')) continue;
+                let cardNo = '';
+                let qty = 1;
+                const xMatch = line.match(/^(.+?)\s*[xX×]\s*(\d+)$/);
+                if (xMatch) {
+                    cardNo = xMatch[1].trim().toUpperCase();
+                    qty = parseInt(xMatch[2], 10);
+                } else {
+                    cardNo = line.toUpperCase();
+                    qty = 1;
+                }
+                if (!cardNo || !cardNo.includes('-')) continue;
+                // Energy cards typically have "PE" or "E" in their code
+                if (cardNo.includes('-PE') || cardNo.includes('-E')) {
+                    for (let i = 0; i < qty; i++) energy.push(cardNo);
+                } else {
+                    for (let i = 0; i < qty; i++) main.push(cardNo);
+                }
+            }
+            return { main, energy };
         }
         return null;
     },

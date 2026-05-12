@@ -65,8 +65,9 @@ impl super::TurnEngine {
                         let ho = game_state.mods.heart_override.clone();
                         let hm = game_state.mods.heart_modifiers.clone();
                         let btm = game_state.mods.blade_type_modifiers.clone();
+                        let om = game_state.mods.orientation_modifiers.clone();
                         let player = game_state.first_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm, &om)
                     };
                     let player_id = game_state.player1.id.clone();
                     let turn = game_state.turn_number;
@@ -90,8 +91,9 @@ impl super::TurnEngine {
                         let ho = game_state.mods.heart_override.clone();
                         let hm = game_state.mods.heart_modifiers.clone();
                         let btm = game_state.mods.blade_type_modifiers.clone();
+                        let om = game_state.mods.orientation_modifiers.clone();
                         let player = game_state.second_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm)
+                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm, &om)
                     };
                     let player_id = game_state.player2.id.clone();
                     let turn = game_state.turn_number;

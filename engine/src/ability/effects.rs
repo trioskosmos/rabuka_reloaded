@@ -125,6 +125,7 @@ pub(crate) fn draw_cards_for_player(
 
 impl<'a> AbilityResolver<'a> {
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+        self.current_effect = Some(effect.clone());
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
         if !self.can_activate_effect(effect) {
@@ -743,6 +744,7 @@ impl<'a> AbilityResolver<'a> {
                     group: group_filter.clone(),
                     filtered_indices: None,
                     characters: None,
+                    is_select_action: false,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -794,8 +796,9 @@ impl<'a> AbilityResolver<'a> {
                     description: format!("Select {} energy card(s) to deactivate (set to wait)", effective_count),
                     allow_skip: false,
                     cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-                    filtered_indices: None,
-                });
+                filtered_indices: None,
+                is_select_action: false,
+            });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
             }
@@ -1489,8 +1492,9 @@ impl<'a> AbilityResolver<'a> {
             description: format!("Discard {} cards from hand (target: {} cards in hand)", cards_to_discard, target_count),
             allow_skip: false,
             cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-            filtered_indices: None,
-        });
+                filtered_indices: None,
+                is_select_action: false,
+            });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }
