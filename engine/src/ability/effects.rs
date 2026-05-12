@@ -125,7 +125,6 @@ pub(crate) fn draw_cards_for_player(
 
 impl<'a> AbilityResolver<'a> {
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
-        self.current_effect = Some(effect.clone());
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
         if !self.can_activate_effect(effect) {

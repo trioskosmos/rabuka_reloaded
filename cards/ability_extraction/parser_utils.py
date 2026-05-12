@@ -72,9 +72,10 @@ def normalize_whitespace(text):
 
 
 def normalize_fullwidth_digits(text):
-    """Normalize full-width digits and symbols to half-width (e.g., １ -> 1, ＋ -> +, − -> -)."""
-    fullwidth = '０１２３４５６７８９＋−'
-    halfwidth = '0123456789+-'
+    """Normalize full-width digits and symbols to half-width (e.g., １ -> 1, ＋ -> +, − -> -, － -> -)."""
+    # Handle both U+2212 (minus sign) and U+FF0D (fullwidth hyphen-minus)
+    fullwidth = '０１２３４５６７８９＋−－'
+    halfwidth  = '0123456789+--'
     translation = str.maketrans(fullwidth, halfwidth)
     return text.translate(translation)
 

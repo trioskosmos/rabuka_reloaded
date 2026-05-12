@@ -136,12 +136,27 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         filtered_indices: Option<Vec<usize>>, is_select_action: bool) -> Result<(), String> {
         println!("DEBUG: handle_select_card - zone: '{}', indices: {:?}, context: {:?}", zone, indices, context);
         if self.game_state.entry_cost().and_then(|c| c.cost_type.as_deref()) == Some("reveal") {
-            let card_ids: Vec<i16> = {
-                let player = self.game_state.active_player();
-                indices.iter().filter_map(|&idx| {
-                    if idx < player.hand.cards.len() { Some(player.hand.cards[idx]) } else { None }
-                }).collect()
-            };
+            let cost = self.game_state.entry_cost().cloned().unwrap();
+            let card_db = self.game_state.card_database.clone();
+            let player = self.game_state.active_player();
+            let card_ids: Vec<i16> = indices.iter().filter_map(|&idx| {
+                if idx < player.hand.cards.len() {
+                    let cid = player.hand.cards[idx];
+                    let passes = util::card_matches_type(&card_db, cid, cost.card_type.as_deref())
+                        && util::card_matches_characters(&card_db, cid, cost.characters.as_ref())
+                        && match cost.group_names.as_ref() {
+                            Some(groups) => groups.iter().any(|g| util::card_matches_group_str(&card_db, cid, Some(g.as_str()))),
+                            None => true,
+                        }
+                        && util::card_matches_cost_limit(&card_db, cid, cost.cost_limit);
+                    if passes { Some(cid) } else { None }
+                } else { None }
+            }).collect();
+            // Validate that we got enough matching cards
+            let count = cost.count.unwrap_or(1) as usize;
+            if card_ids.len() < count {
+                return Err("Not enough valid cards to reveal for cost".to_string());
+            }
             for card_id in card_ids {
                 self.game_state.revealed_cards.push(card_id);
                 self.revealed_cost_cards.push(card_id);
@@ -282,15 +297,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             "revealed_cards" => {
                 let cards: Vec<i16> = indices.iter().map(|&i| self.game_state.revealed_cards.remove(i)).collect();
                 self.selected_cards = cards;
-                // Move selected cards to destination immediately
+                // Move selected cards to destination
                 let dst = self.game_state.entry_destination().map(|s| s.to_string());
+                let dst_str = dst.as_deref().unwrap_or("hand");
                 let player = self.game_state.active_player_mut();
                 for &cid in &self.selected_cards.clone() {
-                    match dst.as_deref() {
-                        Some("hand") | None => player.hand.add_card(cid),
-                        Some("discard") => player.waitroom.add_card(cid),
-                        Some(_) => player.hand.add_card(cid),
-                    }
+                    crate::ability::util::place_card_in_zone(player, cid, dst_str, None, false, 1);
                 }
                 return self.finalize_choice(&context);
             }
@@ -342,15 +354,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
                 self.selected_cards = cards;
-                // Move selected cards to destination immediately
+                // Move selected cards to destination
                 let dst = self.game_state.entry_destination().map(|s| s.to_string());
+                let dst_str = dst.as_deref().unwrap_or("hand");
                 let player = self.game_state.active_player_mut();
                 for &cid in &self.selected_cards.clone() {
-                    match dst.as_deref() {
-                        Some("hand") | None => player.hand.add_card(cid),
-                        Some("discard") => player.waitroom.add_card(cid),
-                        Some(_) => player.hand.add_card(cid),
-                    }
+                    crate::ability::util::place_card_in_zone(player, cid, dst_str, None, false, 1);
                 }
             }
             "energy_zone" => self.execute_selected_energy_zone_cards(indices, count)?,

@@ -425,112 +425,96 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let location = condition.location.as_deref().unwrap_or("");
         let group_names = condition.group_names.as_ref();
         let group = condition.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str()));
+        let hc: &[String] = condition.heart_colors.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
 
-        if location == "revealed_cards" {
-            let actual = self.game_state.revealed_cards.iter().filter(|&&cid| {
-                let type_ok = match card_type {
+        // Helper: count cards in a zone filtered by type + heart + group
+        let count_filtered = |zone_source: &[i16], ct: &str| -> usize {
+            zone_source.iter().filter(|&&cid| {
+                let type_ok = match ct {
                     "live_card" => card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false),
                     "member_card" => card_db.get_card(cid).map(|c| c.is_member()).unwrap_or(false),
                     "energy_card" => card_db.get_card(cid).map(|c| c.is_energy()).unwrap_or(false),
                     _ => true,
                 };
                 if !type_ok { return false; }
+                if !hc.is_empty() && !crate::ability::util::card_matches_heart_colors(card_db, cid, hc) {
+                    return false;
+                }
                 if let Some(g) = group {
                     crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
                 } else if let Some(gn) = group_names {
                     gn.iter().any(|g| crate::ability::util::card_matches_group_str(card_db, cid, Some(g)))
                 } else { true }
-            }).count() as u32;
+            }).count()
+        };
+
+        // Explicit source: preceding_moved — check against the resolver's moved_cards
+        // (set by a prior move_cards action in the same sequential chain)
+        if condition.source.as_deref() == Some("preceding_moved") {
+            let actual = count_filtered(&self.moved_cards, card_type) as u32;
             return compare_counts(condition.operator.as_deref(), actual, count);
         }
 
-        let stage_member_count = |p: &crate::player::Player| -> usize {
-            p.stage.stage.iter().filter(|&&id| id != -1).count()
-        };
-
-        // Check for location-based zones first (override card_type mapping)
-        let zone_count = |zone: &str| -> usize {
-            match zone {
-                "live_card_zone" => player.live_card_zone.cards.len(),
-                "success_live_zone" => {
-                    if target == "either" || target == "both" {
-                        self.game_state.player1.success_live_card_zone.cards.len()
-                            + self.game_state.player2.success_live_card_zone.cards.len()
-                    } else {
-                        player.success_live_card_zone.cards.len()
-                    }
+        // Resolve location to an actual card list
+        let actual = match location {
+            "revealed_cards" => count_filtered(&self.game_state.revealed_cards, card_type),
+            "stage" => count_filtered(&player.stage.stage, card_type),
+            "hand" => count_filtered(&player.hand.cards, card_type),
+            "discard" | "waitroom" => {
+                // Check recently moved cards first (chained from a preceding move_cards action)
+                if let Some(ref moved) = self.game_state.recently_moved_cards {
+                    count_filtered(moved, card_type)
+                } else {
+                    count_filtered(&player.waitroom.cards, card_type)
                 }
-                "revealed_cards" => self.game_state.revealed_cards.len(),
-                "energy_zone" => player.energy_zone.cards.len(),
-                _ => 0,
             }
-        };
-
-        let actual_count = match condition.unit.as_deref() {
-            Some("types") => {
-                let mut color_types = std::collections::HashSet::new();
-                let card_db = &self.game_state.card_database;
-                for &cid in &player.stage.stage {
-                    if cid == -1 { continue; }
-                    if let Some(card) = card_db.get_card(cid) {
-                        if let Some(ref base_heart) = card.base_heart {
-                            for (color, _) in &base_heart.hearts {
-                                color_types.insert(*color);
-                            }
-                        }
-                    }
+            "deck" => count_filtered(&player.main_deck.cards, card_type),
+            "energy_zone" => count_filtered(&player.energy_zone.cards, card_type),
+            "live_card_zone" => count_filtered(&player.live_card_zone.cards, card_type),
+            "success_live_zone" | "success_live_card_zone" => {
+                if target == "either" || target == "both" {
+                    let p1 = count_filtered(&self.game_state.player1.success_live_card_zone.cards, card_type);
+                    let p2 = count_filtered(&self.game_state.player2.success_live_card_zone.cards, card_type);
+                    p1 + p2
+                } else {
+                    count_filtered(&player.success_live_card_zone.cards, card_type)
                 }
-                color_types.len() as u32
             }
-            _ if condition.location.as_deref().map_or(false, |l| {
-                let zc = zone_count(l);
-                zc > 0 || l == "success_live_zone"
-            }) => {
-                let loc = condition.location.as_deref().unwrap_or("");
-                let actual = zone_count(loc) as u32;
-                actual
-            }
-            _ => {
-                let count = match card_type {
-                    "live_card" => {
-                        // When checking for live cards without a specific location,
-                        // check recently moved cards if available, otherwise check discard pile
-                        if let Some(ref moved_cards) = self.game_state.recently_moved_cards {
-                            moved_cards.iter().filter(|&&cid| {
-                                card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
-                            }).count()
-                        } else {
-                            // Fallback: check discard pile (waitroom) for live cards
-                            player.waitroom.cards.iter().filter(|&&cid| {
-                                card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
-                            }).count()
-                        }
-                    },
-                    "member_card" => {
-                        if condition.aggregate.as_deref() == Some("total") {
-                            let total = player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers, &self.game_state.mods.orientation_modifiers) as usize;
-                            total
-                        } else {
-                            let mut member_count = stage_member_count(player);
-                            if exclude_self {
-                                if let Some(cid) = activating_id {
-                                    if player.stage.stage.iter().any(|&id| id == cid) {
-                                        member_count = member_count.saturating_sub(1);
+            // No explicit location: use recently_moved if available, otherwise infer from card_type
+            "" => {
+                if let Some(ref moved) = self.game_state.recently_moved_cards {
+                    count_filtered(moved, card_type)
+                } else {
+                    match card_type {
+                        "live_card" => count_filtered(&player.waitroom.cards, card_type),
+                        "member_card" => {
+                            if condition.aggregate.as_deref() == Some("total") {
+                                player.stage.total_blades(card_db, &self.game_state.mods.blade_modifiers, &self.game_state.mods.orientation_modifiers) as usize
+                            } else {
+                                let mut stage_count = player.stage.stage.iter().filter(|&&id| id != -1 && {
+                                    if hc.is_empty() { true }
+                                    else { crate::ability::util::card_matches_heart_colors(card_db, id, hc) }
+                                }).count();
+                                if exclude_self {
+                                    if let Some(cid) = activating_id {
+                                        if player.stage.stage.iter().any(|&id| id == cid) {
+                                            stage_count = stage_count.saturating_sub(1);
+                                        }
                                     }
                                 }
+                                stage_count
                             }
-                            member_count
                         }
+                        "energy_card" => player.energy_zone.cards.len(),
+                        _ => 0,
                     }
-                    "energy_card" => player.energy_zone.cards.len(),
-                    _ => 0 as usize,
-                };
-                count as u32
+                }
             }
-        };
-        let passed = compare_counts(condition.operator.as_deref(), actual_count, count);
+            _ => 0,
+        } as u32;
+        let passed = compare_counts(condition.operator.as_deref(), actual, count);
         let mut dbg = AbDebug::new();
-        dbg.condition(condition, actual_count, count, passed);
+        dbg.condition(condition, actual, count, passed);
         passed
     }
 

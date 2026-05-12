@@ -392,24 +392,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    --img-w: calc(var(--card-w) * 1);
-    --img-h: calc(var(--card-h) * 1);
+    width: 100%;
+    height: 100%;
 }
 
 .live-card-inner img {
-    width: var(--img-w);
-    height: var(--img-h);
+    width: 100%;
+    height: 100%;
     object-fit: contain;
-}
-
-.card.orientation-landscape .live-card-inner {
-    --img-w: var(--card-h);
-    --img-h: var(--card-w);
-}
-
-.card.orientation-landscape.card-card-mini .live-card-inner {
-    --img-w: var(--card-h-mini);
-    --img-h: var(--card-w-mini);
 }
 
 .live-card-inner .perf-badge {

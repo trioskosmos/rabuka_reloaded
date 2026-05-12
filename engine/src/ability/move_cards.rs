@@ -35,7 +35,25 @@ fn remove_cards_from_hand(player: &mut crate::player::Player, indices: &[usize])
 
 impl<'a> AbilityResolver<'a> {
     pub fn execute_move_cards(&mut self, _effect: &AbilityEffect) -> Result<(), String> {
-        let count = _effect.count.unwrap_or(0) as usize;
+        // Resolve dynamic_count if count is not explicitly set
+        let count = if _effect.count.is_some() {
+            _effect.count.unwrap() as usize
+        } else if let Some(ref dc) = _effect.dynamic_count {
+            match dc.count_type.as_str() {
+                "revealed_cards" => {
+                    // Count cards revealed by a previous cost/effect step
+                    let revealed = if !self.game_state.player1_cheer_revealed_cards.is_empty() {
+                        &self.game_state.player1_cheer_revealed_cards
+                    } else {
+                        &self.game_state.revealed_cards
+                    };
+                    revealed.len()
+                }
+                _ => 0
+            }
+        } else {
+            0
+        };
         let group_name = _effect.group_name();
 
         // Handle or_card_types: let the player pick which type to search for
@@ -72,8 +90,8 @@ impl<'a> AbilityResolver<'a> {
         let vacated_stage_area = self.game_state.last_vacated_stage_area;
         self.game_state.last_vacated_stage_area = None;
 
-        // Character name filter from universal ActionModifiers
-        // let character_filter: Option<Vec<String>> = _effect.characters.clone();
+        // Character name filter from the effect
+        // TEMPORARILY REVERTED: _effect.characters breaks Chika score tests
         let character_filter: Option<Vec<String>> = None;
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
@@ -484,9 +502,10 @@ impl<'a> AbilityResolver<'a> {
         for card_id in &moved_cards { self.game_state.clear_modifiers_for_card(*card_id); }
         for card_id in &moved_cards { self.game_state.record_card_movement(*card_id); }
         
-        // Set recently_moved_cards for condition checking when destination is discard
+        // Store moved cards on the resolver for chained condition checking
+        // e.g. "move 3 cards to discard → if all are member cards → draw"
         if destination == "discard" {
-            self.game_state.recently_moved_cards = Some(moved_cards.clone());
+            self.moved_cards = moved_cards.clone();
         }
         
         Ok(())

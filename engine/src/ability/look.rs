@@ -211,6 +211,7 @@ impl<'a> AbilityResolver<'a> {
             self.looked_at_cards.retain(|id| !self.selected_cards.contains(id));
         }
 
+        let optional = self.current_effect.as_ref().map_or(false, |e| e.optional.unwrap_or(false));
         if self.looked_at_cards.len() < count as usize {
             return Ok(());  // Not enough distinct cards — skip silently
         }
@@ -218,7 +219,7 @@ impl<'a> AbilityResolver<'a> {
             zone: source.to_string(), card_type: card_type.map(|s| s.to_string()),
             count: count as usize,
             description: format!("Select {} card(s) from {}", count, source),
-            allow_skip: false,
+            allow_skip: optional,
             cost_limit: None, cost_limit_operator: None, group: None, characters: None,
             filtered_indices: None,
             is_select_action: true,

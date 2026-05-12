@@ -1,5 +1,6 @@
 import { State } from '../state.js';
 import { ActionButtons } from './ActionButtons.js';
+import { Tooltips } from '../ui_tooltips.js';
 import * as i18n from '../i18n/index.js';
 import { StringUtils } from '../utils/StringUtils.js';
 
@@ -27,8 +28,8 @@ export const ActionListView = {
                 if (pc.trigger_type) ctxHTML += ` <span style="opacity:0.6; font-size:0.8em;">(${pc.trigger_type})</span>`;
             }
             if (pc.ability_text) {
-                const shortAbility = pc.ability_text.length > 120 ? pc.ability_text.substring(0, 120) + '…' : pc.ability_text;
-                ctxHTML += `<div style="color:rgba(255,255,255,0.7); margin-top:3px; line-height:1.4;">${shortAbility}</div>`;
+                const enrichedAbility = Tooltips.enrichAbilityText(pc.ability_text);
+                ctxHTML += `<div style="color:rgba(255,255,255,0.7); margin-top:3px; line-height:1.5; font-size:0.9em;">${enrichedAbility}</div>`;
             }
             if (ctxHTML) {
                 ctxDiv.innerHTML = ctxHTML;

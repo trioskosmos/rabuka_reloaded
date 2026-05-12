@@ -823,6 +823,10 @@ pub struct Condition {
     /// "のみ" — ALL members on stage must match the group (not just any)
     #[serde(default)]
     pub all_members: Option<bool>,
+    /// Explicit source reference for condition evaluation.
+    /// "preceding_moved" — check against the most recently moved cards from a prior action.
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

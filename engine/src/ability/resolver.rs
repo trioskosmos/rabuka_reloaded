@@ -19,6 +19,7 @@ pub struct AbilityResolver<'a> {
     pub last_draw_count: u32,
     pub looked_at_total_count: usize,
     pub selected_cards: Vec<i16>,
+    pub moved_cards: Vec<i16>,
 }
 
 impl<'a> AbilityResolver<'a> {
@@ -46,6 +47,7 @@ impl<'a> AbilityResolver<'a> {
             last_draw_count: 0,
             looked_at_total_count: 0,
             selected_cards,
+            moved_cards: Vec::new(),
         }
     }
 

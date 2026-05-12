@@ -30,7 +30,7 @@ export const ZoneViewer = {
 
         // Rust backend format: player1, player2
         const player = playerIdx === 0 ? state.player1 : state.player2;
-        const discard = player.discard || [];
+        const discard = (player.waitroom?.cards || player.discard?.cards || player.waitroom || player.discard || []);
         const isMe = playerIdx === State.perspectivePlayer;
         const count = discard.length;
 

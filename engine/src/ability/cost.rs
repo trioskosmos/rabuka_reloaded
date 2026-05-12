@@ -357,13 +357,15 @@ impl<'a> AbilityResolver<'a> {
                     }
                     Ok(())
                 } else {
+                    let group = cost.group_names.as_ref().and_then(|gn| gn.first().cloned());
                     self.pending_choice = Some(Choice::SelectCard {
                         zone: source.to_string(),
                         card_type: card_type.clone(),
                         count: if has_explicit_count { explicit_count } else { 0 },
                         description: "Select cards to reveal from hand".to_string(),
                         allow_skip: true,
-                        cost_limit: None, cost_limit_operator: None, group: None, characters: None,
+                        cost_limit: cost.cost_limit, cost_limit_operator: cost.cost_limit_operator.clone(),
+                        group, characters: cost.characters.clone(),
                         filtered_indices: None,
                         is_select_action: false,
                     });
