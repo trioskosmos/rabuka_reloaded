@@ -4,7 +4,7 @@
 use crate::game_state::GameState;
 use crate::zones::MemberArea;
 
-use crate::ability_resolver::Choice;
+use crate::ability::types::Choice;
 use serde::{Serialize, Deserialize};
 use std::vec::Vec;
 
@@ -219,13 +219,13 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             }
             if target == "choice_string" || target == "conditional_optional" {
                 return vec![
-                    make_action_params(ActionType::ChoiceOption, &format!("Yes — {}", description), ActionParameters { card_id: Some(1), card_no: Some("yes".to_string()), ..make_params() }),
-                    make_action_params(ActionType::ChoiceOption, &format!("No — {}", description), ActionParameters { card_id: Some(0), card_no: Some("no".to_string()), ..make_params() }),
+                    make_action_params(ActionType::ChoiceOption, &format!("Yes  E{}", description), ActionParameters { card_id: Some(1), card_no: Some("yes".to_string()), ..make_params() }),
+                    make_action_params(ActionType::ChoiceOption, &format!("No  E{}", description), ActionParameters { card_id: Some(0), card_no: Some("no".to_string()), ..make_params() }),
                 ];
             }
             vec![
-                make_action_params(ActionType::ChoiceDecision, &format!("Yes — {}", description), ActionParameters { card_id: Some(1), card_no: Some("yes".to_string()), ..make_params() }),
-                make_action_params(ActionType::ChoiceDecision, &format!("No — {}", description), ActionParameters { card_id: Some(0), card_no: Some("no".to_string()), ..make_params() }),
+                make_action_params(ActionType::ChoiceDecision, &format!("Yes  E{}", description), ActionParameters { card_id: Some(1), card_no: Some("yes".to_string()), ..make_params() }),
+                make_action_params(ActionType::ChoiceDecision, &format!("No  E{}", description), ActionParameters { card_id: Some(0), card_no: Some("no".to_string()), ..make_params() }),
             ]
         }
         Choice::SelectCard { zone, card_type, count: _, description, allow_skip, .. } => {
@@ -276,7 +276,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
         }
         Choice::SelectHeartColor { count: _, options, description } | Choice::SelectHeartType { count: _, options, description } => {
             options.iter().enumerate().map(|(i, color)|
-                make_action_params(ActionType::ChoiceOption, &format!("{} — {}", color, description),
+                make_action_params(ActionType::ChoiceOption, &format!("{}  E{}", color, description),
                     ActionParameters { card_id: Some(i as i16), card_no: Some(color.clone()), ..make_params() })
             ).collect()
         }
@@ -466,4 +466,5 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     }
     actions
 }
+
 

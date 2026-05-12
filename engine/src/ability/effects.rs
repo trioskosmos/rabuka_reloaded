@@ -198,10 +198,11 @@ impl<'a> AbilityResolver<'a> {
         if effect.target.as_deref() == Some("both") && !is_position_change {
             let mut for_self = effect.clone();
             for_self.target = Some("self".to_string());
+            let had_choice_before = self.pending_choice.is_some();
             self.execute_effect(&for_self)?;
-            // If self created a pending choice, save opponent for later
-            // (after self's choice chain completes, via pending_sequential_actions).
-            if self.pending_choice.is_some() {
+            // If self created a NEW pending choice (not a pre-existing residual one),
+            // save opponent for later after self's choice chain completes.
+            if self.pending_choice.is_some() && !had_choice_before {
                 let mut for_opponent = effect.clone();
                 for_opponent.target = Some("opponent".to_string());
                 self.game_state.pending_sequential_actions = Some(vec![for_opponent]);
@@ -997,6 +998,17 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_set_blade_type(&mut self, blade_type: Option<&str>, target: &str, duration: Option<&str>) -> Result<(), String> {
         let card_db = self.game_state.card_database.clone();
+        let blade_color = blade_type.and_then(|bt| match bt {
+            "red" => Some(crate::card::BladeColor::Red),
+            "blue" => Some(crate::card::BladeColor::Blue),
+            "green" => Some(crate::card::BladeColor::Green),
+            "yellow" => Some(crate::card::BladeColor::Yellow),
+            "purple" => Some(crate::card::BladeColor::Purple),
+            _ => {
+                eprintln!("[set_blade_type] Unknown blade type: {:?}", bt);
+                None
+            }
+        });
         let stage_card_ids: Vec<(i16, String)> = {
             let player = self.game_state.resolve_target_player(target);
             (0..3).filter_map(|i| {
@@ -1005,6 +1017,9 @@ impl<'a> AbilityResolver<'a> {
             }).collect()
         };
         for (card_id, pid) in stage_card_ids {
+            if let Some(color) = blade_color {
+                self.game_state.set_blade_type_modifier(card_id, color);
+            }
             util::push_temporary_effect(
                 &mut self.game_state,
                 &format!("set_blade_type:{}", blade_type.unwrap_or("")),
@@ -1509,15 +1524,12 @@ impl<'a> AbilityResolver<'a> {
         let current_count = player.hand.cards.len();
         if current_count <= target_count as usize { return Ok(()); }
         let cards_to_discard = current_count - target_count as usize;
-        self.pending_choice = Some(Choice::SelectCard {
-            zone: "hand".to_string(), card_type: None,
-            count: cards_to_discard,
-            description: format!("Discard {} cards from hand (target: {} cards in hand)", cards_to_discard, target_count),
-            allow_skip: false,
-            cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-                filtered_indices: None,
-                is_select_action: false,
-            });
+        self.pending_choice = Some(Choice::select_card(
+                "hand".to_string(),
+                cards_to_discard,
+                format!("Discard {} cards from hand (target: {} cards in hand)", cards_to_discard, target_count),
+                false,
+            ));
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }

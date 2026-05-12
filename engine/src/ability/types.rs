@@ -65,6 +65,17 @@ pub enum LookAndSelectStep {
 }
 
 impl Choice {
+    /// Construct a SelectCard choice with sensible defaults for optional fields.
+    pub fn select_card(
+        zone: String, count: usize, description: String, allow_skip: bool,
+    ) -> Self {
+        Choice::SelectCard {
+            zone, card_type: None, count, description, allow_skip,
+            cost_limit: None, cost_limit_operator: None, group: None,
+            characters: None, filtered_indices: None, is_select_action: false,
+        }
+    }
+
     /// Convert to the JSON format expected by the frontend.
     /// Flattens enum variants and adds frontend-specific fields (choose_count, v_remaining, title).
     pub fn to_frontend_json(&self) -> Option<Value> {

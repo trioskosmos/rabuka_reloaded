@@ -372,9 +372,11 @@ def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
 
 def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
     """Extract blade count limit from text like 'ブレードの数が3つ以下' (<=3 blades)."""
-    m = re.search(r'ブレード[の]数[がは](\d+)[つ個](以下|以上|未満|超)', text)
+    # Normalize: replace {{icon_blade.png|ブレード}} with just ブレード
+    normalized = re.sub(r'\{\{icon_blade\.png\|ブレード\}\}', 'ブレード', text)
+    m = re.search(r'ブレード[の]数[がは](\d+)[つ個](以下|以上|未満|超)', normalized)
     if not m:
-        m = re.search(r'ブレード[の]数[がは](\d+)(以下|以上|未満|超)', text)
+        m = re.search(r'ブレード[の]数[がは](\d+)(以下|以上|未満|超)', normalized)
     if m:
         result = {'blade_limit': int(m.group(1))}
         op = m.group(2)
@@ -1059,6 +1061,9 @@ def _handle_position_change_fields(text, action):
             action['position'] = 'center'
 
 def _try_position(text):
+    # If the text has condition markers, let _try_conditional or the fall-through handle it
+    if any(m in text for m in CONDITION_MARKERS) or '場合' in text or 'とき' in text or 'なら' in text:
+        return None
     for keyword in POSITION_KEYWORDS:
         if keyword in text:
             return {'type': 'position_condition', 'text': text}
@@ -1655,6 +1660,11 @@ def _fill_defaults(action, text):
     if '好きな枚数' in text or '好きな枚数まで' in text or '任意の枚数' in text:
         action['any_number'] = True
         action.pop('count', None)
+    # Extract blade count limit (e.g. "ブレードの数が3つ以下" → blade_limit=3, operator=<=")
+    if 'blade_limit' not in action and 'ブレード' in text:
+        bl = extract_blade_limit(text)
+        if bl:
+            action.update(bl)
     if action.get('original_value') and '元々の' in text:
         cnt = extract_count(text)
         if cnt is not None:

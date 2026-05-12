@@ -27,7 +27,6 @@ impl GameState {
                             conditional_choice: None,
                             execution_context: None,
                             selected_card_ids: Vec::new(),
-                            filtered_looked_at_indices: None,
                         };
 
                         self.ability_queue.enqueue(entry);
@@ -99,7 +98,7 @@ impl GameState {
             self.activating_card = entry.card_id;
 
             let (choice, looked_at, ctx, rev, result) = {
-                let mut resolver = crate::ability_resolver::AbilityResolver::new(self);
+                let mut resolver = crate::ability::resolver::AbilityResolver::new(self);
                 let result = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index);
                 let choice = resolver.get_pending_choice().cloned();
                 let looked_at = resolver.take_looked_at();
@@ -130,7 +129,7 @@ impl GameState {
         }
     }
 
-    pub fn get_pending_choice(&self) -> Option<&crate::ability_resolver::Choice> {
+    pub fn get_pending_choice(&self) -> Option<&crate::ability::types::Choice> {
         self.ability_queue.is_waiting_for_choice()
     }
 
@@ -190,7 +189,7 @@ impl GameState {
             ("opponent", Some("player2") | Some("p2")) => &mut self.player1,
             ("opponent", _) => &mut self.player2,
             ("both", _) => {
-                eprintln!("WARN: resolve_target_player_mut called with 'both' — returning player1, use execute_for_targets instead");
+                eprintln!("WARN: resolve_target_player_mut called with 'both'  Ereturning player1, use execute_for_targets instead");
                 &mut self.player1
             }
             _ => &mut self.player1,
@@ -401,27 +400,6 @@ impl GameState {
                 }
             }
         }).collect()
-    }
-
-    pub fn add_temporary_effect(
-        &mut self,
-        effect_type: String,
-        duration: Duration,
-        target_player_id: String,
-        description: String,
-    ) {
-        let order = self.effect_creation_counter;
-        self.effect_creation_counter += 1;
-        self.temporary_effects.push(TemporaryEffect {
-            effect_type,
-            duration,
-            created_turn: self.turn_number,
-            created_phase: self.current_phase.clone(),
-            target_player_id,
-            description,
-            creation_order: order,
-            effect_data: None,
-        });
     }
 
     pub fn get_temporary_effects_in_order(&self) -> Vec<&TemporaryEffect> {
@@ -638,3 +616,4 @@ impl GameState {
         self.loop_detected
     }
 }
+

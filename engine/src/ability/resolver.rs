@@ -75,19 +75,12 @@ impl<'a> AbilityResolver<'a> {
             return Err(format!("Not enough cards in {}: need {}", zone_name, count));
         }
         if idxs.len() > count {
-            self.pending_choice = Some(Choice::SelectCard {
-                zone: zone_name.to_string(),
-                card_type: None,
-                count: 0,
-                description: format!("Select {} card(s) to {} for cost", count, zone_name),
-                allow_skip: true,
-                cost_limit: None,
-                cost_limit_operator: None,
-                group: None,
-                characters: None,
-                filtered_indices: None,
-                is_select_action: false,
-            });
+            self.pending_choice = Some(Choice::select_card(
+                zone_name.to_string(),
+                0,
+                format!("Select {} card(s) to {} for cost", count, zone_name),
+                true,
+            ));
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);
         }
@@ -313,23 +306,9 @@ impl<'a> AbilityResolver<'a> {
     /// Walk the ability's effect tree to find modify_cost sub-actions and adjust the cost.
     /// Handles patterns like "コストはグループ名1種類につきE減る" (cost reduced per group name).
     fn apply_modify_cost_to_ability_cost(&self, cost: &AbilityCost, ability: &Ability) -> AbilityCost {
-        fn find_modify_cost(effect: &AbilityEffect) -> Option<&AbilityEffect> {
-            if effect.action == "modify_cost" { return Some(effect); }
-            if effect.action == "sequential" {
-                if let Some(ref actions) = effect.compound.actions {
-                    for sub in actions {
-                        if let Some(found) = find_modify_cost(sub) {
-                            return Some(found);
-                        }
-                    }
-                }
-            }
-            None
-        }
-
         let mut cost = cost.clone();
         if let Some(ref effect) = ability.effect {
-            if let Some(mod_cost) = find_modify_cost(effect) {
+            if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
                 if mod_cost.operation.as_deref() == Some("subtract") {
                     if mod_cost.per_unit.unwrap_or(false) {
                         if mod_cost.per_unit_type.as_deref() == Some("group_name") {

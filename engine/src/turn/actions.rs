@@ -72,7 +72,7 @@ impl super::TurnEngine {
                     .map_or(false, |c| c.location.as_deref() == Some("hand"))
         });
         if is_hand_activation {
-            // Card activates from hand — verify it's in hand, skip stage position checks
+            // Card activates from hand  Everify it's in hand, skip stage position checks
             if !player.hand.cards.contains(&card_id) {
                 return Err("Card not found in hand".to_string());
             }
@@ -108,17 +108,17 @@ impl super::TurnEngine {
         Self::resume_queue_with_choice(game_state, choice, result)
     }
 
-    fn build_choice_result(choice: &crate::ability_resolver::Choice, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<crate::ability_resolver::ChoiceResult, String> {
+    fn build_choice_result(choice: &crate::ability::types::Choice, card_id: Option<i16>, card_indices: Option<Vec<usize>>) -> Result<crate::ability::types::ChoiceResult, String> {
         match choice {
-            crate::ability_resolver::Choice::SelectCard { .. } => {
+            crate::ability::types::Choice::SelectCard { .. } => {
                 let indices = card_indices.unwrap_or_else(|| {
                     // Allow select_option(0) to produce indices [0] for SelectCard choices
                     // (instead of requiring card_indices to be explicitly passed)
                     card_id.map(|id| vec![id as usize]).unwrap_or_default()
                 });
-                Ok(crate::ability_resolver::ChoiceResult::CardSelected { indices })
+                Ok(crate::ability::types::ChoiceResult::CardSelected { indices })
             }
-            crate::ability_resolver::Choice::SelectTarget { target, .. } => {
+            crate::ability::types::Choice::SelectTarget { target, .. } => {
                 let selected = match target.as_str() {
                     "pay_optional_cost:skip_optional_cost" => {
                         if card_id == Some(1) { "pay_optional_cost".to_string() } else { "skip_optional_cost".to_string() }
@@ -131,26 +131,26 @@ impl super::TurnEngine {
                     }
                     _ => card_id.map(|id| id.to_string()).unwrap_or_else(|| "0".into())
                 };
-                Ok(crate::ability_resolver::ChoiceResult::TargetSelected { target: selected })
+                Ok(crate::ability::types::ChoiceResult::TargetSelected { target: selected })
             }
-            crate::ability_resolver::Choice::SelectPosition { .. } => {
+            crate::ability::types::Choice::SelectPosition { .. } => {
                 let pos = card_id.map(|id| match id { 0 => "left".into(), 1 => "center".into(), 2 => "right".into(), _ => "center".into() }).unwrap_or_else(|| "center".into());
-                Ok(crate::ability_resolver::ChoiceResult::PositionSelected { position: pos })
+                Ok(crate::ability::types::ChoiceResult::PositionSelected { position: pos })
             }
-            crate::ability_resolver::Choice::SelectHeartColor { count: _, options, description: _ } => {
+            crate::ability::types::Choice::SelectHeartColor { count: _, options, description: _ } => {
                 let idx = card_id.unwrap_or(0) as usize;
                 let chosen = if idx < options.len() { options[idx].clone() } else { "heart00".to_string() };
-                Ok(crate::ability_resolver::ChoiceResult::HeartColorSelected { colors: vec![chosen] })
+                Ok(crate::ability::types::ChoiceResult::HeartColorSelected { colors: vec![chosen] })
             }
-            crate::ability_resolver::Choice::SelectHeartType { count: _, options, description: _ } => {
+            crate::ability::types::Choice::SelectHeartType { count: _, options, description: _ } => {
                 let idx = card_id.unwrap_or(0) as usize;
                 let chosen = if idx < options.len() { options[idx].clone() } else { "heart00".to_string() };
-                Ok(crate::ability_resolver::ChoiceResult::HeartTypeSelected { types: vec![chosen] })
+                Ok(crate::ability::types::ChoiceResult::HeartTypeSelected { types: vec![chosen] })
             }
         }
     }
 
-    fn resume_queue_with_choice(game_state: &mut GameState, choice: crate::ability_resolver::Choice, result: crate::ability_resolver::ChoiceResult) -> Result<(), String> {
+    fn resume_queue_with_choice(game_state: &mut GameState, choice: crate::ability::types::Choice, result: crate::ability::types::ChoiceResult) -> Result<(), String> {
         game_state.ability_queue.resume_with_choice(result.clone());
         let saved_ctx = game_state.ability_queue.current_entry()
             .and_then(|e| e.execution_context.clone())
@@ -161,7 +161,7 @@ impl super::TurnEngine {
         let had_pending_sequential = game_state.pending_sequential_actions.as_ref()
             .map(|v| !v.is_empty()).unwrap_or(false);
         let (new_choice, looked_at, ctx, rev, res) = {
-            let mut resolver = crate::ability_resolver::AbilityResolver::new(game_state);
+            let mut resolver = crate::ability::resolver::AbilityResolver::new(game_state);
             resolver.execution_context = saved_ctx.clone();
             resolver.pending_choice = Some(choice);
             let res = resolver.provide_choice_result(result);
@@ -191,7 +191,7 @@ impl super::TurnEngine {
             game_state.activating_card = None;
             if cost_was_paid && !had_pending_sequential && saved_ctx == ExecutionContext::None {
                 // Cost was paid, no pending sequential actions existed before this choice
-                // resolution, and the effect hadn't started yet → start it now.
+                // resolution, and the effect hadn't started yet ↁEstart it now.
                 game_state.process_current_ability();
                 let player_id = game_state.ability_queue.current_entry()
                     .map(|e| e.player_id.clone())
@@ -199,7 +199,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
             } else if cost_was_paid {
                 // Cost was paid and pending sequential actions existed before this choice
-                // resolution — they were just processed by the choice handler (e.g.
+                // resolution  Ethey were just processed by the choice handler (e.g.
                 // handle_choice_string_store). The ability effect is now complete.
                 game_state.ability_queue.complete_current();
                 let player_id = game_state.ability_queue.current_entry()
@@ -296,3 +296,4 @@ impl super::TurnEngine {
         player.hand.cards = held_back.into_iter().rev().collect();
     }
 }
+

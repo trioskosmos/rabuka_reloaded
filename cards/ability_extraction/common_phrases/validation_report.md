@@ -1,10 +1,10 @@
 # Parser Validation Report
 
-Generated: 2026-05-12T19:16:59.634125
+Generated: 2026-05-13T01:17:16.871100
 
 Total abilities: 645
 
-## WARNING (59)
+## WARNING (60)
 
 - **#23** `any_number_missing`: any_number=True in tree
   - Text: `手札にあるメンバーカードを好きな枚数公開する：公開したカードのコストの合計が、10、20、30、40、50のいずれかの場合、ライブ終了時まで、「{{jyouji`
@@ -117,7 +117,7 @@ Total abilities: 645
 
 - **#262** `stage_dest_missing`: destination=stage expected for ステージに置く/登場させる
   - Text: `{{icon_energy.png|E}}{{icon_energy.png|E}}このメンバーをステージから控え室に置く：自分の手札からコスト13以下の「優木`
-  - Actual: dests={'same_area', 'under_member', 'discard'}
+  - Actual: dests={'under_member', 'same_area', 'discard'}
 
 - **#264** `multiple_targets_missing`: multiple_targets=True in tree
   - Text: `相手のステージにいる「ミア・テイラー」以外のメンバーを1人選ぶ。そのメンバーが持つハートと、このメンバーが持つハートの中に同じ色のハートがある場合、ライブ終了時`
@@ -134,6 +134,10 @@ Total abilities: 645
 - **#275** `max_flag_missing`: max=True in tree
   - Text: `メンバーを3人までウェイトにしてもよい：これによりウェイト状態にしたメンバー1人につき、カードを1枚引く。`
   - Actual: max=set()
+
+- **#287** `stage_dest_missing`: destination=stage expected for ステージに置く/登場させる
+  - Text: `自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエ`
+  - Actual: dests={'empty_area'}
 
 - **#304** `hand_to_discard_not_found`: source=hand AND dest=discard somewhere in tree
   - Text: `カードを2枚引き、手札を2枚控え室に置く。（この能力は左サイドエリアか右サイドエリアに登場した場合のみ発動する。）`
@@ -442,7 +446,7 @@ Total abilities: 645
 
 ## Summary
 
-- Total: 102
+- Total: 103
 - Errors: 0
-- Warnings: 59
+- Warnings: 60
 - Infos: 43

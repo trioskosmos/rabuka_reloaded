@@ -34,11 +34,11 @@ fn remove_cards_from_hand(player: &mut crate::player::Player, indices: &[usize])
 }
 
 impl<'a> AbilityResolver<'a> {
-    pub fn execute_move_cards(&mut self, _effect: &AbilityEffect) -> Result<(), String> {
+    pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         // Resolve dynamic_count if count is not explicitly set
-        let count = if _effect.count.is_some() {
-            _effect.count.unwrap() as usize
-        } else if let Some(ref dc) = _effect.dynamic_count {
+        let count = if effect.count.is_some() {
+            effect.count.unwrap() as usize
+        } else if let Some(ref dc) = effect.dynamic_count {
             match dc.count_type.as_str() {
                 "revealed_cards" => {
                     // Count cards revealed by a previous cost/effect step
@@ -54,11 +54,11 @@ impl<'a> AbilityResolver<'a> {
         } else {
             0
         };
-        let group_name = _effect.group_name();
+        let group_name = effect.group_name();
 
         // Handle or_card_types: let the player pick which type to search for
-        let card_type_owned: Option<String> = if let Some(or_types) = &_effect.or_card_types {
-            if or_types.is_empty() { _effect.card_type.clone() } else {
+        let card_type_owned: Option<String> = if let Some(or_types) = &effect.or_card_types {
+            if or_types.is_empty() { effect.card_type.clone() } else {
                 let chosen = self.game_state.ability_queue.current_entry()
                     .and_then(|e| e.conditional_choice.clone());
                 match chosen {
@@ -77,26 +77,26 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
             }
-        } else { _effect.card_type.clone() };
+        } else { effect.card_type.clone() };
         let card_type_filter: Option<&str> = card_type_owned.as_deref();
-        let tgt = _effect.target.clone();
-        let cost_limit = _effect.cost_limit;
-        let is_self_cost = _effect.self_cost.unwrap_or(false);
-        let exclude_self = _effect.exclude_self.unwrap_or(false);
-        let is_max = _effect.max.unwrap_or(false);
-        let is_all = _effect.all.unwrap_or(false);
+        let tgt = effect.target.clone();
+        let cost_limit = effect.cost_limit;
+        let is_self_cost = effect.self_cost.unwrap_or(false);
+        let exclude_self = effect.exclude_self.unwrap_or(false);
+        let is_max = effect.max.unwrap_or(false);
+        let is_all = effect.all.unwrap_or(false);
         let card_db = self.game_state.card_database.clone();
         let activating_card_id = self.game_state.activating_card;
         let vacated_stage_area = self.game_state.last_vacated_stage_area;
         self.game_state.last_vacated_stage_area = None;
 
         // Character name filter from the effect
-        // TEMPORARILY REVERTED: _effect.characters breaks Chika score tests
+        // TEMPORARILY REVERTED: effect.characters breaks Chika score tests
         let character_filter: Option<Vec<String>> = None;
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
-        let name_fragments: Option<Vec<String>> = if _effect.name_constraint.as_deref() == Some("contains_all")
-            && _effect.name_constraint_source.as_deref() == Some("revealed_card")
+        let name_fragments: Option<Vec<String>> = if effect.name_constraint.as_deref() == Some("contains_all")
+            && effect.name_constraint_source.as_deref() == Some("revealed_card")
         {
             let fragments: Vec<String> = self.game_state.revealed_cost_cards.iter()
                 .chain(self.game_state.revealed_cards.iter())
@@ -123,8 +123,8 @@ impl<'a> AbilityResolver<'a> {
         };
 
         let mut moved_cards: Vec<i16> = Vec::new();
-        let source = _effect.source.clone().unwrap_or_default();
-        let destination = _effect.destination.clone().unwrap_or_default();
+        let source = effect.source.clone().unwrap_or_default();
+        let destination = effect.destination.clone().unwrap_or_default();
 
         {
             let player = match tgt.as_ref().map(|s: &String| s.as_str()).unwrap_or("self") {
@@ -188,7 +188,7 @@ impl<'a> AbilityResolver<'a> {
                     } else {
                         let filter = util::filter_from_parts_full(card_type_filter, group_name, cost_limit, None, character_filter.as_ref(), name_fragments.as_ref(), None, if exclude_self { activating_card_id } else { None });
                         let mut idxs = util::matching_indices(&player.stage.stage, &card_db, &filter, true);
-                        if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < 3 && player.stage.stage[i] == aid); } }
+                        if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < 3 && player.stage.stage[i] == aid); } }
                         match classify_selection(&idxs, count, is_all, InsufficientBehavior::Silent)? {
                             SelectionOutcome::Exact(indices) => {
                                 let (cards, vacated) = Self::stage_remove_with_vacated(player, &indices, &card_db);
@@ -199,7 +199,7 @@ impl<'a> AbilityResolver<'a> {
                                 self.pending_choice = Some(Choice::SelectCard {
                                     zone: "stage".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                                     count, description: format!("Select {} card(s) from stage", count), allow_skip: false,
-                                    cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
+                                    cost_limit, cost_limit_operator: effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
                     filtered_indices: None,
                     is_select_action: false,
                 });
@@ -215,12 +215,12 @@ impl<'a> AbilityResolver<'a> {
                 "hand" => {
                     let filter = util::filter_from_parts_full(card_type_filter, group_name, cost_limit, None, character_filter.as_ref(), name_fragments.as_ref(), None, None);
                     let mut idxs = util::matching_indices(&player.hand.cards, &card_db, &filter, false);
-                    if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.hand.cards.len() && player.hand.cards[i] == aid); } }
+                    if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.hand.cards.len() && player.hand.cards[i] == aid); } }
                     match classify_selection(&idxs, count, is_all, InsufficientBehavior::Silent)? {
                         SelectionOutcome::Exact(indices) => remove_cards_from_hand(player, &indices),
                         SelectionOutcome::Prompt | SelectionOutcome::Skip => {
                             // Always prompt for hand selection - optional determines if skip is allowed
-                            let is_optional = _effect.optional.unwrap_or(false);
+                            let is_optional = effect.optional.unwrap_or(false);
                             self.pending_choice = Some(Choice::SelectCard {
                                 zone: "hand".to_string(),
                                 card_type: card_type_filter.map(|s| s.to_string()),
@@ -228,7 +228,7 @@ impl<'a> AbilityResolver<'a> {
                                 description: format!("Select {} card(s) from hand", count),
                                 allow_skip: is_optional,
                                 cost_limit,
-                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                cost_limit_operator: effect.cost_limit_operator.clone(),
                                 group: group_name.map(|s| s.to_string()),
                                 characters: character_filter.clone(),
                     filtered_indices: None,
@@ -243,7 +243,7 @@ impl<'a> AbilityResolver<'a> {
                     let filter = util::filter_from_parts_full(card_type_filter, group_name, cost_limit, None, character_filter.as_ref(), name_fragments.as_ref(), None, None);
                     let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
                     idxs.retain(|&i| i < player.waitroom.cards.len());
-                    if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.waitroom.cards.len() && player.waitroom.cards[i] == aid); } }
+                    if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.waitroom.cards.len() && player.waitroom.cards[i] == aid); } }
                     match classify_selection(&idxs, count, is_all, InsufficientBehavior::Silent)? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
@@ -255,7 +255,7 @@ impl<'a> AbilityResolver<'a> {
                                 description: format!("Select {} card(s) from discard", count),
                                 allow_skip: false,
                                 cost_limit,
-                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                cost_limit_operator: effect.cost_limit_operator.clone(),
                                 group: group_name.map(|s| s.to_string()),
                                 characters: character_filter.clone(),
                                 filtered_indices: None,
@@ -269,7 +269,7 @@ impl<'a> AbilityResolver<'a> {
                 "energy_zone" => {
                     let filter = util::filter_from_parts(card_type_filter, None, None, None, character_filter.as_ref(), None);
                     let mut idxs = util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
-                    if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.energy_zone.cards.len() && player.energy_zone.cards[i] == aid); } }
+                    if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.energy_zone.cards.len() && player.energy_zone.cards[i] == aid); } }
                     match classify_selection(&idxs, count, is_all, InsufficientBehavior::Error("Not enough cards in energy zone"))? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.energy_zone.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
@@ -280,7 +280,7 @@ impl<'a> AbilityResolver<'a> {
                                 description: format!("Select {} card(s) from energy zone", count),
                                 allow_skip: false,
                                 cost_limit,
-                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                cost_limit_operator: effect.cost_limit_operator.clone(),
                                 group: group_name.map(|s| s.to_string()),
                                 characters: character_filter.clone(),
                                 filtered_indices: None,
@@ -294,7 +294,7 @@ impl<'a> AbilityResolver<'a> {
                 "live_card_zone" => {
                     let filter = util::filter_from_parts(Some("live_card"), group_name, cost_limit, None, character_filter.as_ref(), None);
                     let mut idxs = util::matching_indices(&player.live_card_zone.cards, &card_db, &filter, false);
-                    if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.live_card_zone.cards.len() && player.live_card_zone.cards[i] == aid); } }
+                    if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.live_card_zone.cards.len() && player.live_card_zone.cards[i] == aid); } }
                     match classify_selection(&idxs, count, false, InsufficientBehavior::Error("Not enough cards in live card zone"))? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.live_card_zone.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
@@ -314,23 +314,16 @@ impl<'a> AbilityResolver<'a> {
                 "success_live_zone" => {
                     let filter = util::filter_from_parts(None, None, None, None, character_filter.as_ref(), None);
                     let mut idxs = util::matching_indices(&player.success_live_card_zone.cards, &card_db, &filter, false);
-                    if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.success_live_card_zone.cards.len() && player.success_live_card_zone.cards[i] == aid); } }
+                    if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.success_live_card_zone.cards.len() && player.success_live_card_zone.cards[i] == aid); } }
                     match classify_selection(&idxs, count, false, InsufficientBehavior::Error("Not enough cards in success live zone"))? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.success_live_card_zone.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "success_live_zone".to_string(),
-                                card_type: None,
+                            self.pending_choice = Some(Choice::select_card(
+                                "success_live_zone".to_string(),
                                 count,
-                                description: format!("Select {} card(s) from success live zone", count),
-                                allow_skip: false,
-                                cost_limit: None,
-                                cost_limit_operator: None,
-                                group: None,
-                                characters: None,
-                                filtered_indices: None,
-                                is_select_action: false,
-                            });
+                                format!("Select {} card(s) from success live zone", count),
+                                false,
+                            ));
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -339,7 +332,7 @@ impl<'a> AbilityResolver<'a> {
                 "those_cards" => {
                     let filter = util::filter_from_parts(card_type_filter, group_name, None, None, character_filter.as_ref(), None);
                     let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
-                    if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.waitroom.cards.len() && player.waitroom.cards[i] == aid); } }
+                    if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.waitroom.cards.len() && player.waitroom.cards[i] == aid); } }
                     match classify_selection(&idxs, count, false, InsufficientBehavior::Silent)? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
@@ -351,7 +344,7 @@ impl<'a> AbilityResolver<'a> {
                                 description: format!("Select {} card(s) from discard", count),
                                 allow_skip: false,
                                 cost_limit,
-                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                cost_limit_operator: effect.cost_limit_operator.clone(),
                                 group: group_name.map(|s| s.to_string()),
                                 characters: character_filter.clone(),
                                 filtered_indices: None,
@@ -379,7 +372,7 @@ impl<'a> AbilityResolver<'a> {
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "looked_at".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                             count, description: format!("Select {} card(s) from looked-at cards", count), allow_skip: false,
-                            cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
+                            cost_limit, cost_limit_operator: effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
                             filtered_indices: None,
                             is_select_action: false,
                         });
@@ -424,7 +417,7 @@ impl<'a> AbilityResolver<'a> {
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "selected_cards".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                             count, description: format!("Select {} card(s) from selected cards", count), allow_skip: false,
-                            cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(),
+                            cost_limit, cost_limit_operator: effect.cost_limit_operator.clone(),
                             group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
                             filtered_indices: None,
                             is_select_action: false,
@@ -466,7 +459,7 @@ impl<'a> AbilityResolver<'a> {
                         self.pending_choice = Some(Choice::SelectCard {
                             zone: "revealed_cards".to_string(), card_type: card_type_filter.map(|s| s.to_string()),
                             count, description: format!("Select {} card(s) from revealed cards", count), allow_skip: false,
-                            cost_limit, cost_limit_operator: _effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
+                            cost_limit, cost_limit_operator: effect.cost_limit_operator.clone(), group: group_name.map(|s| s.to_string()), characters: character_filter.clone(),
                             filtered_indices: None,
                             is_select_action: false,
                         });
@@ -479,7 +472,7 @@ impl<'a> AbilityResolver<'a> {
             };
 
             // --- STEP 2: Any-order deck placement (before consuming taken) ---
-            if source == "discard" && destination == "deck" && _effect.placement_order.as_deref() == Some("any_order") && taken.len() > 1 {
+            if source == "discard" && destination == "deck" && effect.placement_order.as_deref() == Some("any_order") && taken.len() > 1 {
                 let taken_count = taken.len();
                 for &c in &taken { moved_cards.push(c); }
                 self.looked_at_cards = taken.clone();
@@ -493,7 +486,7 @@ impl<'a> AbilityResolver<'a> {
             }
 
             // Apply distinct card name filter if specified
-            let distinct = _effect.distinct.as_deref();
+            let distinct = effect.distinct.as_deref();
             if distinct == Some("card_name") || distinct == Some("true") || distinct == Some("distinct") {
                 let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
                 taken.retain(|&id| {
@@ -507,7 +500,7 @@ impl<'a> AbilityResolver<'a> {
             }
 
             // --- STEP 3: Place cards in destination ---
-            let deck_pos = _effect.position.as_ref().and_then(|p| match p {
+            let deck_pos = effect.position.as_ref().and_then(|p| match p {
                 crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
                 crate::card::PositionInfo::Struct { position, .. } => position.as_ref().and_then(|s| s.parse::<usize>().ok()),
             }).map(|p| if p > 0 { p - 1 } else { 0 });
@@ -532,7 +525,7 @@ impl<'a> AbilityResolver<'a> {
                         let pos_target = tgt.clone().unwrap_or_else(|| "self".to_string());
                         self.execution_context = crate::ability::types::ExecutionContext::MoveCardsPosition {
                             card_id: *card_id,
-                            state_change: _effect.state_change.clone(),
+                            state_change: effect.state_change.clone(),
                             target: pos_target,
                         };
                         return Ok(());
@@ -549,7 +542,7 @@ impl<'a> AbilityResolver<'a> {
         }
 
         // --- STEP 3: Apply state_change to moved cards ---
-        if let Some(ref sc) = _effect.state_change {
+        if let Some(ref sc) = effect.state_change {
             if sc == "wait" {
                 for card_id in &moved_cards { self.game_state.add_orientation_modifier(*card_id, "wait"); }
                 if destination == "energy_zone" {

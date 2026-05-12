@@ -1,5 +1,5 @@
 use crate::card::Ability;
-use crate::ability_resolver::Choice;
+use crate::ability::types::Choice;
 use crate::game_state::AbilityTrigger;
 use crate::ability::types::ExecutionContext;
 
@@ -43,7 +43,7 @@ pub struct AbilityQueueEntry {
     /// Whether the cost has been fully paid (for re-entry after cost choice)
     pub cost_paid: bool,
     /// Stored choice result for resumption
-    pub pending_choice_result: Option<crate::ability_resolver::ChoiceResult>,
+    pub pending_choice_result: Option<crate::ability::types::ChoiceResult>,
     /// Discriminator for choice handlers ("choice", "choice_string", "optional_cost", "position_change")
     pub choice_card_no: Option<String>,
     /// JSON-serialized options for choice/choice_string discriminators
@@ -52,8 +52,6 @@ pub struct AbilityQueueEntry {
     pub execution_context: Option<ExecutionContext>,
     /// Cards selected across sequential steps (for exclude_selected)
     pub selected_card_ids: Vec<i16>,
-    /// Mapping from filtered indices to original looked_at indices (for look_and_select)
-    pub filtered_looked_at_indices: Option<Vec<usize>>,
 }
 
 /// Unified ability queue with proper state management
@@ -154,15 +152,9 @@ impl AbilityQueue {
 
     /// Pause for user choice during ability execution
     pub fn pause_for_choice(&mut self, choice: Choice) {
-        let filtered = if let Choice::SelectCard { filtered_indices: Some(ref fidx), .. } = &choice {
-            Some(fidx.clone())
-        } else { None };
         let choice_clone = choice.clone();
         match &mut self.state {
             QueueState::PayingCost { entry_index } | QueueState::ExecutingEffect { entry_index } => {
-                if let Some(e) = self.entries.get_mut(*entry_index) {
-                    e.filtered_looked_at_indices = filtered;
-                }
                 self.state = QueueState::WaitingForChoice {
                     entry_index: *entry_index,
                     choice: choice_clone,
@@ -173,7 +165,7 @@ impl AbilityQueue {
     }
 
     /// Resume after user provides choice result
-    pub fn resume_with_choice(&mut self, result: crate::ability_resolver::ChoiceResult) {
+    pub fn resume_with_choice(&mut self, result: crate::ability::types::ChoiceResult) {
         match &self.state {
             QueueState::WaitingForChoice { entry_index, .. } => {
                 if let Some(entry) = self.entries.get_mut(*entry_index) {
@@ -227,3 +219,4 @@ impl Default for AbilityQueue {
         Self::new()
     }
 }
+

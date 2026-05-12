@@ -1,6 +1,6 @@
 #![recursion_limit = "512"]
 
-// Core data types — re-exported at crate root so all existing imports still work
+// Core data types  Ere-exported at crate root so all existing imports still work
 pub mod core;
 pub use core::card;
 pub use core::card_loader;
@@ -23,7 +23,7 @@ pub use game::web_server;
 
 pub mod turn;
 pub mod ability;
-pub mod ability_resolver;
 pub mod ability_queue;
 pub mod qa_test_suite;
 pub mod triggers;
+

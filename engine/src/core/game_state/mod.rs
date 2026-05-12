@@ -6,7 +6,6 @@ use crate::zones::ResolutionZone;
 use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
 
-pub use crate::config::RuleConfig;
 pub use crate::types::{AbilityTrigger, Duration, GameResult, Phase, ReplacementEffect, TemporaryEffect, TurnPhase,
     PerformanceSnapshot, LiveCardResult, MemberContribution, YellCardResult, Breakdown,
     HeartSource, BladeSource, Allocation, EffectEntry, ScoreLine, TriggeredAbility, Adjustment, AbilityBonus,
@@ -20,7 +19,6 @@ pub struct GameState {
     pub ability_queue: AbilityQueue,
     pub card_database: Arc<CardDatabase>,
     pub mods: Arc<GameModifiers>,
-    pub config: Arc<RuleConfig>,
     pub resolution_zone: ResolutionZone,
     pub pending_choice: Option<serde_json::Value>,
     pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
@@ -114,7 +112,6 @@ impl GameState {
             ability_queue: AbilityQueue::new(),
             card_database,
             mods: Arc::new(GameModifiers::new()),
-            config: Arc::new(RuleConfig::default()),
             resolution_zone: ResolutionZone::new(),
             pending_choice: None,
             pending_sequential_actions: None,

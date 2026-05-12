@@ -6,7 +6,7 @@ use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
 use rabuka_engine::types::{Phase, TurnPhase};
-use rabuka_engine::ability_resolver::AbilityResolver;
+use rabuka_engine::ability::resolver::AbilityResolver;
 
 const FILLER: &str = "PL!-sd1-010-SD";
 const ENERGY_CARD: &str = "LL-E-001-SD";
@@ -135,7 +135,7 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
     for _ in 0..10 {
         if let Some(id) = state.player1.energy_deck.draw() {
             state.player1.energy_zone.cards.push(id);
-            // Don't increment active count — these are wait cards
+            // Don't increment active count  Ethese are wait cards
         }
     }
     // Find a second member card of the same series as card_id for stage
@@ -314,3 +314,4 @@ fn main() {
     eprintln!("Results written to test_results.json");
     println!("{}", output_str);
 }
+

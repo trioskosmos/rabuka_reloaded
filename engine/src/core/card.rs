@@ -95,20 +95,7 @@ impl<'de> Deserialize<'de> for BladeHeart {
         
         let raw = RawBladeHeart::deserialize(deserializer)?;
         let hearts = raw.hearts.into_iter().map(|(k, v)| {
-            let color = match k.as_str() {
-                "heart00" => HeartColor::Heart00,
-                "heart01" => HeartColor::Heart01,
-                "heart02" => HeartColor::Heart02,
-                "heart03" => HeartColor::Heart03,
-                "heart04" => HeartColor::Heart04,
-                "heart05" => HeartColor::Heart05,
-                "heart06" => HeartColor::Heart06,
-                "b_all" => HeartColor::BAll,
-                "draw" => HeartColor::Draw,
-                "score" => HeartColor::Score,
-                _ => HeartColor::Heart00,
-            };
-            (color, v)
+            (parse_heart_color(&k), v)
         }).collect();
         
         Ok(BladeHeart { hearts })
@@ -133,20 +120,7 @@ impl<'de> Deserialize<'de> for BaseHeart {
         
         let raw = RawBaseHeart::deserialize(deserializer)?;
         let hearts = raw.hearts.into_iter().map(|(k, v)| {
-            let color = match k.as_str() {
-                "heart00" => HeartColor::Heart00,
-                "heart01" => HeartColor::Heart01,
-                "heart02" => HeartColor::Heart02,
-                "heart03" => HeartColor::Heart03,
-                "heart04" => HeartColor::Heart04,
-                "heart05" => HeartColor::Heart05,
-                "heart06" => HeartColor::Heart06,
-                "b_all" => HeartColor::BAll,
-                "draw" => HeartColor::Draw,
-                "score" => HeartColor::Score,
-                _ => HeartColor::Heart00,
-            };
-            (color, v)
+            (parse_heart_color(&k), v)
         }).collect();
         
         Ok(BaseHeart { hearts })
@@ -414,20 +388,7 @@ impl<'de> Deserialize<'de> for SpecialHeart {
         
         let raw = RawSpecialHeart::deserialize(deserializer)?;
         let hearts = raw.hearts.into_iter().map(|(k, v)| {
-            let color = match k.as_str() {
-                "heart00" => HeartColor::Heart00,
-                "heart01" => HeartColor::Heart01,
-                "heart02" => HeartColor::Heart02,
-                "heart03" => HeartColor::Heart03,
-                "heart04" => HeartColor::Heart04,
-                "heart05" => HeartColor::Heart05,
-                "heart06" => HeartColor::Heart06,
-                "b_all" => HeartColor::BAll,
-                "draw" => HeartColor::Draw,
-                "score" => HeartColor::Score,
-                _ => HeartColor::Heart00,
-            };
-            (color, v)
+            (parse_heart_color(&k), v)
         }).collect();
         
         Ok(SpecialHeart { hearts })
@@ -918,8 +879,26 @@ impl Card {
             // No heart requirement
             true
         }
+    }
 }
 
+pub fn parse_heart_color(s: &str) -> HeartColor {
+    match s {
+        "heart00" => HeartColor::Heart00,
+        "heart01" => HeartColor::Heart01,
+        "heart02" => HeartColor::Heart02,
+        "heart03" => HeartColor::Heart03,
+        "heart04" => HeartColor::Heart04,
+        "heart05" => HeartColor::Heart05,
+        "heart06" => HeartColor::Heart06,
+        "b_all" => HeartColor::BAll,
+        "draw" => HeartColor::Draw,
+        "score" => HeartColor::Score,
+        _ => HeartColor::Heart00,
+    }
+}
+
+impl Card {
     pub fn get_score(&self) -> u32 {
         self.score.unwrap_or(0)
     }
@@ -944,7 +923,7 @@ impl Card {
     /// Add hearts of specific color
     pub fn add_heart(&mut self, heart_color: &str, amount: u32) {
         if let Some(ref mut base_heart) = self.base_heart {
-            let color = crate::zones::parse_heart_color(heart_color);
+            let color = parse_heart_color(heart_color);
             *base_heart.hearts.entry(color).or_insert(0) += amount;
         }
     }
@@ -952,7 +931,7 @@ impl Card {
     /// Remove hearts of specific color (minimum 0)
     pub fn remove_heart(&mut self, heart_color: &str, amount: u32) {
         if let Some(ref mut base_heart) = self.base_heart {
-            let color = crate::zones::parse_heart_color(heart_color);
+            let color = parse_heart_color(heart_color);
             let current = base_heart.hearts.get(&color).copied().unwrap_or(0);
             if current <= amount {
                 base_heart.hearts.remove(&color);
@@ -965,7 +944,7 @@ impl Card {
     /// Set hearts to specific value
     pub fn set_heart(&mut self, heart_color: &str, amount: u32) {
         if let Some(ref mut base_heart) = self.base_heart {
-            let color = crate::zones::parse_heart_color(heart_color);
+            let color = parse_heart_color(heart_color);
             base_heart.hearts.insert(color, amount);
         }
     }

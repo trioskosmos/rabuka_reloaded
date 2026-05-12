@@ -207,28 +207,9 @@ impl Player {
             // Card was already removed from hand, so add 1 to get true hand count
             let hand_count = self.hand.cards.len() + 1;
             let mut cost_reduction: u32 = 0;
-            // Helper: find modify_cost effects inside ability effects, including nested in sequential
-            fn find_modify_cost<'a>(effect: &'a crate::card::AbilityEffect, op: &str, loc: &str) -> Option<&'a crate::card::AbilityEffect> {
-                if effect.action == "modify_cost"
-                    && effect.operation.as_deref() == Some(op)
-                    && effect.location.as_deref() == Some(loc)
-                {
-                    return Some(effect);
-                }
-                if effect.action == "sequential" {
-                    if let Some(ref actions) = effect.compound.actions {
-                        for sub in actions {
-                            if let Some(found) = find_modify_cost(sub, op, loc) {
-                                return Some(found);
-                            }
-                        }
-                    }
-                }
-                None
-            }
             for ability in &card.abilities {
                 if let Some(ref effect) = ability.effect {
-                    if let Some(_mod) = find_modify_cost(effect, "subtract", "hand") {
+                    if let Some(_mod) = crate::ability::util::find_modify_cost(effect, Some("subtract"), Some("hand")) {
                         let per_unit = _mod.per_unit_count.unwrap_or(1) as usize;
                         cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
                         break;

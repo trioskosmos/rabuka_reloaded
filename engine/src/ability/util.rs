@@ -1,6 +1,27 @@
 use crate::card::CardDatabase;
-use crate::zones::parse_heart_color;
+use crate::card::parse_heart_color;
 use crate::game_state::Duration;
+
+// ============== MODIFY COST ==============
+
+pub fn find_modify_cost<'a>(effect: &'a crate::card::AbilityEffect, op: Option<&str>, loc: Option<&str>) -> Option<&'a crate::card::AbilityEffect> {
+    if effect.action == "modify_cost"
+        && op.map_or(true, |o| effect.operation.as_deref() == Some(o))
+        && loc.map_or(true, |l| effect.location.as_deref() == Some(l))
+    {
+        return Some(effect);
+    }
+    if effect.action == "sequential" {
+        if let Some(ref actions) = effect.compound.actions {
+            for sub in actions {
+                if let Some(found) = find_modify_cost(sub, op, loc) {
+                    return Some(found);
+                }
+            }
+        }
+    }
+    None
+}
 
 // ============== INDIVIDUAL CARD PREDICATES ==============
 

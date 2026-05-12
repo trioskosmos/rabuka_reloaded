@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-12T21:01:19.007072",
+  "generated_at": "2026-05-13T01:05:53.585582",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -3330,7 +3330,9 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "original_value": true
+        "original_value": true,
+        "blade_limit": 3,
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -3631,16 +3633,22 @@
       "effect": {
         "text": "相手のステージにいる元々持つ{{icon_blade.png|ブレード}}の数が3つ以下のすべてのメンバーをウェイトにする",
         "condition": {
-          "type": "position_condition",
           "text": "{{center.png|センター}}自分のステージの右サイドエリアと左サイドエリアにいるメンバーのコストが同じ場合",
-          "position": "left_side"
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "comparison_type": "equality",
+          "operator": "=",
+          "type": "location_condition"
         },
         "state_change": "wait",
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
         "original_value": true,
-        "all": true
+        "all": true,
+        "blade_limit": 3,
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -5146,7 +5154,12 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "μ's"
+          ],
+          "cost_limit": 9,
+          "cost_limit_operator": ">="
         }
       }
     },
@@ -5478,7 +5491,12 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Aqours"
+          ],
+          "cost_limit": 9,
+          "cost_limit_operator": ">="
         }
       }
     },
@@ -5515,7 +5533,8 @@
           "heart_colors": [
             "heart04"
           ],
-          "optional": true
+          "optional": true,
+          "cost_limit_operator": ">="
         },
         "heart_colors": [
           "heart04"
@@ -5869,7 +5888,12 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "虹ヶ咲"
+          ],
+          "cost_limit": 9,
+          "cost_limit_operator": ">="
         }
       }
     },
@@ -6129,7 +6153,12 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Liella!"
+          ],
+          "cost_limit": 9,
+          "cost_limit_operator": ">="
         }
       }
     },
@@ -6533,7 +6562,12 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "蓮ノ空"
+          ],
+          "cost_limit": 9,
+          "cost_limit_operator": ">="
         }
       }
     },
@@ -7272,9 +7306,12 @@
       "effect": {
         "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
-          "type": "position_condition",
           "text": "ステージのセンターエリアにいる場合",
-          "position": "center"
+          "location": "stage",
+          "count": 1,
+          "operator": ">=",
+          "target": "self",
+          "type": "comparison_condition"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -7318,7 +7355,10 @@
           "reveal": true,
           "count": 1,
           "max": true,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Liella!"
+          ]
         }
       }
     },
@@ -7449,7 +7489,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Liella!"
+          ]
         }
       }
     },
@@ -7608,7 +7651,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "みらくらぱーく！"
+          ]
         }
       }
     },
@@ -8325,7 +8371,9 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "cost_limit": 11,
+          "cost_limit_operator": ">="
         }
       }
     },
@@ -8373,9 +8421,13 @@
       "effect": {
         "text": "{{heart_03.png|heart03}}を得る",
         "condition": {
-          "type": "position_condition",
           "text": "自分のステージにいるメンバーのうち、センターエリアにいるメンバーが最も大きいコストを持つ場合",
-          "position": "center"
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "operator": ">",
+          "comparison_type": "cost",
+          "type": "comparison_condition"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -8421,7 +8473,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Liella!"
+          ]
         }
       }
     },
@@ -8462,7 +8517,10 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Liella!"
+          ]
         }
       }
     },
@@ -9705,7 +9763,10 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Aqours"
+          ]
         }
       }
     },
@@ -10071,7 +10132,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "虹ヶ咲"
+          ]
         }
       }
     },
@@ -10263,7 +10327,9 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "original_value": true
+        "original_value": true,
+        "blade_limit": 3,
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -10538,7 +10604,9 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "original_value": true
+        "original_value": true,
+        "blade_limit": 1,
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -10769,11 +10837,6 @@
         "parenthetical": [
           "この能力はセンターエリアにいる場合のみ発動する。"
         ],
-        "activation_condition_parsed": {
-          "type": "position_condition",
-          "text": "この能力はセンターエリアにいる場合のみ発動する。",
-          "position": "center"
-        },
         "activation_position": "center"
       }
     },
@@ -10839,7 +10902,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "lilywhite"
+          ]
         }
       }
     },
@@ -11016,7 +11082,10 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "μ's"
+          ]
         }
       }
     },
@@ -11502,7 +11571,11 @@
           "reveal": true,
           "count": 1,
           "card_type": "live_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Liella!"
+          ],
+          "cost_limit_operator": ">="
         }
       }
     },
@@ -13001,7 +13074,9 @@
         "card_type": "member_card",
         "target": "opponent",
         "action": "change_state",
-        "original_value": true
+        "original_value": true,
+        "blade_limit": 2,
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -13571,7 +13646,9 @@
         "target": "both",
         "action": "change_state",
         "original_value": true,
-        "all": true
+        "all": true,
+        "blade_limit": 3,
+        "blade_limit_operator": "<="
       }
     },
     {
@@ -14086,7 +14163,10 @@
           "reveal": true,
           "count": 1,
           "card_type": "live_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "μ's"
+          ]
         }
       }
     },
@@ -15544,7 +15624,10 @@
           "count": 1,
           "card_type": "live_card",
           "max": true,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "虹ヶ咲"
+          ]
         }
       }
     },
@@ -15956,7 +16039,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "CatChu!"
+          ]
         }
       }
     },
@@ -15995,7 +16081,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "KALEIDOSCORE"
+          ]
         }
       }
     },
@@ -16034,7 +16123,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "5yncri5e!"
+          ]
         }
       }
     },
@@ -17719,9 +17811,18 @@
       "effect": {
         "text": "以下から1つを選ぶ。\n・ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。\n・相手のステージにいるコスト4以下のメンバー1人をウェイトにする",
         "condition": {
-          "type": "position_condition",
           "text": "自分のステージのセンターエリアにコスト9以上の『Aqours』のメンバーがいる場合",
-          "position": "center"
+          "target": "self",
+          "location": "stage",
+          "card_type": "member_card",
+          "count": 9,
+          "operator": ">=",
+          "comparison_type": "cost",
+          "group_names": [
+            "Aqours"
+          ],
+          "cost_limit": 9,
+          "type": "comparison_condition"
         },
         "action": "sequential",
         "actions": [
@@ -18785,9 +18886,15 @@
       "effect": {
         "text": "このカードのスコアを+2する",
         "condition": {
-          "type": "position_condition",
           "text": "自分のセンターエリアに{{icon_blade.png|ブレード}}を9つ以上持つ『μ's』のメンバーがいる場合",
-          "position": "center"
+          "target": "self",
+          "card_type": "member_card",
+          "count": 9,
+          "operator": ">=",
+          "group_names": [
+            "μ's"
+          ],
+          "type": "group_condition"
         },
         "action": "modify_score",
         "value": 2,
@@ -19445,11 +19552,6 @@
         "parenthetical": [
           "この能力は左サイドエリアにいる場合のみ発動する。"
         ],
-        "activation_condition_parsed": {
-          "type": "position_condition",
-          "text": "この能力は左サイドエリアにいる場合のみ発動する。",
-          "position": "left_side"
-        },
         "activation_position": "left_side"
       }
     },
@@ -19514,11 +19616,6 @@
         "parenthetical": [
           "この能力は右サイドエリアにいる場合のみ発動する。"
         ],
-        "activation_condition_parsed": {
-          "type": "position_condition",
-          "text": "この能力は右サイドエリアにいる場合のみ発動する。",
-          "position": "right_side"
-        },
         "activation_position": "right_side"
       }
     },
@@ -19657,9 +19754,16 @@
       "effect": {
         "text": "このカードのスコアを+1する",
         "condition": {
-          "type": "position_condition",
           "text": "自分のセンターエリアにいる『Liella!』のメンバーのコストが、相手のセンターエリアにいるメンバーより高い場合",
-          "position": "center"
+          "target": "both",
+          "card_type": "member_card",
+          "comparison_target": "opponent",
+          "operator": ">",
+          "comparison_type": "cost",
+          "group_names": [
+            "Liella!"
+          ],
+          "type": "comparison_condition"
         },
         "action": "modify_score",
         "value": 1,
@@ -19681,9 +19785,20 @@
       "effect": {
         "text": "そのメンバーは、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "condition": {
-          "type": "position_condition",
           "text": "自分のステージの左サイドエリアにいる『Liella!』のメンバーが{{heart_02.png|heart02}}を3つ以上持つ場合",
-          "position": "left_side"
+          "target": "self",
+          "location": "stage",
+          "count": 3,
+          "resource_type": "heart_02",
+          "heart_colors": [
+            "heart02"
+          ],
+          "card_type": "member_card",
+          "operator": ">=",
+          "group_names": [
+            "Liella!"
+          ],
+          "type": "comparison_condition"
         },
         "duration": "live_end",
         "card_type": "member_card",
@@ -19906,6 +20021,7 @@
           "count": 1,
           "card_type": "member_card",
           "optional": true,
+          "cost_limit_operator": "<=",
           "original_value": true
         },
         "original_value": true
@@ -20315,9 +20431,13 @@
         "per_unit_count": 2,
         "per_unit_type": "つ",
         "condition": {
-          "type": "position_condition",
           "text": "自分のセンターエリアに『μ's』のメンバーがいる場合",
-          "position": "center"
+          "target": "self",
+          "card_type": "member_card",
+          "group_names": [
+            "μ's"
+          ],
+          "type": "group_condition"
         },
         "position": "center",
         "heart_colors": [
@@ -21232,7 +21352,11 @@
           "reveal": true,
           "count": 1,
           "card_type": "member_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "SunnyPassion",
+            "Liella!"
+          ]
         }
       }
     },
@@ -22356,7 +22480,10 @@
           "heart_colors": [
             "heart05"
           ],
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "蓮ノ空"
+          ]
         },
         "heart_colors": [
           "heart05"
@@ -22904,7 +23031,10 @@
           "reveal": true,
           "count": 1,
           "card_type": "live_card",
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "Aqours"
+          ]
         }
       }
     },
@@ -23250,7 +23380,10 @@
           "discard_remaining": true,
           "reveal": true,
           "count": 1,
-          "optional": true
+          "optional": true,
+          "group_names": [
+            "DOLLCHESTRA"
+          ]
         }
       }
     },

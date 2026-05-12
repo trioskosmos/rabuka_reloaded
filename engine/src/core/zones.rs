@@ -351,19 +351,7 @@ impl Stage {
 }
 
 pub fn parse_heart_color(s: &str) -> HeartColor {
-    match s {
-        "heart00" => HeartColor::Heart00,
-        "heart01" => HeartColor::Heart01,
-        "heart02" => HeartColor::Heart02,
-        "heart03" => HeartColor::Heart03,
-        "heart04" => HeartColor::Heart04,
-        "heart05" => HeartColor::Heart05,
-        "heart06" => HeartColor::Heart06,
-        "b_all" => HeartColor::BAll,
-        "draw" => HeartColor::Draw,
-        "score" => HeartColor::Score,
-        _ => HeartColor::Heart00,
-    }
+    crate::card::parse_heart_color(s)
 }
 
 #[derive(Debug, Clone)]
