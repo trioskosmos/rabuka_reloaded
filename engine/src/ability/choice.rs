@@ -351,7 +351,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
 
         match zone {
-            "hand" => self.execute_selected_cards_from_hand(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?,
+            "hand" => {
+                if indices.is_empty() && !allow_skip && count > 0 {
+                    self.execute_selected_cards_from_hand(&[0usize], count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?
+                } else if !indices.is_empty() || allow_skip {
+                    self.execute_selected_cards_from_hand(indices, count, card_type.as_deref(), cost_limit, cost_limit_operator.as_deref(), group.as_deref(), characters.as_ref())?
+                }
+            },
             "deck" => self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?,
             "discard" => {
                 if is_select_action {
@@ -1009,6 +1015,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
         self.game_state.last_vacated_stage_area = vacated;
         eprintln!("[STAGE_HANDLER] removed from stage, vacated={:?}, discard_count={}", vacated, self.game_state.player1.waitroom.cards.len());
+        eprintln!("[STAGE_HANDLER] pending_sequential_actions before finalize: {:?}", 
+            self.game_state.pending_sequential_actions.as_ref().map(|v| v.len()));
         Ok(())
     }
     fn execute_selected_looked_at_cards(&mut self, indices: &[usize]) -> Result<(), String> {

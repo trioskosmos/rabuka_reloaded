@@ -101,6 +101,19 @@ impl super::TurnEngine {
                 if let Some(card) = game_state.card_database.get_card(card_id) {
                     for ability in &card.abilities {
                         if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::AUTO) {
+                            // Prevent infinite re-trigger loops: only fire when the card itself
+                            // has moved to the referenced zone for movement-based conditions.
+                            if let Some(ref effect) = ability.effect {
+                                if let Some(ref condition) = effect.condition {
+                                    if condition.location.as_deref() == Some("discard")
+                                        && condition.card_type.as_deref() == Some("member_card")
+                                    {
+                                        let in_discard = game_state.player1.waitroom.cards.contains(&card_id)
+                                            || game_state.player2.waitroom.cards.contains(&card_id);
+                                        if !in_discard { continue; }
+                                    }
+                                }
+                            }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card.card_no.clone()));
                         }
