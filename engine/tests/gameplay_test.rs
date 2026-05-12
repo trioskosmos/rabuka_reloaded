@@ -582,23 +582,34 @@ fn nico_q168_both_appear_from_discard() {
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Since the ability targets both players, there will be prompts
+    // First: P1 selects a card from their discard
     if game.has_pending_choice() {
-        // Select the cheap member card from P1's discard
         game.select_indices(&[0]);
     }
+    // Then: P1 chooses a position (if multiple empty slots)
+    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
+        game.select_option(1); // choose center
+    }
+    // Next: P2's turn (auto-process if only 1 option)
     if game.has_pending_choice() {
-        // If P2 also needs to select (should auto-process if only 1 option)
         game.select_indices(&[0]);
+    }
+    // Then: P2 chooses a position
+    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
+        game.select_option(2); // choose right (center may be taken by P1)
     }
 
     // Both players should have a new member on stage in wait state
-    // P1's stage should have Nico (center/auto), cheap_p1 (left, wait)
+    // P1's stage should have Nico (left), cheap_p1 (center, wait)
     let p1_members: Vec<i16> = game.state.player1.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
     let p2_members: Vec<i16> = game.state.player2.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
     eprintln!("[Nico] P1 stage members: {:?}", p1_members);
     eprintln!("[Nico] P2 stage members: {:?}", p2_members);
     assert!(p1_members.contains(&cheap_p1), "P1 should have their cheap member on stage");
     assert!(p2_members.contains(&cheap_p2), "P2 should have their cheap member on stage");
+    // Verify wait state on the placed cards
+    assert_eq!(game.state.get_orientation_modifier(cheap_p1), Some(&"wait".to_string()), "P1's cheap member should be in wait state");
+    assert_eq!(game.state.get_orientation_modifier(cheap_p2), Some(&"wait".to_string()), "P2's cheap member should be in wait state");
 }
 
 #[test]
@@ -646,12 +657,16 @@ fn nico_q170_turn_player_appears_first() {
 
     // Q170: Turn player (P1) resolves first. P1's cheap member should appear.
     if game.has_pending_choice() {
-        game.select_indices(&[0]);
+        game.select_indices(&[0]); // select cheap card from discard
+    }
+    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
+        game.select_option(1); // choose center
     }
 
-    // Verify P1 got their cheap member
+    // Verify P1 got their cheap member in wait state
     let p1_members: Vec<i16> = game.state.player1.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
     assert!(p1_members.contains(&cheap_p1), "P1 should have their cheap member");
+    assert_eq!(game.state.get_orientation_modifier(cheap_p1), Some(&"wait".to_string()), "P1's member should be in wait state");
 }
 
 // ── Q181: Area freed when appeared card leaves → new card can appear ──
@@ -679,15 +694,22 @@ fn nico_q181_area_freed_after_card_leaves() {
 
     // Handle both choices
     if game.has_pending_choice() {
-        game.select_indices(&[0]); // P1's choice
+        game.select_indices(&[0]); // P1's card choice
+    }
+    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
+        game.select_option(1); // P1 chooses center
     }
     if game.has_pending_choice() {
-        game.select_indices(&[0]); // P2's choice
+        game.select_indices(&[0]); // P2's card choice
+    }
+    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
+        game.select_option(2); // P2 chooses right
     }
 
-    // The appeared member (cheap) is in a stage area now
+    // The appeared member (cheap) is in a stage area now (center)
     let cheap_area = game.state.player1.stage.stage.iter().position(|&id| id == cheap);
     assert!(cheap_area.is_some(), "Cheap member should be on P1's stage");
+    assert_eq!(game.state.get_orientation_modifier(cheap), Some(&"wait".to_string()), "P1's member should be in wait state");
 
     // Move the appeared member to discard (simulating removal)
     let removed_id = game.state.player1.stage.stage[cheap_area.unwrap()];
@@ -758,11 +780,17 @@ fn nico_cost_filter_only_shows_eligible() {
     // The ability fires for P1 (self): prompts to pick from discard
     // The choice should ONLY include the cost-2 card (cost-9 filtered out)
     if game.has_pending_choice() {
-        game.select_indices(&[0]);
+        game.select_indices(&[0]);  // select cheap card
+    }
+    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
+        game.select_option(1);  // choose center
     }
     // P2's turn: auto-selects (only 1 card in their discard)
     if game.has_pending_choice() {
         game.select_indices(&[0]);
+    }
+    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
+        game.select_option(2);  // choose right (center taken by P1)
     }
 
     // Only the cheap card should be on stage, NOT the expensive one
@@ -770,6 +798,7 @@ fn nico_cost_filter_only_shows_eligible() {
     let p1_has_cheap = game.state.player1.stage.stage.iter().filter(|&&id| id == cheap).count();
     assert_eq!(p1_has_cheap, 1, "Cost-2 card should appear on stage exactly once");
     assert!(!p1_has_expensive, "Cost-9 card should NOT appear on stage");
+    assert_eq!(game.state.get_orientation_modifier(cheap), Some(&"wait".to_string()), "P1's cheap member should be in wait state");
 
     // Verify the expensive card is still in the discard (was never a candidate)
     assert!(game.state.player1.waitroom.cards.contains(&expensive),

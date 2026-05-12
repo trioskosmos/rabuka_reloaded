@@ -248,7 +248,19 @@ impl<'a> AbilityResolver<'a> {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
                             if vacated_stage_area.is_some() { self.game_state.last_vacated_stage_area = vacated_stage_area; }
-                            self.prompt_choice("discard", card_type_filter, count, cost_limit, _effect.cost_limit_operator.clone(), group_name.map(|s| s.to_string()), character_filter.clone());
+                            self.pending_choice = Some(Choice::SelectCard {
+                                zone: "discard".to_string(),
+                                card_type: card_type_filter.map(|s| s.to_string()),
+                                count,
+                                description: format!("Select {} card(s) from discard", count),
+                                allow_skip: false,
+                                cost_limit,
+                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                group: group_name.map(|s| s.to_string()),
+                                characters: character_filter.clone(),
+                                filtered_indices: None,
+                                is_select_action: false,
+                            });
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -260,7 +272,22 @@ impl<'a> AbilityResolver<'a> {
                     if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.energy_zone.cards.len() && player.energy_zone.cards[i] == aid); } }
                     match classify_selection(&idxs, count, is_all, InsufficientBehavior::Error("Not enough cards in energy zone"))? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.energy_zone.cards.remove(i)).collect(),
-                        SelectionOutcome::Prompt => { self.prompt_choice("energy_zone", card_type_filter, count, cost_limit, _effect.cost_limit_operator.clone(), group_name.map(|s| s.to_string()), character_filter.clone()); return Ok(()); }
+                        SelectionOutcome::Prompt => {
+                            self.pending_choice = Some(Choice::SelectCard {
+                                zone: "energy_zone".to_string(),
+                                card_type: card_type_filter.map(|s| s.to_string()),
+                                count,
+                                description: format!("Select {} card(s) from energy zone", count),
+                                allow_skip: false,
+                                cost_limit,
+                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                group: group_name.map(|s| s.to_string()),
+                                characters: character_filter.clone(),
+                                filtered_indices: None,
+                                is_select_action: false,
+                            });
+                            return Ok(());
+                        }
                         SelectionOutcome::Skip => vec![],
                     }
                 }
@@ -290,7 +317,22 @@ impl<'a> AbilityResolver<'a> {
                     if _effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.success_live_card_zone.cards.len() && player.success_live_card_zone.cards[i] == aid); } }
                     match classify_selection(&idxs, count, false, InsufficientBehavior::Error("Not enough cards in success live zone"))? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.success_live_card_zone.cards.remove(i)).collect(),
-                        SelectionOutcome::Prompt => { self.prompt_choice("success_live_zone", None, count, None, None, None, None); return Ok(()); }
+                        SelectionOutcome::Prompt => {
+                            self.pending_choice = Some(Choice::SelectCard {
+                                zone: "success_live_zone".to_string(),
+                                card_type: None,
+                                count,
+                                description: format!("Select {} card(s) from success live zone", count),
+                                allow_skip: false,
+                                cost_limit: None,
+                                cost_limit_operator: None,
+                                group: None,
+                                characters: None,
+                                filtered_indices: None,
+                                is_select_action: false,
+                            });
+                            return Ok(());
+                        }
                         SelectionOutcome::Skip => vec![],
                     }
                 }
@@ -302,7 +344,19 @@ impl<'a> AbilityResolver<'a> {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
                             if vacated_stage_area.is_some() { self.game_state.last_vacated_stage_area = vacated_stage_area; }
-                            self.prompt_choice("discard", card_type_filter, count, cost_limit, _effect.cost_limit_operator.clone(), group_name.map(|s| s.to_string()), character_filter.clone());
+                            self.pending_choice = Some(Choice::SelectCard {
+                                zone: "discard".to_string(),
+                                card_type: card_type_filter.map(|s| s.to_string()),
+                                count,
+                                description: format!("Select {} card(s) from discard", count),
+                                allow_skip: false,
+                                cost_limit,
+                                cost_limit_operator: _effect.cost_limit_operator.clone(),
+                                group: group_name.map(|s| s.to_string()),
+                                characters: character_filter.clone(),
+                                filtered_indices: None,
+                                is_select_action: false,
+                            });
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -457,18 +511,38 @@ impl<'a> AbilityResolver<'a> {
                 crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
                 crate::card::PositionInfo::Struct { position, .. } => position.as_ref().and_then(|s| s.parse::<usize>().ok()),
             }).map(|p| if p > 0 { p - 1 } else { 0 });
-            for card_id in taken {
+            for card_id in &taken {
                 if destination == "deck" && !is_max {
                     if let Some(pos) = deck_pos {
                         let clamped = pos.min(player.main_deck.cards.len());
-                        player.main_deck.cards.insert(clamped, card_id);
+                        player.main_deck.cards.insert(clamped, *card_id);
                     } else {
-                        player.main_deck.cards.insert(0, card_id);
+                        player.main_deck.cards.insert(0, *card_id);
+                    }
+                } else if destination == "empty_area" {
+                    // Check if multiple empty slots exist for position choice
+                    let empty_slots: Vec<usize> = (0..3).filter(|&i| player.stage.stage[i] == -1).collect();
+                    if empty_slots.len() > 1 {
+                        // Create position choice
+                        self.pending_choice = Some(crate::ability::types::Choice::SelectPosition {
+                            position: "center".to_string(), // Default position
+                            description: format!("Choose position for {}", self.game_state.card_database.get_card(*card_id).map(|c| &c.name).map_or("card", |v| v)),
+                            allow_skip: false,
+                        });
+                        self.execution_context = crate::ability::types::ExecutionContext::MoveCardsPosition {
+                            card_id: *card_id,
+                            state_change: _effect.state_change.clone()
+                        };
+                        return Ok(());
+                    } else {
+                        // Single empty slot - place directly
+                        util::place_card_in_zone(player, *card_id, destination.as_str(), vacated_stage_area, is_max, count);
                     }
                 } else {
-                    util::place_card_in_zone(player, card_id, destination.as_str(), vacated_stage_area, is_max, count);
+                    // For "both" targeting or other cases, use normal placement
+                    util::place_card_in_zone(player, *card_id, destination.as_str(), vacated_stage_area, is_max, count);
                 }
-                moved_cards.push(card_id);
+                moved_cards.push(*card_id);
             }
         }
 
@@ -509,19 +583,6 @@ impl<'a> AbilityResolver<'a> {
         }
         
         Ok(())
-    }
-
-    fn prompt_choice(&mut self, zone: &str, card_type: Option<&str>, count: usize,
-        cost_limit: Option<u32>, cost_limit_operator: Option<String>,
-        group: Option<String>, characters: Option<Vec<String>>) {
-        self.pending_choice = Some(Choice::SelectCard {
-            zone: zone.to_string(), card_type: card_type.map(|s| s.to_string()),
-            count, description: format!("Select {} card(s) from {}", count, zone), allow_skip: false,
-            cost_limit, cost_limit_operator, group, characters,
-            filtered_indices: None,
-            is_select_action: false,
-        });
-        self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }
 
     fn stage_remove_with_vacated(player: &mut crate::player::Player, idxs: &[usize], card_db: &crate::card::CardDatabase) -> (Vec<i16>, Option<usize>) {

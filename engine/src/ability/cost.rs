@@ -76,7 +76,7 @@ impl<'a> AbilityResolver<'a> {
                 let count = cost.count.unwrap_or(1) as usize;
                 let card_type = cost.card_type.clone();
                 let optional = cost.optional.unwrap_or(false);
-                let text = &cost.text;
+                let _text = &cost.text;
                 let is_activation = self.current_ability.as_ref()
                     .and_then(|a| a.triggers.as_ref())
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);

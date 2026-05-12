@@ -1,33 +1,12 @@
-import json, sys
-sys.path.insert(0, 'cards/ability_extraction')
-from parser import parse_effect, _normalize_effect_tree, _clean, normalize, split_cost_effect
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from parser import parse_ability
 
-t = '{{center.png|センター}}メンバー1人をウェイトにする：ライブ終了時まで、これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。（この能力はセンターエリアに登場している場合のみ起動できる。）'
+t3 = '{{center.png|センター}}メンバー1人をウェイトにする：ライブ終了時まで、これによってウェイト状態になったメンバーは、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。（この能力はセンターエリアに登場している場合のみ起動できる。）'
+print("Input text:", t3)
+print()
 
-norm = normalize(t.strip())
-cost, effect_text = split_cost_effect(norm)
-print('effect_text:', effect_text[:80])
-
-effect = parse_effect(effect_text)
-print('After parse_effect:')
-print('  action:', effect.get('action'))
-if effect.get('action') == 'gain_ability':
-    print('  ability_gain:', effect.get('ability_gain','')[:40])
-else:
-    print('  actions:', [a.get('action') for a in effect.get('actions',[])])
-
-effect2 = _normalize_effect_tree(effect, norm)
-print('After _normalize_effect_tree:')
-print('  action:', effect2.get('action'))
-if effect2.get('action') == 'gain_ability':
-    print('  ability_gain:', effect2.get('ability_gain','')[:40])
-else:
-    print('  actions:', [a.get('action') for a in effect2.get('actions',[])])
-
-effect3 = _clean(effect2)
-print('After _clean:')
-print('  action:', effect3.get('action'))
-if effect3.get('action') == 'gain_ability':
-    print('  ability_gain:', effect3.get('ability_gain','')[:40])
-else:
-    print('  actions:', [a.get('action') for a in effect3.get('actions',[])])
+result = parse_ability(t3)
+print("Full result:")
+import json
+print(json.dumps(result, indent=2, ensure_ascii=False))

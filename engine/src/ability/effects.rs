@@ -1051,7 +1051,7 @@ impl<'a> AbilityResolver<'a> {
         if ability_text.contains("スコアを+1") || ability_text.contains("スコアを＋1") {
             // This is a score modifier effect
             let value = 1; // +1 score
-            let operation = "add";
+            let _operation = "add";
             
             // Apply to the activating card (self target)
             if let Some(card_id) = self.game_state.activating_card {

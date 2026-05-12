@@ -1,5 +1,5 @@
-import json, sys
-sys.path.insert(0, 'cards/ability_extraction')
+import json, sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from parser import parse_ability
 
 # Card 1: Liella! group filter
@@ -31,6 +31,19 @@ r3 = parse_ability(t3)
 e3 = r3.get('effect', {})
 print('=== Card 3: center gain_ability ===')
 print('action:', e3.get('action'))
-print('ability_gain:', e3.get('ability_gain','')[:40])
-print('gained_effect:', e3.get('gained_effect',{}).get('action'))
+# Look in actions array for gain_ability entry
+actions = e3.get('actions', [])
+gain_action = next((a for a in actions if a.get('action') == 'gain_ability'), None)
+if gain_action:
+    print('ability_gain:', gain_action.get('ability_gain','')[:40])
+    print('duration:', gain_action.get('duration'))
+else:
+    print('ability_gain: NOT FOUND')
+# Look for modify_score action  
+score_action = next((a for a in actions if a.get('action') == 'modify_score'), None)
+if score_action:
+    print('gained_effect action:', score_action.get('action'))
+    print('gained_effect value:', score_action.get('value'))
+else:
+    print('gained_effect: NOT FOUND')
 print('activation_position:', e3.get('activation_position'))

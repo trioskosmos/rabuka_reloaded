@@ -300,7 +300,7 @@ def extract_destination(text: str) -> Optional[str]:
         return 'deck_top_or_bottom'
     if '成功ライブカード置き場に置く' in text:
         return 'success_live_zone'
-    if 'メンバーのいないエリアに登場させる' in text:
+    if 'メンバーのいないエリアに登場させる' in text or 'メンバーのいないエリアにウェイト状態で登場させる' in text:
         return 'empty_area'
     if 'デッキの一番上に置く' in text or '山札の上に置く' in text:
         return 'deck_top'
@@ -2827,11 +2827,17 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     if hc: result['heart_colors'] = hc
     if extract_max(select_text): result['max'] = True
     if extract_optional(select_text): result['optional'] = True
+    gns = extract_group_names(select_text)
+    if gns: result['group_names'] = gns
+    cl = extract_cost_limit(select_text)
+    if cl: result['cost_limit'] = cl
+    op = extract_operator(select_text)
+    if op: result['cost_limit_operator'] = op
     return result
 
 
 def _enrich_from_text(d, text):
-    """Add common fields (count, max, card_type, heart_colors, optional) from text."""
+    """Add common fields (count, max, card_type, heart_colors, optional, group_names, cost_limit) from text."""
     c = extract_count(text)
     if c: d['count'] = c
     if extract_max(text): d['max'] = True
@@ -2840,6 +2846,12 @@ def _enrich_from_text(d, text):
     hc = list(dict.fromkeys(f'heart{m.zfill(2)}' for m in re.findall(r'heart_(\d+)', text)))
     if hc: d['heart_colors'] = hc
     if extract_optional(text): d['optional'] = True
+    gns = extract_group_names(text)
+    if gns: d['group_names'] = gns
+    cl = extract_cost_limit(text)
+    if cl: d['cost_limit'] = cl
+    op = extract_operator(text)
+    if op: d['cost_limit_operator'] = op
 
 
 def _build_look_select_actions(select_text):

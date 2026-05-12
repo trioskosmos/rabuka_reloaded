@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-12T20:41:03.504626",
+  "generated_at": "2026-05-12T21:01:19.007072",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -10907,7 +10907,7 @@
       "effect": {
         "text": "自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。",
         "source": "discard",
-        "destination": "stage",
+        "destination": "empty_area",
         "cost_limit": 2,
         "cost_limit_operator": "<=",
         "state_change": "wait",

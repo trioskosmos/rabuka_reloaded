@@ -18,6 +18,7 @@ use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::types::{Phase, TurnPhase};
 use rabuka_engine::zones::MemberArea;
+use rabuka_engine::ability::types::Choice;
 
 /// Load the real card database from `cards/cards.json` + `cards/abilities.json`.
 /// This includes ALL real cards (both the tested ability cards and filler cards).
@@ -218,6 +219,30 @@ impl TestGame {
             if id == -1 { "empty".into() } else { self.name(id) }
         }).collect();
         eprintln!("[STAGE] {:?}", cards);
+    }
+
+    /// Get type of pending choice as a string.
+    pub fn pending_choice_type(&self) -> Option<String> {
+        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
+            match choice {
+                Choice::SelectCard { .. } => Some("SelectCard".to_string()),
+                Choice::SelectTarget { .. } => Some("SelectTarget".to_string()),
+                Choice::SelectPosition { .. } => Some("SelectPosition".to_string()),
+                Choice::SelectHeartColor { .. } => Some("SelectHeartColor".to_string()),
+                Choice::SelectHeartType { .. } => Some("SelectHeartType".to_string()),
+            }
+        } else if let Some(ref pc) = self.state.pending_choice {
+            match pc["choice_type"].as_str() {
+                Some("SelectCard") => Some("SelectCard".to_string()),
+                Some("SelectTarget") => Some("SelectTarget".to_string()),
+                Some("SelectPosition") => Some("SelectPosition".to_string()),
+                Some("SelectHeartColor") => Some("SelectHeartColor".to_string()),
+                Some("SelectHeartType") => Some("SelectHeartType".to_string()),
+                _ => Some("Unknown".to_string()),
+            }
+        } else {
+            None
+        }
     }
 
     /// Print the current pending choice details.

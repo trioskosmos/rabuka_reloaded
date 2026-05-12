@@ -49,6 +49,11 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 self.execution_context = ExecutionContext::None;
                 Ok(())
             }
+            ExecutionContext::MoveCardsPosition { .. } => {
+                // The position choice was already handled in handle_select_position.
+                // After selection, the resolver set execution_context back to None.
+                Ok(())
+            }
         }
     }
 
@@ -678,21 +683,60 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn handle_select_position(&mut self, position: &str, context: ExecutionContext) -> Result<(), String> {
-        if let ExecutionContext::LookAndSelect { step } = context {
-            if let LookAndSelectStep::Finalize { destination } = step {
-                if destination == "stage" {
-                    if let Some(&card_id) = self.looked_at_cards.last() {
-                        let player = &mut self.game_state.player1;
-                        match position {
-                            "center" => { player.stage.stage[1] = card_id; player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center); }
-                            "left_side" => { player.stage.stage[0] = card_id; player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide); }
-                            "right_side" => { player.stage.stage[2] = card_id; player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide); }
-                            _ => { player.hand.add_card(card_id); }
+        match &context {
+            ExecutionContext::LookAndSelect { step } => {
+                if let LookAndSelectStep::Finalize { destination } = step {
+                    if destination == "stage" {
+                        if let Some(&card_id) = self.looked_at_cards.last() {
+                            let player = &mut self.game_state.player1;
+                            match position {
+                                "center" => { player.stage.stage[1] = card_id; player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center); }
+                                "left_side" => { player.stage.stage[0] = card_id; player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide); }
+                                "right_side" => { player.stage.stage[2] = card_id; player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide); }
+                                _ => { player.hand.add_card(card_id); }
+                            }
+                            self.looked_at_cards.clear();
                         }
-                        self.looked_at_cards.clear();
                     }
                 }
             }
+            ExecutionContext::MoveCardsPosition { card_id, state_change } => {
+                let is_p2 = self.game_state.ability_queue.current_entry()
+                    .map(|e| e.player_id == "player2" || e.player_id == "p2")
+                    .unwrap_or(false);
+                let player = if is_p2 {
+                    &mut self.game_state.player2
+                } else {
+                    &mut self.game_state.player1
+                };
+                let pos = match position {
+                    "center" => 1,
+                    "left_side" => 0,
+                    "right_side" => 2,
+                    _ => { player.hand.add_card(*card_id); return Ok(()); }
+                };
+                if pos < 3 && player.stage.stage[pos] == -1 {
+                    player.stage.stage[pos] = *card_id;
+                    let area = match pos {
+                        0 => crate::zones::MemberArea::LeftSide,
+                        1 => crate::zones::MemberArea::Center,
+                        2 => crate::zones::MemberArea::RightSide,
+                        _ => crate::zones::MemberArea::Center,
+                    };
+                    player.areas_locked_this_turn.insert(area);
+                } else {
+                    player.hand.add_card(*card_id);
+                }
+                // Apply state_change and record movement (same as move_cards executor)
+                self.game_state.clear_modifiers_for_card(*card_id);
+                self.game_state.record_card_movement(*card_id);
+                if let Some(ref sc) = state_change {
+                    if sc == "wait" {
+                        self.game_state.add_orientation_modifier(*card_id, "wait");
+                    }
+                }
+            }
+            _ => {}
         }
         self.pending_choice = None;
         self.execution_context = ExecutionContext::None;
