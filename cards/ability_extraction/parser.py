@@ -370,6 +370,21 @@ def extract_cost_limit(text: str) -> Optional[Union[int, List[int]]]:
             return int(m.group(1))
     return None
 
+def extract_blade_limit(text: str) -> Optional[Dict[str, Any]]:
+    """Extract blade count limit from text like 'ブレードの数が3つ以下' (<=3 blades)."""
+    m = re.search(r'ブレード[の]数[がは](\d+)[つ個](以下|以上|未満|超)', text)
+    if not m:
+        m = re.search(r'ブレード[の]数[がは](\d+)(以下|以上|未満|超)', text)
+    if m:
+        result = {'blade_limit': int(m.group(1))}
+        op = m.group(2)
+        if op == '以下': result['blade_limit_operator'] = '<='
+        elif op == '以上': result['blade_limit_operator'] = '>='
+        elif op == '未満': result['blade_limit_operator'] = '<'
+        elif op == '超': result['blade_limit_operator'] = '>'
+        return result
+    return None
+
 def extract_deck_position(text: str) -> Optional[int]:
     """Extract deck position from text like '一番上から4枚目' (4th from top)."""
     # Match patterns like "一番上から4枚目" or "上から4枚目"

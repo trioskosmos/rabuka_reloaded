@@ -207,6 +207,18 @@ impl CardDatabase {
         }
     }
 
+    /// Create a copy of an existing card with a new unique ID.
+    /// Used to give each card copy its own ID for per-copy modifier tracking.
+    pub fn create_copy(&mut self, template_id: i16) -> i16 {
+        let card = self.cards.get(&template_id)
+            .expect("Template card not found")
+            .clone();
+        let copy_id = self.next_id;
+        self.next_id += 1;
+        self.cards.insert(copy_id, card);
+        copy_id
+    }
+
     pub fn load_or_create(cards: Vec<Card>) -> Self {
         let mut db = Self::new();
         

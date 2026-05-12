@@ -529,9 +529,11 @@ impl<'a> AbilityResolver<'a> {
                             description: format!("Choose position for {}", self.game_state.card_database.get_card(*card_id).map(|c| &c.name).map_or("card", |v| v)),
                             allow_skip: false,
                         });
+                        let pos_target = tgt.clone().unwrap_or_else(|| "self".to_string());
                         self.execution_context = crate::ability::types::ExecutionContext::MoveCardsPosition {
                             card_id: *card_id,
-                            state_change: _effect.state_change.clone()
+                            state_change: _effect.state_change.clone(),
+                            target: pos_target,
                         };
                         return Ok(());
                     } else {

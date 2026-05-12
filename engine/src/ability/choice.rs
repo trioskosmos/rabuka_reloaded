@@ -700,14 +700,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
             }
-            ExecutionContext::MoveCardsPosition { card_id, state_change } => {
-                let is_p2 = self.game_state.ability_queue.current_entry()
-                    .map(|e| e.player_id == "player2" || e.player_id == "p2")
-                    .unwrap_or(false);
-                let player = if is_p2 {
-                    &mut self.game_state.player2
-                } else {
-                    &mut self.game_state.player1
+            ExecutionContext::MoveCardsPosition { card_id, state_change, target } => {
+                let player = match target.as_str() {
+                    "opponent" => &mut self.game_state.player2,
+                    _ => &mut self.game_state.player1,
                 };
                 let pos = match position {
                     "center" => 1,
@@ -740,6 +736,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
         self.pending_choice = None;
         self.execution_context = ExecutionContext::None;
+
+        // Process any pending sequential actions (e.g., target="both" deferred opponent)
+        if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
+            for (i, action) in pending.iter().enumerate() {
+                self.execute_effect(action)?;
+                if self.pending_choice.is_some() {
+                    let remaining = pending[i + 1..].to_vec();
+                    self.game_state.pending_sequential_actions = if remaining.is_empty() { None } else { Some(remaining) };
+                    return Ok(());
+                }
+            }
+            self.game_state.pending_sequential_actions = None;
+        }
+
         Ok(())
     }
 

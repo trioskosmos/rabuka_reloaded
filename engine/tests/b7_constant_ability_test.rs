@@ -44,7 +44,7 @@ fn hanamaru_constant_cost_per_success_card() {
     let filler = game.id("PL!-sd1-010-SD");
 
     // Get base cost
-    let card = db.get_card(hanamaru).unwrap();
+    let card = game.db.get_card(hanamaru).unwrap();
     let base_cost = card.cost.unwrap_or(0);
 
     // Place a card in success live zone → cost +1

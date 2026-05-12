@@ -6,6 +6,8 @@
 /// Filler cards (zero abilities, no ability triggers) are available in
 /// `tests/data/cards.json` and can be referenced by card_no.
 
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -59,11 +61,14 @@ pub fn card_id(db: &CardDatabase, card_no: &str) -> i16 {
 pub struct TestGame {
     pub db: Arc<CardDatabase>,
     pub state: GameState,
+    copy_pool: RefCell<HashMap<i16, Vec<i16>>>,
 }
 
 #[allow(dead_code)]
 impl TestGame {
     /// Create a fresh game in Main phase, turn 1 (skips RPS/mulligan/setup).
+    /// Pre-creates unique copy IDs for each card template so `id()` returns
+    /// distinct IDs for per-copy modifier tracking without mutating state.
     pub fn new(db: Arc<CardDatabase>) -> Self {
         let mut p1 = Player::new("p1".into(), "Player 1".into(), true);
         let p2 = Player::new("p2".into(), "Player 2".into(), false);
@@ -74,12 +79,47 @@ impl TestGame {
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
 
-        TestGame { db, state }
+        // Pre-create copy IDs for every card template
+        let mut copy_pool: HashMap<i16, Vec<i16>> = HashMap::new();
+        let template_ids: Vec<i16> = state.card_database.cards.keys().copied().collect();
+        for &tid in &template_ids {
+            let mut copies = Vec::new();
+            for _ in 0..5 {
+                let cid = Arc::make_mut(&mut state.card_database).create_copy(tid);
+                copies.push(cid);
+            }
+            copy_pool.insert(tid, copies);
+        }
+
+        // Use the mutated database (with copies) as the test's db reference
+        let db_with_copies = state.card_database.clone();
+
+        TestGame { db: db_with_copies, state, copy_pool: RefCell::new(copy_pool) }
     }
 
     /// Look up a card's numeric ID by card_no in the database.
+    /// Returns the same unique copy_id for each card_no (not the base template_id).
+    /// Each template gets 5 pre-created copies; `id()` returns the same copy_id
+    /// for repeated calls with the same card_no so test patterns like
+    /// `game.state.hand.cards.push(game.id("x"))` + `game.set_live_card(game.id("x"))`
+    /// both refer to the same in-zone card. Use `game.new_id("...")` for distinct copies.
     pub fn id(&self, card_no: &str) -> i16 {
-        card_id(&self.db, card_no)
+        let template_id = card_id(&self.db, card_no);
+        let pool = self.copy_pool.borrow();
+        pool.get(&template_id)
+            .and_then(|v| v.last().copied())
+            .unwrap_or(template_id)
+    }
+
+    /// Get a NEW unique copy_id (different from `id()`).
+    /// Each call returns a distinct ID, used when multiple copies of the same card
+    /// are needed in the same zone.
+    pub fn new_id(&self, card_no: &str) -> i16 {
+        let template_id = card_id(&self.db, card_no);
+        self.copy_pool.borrow_mut()
+            .get_mut(&template_id)
+            .and_then(|v| v.pop())
+            .unwrap_or(template_id)
     }
 
     /// Shortcut for `state.player1` (the active player in our tests).
@@ -198,7 +238,7 @@ impl TestGame {
 
     /// Resolve a card ID to its name from the database.
     pub fn name(&self, id: i16) -> String {
-        self.db.get_card(id).map(|c| format!("{} ({})", c.name, c.card_no)).unwrap_or_else(|| format!("#{}", id))
+        self.state.card_database.get_card(id).map(|c| format!("{} ({})", c.name, c.card_no)).unwrap_or_else(|| format!("#{}", id))
     }
 
     /// Print card IDs in player1's hand.

@@ -199,6 +199,14 @@ impl<'a> AbilityResolver<'a> {
             let mut for_self = effect.clone();
             for_self.target = Some("self".to_string());
             self.execute_effect(&for_self)?;
+            // If self created a pending choice, save opponent for later
+            // (after self's choice chain completes, via pending_sequential_actions).
+            if self.pending_choice.is_some() {
+                let mut for_opponent = effect.clone();
+                for_opponent.target = Some("opponent".to_string());
+                self.game_state.pending_sequential_actions = Some(vec![for_opponent]);
+                return Ok(());
+            }
             let mut for_opponent = effect.clone();
             for_opponent.target = Some("opponent".to_string());
             return self.execute_effect(&for_opponent);

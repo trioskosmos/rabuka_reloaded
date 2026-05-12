@@ -1179,7 +1179,7 @@ fn hareruya_q64_waitroom_only_five_distinct_liella_condition_met() {
     advance_to_live_start(&mut game);
 
     // Debug: check the ability's condition locations field
-    let card = db.get_card(game.state.player1.live_card_zone.cards[0]).unwrap();
+    let card = game.db.get_card(game.state.player1.live_card_zone.cards[0]).unwrap();
     for ab in &card.abilities {
         if let Some(ref ef) = ab.effect {
             if let Some(ref cond) = ef.condition {
@@ -1255,10 +1255,11 @@ fn wien_q117_another_member_triggers_yell_reduction() {
 
     // Wien at Center + another member at RightSide (any member = "other")
     game.state.player1.stage.stage = [-1, wien, game.id("PL!-sd1-010-SD")];
-    game.state.player1.hand.cards.push(game.id("PL!-sd1-020-SD"));
+    let live_card = game.id("PL!-sd1-020-SD");
+    game.state.player1.hand.cards.push(live_card);
 
     advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(game.id("PL!-sd1-020-SD"));
+    game.set_live_card(live_card);
     advance_to_live_start(&mut game);
 
     // Q117: Condition should be met, yell count modified

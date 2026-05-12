@@ -90,7 +90,7 @@ fn ayumu_pb1_q200_placed_card_retains_abilities() {
     }
 
     // The placed card should still have abilities in the database
-    let card = db.get_card(target_ayumu)
+    let card = game.db.get_card(target_ayumu)
         .expect("Target card should be in database");
     assert!(!card.abilities.is_empty(),
         "Placed card should retain its abilities");

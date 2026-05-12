@@ -54,7 +54,7 @@ pub enum ExecutionContext {
     None,
     SingleEffect { effect_index: usize },
     LookAndSelect { step: LookAndSelectStep },
-    MoveCardsPosition { card_id: i16, state_change: Option<String> },
+    MoveCardsPosition { card_id: i16, state_change: Option<String>, target: String },
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -12,7 +12,7 @@ fn kinako_hs_q81_multiname_has_individual_names_in_card_db() {
 
     // Verify the multi-name card exists in the database
     let multi = game.id("LL-bp1-001-R\u{ff0b}");
-    let card = db.get_card(multi).expect("Multi-name card in DB");
+    let card = game.db.get_card(multi).expect("Multi-name card in DB");
     let name = &card.name;
     eprintln!("[KINAKO] multi card name: {}", name);
     // The name should contain '&' separating individual names
