@@ -311,7 +311,40 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
                 return self.finalize_choice(&context);
             }
-                _ => {}
+            "under_member" => {
+                let player = self.game_state.active_player_mut();
+                let area_order = [crate::zones::MemberArea::Center, crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::RightSide];
+                let mut cards_to_move = Vec::new();
+                for &idx in indices.iter() {
+                    let mut global_idx = 0;
+                    let mut found = false;
+                    for area in &area_order {
+                        let under = player.stage.get_under_cards(*area);
+                        if idx < global_idx + under.len() {
+                            let card_id = under[idx - global_idx];
+                            cards_to_move.push((*area, card_id));
+                            found = true;
+                            break;
+                        }
+                        global_idx += under.len();
+                    }
+                    if !found { return Err(format!("Card at index {} not found in under_member", idx)); }
+                }
+                let _ = player;
+                for (area, card_id) in cards_to_move {
+                    let under = &mut self.game_state.player1.stage.under_cards[match area {
+                        crate::zones::MemberArea::LeftSide => 0,
+                        crate::zones::MemberArea::Center => 1,
+                        crate::zones::MemberArea::RightSide => 2,
+                    }];
+                    if let Some(pos) = under.iter().position(|&c| c == card_id) {
+                        under.remove(pos);
+                        self.game_state.player1.energy_deck.cards.push(card_id);
+                    }
+                }
+                return self.finalize_choice(&context);
+            }
+            _ => {}
             }
             self.pending_choice = None;
             return Ok(());
@@ -376,6 +409,38 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
                 self.selected_cards = cards;
+            }
+            "under_member" => {
+                let player = self.game_state.active_player_mut();
+                let area_order = [crate::zones::MemberArea::Center, crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::RightSide];
+                let mut cards_to_move = Vec::new();
+                for &idx in indices.iter() {
+                    let mut global_idx = 0;
+                    let mut found = false;
+                    for area in &area_order {
+                        let under = player.stage.get_under_cards(*area);
+                        if idx < global_idx + under.len() {
+                            let card_id = under[idx - global_idx];
+                            cards_to_move.push((*area, card_id));
+                            found = true;
+                            break;
+                        }
+                        global_idx += under.len();
+                    }
+                    if !found { return Err(format!("Card at index {} not found in under_member", idx)); }
+                }
+                let _ = player;
+                for (area, card_id) in cards_to_move {
+                    let under = &mut self.game_state.player1.stage.under_cards[match area {
+                        crate::zones::MemberArea::LeftSide => 0,
+                        crate::zones::MemberArea::Center => 1,
+                        crate::zones::MemberArea::RightSide => 2,
+                    }];
+                    if let Some(pos) = under.iter().position(|&c| c == card_id) {
+                        under.remove(pos);
+                        self.game_state.player1.energy_deck.cards.push(card_id);
+                    }
+                }
             }
             _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
         }
@@ -586,11 +651,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn handle_optional_cost_payment(&mut self, selected: &str) -> Result<(), String> {
-        if selected == "skip_optional_cost" {
+        if selected == "skip_optional_cost" || selected == "0" {
             self.pending_choice = None;
             return Ok(());
         }
-        if selected == "pay_optional_cost" {
+        // "pay_optional_cost" from effect-based optional, or "1" from select_option(1), or any non-skip value
+        let is_pay = true; // We already returned for skip/0 cases above
+        if is_pay {
             if let Some(cost) = self.game_state.entry_cost().cloned() {
                 if let Some(energy) = cost.energy { if energy > 0 {
                     let tgt = cost.target.as_deref().unwrap_or("self");
@@ -601,17 +668,43 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         self.game_state.add_orientation_modifier(id, "wait");
                     }
                 }
+                eprintln!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
+                    cost.cost_type, self.game_state.entry_cost().is_some(), 
+                    self.game_state.entry_effect().map(|e| e.action.clone()));
+                if cost.cost_type.as_deref() == Some("place_energy_under_member") {
+                    self.execute_place_energy_under_member(
+                        cost.count.unwrap_or(1),
+                        cost.target.as_deref().unwrap_or("self"),
+                        cost.position.as_ref(),
+                        false,
+                        cost.source.as_deref(),
+                    )?;
+                }
             }
             self.pending_choice = None;
+            let is_effect_optional = self.game_state.entry_choice_card_no().as_deref() == Some("optional_cost");
             if self.game_state.entry_cost().is_some() {
                 if let Some(effect) = self.game_state.entry_effect().cloned() {
                     if let Err(e) = self.execute_effect(&effect) { eprintln!("Failed to execute effect after optional cost: {}", e); }
                 }
             } else if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-                for action in pending {
-                    if let Err(e) = self.execute_effect(action) { eprintln!("Failed to execute action after optional: {}", e); }
+                if !pending.is_empty() {
+                    for action in pending {
+                        if let Err(e) = self.execute_effect(action) { eprintln!("Failed to execute action after optional: {}", e); }
+                    }
+                    self.game_state.pending_sequential_actions = None;
                 }
-                self.game_state.pending_sequential_actions = None;
+            } else if is_effect_optional {
+                if let Some(effect) = self.game_state.entry_effect().cloned() {
+                    let new_count = effect.energy_count.unwrap_or(effect.count_or(1));
+                    self.execute_place_energy_under_member(
+                        new_count,
+                        effect.target_name(),
+                        effect.position.as_ref(),
+                        false,
+                        effect.source.as_deref(),
+                    ).map_err(|e| e)?;
+                }
             }
         }
         Ok(())
@@ -887,9 +980,36 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         cost_limit: Option<u32>, cost_limit_operator: Option<&str>, group: Option<&str>, characters: Option<&Vec<String>>) -> Result<(), String> {
         self.execute_selected_cards_from_zone("discard", indices, count, card_type_filter, cost_limit, cost_limit_operator, group, characters)
     }
-    fn execute_selected_cards_from_stage(&mut self, indices: &[usize], count: usize, card_type_filter: Option<&str>,
+    fn execute_selected_cards_from_stage(&mut self, indices: &[usize], _count: usize, card_type_filter: Option<&str>,
         cost_limit: Option<u32>, cost_limit_operator: Option<&str>, group: Option<&str>, characters: Option<&Vec<String>>) -> Result<(), String> {
-        self.execute_selected_cards_from_zone("stage", indices, count, card_type_filter, cost_limit, cost_limit_operator, group, characters)
+        let card_db = self.game_state.card_database.clone();
+        let destination = self.game_state.entry_destination().map(|s| s.to_string()).unwrap_or_else(|| "discard".to_string());
+        let passes = |cid: i16| -> bool {
+            crate::ability::util::card_matches_type(&card_db, cid, card_type_filter)
+                && crate::ability::util::card_matches_cost_limit_op(&card_db, cid, cost_limit, cost_limit_operator)
+                && crate::ability::util::card_matches_group_str(&card_db, cid, group)
+                && match characters { Some(chars) if !chars.is_empty() => crate::ability::util::card_matches_characters(&card_db, cid, Some(chars)), _ => true, }
+        };
+        let mut vacated = None;
+        {
+            let player = self.game_state.active_player_mut();
+            for &idx in indices.iter().rev() {
+                if idx < 3 && player.stage.stage[idx] != -1 && passes(player.stage.stage[idx]) {
+                    if let Some(card_id) = player.remove_member_from_stage_with_recycling(idx, &card_db) {
+                        vacated = Some(idx);
+                        match destination.as_str() {
+                            "discard" => player.waitroom.add_card(card_id),
+                            "hand" => player.hand.add_card(card_id),
+                            "deck" | "deck_top" => player.main_deck.cards.insert(0, card_id),
+                            _ => player.waitroom.add_card(card_id),
+                        }
+                    }
+                }
+            }
+        }
+        self.game_state.last_vacated_stage_area = vacated;
+        eprintln!("[STAGE_HANDLER] removed from stage, vacated={:?}, discard_count={}", vacated, self.game_state.player1.waitroom.cards.len());
+        Ok(())
     }
     fn execute_selected_looked_at_cards(&mut self, indices: &[usize]) -> Result<(), String> {
         let player = self.game_state.resolve_target_player_mut("self");

@@ -28,10 +28,10 @@ fn emma_bp5_q215_wait_energy_placed_then_activate() {
     // Select 2 energy to deactivate (the energy activation will remove them from zone)
     if game.has_pending_choice() { game.select_indices(&[0, 1]); }
 
-    // After cost: 5 energy remain (custom cost doesn't remove from zone). 
-    // After activation: 3 remain (activation removes 2 from zone)
+    // Cost correctly removes 1 from zone (under member). 4 remain.
+    // Activation effect then deactivates 2 → 2 remain.
     let ecount = game.state.player1.energy_zone.cards.len();
-    assert_eq!(ecount, 3, "Activation removed 2 from zone (cost doesn't remove)");
+    assert_eq!(ecount, 2, "Cost removes 1, activation deactivates 2 → 2 remain");
 }
 
 /// Only 1 wait energy in zone (0 active). Place it, then activate tries

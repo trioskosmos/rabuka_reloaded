@@ -157,7 +157,11 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_db = &self.game_state.card_database;
         let player = self.game_state.resolve_target_player(target);
         let cards: Vec<i16> = match location {
-            "revealed_cards" => self.game_state.revealed_cards.iter().copied().collect(),
+            "revealed_cards" => self.game_state.revealed_cards.iter().copied().chain(
+                self.game_state.player1_cheer_revealed_cards.iter().copied()
+            ).chain(
+                self.game_state.player2_cheer_revealed_cards.iter().copied()
+            ).collect(),
             "stage" => player.stage.stage.iter().filter(|&&id| id != -1).copied().collect(),
             _ => return true,
         };

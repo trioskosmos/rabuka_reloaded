@@ -14,6 +14,7 @@ pub struct GameModifiers {
     pub score_modifiers: HashMap<i16, i32>,
     pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, i32>>,
     pub constant_blade_bonuses: HashMap<i16, i32>,
+    pub constant_cost_bonuses: HashMap<i16, i32>,
 }
 
 impl GameModifiers {
@@ -28,6 +29,7 @@ impl GameModifiers {
             score_modifiers: HashMap::new(),
             need_heart_modifiers: HashMap::new(),
             constant_blade_bonuses: HashMap::new(),
+            constant_cost_bonuses: HashMap::new(),
         }
     }
 
@@ -133,6 +135,14 @@ impl GameModifiers {
         *self.cost_modifiers.entry(card_id).or_insert(0) += delta;
     }
 
+    pub fn remove_cost_modifier(&mut self, card_id: i16, delta: i32) {
+        let current = self.cost_modifiers.entry(card_id).or_insert(0);
+        *current = (*current - delta).max(0);
+        if *current == 0 {
+            self.cost_modifiers.remove(&card_id);
+        }
+    }
+
     pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
         self.cost_modifiers.insert(card_id, value);
     }
@@ -153,5 +163,7 @@ impl GameModifiers {
         self.need_heart_modifiers.remove(&card_id);
         self.orientation_modifiers.remove(&card_id);
         self.cost_modifiers.remove(&card_id);
+        self.constant_blade_bonuses.remove(&card_id);
+        self.constant_cost_bonuses.remove(&card_id);
     }
 }

@@ -448,7 +448,7 @@ impl GameState {
                 "activation_cost_decrease" => {
                     self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
                 }
-                "gain_resource_blade" => {
+                s if s.starts_with("gain_blade") => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {
                             for card_data in cards {
@@ -469,15 +469,26 @@ impl GameState {
                         }
                     }
                 }
-                "gain_resource_heart" => {
+                s if s.starts_with("gain_heart") => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {
                             for card_data in cards {
                                 if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
                                     if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
-                                        self.remove_heart_modifier(card_id as i16, crate::card::HeartColor::Heart01, amount as i32);
-                                        eprintln!("Reverted {} hearts from card {}", amount, card_id);
+                                        let color_str = card_data.get("color").and_then(|v| v.as_str()).unwrap_or("heart01");
+                                        let color = crate::zones::parse_heart_color(color_str);
+                                        self.remove_heart_modifier(card_id as i16, color, amount as i32);
+                                        eprintln!("Reverted {} hearts from card {} (color {:?})", amount, card_id, color);
                                     }
+                                }
+                            }
+                        } else if let Some(card_data) = data.as_object() {
+                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
+                                if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
+                                    let color_str = card_data.get("color").and_then(|v| v.as_str()).unwrap_or("heart01");
+                                    let color = crate::zones::parse_heart_color(color_str);
+                                    self.remove_heart_modifier(card_id as i16, color, amount as i32);
+                                    eprintln!("Reverted {} hearts from card {} (color {:?})", amount, card_id, color);
                                 }
                             }
                         }

@@ -849,28 +849,40 @@ impl Card {
         if let Some(ref need_heart) = self.need_heart {
             let wildcard_count = *provided_hearts.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
             
+            // Count total hearts available for heart0 requirements (any color can be used)
+            let total_hearts_for_heart0: u32 = provided_hearts.hearts.values().sum();
+            
             for (color, needed_amount) in &need_heart.hearts {
-                if let Some(&provided_amount) = provided_hearts.hearts.get(color) {
-                    if provided_amount + wildcard_count >= *needed_amount {
-                        // Subtract the specific hearts first, then use wildcard if needed
-                        let remaining_needed = if provided_amount >= *needed_amount {
-                            0
+                if *color == HeartColor::Heart00 {
+                    // heart0 requirement: any heart color can fulfill this
+                    if total_hearts_for_heart0 < *needed_amount {
+                        return false;
+                    }
+                } else {
+                    // Specific heart color requirement
+                    let wildcard_count = wildcard_count;
+                    if let Some(&provided_amount) = provided_hearts.hearts.get(color) {
+                        if provided_amount + wildcard_count >= *needed_amount {
+                            // Subtract the specific hearts first, then use wildcard if needed
+                            let remaining_needed = if provided_amount >= *needed_amount {
+                                0
+                            } else {
+                                *needed_amount - provided_amount
+                            };
+                            if remaining_needed > wildcard_count {
+                                return false;
+                            }
                         } else {
-                            *needed_amount - provided_amount
-                        };
-                        if remaining_needed > wildcard_count {
-                            return false;
+                            // Not enough even with wildcard
+                            if *needed_amount > wildcard_count {
+                                return false;
+                            }
                         }
                     } else {
-                        // Not enough even with wildcard
+                        // No specific hearts available, use wildcard
                         if *needed_amount > wildcard_count {
                             return false;
                         }
-                    }
-                } else {
-                    // No specific hearts available, use wildcard
-                    if *needed_amount > wildcard_count {
-                        return false;
                     }
                 }
             }

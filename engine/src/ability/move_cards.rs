@@ -466,7 +466,24 @@ impl<'a> AbilityResolver<'a> {
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     }
+                    // Also remove revealed cards from hand (they were revealed/cost but still in hand)
+                    for &cid in &cards {
+                        if let Some(idx) = player.hand.cards.iter().position(|&c| c == cid) {
+                            player.hand.cards.remove(idx);
+                        }
+                    }
                     cards
+                }
+                "under_member" => {
+                    // Move from under_member to destination needs a choice.
+                    // Delegate to place_energy_under_member for choice creation.
+                    return self.execute_place_energy_under_member(
+                        count as u32,
+                        effect.target_name(),
+                        effect.position.as_ref(),
+                        effect.optional.unwrap_or(false),
+                        Some("under_member"),
+                    );
                 }
                 _ => { return Err(format!("Unknown source zone: {}", source)); }
             };

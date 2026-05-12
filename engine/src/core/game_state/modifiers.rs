@@ -56,6 +56,47 @@ impl GameState {
         for (cid, old) in &old_bonuses { self.remove_blade_modifier(*cid, *old); }
         for (&cid, &new_val) in &expected { self.add_blade_modifier(cid, new_val); }
         Arc::make_mut(&mut self.mods).constant_blade_bonuses = expected;
+        self.recalculate_constant_cost_modifiers();
+    }
+
+    pub fn recalculate_constant_cost_modifiers(&mut self) {
+        let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
+        for &cid in self.player1.stage.stage.iter().chain(self.player2.stage.stage.iter()) {
+            if cid == -1 { continue; }
+            let card = match self.card_database.get_card(cid) { Some(c) => c, None => continue };
+            for ability in &card.abilities {
+                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
+                    if let Some(ref effect) = ability.effect {
+                        if effect.action == "modify_cost" {
+                            cost_abilities.push((cid, effect.clone()));
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut expected: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
+        {
+            let resolver = crate::ability::resolver::AbilityResolver::new(self);
+            for &(cid, ref effect) in &cost_abilities {
+                let cond_met = effect.condition.as_ref().map_or(true, |c| resolver.evaluate_condition(c));
+                if cond_met {
+                    let value = effect.value.unwrap_or(0) as i32;
+                    let op = effect.operation.as_deref().unwrap_or("add");
+                    match op {
+                        "add" => *expected.entry(cid).or_insert(0) += value,
+                        "set" => { expected.insert(cid, value); },
+                        _ => {},
+                    }
+                }
+            }
+        }
+
+        // Remove old constant cost bonuses, apply new ones, store new state
+        let old_bonuses = std::mem::take(&mut Arc::make_mut(&mut self.mods).constant_cost_bonuses);
+        for (cid, old) in &old_bonuses { self.remove_cost_modifier(*cid, *old); }
+        for (&cid, &new_val) in &expected { self.add_cost_modifier(cid, new_val); }
+        Arc::make_mut(&mut self.mods).constant_cost_bonuses = expected;
     }
 
     pub fn add_heart_modifier(&mut self, card_id: i16, color: crate::card::HeartColor, delta: i32) {
@@ -70,6 +111,7 @@ impl GameState {
         self.mods.get_heart_modifier(card_id, color)
     }
 
+    
     pub fn set_heart_override(&mut self, card_id: i16, color: crate::card::HeartColor, count: u32, duration: &str) {
         Arc::make_mut(&mut self.mods).set_heart_override(card_id, color, count);
         let mut data = serde_json::Map::new();
@@ -336,6 +378,10 @@ impl GameState {
 
     pub fn add_cost_modifier(&mut self, card_id: i16, delta: i32) {
         Arc::make_mut(&mut self.mods).add_cost_modifier(card_id, delta);
+    }
+
+    pub fn remove_cost_modifier(&mut self, card_id: i16, delta: i32) {
+        Arc::make_mut(&mut self.mods).remove_cost_modifier(card_id, delta);
     }
 
     pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {

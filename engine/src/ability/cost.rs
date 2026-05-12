@@ -378,7 +378,20 @@ impl<'a> AbilityResolver<'a> {
                     cost.target.as_deref().unwrap_or("self"),
                     cost.position.as_ref(),
                     cost.optional.unwrap_or(false),
+                    cost.source.as_deref(),
                 )
+            }
+            Some("custom") => {
+                if cost.destination.as_deref() == Some("under_member") {
+                    self.execute_place_energy_under_member(
+                        cost.count.unwrap_or(1),
+                        cost.target.as_deref().unwrap_or("self"),
+                        cost.position.as_ref(),
+                        cost.optional.unwrap_or(false),
+                        None,
+                    )?;
+                }
+                Ok(())
             }
             _ => Ok(()),
         }

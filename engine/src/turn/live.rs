@@ -343,6 +343,7 @@ impl super::TurnEngine {
                             bh_arr[0] += count;
                         } else if effective_color == HeartColor::Draw {
                             draw_icons += count;
+                            // Process draw effects immediately
                             for _ in 0..*count {
                                 if let Some(new_card) = player.main_deck.draw() {
                                     player.hand.add_card(new_card);
@@ -486,6 +487,7 @@ impl super::TurnEngine {
             allocations,
             heart_sources,
             blade_sources,
+            draw_effects_occurred: true, // Flag to trigger auto abilities after draw effects
         }
     }
 }

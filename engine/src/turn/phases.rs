@@ -11,6 +11,7 @@ impl super::TurnEngine {
             match game_state.current_phase {
                 Phase::Active => {
                     game_state.reset_keyword_tracking();
+                    game_state.reset_keyword_tracking();
                     game_state.player1.activate_all_energy();
                     game_state.player2.activate_all_energy();
                     game_state.recalculate_constant_blade_modifiers();
@@ -66,8 +67,7 @@ impl super::TurnEngine {
                         let hm = game_state.mods.heart_modifiers.clone();
                         let btm = game_state.mods.blade_type_modifiers.clone();
                         let om = game_state.mods.orientation_modifiers.clone();
-                        let player = game_state.first_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm, &om)
+                        Self::player_perform_live(game_state.first_attacker_mut(), &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm, &om)
                     };
                     let player_id = game_state.player1.id.clone();
                     let turn = game_state.turn_number;
@@ -80,6 +80,11 @@ impl super::TurnEngine {
                     let p1_id = game_state.player1.id.clone();
                     Self::trigger_auto_abilities_for_player(game_state, &p1_id);
                     game_state.process_pending_auto_abilities(&p1_id);
+                    // Trigger auto abilities again after draw effects are resolved
+                    if perf_data.draw_effects_occurred {
+                        Self::trigger_auto_abilities_for_player(game_state, &p1_id);
+                        game_state.process_pending_auto_abilities(&p1_id);
+                    }
                     game_state.current_phase = Phase::SecondAttackerPerformance;
                 }
                 Phase::SecondAttackerPerformance => {
@@ -92,8 +97,7 @@ impl super::TurnEngine {
                         let hm = game_state.mods.heart_modifiers.clone();
                         let btm = game_state.mods.blade_type_modifiers.clone();
                         let om = game_state.mods.orientation_modifiers.clone();
-                        let player = game_state.second_attacker_mut();
-                        Self::player_perform_live(player, &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm, &om)
+                        Self::player_perform_live(game_state.second_attacker_mut(), &mut resolution_zone, &player_id, &card_db, &bm, &ho, &hm, &btm, &om)
                     };
                     let player_id = game_state.player2.id.clone();
                     let turn = game_state.turn_number;
@@ -106,6 +110,11 @@ impl super::TurnEngine {
                     let p2_id = game_state.player2.id.clone();
                     Self::trigger_auto_abilities_for_player(game_state, &p2_id);
                     game_state.process_pending_auto_abilities(&p2_id);
+                    // Trigger auto abilities again after draw effects are resolved
+                    if perf_data.draw_effects_occurred {
+                        Self::trigger_auto_abilities_for_player(game_state, &p2_id);
+                        game_state.process_pending_auto_abilities(&p2_id);
+                    }
                     game_state.current_phase = Phase::LiveVictoryDetermination;
                 }
                 Phase::LiveVictoryDetermination => {
@@ -117,6 +126,7 @@ impl super::TurnEngine {
                     game_state.turn_number += 1;
                     game_state.current_turn_phase = crate::game_state::TurnPhase::FirstAttackerNormal;
                     game_state.current_phase = Phase::Active;
+                    game_state.check_expired_effects();
                 }
                 _ => {}
             }

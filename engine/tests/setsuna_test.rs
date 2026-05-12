@@ -59,8 +59,8 @@ fn setsuna_q184_energy_under_member_not_counted() {
 
     assert_eq!(game.state.player1.energy_zone.cards.len(), 2,
         "Q184: 1 card removed for placement, 2 remain (inactive)");
-    assert_eq!(game.state.player1.energy_zone.active_energy_count, 1,
-        "Q184: 2 active consumed, 1 remaining active");
+    assert_eq!(game.state.player1.energy_zone.active_energy_count, 0,
+        "Q184: 2 active consumed for cost, 1 removed for placement → 0 remaining");
 }
 
 /// The debut should target the SAME area the original card vacated, not

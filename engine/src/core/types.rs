@@ -117,6 +117,7 @@ pub struct LivePerformanceData {
     pub allocations: Vec<Allocation>,
     pub heart_sources: Vec<HeartSource>,
     pub blade_sources: Vec<BladeSource>,
+    pub draw_effects_occurred: bool,
 }
 
 // ============== PERFORMANCE SNAPSHOT ==============

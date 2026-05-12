@@ -272,6 +272,12 @@ pub fn zone_cards<'a>(player: &'a crate::player::Player, zone: &str) -> &'a [i16
         "energy_zone" => &player.energy_zone.cards,
         "live_card_zone" => &player.live_card_zone.cards,
         "success_live_zone" => &player.success_live_card_zone.cards,
+        "under_member" => {
+            // Return all under_cards as a flat slice - needs allocation since
+            // under_cards are stored as 3 separate SmallVecs.
+            // This returns an empty slice; the caller must handle under_member separately.
+            &[]
+        },
         _ => &[],
     }
 }
@@ -420,6 +426,9 @@ pub fn calculate_per_unit_multiplier(
         Some("energy") => player.energy_zone.cards.len() as u32,
         Some("live_card_zone") => player.live_card_zone.cards.len() as u32,
         Some("discard") => player.waitroom.cards.len() as u32,
+        Some("under_member") | Some("下") => {
+            player.stage.under_cards.iter().map(|sv| sv.len()).sum::<usize>() as u32
+        }
         _ => 1,
     }
 }
@@ -439,18 +448,37 @@ pub fn resolve_per_unit_count(
     }
     let zone = match per_unit_type {
         Some("stage") | Some("member") | Some("人") | Some("members") => "stage",
-        Some("hand") | Some("card") | Some("枚") => "hand",
+        Some("hand") | Some("card") => "hand",
+        Some("枚") => {
+            let has_member_ct = filter.card_type.map_or(false, |ct| ct == "member_card");
+            if has_member_ct {
+                "under_member"
+            } else {
+                "hand"
+            }
+        },
         Some("discard") => "waitroom",
         Some("live_card_zone") => "live_card_zone",
         _ => return 1,
     };
-    let cards = zone_cards(player, zone);
-    if heart_colors.is_empty() {
-        count_matching(cards, card_db, filter, zone == "stage")
+    if zone == "under_member" {
+        let cards: Vec<i16> = player.stage.under_cards.iter().flat_map(|sv| sv.iter()).copied().collect();
+        if heart_colors.is_empty() {
+            count_matching(&cards, card_db, filter, false)
+        } else {
+            cards.iter()
+                .filter(|&&id| filter.matches(card_db, id, false) && card_matches_heart_colors(card_db, id, heart_colors))
+                .count() as u32
+        }
     } else {
-        cards.iter()
-            .filter(|&&id| filter.matches(card_db, id, zone == "stage") && card_matches_heart_colors(card_db, id, heart_colors))
-            .count() as u32
+        let cards = zone_cards(player, zone);
+        if heart_colors.is_empty() {
+            count_matching(cards, card_db, filter, zone == "stage")
+        } else {
+            cards.iter()
+                .filter(|&&id| filter.matches(card_db, id, zone == "stage") && card_matches_heart_colors(card_db, id, heart_colors))
+                .count() as u32
+        }
     }
 }
 

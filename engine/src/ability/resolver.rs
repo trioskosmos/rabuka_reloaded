@@ -225,14 +225,23 @@ impl<'a> AbilityResolver<'a> {
 
         if !cost_already_paid {
             if let Some(ref cost) = ability.cost {
-                // Check for modify_cost effects in the ability's own effect tree
-                // (cost reduction per group name, hand size, etc.)
                 let cost = self.apply_modify_cost_to_ability_cost(cost, ability);
                 if let Err(e) = self.pay_cost(&cost) {
                     dbg.p("RESULT", format_args!("COST FAILED: {}", e));
                     return Err(e);
                 }
                 dbg.p("RESULT", "cost paid ✓");
+            }
+        }
+
+        // Record use_limit early when there's no cost or cost doesn't create choice
+        // This ensures use_limit is set before effect runs (important for AUTO triggers)
+        if !cost_already_paid && self.pending_choice.is_none() {
+            if let Some(ref key) = ability_key {
+                if ability.use_limit.is_some() {
+                    eprintln!("[USE_LIMIT] inserting key={}", key);
+                    self.game_state.turn_limited_abilities_used.insert(key.clone());
+                }
             }
         }
 
@@ -274,12 +283,28 @@ impl<'a> AbilityResolver<'a> {
                 return Err(e);
             }
             if self.pending_choice.is_some() {
+                if !cost_already_paid {
+                    if let Some(ref key) = ability_key {
+                        if ability.use_limit.is_some() {
+                            eprintln!("[USE_LIMIT] inserting key={}", key);
+                            self.game_state.turn_limited_abilities_used.insert(key.clone());
+                        }
+                    }
+                }
                 self.store_pending_choice();
                 return Ok(());
             }
             dbg.p("RESULT", "effect applied ✓");
         }
 
+        if !cost_already_paid {
+            if let Some(ref key) = ability_key {
+                if ability.use_limit.is_some() {
+                    eprintln!("[USE_LIMIT] inserting key={}", key);
+                    self.game_state.turn_limited_abilities_used.insert(key.clone());
+                }
+            }
+        }
         if let Some(key) = ability_key {
             if ability.use_limit.is_some() {
                 self.game_state.turn_limited_abilities_used.insert(key);
