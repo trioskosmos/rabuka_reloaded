@@ -1041,9 +1041,25 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_gain_ability(&mut self, ability_text: &str, target: &str, duration: Option<&str>) -> Result<(), String> {
+        // Store the gained ability for tracking purposes
         if let Some(card_id) = self.game_state.activating_card {
             self.game_state.gained_abilities.entry(card_id).or_default().push(ability_text.to_string());
         }
+        
+        // Parse and apply the gained ability effect immediately
+        // Handle common gained ability patterns
+        if ability_text.contains("スコアを+1") || ability_text.contains("スコアを＋1") {
+            // This is a score modifier effect
+            let value = 1; // +1 score
+            let operation = "add";
+            
+            // Apply to the activating card (self target)
+            if let Some(card_id) = self.game_state.activating_card {
+                self.game_state.add_score_modifier(card_id, value);
+                eprintln!("[GAINED_ABILITY] Applied +1 score modifier to card {}", card_id);
+            }
+        }
+        
         util::push_temporary_effect(
             &mut self.game_state,
             &format!("gain_ability:{}", ability_text),
