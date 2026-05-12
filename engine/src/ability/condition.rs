@@ -462,7 +462,30 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         // Resolve location to an actual card list
         let actual = match location {
             "revealed_cards" => count_filtered(&self.game_state.revealed_cards, card_type),
-            "stage" => count_filtered(&player.stage.stage, card_type),
+            "stage" => {
+                if condition.unit.as_deref() == Some("types") {
+                    // Count distinct heart color types present across all stage members
+                    let required_colors: Vec<crate::card::HeartColor> = hc.iter()
+                        .map(|s| crate::zones::parse_heart_color(s))
+                        .collect();
+                    let mut present = std::collections::HashSet::new();
+                    for &cid in &player.stage.stage {
+                        if cid == -1 { continue; }
+                        if let Some(card) = card_db.get_card(cid) {
+                            if let Some(ref bh) = card.base_heart {
+                                for (color, _) in &bh.hearts {
+                                    if required_colors.contains(color) {
+                                        present.insert(*color);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    present.len()
+                } else {
+                    count_filtered(&player.stage.stage, card_type)
+                }
+            }
             "hand" => count_filtered(&player.hand.cards, card_type),
             "discard" | "waitroom" => {
                 // Check recently moved cards first (chained from a preceding move_cards action)

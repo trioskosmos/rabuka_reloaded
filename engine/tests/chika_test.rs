@@ -162,10 +162,10 @@ fn chika_turn1_use_limit() {
     game.state.player1.stage.stage = [-1, chika, -1];
     game.give_energy(10);
 
-    // First activation succeeds
+    // First activation succeeds (gain_ability grants constant +1 score)
     game.activate_ability(chika);
     assert_eq!(game.state.get_score_modifier(chika), 1,
-        "First activation should apply +1 score");
+        "First activation should apply +1 score via granted constant ability");
 
     // Second activation in same turn should skip (use_limit=1)
     let _result = TurnEngine::execute_main_phase_action(
@@ -180,7 +180,7 @@ fn chika_turn1_use_limit() {
     // The function may return Ok (skipping silently) or Err
     // Either way, score should still be 1 (not 2)
     assert_eq!(game.state.get_score_modifier(chika), 1,
-        "Second activation should not apply another +1 score");
+        "Second activation should not apply any additional score modifiers");
 }
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {

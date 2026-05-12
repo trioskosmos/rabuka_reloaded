@@ -48,9 +48,6 @@ fn miracle_wave_q182_excess_heart_score_4() {
     game.pass(); // → Active (processes LiveVictoryDetermination)
 
     let mod_val = game.state.get_score_modifier(game.id("PL!S-bp3-019-L"));
-    eprintln!("[WAVE] score_mod={}", mod_val);
-    // set_score should fire if either or_condition passes
-    // revealed_cards is empty → first condition (negation of empty = true)
-    // Should pass → score = 4 (unless engine gap prevents it)
-    // Known gap: revealed_cards always empty at LiveSuccess timing
+    assert_eq!(mod_val, 4,
+        "Excess heart ≥2 → score should be set to 4 (got {})", mod_val);
 }

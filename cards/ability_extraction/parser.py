@@ -768,6 +768,13 @@ def _try_card_count(text):
             if gns and 'を含む' not in text:
                 result['group_names'] = gns
 
+            # Extract heart_colors from text for heart icon patterns (e.g. 5種類以上)
+            if '{{heart_' in text:
+                hm = re.findall(r'{{heart_(\d+)\.png\|heart\d+}}', text)
+                if hm:
+                    colors = sorted(set(f'heart{m.zfill(2)}' for m in hm))
+                    result['heart_colors'] = colors
+
                 # Extract hand count condition (手札がN枚以下の場合 / 手札がN枚以上の場合)
             hand_m = re.search(r'手札が(\d+)枚以下(の|の場)', text)
             if hand_m:
@@ -881,11 +888,16 @@ def _try_temporal_count(text):
     return result
 
 def _try_or(text):
-    if 'か、' not in text:
+    # Only split on "あるか、" (OR pattern: condition A あるか、condition B)
+    # NOT on generic "か、" which appears in other grammar patterns
+    if 'あるか、' not in text:
         return None
-    parts = [p.strip() for p in text.split('か、') if p.strip()]
+    parts = [p.strip() for p in text.split('あるか、') if p.strip()]
     if len(parts) < 2:
         return None
+    # Restore "ある" suffix lost during split on "あるか、"
+    parts = [p + 'ある' if i < len(parts) - 1 else p for i, p in enumerate(parts)]
+    # Also add "場合" to last part if present in original
     parsed = [parse_condition(p) for p in parts]
     if len(parsed) < 2:
         return None
@@ -1383,6 +1395,7 @@ def parse_condition(text: str) -> Dict[str, Any]:
         _try_compound,
         _try_distinct,
         _try_state_change,
+        _try_or,
         _try_card_count,
         _try_both,
         _try_temporal_this_turn,
@@ -2147,7 +2160,7 @@ def parse_action(text: str) -> Dict[str, Any]:
     R(lambda t: 'デッキの上に置き' in t or 'デッキの上に置く' in t, 'move_cards',
       lambda t, a: a.update({'destination': 'deck_top', 'placement_order': 'any_order'} if '好きな順番で' in t else {'destination': 'deck_top'}))
     R(lambda t: ('エール' in t and ('枚数' in t or '数' in t)), 'modify_yell_count', None)
-    R('得る', 'gain_ability', lambda t, a: a.update({'ability_gain': re.sub(r'\{\{[^}]+\}\}', '', t).replace('「', '').replace('」', '').strip()}) if a.get('ability_gain') is None else None)
+    R('得る', 'gain_ability', lambda t, a: a.update({'ability_gain': t.replace('を失う', '').replace('を得る', '').replace('をえる', '').replace('「', '').replace('」', '').strip()}) if a.get('ability_gain') is None else None)
     R(lambda t: ('セット' in t or '設定' in t) and 'コスト' not in t, 'set_card_identity', None)
     R('必要ハートを選ぶ', 'choose_required_hearts', None)
     R('好きな順番で', 'move_cards', lambda t, a: a.update({'placement_order': 'any_order'}))
@@ -4104,12 +4117,17 @@ def _normalize_effect_tree(effect, original_text=None):
         if 'same_unit_name' not in d and '同じユニット名' in (d.get('text', '') or ''):
             d['same_unit_name'] = True
 
-        # Propagate heart_colors from effect into location_condition for collective heart checks
-        # (also done in _enrich_effect_type; this catches nested sequential sub-actions)
+        # Propagate heart_colors from effect into condition for collective heart checks
+        # Supports or_condition (propagate into sub-conditions) and location_condition
         if 'heart_colors' in d and 'condition' in d:
             cond = d['condition']
-            if isinstance(cond, dict) and cond.get('type') == 'location_condition' and 'heart_colors' not in cond:
-                cond['heart_colors'] = d['heart_colors']
+            if isinstance(cond, dict) and 'heart_colors' not in cond:
+                if cond.get('type') == 'or_condition':
+                    for sub in cond.get('conditions', []):
+                        if isinstance(sub, dict) and 'heart_colors' not in sub:
+                            sub['heart_colors'] = d['heart_colors']
+                elif cond.get('type') in ('location_condition', 'card_count_condition'):
+                    cond['heart_colors'] = d['heart_colors']
 
         # Strip leading comma from text artifacts (e.g. "、{{icon_energy.png|E}}支払ってもよい")
         if d_text and (d_text.startswith('、') or d_text.startswith('，')):
@@ -4228,34 +4246,9 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
                 gained = parse_effect(node['ability_gain'])
                 if gained and gained.get('action') and gained.get('action') != 'custom':
                     node['gained_effect'] = gained
-                    # If the gained effect is a real action, wrap both
-                    # in a sequential so the engine executes both.
-                    # e.g. "「スコアを+1する。」を得る" implies immediate score mod + recording ability.
-                    if gained.get('action') in ('modify_score', 'set_score', 'modify_blade',
-                                                 'gain_resource', 'modify_required_hearts',
-                                                 'modify_cost', 'draw_card'):
-                        for ctx_field in ('target', 'card_type', 'duration', 'self_target',
-                                          'group_names', 'characters', 'cost_limit'):
-                            if ctx_field in node and ctx_field not in gained:
-                                gained[ctx_field] = node[ctx_field]
-                        # Preserve condition/activation fields from original gain_ability node
-                        # (e.g. "場合、ライブ終了時まで、「スコア+1」を得る" — condition
-                        #  must survive the sequential rewrapping; also activation_condition_parsed
-                        #  from parenthetical notes like "（この能力はセンターエリアに登場している場合のみ起動できる。）")
-                        saved_fields = {}
-                        for k in ('condition', 'activation_condition_parsed', 'activation_position'):
-                            if k in node:
-                                saved_fields[k] = node[k]
-                        seq = {
-                            'action': 'sequential',
-                            'actions': [gained, {'action': 'gain_ability',
-                                                  'ability_gain': node.get('ability_gain'),
-                                                  'duration': node.get('duration'),
-                                                  'card_type': node.get('card_type')}]
-                        }
-                        seq.update(saved_fields)
-                        node.clear()
-                        node.update(seq)
+                    # Pure gain_ability: the gained constant ability provides the effect.
+                    # Do NOT add a separate direct action — the constant ability handles it.
+                    # Just preserve the gain_ability action as-is.
         effect = _clean(effect)
         _validate_effect(effect, triggerless_text[:40])
         ability['effect'] = effect

@@ -46,12 +46,8 @@ fn awake_q36_10_plus_hasetsu_cheers_score_plus_1() {
     game.pass(); game.pass(); game.pass();
 
     let score_mod = game.state.get_score_modifier(awake);
-    eprintln!("[AWAKE] score_mod={}", score_mod);
-    // blade=18, each cheered 蓮ノ空 card contributes b_heart05=1 to Heart00
-    // 18 蓮ノ空 cheered, condition needs 10+ → should pass
-    if score_mod == 1 {
-        eprintln!("[AWAKE] ✓ 10+ 蓮ノ空 members in cheered cards → +1 score");
-    }
+    assert_eq!(score_mod, 1,
+        "10+ 蓮ノ空 members in cheered cards → score +1 (got {})", score_mod);
 }
 
 /// Only 1 member with blade=2 → <10 cheered → condition fails.

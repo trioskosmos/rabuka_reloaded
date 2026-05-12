@@ -37,5 +37,5 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0() {
         Some(&game.state.mods.need_heart_modifiers)
     );
     eprintln!("[MIFUNE] final score: {}", score);
-    assert!(score < 10 || true, "Score processed");
+    assert!(score < 10, "Score should be low due to -1 penalty (got {})", score);
 }
