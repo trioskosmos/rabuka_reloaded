@@ -1363,7 +1363,17 @@ def _infer_condition_type(condition, text):
     elif condition.get('operator') and condition.get('target'):
         condition['type'] = 'comparison_condition'
     elif condition.get('aggregate') == 'total':
-        condition['type'] = 'score_threshold_condition'
+        if 'コスト' in text or '合計が' in text:
+            # "コストの合計がN" or "合計がN" → cost comparison, not score threshold
+            condition['type'] = 'comparison_condition'
+            condition['comparison_type'] = 'cost'
+            condition['operator'] = '='
+            # Extract the number from "合計がN" or "合計が、N"
+            cm = re.search(r'合計が、?(\d+)', text)
+            if cm:
+                condition['count'] = int(cm.group(1))
+        else:
+            condition['type'] = 'score_threshold_condition'
     elif location and condition.get('target'):
         condition['type'] = 'location_condition'
     elif location and operator:
@@ -3278,36 +3288,50 @@ def _try_kore_niyori_cascade(text):
 
 
 def _try_period_conditional(text):
-    """。場合、 — period-then-conditional patterns.
-    Handles "<action>。<condition>、<action>" where the condition marker
-    follows a sentence boundary (period), ensuring the preceding action
-    isn't lost when the condition marker blocks implicit sequential."""
-    if '。' not in text:
+    """。場合、 — period-then-conditional patterns (chainable).
+    Handles "<uncond_action>。<cond1>、<action1>。<cond2>、<action2>..."
+    Splits on periods and processes each condition=action pair."""
+    if '。' not in text or '場合' not in text:
         return None
-    for keyword in ['場合', 'とき', 'なら']:
-        marker = keyword + '、'
-        if marker in text:
-            period_pos = text.find('。')
-            marker_pos = text.find(marker)
-            if marker_pos > period_pos:
-                first = text[:period_pos].strip()
-                rest = text[period_pos + 1:].strip()
-                fa = parse_effect(first)
-                if fa.get('action', 'custom') == 'custom':
-                    return None
-                cond_result = _try_conditional(rest)
-                if cond_result is None:
-                    return None
-                actions = [fa]
-                ca = cond_result.get('actions', [])
+    # Don't handle patterns with "これにより" (complex condition markers) or
+    # "この能力は" (activation condition suffixes) — those have their own handlers.
+    if 'これにより' in text or 'この能力は' in text:
+        return None
+    parts = [p.strip() for p in text.split('。') if p.strip()]
+    if len(parts) < 2:
+        return None
+    # Find where conditional segments start (first part containing '場合')
+    cond_start = None
+    for i, p in enumerate(parts):
+        if '場合' in p:
+            cond_start = i
+            break
+    if cond_start is None:
+        return None
+    # Unconditional leading action(s)
+    actions = []
+    for p in parts[:cond_start]:
+        fa = parse_effect(p)
+        if fa.get('action', 'custom') != 'custom':
+            actions.append(fa)
+    # Each conditional segment: "条件、action" 
+    for p in parts[cond_start:]:
+        # Split on the first occurrence of 場合、
+        idx = p.find('場合、')
+        if idx >= 0:
+            cond_part = p[:idx + 2]  # includes "場合"
+            action_part = p[idx + 3:].strip()  # after "場合、"
+            # Parse the action with its condition
+            full = cond_part + '、' + action_part
+            ce = _try_conditional(full)
+            if ce is not None:
+                ca = ce.get('actions', [])
                 if ca:
                     actions.extend(ca)
                 else:
-                    actions.append(cond_result)
-                result = {'text': text, 'action': 'sequential', 'actions': actions}
-                # Condition is already embedded in the second action (cond_result),
-                # do NOT set it on the top-level sequential wrapper.
-                return result
+                    actions.append(ce)
+    if len(actions) >= 2:
+        return {'text': text, 'action': 'sequential', 'actions': actions}
     return None
 
 
@@ -3447,18 +3471,27 @@ def _try_baton_touch_effect(text):
 
 
 def _try_kore_niyori_result(text):
-    """これにより～した場合 — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
-    if 'これにより' not in text or '場合' not in text:
+    """これにより～した場合/とき — conditional on result (invalidation follow-up, discard follow-up, etc.)."""
+    if 'これにより' not in text:
         return None
-    m = re.search(r'これにより(.+?)場合', text)
+    # Support both 場合 and とき as condition markers
+    cond_marker = None
+    for marker in ['場合', 'とき']:
+        m = re.search(r'これにより(.+?)' + marker, text)
+        if m:
+            cond_marker = marker
+            break
+    if cond_marker is None:
+        return None
+    m = re.search(r'これにより(.+?)' + cond_marker, text)
     if not m:
         return None
     parts = text.split('これにより', 1)
     sp = 'これにより' + parts[1].strip()
-    if '場合' not in sp:
+    if cond_marker not in sp:
         return None
-    cp, fp = sp.split('場合', 1)
-    cond = parse_condition(cp.strip() + '場合')
+    cp, fp = sp.split(cond_marker, 1)
+    cond = parse_condition(cp.strip() + cond_marker)
     # "custom" type conditions can't be evaluated by the engine — skip them
     if cond.get('type') == 'custom':
         cond = None

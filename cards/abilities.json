@@ -2538,17 +2538,17 @@
         "placement_order": "any_order"
       },
       "effect": {
-        "text": "カードを1枚引く。合計が8の場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
-        "condition": {
-          "text": "それらのカードのコストの合計が、6の場合",
-          "comparison_type": "cost",
-          "aggregate": "total",
-          "type": "comparison_condition"
-        },
+        "text": "それらのカードのコストの合計が、6の場合、カードを1枚引く。合計が8の場合、ライブ終了時まで、{{icon_all.png|ハート}}を得る。合計が25の場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
         "action": "sequential",
         "actions": [
           {
             "text": "カードを1枚引く",
+            "condition": {
+              "text": "それらのカードのコストの合計が、6の場合",
+              "comparison_type": "cost",
+              "aggregate": "total",
+              "type": "comparison_condition"
+            },
             "count": 1,
             "action": "draw_card",
             "source": "deck",
@@ -2556,26 +2556,33 @@
           },
           {
             "text": "{{icon_all.png|ハート}}を得る",
+            "condition": {
+              "text": "合計が8の場合",
+              "aggregate": "total",
+              "type": "comparison_condition",
+              "comparison_type": "cost",
+              "operator": "=",
+              "count": 8
+            },
             "action": "gain_ability",
             "ability_gain": "{{icon_all.png|ハート}}",
-            "count": 1
+            "count": 1,
+            "duration": "live_end"
           },
           {
-            "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
+            "text": "「{{jyouji.png|常時}}ライブの合計スコアを+1する",
             "condition": {
               "text": "合計が25の場合",
               "aggregate": "total",
-              "type": "score_threshold_condition"
+              "type": "comparison_condition",
+              "comparison_type": "cost",
+              "operator": "=",
+              "count": 25
             },
-            "action": "gain_ability",
-            "ability_gain": "ライブの合計スコアを+1する。",
-            "duration": "live_end",
-            "gained_effect": {
-              "text": "ライブの合計スコアを+1する",
-              "action": "modify_score",
-              "value": 1,
-              "operation": "add"
-            }
+            "action": "modify_score",
+            "value": 1,
+            "operation": "add",
+            "duration": "live_end"
           }
         ]
       }
@@ -5861,24 +5868,24 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "ライブの合計スコアを+1する。自分が余剰ハートを2つ以上持つ場合、ライブの合計スコアを-1する。この効果ではライブの合計スコアは0未満にはならない",
-        "condition": {
-          "type": "location_condition",
-          "card_type": "member_card",
-          "location": "stage",
-          "text": "自分が余剰ハートを持たない場合",
-          "negation": true
-        },
+        "text": "自分が余剰ハートを持たない場合、ライブの合計スコアを+1する。自分が余剰ハートを2つ以上持つ場合、ライブの合計スコアを-1する。この効果ではライブの合計スコアは0未満にはならない",
         "action": "sequential",
         "actions": [
           {
             "text": "ライブの合計スコアを+1する",
+            "condition": {
+              "type": "location_condition",
+              "card_type": "member_card",
+              "location": "stage",
+              "text": "自分が余剰ハートを持たない場合",
+              "negation": true
+            },
             "action": "modify_score",
             "value": 1,
             "operation": "add"
           },
           {
-            "text": "ライブの合計スコアを-1する。この効果ではライブの合計スコアは0未満にはならない",
+            "text": "ライブの合計スコアを-1する",
             "condition": {
               "text": "自分が余剰ハートを2つ以上持つ場合",
               "resource_type": "surplus_heart",
@@ -5886,7 +5893,6 @@
               "operator": ">=",
               "type": "comparison_condition"
             },
-            "effect_constraint": "minimum_value:0",
             "action": "modify_score",
             "value": 1,
             "operation": "remove"
@@ -5918,6 +5924,15 @@
           },
           {
             "text": "自分の控え室からライブカードを1枚手札に加える",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 3,
+              "operator": ">=",
+              "text": "・自分の控え室にカード名が異なるライブカードが3枚以上ある場合",
+              "card_type": "live_card",
+              "location": "discard",
+              "target": "self"
+            },
             "source": "discard",
             "destination": "hand",
             "count": 1,
@@ -7932,9 +7947,11 @@
               {
                 "text": "そのメンバーは、このメンバーがいたエリアに移動させる",
                 "condition": {
-                  "type": "movement_condition",
-                  "text": "このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合",
-                  "movement": "moves"
+                  "text": "選んだエリアにメンバーがいる場合",
+                  "card_type": "member_card",
+                  "count": 1,
+                  "operator": ">=",
+                  "type": "card_count_condition"
                 },
                 "destination": "same_area",
                 "card_type": "member_card",
@@ -8454,9 +8471,11 @@
           {
             "text": "そのメンバーは、このメンバーがいたエリアに移動させる",
             "condition": {
-              "type": "movement_condition",
-              "text": "このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合",
-              "movement": "moves"
+              "text": "選んだエリアにメンバーがいる場合",
+              "card_type": "member_card",
+              "count": 1,
+              "operator": ">=",
+              "type": "card_count_condition"
             },
             "destination": "same_area",
             "card_type": "member_card",
@@ -9971,9 +9990,18 @@
           },
           {
             "text": "{{icon_blade.png|ブレード}}を得る",
+            "condition": {
+              "text": "そのメンバーが持つハートと、このメンバーが持つハートの中に同じ色のハートがある場合",
+              "card_type": "member_card",
+              "operator": "=",
+              "comparison_type": "equality",
+              "type": "card_count_condition",
+              "count": 1
+            },
             "action": "gain_resource",
             "resource": "blade",
-            "count": 1
+            "count": 1,
+            "duration": "live_end"
           },
           {
             "text": "元々の{{icon_blade.png|ブレード}}の数が同じ場合についても同じことを行う",
@@ -11921,23 +11949,17 @@
             "action": "reveal"
           },
           {
-            "text": "公開したカードを手札に加え、このメンバーはポジションチェンジする",
-            "action": "sequential",
-            "actions": [
-              {
-                "text": "公開したカードを手札に加え",
-                "action": "move_cards",
-                "destination": "hand",
-                "source": "discard",
-                "card_type": "card",
-                "count": 1
-              },
-              {
-                "text": "このメンバーはポジションチェンジする",
-                "card_type": "member_card",
-                "action": "position_change"
-              }
-            ]
+            "text": "公開したカードを手札に加え",
+            "action": "move_cards",
+            "destination": "hand",
+            "source": "discard",
+            "card_type": "card",
+            "count": 1
+          },
+          {
+            "text": "このメンバーはポジションチェンジする",
+            "card_type": "member_card",
+            "action": "position_change"
           },
           {
             "text": "公開したカードを控え室に置く",
@@ -13335,7 +13357,35 @@
             "action": "select"
           },
           {
+            "text": "自分のデッキの一番上のカードを公開する",
+            "source": "deck_top",
+            "count": 1,
+            "target": "self",
+            "action": "reveal"
+          },
+          {
             "text": "公開したカードを手札に加える",
+            "condition": {
+              "type": "compound",
+              "operator": "and",
+              "conditions": [
+                {
+                  "text": "公開したカードがメンバーカードで、",
+                  "card_type": "member_card",
+                  "count": 1,
+                  "operator": ">=",
+                  "type": "card_count_condition"
+                },
+                {
+                  "text": "コストが選んだ数以上の場合",
+                  "operator": ">=",
+                  "comparison_type": "cost",
+                  "type": "comparison_condition"
+                }
+              ],
+              "text": "公開したカードがメンバーカードで、かつコストが選んだ数以上の場合",
+              "card_type": "member_card"
+            },
             "destination": "hand",
             "action": "move_cards",
             "source": "discard",
@@ -18024,35 +18074,33 @@
       "cost": null,
       "effect": {
         "text": "自分のステージにいる『Printemps』のメンバーをアクティブにする。これによりウェイト状態のメンバーが3人以上アクティブ状態になったとき、このカードのスコアを+1する",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "自分のステージにいる『Printemps』のメンバーをアクティブにする",
-            "state_change": "active",
-            "card_type": "member_card",
-            "target": "self",
-            "group_names": [
-              "Printemps"
-            ],
-            "action": "change_state"
-          },
-          {
-            "text": "このカードのスコアを+1する",
-            "condition": {
-              "type": "state_change_condition",
-              "text": "これによりウェイト状態のメンバーが3人以上アクティブ状態になったとき",
-              "from_state": "wait",
-              "to_state": "active",
-              "count": 3,
-              "operator": ">=",
-              "unit": "人"
-            },
-            "action": "modify_score",
-            "value": 1,
-            "operation": "add",
-            "self_target": true
-          }
-        ]
+        "action": "conditional_on_result",
+        "primary_effect": {
+          "text": "自分のステージにいる『Printemps』のメンバーをアクティブにする。",
+          "state_change": "active",
+          "card_type": "member_card",
+          "target": "self",
+          "group_names": [
+            "Printemps"
+          ],
+          "action": "change_state"
+        },
+        "result_condition": {
+          "type": "state_change_condition",
+          "text": "これによりウェイト状態のメンバーが3人以上アクティブ状態になったとき",
+          "from_state": "wait",
+          "to_state": "active",
+          "count": 3,
+          "operator": ">=",
+          "unit": "人"
+        },
+        "followup_action": {
+          "text": "このカードのスコアを+1する",
+          "action": "modify_score",
+          "value": 1,
+          "operation": "add",
+          "self_target": true
+        }
       }
     },
     {
@@ -19065,7 +19113,7 @@
             "action": "select"
           },
           {
-            "text": "代わりに1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・自分の控え室からメンバーカードを1枚手札に加える",
+            "text": "代わりに1つ以上を選ぶ",
             "condition": {
               "text": "自分の成功ライブカード置き場に『虹ヶ咲』のカードがある場合",
               "target": "self",
@@ -19085,14 +19133,9 @@
               "action": "do_nothing"
             },
             "alternative_effect": {
-              "text": "1つ以上を選ぶ。\n・自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。\n・自分の控え室からメンバーカードを1枚手札に加える",
-              "source": "energy_deck",
-              "destination": "energy_zone",
-              "state_change": "wait",
+              "text": "1つ以上を選ぶ",
               "count": 1,
-              "card_type": "member_card",
-              "target": "self",
-              "action": "move_cards"
+              "action": "select"
             }
           }
         ]
