@@ -1,0 +1,1833 @@
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 1 test
+test all_action_types_fire_without_crash ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.73s
+
+
+running 3 tests
+test awake_q36_low_cheers_no_score ... ok
+test awake_q36_10_plus_hasetsu_cheers_score_plus_1 ... ok
+test awake_q36_non_hasetsu_cheered_no_score ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 5 tests
+test azuna_q158_blade_single_member ... ok
+test azuna_q158_blade_all_members ... ok
+test azuna_q157_energy_under_member_uses_any_energy ... ok
+test azuna_q158_blade_not_gained_if_energy_not_placed ... ok
+test azuna_q184_energy_under_member_not_counted ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+
+running 2 tests
+test ayumu_pb1_q199_no_baton_touch_after_effect_placement ... ok
+test ayumu_pb1_q200_placed_card_retains_abilities ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 2 tests
+test hanamaru_constant_cost_per_success_card ... ok
+test eri_constant_blade_per_wait_member ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 1 test
+test q36_live_success_timing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 6 tests
+test tiny_stars_live_success_timing ... ok
+test mijuku_dreamer_live_success_timing ... ok
+test kanan_live_success_timing ... ok
+test kaguya_live_success_recover ... ok
+test cutie_panther_live_start_reduce_hearts ... ok
+test kaguya_live_success_cheer_recover ... FAILED
+
+failures:
+
+---- kaguya_live_success_cheer_recover stdout ----
+[LIVE_START_TRIGGER] triggering 0 abilities for player p1
+[AUTO_TRIGGER] checking stage for player p1 stage=[5613, -1, -1]
+[AUTO_TRIGGER] checking stage for player p1 stage=[5613, -1, -1]
+[AUTO_TRIGGER] checking stage for player p2 stage=[-1, -1, -1]
+[AUTO_TRIGGER] checking stage for player p2 stage=[-1, -1, -1]
+[TRIGGER] live_success live_card: card=PL!-pb1-031-L trigger=Some("ライブ成功時") match=true
+[AB]ABILITY "輝夜の城で踊りたい" (3958)
+[AB]  TRIGGER ライブ成功時 
+[AB]  TEXT {{live_success.png|ライブ成功時}}手札を1枚控え室に置いてもよい：エールにより公開された自分のカードの中から、『μ's』のメンバーカードを1枚手札に加える。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'kaguya_live_success_cheer_recover' (8244) panicked at tests\b9_more_test.rs:82:5:
+μ's member should be recovered to hand by kaguya LiveSuccess ability
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    kaguya_live_success_cheer_recover
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 3 tests
+test hanamaru_s3_q155_constant_cost_increase ... ok
+test maki_sd1_q125_restriction_parsed ... ok
+test you_s3_q153_live_success_draw_if_fewer_revealed ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 2 tests
+test start_dash_q36_live_success_draw_3 ... ok
+test nico_bp4_q189_debut_active_to_wait ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 1 test
+test bring_love_q225_multiname_counts_as_one_member ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 1 test
+test test_cannot_baton_touch_restriction_blocks_action ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+
+running 8 tests
+test rurino_ozora_only_selects_mirakura_cards ... ok
+test rurino_ozora_cost_payment_success ... ok
+test rurino_ozora_multiple_copies_on_stage ... ok
+test rurino_ozora_different_stage_positions ... ok
+test rurino_ozora_empty_discard ... ok
+test rurino_ozora_no_trigger_when_alone_on_stage ... ok
+test rurino_ozora_optional_cost_no_payment ... ok
+test rurino_ozora_triggers_with_other_members ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+
+running 2 tests
+test cheer_pipeline_score_icon ... ok
+test cheer_pipeline_draw_and_score_icons ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 5 tests
+test chika_turn1_use_limit ... ok
+test chika_q152_self_only ... ok
+test chika_q151_ability_lost_on_leave ... ok
+test chika_center_required ... ok
+test chika_q171_live_end_persistence ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+
+running 2 tests
+test chisato_bp5_q219_cost_10_needs_10_energy ... ok
+test chisato_bp5_q219_cost_10_fails_with_9 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 1 test
+test chisato_q126_area_move_triggers_energy_placement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+
+
+running 5 tests
+test chisato_q78_ability_lost_on_leave ... ok
+test chisato_q129_cost_reduction_affects_threshold ... ok
+test chisato_reveal_creates_choice ... ok
+test chisato_cost_hits_threshold_condition_passes ... ok
+test chisato_cost_misses_threshold_condition_fails ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+
+running 1 test
+test daisuki_q156_two_copies_re_yell_triggers ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 1 test
+test dazzling_q187_exclude_selected_liella_other_pickable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 1 test
+test test_draw_phase_no_unwanted_discards ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+
+running 2 tests
+test dream_believers_q212_multiname_no_match ... ok
+test dream_believers_one_hasetsu_plus_other_pass ... FAILED
+
+failures:
+
+---- dream_believers_one_hasetsu_plus_other_pass stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!HS-bp5-017-L_{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：自分のステージに『蓮ノ空』のメンバー1人を含むメンバーが2人以上おり、かつそれらのメンバーのユニット名がそれぞれ異なる場合、このカードのスコアを＋１する。 card_no=PL!HS-bp5-017-L
+[AB]ABILITY "Dream Believers（104期Ver.）" (6763)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：自分のステージに『蓮ノ空』のメンバー1人を含むメンバーが2人以上おり、かつそれらのメンバーのユニット名がそれぞれ異なる場合、このカードのスコアを＋１する。
+[AB]  COST pay 1 E (optional)
+[AB]COST pay 1 E (optional) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay 1 energy (or skip)?", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+[DREAM] 1 hasetsu + 1 other: mod=0
+
+thread 'dream_believers_one_hasetsu_plus_other_pass' (13572) panicked at tests\dream_believers_test.rs:42:5:
+assertion `left == right` failed: Condition passes with 1 蓮ノ空 + 1 non-蓮ノ空
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    dream_believers_one_hasetsu_plus_other_pass
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 2 tests
+test dream_with_you_q116_blade_6_no_score ... ok
+test dream_with_you_q116_blade_10_score_plus_1 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 1 test
+test eli_q79_vacated_area_can_play_new_member ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 3 tests
+test emma_bp5_q215_no_energy_cost_fails_gracefully ... ok
+test emma_bp5_q215_wait_energy_placed_then_activate ... ok
+test emma_bp5_q215_only_wait_energy_available ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 2 tests
+test emma_q163_self_excluded_no_other_niko_cost_fails ... ok
+test emma_q163_nijigasaki_member_pays_cost ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 22 tests
+test kasumi_debut_place_two_energy_under ... ok
+test mia_activate_retrieves_live_even_without_energy_placement ... ok
+test ayumu_bp3n_debut_skip_no_draw ... ok
+test ayumu_bp3n_debit_place_one_under_draw_two ... ok
+test ayumu_bp3n_q157_wait_energy_placed_under ... ok
+test mia_activate_cost_does_not_remove_energy ... ok
+test kasumi_rule_4553_under_cards_follow_position_change ... ok
+test kasumi_debut_skip_optional_no_energy_moved ... ok
+test ayumu_bp5n_heart01_condition_passes_but_modifier_not_found ... ok
+test kasumi_rule_1054_under_energy_recycles_to_energy_deck ... ok
+test mia_use_limit_not_enforced ... ok
+test kasumi_q184_under_energy_not_counted_in_zone ... ok
+test awakening_move_energy_from_under_to_deck ... ok
+test rina_debit_triggers_with_target_in_discard ... ok
+test rina_rule_1053_under_member_goes_to_waitroom ... ok
+test rina_rule_4553_under_member_follows_position_change ... ok
+test sayaka_use_limit_enforced ... ok
+test sayaka_live_start_per_unit_counts_hand_not_under ... ok
+test sayaka_rule_4553_under_members_follow_position_change ... ok
+test sayaka_activate_effect_does_not_place_under ... ok
+test sayaka_live_start_zero_under_still_gets_hand_count ... ok
+test sayaka_rule_1053_under_members_go_to_waitroom ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.85s
+
+
+running 1 test
+test eri_q144_up_to_semantics_1_eligible_opponent_still_works ... FAILED
+
+failures:
+
+---- eri_q144_up_to_semantics_1_eligible_opponent_still_works stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 10838, -1]
+[AB]ABILITY "絢瀬絵里" (10838)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [1] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [1]
+DEBUG: handle_select_card - zone: 'hand', indices: [1], context: None
+
+thread 'eri_q144_up_to_semantics_1_eligible_opponent_still_works' (17472) panicked at tests\eri_bp3_test.rs:48:5:
+assertion `left == right` failed: 1 eligible opponent member was put to wait — 'up to 2' is an upper bound
+  left: None
+ right: Some("wait")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    eri_q144_up_to_semantics_1_eligible_opponent_still_works
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 4 tests
+test fuyumari_q118_opponent_picks_first_card ... FAILED
+test fuyumari_q118_card_count_integrity ... ok
+test fuyumari_q118_opponent_picks_second_card ... FAILED
+test fuyumari_q118_only_one_live_card_no_effect ... ok
+
+failures:
+
+---- fuyumari_q118_opponent_picks_first_card stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[5148, -1, -1]
+[AB]ABILITY "鬼塚冬毬" (5148)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。そうした場合、相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える。
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(5148)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(5148)
+[AB]EFFECT select 2 live_card from discard
+DEBUG: execute_effect - action: select, source: discard, destination: none
+[AB]EFFECT select 2 live_card from discard
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "discard", card_type: Some("live_card"), count: 2, description: "Select 2 card(s) from discard", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0, 1] }
+DEBUG: Processing SelectCard choice - zone: 'discard', card_type: Some("live_card"), count: 2, indices: [0, 1]
+DEBUG: handle_select_card - zone: 'discard', indices: [0, 1], context: SingleEffect { effect_index: 0 }
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(5148)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(5148)
+[AB]EFFECT select 1 card from ?
+DEBUG: execute_effect - action: select, source: none, destination: none
+[AB]EFFECT select 1 card from ?
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: SingleEffect { effect_index: 0 }
+[AB]EFFECT move 1 from selected_cards → hand (type: card)
+DEBUG: execute_effect - action: move_cards, source: selected_cards, destination: hand
+[AB]EFFECT move 1 from selected_cards → hand (type: card)
+
+thread 'fuyumari_q118_opponent_picks_first_card' (12300) panicked at tests\fuyumari_debut_test.rs:53:5:
+Opponent-chosen card (live_a) should be in hand
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- fuyumari_q118_opponent_picks_second_card stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[5148, -1, -1]
+[AB]ABILITY "鬼塚冬毬" (5148)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}自分の控え室にある、カード名の異なるライブカードを2枚選ぶ。そうした場合、相手はそれらのカードのうち1枚を選ぶ。これにより相手に選ばれたカードを自分の手札に加える。
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(5148)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(5148)
+[AB]EFFECT select 2 live_card from discard
+DEBUG: execute_effect - action: select, source: discard, destination: none
+[AB]EFFECT select 2 live_card from discard
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "discard", card_type: Some("live_card"), count: 2, description: "Select 2 card(s) from discard", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0, 1] }
+DEBUG: Processing SelectCard choice - zone: 'discard', card_type: Some("live_card"), count: 2, indices: [0, 1]
+DEBUG: handle_select_card - zone: 'discard', indices: [0, 1], context: SingleEffect { effect_index: 0 }
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(5148)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(5148)
+[AB]EFFECT select 1 card from ?
+DEBUG: execute_effect - action: select, source: none, destination: none
+[AB]EFFECT select 1 card from ?
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [1] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [1]
+DEBUG: handle_select_card - zone: 'hand', indices: [1], context: SingleEffect { effect_index: 0 }
+[AB]EFFECT move 1 from selected_cards → hand (type: card)
+DEBUG: execute_effect - action: move_cards, source: selected_cards, destination: hand
+[AB]EFFECT move 1 from selected_cards → hand (type: card)
+
+thread 'fuyumari_q118_opponent_picks_second_card' (18416) panicked at tests\fuyumari_debut_test.rs:90:5:
+Opponent-chosen card (live_b) should be in hand
+
+
+failures:
+    fuyumari_q118_opponent_picks_first_card
+    fuyumari_q118_opponent_picks_second_card
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+
+running 5 tests
+test fuyumari_q63_effect_debut_no_cost_payment ... ok
+test fuyumari_edge_no_valid_cost_target ... ok
+test fuyumari_q63_optional_cost_skipped ... ok
+test fuyumari_edge_exclude_self_from_cost ... ok
+test fuyumari_q95_player_chooses_card_from_discard ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+
+running 37 tests
+test ayumu_q62_and_name_has_individual_names ... ok
+test distortion_max_cap_8_wait_refresh_6_only ... ok
+test distortion_no_refresh_when_no_wait_energy ... ok
+test distortion_q103_two_triggers_only_one_plus_1 ... ok
+test distortion_exact_max_boundary_6_wait_all_refreshed ... ok
+test ayumu_kanon_koko_debut_recover_from_discard ... ok
+test ai_screeam_answer_both_discard ... ok
+test bella_q174_no_member_on_stage_ability_does_not_fire ... ok
+test lovepeace_q149_total_hearts_sum_of_base_hearts ... ok
+test bella_q174_no_heart04_surplus_ability_does_not_fire ... ok
+test ayumu_live_start_triggers ... ok
+test ai_screeam_answer_both_draw ... ok
+test ai_screeam_answer_both_gain_blade ... ok
+test distortion_basic_energy_refresh_with_catchu ... ok
+test distortion_q96_score_permanent_after_energy_used ... ok
+test hareruya_q64_waitroom_only_five_distinct_liella_condition_met ... ok
+test distortion_same_name_catchu_condition_not_met ... ok
+test energy_zone_capacity_handled ... ok
+test hareruya_q74_multiname_distinct_counting ... ok
+test distortion_q97_all_active_no_catchu_score_plus_1 ... ok
+test nico_cost_filter_only_shows_eligible ... FAILED
+test lovepeace_q172_ability_gained_hearts_count_but_not_blade ... ok
+test nico_q168_no_suitable_card_skips ... ok
+test you_q129_cost_reduction_self_only ... ok
+test nico_q168_both_appear_from_discard ... FAILED
+test lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1 ... ok
+test nico_q169_no_baton_touch_from_appeared_area ... ok
+test nico_q170_turn_player_appears_first ... FAILED
+test nico_requires_empty_area ... ok
+test nico_q181_area_freed_after_card_leaves ... FAILED
+test turn_limit_prevents_second_activation ... ok
+test phase_walkthrough_two_turns ... ok
+test you_abilityless_card_not_in_choice ... ok
+test wien_q117_another_member_triggers_yell_reduction ... ok
+test you_q186_cost_reduced_playable ... ok
+test you_live_start_optional_cost_triggers ... ok
+test you_q186_cost_reduced_fails ... ok
+
+failures:
+
+---- nico_cost_filter_only_shows_eligible stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8298, -1, -1]
+[AB]ABILITY "矢澤にこ" (8298)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。）
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]  RESULT effect applied ✓
+
+thread 'nico_cost_filter_only_shows_eligible' (9400) panicked at tests\gameplay_test.rs:804:5:
+assertion `left == right` failed: P1's cheap member should be in wait state
+  left: None
+ right: Some("wait")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- nico_q168_both_appear_from_discard stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8298, -1, -1]
+[AB]ABILITY "矢澤にこ" (8298)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。）
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]  RESULT effect applied ✓
+[Nico] P1 stage members: [8298, 9403]
+[Nico] P2 stage members: [3293]
+
+thread 'nico_q168_both_appear_from_discard' (18716) panicked at tests\gameplay_test.rs:614:5:
+assertion `left == right` failed: P1's cheap member should be in wait state
+  left: None
+ right: Some("wait")
+
+---- nico_q170_turn_player_appears_first stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8298, -1, -1]
+[AB]ABILITY "矢澤にこ" (8298)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。）
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]  RESULT effect applied ✓
+
+thread 'nico_q170_turn_player_appears_first' (16584) panicked at tests\gameplay_test.rs:672:5:
+assertion `left == right` failed: P1's member should be in wait state
+  left: None
+ right: Some("wait")
+
+---- nico_q181_area_freed_after_card_leaves stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8298, -1, -1]
+[AB]ABILITY "矢澤にこ" (8298)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室からコスト2以下のメンバーカードを1枚、メンバーのいないエリアにウェイト状態で登場させる。（この効果で登場したメンバーのいるエリアには、このターンにメンバーは登場できない。）
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+[AB]EFFECT move 1 from discard → stage (type: member_card)
+[AB]  RESULT effect applied ✓
+
+thread 'nico_q181_area_freed_after_card_leaves' (20404) panicked at tests\gameplay_test.rs:715:5:
+assertion `left == right` failed: P1's member should be in wait state
+  left: None
+ right: Some("wait")
+
+
+failures:
+    nico_cost_filter_only_shows_eligible
+    nico_q168_both_appear_from_discard
+    nico_q170_turn_player_appears_first
+    nico_q181_area_freed_after_card_leaves
+
+test result: FAILED. 33 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.81s
+
+
+running 2 tests
+test hanamaru_q120_no_live_in_revealed_no_draw ... ok
+test hanamaru_q120_hand7_auto_condition_checked_after_blade_draws ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 1 test
+test hanamusubi_q213_member_card_moved_before_live_start ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+
+running 3 tests
+test hanano_edge_no_unit_has_2_skip ... ok
+test hanano_q175_largest_unit_wins_tie_goes_alphabetical ... ok
+test hanano_q175_singleton_filtered_out_choice_created ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+
+running 1 test
+test hanayo_q183_self_only_wait_no_opponent_affected ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+
+running 3 tests
+test hazuki_activate_not_enough_deck_no_blade ... ok
+test hazuki_activate_no_liella_discarded_gain_0_blade ... ok
+test hazuki_activate_two_liella_discarded_gain_2_blade ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+
+running 3 tests
+test himeno_edge_no_mirakura_skips ... ok
+test himeno_q82_identity_live_card_selectable ... FAILED
+test himeno_q82_dodo_live_card_selectable ... FAILED
+
+failures:
+
+---- himeno_q82_identity_live_card_selectable stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[5213, -1, -1]
+[AB]ABILITY "安養寺 姫芽" (5213)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『みらくらぱーく！』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'himeno_q82_identity_live_card_selectable' (7816) panicked at tests\himeno_test.rs:70:5:
+Q82: アイデンティティ (みらくらぱーく！) is selectable
+
+---- himeno_q82_dodo_live_card_selectable stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[5213, -1, -1]
+[AB]ABILITY "安養寺 姫芽" (5213)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『みらくらぱーく！』のカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'himeno_q82_dodo_live_card_selectable' (7080) panicked at tests\himeno_test.rs:41:5:
+Q82: ド！ド！ド！ (みらくらぱーく！) is selectable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    himeno_q82_dodo_live_card_selectable
+    himeno_q82_identity_live_card_selectable
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+
+running 3 tests
+test hinoshita_q236_name_contains_all_matches ... ok
+test hinoshita_q237_name_contains_all_no_match ... ok
+test hinoshita_no_matching_live_in_discard_fails ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 7 tests
+test honoka_q166_target_last_card ... FAILED
+test honoka_q166_no_member_in_deck_refresh ... ok
+test honoka_q166_member_found_after_4_fillers ... FAILED
+test honoka_q166_live_card_chosen ... FAILED
+test honoka_q166_two_matches_only_one_added ... FAILED
+test honoka_q167_deck_exhausted_during_reveal ... ok
+test honoka_q166_target_first_card ... FAILED
+
+failures:
+
+---- honoka_q166_target_last_card stdout ----
+[AB]ABILITY "高坂穂乃果" (11108)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+[AB]  COST compound (2 sub-costs)
+[AB]COST compound (2 sub-costs) → OK
+[AB]COST set self → wait → OK
+[CHANGE_STATE] stage=[11108] card_type=Some("member_card") exclude_self=false activating_id=Some(11108) self_cost=Some(true)
+[CHANGE_STATE] id=11108 group_ok=true name_ok=true ok=true
+[CHANGE_STATE] candidates=[11108]
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置く) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'honoka_q166_target_last_card' (19520) panicked at tests\honoka_test.rs:132:5:
+Target (last card) should be in hand
+
+---- honoka_q166_member_found_after_4_fillers stdout ----
+[AB]ABILITY "高坂穂乃果" (11108)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+[AB]  COST compound (2 sub-costs)
+[AB]COST compound (2 sub-costs) → OK
+[AB]COST set self → wait → OK
+[CHANGE_STATE] stage=[11108] card_type=Some("member_card") exclude_self=false activating_id=Some(11108) self_cost=Some(true)
+[CHANGE_STATE] id=11108 group_ok=true name_ok=true ok=true
+[CHANGE_STATE] candidates=[11108]
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置く) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'honoka_q166_member_found_after_4_fillers' (13652) panicked at tests\honoka_test.rs:80:5:
+Target should be in hand
+
+---- honoka_q166_live_card_chosen stdout ----
+[AB]ABILITY "高坂穂乃果" (11108)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+[AB]  COST compound (2 sub-costs)
+[AB]COST compound (2 sub-costs) → OK
+[AB]COST set self → wait → OK
+[CHANGE_STATE] stage=[11108] card_type=Some("member_card") exclude_self=false activating_id=Some(11108) self_cost=Some(true)
+[CHANGE_STATE] id=11108 group_ok=true name_ok=true ok=true
+[CHANGE_STATE] candidates=[11108]
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置く) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'honoka_q166_live_card_chosen' (11876) panicked at tests\honoka_test.rs:158:5:
+Live card should be found and added to hand
+
+---- honoka_q166_two_matches_only_one_added stdout ----
+[AB]ABILITY "高坂穂乃果" (11108)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+[AB]  COST compound (2 sub-costs)
+[AB]COST compound (2 sub-costs) → OK
+[AB]COST set self → wait → OK
+[CHANGE_STATE] stage=[11108] card_type=Some("member_card") exclude_self=false activating_id=Some(11108) self_cost=Some(true)
+[CHANGE_STATE] id=11108 group_ok=true name_ok=true ok=true
+[CHANGE_STATE] candidates=[11108]
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置く) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'honoka_q166_two_matches_only_one_added' (15052) panicked at tests\honoka_test.rs:187:5:
+assertion `left == right` failed: Only 1 of 2 matching cards added (reveal stops at first match)
+  left: 0
+ right: 1
+
+---- honoka_q166_target_first_card stdout ----
+[AB]ABILITY "高坂穂乃果" (11108)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。選んだカードが公開されるまで、自分のデッキの一番上からカードを１枚ずつ公開する。そのカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+[AB]  COST compound (2 sub-costs)
+[AB]COST compound (2 sub-costs) → OK
+[AB]COST set self → wait → OK
+[CHANGE_STATE] stage=[11108] card_type=Some("member_card") exclude_self=false activating_id=Some(11108) self_cost=Some(true)
+[CHANGE_STATE] id=11108 group_ok=true name_ok=true ok=true
+[CHANGE_STATE] candidates=[11108]
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置く) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'honoka_q166_target_first_card' (15744) panicked at tests\honoka_test.rs:106:5:
+Target (first card) should be in hand
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    honoka_q166_live_card_chosen
+    honoka_q166_member_found_after_4_fillers
+    honoka_q166_target_first_card
+    honoka_q166_target_last_card
+    honoka_q166_two_matches_only_one_added
+
+test result: FAILED. 2 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.86s
+
+
+running 3 tests
+test jellyfish_non_5yncri5e_member_moves_no_reduction ... ok
+test jellyfish_q99_two_qualifying_members_reduce_by_2 ... ok
+test jellyfish_q98_same_card_appeared_and_moved_counts_once ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+
+running 2 tests
+test kagayaiteru_q125_cannot_place_in_success_zone ... ok
+test kagayaiteru_live_success_draw_then_discard ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 2 tests
+test kanata_live_success_no_others_condition_checked ... ok
+test kanata_live_success_with_others_waits_self ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 1 test
+test kanon_q106_debut_recover_from_discard ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 3 tests
+test kanon_q93_partial_resolution_one_card ... ok
+test kanon_q93_partial_resolution_zero_cards ... ok
+test kanon_ab1_live_success_fires_but_live_fails_no_hearts ... FAILED
+
+failures:
+
+---- kanon_ab1_live_success_fires_but_live_fails_no_hearts stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!SP-pb1-001-R_{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり、自分の手札を2枚控え室に置く。 card_no=PL!SP-pb1-001-R
+[AB]ABILITY "澁谷かのん" (10388)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり、自分の手札を2枚控え室に置く。
+[AB]  COST pay 2 E (optional)
+[AB]COST pay 2 E (optional) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay 2 energy (or skip)?", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+[LIVE] Heart requirement not met — discarding all live cards
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 10388, -1]
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 10388, -1]
+[AUTO_TRIGGER] checking stage for player p2 stage=[-1, -1, -1]
+[AUTO_TRIGGER] checking stage for player p2 stage=[-1, -1, -1]
+[TRIGGER] live_success stage: card=PL!SP-pb1-001-R trigger=Some("ライブ成功時")
+[AB]ABILITY "澁谷かのん" (10388)
+[AB]  TRIGGER ライブ成功時 
+[AB]  TEXT {{live_success.png|ライブ成功時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブの合計スコアを＋１する。
+[AB]  COST pay 6 E (optional)
+[AB]COST pay 6 E (optional) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay 6 energy (or skip)?", allow_skip: true }), result: TargetSelected { target: "pay_optional_cost" }
+[OPT_COST] checking cost_type: Some("pay_energy"), entry_cost: true, entry_effect_action: Some("modify_score")
+[AB]EFFECT score add 1
+DEBUG: execute_effect - action: modify_score, source: none, destination: none
+[AB]EFFECT score add 1
+[SCORE] ids=[] final_value=1 self_target=false target=self activating_id=Some(10388)
+
+thread 'kanon_ab1_live_success_fires_but_live_fails_no_hearts' (6248) panicked at tests\kanon_test.rs:62:5:
+assertion `left == right` failed: Q92: optional cost not deducted when live cannot succeed (no hearts on stage)
+  left: 6
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    kanon_ab1_live_success_fires_but_live_fails_no_hearts
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+
+running 5 tests
+test kasumi_q76_appear_on_occupied_area ... ok
+test kasumi_q122_look_top3_no_refresh_with_exactly_3 ... ok
+test kasumi_ab0_debut_look_topdeck_arrange ... ok
+test kasumi_q63_ability_appearance_no_cost_paid ... ok
+test kasumi_q75_no_baton_touch_same_turn ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.56s
+
+
+running 2 tests
+test kinako_bp5_q234_deck_2_activation_fails_no_movement ... ok
+test kinako_bp5_q234_deck_4_activation_succeeds_position_changes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 1 test
+test kinako_hs_q81_multiname_has_individual_names_in_card_db ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 2 tests
+test kinako_q171_blade_live_end_duration ... ok
+test kinako_q94_debut_grants_2_blade ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 2 tests
+test kinako_activate_high_cost_card_stays_in_hand ... ok
+test kinako_activate_discards_matching_card ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 1 test
+test konata_bp4_q188_placed_in_wait_no_trigger ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+
+running 2 tests
+test konata_q77_debuted_this_turn_activates_energy ... ok
+test konata_no_debut_condition_fails ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 2 tests
+test kotori_q208_multiname_and_single_coexist ... ok
+test kotori_q207_multiname_matches_any_individual_name ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 2 tests
+test ladybug_q114_both_members_on_stage_reduces_hearts ... ok
+test ladybug_q114_missing_sayaka_no_reduction ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 3 tests
+test link_to_future_three_distinct_members_plus_6 ... ok
+test link_to_future_zero_members_score_0 ... ok
+test link_to_future_one_member_plus_2 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.36s
+
+
+running 2 tests
+test ll_joint_requires_6_cards ... ok
+test ll_joint_creates_choice_with_6_cards ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 1 test
+test love_u_q192_live_success_condition_evaluated ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+
+running 4 tests
+test maki_no_baton_touch_no_appear ... ok
+test maki_baton_touch_places_cheap_member_on_stage ... ok
+test maki_no_eligible_hand_skips ... ok
+test maki_equal_cost_no_appear ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.40s
+
+
+running 3 tests
+test maki_edge_cost5_opponent_draws_nothing ... ok
+test maki_q177_debut_triggers_draw_via_ab0 ... FAILED
+test maki_edge_no_opponent_member_no_draw ... ok
+
+failures:
+
+---- maki_q177_debut_triggers_draw_via_ab0 stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 2843, -1]
+[AB]ABILITY "西木野真姫" (2843)
+[AB]  TRIGGER ライブ開始時, 登場 
+[AB]  TEXT {{toujyou.png|登場}}/{{live_start.png|ライブ開始時}}{{center.png|センター}}『BiBi』のメンバー1人をウェイトにしてもよい：相手は、自身のステージにいるアクティブ状態のメンバー1人をウェイトにする。（この能力はセンターエリアにいる場合のみ発動する。）
+[AB]  COST set self → wait
+[AB]COST set self → wait → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay optional cost: Put this member to wait state? (pay or skip)", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+[AB]ABILITY "西木野真姫" (2843)
+[AB]  TRIGGER 自動 1/turn
+[AB]  TEXT {{jidou.png|自動}}{{turn1.png|ターン1回}}自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき、カードを1枚引く。
+[USE_LIMIT] inserting key=2843_1_1
+[AB]EFFECT draw 1 card(s)
+[AB]COND (gated by: 自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき)
+DEBUG: execute_effect - action: draw_card, source: deck, destination: hand
+[AB]EFFECT draw 1 card(s)
+[AB]COND (gated by: 自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき)
+[AB]COND state_change_condition state_change_condition ... FAIL
+DEBUG: cannot activate effect
+[AB]  RESULT effect applied ✓
+[USE_LIMIT] inserting key=2843_1_1
+
+thread 'maki_q177_debut_triggers_draw_via_ab0' (9860) panicked at tests\maki_test.rs:46:5:
+assertion `left == right` failed: Q177: Cost ≤4 opponent waited → draw 1
+  left: 1
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    maki_q177_debut_triggers_draw_via_ab0
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+running 3 tests
+test mari_q131_zero_deck_blocks_live_start ... ok
+test mari_q131_one_card_deck_blocked ... ok
+test mari_live_start_sufficient_deck_fires ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.31s
+
+
+running 1 test
+test mei_bp5_q235_debut_look_and_select_with_multiname ... FAILED
+
+failures:
+
+---- mei_bp5_q235_debut_look_and_select_with_multiname stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8613, -1, -1]
+[AB]ABILITY "米女メイ" (8613)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から各グループ名につき1枚ずつ公開し、3枚まで手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'mei_bp5_q235_debut_look_and_select_with_multiname' (17488) panicked at tests\mei_bp5_test.rs:69:5:
+Multi-name card should have been added to hand (was first card selected for add)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mei_bp5_q235_debut_look_and_select_with_multiname
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 1 test
+test mia_q190_heart_selection_excludes_heart00 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 2 tests
+test mia_q73_deck_has_live_card_after_refresh ... ok
+test mia_q102_no_live_card_anywhere ... FAILED
+
+failures:
+
+---- mia_q102_no_live_card_anywhere stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 9263, -1]
+[AB]ABILITY "ミア・テイラー" (9263)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：ライブカードが公開されるまで、自分のデッキの一番上のカードを公開し続ける。そのライブカードを手札に加え、これにより公開されたほかのすべてのカードを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'mia_q102_no_live_card_anywhere' (12212) panicked at tests\mia_test.rs:86:5:
+assertion `left == right` failed: Deck should be exhausted after full reveal, got 3
+  left: 3
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mia_q102_no_live_card_anywhere
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 1 test
+test mifune_q231_excess_heart_2_score_cancels_to_0 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 4 tests
+test miracle_stay_tune_empty_success_zone_no_score ... ok
+test miracle_stay_tune_neither_condition_no_score ... ok
+test miracle_stay_tune_fewer_than_3_distinct_members_no_score ... ok
+test miracle_stay_tune_both_conditions_met_score_plus_1 ... FAILED
+
+failures:
+
+---- miracle_stay_tune_both_conditions_met_score_plus_1 stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!N-bp5-027-L_{{live_start.png|ライブ開始時}}自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる場合、このカードのスコアを＋１する。 card_no=PL!N-bp5-027-L
+[AB]ABILITY "ミラクル STAY TUNE！" (2928)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる場合、このカードのスコアを＋１する。
+[AB]EFFECT score add 1
+[AB]COND (gated by: 自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる場合)
+DEBUG: execute_effect - action: modify_score, source: none, destination: none
+[AB]EFFECT score add 1
+[AB]COND (gated by: 自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつ自分のステージに名前の異なるメンバーが3人以上いる場合)
+[AB]COMPOUND 2 sub-conditions, operator=and
+[AB]COND card_count_condition >=2 xsuccess_live_zone either actual=0 FAIL
+[AB]COND card_count_condition >=1 xsuccess_live_zone either actual=0 FAIL
+[DISTINCT] check: target=self location=stage group_names=None
+[AB]COND location_condition   >=1 @stage.self distinct=names → actual=1 PASS
+[AB]COMPOUND → 1/2 passed = FAIL
+[AB]COND compound             2 sub-conditions
+DEBUG: cannot activate effect
+[AB]  RESULT effect applied ✓
+
+thread 'miracle_stay_tune_both_conditions_met_score_plus_1' (18040) panicked at tests\miracle_stay_tune_test.rs:51:5:
+assertion `left == right` failed: Both conditions met → score +1
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    miracle_stay_tune_both_conditions_met_score_plus_1
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+
+running 1 test
+test miracle_wave_q182_excess_heart_score_4 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 1 test
+test miyashita_ai_q197_cost10_appears_draw_1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 3 tests
+test miyashita_ai_only_two_debuts_no_draw ... ok
+test miyashita_ai_q160_displaced_debuts_still_count ... ok
+test miyashita_ai_q162_q161_three_debuts_triggers_draw ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 1 test
+test mymai_tonight_q121_blade_given_to_all_stage_members ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 4 tests
+test test_multiple_live_cards_among_five_drawn_still_only_draw_one ... ok
+test test_live_card_among_five_drawn_triggers_draw ... ok
+test test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw ... FAILED
+test test_no_live_cards_among_five_drawn_no_draw ... ok
+
+failures:
+
+---- test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 3758, -1]
+[AB]ABILITY "東條 希" (3758)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}自分のデッキの上からカードを5枚控え室に置く。それらの中にライブカードがある場合、カードを1枚引く。
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(3758)
+[ABILITY]  >> sub-action[0]: action=move_cards has_condition=false card_id=Some(3758)
+[AB]EFFECT move 5 from deck_top → discard (type: card)
+DEBUG: execute_effect - action: move_cards, source: deck_top, destination: discard
+[AB]EFFECT move 5 from deck_top → discard (type: card)
+[ABILITY]  >> sub-action[1]: action=draw_card has_condition=true card_id=Some(3758)
+[AB]EFFECT draw 1 card(s)
+[AB]COND (gated by: それらの中にライブカードがある場合)
+DEBUG: execute_effect - action: draw_card, source: deck, destination: hand
+[AB]EFFECT draw 1 card(s)
+[AB]COND (gated by: それらの中にライブカードがある場合)
+[AB]COND card_count_condition >=1 x actual=1 PASS
+[AB]COND card_count_condition >=1 x actual=1 PASS
+[AB]COND card_count_condition >=1 x actual=1 PASS
+[AB]COND card_count_condition >=1 x actual=1 PASS
+[AB]  RESULT effect applied ✓
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 3758, -1]
+
+thread 'test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw' (19316) panicked at tests\nagi_live_card_draw_test.rs:173:5:
+assertion `left == right` failed: Should NOT have drawn any card since none of the 5 drawn cards were live cards
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+
+running 1 test
+test natsumi_bp5_q222_repeat_continues_after_wait ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 1 test
+test natsumi_live_start_blade_per_2_hand ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 2 tests
+test nico_q209_cost_choice_then_recover ... FAILED
+test nico_q209_no_live_card_in_discard ... ok
+
+failures:
+
+---- nico_q209_cost_choice_then_recover stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[-1, 4568, -1]
+[AB]ABILITY "矢澤にこ" (4568)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{turn1.png|ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_06.png|heart06}}を3以上含むライブカードを1枚手札に加える。
+[AB]  COST hand → discard (2 card)
+[AB]COST move 2 from hand to discard (src: 手札を2枚控え室に置く) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 2, description: "Select 2 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0, 1] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 2, indices: [0, 1]
+DEBUG: handle_select_card - zone: 'hand', indices: [0, 1], context: None
+
+thread 'nico_q209_cost_choice_then_recover' (7484) panicked at tests\nico_recover_test.rs:43:5:
+Q209: Live card discarded as cost should be recoverable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    nico_q209_cost_choice_then_recover
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 4 tests
+test nozomi_q229_baton_touch_triggers_discard_then_draw ... ok
+test nozomi_q229_both_at_3_no_discard_draw_3 ... ok
+test nozomi_edge_equal_cost_baton_touch_no_trigger ... ok
+test nozomi_edge_play_to_empty_no_trigger ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+
+running 1 test
+test test_per_unit_discard_bug_fix ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+
+running 2 tests
+test poppin_lower_score_no_recovery ... ok
+test poppin_q66_has_cards_beats_no_cards ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 7 tests
+test position_change_no_other_members ... ok
+test position_change_three_members_all_move ... ok
+test position_change_with_swap ... ok
+test position_change_one_member ... ok
+test position_change_two_members ... ok
+test position_change_skip_optional ... ok
+test position_change_tracks_card_movement ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+
+running 3 tests
+test eutopia_q38_score_condition_checks_live_card_count ... ok
+test eutopia_q38_three_live_cards_score_plus_2 ... ok
+test rainbow_q38_member_on_stage_per_live_card_blade ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 3 tests
+test cara_tesoro_q203_live_start_fires ... ok
+test eternalize_q204_zero_niko_hearts_unchanged ... ok
+test eternalize_q204_two_niko_hearts_reduced ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.37s
+
+
+running 5 tests
+test ren_ab0_blade_duration_live_end ... ok
+test ren_ab0_all_3_liella_grants_3_blade ... ok
+test ren_ab0_preexisting_liella_in_discard_inflates_count ... ok
+test ren_ab0_2_liella_among_3_discarded_grants_2_blade ... ok
+test ren_ab0_no_liella_no_blade ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.51s
+
+
+running 2 tests
+test riko_q130_opponent_skips_triggers_conditional ... ok
+test riko_q130_opponent_discards_skips_conditional ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 2 tests
+test rin_q123_activate_empty_waitroom ... ok
+test rin_q79_vacated_area_can_receive_new_member ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 7 tests
+test select_both_cards_stay_on_deck ... FAILED
+test select_one_card_other_discarded ... FAILED
+test cost_paid_applies_wait_state ... ok
+test select_both_cards_any_order_card_b_on_top ... FAILED
+test cost_skipped_does_not_apply_wait_state ... ok
+test select_zero_cards_both_discarded ... FAILED
+test card_count_integrity ... FAILED
+
+failures:
+
+---- select_both_cards_stay_on_deck stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8743, -1, -1]
+[AB]ABILITY "星空 凛" (8743)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST set self → wait
+[AB]COST set self → wait → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay optional cost: Put this member to wait state? (pay or skip)", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+
+thread 'select_both_cards_stay_on_deck' (16488) panicked at tests\helpers\mod.rs:223:14:
+select_indices failed: "No pending choice to resume"
+
+---- select_one_card_other_discarded stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8743, -1, -1]
+[AB]ABILITY "星空 凛" (8743)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST set self → wait
+[AB]COST set self → wait → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay optional cost: Put this member to wait state? (pay or skip)", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+
+thread 'select_one_card_other_discarded' (19264) panicked at tests\helpers\mod.rs:223:14:
+select_indices failed: "No pending choice to resume"
+
+---- select_both_cards_any_order_card_b_on_top stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8743, -1, -1]
+[AB]ABILITY "星空 凛" (8743)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST set self → wait
+[AB]COST set self → wait → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay optional cost: Put this member to wait state? (pay or skip)", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+
+thread 'select_both_cards_any_order_card_b_on_top' (19692) panicked at tests\helpers\mod.rs:223:14:
+select_indices failed: "No pending choice to resume"
+
+---- select_zero_cards_both_discarded stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8743, -1, -1]
+[AB]ABILITY "星空 凛" (8743)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST set self → wait
+[AB]COST set self → wait → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay optional cost: Put this member to wait state? (pay or skip)", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+
+thread 'select_zero_cards_both_discarded' (17068) panicked at tests\rina_bp3_debut_test.rs:111:5:
+Should have look_and_select choice
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- card_count_integrity stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[8743, -1, -1]
+[AB]ABILITY "星空 凛" (8743)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}このメンバーをウェイトにしてもよい：自分のデッキの上からカードを2枚見る。その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST set self → wait
+[AB]COST set self → wait → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay optional cost: Put this member to wait state? (pay or skip)", allow_skip: true }), result: TargetSelected { target: "skip_optional_cost" }
+
+thread 'card_count_integrity' (20404) panicked at tests\helpers\mod.rs:223:14:
+select_indices failed: "No pending choice to resume"
+
+
+failures:
+    card_count_integrity
+    select_both_cards_any_order_card_b_on_top
+    select_both_cards_stay_on_deck
+    select_one_card_other_discarded
+    select_zero_cards_both_discarded
+
+test result: FAILED. 2 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.84s
+
+
+running 1 test
+test rina_bp3_q164_select_from_own_discard ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 1 test
+test rina_q226_position_clamps_to_bottom ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 2 tests
+test sayaka_q80_debut_to_vacated_area_same_turn ... ok
+test sayaka_q63_ability_debut_no_cost_payment ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 4 tests
+test setsuna_q230_both_zero_heart02_gained ... ok
+test setsuna_surplus_heart_draw_and_discard_net_plus_1 ... ok
+test setsuna_unequal_success_cards_no_heart ... ok
+test setsuna_surplus_heart_draw_2_discard_1_net_plus_1 ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+
+running 1 test
+test setsuna_q205_all_heart_granted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 3 tests
+test setsuna_q157_wait_energy_can_be_placed_under_member ... ok
+test setsuna_q184_energy_under_member_not_counted ... ok
+test setsuna_debuts_to_vacated_area_not_stage_first_empty ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 2 tests
+test shizuku_q196_needs_hand_activation ... ok
+test shizuku_q196_draw_after_discard_cost ... FAILED
+
+failures:
+
+---- shizuku_q196_draw_after_discard_cost stdout ----
+[AB]ABILITY "桜坂しずく" (9133)
+[AB]  TRIGGER 起動 
+[AB]  TEXT {{kidou.png|起動}}{{icon_energy.png|E}}{{icon_energy.png|E}}このカードを手札から控え室に置く：カードを1枚引き、ライブ終了時まで、自分のステージにいる『虹ヶ咲』のメンバー1人は{{icon_blade.png|ブレード}}を得る。この能力は、このカードが手札にある場合のみ起動できる。
+[AB]  COST compound (2 sub-costs)
+[AB]COST compound (2 sub-costs) → OK
+[AB]COST pay 2 E → OK
+[AB]COST move 1 from hand to discard (src: このカードを手札から控え室に置く) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+
+thread 'shizuku_q196_draw_after_discard_cost' (15052) panicked at tests\shizuku_pb1_test.rs:44:5:
+assertion `left == right` failed: 1 card should have been drawn from deck
+  left: 30
+ right: 29
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    shizuku_q196_draw_after_discard_cost
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 4 tests
+test rin_live_success_ability_triggers ... ok
+test rin_activate_across_turns ... ok
+test rin_turn1_use_limit ... ok
+test rin_activate_places_energy_under_draws_heart ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+
+running 1 test
+test smile_q224_live_success_score_plus_1 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 2 tests
+test solitude_q67_non_hasetsu_member_no_score ... ok
+test solitude_q67_hasetsu_member_with_heart01_score_plus_1 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.30s
+
+
+running 1 test
+test special_color_q195_set_blade_liella_at_center ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 1 test
+test start_true_dreams_q66_opponent_no_card_score_higher ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 5 tests
+test strawberry_q36_only_fires_in_live_victory_determination ... ok
+test strawberry_q132_first_attacker_evaluated ... ok
+test strawberry_q142_wrong_group_prevents_score ... ok
+test strawberry_opponent_didnt_win_no_score ... ok
+test strawberry_q142_excess_heart_prevents_score ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.58s
+
+
+running 3 tests
+test strawberry_trapper_insufficient_heart05_no_score ... ok
+test strawberry_trapper_no_opponent_success_no_score ... ok
+test strawberry_trapper_q132_conditions_met_score_plus_2 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+
+running 3 tests
+test sumire_q112_positive_no_blade_heart_triggers_heart06 ... ok
+test sumire_q112_cheer_with_blade_heart_no_gain ... ok
+test sumire_q113_no_cheer_no_trigger ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+
+running 3 tests
+test sumire_no_baton_touch_no_draw ... ok
+test sumire_no_liella_on_stage_plays_normally ... ok
+test sumire_q193_q194_baton_touch_draw_and_deploy ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.34s
+
+
+running 1 test
+test sumire_bp5_q220_position_change_moves_sumire ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s
+
+
+running 4 tests
+test sunny_branch3_3_members_duplicate_name_no_score ... ok
+test sunny_branch1_no_members_does_nothing ... ok
+test sunny_branch1_1_member_triggers_draw ... ok
+test sunny_branch3_3_members_score_plus_1 ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+
+running 2 tests
+test takaramono_excess_heart_no_score ... ok
+test takaramono_no_excess_heart_score_plus_1 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+
+running 3 tests
+test tokimeki_q232_modifier_separate_from_base_score ... ok
+test tokimeki_q216_missing_hearts_no_score ... ok
+test tokimeki_all_6_colors_collectively_score_plus_1 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s
+
+
+running 2 tests
+test tote_mari_q68_debut_draws_and_sets_cannot_live ... ok
+test tote_mari_q68_can_still_set_live_card ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+
+
+running 2 tests
+test toubatsu_q118_2_distinct_live_cards_works ... ok
+test toubatsu_q118_1_live_card_fails ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.27s
+
+
+running 3 tests
+test umi_q228_insufficient_energy_fails ... ok
+test umi_q228_four_unique_groups_cost_zero ... ok
+test umi_q228_two_groups_cost_2 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+
+running 1 test
+test victory_road_q217_q227_cost_handling ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 3 tests
+test vitamin_q119_score_locked_after_resolution ... ok
+test vitamin_q128_hand_greater_triggers_score ... ok
+test vitamin_hand_less_or_equal_no_score ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+
+running 3 tests
+test wao_wao_q179_only_2_wait_to_active_no_score ... ok
+test wao_wao_q178_activate_3_printemps_score_plus_1 ... ok
+test wao_wao_q178_already_active_no_change ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+
+
+running 4 tests
+test wien_bp5_q223_opponent_swap_when_destination_occupied ... ok
+test wien_bp5_q223_p1_center_empty_opponent_chooses ... ok
+test wien_bp5_q223_both_centers_empty_no_moves ... ok
+test wien_bp5_q223_both_centers_occupied_both_choose ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.52s
+
+
+running 4 tests
+test wien_cost_modifier_dynamic ... ok
+test wien_cost_modifier_cleared_on_leave ... ok
+test wien_low_energy_no_cost_modifier ... ok
+test wien_high_energy_cost_modifier_applied ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+
+
+running 3 tests
+test wien_q113_no_cheer_no_trigger ... ok
+test wien_q112_cheer_with_blade_heart_no_gain ... ok
+test wien_q112_positive_no_blade_heart_triggers_heart03 ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+
+running 1 test
+test test_yoshiko_card_identities ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+
+running 8 tests
+test test_yoshiko_center_ability_no_valid_discard_targets ... ok
+test test_yoshiko_center_ability_no_other_aqours_on_stage ... ok
+test test_yoshiko_center_ability_fails_no_hand_cards ... ok
+test test_yoshiko_center_ability_cost_calculation ... ok
+test test_yoshiko_center_ability_fails_not_in_center ... ok
+test test_yoshiko_center_ability_basic_success ... ok
+test test_yoshiko_center_ability_use_limit ... ok
+test test_yoshiko_center_ability_exclude_self ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.05s
+
+
+running 1 test
+test test_yoshiko_debug_move_execution ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+
+running 1 test
+test test_yoshiko_debug_behavior ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s
+
+
+running 6 tests
+test yoshiko_debut_high_cost_not_selectable ... ok
+test yoshiko_debit_single_cost4_ok ... ok
+test yoshiko_debut_over_cost_filtered ... ok
+test yoshiko_debit_stage_full_graceful ... ok
+test yoshiko_debit_cost2_then_cost4_exceeds ... ok
+test yoshiko_debit_two_cost2_ok ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+
+running 1 test
+test test_yoshiko_detailed_debug ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 1 test
+test test_yoshiko_filter_logic ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 1 test
+test test_yoshiko_with_choice_handling ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 1 test
+test test_yoshiko_group_matching ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s
+
+
+running 1 test
+test test_yoshiko_main_effect_only ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 1 test
+test test_yoshiko_single_target ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 2 tests
+test yoshiko_q154_no_candidate_in_deck_search_ends_cleanly ... ok
+test yoshiko_q154_wrong_cost_aqours_in_deck_not_deployed ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+
+
+running 8 tests
+test you_select_3_then_ends ... FAILED
+test you_q124_two_plays_both_reject_blade_hearts ... ok
+test you_ability_user_scenario_select_one_card ... FAILED
+test you_ability_select_1_card ... FAILED
+test you_q124_blade_heart_excluded_base_heart_included ... ok
+test you_select_2_then_ends ... FAILED
+test you_ability_select_multiple_cards ... FAILED
+test you_ability_ends_and_discard_only_grows_at_end ... FAILED
+
+failures:
+
+---- you_select_3_then_ends stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[7268, -1, -1]
+[AB]ABILITY "渡辺 曜" (7268)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'you_select_3_then_ends' (19316) panicked at tests\you_debut_test.rs:315:5:
+Qualifying1 should be in hand
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- you_ability_user_scenario_select_one_card stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[7268, -1, -1]
+[AB]ABILITY "渡辺 曜" (7268)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'you_ability_user_scenario_select_one_card' (17556) panicked at tests\you_debut_test.rs:221:5:
+Selected card should be in hand
+
+---- you_ability_select_1_card stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[7268, -1, -1]
+[AB]ABILITY "渡辺 曜" (7268)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'you_ability_select_1_card' (9936) panicked at tests\you_debut_test.rs:110:5:
+Should have look_and_select choice
+
+---- you_select_2_then_ends stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[7268, -1, -1]
+[AB]ABILITY "渡辺 曜" (7268)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'you_select_2_then_ends' (18204) panicked at tests\you_debut_test.rs:286:5:
+Qualifying1 should be in hand
+
+---- you_ability_select_multiple_cards stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[7268, -1, -1]
+[AB]ABILITY "渡辺 曜" (7268)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'you_ability_select_multiple_cards' (4576) panicked at tests\you_debut_test.rs:172:5:
+First qualifying card should be in hand
+
+---- you_ability_ends_and_discard_only_grows_at_end stdout ----
+[AUTO_TRIGGER] checking stage for player p1 stage=[7268, -1, -1]
+[AB]ABILITY "渡辺 曜" (7268)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを7枚見る。その中から{{heart_02.png|heart02}}か{{heart_04.png|heart04}}か{{heart_05.png|heart05}}を持つメンバーカードを3枚まで公開して手札に加えてもよい。残りを控え室に置く。
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+[AB]  RESULT cost paid ✓
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand (or skip)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: None
+
+thread 'you_ability_ends_and_discard_only_grows_at_end' (10052) panicked at tests\you_debut_test.rs:72:5:
+assertion `left == right` failed: Expected 7 looked-at cards in discard, got 0
+  left: 0
+ right: 7
+
+
+failures:
+    you_ability_ends_and_discard_only_grows_at_end
+    you_ability_select_1_card
+    you_ability_select_multiple_cards
+    you_ability_user_scenario_select_one_card
+    you_select_2_then_ends
+    you_select_3_then_ends
+
+test result: FAILED. 2 passed; 6 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.08s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

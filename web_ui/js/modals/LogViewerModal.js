@@ -4,6 +4,7 @@ import { Tooltips } from '../ui_tooltips.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
 import { ModalManager } from '../utils/ModalManager.js';
+import { resolveCardImagePath } from '../components/CardRenderer.js';
 
 export const LogViewerModal = {
     init: () => {
@@ -132,7 +133,9 @@ export const LogViewerModal = {
             });
         }
 
-        // Render groups with enhanced formatting
+        // Render groups with enhanced formatting (newest first)
+        groupedLogs.reverse();
+
         const logContent = document.createElement('div');
         logContent.className = 'log-viewer-entries';
 
@@ -235,6 +238,9 @@ export const LogViewerModal = {
             <div class="log-viewer-expand-icon">▸</div>
         `;
 
+        // Add card image if available
+        LogViewerModal._addCardImage(headerDiv, headerEntry);
+
         block.appendChild(headerDiv);
 
         if (detailEntries.length > 0) {
@@ -289,6 +295,8 @@ export const LogViewerModal = {
                 ${enhanced.result ? `<div class="log-viewer-result">${enhanced.result}</div>` : ''}
             </div>
         `;
+
+        LogViewerModal._addCardImage(div, group.body);
 
         return div;
     },
@@ -444,6 +452,36 @@ export const LogViewerModal = {
         // Annotate enums if metadata is available
         return LogViewerModal.annotateEnums(readable);
     }
+};
+
+// Helper: resolve card name from a log entry body
+LogViewerModal._resolveCardNameFromBody = (body) => {
+    if (!body) return null;
+    const triggerMatch = body.match(/\[TRIGGER:\d+\]\s*(.*?):\s/i);
+    const rustMatch = body.match(/(\[Rule .*?\]|\[Activated\]|\[Turn Start\]|\[Turn End\]|\[Triggered\])\s*(.*?):\s/i);
+    if (!triggerMatch && !rustMatch) return null;
+    const cardName = triggerMatch ? triggerMatch[1] : rustMatch[2];
+    return cardName?.trim() || null;
+};
+
+// Helper: add card image to a modal entry element
+LogViewerModal._addCardImage = (el, body) => {
+    const cardName = LogViewerModal._resolveCardNameFromBody(body);
+    if (!cardName) return;
+    const cardData = State.resolveCardDataByName(cardName);
+    if (!cardData || !cardData.card_no) return;
+
+    const imgPath = resolveCardImagePath(cardData.card_no);
+    if (imgPath) {
+        const img = document.createElement('img');
+        img.src = imgPath;
+        img.className = 'log-viewer-card-thumb';
+        img.alt = cardData.name || cardName;
+        img.loading = 'lazy';
+        el.insertBefore(img, el.firstChild);
+    }
+
+    Tooltips.attachCardData(el, cardData);
 };
 
 // Export for global use

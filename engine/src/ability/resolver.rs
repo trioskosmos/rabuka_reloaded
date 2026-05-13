@@ -1,9 +1,9 @@
+use super::debug::AbDebug;
+use super::types::{Choice, ExecutionContext};
+use super::util;
 use crate::card::{Ability, AbilityCost, AbilityEffect, CardDatabase, Keyword};
 use crate::game_state::{GameState, Phase};
 use crate::zones::MemberArea;
-use super::types::{Choice, ExecutionContext};
-use super::util;
-use super::debug::AbDebug;
 use std::sync::Arc;
 
 pub struct AbilityResolver<'a> {
@@ -26,8 +26,10 @@ pub struct AbilityResolver<'a> {
 impl<'a> AbilityResolver<'a> {
     pub fn new(game_state: &'a mut GameState) -> Self {
         let activating_card_id = game_state.activating_card;
-        let looked_at_cards = Vec::new();
-        let selected_cards = game_state.ability_queue.current_entry()
+        let looked_at_cards = game_state.looked_at_cards.clone();
+        let selected_cards = game_state
+            .ability_queue
+            .current_entry()
             .map(|e| e.selected_card_ids.clone())
             .unwrap_or_default();
         AbilityResolver {
@@ -64,7 +66,8 @@ impl<'a> AbilityResolver<'a> {
         card_type: Option<&str>,
         group_name: Option<&str>,
         cost_limit: Option<u32>,
-        zone_name: &str, _prompt_desc: &str,
+        zone_name: &str,
+        _prompt_desc: &str,
     ) -> Result<Option<Vec<usize>>, String> {
         let filter = util::filter_from_parts(card_type, group_name, cost_limit, None, None, None);
         let idxs = util::matching_indices(cards, card_db, &filter, false);
@@ -148,12 +151,18 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 Keyword::LiveStart => {
-                    if !matches!(self.game_state.current_phase, Phase::LiveCardSetP1Turn | Phase::LiveCardSetP2Turn) {
+                    if !matches!(
+                        self.game_state.current_phase,
+                        Phase::LiveCardSetP1Turn | Phase::LiveCardSetP2Turn
+                    ) {
                         return false;
                     }
                 }
                 Keyword::LiveSuccess => {
-                    if !matches!(self.game_state.current_phase, Phase::LiveVictoryDetermination) {
+                    if !matches!(
+                        self.game_state.current_phase,
+                        Phase::LiveVictoryDetermination
+                    ) {
                         return false;
                     }
                 }
@@ -176,7 +185,10 @@ impl<'a> AbilityResolver<'a> {
                     if let Some(ref effect) = entry.ability.effect {
                         if let Some(ref maker) = effect.choice_maker {
                             if let Some(obj) = j.as_object_mut() {
-                                obj.insert("choice_maker".to_string(), serde_json::Value::String(maker.clone()));
+                                obj.insert(
+                                    "choice_maker".to_string(),
+                                    serde_json::Value::String(maker.clone()),
+                                );
                             }
                         }
                     }
@@ -187,7 +199,12 @@ impl<'a> AbilityResolver<'a> {
         }
     }
 
-    pub fn resolve_ability(&mut self, ability: &Ability, activating_card: Option<i16>, ability_index: usize) -> Result<(), String> {
+    pub fn resolve_ability(
+        &mut self,
+        ability: &Ability,
+        activating_card: Option<i16>,
+        ability_index: usize,
+    ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
 
         // Card info for debug
@@ -201,7 +218,10 @@ impl<'a> AbilityResolver<'a> {
 
         // Check use_limit before cost, but don't insert until after effect runs
         let ability_key = activating_card.map(|card_id| {
-            format!("{}_{}_{}", card_id, ability_index, self.game_state.turn_number)
+            format!(
+                "{}_{}_{}",
+                card_id, ability_index, self.game_state.turn_number
+            )
         });
 
         if let Some(ref key) = ability_key {
@@ -217,7 +237,10 @@ impl<'a> AbilityResolver<'a> {
         self.current_ability = Some(ability.clone());
         self.game_state.activating_card = activating_card;
 
-        let cost_already_paid = self.game_state.ability_queue.current_entry()
+        let cost_already_paid = self
+            .game_state
+            .ability_queue
+            .current_entry()
             .map_or(false, |e| e.cost_paid);
 
         if !cost_already_paid {
@@ -237,7 +260,9 @@ impl<'a> AbilityResolver<'a> {
             if let Some(ref key) = ability_key {
                 if ability.use_limit.is_some() {
                     eprintln!("[USE_LIMIT] inserting key={}", key);
-                    self.game_state.turn_limited_abilities_used.insert(key.clone());
+                    self.game_state
+                        .turn_limited_abilities_used
+                        .insert(key.clone());
                 }
             }
         }
@@ -255,9 +280,26 @@ impl<'a> AbilityResolver<'a> {
         // Check position keywords (Center/LeftSide/RightSide) AFTER cost payment.
         // Position checks gate the effect, not the cost — the test expects cost to still be paid.
         if let Some(card_id) = activating_card {
-            let position = self.game_state.player1.stage.stage.iter().position(|&id| id == card_id)
-                .or_else(|| self.game_state.player2.stage.stage.iter().position(|&id| id == card_id))
-                .map(|idx| match idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide });
+            let position = self
+                .game_state
+                .player1
+                .stage
+                .stage
+                .iter()
+                .position(|&id| id == card_id)
+                .or_else(|| {
+                    self.game_state
+                        .player2
+                        .stage
+                        .stage
+                        .iter()
+                        .position(|&id| id == card_id)
+                })
+                .map(|idx| match idx {
+                    0 => crate::zones::MemberArea::LeftSide,
+                    1 => crate::zones::MemberArea::Center,
+                    _ => crate::zones::MemberArea::RightSide,
+                });
             if let Some(ref kws) = ability.keywords {
                 for kw in kws {
                     let pos_ok = match kw {
@@ -284,7 +326,9 @@ impl<'a> AbilityResolver<'a> {
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() {
                             eprintln!("[USE_LIMIT] inserting key={}", key);
-                            self.game_state.turn_limited_abilities_used.insert(key.clone());
+                            self.game_state
+                                .turn_limited_abilities_used
+                                .insert(key.clone());
                         }
                     }
                 }
@@ -298,7 +342,9 @@ impl<'a> AbilityResolver<'a> {
             if let Some(ref key) = ability_key {
                 if ability.use_limit.is_some() {
                     eprintln!("[USE_LIMIT] inserting key={}", key);
-                    self.game_state.turn_limited_abilities_used.insert(key.clone());
+                    self.game_state
+                        .turn_limited_abilities_used
+                        .insert(key.clone());
                 }
             }
         }
@@ -327,7 +373,11 @@ impl<'a> AbilityResolver<'a> {
 
     /// Walk the ability's effect tree to find modify_cost sub-actions and adjust the cost.
     /// Handles patterns like "コストはグループ名1種類につきE減る" (cost reduced per group name).
-    fn apply_modify_cost_to_ability_cost(&self, cost: &AbilityCost, ability: &Ability) -> AbilityCost {
+    fn apply_modify_cost_to_ability_cost(
+        &self,
+        cost: &AbilityCost,
+        ability: &Ability,
+    ) -> AbilityCost {
         let mut cost = cost.clone();
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
@@ -339,7 +389,9 @@ impl<'a> AbilityResolver<'a> {
                             let card_db = &self.game_state.card_database;
                             let mut groups = std::collections::HashSet::new();
                             for &cid in &player.stage.stage {
-                                if cid == -1 { continue; }
+                                if cid == -1 {
+                                    continue;
+                                }
                                 if let Some(card) = card_db.get_card(cid) {
                                     if let Some(ref unit) = card.unit {
                                         groups.insert(unit.clone());
@@ -347,7 +399,8 @@ impl<'a> AbilityResolver<'a> {
                                 }
                             }
                             let per_unit_count = mod_cost.per_unit_count.unwrap_or(1) as u32;
-                            let reduction = (groups.len() as u32 / per_unit_count) * mod_cost.count.unwrap_or(1);
+                            let reduction = (groups.len() as u32 / per_unit_count)
+                                * mod_cost.count.unwrap_or(1);
                             if cost.cost_type.as_deref() == Some("pay_energy") {
                                 let new_energy = cost.energy.unwrap_or(0).saturating_sub(reduction);
                                 cost.energy = Some(new_energy);

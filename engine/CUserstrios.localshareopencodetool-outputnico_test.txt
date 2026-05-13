@@ -1,0 +1,14 @@
+
+running 1 test
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+DEBUG: execute_effect - action: move_cards, source: discard, destination: stage
+test nico_cost_filter_only_shows_eligible ... FAILED
+
+failures:
+
+failures:
+    nico_cost_filter_only_shows_eligible
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 36 filtered out; finished in 0.24s
+

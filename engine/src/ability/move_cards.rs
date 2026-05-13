@@ -600,6 +600,10 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 "looked_at" => {
+                    eprintln!(
+                        "[MOVE_LOOKED_AT] self.looked_at_cards.len()={}",
+                        self.looked_at_cards.len()
+                    );
                     let mut idxs: Vec<usize> = (0..self.looked_at_cards.len())
                         .filter(|&i| {
                             let cid = self.looked_at_cards[i];
@@ -908,10 +912,22 @@ impl<'a> AbilityResolver<'a> {
             }
         }
 
+        for card_id in &moved_cards {
+            self.game_state.mods.clear_all_for_card(*card_id);
+        }
+
         // --- STEP 3: Apply state_change to moved cards ---
+        // Must come AFTER clear_all_for_card so state_change isn't wiped.
+        eprintln!(
+            "[STATE_CHANGE] effect.state_change={:?}, moved_cards.len={}, moved_cards={:?}",
+            effect.state_change,
+            moved_cards.len(),
+            moved_cards
+        );
         if let Some(ref sc) = effect.state_change {
             if sc == "wait" {
                 for card_id in &moved_cards {
+                    eprintln!("[STATE_CHANGE] applying wait to card_id={}", card_id);
                     self.game_state
                         .mods
                         .add_orientation_modifier(*card_id, "wait");
@@ -949,14 +965,60 @@ impl<'a> AbilityResolver<'a> {
         for card_id in &moved_cards {
             self.game_state.mods.clear_all_for_card(*card_id);
         }
+
+        // --- STEP 3: Apply state_change to moved cards ---
+        // Must come AFTER clear_all_for_card so state_change isn't wiped.
+        eprintln!(
+            "[STATE_CHANGE] effect.state_change={:?}, moved_cards.len={}, moved_cards={:?}",
+            effect.state_change,
+            moved_cards.len(),
+            moved_cards
+        );
+        if let Some(ref sc) = effect.state_change {
+            if sc == "wait" {
+                for card_id in &moved_cards {
+                    eprintln!("[STATE_CHANGE] applying wait to card_id={}", card_id);
+                    self.game_state
+                        .mods
+                        .add_orientation_modifier(*card_id, "wait");
+                }
+                if destination == "energy_zone" {
+                    let p = match tgt.as_deref().unwrap_or("self") {
+                        "self" => &mut self.game_state.player1,
+                        "opponent" => &mut self.game_state.player2,
+                        _ => &mut self.game_state.player1,
+                    };
+                    for _ in &moved_cards {
+                        p.energy_zone.active_energy_count =
+                            p.energy_zone.active_energy_count.saturating_sub(1);
+                    }
+                }
+            } else if sc == "active" {
+                for card_id in &moved_cards {
+                    self.game_state
+                        .mods
+                        .add_orientation_modifier(*card_id, "active");
+                }
+                if destination == "energy_zone" {
+                    let p = match tgt.as_ref().map(|s| s.as_str()).unwrap_or("self") {
+                        "self" => &mut self.game_state.player1,
+                        "opponent" => &mut self.game_state.player2,
+                        _ => &mut self.game_state.player1,
+                    };
+                    p.energy_zone.active_energy_count += moved_cards.len();
+                }
+            }
+        }
+
         for card_id in &moved_cards {
             self.game_state.record_card_movement(*card_id);
         }
 
-        // Store moved cards on the resolver for chained condition checking
+        // Store moved cards for chained condition checking
         // e.g. "move 3 cards to discard → if all are member cards → draw"
         if destination == "discard" {
             self.moved_cards = moved_cards.clone();
+            self.game_state.recently_moved_cards = Some(moved_cards.clone());
         }
 
         Ok(())

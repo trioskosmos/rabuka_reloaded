@@ -5,7 +5,9 @@ mod helpers;
 use helpers::*;
 
 fn advance_to_live_set(game: &mut TestGame) {
-    for _ in 0..5 { game.pass(); }
+    for _ in 0..5 {
+        game.pass();
+    }
 }
 
 /// Stage: 大沢瑠璃乃 (蓮ノ空) + filler (non-蓮ノ空). Total=2 members, 1 蓮ノ空.
@@ -21,20 +23,28 @@ fn dream_believers_one_hasetsu_plus_other_pass() {
     let rurino = game.id("PL!HS-bp1-005-P"); // 大沢瑠璃乃, 蓮ノ空
 
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..40 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..40 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..40 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.stage.stage = [rurino, filler, -1];
     game.state.player1.hand.cards.push(dream);
     game.state.player1.hand.cards.push(filler);
 
+    game.give_energy(1);
     advance_to_live_set(&mut game);
     game.set_live_card(dream);
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    while game.has_pending_choice() {
+        game.select_option(1);
+        if game.has_pending_choice() { game.select_indices(&[]); }
+    }
 
     let mod_val = game.state.mods.get_score_modifier(dream);
     eprintln!("[DREAM] 1 hasetsu + 1 other: mod={}", mod_val);
@@ -56,20 +66,28 @@ fn dream_believers_q212_multiname_no_match() {
     let multi = game.id("LL-bp2-001-R\u{ff0b}");
 
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..40 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..40 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..40 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.stage.stage = [rurino, multi, filler];
     game.state.player1.hand.cards.push(dream);
     game.state.player1.hand.cards.push(filler);
 
+    game.give_energy(1);
     advance_to_live_set(&mut game);
     game.set_live_card(dream);
     game.pass();
     game.pass();
 
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    while game.has_pending_choice() {
+        game.select_option(1);
+        if game.has_pending_choice() { game.select_indices(&[]); }
+    }
 
     let mod_val = game.state.mods.get_score_modifier(dream);
     eprintln!("[DREAM] rurino + multi: mod={} (expected 0)", mod_val);

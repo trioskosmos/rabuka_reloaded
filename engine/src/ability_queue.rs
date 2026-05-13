@@ -54,6 +54,8 @@ pub struct AbilityQueueEntry {
     pub selected_card_ids: Vec<i16>,
     /// Whether the effect has started executing (prevents re-processing)
     pub effect_started: bool,
+    /// Whether the optional cost was actually paid (not skipped)
+    pub optional_cost_was_paid: bool,
 }
 
 /// Unified ability queue with proper state management

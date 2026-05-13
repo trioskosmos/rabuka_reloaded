@@ -6237,7 +6237,8 @@
             },
             "effect_constraint": "minimum_value:0",
             "action": "modify_score",
-            "operation": null
+            "operation": "remove",
+            "value": 1
           }
         ]
       }
@@ -9185,6 +9186,8 @@
             "actions": [
               {
                 "text": "相手はそれらのカードのうち1枚を選ぶ",
+                "source": "selected_cards",
+                "target": "opponent",
                 "count": 1,
                 "action": "select"
               },

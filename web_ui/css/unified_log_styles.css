@@ -281,6 +281,73 @@
     }
 }
 
+/* Card thumbnail in log entries */
+.log-card-thumb {
+    width: 24px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-right: 6px;
+    flex-shrink: 0;
+    display: inline-block;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.log-entry {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 3px 6px;
+}
+
+.log-group-header .log-card-thumb {
+    width: 20px;
+    height: 28px;
+}
+
+/* Full ability text in log entries */
+.log-full-ability {
+    font-size: 0.7rem;
+    color: var(--text-secondary, #999);
+    padding: 4px 6px;
+    margin-top: 3px;
+    border-left: 2px solid rgba(74, 158, 255, 0.2);
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 3px;
+    line-height: 1.45;
+    word-break: break-word;
+    white-space: pre-wrap;
+    flex: 0 0 100%;
+    box-sizing: border-box;
+}
+
+.log-group-details .log-full-ability {
+    margin-left: 16px;
+    margin-right: 4px;
+    margin-bottom: 4px;
+}
+
+/* Card thumbnail in log viewer modal */
+.log-viewer-card-thumb {
+    width: 28px;
+    height: 40px;
+    object-fit: cover;
+    border-radius: 3px;
+    flex-shrink: 0;
+    margin-right: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.log-viewer-header .log-viewer-card-thumb {
+    align-self: center;
+}
+
+.log-viewer-standalone .log-viewer-card-thumb {
+    align-self: flex-start;
+    margin-top: 2px;
+}
+
 /* Landscape orientation adjustments */
 @media (max-width: 896px) and (orientation: landscape) {
     .log-section {

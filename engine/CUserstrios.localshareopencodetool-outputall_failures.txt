@@ -1,0 +1,71 @@
+
+running 2 tests
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay 1 energy (or skip)?", allow_skip: true }), result: TargetSelected { target: "pay_optional_cost" }
+DEBUG: execute_effect - action: modify_score, source: none, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay 1 energy (or skip)?", allow_skip: true }), result: TargetSelected { target: "pay_optional_cost" }
+DEBUG: execute_effect - action: modify_score, source: none, destination: none
+DEBUG: cannot activate effect
+test dream_believers_one_hasetsu_plus_other_pass ... ok
+test dream_believers_q212_multiname_no_match ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+
+running 4 tests
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: select, source: discard, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "discard", card_type: Some("live_card"), count: 2, description: "Select 2 card(s) from discard", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0, 1] }
+DEBUG: Processing SelectCard choice - zone: 'discard', card_type: Some("live_card"), count: 2, indices: [0, 1]
+DEBUG: handle_select_card - zone: 'discard', indices: [0, 1], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: select, source: none, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: move_cards, source: selected_cards, destination: hand
+DEBUG: execute_effect - action: select, source: discard, destination: none
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: select, source: none, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: []
+DEBUG: handle_select_card - zone: 'hand', indices: [], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: select, source: discard, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "discard", card_type: Some("live_card"), count: 2, description: "Select 2 card(s) from discard", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0, 1] }
+DEBUG: Processing SelectCard choice - zone: 'discard', card_type: Some("live_card"), count: 2, indices: [0, 1]
+DEBUG: handle_select_card - zone: 'discard', indices: [0, 1], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: select, source: none, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [1] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [1]
+DEBUG: handle_select_card - zone: 'hand', indices: [1], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: move_cards, source: selected_cards, destination: hand
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: select, source: discard, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "discard", card_type: Some("live_card"), count: 2, description: "Select 2 card(s) from discard", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0, 1] }
+DEBUG: Processing SelectCard choice - zone: 'discard', card_type: Some("live_card"), count: 2, indices: [0, 1]
+DEBUG: handle_select_card - zone: 'discard', indices: [0, 1], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+DEBUG: execute_effect - action: select, source: none, destination: none
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "hand", card_type: None, count: 1, description: "Select 1 card(s) from hand", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: true }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'hand', card_type: None, count: 1, indices: [0]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: move_cards, source: selected_cards, destination: hand
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "selected_cards", card_type: Some("card"), count: 1, description: "Select 1 card(s) from selected cards", allow_skip: false, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [] }
+DEBUG: Processing SelectCard choice - zone: 'selected_cards', card_type: Some("card"), count: 1, indices: []
+DEBUG: handle_select_card - zone: 'selected_cards', indices: [], context: SingleEffect { effect_index: 0 }
+DEBUG: execute_effect - action: move_cards, source: selected_cards, destination: hand
+test fuyumari_q118_opponent_picks_first_card ... FAILED
+test fuyumari_q118_card_count_integrity ... ok
+test fuyumari_q118_only_one_live_card_no_effect ... ok
+test fuyumari_q118_opponent_picks_second_card ... FAILED
+
+failures:
+
+failures:
+    fuyumari_q118_opponent_picks_first_card
+    fuyumari_q118_opponent_picks_second_card
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+

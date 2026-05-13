@@ -38,6 +38,7 @@ impl GameState {
                             execution_context: None,
                             selected_card_ids: Vec::new(),
                             effect_started: false,
+                            optional_cost_was_paid: false,
                         };
 
                         self.ability_queue.enqueue(entry);
@@ -135,6 +136,7 @@ impl GameState {
     pub(crate) fn process_current_ability(&mut self) {
         if let Some(entry) = self.ability_queue.current_entry().cloned() {
             self.activating_card = entry.card_id;
+            let cost_already_paid = entry.cost_paid;
 
             let (choice, looked_at, ctx, rev, result) = {
                 let mut resolver = crate::ability::resolver::AbilityResolver::new(self);
@@ -160,10 +162,10 @@ impl GameState {
             if let Some(c) = choice {
                 if let Some(e) = self.ability_queue.current_entry_mut() {
                     e.execution_context = Some(ctx);
-                    // Mark effect as started only when cost was already paid before this run
-                    // (cost choice creation sets cost_paid=true, but we need to distinguish
-                    // cost-creation from effect-execution)
-                    if e.cost_paid || entry.ability.cost.is_none() {
+                    // Mark effect as started when cost was already paid before this run.
+                    // The cost_already_paid variable captures cost_paid BEFORE resolve_ability
+                    // runs, which distinguishes cost-creation from effect-execution.
+                    if cost_already_paid || entry.ability.cost.is_none() {
                         e.effect_started = true;
                     }
                 }

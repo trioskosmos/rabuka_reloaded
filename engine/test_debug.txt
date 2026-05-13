@@ -1,0 +1,28 @@
+
+running 1 test
+test select_both_cards_stay_on_deck ... DEBUG: provide_choice_result - choice: Some(SelectTarget { target: "pay_optional_cost:skip_optional_cost", description: "Pay optional cost: Put this member to wait state? (pay or skip)", allow_skip: true }), result: TargetSelected { target: "pay_optional_cost" }
+DEBUG: execute_effect - action: look_and_select, source: none, destination: none
+DEBUG: Executing look_action: AbilityEffect { text: "自分のデッキの上からカードを2枚見る。", action: "look_at", source: Some("deck_top"), destination: None, count: Some(2), target_count: None, card_type: None, target: Some("self"), duration: None, resource: None, position: None, state_change: None, optional: None, max: None, effect_constraint: None, resource_icon_count: None, ability_gain: None, quoted_text: None, per_unit: None, condition: None, compound: CompoundBranch { look_action: None, select_action: None, actions: None, primary_effect: None, alternative_condition: None, alternative_effect: None, result_condition: None, followup_action: None, optional_action: None, conditional_action: None, conditional_negation: None }, operation: None, value: None, heart_colors: [], blade_type: None, energy_count: None, target_member: None, choice_options: None, options: None, per_unit_count: None, per_unit_type: None, repeat_limit: None, is_further: None, restriction_type: None, restricted_destination: None, dynamic_count: None, placement_order: None, cost_limit: None, cost_limit_operator: None, any_number: None, discard_remaining: None, reveal: None, distinct: None, name_constraint: None, name_constraint_source: None, activation_condition_parsed: None, ability_text: None, use_limit: None, triggers: None, self_cost: None, exclude_self: None, exclude_selected: None, effect_type: None, choice: None, timing: None, treat_as: None, replaces_event: None, choice_based: None, identities: None, action_by: None, opponent_action: None, lose_blade_hearts: None, conditional: None, choice_type: None, heart_type: None, parenthetical: None, characters: None, source_card: None, or_card_types: None, activation_position: None, source_position: None, exclude_position: None, all_regions: None, character_effects: None, group_names: None, heart_selection: None, location: None, multiple_targets: None, question: None, answers: None, choice_maker: None, state: None, target_trigger: None, timing_condition: None, self_target: None, trigger_type: None, sign: None, phase: None, all: None, original_value: None, group_reference: None, trigger_condition: None }
+DEBUG: execute_effect - action: look_at, source: deck_top, destination: none
+DEBUG: After look_action - looked_at_cards.len(): 2
+DEBUG: Synced to game_state.looked_at_cards.len(): 2
+DEBUG: Creating choice - available_count: 2, max_select: 2, description: Select any number of cards from the 2 looked-at cards (or skip) (placement_order: default)
+DEBUG: Choice created and stored - pending_choice.is_some(): true
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "looked_at", card_type: None, count: 2, description: "Select any number of cards from the 2 looked-at cards (or skip) (placement_order: default)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0, 1] }
+DEBUG: Processing SelectCard choice - zone: 'looked_at', card_type: None, count: 2, indices: [0, 1]
+DEBUG: handle_select_card - zone: 'looked_at', indices: [0, 1], context: LookAndSelect { step: Select { count: 2 } }
+DEBUG: execute_effect - action: move_cards, source: looked_at, destination: deck_top
+DEBUG: provide_choice_result - choice: Some(SelectCard { zone: "looked_at", card_type: None, count: 2, description: "Select any number of cards from the 2 looked-at cards (or skip) (placement_order: default)", allow_skip: true, cost_limit: None, cost_limit_operator: None, group: None, characters: None, filtered_indices: None, is_select_action: false }), result: CardSelected { indices: [0] }
+DEBUG: Processing SelectCard choice - zone: 'looked_at', card_type: None, count: 2, indices: [0]
+DEBUG: handle_select_card - zone: 'looked_at', indices: [0], context: None
+DEBUG: execute_effect - action: move_cards, source: looked_at, destination: deck_top
+DEBUG: execute_effect - action: move_cards, source: looked_at_remaining, destination: discard
+FAILED
+
+failures:
+
+failures:
+    select_both_cards_stay_on_deck
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.24s
+

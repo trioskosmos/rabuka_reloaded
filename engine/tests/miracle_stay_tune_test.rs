@@ -8,7 +8,9 @@ mod helpers;
 use helpers::*;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
-    for _ in 0..5 { game.pass(); }
+    for _ in 0..5 {
+        game.pass();
+    }
 }
 
 fn advance_to_live_start(game: &mut TestGame) {
@@ -29,23 +31,39 @@ fn miracle_stay_tune_both_conditions_met_score_plus_1() {
     let member3 = game.id("PL!-sd1-008-SD");
 
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
     // 3 distinct-name members
     game.state.player1.stage.stage = [member1, member2, member3];
-    // Pre-populate success_live_zone with 2 cards (either player)
-    game.state.player1.success_live_card_zone.cards.push(filler);
-    game.state.player1.success_live_card_zone.cards.push(filler);
+    // Pre-populate success_live_zone with 2 live cards (either player)
+    let live_card_a = game.id("PL!-sd1-019-SD");
+    let live_card_b = game.id("PL!-sd1-020-SD");
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(live_card_a);
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(live_card_b);
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 1, "Both conditions met → score +1");
@@ -62,9 +80,13 @@ fn miracle_stay_tune_fewer_than_3_distinct_members_no_score() {
     let member1 = game.id("PL!-sd1-002-SD");
 
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
@@ -76,7 +98,9 @@ fn miracle_stay_tune_fewer_than_3_distinct_members_no_score() {
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Only 1 distinct member → no score");
@@ -95,9 +119,13 @@ fn miracle_stay_tune_empty_success_zone_no_score() {
     let member3 = game.id("PL!-sd1-008-SD");
 
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
@@ -107,7 +135,9 @@ fn miracle_stay_tune_empty_success_zone_no_score() {
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Empty success zone → no score");
@@ -124,9 +154,13 @@ fn miracle_stay_tune_neither_condition_no_score() {
     let member1 = game.id("PL!-sd1-002-SD");
 
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..20 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.hand.cards.push(card);
     game.state.player1.hand.cards.push(filler);
@@ -136,7 +170,9 @@ fn miracle_stay_tune_neither_condition_no_score() {
     game.set_live_card(card);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Neither condition met → no score");

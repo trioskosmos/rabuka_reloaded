@@ -4,7 +4,9 @@ mod helpers;
 use helpers::*;
 
 fn advance_to_live_set(game: &mut TestGame) {
-    for _ in 0..5 { game.pass(); }
+    for _ in 0..5 {
+        game.pass();
+    }
 }
 
 #[test]
@@ -17,9 +19,13 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0() {
     let filler_n = game.id("PL!N-sd1-001-SD");
 
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..40 { game.state.player1.main_deck.cards.push(filler_n); }
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler_n);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..40 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..40 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     // Stage: 虹ヶ咲 members with hearts → excess hearts will exist
     game.state.player1.stage.stage = [filler_n, filler_n, filler_n];
@@ -28,14 +34,24 @@ fn mifune_q231_excess_heart_2_score_cancels_to_0() {
 
     advance_to_live_set(&mut game);
     game.set_live_card(mifune);
-    game.pass(); game.pass(); game.pass(); game.pass(); game.pass();
+    // Pass through to LiveVictoryDetermination where LiveSuccess triggers fire
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
 
-    let score = game.state.player1.live_card_zone.calculate_live_score(
-        &game.state.card_database,
-        game.state.player1_cheer_blade_heart_count,
-        game.state.player1.stage_hearts.as_ref(),
-        Some(&game.state.mods.need_heart_modifiers)
+    // Consume any residual choices from the live phase / ability triggers
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // The ability should have applied both +1 score and -1 penalty (net 0)
+    let mod_val = game.state.mods.get_score_modifier(mifune);
+    eprintln!("[MIFUNE] score_modifier: {}", mod_val);
+    assert_eq!(
+        mod_val, 0,
+        "Score modifier should be 0 (+1 add -1 remove) with 2+ surplus hearts (got {})",
+        mod_val
     );
-    eprintln!("[MIFUNE] final score: {}", score);
-    assert!(score < 10, "Score should be low due to -1 penalty (got {})", score);
 }

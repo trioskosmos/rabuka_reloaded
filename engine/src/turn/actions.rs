@@ -348,6 +348,7 @@ impl super::TurnEngine {
             return Err(e);
         }
         if let Some(c) = new_choice {
+            eprintln!("[RWC] new_choice is Some, storing");
             if let Some(e) = game_state.ability_queue.current_entry_mut() {
                 e.execution_context = Some(ctx);
             }
@@ -358,6 +359,7 @@ impl super::TurnEngine {
             game_state.pending_choice = choice_json;
             game_state.ability_queue.pause_for_choice(c);
         } else {
+            eprintln!("[RWC] new_choice is None, starting else chain");
             let cost_was_paid = game_state
                 .ability_queue
                 .current_entry()
@@ -366,6 +368,8 @@ impl super::TurnEngine {
                 .ability_queue
                 .current_entry()
                 .map_or(false, |e| e.effect_started);
+            eprintln!("[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}, saved_ctx={:?}",
+                cost_was_paid, effect_started, had_pending_sequential, saved_ctx);
             game_state.pending_choice = None;
             game_state.activating_card = None;
             if cost_was_paid
@@ -373,40 +377,31 @@ impl super::TurnEngine {
                 && saved_ctx == ExecutionContext::None
                 && !effect_started
             {
-                // Cost was paid but effect hasn't started yet — execute it.
+                eprintln!("RWC: calling process_current_ability");
                 game_state.process_current_ability();
-                let player_id = game_state
-                    .ability_queue
-                    .current_entry()
-                    .map(|e| e.player_id.clone())
-                    .unwrap_or_else(|| "p1".to_string());
-                game_state.process_pending_auto_abilities(&player_id);
+                // Only check for new auto-triggers if the ability created a pending choice.
+                // If it auto-resolved (no pending choice), the ability completed and
+                // re-checking triggers would re-queue the same trigger.
+                if game_state.pending_choice.is_some()
+                    || game_state.ability_queue.is_waiting_for_choice().is_some()
+                {
+                    let player_id = game_state
+                        .ability_queue
+                        .current_entry()
+                        .map(|e| e.player_id.clone())
+                        .unwrap_or_else(|| "p1".to_string());
+                    game_state.process_pending_auto_abilities(&player_id);
+                }
             } else if cost_was_paid
                 && !had_pending_sequential
                 && saved_ctx == ExecutionContext::None
                 && effect_started
             {
-                // Effect already started — this was a sub-choice resolving.
-                // The ability is complete.
                 game_state.ability_queue.complete_current();
-                let player_id = game_state
-                    .ability_queue
-                    .current_entry()
-                    .map(|e| e.player_id.clone())
-                    .unwrap_or_else(|| "p1".to_string());
-                game_state.process_pending_auto_abilities(&player_id);
+                let active_player_id = game_state.active_player().id.clone();
+                game_state.process_pending_auto_abilities(&active_player_id);
             } else if cost_was_paid {
-            } else if cost_was_paid {
-                // Cost was paid and pending sequential actions existed before this choice
-                // resolution  Ethey were just processed by the choice handler (e.g.
-                // handle_choice_string_store). The ability effect is now complete.
                 game_state.ability_queue.complete_current();
-                let player_id = game_state
-                    .ability_queue
-                    .current_entry()
-                    .map(|e| e.player_id.clone())
-                    .unwrap_or_else(|| "p1".to_string());
-                game_state.process_pending_auto_abilities(&player_id);
             } else {
                 game_state.ability_queue.complete_current();
             }

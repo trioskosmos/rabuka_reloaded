@@ -14,27 +14,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             .as_ref()
                             .and_then(|e| e.compound.select_action.clone())
                         {
-                            if select_action.action == "sequential" {
-                                self.pending_choice = None;
-                                self.execution_context = ExecutionContext::None;
-                                if let Some(ref actions) = select_action.compound.actions {
-                                    if actions.len() == 3 {
-                                        if let Some(last_action) = actions.last() {
-                                            if last_action.action == "move_cards"
-                                                && last_action.source.as_deref()
-                                                    == Some("looked_at_remaining")
-                                            {
-                                                let mut discard_only = last_action.clone();
-                                                discard_only.source = Some("looked_at".to_string());
-                                                return self.execute_effect(&discard_only);
-                                            }
-                                        }
-                                    }
-                                }
-                                return self.execute_effect(&select_action);
-                            } else if select_action.action == "select_cards" {
-                                // For select_cards format, after choice is resolved, ability is done
-                                // The selected cards were already moved to destination in handle_select_cards_looked_at
+                            if select_action.action == "sequential"
+                                || select_action.action == "select_cards"
+                            {
+                                // Both sequential and select_cards formats:
+                                // The selected cards were already moved to destination
+                                // in handle_select_cards_looked_at. Nothing more to do.
                                 self.execution_context = ExecutionContext::None;
                                 return Ok(());
                             }
@@ -84,11 +69,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         let has_pending_sequential = self.game_state.pending_sequential_actions.is_some();
 
-        // Clear choice unless:
-        // - We're in a looked_at choice AND
-        // - We have pending sequential actions to process (old format)
-        // For select_cards format, we should NOT preserve - the selection completes the ability
-        let should_preserve = is_actual_looked_at_choice && has_pending_sequential;
+        // Only preserve if this is the initial looked_at selection (not a sub-action choice).
+        // Sub-choices created by pending_sequential_actions should NOT be preserved,
+        // otherwise the chain never terminates.
+        let is_initial_looked_at = is_actual_looked_at_choice
+            && matches!(
+                context,
+                ExecutionContext::LookAndSelect {
+                    step: LookAndSelectStep::Select { .. }
+                }
+            );
+        let should_preserve = is_initial_looked_at && has_pending_sequential;
 
         if !should_preserve {
             self.pending_choice = None;
@@ -358,6 +349,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?
                 }
                 "looked_at" => {
+                    eprintln!("[HSC1_LOOKED_AT] START: looked_cards.len()={}, indices={:?}, filtered_indices={:?}, is_select_cards={}",
+                        self.looked_at_cards.len(), indices, filtered_indices, self.game_state.ability_queue.current_entry()
+                            .and_then(|e| e.ability.effect.as_ref())
+                            .and_then(|ef| ef.compound.select_action.as_ref())
+                            .map(|sa| {
+                                eprintln!("[HSC1_SA] sa.action={:?}, compound.actions.len={:?}", sa.action, sa.compound.actions.as_ref().map(|a| a.len()));
+                                sa.action == "select_cards"
+                            })
+                            .unwrap_or(false));
                     let mapped_indices: Vec<usize> = if let Some(ref fidx) = filtered_indices {
                         indices
                             .iter()
@@ -376,7 +376,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             .and_then(|ef| ef.compound.select_action.clone())
                     };
                     let is_select_cards = entry_effect_sa()
-                        .map(|sa| sa.action == "select_cards")
+                        .map(|sa| sa.action == "select_cards" || sa.action == "sequential")
                         .unwrap_or(false);
 
                     if is_select_cards {
@@ -388,13 +388,21 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }
                     } else if let ExecutionContext::LookAndSelect { .. } = self.execution_context {
                         if let Some(ref select_action) = entry_effect_sa() {
-                            if let Some(ref actions) = select_action.compound.actions {
+                            if select_action.action == "select_cards"
+                                || select_action.action == "sequential"
+                            {
+                                self.handle_select_cards_looked_at(&mapped_indices)?;
+                                self.looked_at_cards = self.game_state.looked_at_cards.clone();
+                            } else if let Some(ref actions) = select_action.compound.actions {
                                 self.game_state.pending_sequential_actions = Some(actions.clone());
+                                self.execute_selected_looked_at_cards(&mapped_indices)?;
+                            } else {
+                                self.execute_selected_looked_at_cards(&mapped_indices)?;
                             }
+                        } else {
+                            self.execute_selected_looked_at_cards(&mapped_indices)?;
                         }
-                    }
-
-                    if self.game_state.pending_sequential_actions.is_none() {
+                    } else {
                         self.execute_selected_looked_at_cards(&mapped_indices)?;
                     }
 
@@ -513,6 +521,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         characters.as_ref(),
                     )?
                 }
+                // Track whether optional cost was actually paid
+                if allow_skip {
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.optional_cost_was_paid = !indices.is_empty();
+                    }
+                }
             }
             "deck" => {
                 self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?
@@ -541,16 +555,22 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "looked_at" => {
+                eprintln!("[LOOKED_AT_DEBUG] handle_select_card looked_at indices={:?}, self.looked_at_cards.len()={}", indices, self.looked_at_cards.len());
                 self.reveal_selected_looked_at(indices);
-                let is_select_cards = self
+                let has_compound = self
                     .game_state
                     .ability_queue
                     .current_entry()
                     .and_then(|e| e.ability.effect.as_ref())
                     .and_then(|ef| ef.compound.select_action.as_ref())
-                    .map(|sa| sa.action == "select_cards")
+                    .map(|sa| sa.action == "select_cards" || sa.action == "sequential")
                     .unwrap_or(false);
-                if is_select_cards {
+
+                eprintln!(
+                    "[LOOKED_AT_DEBUG] indices={:?}, has_compound={}",
+                    indices, has_compound
+                );
+                if has_compound {
                     self.handle_select_cards_looked_at(indices)?;
                 } else {
                     self.execute_selected_looked_at_cards(indices)?;
@@ -905,10 +925,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     fn handle_optional_cost_payment(&mut self, selected: &str) -> Result<(), String> {
         if selected == "skip_optional_cost" || selected == "0" {
             self.pending_choice = None;
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+                entry.optional_cost_was_paid = false;
+            }
             return Ok(());
         }
-        // "pay_optional_cost" from effect-based optional, or "1" from select_option(1), or any non-skip value
-        let is_pay = true; // We already returned for skip/0 cases above
+        // "pay_optional_cost" or "1" from select_option(1)
+        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+            entry.optional_cost_was_paid = true;
+        }
+        let is_pay = true;
         if is_pay {
             if let Some(cost) = self.game_state.entry_cost().cloned() {
                 if let Some(energy) = cost.energy {
@@ -946,6 +973,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if let Some(effect) = self.game_state.entry_effect().cloned() {
                     if let Err(e) = self.execute_effect(&effect) {
                         eprintln!("Failed to execute effect after optional cost: {}", e);
+                    }
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.effect_started = true;
                     }
                 }
             } else if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
@@ -1240,6 +1270,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         group: Option<&str>,
         characters: Option<&Vec<String>>,
     ) -> Result<(), String> {
+        eprintln!("[EXEC_ZONE] enter zone={} indices={:?}", zone, indices);
         let destination = self.game_state.entry_destination().map(|s| s.to_string());
         let target = self
             .game_state
@@ -1377,6 +1408,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         return Ok(());
                     }
                 }
+                let mut card_ids_moved: Vec<i16> = Vec::new();
                 for i in idxs {
                     if i < player.waitroom.cards.len() {
                         let card_id = player.waitroom.cards.remove(i);
@@ -1409,9 +1441,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 }
                                 _ => player.hand.add_card(card_id),
                             }
+                            card_ids_moved.push(card_id);
                             moved.push(card_id);
                         } else {
                             player.waitroom.cards.insert(i, card_id);
+                        }
+                    }
+                }
+                // Apply state_change to moved cards (e.g. "wait" state)
+                let state_change = self
+                    .game_state
+                    .ability_queue
+                    .current_entry()
+                    .and_then(|e| e.ability.effect.as_ref())
+                    .and_then(|ef| ef.state_change.clone());
+                if let Some(sc) = state_change {
+                    if sc == "wait" {
+                        for &cid in &card_ids_moved {
+                            self.game_state.mods.add_orientation_modifier(cid, "wait");
                         }
                     }
                 }
@@ -1570,6 +1617,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         Ok(())
     }
     fn execute_selected_looked_at_cards(&mut self, indices: &[usize]) -> Result<(), String> {
+        eprintln!("[LOOKED_AT_DEBUG] execute_selected_looked_at_cards called with {} indices, self.looked_at_cards.len()={}, game_state.looked_at.len()={}",
+            indices.len(), self.looked_at_cards.len(), self.game_state.looked_at_cards.len());
         let player = self.game_state.resolve_target_player_mut("self");
         let mut indices_to_remove: Vec<usize> = indices.iter().copied().collect();
         indices_to_remove.sort_by(|a, b| b.cmp(a));
@@ -1591,17 +1640,41 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             .current_entry()
             .and_then(|e| e.ability.effect.as_ref())
             .and_then(|ef| ef.compound.select_action.clone());
-        let destination = select_action
+        let is_sequential = select_action
             .as_ref()
-            .and_then(|sa| sa.destination.clone())
-            .unwrap_or_else(|| "hand".to_string());
-        let discard_remaining = select_action
-            .as_ref()
-            .and_then(|sa| sa.discard_remaining)
-            .unwrap_or(true);
-        let placement_order = select_action
-            .as_ref()
-            .and_then(|sa| sa.placement_order.clone());
+            .map(|sa| sa.action == "sequential")
+            .unwrap_or(false);
+        let (destination, discard_remaining, placement_order) = if is_sequential {
+            let first_move = select_action
+                .as_ref()
+                .and_then(|sa| sa.compound.actions.as_ref())
+                .and_then(|actions| {
+                    actions.iter().find(|a| {
+                        a.action == "move_cards" && a.source.as_deref() == Some("looked_at")
+                    })
+                });
+            (
+                first_move
+                    .and_then(|a| a.destination.clone())
+                    .unwrap_or_else(|| "hand".to_string()),
+                first_move.and_then(|a| a.discard_remaining).unwrap_or(true),
+                first_move.and_then(|a| a.placement_order.clone()),
+            )
+        } else {
+            (
+                select_action
+                    .as_ref()
+                    .and_then(|sa| sa.destination.clone())
+                    .unwrap_or_else(|| "hand".to_string()),
+                select_action
+                    .as_ref()
+                    .and_then(|sa| sa.discard_remaining)
+                    .unwrap_or(true),
+                select_action
+                    .as_ref()
+                    .and_then(|sa| sa.placement_order.clone()),
+            )
+        };
         println!("DEBUG: handle_select_cards_looked_at - destination: {}, discard_remaining: {}, placement_order: {:?}", destination, discard_remaining, placement_order);
 
         // If game_state.looked_at_cards was reset (resolver recreation), restore from selected_cards
@@ -1745,6 +1818,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
         }
 
+        self.looked_at_cards = self.game_state.looked_at_cards.clone();
         Ok(())
     }
     fn execute_selected_energy_zone_cards(

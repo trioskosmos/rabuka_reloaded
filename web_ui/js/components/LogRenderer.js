@@ -4,6 +4,7 @@ import { Tooltips } from '../ui_tooltips.js';
 import { LogFilter } from '../utils/LogFilter.js';
 import { PerformanceMonitor } from '../utils/PerformanceMonitor.js';
 import { LogViewerModal } from '../modals/LogViewerModal.js';
+import { resolveCardImagePath } from './CardRenderer.js';
 
 const Phase = {
     RPS: 0, SETUP: 1, MULLIGAN_P1: 2, MULLIGAN_P2: 3,
@@ -53,7 +54,7 @@ export const LogRenderer = {
         }
 
         ruleLogEl.appendChild(fragment);
-        if (!showingFullLog) ruleLogEl.scrollTop = ruleLogEl.scrollHeight;
+        if (!showingFullLog) ruleLogEl.scrollTop = 0;
 
         PerformanceMonitor.endPerfMeasure();
     },
@@ -335,7 +336,7 @@ export const LogRenderer = {
         let groupedLogs = [];
         let currentGroup = null;
 
-        logData.forEach((entry) => {
+        [...logData].reverse().forEach((entry) => {
             const idMatch = entry.match(/\[Turn \d+\] \[ID: (\d+)\] (.*)/);
             const executionId = idMatch ? idMatch[1] : null;
             const body = idMatch ? idMatch[2] : entry.replace(/^\[Turn \d+\]\s*/, '');
@@ -392,6 +393,8 @@ export const LogRenderer = {
             ${modalButton}
         `;
 
+        LogRenderer.enrichLogEntryWithCard(headerDiv, headerEntry, currentLang, showFriendlyAbilities);
+
         blockDiv.appendChild(headerDiv);
 
         // Headers are now non-clickable - use modal button for expanded view
@@ -410,6 +413,13 @@ export const LogRenderer = {
                 `;
                 detailsContainer.appendChild(detailDiv);
             });
+
+            // Add full card ability text in details section
+            const cardData = LogRenderer.resolveCardFromBody(headerEntry);
+            if (cardData) {
+                LogRenderer.appendFullAbility(detailsContainer, cardData);
+            }
+
             blockDiv.appendChild(detailsContainer);
         }
 
@@ -441,6 +451,14 @@ export const LogRenderer = {
             <div class="log-entry-icon"></div>
             <div class="log-entry-content">${enrichedBody}</div>
         `;
+
+        LogRenderer.enrichLogEntryWithCard(div, group.body, currentLang, showFriendlyAbilities);
+
+        // For standalone entries also show full ability
+        const cardData = LogRenderer.resolveCardFromBody(group.body);
+        if (cardData && !group.entry.includes('Mulligan') && !group.entry.includes('PLAYS')) {
+            LogRenderer.appendFullAbility(div, cardData);
+        }
 
         return div;
     },
@@ -545,6 +563,53 @@ export const LogRenderer = {
             .replace(/HEART_WILD/g, '[Wild]');
 
         return (turnPrefix ? `<span class="log-turn-prefix">${turnPrefix}</span> ` : "") + playerTag + displayText;
+    },
+
+    resolveCardFromBody: (body) => {
+        if (!body) return null;
+        const abilityMatch = body.match(/\[TRIGGER:\d+\]\s*(.*?):\s/);
+        const rustAbilityMatch = body.match(/(\[Rule .*?\]|\[Activated\]|\[Turn Start\]|\[Turn End\]|\[Triggered\])\s*(.*?):\s/);
+        const match = abilityMatch || rustAbilityMatch;
+        let cardName = null;
+        if (abilityMatch) {
+            cardName = abilityMatch[1].trim();
+        } else if (rustAbilityMatch) {
+            cardName = rustAbilityMatch[2].trim();
+        }
+        if (!cardName) return null;
+        const cardData = State.resolveCardDataByName(cardName) || State.resolveCardDataByName(cardName.replace(/^["']|["']$/g, ''));
+        if (!cardData || !cardData.card_no) return null;
+        return cardData;
+    },
+
+    enrichLogEntryWithCard: (entryEl, body, currentLang, showFriendlyAbilities) => {
+        if (!entryEl || !body) return;
+        const cardData = LogRenderer.resolveCardFromBody(body);
+        if (!cardData) return;
+
+        const imgPath = resolveCardImagePath(cardData.card_no);
+        if (imgPath) {
+            const img = document.createElement('img');
+            img.src = imgPath;
+            img.className = 'log-card-thumb';
+            img.alt = cardData.name || 'Card';
+            img.loading = 'lazy';
+            entryEl.insertBefore(img, entryEl.firstChild);
+        }
+
+        Tooltips.attachCardData(entryEl, cardData);
+    },
+
+    appendFullAbility: (containerEl, cardData) => {
+        if (!containerEl || !cardData) return;
+        const rawAbility = Tooltips.getEffectiveRawText(cardData);
+        if (!rawAbility || rawAbility.length < 5) return;
+
+        const abilityDiv = document.createElement('div');
+        abilityDiv.className = 'log-full-ability';
+        const enriched = Tooltips.enrichAbilityText(rawAbility);
+        abilityDiv.innerHTML = enriched;
+        containerEl.appendChild(abilityDiv);
     },
 
     renderActiveAbilities: (containerId, abilities) => {
@@ -698,11 +763,11 @@ export const LogRenderer = {
         if (newHistoryEntries.length > 0) {
             const turnHistorySection = ruleLogEl.querySelector('.turn-history-section');
             if (turnHistorySection) {
-                newHistoryEntries.forEach(event => {
+                [...newHistoryEntries].reverse().forEach(event => {
                     const filteredEvent = LogFilter.applyFilters([event])[0];
                     if (filteredEvent) {
                         const entry = LogRenderer.createTurnEventElement(event);
-                        turnHistorySection.appendChild(entry);
+                        turnHistorySection.insertBefore(entry, turnHistorySection.firstChild || null);
                     }
                 });
             }
@@ -711,13 +776,13 @@ export const LogRenderer = {
         if (newLogEntries.length > 0) {
             const ruleLogSection = ruleLogEl.querySelector('.rule-log-section');
             if (ruleLogSection) {
-                newLogEntries.forEach(entry => {
+                [...newLogEntries].reverse().forEach(entry => {
                     const div = LogRenderer.createStandaloneLogEntry(
                         { entry, body: entry.replace(/^\[Turn \d+\]\s*/, ''), turnPrefix: '' },
                         currentLang,
                         showFriendlyAbilities
                     );
-                    ruleLogSection.appendChild(div);
+                    ruleLogSection.insertBefore(div, ruleLogSection.firstChild || null);
                 });
             }
         }
@@ -725,6 +790,6 @@ export const LogRenderer = {
         PerformanceMonitor._lastLogCount = currentLogCount;
         PerformanceMonitor._lastHistoryCount = currentHistoryCount;
 
-        if (!State.showingFullLog) ruleLogEl.scrollTop = ruleLogEl.scrollHeight;
+        if (!State.showingFullLog) ruleLogEl.scrollTop = 0;
     }
 };
