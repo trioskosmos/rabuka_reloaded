@@ -3,50 +3,9 @@ use super::util;
 use crate::card::AbilityEffect;
 
 impl<'a> super::resolver::AbilityResolver<'a> {
-    pub fn resume_execution(&mut self, context: ExecutionContext) -> Result<(), String> {
-        match context {
-            ExecutionContext::None => Ok(()),
-            ExecutionContext::LookAndSelect { step } => {
-                match step {
-                    LookAndSelectStep::Select { count: _ } => {
-                        if let Some(ref select_action) = self
-                            .current_effect
-                            .as_ref()
-                            .and_then(|e| e.compound.select_action.clone())
-                        {
-                            if select_action.action == "sequential"
-                                || select_action.action == "select_cards"
-                            {
-                                // Both sequential and select_cards formats:
-                                // The selected cards were already moved to destination
-                                // in handle_select_cards_looked_at. Nothing more to do.
-                                self.execution_context = ExecutionContext::None;
-                                return Ok(());
-                            }
-                        }
-                        self.execution_context = ExecutionContext::None;
-                        Ok(())
-                    }
-                    LookAndSelectStep::LookAt { .. } => {
-                        self.execution_context = ExecutionContext::None;
-                        Ok(())
-                    }
-                    LookAndSelectStep::Finalize { .. } => {
-                        self.execution_context = ExecutionContext::None;
-                        Ok(())
-                    }
-                }
-            }
-            ExecutionContext::SingleEffect { effect_index: _ } => {
-                self.execution_context = ExecutionContext::None;
-                Ok(())
-            }
-            ExecutionContext::MoveCardsPosition { .. } => {
-                // The position choice was already handled in handle_select_position.
-                // After selection, the resolver set execution_context back to None.
-                Ok(())
-            }
-        }
+    pub fn resume_execution(&mut self, _context: ExecutionContext) -> Result<(), String> {
+        self.execution_context = ExecutionContext::None;
+        Ok(())
     }
 
     pub fn expire_live_end_effects(&mut self) {
@@ -334,7 +293,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }
                         self.selected_cards = cards;
                     } else {
-                        self.execute_selected_cards_from_discard(
+                        self.execute_selected_cards_from_zone(
+                            "discard",
                             indices,
                             count,
                             card_type.as_deref(),
@@ -345,9 +305,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         )?;
                     }
                 }
-                "deck" => {
-                    self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?
-                }
+                "deck" => self.execute_selected_cards_from_zone(
+                    "deck",
+                    indices,
+                    count,
+                    card_type.as_deref(),
+                    None,
+                    None,
+                    None,
+                    None,
+                )?,
                 "looked_at" => {
                     eprintln!("[HSC1_LOOKED_AT] START: looked_cards.len()={}, indices={:?}, filtered_indices={:?}, is_select_cards={}",
                         self.looked_at_cards.len(), indices, filtered_indices, self.game_state.ability_queue.current_entry()
@@ -395,15 +362,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 self.looked_at_cards = self.game_state.looked_at_cards.clone();
                             } else if let Some(ref actions) = select_action.compound.actions {
                                 self.game_state.pending_sequential_actions = Some(actions.clone());
-                                self.execute_selected_looked_at_cards(&mapped_indices)?;
+                                self.handle_select_cards_looked_at(&mapped_indices)?;
+                                self.looked_at_cards = self.game_state.looked_at_cards.clone();
                             } else {
-                                self.execute_selected_looked_at_cards(&mapped_indices)?;
+                                self.handle_select_cards_looked_at(&mapped_indices)?;
+                                self.looked_at_cards = self.game_state.looked_at_cards.clone();
                             }
                         } else {
-                            self.execute_selected_looked_at_cards(&mapped_indices)?;
+                            self.handle_select_cards_looked_at(&mapped_indices)?;
+                            self.looked_at_cards = self.game_state.looked_at_cards.clone();
                         }
                     } else {
-                        self.execute_selected_looked_at_cards(&mapped_indices)?;
+                        self.handle_select_cards_looked_at(&mapped_indices)?;
+                        self.looked_at_cards = self.game_state.looked_at_cards.clone();
                     }
 
                     // Check if we can select more cards (for "up to X" abilities)
@@ -500,19 +471,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         match zone {
             "hand" => {
-                if indices.is_empty() && !allow_skip && count > 0 {
-                    self.execute_selected_cards_from_hand(
-                        &[0usize],
-                        count,
-                        card_type.as_deref(),
-                        cost_limit,
-                        cost_limit_operator.as_deref(),
-                        group.as_deref(),
-                        characters.as_ref(),
-                    )?
-                } else if !indices.is_empty() || allow_skip {
-                    self.execute_selected_cards_from_hand(
-                        indices,
+                let hand_idx = if indices.is_empty() && !allow_skip && count > 0 {
+                    &[0usize]
+                } else {
+                    indices
+                };
+                if !hand_idx.is_empty() || allow_skip {
+                    self.execute_selected_cards_from_zone(
+                        "hand",
+                        hand_idx,
                         count,
                         card_type.as_deref(),
                         cost_limit,
@@ -528,9 +495,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
             }
-            "deck" => {
-                self.execute_selected_cards_from_deck(indices, count, card_type.as_deref())?
-            }
+            "deck" => self.execute_selected_cards_from_zone(
+                "deck",
+                indices,
+                count,
+                card_type.as_deref(),
+                None,
+                None,
+                None,
+                None,
+            )?,
             "discard" => {
                 if is_select_action {
                     // Just store card IDs without moving
@@ -543,7 +517,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                     self.selected_cards = cards;
                 } else {
-                    self.execute_selected_cards_from_discard(
+                    self.execute_selected_cards_from_zone(
+                        "discard",
                         indices,
                         count,
                         card_type.as_deref(),
@@ -566,15 +541,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     .map(|sa| sa.action == "select_cards" || sa.action == "sequential")
                     .unwrap_or(false);
 
-                eprintln!(
-                    "[LOOKED_AT_DEBUG] indices={:?}, has_compound={}",
-                    indices, has_compound
-                );
-                if has_compound {
-                    self.handle_select_cards_looked_at(indices)?;
-                } else {
-                    self.execute_selected_looked_at_cards(indices)?;
-                }
+                self.handle_select_cards_looked_at(indices)?;
             }
             "revealed_cards" => {
                 let mut cards = Vec::new();
@@ -1491,148 +1458,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_selected_cards_from_hand(
-        &mut self,
-        indices: &[usize],
-        count: usize,
-        card_type_filter: Option<&str>,
-        cost_limit: Option<u32>,
-        cost_limit_operator: Option<&str>,
-        group: Option<&str>,
-        characters: Option<&Vec<String>>,
-    ) -> Result<(), String> {
-        self.execute_selected_cards_from_zone(
-            "hand",
-            indices,
-            count,
-            card_type_filter,
-            cost_limit,
-            cost_limit_operator,
-            group,
-            characters,
-        )
-    }
-    fn execute_selected_cards_from_deck(
-        &mut self,
-        indices: &[usize],
-        count: usize,
-        card_type_filter: Option<&str>,
-    ) -> Result<(), String> {
-        self.execute_selected_cards_from_zone(
-            "deck",
-            indices,
-            count,
-            card_type_filter,
-            None,
-            None,
-            None,
-            None,
-        )
-    }
-    fn execute_selected_cards_from_discard(
-        &mut self,
-        indices: &[usize],
-        count: usize,
-        card_type_filter: Option<&str>,
-        cost_limit: Option<u32>,
-        cost_limit_operator: Option<&str>,
-        group: Option<&str>,
-        characters: Option<&Vec<String>>,
-    ) -> Result<(), String> {
-        self.execute_selected_cards_from_zone(
-            "discard",
-            indices,
-            count,
-            card_type_filter,
-            cost_limit,
-            cost_limit_operator,
-            group,
-            characters,
-        )
-    }
-    fn execute_selected_cards_from_stage(
-        &mut self,
-        indices: &[usize],
-        _count: usize,
-        card_type_filter: Option<&str>,
-        cost_limit: Option<u32>,
-        cost_limit_operator: Option<&str>,
-        group: Option<&str>,
-        characters: Option<&Vec<String>>,
-    ) -> Result<(), String> {
-        let card_db = self.game_state.card_database.clone();
-        let destination = self
-            .game_state
-            .entry_destination()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "discard".to_string());
-        let passes = |cid: i16| -> bool {
-            crate::ability::util::card_matches_type(&card_db, cid, card_type_filter)
-                && crate::ability::util::card_matches_cost_limit_op(
-                    &card_db,
-                    cid,
-                    cost_limit,
-                    cost_limit_operator,
-                )
-                && crate::ability::util::card_matches_group_str(&card_db, cid, group)
-                && match characters {
-                    Some(chars) if !chars.is_empty() => {
-                        crate::ability::util::card_matches_characters(&card_db, cid, Some(chars))
-                    }
-                    _ => true,
-                }
-        };
-        let mut vacated = None;
-        {
-            let player = self.game_state.active_player_mut();
-            for &idx in indices.iter().rev() {
-                if idx < 3 && player.stage.stage[idx] != -1 && passes(player.stage.stage[idx]) {
-                    if let Some(card_id) =
-                        player.remove_member_from_stage_with_recycling(idx, &card_db)
-                    {
-                        vacated = Some(idx);
-                        match destination.as_str() {
-                            "discard" => player.waitroom.add_card(card_id),
-                            "hand" => player.hand.add_card(card_id),
-                            "deck" | "deck_top" => player.main_deck.cards.insert(0, card_id),
-                            _ => player.waitroom.add_card(card_id),
-                        }
-                    }
-                }
-            }
-        }
-        self.game_state.last_vacated_stage_area = vacated;
-        eprintln!(
-            "[STAGE_HANDLER] removed from stage, vacated={:?}, discard_count={}",
-            vacated,
-            self.game_state.player1.waitroom.cards.len()
-        );
-        eprintln!(
-            "[STAGE_HANDLER] pending_sequential_actions before finalize: {:?}",
-            self.game_state
-                .pending_sequential_actions
-                .as_ref()
-                .map(|v| v.len())
-        );
-        Ok(())
-    }
-    fn execute_selected_looked_at_cards(&mut self, indices: &[usize]) -> Result<(), String> {
-        eprintln!("[LOOKED_AT_DEBUG] execute_selected_looked_at_cards called with {} indices, self.looked_at_cards.len()={}, game_state.looked_at.len()={}",
-            indices.len(), self.looked_at_cards.len(), self.game_state.looked_at_cards.len());
-        let player = self.game_state.resolve_target_player_mut("self");
-        let mut indices_to_remove: Vec<usize> = indices.iter().copied().collect();
-        indices_to_remove.sort_by(|a, b| b.cmp(a));
-        for i in indices_to_remove {
-            if i < self.looked_at_cards.len() {
-                let card_id = self.looked_at_cards.remove(i);
-                player.hand.add_card(card_id);
-            }
-        }
-        for card_id in self.looked_at_cards.drain(..) {
-            player.waitroom.add_card(card_id);
-        }
-        Ok(())
-    }
     fn handle_select_cards_looked_at(&mut self, indices: &[usize]) -> Result<(), String> {
         let select_action = self
             .game_state
@@ -1753,7 +1578,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 _ => player.hand.add_card(card_id),
             }
         }
-        drop(player);
+        let _ = player;
         println!(
             "DEBUG: Hand now has {} cards: {:?}",
             self.game_state.active_player().hand.cards.len(),

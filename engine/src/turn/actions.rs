@@ -310,25 +310,6 @@ impl super::TurnEngine {
             .as_ref()
             .map(|v| !v.is_empty())
             .unwrap_or(false);
-        // Determine if the resolved choice was a cost payment choice.
-        // Cost choices are:
-        //   - SelectTarget with target "pay_optional_cost:skip_optional_cost" (pay_energy costs)
-        //   - SelectCard with zone="hand", allow_skip=true, is_select_action=false (move_cards costs)
-        // Effect choices are SelectCard with other zones (e.g. discard selection).
-        let was_cost_choice = match &choice {
-            crate::ability::types::Choice::SelectTarget { target, .. }
-                if target == "pay_optional_cost:skip_optional_cost" =>
-            {
-                true
-            }
-            crate::ability::types::Choice::SelectCard {
-                zone,
-                allow_skip,
-                is_select_action,
-                ..
-            } if zone == "hand" && *allow_skip && !*is_select_action => true,
-            _ => false,
-        };
         let (new_choice, looked_at, ctx, rev, res) = {
             let mut resolver = crate::ability::resolver::AbilityResolver::new(game_state);
             resolver.execution_context = saved_ctx.clone();

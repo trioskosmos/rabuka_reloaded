@@ -188,17 +188,6 @@ impl super::TurnEngine {
                     if game_state.pending_choice.is_some() {
                         return;
                     }
-                    // Trigger LiveSuccess abilities for both players
-                    Self::trigger_live_success_abilities(
-                        game_state,
-                        &game_state.player1.id.clone(),
-                    );
-                    game_state.process_pending_auto_abilities(&game_state.player1.id.clone());
-                    Self::trigger_live_success_abilities(
-                        game_state,
-                        &game_state.player2.id.clone(),
-                    );
-                    game_state.process_pending_auto_abilities(&game_state.player2.id.clone());
                     game_state.clear_revealed_cards();
                     game_state.revealed_cost_cards.clear();
                     game_state.turn_limited_abilities_used.clear();
