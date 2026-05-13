@@ -111,6 +111,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             self.game_state.pending_sequential_actions = None;
+            if should_preserve && self.pending_choice.is_some() {
+                self.pending_choice = None;
+            }
         }
         Ok(())
     }
@@ -1327,6 +1330,11 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             "discard" => {
                 let dest = destination.as_deref().unwrap_or("hand");
+                // Pre-flight: if destination is stage and no room, silently reject
+                if dest == "stage" && player.stage.stage.iter().all(|&id| id != -1) {
+                    eprintln!("[DISCARD_ZONE] stage is full, cannot place cards from discard");
+                    return Ok(());
+                }
                 let mut idxs: Vec<usize> = indices.iter().copied().collect();
                 idxs.sort_by(|a, b| b.cmp(a));
                 eprintln!(
@@ -1383,7 +1391,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                     } else if player.stage.stage[2] == -1 {
                                         player.stage.stage[2] = card_id;
                                     } else {
-                                        player.hand.add_card(card_id);
+                                        // Stage full — return card to discard
+                                        player.waitroom.cards.insert(i, card_id);
+                                        eprintln!("[DISCARD_ZONE] no stage room, returning card to discard");
+                                        continue;
                                     }
                                 }
                                 "same_area" => {

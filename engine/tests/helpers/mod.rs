@@ -5,13 +5,13 @@
 ///
 /// Filler cards (zero abilities, no ability triggers) are available in
 /// `tests/data/cards.json` and can be referenced by card_no.
-
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
+use rabuka_engine::ability::types::Choice;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game_setup::ActionType;
@@ -20,7 +20,6 @@ use rabuka_engine::player::Player;
 use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::types::{Phase, TurnPhase};
 use rabuka_engine::zones::MemberArea;
-use rabuka_engine::ability::types::Choice;
 
 /// Load the real card database from `cards/cards.json` + `cards/abilities.json`.
 /// This includes ALL real cards (both the tested ability cards and filler cards).
@@ -32,7 +31,8 @@ pub fn load_real_database() -> Arc<CardDatabase> {
         let cards = CardLoader::load_cards_from_file(cards_path)
             .expect("Failed to load real cards from ../cards/cards.json");
         Arc::new(CardDatabase::load_or_create(cards))
-    }).clone()
+    })
+    .clone()
 }
 
 /// Get a card's database ID by its card_no string.
@@ -94,7 +94,11 @@ impl TestGame {
         // Use the mutated database (with copies) as the test's db reference
         let db_with_copies = state.card_database.clone();
 
-        TestGame { db: db_with_copies, state, copy_pool: RefCell::new(copy_pool) }
+        TestGame {
+            db: db_with_copies,
+            state,
+            copy_pool: RefCell::new(copy_pool),
+        }
     }
 
     /// Look up a card's numeric ID by card_no in the database.
@@ -116,7 +120,8 @@ impl TestGame {
     /// are needed in the same zone.
     pub fn new_id(&self, card_no: &str) -> i16 {
         let template_id = card_id(&self.db, card_no);
-        self.copy_pool.borrow_mut()
+        self.copy_pool
+            .borrow_mut()
             .get_mut(&template_id)
             .and_then(|v| v.pop())
             .unwrap_or(template_id)
@@ -229,7 +234,10 @@ impl TestGame {
         TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::Pass,
-            None, None, None, None,
+            None,
+            None,
+            None,
+            None,
         )
         .expect("pass failed");
     }
@@ -238,26 +246,55 @@ impl TestGame {
 
     /// Resolve a card ID to its name from the database.
     pub fn name(&self, id: i16) -> String {
-        self.state.card_database.get_card(id).map(|c| format!("{} ({})", c.name, c.card_no)).unwrap_or_else(|| format!("#{}", id))
+        self.state
+            .card_database
+            .get_card(id)
+            .map(|c| format!("{} ({})", c.name, c.card_no))
+            .unwrap_or_else(|| format!("#{}", id))
     }
 
     /// Print card IDs in player1's hand.
     pub fn dbg_hand(&self) {
-        let cards: Vec<String> = self.state.player1.hand.cards.iter().map(|&id| self.name(id)).collect();
+        let cards: Vec<String> = self
+            .state
+            .player1
+            .hand
+            .cards
+            .iter()
+            .map(|&id| self.name(id))
+            .collect();
         eprintln!("[HAND] {:?}", cards);
     }
 
     /// Print card IDs in player1's waitroom.
     pub fn dbg_discard(&self) {
-        let cards: Vec<String> = self.state.player1.waitroom.cards.iter().map(|&id| self.name(id)).collect();
+        let cards: Vec<String> = self
+            .state
+            .player1
+            .waitroom
+            .cards
+            .iter()
+            .map(|&id| self.name(id))
+            .collect();
         eprintln!("[DISCARD] {:?}", cards);
     }
 
     /// Print cards on player1's stage.
     pub fn dbg_stage(&self) {
-        let cards: Vec<String> = self.state.player1.stage.stage.iter().map(|&id| {
-            if id == -1 { "empty".into() } else { self.name(id) }
-        }).collect();
+        let cards: Vec<String> = self
+            .state
+            .player1
+            .stage
+            .stage
+            .iter()
+            .map(|&id| {
+                if id == -1 {
+                    "empty".into()
+                } else {
+                    self.name(id)
+                }
+            })
+            .collect();
         eprintln!("[STAGE] {:?}", cards);
     }
 

@@ -1,7 +1,13 @@
 impl GameState {
-
-    pub fn trigger_auto_ability(&mut self, ability_id: String, trigger_type: AbilityTrigger, player_id: String, source_card_id: Option<String>, explicit_card_id: Option<i16>) {
-        use crate::ability_queue::{AbilityQueueEntry, AbilityId};
+    pub fn trigger_auto_ability(
+        &mut self,
+        ability_id: String,
+        trigger_type: AbilityTrigger,
+        player_id: String,
+        source_card_id: Option<String>,
+        explicit_card_id: Option<i16>,
+    ) {
+        use crate::ability_queue::{AbilityId, AbilityQueueEntry};
 
         if let Some(ref card_no) = source_card_id {
             let (card, card_id) = if let Some(cid) = explicit_card_id {
@@ -13,7 +19,11 @@ impl GameState {
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
                     if ability_id.contains(&ability.full_text) {
                         let entry = AbilityQueueEntry {
-                            id: AbilityId::new(card_no, ability_index, &format!("{:?}", trigger_type)),
+                            id: AbilityId::new(
+                                card_no,
+                                ability_index,
+                                &format!("{:?}", trigger_type),
+                            ),
                             card_no: card_no.clone(),
                             player_id,
                             ability: ability.clone(),
@@ -27,6 +37,7 @@ impl GameState {
                             conditional_choice: None,
                             execution_context: None,
                             selected_card_ids: Vec::new(),
+                            effect_started: false,
                         };
 
                         self.ability_queue.enqueue(entry);
@@ -38,40 +49,68 @@ impl GameState {
     }
 
     /// Search for a card in the specified player's zones first, fall back to the other player.
-    fn find_card_by_number_for_player(&self, card_no: &str, player_id: &str) -> (Option<crate::card::Card>, Option<i16>) {
-        let preferred = if player_id == self.player1.id || player_id == "p1" { &self.player1 } else { &self.player2 };
-        let other = if std::ptr::eq(preferred, &self.player1) { &self.player2 } else { &self.player1 };
+    fn find_card_by_number_for_player(
+        &self,
+        card_no: &str,
+        player_id: &str,
+    ) -> (Option<crate::card::Card>, Option<i16>) {
+        let preferred = if player_id == self.player1.id || player_id == "p1" {
+            &self.player1
+        } else {
+            &self.player2
+        };
+        let other = if std::ptr::eq(preferred, &self.player1) {
+            &self.player2
+        } else {
+            &self.player1
+        };
         let result = self.search_player_zones_for_card(card_no, preferred);
-        if result.0.is_some() { return result; }
+        if result.0.is_some() {
+            return result;
+        }
         self.search_player_zones_for_card(card_no, other)
     }
 
-    fn search_player_zones_for_card(&self, card_no: &str, player: &Player) -> (Option<crate::card::Card>, Option<i16>) {
+    fn search_player_zones_for_card(
+        &self,
+        card_no: &str,
+        player: &Player,
+    ) -> (Option<crate::card::Card>, Option<i16>) {
         for id in &player.hand.cards {
             if let Some(card) = self.card_database.get_card(*id) {
-                if card.card_no == card_no { return (Some(card.clone()), Some(*id)); }
+                if card.card_no == card_no {
+                    return (Some(card.clone()), Some(*id));
+                }
             }
         }
         for stage_card_id in &player.stage.stage {
             if *stage_card_id != -1 {
                 if let Some(card) = self.card_database.get_card(*stage_card_id) {
-                    if card.card_no == card_no { return (Some(card.clone()), Some(*stage_card_id)); }
+                    if card.card_no == card_no {
+                        return (Some(card.clone()), Some(*stage_card_id));
+                    }
                 }
             }
         }
         for waitroom_card_id in &player.waitroom.cards {
             if let Some(card) = self.card_database.get_card(*waitroom_card_id) {
-                if card.card_no == card_no { return (Some(card.clone()), Some(*waitroom_card_id)); }
+                if card.card_no == card_no {
+                    return (Some(card.clone()), Some(*waitroom_card_id));
+                }
             }
         }
         for live_card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*live_card_id) {
-                if card.card_no == card_no { return (Some(card.clone()), Some(*live_card_id)); }
+                if card.card_no == card_no {
+                    return (Some(card.clone()), Some(*live_card_id));
+                }
             }
         }
         for success_card_id in &player.success_live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*success_card_id) {
-                if card.card_no == card_no { return (Some(card.clone()), Some(*success_card_id)); }
+                if card.card_no == card_no {
+                    return (Some(card.clone()), Some(*success_card_id));
+                }
             }
         }
         (None, None)
@@ -99,7 +138,8 @@ impl GameState {
 
             let (choice, looked_at, ctx, rev, result) = {
                 let mut resolver = crate::ability::resolver::AbilityResolver::new(self);
-                let result = resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index);
+                let result =
+                    resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index);
                 let choice = resolver.get_pending_choice().cloned();
                 let looked_at = resolver.take_looked_at();
                 let ctx = resolver.execution_context.clone();
@@ -120,6 +160,12 @@ impl GameState {
             if let Some(c) = choice {
                 if let Some(e) = self.ability_queue.current_entry_mut() {
                     e.execution_context = Some(ctx);
+                    // Mark effect as started only when cost was already paid before this run
+                    // (cost choice creation sets cost_paid=true, but we need to distinguish
+                    // cost-creation from effect-execution)
+                    if e.cost_paid || entry.ability.cost.is_none() {
+                        e.effect_started = true;
+                    }
                 }
                 self.ability_queue.pause_for_choice(c);
             } else {
@@ -134,11 +180,15 @@ impl GameState {
     }
 
     pub fn entry_effect(&self) -> Option<&crate::card::AbilityEffect> {
-        self.ability_queue.current_entry().and_then(|e| e.ability.effect.as_ref())
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.ability.effect.as_ref())
     }
 
     pub fn entry_cost(&self) -> Option<&crate::card::AbilityCost> {
-        self.ability_queue.current_entry().and_then(|e| e.ability.cost.as_ref())
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.ability.cost.as_ref())
     }
 
     pub fn entry_characters(&self) -> Option<&Vec<String>> {
@@ -150,11 +200,15 @@ impl GameState {
     }
 
     pub fn entry_choice_card_no(&self) -> Option<String> {
-        self.ability_queue.current_entry().and_then(|e| e.choice_card_no.clone())
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_card_no.clone())
     }
 
     pub fn entry_conditional_choice(&self) -> Option<String> {
-        self.ability_queue.current_entry().and_then(|e| e.conditional_choice.clone())
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.conditional_choice.clone())
     }
 
     /// Inject card and ability identity into the pending_choice JSON so the frontend
@@ -162,13 +216,28 @@ impl GameState {
     pub fn inject_choice_ability_context(&self, json: &mut serde_json::Value) {
         if let Some(obj) = json.as_object_mut() {
             if let Some(entry) = self.ability_queue.current_entry() {
-                obj.insert("card_no".into(), serde_json::Value::String(entry.card_no.clone()));
-                obj.insert("ability_text".into(), serde_json::Value::String(entry.ability.full_text.clone()));
-                obj.insert("trigger_type".into(), serde_json::Value::String(format!("{:?}", entry.trigger_type)));
+                obj.insert(
+                    "card_no".into(),
+                    serde_json::Value::String(entry.card_no.clone()),
+                );
+                obj.insert(
+                    "ability_text".into(),
+                    serde_json::Value::String(entry.ability.full_text.clone()),
+                );
+                obj.insert(
+                    "trigger_type".into(),
+                    serde_json::Value::String(format!("{:?}", entry.trigger_type)),
+                );
                 if let Some(cid) = entry.card_id {
-                    obj.insert("card_id".into(), serde_json::Value::Number(serde_json::Number::from(cid as i64)));
+                    obj.insert(
+                        "card_id".into(),
+                        serde_json::Value::Number(serde_json::Number::from(cid as i64)),
+                    );
                     if let Some(card) = self.card_database.get_card(cid) {
-                        obj.insert("card_name".into(), serde_json::Value::String(card.name.clone()));
+                        obj.insert(
+                            "card_name".into(),
+                            serde_json::Value::String(card.name.clone()),
+                        );
                     }
                 }
             }
@@ -178,7 +247,9 @@ impl GameState {
     /// Resolve which player "self" refers to based on the ability master's player_id.
     /// The ability queue entry stores which player activated this ability.
     fn ability_master_id(&self) -> Option<String> {
-        self.ability_queue.current_entry().map(|e| e.player_id.clone())
+        self.ability_queue
+            .current_entry()
+            .map(|e| e.player_id.clone())
     }
 
     pub fn resolve_target_player_mut(&mut self, target: &str) -> &mut Player {
@@ -196,15 +267,27 @@ impl GameState {
         }
     }
 
-    pub fn resolve_target_single<'a>(&'a self, target: &str, perspective_player: &'a Player) -> Option<&'a Player> {
+    pub fn resolve_target_single<'a>(
+        &'a self,
+        target: &str,
+        perspective_player: &'a Player,
+    ) -> Option<&'a Player> {
         match target {
             "self" | "自分" => Some(perspective_player),
-            "opponent" | "相手" => Some(if std::ptr::eq(perspective_player, &self.player1) { &self.player2 } else { &self.player1 }),
+            "opponent" | "相手" => Some(if std::ptr::eq(perspective_player, &self.player1) {
+                &self.player2
+            } else {
+                &self.player1
+            }),
             _ => None,
         }
     }
 
-    pub fn resolve_target_single_mut<'a>(&'a mut self, target: &str, perspective_player: &'a Player) -> Option<&'a mut Player> {
+    pub fn resolve_target_single_mut<'a>(
+        &'a mut self,
+        target: &str,
+        perspective_player: &'a Player,
+    ) -> Option<&'a mut Player> {
         match target {
             "self" | "自分" => {
                 if std::ptr::eq(perspective_player, &self.player1) {
@@ -254,7 +337,11 @@ impl GameState {
         }
     }
 
-    pub fn resolve_target<'a>(&'a self, target: &str, perspective_player: &'a Player) -> Vec<&'a Player> {
+    pub fn resolve_target<'a>(
+        &'a self,
+        target: &str,
+        perspective_player: &'a Player,
+    ) -> Vec<&'a Player> {
         match target {
             "self" | "自分" => {
                 vec![perspective_player]
@@ -276,7 +363,11 @@ impl GameState {
         }
     }
 
-    pub fn resolve_target_mut(&mut self, target: &str, perspective_player_id: &str) -> Vec<&mut Player> {
+    pub fn resolve_target_mut(
+        &mut self,
+        target: &str,
+        perspective_player_id: &str,
+    ) -> Vec<&mut Player> {
         match target {
             "self" | "自分" => {
                 if perspective_player_id == self.player1.id {
@@ -338,15 +429,23 @@ impl GameState {
     pub fn can_place_card_in_zone(&self, card_id: i16, zone: &str, _player_id: &str) -> bool {
         if let Some(card) = self.card_database.get_card(card_id) {
             for ability in &card.abilities {
-                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
+                if ability
+                    .triggers
+                    .as_ref()
+                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
+                {
                     if let Some(ref effect) = ability.effect {
-                        let restricted_to = effect.restricted_destination.as_deref()
+                        let restricted_to = effect
+                            .restricted_destination
+                            .as_deref()
                             .or_else(|| effect.destination.as_deref());
                         if effect.action == "restriction"
                             && effect.restriction_type.as_deref() == Some("cannot_place")
                             && (restricted_to == Some(zone)
-                                || restricted_to == Some("live_card_zone") && zone == "success_live_zone"
-                                || restricted_to == Some("success_live_zone") && zone == "live_card_zone")
+                                || restricted_to == Some("live_card_zone")
+                                    && zone == "success_live_zone"
+                                || restricted_to == Some("success_live_zone")
+                                    && zone == "live_card_zone")
                         {
                             eprintln!("Card {} cannot be placed in {} due to constant ability restriction", card.card_no, zone);
                             return false;
@@ -361,8 +460,22 @@ impl GameState {
     pub fn enforce_constant_ability_restrictions(&mut self) {
         let p1_id = self.player1.id.clone();
         let p2_id = self.player2.id.clone();
-        let p1_cards: Vec<(usize, i16)> = self.player1.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect();
-        let p2_cards: Vec<(usize, i16)> = self.player2.live_card_zone.cards.iter().enumerate().map(|(i, &id)| (i, id)).collect();
+        let p1_cards: Vec<(usize, i16)> = self
+            .player1
+            .live_card_zone
+            .cards
+            .iter()
+            .enumerate()
+            .map(|(i, &id)| (i, id))
+            .collect();
+        let p2_cards: Vec<(usize, i16)> = self
+            .player2
+            .live_card_zone
+            .cards
+            .iter()
+            .enumerate()
+            .map(|(i, &id)| (i, id))
+            .collect();
 
         let mut cards_to_remove: Vec<(&str, usize)> = Vec::new();
         for (index, card_id) in p1_cards {
@@ -377,11 +490,18 @@ impl GameState {
         }
 
         for (player_id, index) in cards_to_remove {
-            let player = if *player_id == self.player1.id { &mut self.player1 } else { &mut self.player2 };
+            let player = if *player_id == self.player1.id {
+                &mut self.player1
+            } else {
+                &mut self.player2
+            };
             let card = player.live_card_zone.cards.remove(index);
             player.waitroom.cards.push(card);
             if let Some(card_data) = self.card_database.get_card(card) {
-                eprintln!("Removed card {} from live_card_zone due to constant ability restriction", card_data.card_no);
+                eprintln!(
+                    "Removed card {} from live_card_zone due to constant ability restriction",
+                    card_data.card_no
+                );
             }
         }
     }
@@ -392,42 +512,66 @@ impl GameState {
         trigger: AbilityTrigger,
         player: &Player,
     ) -> Vec<&'a crate::card::Ability> {
-        card.abilities.iter().filter(|ability| {
-            // Skip abilities with null triggers - they should not auto-trigger during any phase
-            if ability.triggers.is_none() {
-                return false;
-            }
-            
-            match trigger {
-                AbilityTrigger::Activation => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::ACTIVATION));
-                    trigger_match
+        card.abilities
+            .iter()
+            .filter(|ability| {
+                // Skip abilities with null triggers - they should not auto-trigger during any phase
+                if ability.triggers.is_none() {
+                    return false;
                 }
-                AbilityTrigger::Debut => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN));
-                    let should_trigger = trigger_match && self.should_trigger_debut(player, card);
-                    should_trigger
+
+                match trigger {
+                    AbilityTrigger::Activation => {
+                        let trigger_match = ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t.contains(crate::triggers::ACTIVATION));
+                        trigger_match
+                    }
+                    AbilityTrigger::Debut => {
+                        let trigger_match = ability.triggers.as_ref().map_or(false, |t| {
+                            t.contains(crate::triggers::DEBUT)
+                                || t.contains(crate::triggers::DEBUT_EN)
+                        });
+                        let should_trigger =
+                            trigger_match && self.should_trigger_debut(player, card);
+                        should_trigger
+                    }
+                    AbilityTrigger::LiveStart => {
+                        let trigger_match = ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t.contains(crate::triggers::LIVE_START));
+                        let should_trigger =
+                            trigger_match && self.should_trigger_live_start(player);
+                        should_trigger
+                    }
+                    AbilityTrigger::LiveSuccess => {
+                        let trigger_match = ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t.contains(crate::triggers::LIVE_SUCCESS));
+                        let should_trigger =
+                            trigger_match && self.should_trigger_live_success(player);
+                        should_trigger
+                    }
+                    AbilityTrigger::Constant => {
+                        let trigger_match = ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t.contains(crate::triggers::CONSTANT));
+                        trigger_match
+                    }
+                    AbilityTrigger::Auto => {
+                        let trigger_match = ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t.contains(crate::triggers::AUTO));
+                        trigger_match
+                    }
                 }
-                AbilityTrigger::LiveStart => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::LIVE_START));
-                    let should_trigger = trigger_match && self.should_trigger_live_start(player);
-                    should_trigger
-                }
-                AbilityTrigger::LiveSuccess => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::LIVE_SUCCESS));
-                    let should_trigger = trigger_match && self.should_trigger_live_success(player);
-                    should_trigger
-                }
-                AbilityTrigger::Constant => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT));
-                    trigger_match
-                }
-                AbilityTrigger::Auto => {
-                    let trigger_match = ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::AUTO));
-                    trigger_match
-                }
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     pub fn get_temporary_effects_in_order(&self) -> Vec<&TemporaryEffect> {
@@ -441,15 +585,9 @@ impl GameState {
 
         for (i, effect) in self.temporary_effects.iter().enumerate() {
             let is_expired = match effect.duration {
-                Duration::LiveEnd => {
-                    self.current_turn_phase != TurnPhase::Live
-                }
-                Duration::ThisTurn => {
-                    self.turn_number > effect.created_turn
-                }
-                Duration::ThisLive => {
-                    self.current_turn_phase != TurnPhase::Live
-                }
+                Duration::LiveEnd => self.current_turn_phase != TurnPhase::Live,
+                Duration::ThisTurn => self.turn_number > effect.created_turn,
+                Duration::ThisLive => self.current_turn_phase != TurnPhase::Live,
                 Duration::Permanent => false,
                 Duration::AsLongAs => {
                     // AsLongAs effects persist as long as their condition is true.
@@ -457,9 +595,7 @@ impl GameState {
                     // condition re-evaluation is not yet implemented.
                     self.current_turn_phase != TurnPhase::Live
                 }
-                Duration::Unless => {
-                    self.current_turn_phase != TurnPhase::Live
-                }
+                Duration::Unless => self.current_turn_phase != TurnPhase::Live,
             };
 
             if is_expired {
@@ -471,26 +607,40 @@ impl GameState {
             let effect = self.temporary_effects.remove(i);
             match effect.effect_type.as_str() {
                 "activation_cost_increase" => {
-                    self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
+                    self.prohibition_effects
+                        .retain(|p| !p.contains(&effect.effect_type));
                 }
                 "activation_cost_decrease" => {
-                    self.prohibition_effects.retain(|p| !p.contains(&effect.effect_type));
+                    self.prohibition_effects
+                        .retain(|p| !p.contains(&effect.effect_type));
                 }
                 s if s.starts_with("gain_blade") => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {
                             for card_data in cards {
-                                if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
-                                    if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
-                                        self.mods.remove_blade_modifier(card_id as i16, amount as i32);
-                                        eprintln!("Reverted {} blades from card {}", amount, card_id);
+                                if let Some(card_id) =
+                                    card_data.get("card_id").and_then(|v| v.as_i64())
+                                {
+                                    if let Some(amount) =
+                                        card_data.get("amount").and_then(|v| v.as_i64())
+                                    {
+                                        self.mods
+                                            .remove_blade_modifier(card_id as i16, amount as i32);
+                                        eprintln!(
+                                            "Reverted {} blades from card {}",
+                                            amount, card_id
+                                        );
                                     }
                                 }
                             }
                         } else if let Some(card_data) = data.as_object() {
-                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
-                                if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
-                                    self.mods.remove_blade_modifier(card_id as i16, amount as i32);
+                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64())
+                            {
+                                if let Some(amount) =
+                                    card_data.get("amount").and_then(|v| v.as_i64())
+                                {
+                                    self.mods
+                                        .remove_blade_modifier(card_id as i16, amount as i32);
                                     eprintln!("Reverted {} blades from card {}", amount, card_id);
                                 }
                             }
@@ -501,22 +651,49 @@ impl GameState {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(cards) = data.as_array() {
                             for card_data in cards {
-                                if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
-                                    if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
-                                        let color_str = card_data.get("color").and_then(|v| v.as_str()).unwrap_or("heart01");
+                                if let Some(card_id) =
+                                    card_data.get("card_id").and_then(|v| v.as_i64())
+                                {
+                                    if let Some(amount) =
+                                        card_data.get("amount").and_then(|v| v.as_i64())
+                                    {
+                                        let color_str = card_data
+                                            .get("color")
+                                            .and_then(|v| v.as_str())
+                                            .unwrap_or("heart01");
                                         let color = crate::zones::parse_heart_color(color_str);
-                                        self.mods.remove_heart_modifier(card_id as i16, color, amount as i32);
-                                        eprintln!("Reverted {} hearts from card {} (color {:?})", amount, card_id, color);
+                                        self.mods.remove_heart_modifier(
+                                            card_id as i16,
+                                            color,
+                                            amount as i32,
+                                        );
+                                        eprintln!(
+                                            "Reverted {} hearts from card {} (color {:?})",
+                                            amount, card_id, color
+                                        );
                                     }
                                 }
                             }
                         } else if let Some(card_data) = data.as_object() {
-                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
-                                if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
-                                    let color_str = card_data.get("color").and_then(|v| v.as_str()).unwrap_or("heart01");
+                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64())
+                            {
+                                if let Some(amount) =
+                                    card_data.get("amount").and_then(|v| v.as_i64())
+                                {
+                                    let color_str = card_data
+                                        .get("color")
+                                        .and_then(|v| v.as_str())
+                                        .unwrap_or("heart01");
                                     let color = crate::zones::parse_heart_color(color_str);
-                                    self.mods.remove_heart_modifier(card_id as i16, color, amount as i32);
-                                    eprintln!("Reverted {} hearts from card {} (color {:?})", amount, card_id, color);
+                                    self.mods.remove_heart_modifier(
+                                        card_id as i16,
+                                        color,
+                                        amount as i32,
+                                    );
+                                    eprintln!(
+                                        "Reverted {} hearts from card {} (color {:?})",
+                                        amount, card_id, color
+                                    );
                                 }
                             }
                         }
@@ -580,7 +757,11 @@ impl GameState {
     }
 
     pub fn mark_replacement_effect_applied(&mut self, card_id: i16) {
-        if let Some(effect) = self.replacement_effects.iter_mut().find(|e| e.card_id == card_id) {
+        if let Some(effect) = self
+            .replacement_effects
+            .iter_mut()
+            .find(|e| e.card_id == card_id)
+        {
             effect.applied_this_event = true;
         }
     }
@@ -655,4 +836,3 @@ impl GameState {
         self.loop_detected
     }
 }
-

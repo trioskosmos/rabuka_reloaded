@@ -2351,6 +2351,58 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
 
+        // Handle specific card_no target with no destination specified:
+        // find the card's current position and create a destination choice.
+        if effect.target_member.is_some() && position_str.is_empty() {
+            let target_m = target.to_string();
+            let card_no = effect.target_member.as_deref().unwrap_or("").to_string();
+            let optional = effect.optional.unwrap_or(false);
+            let card_db = self.game_state.card_database.clone();
+            // Collect stage card info before mutable borrow
+            let stage_snapshot: Vec<(i16, String)> = {
+                let player = self.game_state.resolve_target_player_mut(&target_m);
+                (0..3)
+                    .filter_map(|i| {
+                        let cid = player.stage.stage[i];
+                        if cid == -1 {
+                            None
+                        } else {
+                            let cn = card_db
+                                .get_card(cid)
+                                .map(|c| c.card_no.clone())
+                                .unwrap_or_default();
+                            Some((cid, cn))
+                        }
+                    })
+                    .collect()
+            };
+            let target_pos = stage_snapshot.iter().position(|(_, cn)| cn == &card_no);
+            if let Some(current_idx) = target_pos {
+                let card_id = stage_snapshot[current_idx].0;
+                let pos_name = match current_idx {
+                    0 => "Left",
+                    1 => "Center",
+                    _ => "Right",
+                };
+                let card_name = card_db
+                    .get_card(card_id)
+                    .map(|c| c.name.clone())
+                    .unwrap_or_else(|| "member".to_string());
+                if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some(format!("position_change:self:{}", card_no));
+                }
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "position|destination".to_string(),
+                    description: format!(
+                        "Choose destination for {} (currently at {})",
+                        card_name, pos_name
+                    ),
+                    allow_skip: optional,
+                });
+            }
+            return Ok(());
+        }
+
         let card_db = self.card_db();
         let player = self.game_state.resolve_target_player_mut(target);
         let target_index = match position_str {

@@ -1,7 +1,7 @@
-use crate::card::Ability;
 use crate::ability::types::Choice;
-use crate::game_state::AbilityTrigger;
 use crate::ability::types::ExecutionContext;
+use crate::card::Ability;
+use crate::game_state::AbilityTrigger;
 
 /// Unique identifier for an ability instance in the queue
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -52,6 +52,8 @@ pub struct AbilityQueueEntry {
     pub execution_context: Option<ExecutionContext>,
     /// Cards selected across sequential steps (for exclude_selected)
     pub selected_card_ids: Vec<i16>,
+    /// Whether the effect has started executing (prevents re-processing)
+    pub effect_started: bool,
 }
 
 /// Unified ability queue with proper state management
@@ -142,7 +144,9 @@ impl AbilityQueue {
         while self.current_index < self.entries.len() {
             let entry = &self.entries[self.current_index];
             if !entry.completed {
-                self.state = QueueState::PayingCost { entry_index: self.current_index };
+                self.state = QueueState::PayingCost {
+                    entry_index: self.current_index,
+                };
                 return true;
             }
             self.current_index += 1;
@@ -154,7 +158,8 @@ impl AbilityQueue {
     pub fn pause_for_choice(&mut self, choice: Choice) {
         let choice_clone = choice.clone();
         match &mut self.state {
-            QueueState::PayingCost { entry_index } | QueueState::ExecutingEffect { entry_index } => {
+            QueueState::PayingCost { entry_index }
+            | QueueState::ExecutingEffect { entry_index } => {
                 self.state = QueueState::WaitingForChoice {
                     entry_index: *entry_index,
                     choice: choice_clone,
@@ -171,7 +176,9 @@ impl AbilityQueue {
                 if let Some(entry) = self.entries.get_mut(*entry_index) {
                     entry.pending_choice_result = Some(result);
                 }
-                self.state = QueueState::ExecutingEffect { entry_index: *entry_index };
+                self.state = QueueState::ExecutingEffect {
+                    entry_index: *entry_index,
+                };
             }
             _ => {}
         }
@@ -219,4 +226,3 @@ impl Default for AbilityQueue {
         Self::new()
     }
 }
-
