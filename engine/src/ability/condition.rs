@@ -815,7 +815,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             };
             // Check if any member on the target player's stage has the target orientation
             let orientation_check = |card_id: i16| -> bool {
-                let o = self.game_state.get_orientation_modifier(card_id);
+                let o = self.game_state.mods.get_orientation_modifier(card_id);
                 match (from, to) {
                     ("active", "wait") => o.map_or(false, |s| s == "wait"),
                     ("wait", "active") => o.map_or(true, |s| s == "active"),

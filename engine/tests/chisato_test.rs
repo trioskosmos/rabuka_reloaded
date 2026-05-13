@@ -147,11 +147,11 @@ fn chisato_q78_ability_lost_on_leave() {
     // Now move Chisato to waitroom (simulating leaving stage)
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(chisato);
-    game.state.clear_modifiers_for_card(chisato);
+    game.state.mods.clear_all_for_card(chisato);
 
     // After leaving stage, the gained ability should be gone
     // (The score modifier should also be cleared)
-    let score_mod = game.state.get_score_modifier(chisato);
+    let score_mod = game.state.mods.get_score_modifier(chisato);
     assert_eq!(score_mod, 0,
         "Q78: Score boost should be lost when member leaves stage");
 }

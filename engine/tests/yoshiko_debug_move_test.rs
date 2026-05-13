@@ -68,4 +68,20 @@ fn test_yoshiko_debug_move_execution() {
     println!("Stage: {:?}", game.player().stage.stage);
     println!("Hand: {:?}", game.player().hand.cards);
     println!("Discard: {:?}", game.player().waitroom.cards);
+
+    // Filter should match only Chika (Aqours member_card excluding Yoshiko)
+    assert_eq!(matching_indices, vec![0usize],
+        "filter should match only Chika at index 0 (Yoshiko excluded)");
+    assert_eq!(stage_data[matching_indices[0]], chika,
+        "matched card should be Chika");
+
+    // After activation: Yoshiko's cost sets self to wait but doesn't remove from stage
+    let after_stage = game.player().stage.stage.clone();
+    assert_eq!(after_stage[0], chika, "Chika should remain on left side");
+    assert_eq!(after_stage[1], yoshiko, "Yoshiko stays on center (set to wait, not removed from stage)");
+
+    // Yoshiko should NOT be in waitroom (wait cost doesn't remove from stage)
+    let after_waitroom = &game.player().waitroom.cards;
+    assert!(!after_waitroom.contains(&yoshiko),
+        "Yoshiko should NOT be in waitroom (wait doesn't remove from stage)");
 }

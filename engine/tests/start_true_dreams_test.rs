@@ -40,11 +40,16 @@ fn start_true_dreams_q66_opponent_no_card_score_higher() {
         game.state.player2.main_deck.cards.push(filler);
     }
 
+    // Seed energy_deck so the ability can place energy
+    for _ in 0..5 { game.state.player1.energy_deck.cards.push(game.id("LL-E-001-SD")); }
+    let energy_before = game.state.player1.energy_zone.cards.len();
+
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(start);
     advance_to_live_success(&mut game);
 
     // LiveSuccess fired and condition evaluated true (P1 has card, P2 doesn't).
-    // The ability tries to move from energy_deck → energy_zone.
-    // Verify the condition passed by checking the LiveSuccess triggered.
+    // The ability should have moved 1 energy from energy_deck → energy_zone.
+    assert_eq!(game.state.player1.energy_zone.cards.len(), energy_before + 1,
+        "Q66: Should place 1 energy when opponent has no live card");
 }

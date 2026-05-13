@@ -54,12 +54,11 @@ fn link_to_future_three_distinct_members_plus_6() {
     advance_to_live_start(&mut game);
 
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    let score_mod = game.state.get_score_modifier(live_card_id);
+    let score_mod = game.state.mods.get_score_modifier(live_card_id);
 
-    eprintln!("[LINK] Score mod with 3 distinct 蓮ノ空 members: {}", score_mod);
-    if score_mod == 6 {
-        eprintln!("[LINK] ✓ +6 score for 3 distinct members");
-    }
+    assert_eq!(score_mod, 6,
+        "3 distinct 蓮ノ空 members should give +6 score mod (2 each)");
+    eprintln!("[LINK] Score mod with 3 distinct 蓮ノ空 members: {} ✓", score_mod);
 }
 
 /// LiveStart with 1 蓮ノ空 member → +2 score.
@@ -87,9 +86,11 @@ fn link_to_future_one_member_plus_2() {
     advance_to_live_start(&mut game);
 
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    let score_mod = game.state.get_score_modifier(live_card_id);
+    let score_mod = game.state.mods.get_score_modifier(live_card_id);
 
-    eprintln!("[LINK] Score mod with 1 member: {}", score_mod);
+    assert_eq!(score_mod, 2,
+        "1 蓮ノ空 member should give +2 score mod");
+    eprintln!("[LINK] Score mod with 1 member: {} ✓", score_mod);
 }
 
 /// LiveStart with 0 蓮ノ空 members → +0 score added on top of base score 0.
@@ -116,7 +117,7 @@ fn link_to_future_zero_members_score_0() {
     advance_to_live_start(&mut game);
 
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    let score_mod = game.state.get_score_modifier(live_card_id);
+    let score_mod = game.state.mods.get_score_modifier(live_card_id);
 
     assert_eq!(score_mod, 0,
         "Score should be 0 when no 蓮ノ空 members on stage");

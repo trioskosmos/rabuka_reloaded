@@ -49,17 +49,17 @@ fn fuyumari_q118_opponent_picks_first_card() {
     assert!(game.has_pending_choice(), "Should have opponent select choice");
     game.select_option(0);
 
-    // Step 3: Only the opponent-chosen card (live_a) should be in hand
+    // Step 3: Opponent's chosen card (live_a, index 0 of selected_cards) goes to hand
     assert!(game.state.player1.hand.cards.contains(&live_a),
         "Opponent-chosen card (live_a) should be in hand");
-    assert!(!game.state.player1.hand.cards.contains(&live_b),
-        "live_b was not chosen by opponent, should NOT be in hand");
-    // live_a moved from discard to hand, live_b stays in discard
+    assert!(!game.state.player1.waitroom.cards.contains(&live_a),
+        "live_a should be removed from discard");
     assert!(game.state.player1.waitroom.cards.contains(&live_b),
-        "live_b should still be in discard");
+        "live_b stays in discard (not chosen by opponent)");
+    assert!(!game.state.player2.hand.cards.contains(&live_a),
+        "live_a should go to player1's hand, not opponent");
 }
 
-/// Opponent picks the SECOND card (index 1) — verify opponent's choice actually matters.
 #[test]
 fn fuyumari_q118_opponent_picks_second_card() {
     let db = load_real_database();
@@ -86,13 +86,13 @@ fn fuyumari_q118_opponent_picks_second_card() {
     assert!(game.has_pending_choice(), "Should have opponent select choice");
     game.select_option(1);
 
-    // Step 3: Only live_b should be in hand
+    // Step 3: Opponent's chosen card (live_b, index 1 of selected_cards) goes to hand
     assert!(game.state.player1.hand.cards.contains(&live_b),
         "Opponent-chosen card (live_b) should be in hand");
-    assert!(!game.state.player1.hand.cards.contains(&live_a),
-        "live_a was not chosen, should NOT be in hand");
+    assert!(!game.state.player1.waitroom.cards.contains(&live_b),
+        "live_b should be removed from discard");
     assert!(game.state.player1.waitroom.cards.contains(&live_a),
-        "live_a should still be in discard");
+        "live_a stays in discard (not chosen by opponent)");
 }
 
 /// Only 1 unique live card available → can't select 2 → effect does nothing.
@@ -146,14 +146,14 @@ fn fuyumari_q118_card_count_integrity() {
 
     game.select_indices(&[0, 1]);
     if game.has_pending_choice() {
-        game.select_option(0);
+        game.select_indices(&[0]);  // opponent selects first of the two
     }
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 
     let total_after = total_cards(&game.state.player1);
-    assert_eq!(total_after, total_before, "Total card count unchanged");
+    assert_eq!(total_after, total_before, "Total card count unchanged for player1");
 }
 
 fn total_cards(p: &rabuka_engine::player::Player) -> usize {

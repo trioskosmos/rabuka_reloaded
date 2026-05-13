@@ -47,7 +47,10 @@ fn love_u_q192_live_success_condition_evaluated() {
     // LiveSuccess fires — condition evaluated. With card_property has_all_blade
     // and revealed_cards location, the condition check runs through the
     // card_count_condition evaluator.
-    // At minimum, verify no crash and ability fires.
+    // Verify the live card survived LiveSuccess without crashing
+    assert!(!game.state.player1.success_live_card_zone.cards.is_empty() ||
+            !game.state.player1.live_card_zone.cards.is_empty(),
+        "Live card should have survived LiveSuccess phase");
 }
 
 

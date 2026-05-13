@@ -29,7 +29,7 @@ fn kanon_q106_debut_recover_from_discard() {
     game.play_to_stage(kanon, rabuka_engine::zones::MemberArea::Center);
 
     let recovered = game.state.player1.hand.cards.contains(&liella);
-    eprintln!("[KANON] Liella! card recovered from discard: {}", recovered);
+    assert!(recovered, "card should have been recovered from discard");
     assert!(game.state.player1.stage.stage.contains(&kanon),
         "Kanon should be on stage after debut");
 }

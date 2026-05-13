@@ -27,7 +27,7 @@ fn eri_q144_up_to_semantics_1_eligible_opponent_still_works() {
     game.add_to_hand(filler);
     game.give_energy(15);
 
-    assert_eq!(game.state.get_orientation_modifier(eligible), None,
+    assert_eq!(game.state.mods.get_orientation_modifier(eligible), None,
         "Before activation: eligible member is active on opponent's stage");
 
     game.play_to_stage(eri, MemberArea::Center);
@@ -44,7 +44,7 @@ fn eri_q144_up_to_semantics_1_eligible_opponent_still_works() {
 
     // Q144: Only 1 eligible member existed, but the ability activates
     // and puts that member to wait — "up to 2" is an upper bound
-    let orientation = game.state.get_orientation_modifier(eligible);
+    let orientation = game.state.mods.get_orientation_modifier(eligible);
     assert_eq!(orientation, Some(&"wait".to_string()),
         "1 eligible opponent member was put to wait — 'up to 2' is an upper bound");
 }

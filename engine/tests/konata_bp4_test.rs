@@ -14,7 +14,7 @@ fn konata_bp4_q188_placed_in_wait_no_trigger() {
     for _ in 0..30 { game.state.player1.main_deck.cards.push(filler); }
 
     game.state.player1.stage.stage = [konata, filler, filler];
-    game.state.add_orientation_modifier(konata, "wait");
+    game.state.mods.add_orientation_modifier(konata, "wait");
 
     rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
         &mut game.state, "p1");

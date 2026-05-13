@@ -27,6 +27,20 @@ fn test_yoshiko_group_matching() {
             // Test the actual function used by abilities
             let matches = rabuka_engine::ability::util::card_matches_group_str(&game.state.card_database, card_id, Some("Aqours"));
             println!("{} matches 'Aqours': {}", name, matches);
+            assert!(matches, "{} should match group 'Aqours'", name);
+        } else {
+            panic!("Card not found in database for {}", name);
         }
+    }
+
+    // Verify all three cards pass the full filter_from_parts too
+    for &card_id in &[yoshiko, chika, riko] {
+        let filter = rabuka_engine::ability::util::filter_from_parts_full(
+            Some("member_card"),
+            Some("Aqours"),
+            None, None, None, None, None, None,
+        );
+        assert!(filter.matches(&game.state.card_database, card_id, true),
+            "all Aqours cards should match member_card+Aqours filter");
     }
 }

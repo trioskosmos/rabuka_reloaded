@@ -49,7 +49,7 @@ fn rin_activate_places_energy_under_draws_heart() {
         "drew 1 card");
 
     // heart01 modifier
-    assert_eq!(game.state.get_heart_modifier(rin, rabuka_engine::card::HeartColor::Heart01), 1,
+    assert_eq!(game.state.mods.get_heart_modifier(rin, rabuka_engine::card::HeartColor::Heart01), 1,
         "+1 heart01 modifier");
 }
 
@@ -70,7 +70,7 @@ fn rin_turn1_use_limit() {
     game.give_energy(10);
 
     game.activate_ability(rin);
-    assert_eq!(game.state.get_heart_modifier(rin, rabuka_engine::card::HeartColor::Heart01), 1,
+    assert_eq!(game.state.mods.get_heart_modifier(rin, rabuka_engine::card::HeartColor::Heart01), 1,
         "+1 after first activation");
 
     let _ = TurnEngine::execute_main_phase_action(
@@ -78,7 +78,7 @@ fn rin_turn1_use_limit() {
         Some(rin), None, None, None,
     );
 
-    assert_eq!(game.state.get_heart_modifier(rin, rabuka_engine::card::HeartColor::Heart01), 1,
+    assert_eq!(game.state.mods.get_heart_modifier(rin, rabuka_engine::card::HeartColor::Heart01), 1,
         "still +1 after second activation skipped (use_limit)");
 }
 

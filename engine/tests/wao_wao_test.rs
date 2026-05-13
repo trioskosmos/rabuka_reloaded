@@ -36,9 +36,9 @@ fn wao_wao_q178_activate_3_printemps_score_plus_1() {
 
     // Stage: 3 Printemps members in wait (left, center, right)
     game.state.player1.stage.stage = [printemps_a, printemps_b, printemps_c];
-    game.state.add_orientation_modifier(printemps_a, "wait");
-    game.state.add_orientation_modifier(printemps_b, "wait");
-    game.state.add_orientation_modifier(printemps_c, "wait");
+    game.state.mods.add_orientation_modifier(printemps_a, "wait");
+    game.state.mods.add_orientation_modifier(printemps_b, "wait");
+    game.state.mods.add_orientation_modifier(printemps_c, "wait");
 
     // Hand: WAO-WAO as the live card for this performance
     game.state.player1.hand.cards.push(wao_wao);
@@ -52,19 +52,19 @@ fn wao_wao_q178_activate_3_printemps_score_plus_1() {
     game.pass();
     game.pass();
 
-    // All 3 Printemps should now be active (None or Some("active"))
-    let o_a = game.state.get_orientation_modifier(printemps_a);
-    assert!(o_a.is_none() || o_a.unwrap() == "active",
+    // All 3 Printemps should now be active ("active" string modifier = active state)
+    let o_a = game.state.mods.get_orientation_modifier(printemps_a);
+    assert!(o_a.map(|s| s.as_str()) == Some("active"),
         "printemps_a should be active, got {:?}", o_a);
-    let o_b = game.state.get_orientation_modifier(printemps_b);
-    assert!(o_b.is_none() || o_b.unwrap() == "active",
+    let o_b = game.state.mods.get_orientation_modifier(printemps_b);
+    assert!(o_b.map(|s| s.as_str()) == Some("active"),
         "printemps_b should be active, got {:?}", o_b);
-    let o_c = game.state.get_orientation_modifier(printemps_c);
-    assert!(o_c.is_none() || o_c.unwrap() == "active",
+    let o_c = game.state.mods.get_orientation_modifier(printemps_c);
+    assert!(o_c.map(|s| s.as_str()) == Some("active"),
         "printemps_c should be active, got {:?}", o_c);
 
     // 3 wait→active → score +1
-    let score_mod = game.state.get_score_modifier(wao_wao);
+    let score_mod = game.state.mods.get_score_modifier(wao_wao);
     assert_eq!(score_mod, 1,
         "3 wait members activated → score +1");
 }
@@ -95,7 +95,7 @@ fn wao_wao_q178_already_active_no_change() {
     game.pass();
     game.pass();
 
-    let score_mod = game.state.get_score_modifier(wao_wao);
+    let score_mod = game.state.mods.get_score_modifier(wao_wao);
     assert_eq!(score_mod, 0,
         "0 wait members changed → no score boost");
 }
@@ -114,8 +114,8 @@ fn wao_wao_q179_only_2_wait_to_active_no_score() {
 
     // Stage: 2 wait + 1 already active
     game.state.player1.stage.stage = [printemps_a, printemps_b, printemps_c];
-    game.state.add_orientation_modifier(printemps_a, "wait");
-    game.state.add_orientation_modifier(printemps_b, "wait");
+    game.state.mods.add_orientation_modifier(printemps_a, "wait");
+    game.state.mods.add_orientation_modifier(printemps_b, "wait");
     // printemps_c stays active (no modifier)
 
     game.state.player1.hand.cards.push(wao_wao);
@@ -130,7 +130,7 @@ fn wao_wao_q179_only_2_wait_to_active_no_score() {
     game.pass();
 
     // Only 2 changed from wait→active → condition requires 3+ → no score
-    let score_mod = game.state.get_score_modifier(wao_wao);
+    let score_mod = game.state.mods.get_score_modifier(wao_wao);
     assert_eq!(score_mod, 0,
         "Only 2 wait members changed, condition requires 3+");
 }

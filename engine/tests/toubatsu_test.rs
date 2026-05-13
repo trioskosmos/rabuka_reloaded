@@ -39,17 +39,26 @@ fn toubatsu_q118_2_distinct_live_cards_works() {
         game.select_indices(&[0, 1]);
     }
 
-    // After selection, the opponent chooses 1 → it goes to hand
+    // After selection, the opponent chooses 1 → it goes to opponent's hand
     // Handle opponent choice if present
     if game.has_pending_choice() {
-        game.select_option(0); // opponent selects first card
+        game.select_indices(&[0]); // opponent selects first card (index in selected_cards)
     }
 
-    // One of the live cards should now be in hand
+    // After selection, the opponent chooses 1 → it goes to opponent's hand
+    // Handle opponent choice if present
+    if game.has_pending_choice() {
+        game.select_indices(&[0]); // opponent selects first card (index in selected_cards)
+    }
+
+    // One card should be in player1's hand (the opponent's chosen card goes to the player)
     let in_hand = game.state.player1.hand.cards.contains(&live_a)
         || game.state.player1.hand.cards.contains(&live_b);
     assert!(in_hand,
-        "One of the 2 distinct live cards should be added to hand");
+        "One of the 2 distinct live cards should be added to hand by opponent choice");
+    assert!(!game.state.player1.waitroom.cards.contains(&live_a)
+        || !game.state.player1.waitroom.cards.contains(&live_b),
+        "At least one live card should have moved out of discard");
 }
 
 /// Q118: Only 1 live card in discard → ability fails, nothing added to hand.

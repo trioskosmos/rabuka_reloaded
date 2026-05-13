@@ -36,4 +36,32 @@ fn test_yoshiko_card_identities() {
     game.add_to_stage(MemberArea::RightSide, riko);
     
     println!("Stage setup: {:?}", game.player().stage.stage);
+
+    // Verify card identities
+    assert!(yoshiko > 0, "Yoshiko card ID should be valid");
+    assert!(chika > 0, "Chika card ID should be valid");
+    assert!(riko > 0, "Riko card ID should be valid");
+
+    if let Some(yoshiko_card) = game.state.card_database.get_card(yoshiko) {
+        assert_eq!(yoshiko_card.unit.as_deref(), Some("GuiltyKiss"),
+            "Yoshiko should belong to GuiltyKiss unit");
+        assert!(yoshiko_card.name.contains("善子") || yoshiko_card.name.contains("Yoshiko"),
+            "Card name should reference Yoshiko");
+    }
+
+    if let Some(chika_card) = game.state.card_database.get_card(chika) {
+        assert!(chika_card.unit.as_deref().map(|u| u.contains("CYaRon")).unwrap_or(false),
+            "Chika should belong to CYaRon!! unit, got {:?}", chika_card.unit);
+    }
+
+    if let Some(riko_card) = game.state.card_database.get_card(riko) {
+        assert_eq!(riko_card.unit.as_deref(), Some("GuiltyKiss"),
+            "Riko should belong to GuiltyKiss unit");
+    }
+
+    // Verify stage placement
+    let stage = &game.player().stage.stage;
+    assert_eq!(stage[0], chika, "LeftSide should be Chika");
+    assert_eq!(stage[1], yoshiko, "Center should be Yoshiko");
+    assert_eq!(stage[2], riko, "RightSide should be Riko");
 }

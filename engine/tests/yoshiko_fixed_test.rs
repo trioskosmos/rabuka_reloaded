@@ -48,7 +48,7 @@ fn test_yoshiko_with_choice_handling() {
     
     // Verify results
     assert!(game.player().stage.stage[1] == yoshiko, "Yoshiko should still be on stage in wait state");
-    assert!(game.player().hand.cards.len() < 1, "Hand card should be discarded");
+    assert_eq!(game.player().hand.cards.len(), 0, "Hand card should be discarded");
     assert!(game.player().waitroom.cards.contains(&hand_card), "Hand card should be in discard");
     
     // Verify core ability mechanics are working (costs paid, choices triggered)

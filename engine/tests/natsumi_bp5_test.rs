@@ -75,7 +75,7 @@ fn natsumi_bp5_q222_repeat_continues_after_wait() {
         deck_before - deck_after);
 
     // Natsumi should be in wait state (every discard by ability was a live card)
-    let orientation = game.state.get_orientation_modifier(natsumi);
+    let orientation = game.state.mods.get_orientation_modifier(natsumi);
     assert_eq!(orientation, Some(&"wait".to_string()),
         "Q222: Natsumi should be in wait state after live card discards");
 }

@@ -47,5 +47,5 @@ fn test_yoshiko_debug_behavior() {
     println!("Hand card discarded: {}", hand_card_discarded);
     println!("Someone in discard: {}", someone_in_discard);
     
-    // Don't assert anything, just observe what happens
+    assert_eq!(game.state.player1.hand.cards.len(), 0, "hand card was discarded as cost, no card drawn back");
 }

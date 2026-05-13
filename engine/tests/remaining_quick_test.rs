@@ -91,6 +91,6 @@ fn cara_tesoro_q203_live_start_fires() {
     game.pass();
     while game.has_pending_choice() { game.select_option(0); }
 
-    let mod_val = game.state.get_score_modifier(cara);
+    let mod_val = game.state.mods.get_score_modifier(cara);
     assert!(mod_val >= 0, "Q203: Score modifier evaluated");
 }

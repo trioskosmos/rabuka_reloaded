@@ -61,7 +61,7 @@ fn kanata_live_success_with_others_waits_self() {
 
     // The engine's LiveSuccess condition checks "stage.self" for other members.
     // With another member present, the LiveSuccess ability should fire.
-    let _kanata_orien = game.state.get_orientation_modifier(kanata);
+    let _kanata_orien = game.state.mods.get_orientation_modifier(kanata);
     // Engine may or may not set wait depending on implementation details,
     // but the ability should have been triggered without crashing.
     // At minimum, verify the game state is consistent.
@@ -98,7 +98,7 @@ fn kanata_live_success_no_others_condition_checked() {
 
     game.pass(); game.pass(); game.pass();
 
-    let _kanata_orien = game.state.get_orientation_modifier(kanata);
+    let _kanata_orien = game.state.mods.get_orientation_modifier(kanata);
     // When alone on stage, the condition should fail (no other members)
     // Kanata should not have been waited by this ability
     assert!(game.state.player1.stage.stage.contains(&kanata),

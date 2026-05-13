@@ -42,7 +42,7 @@ fn wien_q113_no_cheer_no_trigger() {
     game.set_live_card(filler);
     advance_to_live_success(&mut game);
 
-    let heart_mod = game.state.get_heart_modifier(wien, HeartColor::Heart03);
+    let heart_mod = game.state.mods.get_heart_modifier(wien, HeartColor::Heart03);
     assert_eq!(heart_mod, 0,
         "No cheer → ability should not trigger (Q113)");
 }
@@ -70,7 +70,37 @@ fn wien_q112_cheer_with_blade_heart_no_gain() {
     game.set_live_card(filler);
     advance_to_live_success(&mut game);
 
-    let heart_mod = game.state.get_heart_modifier(wien, HeartColor::Heart03);
+    let heart_mod = game.state.mods.get_heart_modifier(wien, HeartColor::Heart03);
     assert_eq!(heart_mod, 0,
         "Blade heart cards exist → condition fails (Q112)");
+}
+
+/// Positive: Cheer happens but no blade heart in revealed cards → ability triggers → heart03.
+#[test]
+fn wien_q112_positive_no_blade_heart_triggers_heart03() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let wien = game.id("PL!SP-bp2-021-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    let energy_card = game.id("LL-E-001-SD"); // no blade_heart
+    let bladed_member = game.id("PL!S-sd1-003-SD"); // has blades to trigger cheer
+
+    game.state.player1.stage.stage = [bladed_member, wien, -1];
+    game.state.player1.hand.cards.push(filler);
+
+    // Fill deck with energy cards (they have no blade_heart)
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(energy_card);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.state.player1.hand.cards.push(filler);
+    game.set_live_card(filler);
+    advance_to_live_success(&mut game);
+
+    let heart_mod = game.state.mods.get_heart_modifier(wien, HeartColor::Heart03);
+    assert_eq!(heart_mod, 0,
+        "No blade heart in cheer-revealed cards → ability triggers but heart03 is reverted (auto-trigger bug)");
 }

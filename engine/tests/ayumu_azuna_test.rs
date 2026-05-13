@@ -61,11 +61,11 @@ fn azuna_q158_blade_all_members() {
         game.select_option(1);
     }
 
-    assert_eq!(game.state.get_blade_modifier(member_left), 2,
+    assert_eq!(game.state.mods.get_blade_modifier(member_left), 2,
         "Left member +2 blade (Q158)");
-    assert_eq!(game.state.get_blade_modifier(ayumu), 2,
+    assert_eq!(game.state.mods.get_blade_modifier(ayumu), 2,
         "Center member +2 blade (Q158)");
-    assert_eq!(game.state.get_blade_modifier(member_right), 2,
+    assert_eq!(game.state.mods.get_blade_modifier(member_right), 2,
         "Right member +2 blade (Q158)");
 }
 
@@ -90,7 +90,7 @@ fn azuna_q158_blade_single_member() {
         game.select_option(1);
     }
 
-    assert_eq!(game.state.get_blade_modifier(ayumu), 2);
+    assert_eq!(game.state.mods.get_blade_modifier(ayumu), 2);
 }
 
 /// select_option(0) = skip → no place_energy → no conditional (blade stays 0)
@@ -114,7 +114,7 @@ fn azuna_q158_blade_not_gained_if_energy_not_placed() {
         game.select_option(0);
     }
 
-    assert_eq!(game.state.get_blade_modifier(ayumu), 0);
+    assert_eq!(game.state.mods.get_blade_modifier(ayumu), 0);
 }
 
 /// Q157: Wait energy CAN be placed (any energy state works)
@@ -144,7 +144,7 @@ fn azuna_q157_energy_under_member_uses_any_energy() {
         game.select_option(1);
     }
 
-    assert_eq!(game.state.get_blade_modifier(ayumu), 2,
+    assert_eq!(game.state.mods.get_blade_modifier(ayumu), 2,
         "Q157: Blade works with any energy type");
 }
 

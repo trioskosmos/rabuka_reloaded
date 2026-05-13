@@ -36,13 +36,13 @@ fn shizuku_q196_draw_after_discard_cost() {
 
     while game.has_pending_choice() { game.select_indices(&[0]); }
 
-    // Energy cost paid (15-2=13 max)
-    assert!(game.state.player1.energy_zone.active_energy_count <= 13,
-        "2 energy should have been paid");
+    // Energy cost paid (15-2=13)
+    assert_eq!(game.state.player1.energy_zone.active_energy_count, 13,
+        "2 energy should have been paid (15-2=13)");
 
     // Card drawn from deck
-    assert!(game.state.player1.main_deck.cards.len() < deck_before,
-        "At least 1 card should have been drawn from deck");
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 1,
+        "1 card should have been drawn from deck");
 }
 
 /// Test that ability cannot activate from stage (requires hand)

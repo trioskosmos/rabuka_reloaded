@@ -45,12 +45,12 @@ fn chisato_q126_area_move_triggers_energy_placement() {
     // Q126: area move should trigger the auto ability,
     // placing 1 energy card from energy deck → energy zone
     let energy_after = game.state.player1.energy_zone.cards.len();
-    assert!(energy_after > energy_before,
-        "Area move should trigger energy placement: {} → {}",
+    assert_eq!(energy_after, energy_before + 1,
+        "Area move should trigger 1 energy placement: {} → {}",
         energy_before, energy_after);
 
     let energy_deck_after = game.state.player1.energy_deck.cards.len();
-    assert!(energy_deck_after < energy_deck_before,
+    assert_eq!(energy_deck_after, energy_deck_before - 1,
         "Energy deck should lose 1 card: {} → {}",
         energy_deck_before, energy_deck_after);
 }

@@ -45,7 +45,7 @@ fn awake_q36_10_plus_hasetsu_cheers_score_plus_1() {
     advance_to_live_start(&mut game);
     game.pass(); game.pass(); game.pass();
 
-    let score_mod = game.state.get_score_modifier(awake);
+    let score_mod = game.state.mods.get_score_modifier(awake);
     assert_eq!(score_mod, 1,
         "10+ 蓮ノ空 members in cheered cards → score +1 (got {})", score_mod);
 }
@@ -72,7 +72,7 @@ fn awake_q36_low_cheers_no_score() {
     advance_to_live_start(&mut game);
     game.pass(); game.pass(); game.pass();
 
-    assert_eq!(game.state.get_score_modifier(awake), 0,
+    assert_eq!(game.state.mods.get_score_modifier(awake), 0,
         "<10 cheered cards → no score");
 }
 
@@ -99,7 +99,7 @@ fn awake_q36_non_hasetsu_cheered_no_score() {
     advance_to_live_start(&mut game);
     game.pass(); game.pass(); game.pass();
 
-    assert_eq!(game.state.get_score_modifier(awake), 0,
+    assert_eq!(game.state.mods.get_score_modifier(awake), 0,
         "Non-蓮ノ空 cheered cards should NOT count toward 10");
 }
 

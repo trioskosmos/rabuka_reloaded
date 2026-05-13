@@ -44,14 +44,23 @@ fn kaguya_live_success_cheer_recover() {
     let kaguya = game.id("PL!-pb1-031-L");
     let member = game.id("PL!-sd1-001-SD");  // μ's member (高坂穂乃果)
     let filler = game.id("PL!-sd1-010-SD");
+    let bladed_member = game.id("PL!S-sd1-003-SD");  // Has blades to trigger cheer
 
     // Stage: 1 member with blade (needed for cheer)
-    game.state.player1.stage.stage = [member, -1, -1];
+    game.state.player1.stage.stage = [bladed_member, -1, -1];
     game.state.player1.hand.cards.push(kaguya);
-    // Deck: put a μ's member in position to be cheer-revealed
+    game.state.player1.hand.cards.push(filler);  // For optional discard cost
+
+    // Deck: need exactly 1 filler before member because:
+    // - LiveCardSetP1Turn replacement draw consumes 1 card from P1's deck
+    // - Yell then draws from index 0 = member = first in revealed_cards
+    // (Odd trivia: the draw phase during the first 5 passes draws from P2, not P1)
     game.state.player1.main_deck.cards.clear();
-    game.state.player1.main_deck.cards.push(member);  // First cheer card
-    for _ in 0..20 { game.state.player1.main_deck.cards.push(filler); }
+    game.state.player1.main_deck.cards.push(filler);  // consumed by replacement draw
+    game.state.player1.main_deck.cards.push(member);   // first yell/revealed card
+    for _ in 0..30 { game.state.player1.main_deck.cards.push(filler); }
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
 
     // Advance to live card set phase
     for _ in 0..5 { game.pass(); }
@@ -62,21 +71,15 @@ fn kaguya_live_success_cheer_recover() {
 
     // After live performance, cheer-revealed cards should be in revealed_cards
     // If the member was cheer-revealed, the ability should add it to hand
-    // (Optional cost is auto-skipped when no cards in hand)
-    if game.has_pending_choice() {
-        // Select the μ's member from revealed cards
+    // Handle all pending choices (cost + revealed_cards selection)
+    while game.has_pending_choice() {
+        // Select the first option whenever prompted
         game.select_indices(&[0]);
     }
 
-    // Verify: the member card was either added to hand or the mechanism worked
-    let member_in_hand = game.state.player1.hand.cards.contains(&member);
-    let member_in_cheer_revealed = game.state.player1_cheer_revealed_cards.contains(&member);
-    let member_in_global_revealed = game.state.revealed_cards.contains(&member);
-    // Card might be consumed during live performance - just verify no crash
-    let ok = member_in_hand || member_in_cheer_revealed || member_in_global_revealed;
-    if !ok {
-        eprintln!("NOTE: member card consumed during live performance (expected in some pipelines)");
-    }
+    // Verify: the μ's member card was recovered to hand by the LiveSuccess ability
+    assert!(game.state.player1.hand.cards.contains(&member),
+        "μ's member should be recovered to hand by kaguya LiveSuccess ability");
 }
 
 /// PL!S-bp2-022-L (未熟DREAMER) Q36: LiveSuccess timing.

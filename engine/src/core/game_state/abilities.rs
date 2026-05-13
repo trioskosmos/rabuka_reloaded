@@ -196,6 +196,34 @@ impl GameState {
         }
     }
 
+    pub fn resolve_target_single<'a>(&'a self, target: &str, perspective_player: &'a Player) -> Option<&'a Player> {
+        match target {
+            "self" | "自分" => Some(perspective_player),
+            "opponent" | "相手" => Some(if std::ptr::eq(perspective_player, &self.player1) { &self.player2 } else { &self.player1 }),
+            _ => None,
+        }
+    }
+
+    pub fn resolve_target_single_mut<'a>(&'a mut self, target: &str, perspective_player: &'a Player) -> Option<&'a mut Player> {
+        match target {
+            "self" | "自分" => {
+                if std::ptr::eq(perspective_player, &self.player1) {
+                    Some(&mut self.player1)
+                } else {
+                    Some(&mut self.player2)
+                }
+            }
+            "opponent" | "相手" => {
+                if std::ptr::eq(perspective_player, &self.player1) {
+                    Some(&mut self.player2)
+                } else {
+                    Some(&mut self.player1)
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub fn resolve_target_player(&self, target: &str) -> &Player {
         let master = self.ability_master_id();
         match (target, master.as_deref()) {
@@ -454,7 +482,7 @@ impl GameState {
                             for card_data in cards {
                                 if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
                                     if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
-                                        self.remove_blade_modifier(card_id as i16, amount as i32);
+                                        self.mods.remove_blade_modifier(card_id as i16, amount as i32);
                                         eprintln!("Reverted {} blades from card {}", amount, card_id);
                                     }
                                 }
@@ -462,7 +490,7 @@ impl GameState {
                         } else if let Some(card_data) = data.as_object() {
                             if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64()) {
                                 if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
-                                    self.remove_blade_modifier(card_id as i16, amount as i32);
+                                    self.mods.remove_blade_modifier(card_id as i16, amount as i32);
                                     eprintln!("Reverted {} blades from card {}", amount, card_id);
                                 }
                             }
@@ -477,7 +505,7 @@ impl GameState {
                                     if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
                                         let color_str = card_data.get("color").and_then(|v| v.as_str()).unwrap_or("heart01");
                                         let color = crate::zones::parse_heart_color(color_str);
-                                        self.remove_heart_modifier(card_id as i16, color, amount as i32);
+                                        self.mods.remove_heart_modifier(card_id as i16, color, amount as i32);
                                         eprintln!("Reverted {} hearts from card {} (color {:?})", amount, card_id, color);
                                     }
                                 }
@@ -487,7 +515,7 @@ impl GameState {
                                 if let Some(amount) = card_data.get("amount").and_then(|v| v.as_i64()) {
                                     let color_str = card_data.get("color").and_then(|v| v.as_str()).unwrap_or("heart01");
                                     let color = crate::zones::parse_heart_color(color_str);
-                                    self.remove_heart_modifier(card_id as i16, color, amount as i32);
+                                    self.mods.remove_heart_modifier(card_id as i16, color, amount as i32);
                                     eprintln!("Reverted {} hearts from card {} (color {:?})", amount, card_id, color);
                                 }
                             }
@@ -497,7 +525,7 @@ impl GameState {
                 "heart_override" => {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
-                            Arc::make_mut(&mut self.mods).remove_heart_override(card_id as i16);
+                            self.mods.remove_heart_override(card_id as i16);
                             eprintln!("Removed heart override for card {}", card_id);
                         }
                     }

@@ -43,7 +43,7 @@ fn ren_ab0_2_liella_among_3_discarded_grants_2_blade() {
     assert_eq!(game.state.player1.waitroom.cards.len(), discard_before + 3);
 
     // Per-unit: (2 Liella! matching / 1 per_unit_count) * 1 count = 2 blade
-    assert_eq!(game.state.get_blade_modifier(ren), 2,
+    assert_eq!(game.state.mods.get_blade_modifier(ren), 2,
         "2 Liella! members among 3 discarded → 2 blade");
 }
 
@@ -64,7 +64,7 @@ fn ren_ab0_no_liella_no_blade() {
 
     game.activate_ability(ren);
 
-    assert_eq!(game.state.get_blade_modifier(ren), 0,
+    assert_eq!(game.state.mods.get_blade_modifier(ren), 0,
         "0 Liella! members discarded → 0 blade");
 }
 
@@ -85,7 +85,7 @@ fn ren_ab0_all_3_liella_grants_3_blade() {
 
     game.activate_ability(ren);
 
-    assert_eq!(game.state.get_blade_modifier(ren), 3,
+    assert_eq!(game.state.mods.get_blade_modifier(ren), 3,
         "3 Liella! members discarded → 3 blade");
 }
 
@@ -106,7 +106,7 @@ fn ren_ab0_blade_duration_live_end() {
 
     game.activate_ability(ren);
 
-    assert_eq!(game.state.get_blade_modifier(ren), 3,
+    assert_eq!(game.state.mods.get_blade_modifier(ren), 3,
         "Blade modifier persists after ability resolves (duration=live_end)");
 }
 
@@ -141,7 +141,7 @@ fn ren_ab0_preexisting_liella_in_discard_inflates_count() {
     // = 2 pre-existing + 1 just placed = 3
     // Expected: 1 (only the 1 placed by cost), Got: 3 (all in discard)
     // This is the known limitation — engine needs cost-result tracking
-    assert_eq!(game.state.get_blade_modifier(ren), 3,
+    assert_eq!(game.state.mods.get_blade_modifier(ren), 3,
         "GOT 3 (all Liella! in discard). Expected 1 (only the 1 placed by cost). \
          Limitation: engine lacks cost-result tracking for per-unit 'discard'.");
 }

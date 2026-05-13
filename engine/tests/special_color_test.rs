@@ -48,7 +48,7 @@ fn special_color_q195_set_blade_liella_at_center() {
     // set_blade_count(3) should set target member's blade to 3
     // Engine sets blade_modifier to 3 (delta = 3 - 0 = 3)
     // Q195: if member already had +1, result should be 4 (set + ongoing)
-    assert_eq!(game.state.get_blade_modifier(liella), 3,
+    assert_eq!(game.state.mods.get_blade_modifier(liella), 3,
         "Liella! member blade modifier should be 3 after set_blade_count");
 }
 

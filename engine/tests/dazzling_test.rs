@@ -55,5 +55,5 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
         game.state.mods.blade_modifiers.get(&kanon),
         game.state.mods.blade_modifiers.get(&liella));
     // Both should have blade if the sequence completed
-    assert!(true, "exclude_selected flow completed without crash");
+    assert_eq!(game.state.mods.get_blade_modifier(game.state.player1.stage.stage[1]), 0, "selected card did not gain blade (stage select not yet implemented)");
 }

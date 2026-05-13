@@ -32,6 +32,6 @@ fn q36_live_success_timing() {
     // After LiveVictoryDetermination processes, the turn advances to Active
     // (or back to Main if second turn). LiveSuccess abilities already fired.
     let phase = game.state.current_phase.to_string();
-    assert!(phase == "Active" || phase.contains("CardSet"),
-        "After LiveSuccess, phase should be Active or LiveCardSet, got {}", phase);
+    assert_eq!(phase, "Active",
+        "After LiveVictoryDetermination, phase should be Active, got {}", phase);
 }

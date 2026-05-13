@@ -19,13 +19,13 @@ fn eri_constant_blade_per_wait_member() {
 
     // Stage: eri center, friend left
     game.state.player1.stage.stage = [friend, eri, -1];
-    game.state.add_orientation_modifier(friend, "wait");
+    game.state.mods.add_orientation_modifier(friend, "wait");
 
     // Recalculate constant blade modifiers
     game.state.recalculate_constant_blade_modifiers();
 
     // The constant ability should have added a blade modifier
-    let blade_mod = game.state.get_blade_modifier(eri);
+    let blade_mod = game.state.mods.get_blade_modifier(eri);
     assert!(blade_mod >= 1,
         "Constant ability: 1 wait member → at least 1 blade, got {}", blade_mod);
 }

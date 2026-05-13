@@ -1,9 +1,10 @@
-use crate::card::{Ability, AbilityCost, AbilityEffect, Keyword};
+use crate::card::{Ability, AbilityCost, AbilityEffect, CardDatabase, Keyword};
 use crate::game_state::{GameState, Phase};
 use crate::zones::MemberArea;
 use super::types::{Choice, ExecutionContext};
 use super::util;
 use super::debug::AbDebug;
+use std::sync::Arc;
 
 pub struct AbilityResolver<'a> {
     pub game_state: &'a mut GameState,
@@ -24,12 +25,8 @@ pub struct AbilityResolver<'a> {
 
 impl<'a> AbilityResolver<'a> {
     pub fn new(game_state: &'a mut GameState) -> Self {
-        static mut RESOLVER_COUNT: u32 = 0;
-        let count = unsafe { RESOLVER_COUNT += 1; RESOLVER_COUNT };
         let activating_card_id = game_state.activating_card;
-        // DON'T take from game_state - just use empty, reference game_state.looked_at_cards when needed
         let looked_at_cards = Vec::new();
-        println!("DEBUG: Resolver new #{} - using empty looked_at_cards (will access game_state directly)", count);
         let selected_cards = game_state.ability_queue.current_entry()
             .map(|e| e.selected_card_ids.clone())
             .unwrap_or_default();
@@ -363,4 +360,7 @@ impl<'a> AbilityResolver<'a> {
         cost
     }
 
+    pub fn card_db(&self) -> Arc<CardDatabase> {
+        self.game_state.card_database.clone()
     }
+}

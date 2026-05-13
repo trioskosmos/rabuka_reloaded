@@ -9,22 +9,27 @@ fn test_draw_phase_no_unwanted_discards() {
     let mut game = TestGame::new(db);
 
     let filler = game.id("PL!-sd1-010-SD");
+
+    // Both players need decks for phase progression
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
-    let hand_before = game.state.player1.hand.cards.len();
-    let deck_before = game.state.player1.main_deck.cards.len();
-    let discard_before = game.state.player1.waitroom.cards.len();
+    // After TestGame::new, P1 is in Main phase (their turn is complete).
+    // The next pass goes to P2's Active phase (SecondAttackerNormal).
+    // Advance through P2's turn: Active → Energy → Draw → Main
+    // P2 draws 1 card on the 4th pass (Draw→Main transition).
+    let p2_deck_before = game.state.player2.main_deck.cards.len();
+    let p2_discard_before = game.state.player2.waitroom.cards.len();
 
-    // After TestGame::new, we're in Main phase. Advance through phases.
-    // The next phase transition from Main should go through draw steps.
-    game.pass();
+    for _ in 0..4 { game.pass(); }
 
-    let hand_after = game.state.player1.hand.cards.len();
-    let deck_after = game.state.player1.main_deck.cards.len();
-    let discard_after = game.state.player1.waitroom.cards.len();
+    let p2_deck_after = game.state.player2.main_deck.cards.len();
+    let p2_discard_after = game.state.player2.waitroom.cards.len();
 
-    // In normal gameplay, passing the turn should trigger draw and may add a card
-    assert!(deck_after <= deck_before, "Deck should not grow during draw phase");
-    assert!(discard_after >= discard_before, "Discard should not shrink during draw phase");
+    assert_eq!(p2_deck_after, p2_deck_before - 1, "1 card drawn from deck during draw phase");
+    assert_eq!(p2_discard_after, p2_discard_before, "No discard during draw phase");
 }

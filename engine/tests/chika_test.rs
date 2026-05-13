@@ -41,13 +41,13 @@ fn chika_q152_self_only() {
     game.activate_ability(chika);
 
     // Q152: Only P1's members are targeted (self), not P2's
-    let p1_wait = game.state.get_orientation_modifier(chika);
-    assert!(p1_wait == Some(&"wait".to_string()) || p1_wait.is_some(),
+    let p1_wait = game.state.mods.get_orientation_modifier(chika);
+    assert_eq!(p1_wait, Some(&"wait".to_string()),
         "Q152: Chika should be in wait state after activation");
 
     // P2's member should NOT be waited
-    let p2_wait = game.state.get_orientation_modifier(filler);
-    assert!(p2_wait.is_none() || p2_wait != Some(&"wait".to_string()),
+    let p2_wait = game.state.mods.get_orientation_modifier(filler);
+    assert_ne!(p2_wait, Some(&"wait".to_string()),
         "Q152: Opponent member should NOT be waited");
 }
 
@@ -65,7 +65,7 @@ fn chika_q151_ability_lost_on_leave() {
     game.activate_ability(chika);
 
     // Chika should have +1 score modifier after activation
-    let score_before = game.state.get_score_modifier(chika);
+    let score_before = game.state.mods.get_score_modifier(chika);
     assert_eq!(score_before, 1,
         "Q151: Chika should have +1 score after activation");
 
@@ -75,9 +75,9 @@ fn chika_q151_ability_lost_on_leave() {
     // clear_modifiers_for_card is called by move_cards when card moves
 
     // Manually clear (since we bypassed move_cards)
-    game.state.clear_modifiers_for_card(chika);
+    game.state.mods.clear_all_for_card(chika);
 
-    let score_after = game.state.get_score_modifier(chika);
+    let score_after = game.state.mods.get_score_modifier(chika);
     assert_eq!(score_after, 0,
         "Q151: Score boost should be lost when member leaves stage");
 }
@@ -101,7 +101,7 @@ fn chika_q171_live_end_persistence() {
 
     // Activate → Chika gains +1 score
     game.activate_ability(chika);
-    assert_eq!(game.state.get_score_modifier(chika), 1,
+    assert_eq!(game.state.mods.get_score_modifier(chika), 1,
         "Score should be +1 after activation");
 
     // Advance through phases to live
@@ -119,7 +119,7 @@ fn chika_q171_live_end_persistence() {
     game.pass(); // → LiveVictoryDetermination
 
     // Q171: Score modifier should still exist during LiveVictoryDetermination
-    assert_eq!(game.state.get_score_modifier(chika), 1,
+    assert_eq!(game.state.mods.get_score_modifier(chika), 1,
         "Q171: Score +1 should persist to LiveVictoryDetermination");
 }
 
@@ -147,7 +147,7 @@ fn chika_center_required() {
 
     // Position mismatch skips the ability, but doesn't error
     // The score modifier should NOT be applied
-    assert_eq!(game.state.get_score_modifier(chika), 0,
+    assert_eq!(game.state.mods.get_score_modifier(chika), 0,
         "Score should NOT be applied when activated from wrong position");
 }
 
@@ -164,7 +164,7 @@ fn chika_turn1_use_limit() {
 
     // First activation succeeds (gain_ability grants constant +1 score)
     game.activate_ability(chika);
-    assert_eq!(game.state.get_score_modifier(chika), 1,
+    assert_eq!(game.state.mods.get_score_modifier(chika), 1,
         "First activation should apply +1 score via granted constant ability");
 
     // Second activation in same turn should skip (use_limit=1)
@@ -179,7 +179,7 @@ fn chika_turn1_use_limit() {
 
     // The function may return Ok (skipping silently) or Err
     // Either way, score should still be 1 (not 2)
-    assert_eq!(game.state.get_score_modifier(chika), 1,
+    assert_eq!(game.state.mods.get_score_modifier(chika), 1,
         "Second activation should not apply any additional score modifiers");
 }
 

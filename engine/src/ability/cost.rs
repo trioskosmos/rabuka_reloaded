@@ -260,7 +260,7 @@ impl<'a> AbilityResolver<'a> {
 
                     if candidates.len() <= count {
                         for &card_id in &candidates {
-                            self.game_state.add_orientation_modifier(card_id, "wait");
+                            self.game_state.mods.add_orientation_modifier(card_id, "wait");
                         }
                     } else {
                         self.pending_choice = Some(Choice::SelectCard {

@@ -86,7 +86,7 @@ fn sunny_branch3_3_members_score_plus_1() {
 
     // Branch 3: score +1 for 3 distinct-name members
     let sunny_id = game.state.player1.live_card_zone.cards[0];
-    let score_mod = game.state.get_score_modifier(sunny_id);
+    let score_mod = game.state.mods.get_score_modifier(sunny_id);
     assert_eq!(score_mod, 1, "3 distinct-name members should give +1 score");
 }
 
@@ -113,7 +113,7 @@ fn sunny_branch3_3_members_duplicate_name_no_score() {
     advance_to_live_start(&mut game);
 
     let sunny_id = game.state.player1.live_card_zone.cards[0];
-    let score_mod = game.state.get_score_modifier(sunny_id);
+    let score_mod = game.state.mods.get_score_modifier(sunny_id);
     assert_eq!(score_mod, 0, "No score bonus with duplicate names");
 }
 

@@ -72,7 +72,7 @@ fn emma_q163_nijigasaki_member_pays_cost() {
 
     let hand_count = game.state.player1.hand.cards.len();
     eprintln!("[EMMA] hand after activation: {}", hand_count);
-    let niji_waited = game.state.get_orientation_modifier(niji)
+    let niji_waited = game.state.mods.get_orientation_modifier(niji)
         .map_or(false, |o| o == "wait");
     eprintln!("[EMMA] niji waited: {}", niji_waited);
     assert!(hand_count > 0, "Should have drawn 1 card");

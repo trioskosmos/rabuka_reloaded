@@ -62,7 +62,7 @@ fn jellyfish_q99_two_qualifying_members_reduce_by_2() {
 
     // LiveStart fired: counting 2 5yncri5e! members with appeared_or_moved
     use rabuka_engine::card::HeartColor;
-    let reduction = game.state.get_need_heart_modifier(jellyfish, HeartColor::Heart00);
+    let reduction = game.state.mods.get_need_heart_modifier(jellyfish, HeartColor::Heart00);
     assert_eq!(reduction, -2,
         "Q99: 2 qualifying members should reduce heart00 by 2");
 }
@@ -97,7 +97,7 @@ fn jellyfish_q98_same_card_appeared_and_moved_counts_once() {
     advance_to_live_start(&mut game);
 
     use rabuka_engine::card::HeartColor;
-    let reduction = game.state.get_need_heart_modifier(jellyfish, HeartColor::Heart00);
+    let reduction = game.state.mods.get_need_heart_modifier(jellyfish, HeartColor::Heart00);
     assert_eq!(reduction, -1,
         "Q98: Same card with both flags should count once (OR logic), not twice");
 }
@@ -131,7 +131,7 @@ fn jellyfish_non_5yncri5e_member_moves_no_reduction() {
     advance_to_live_start(&mut game);
 
     use rabuka_engine::card::HeartColor;
-    let reduction = game.state.get_need_heart_modifier(jellyfish, HeartColor::Heart00);
+    let reduction = game.state.mods.get_need_heart_modifier(jellyfish, HeartColor::Heart00);
     assert_eq!(reduction, 0,
         "Negative: Non-5yncri5e! member should not reduce heart00");
 }

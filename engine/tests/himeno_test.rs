@@ -95,5 +95,7 @@ fn himeno_edge_no_mirakura_skips() {
 
     // Verify nothing was added to hand from deck (no matching cards)
     // After play_to_stage: hand had himeno + filler = 2 → himeno played → 1
-    assert!(true, "No crash with no matching cards");
+    // No matching mirakura cards found → nothing added to hand
+    assert_eq!(game.state.player1.hand.cards.len(), 1,
+        "No cards added to hand when no mirakura card in top 5");
 }

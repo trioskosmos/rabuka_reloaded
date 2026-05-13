@@ -1,7 +1,6 @@
 /// Integration tests for energy-under-member and member-under-member mechanics.
 ///
-/// ALL GAPS FIXED:
-///   Engine: re-entry for effect-based optional placement,
+/// GAP: Engine: re-entry for effect-based optional placement,
 ///   use_limit recording at cost-pay time,
 ///   under_member source handler in move_cards,
 ///   under_member zone in per_unit/zone_cards/count functions,
@@ -68,12 +67,12 @@ fn kasumi_debut_place_two_energy_under() {
     game.play_to_stage(kasumi, MemberArea::Center);
     assert!(game.has_pending_choice(), "should prompt optional cost");
     game.select_option(1); // "pay" (index 1 = pay_optional_cost)
-    // FIXED: handle_optional_cost_payment now re-enters placement for effect-based optional
+    // GAP: handle_optional_cost_payment re-enters placement for effect-based optional
     assert_eq!(game.state.player1.energy_zone.cards.len(), 11,
-        "FIXED: 2 energy removed from zone");
+        "2 energy removed from zone");
     let under = game.state.player1.stage.get_under_cards(MemberArea::Center);
     assert_eq!(under.len(), 2,
-        "FIXED: 2 energy under center member");
+        "2 energy under center member");
 }
 
 #[test]
@@ -145,11 +144,11 @@ fn mia_activate_cost_does_not_remove_energy() {
     if game.has_pending_choice() { game.select_indices(&[0]); }
     let energy_after = game.state.player1.energy_zone.cards.len();
     let under = game.state.player1.stage.get_under_cards(MemberArea::Center).len();
-    // FIXED: cost now correctly removes energy and places under member
+    // GAP: cost now correctly removes energy and places under member
     assert_eq!(energy_after, energy_before - 1,
-        "FIXED: custom cost removes 1 energy from zone");
+        "custom cost removes 1 energy from zone");
     assert_eq!(under, 1,
-        "FIXED: 1 energy placed under member");
+        "1 energy placed under member");
 }
 
 #[test]
@@ -191,12 +190,12 @@ fn mia_use_limit_not_enforced() {
     game.try_activate_ability(mia).ok();
     // Verify no change — use_limit blocked effect AND cost
     assert_eq!(game.state.player1.hand.cards.len(), hand_before,
-        "FIXED: use_limit=1 prevented second activation from retrieving another live");
+        "use_limit=1 prevented second activation from retrieving another live");
     let energy_after = game.state.player1.energy_zone.cards.len() + game.state.player1.stage.get_under_cards(MemberArea::Center).len();
     assert_eq!(energy_after, energy_before,
-        "FIXED: use_limit=1 prevented second activation cost from being paid");
+        "use_limit=1 prevented second activation cost from being paid");
     assert!(!game.state.player1.hand.cards.contains(&niji2),
-        "FIXED: second activation should NOT retrieve another live");
+        "use_limit=1 prevented second activation from retrieving another live");
 }
 
 // ====================================================================
@@ -222,11 +221,11 @@ fn ayumu_bp3n_debit_place_one_under_draw_two() {
     assert!(game.has_pending_choice(), "should prompt optional cost");
     game.select_option(1); // "pay"
     assert_eq!(game.state.player1.energy_zone.cards.len(), energy_before - 1,
-        "FIXED: 1 energy removed from zone");
+        "1 energy removed from zone");
     assert_eq!(game.state.player1.stage.get_under_cards(MemberArea::Center).len(), 1,
-        "FIXED: 1 energy under center member");
+        "1 energy under center member");
     assert_eq!(game.state.player1.hand.cards.len(), hand_before + 1,
-        "FIXED: 2 cards drawn (+1 net from hand before play)");
+        "2 cards drawn (+1 net from hand before play)");
 }
 
 #[test]
@@ -333,8 +332,8 @@ fn ayumu_bp5n_heart01_condition_passes_but_modifier_not_found() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
-    let heart = game.state.get_heart_modifier(ayumu, rabuka_engine::card::HeartColor::Heart01);
-    assert_eq!(heart, 1, "FIXED: heart01=1 on Ayumu after LiveStart condition passes");
+    let heart = game.state.mods.get_heart_modifier(ayumu, rabuka_engine::card::HeartColor::Heart01);
+    assert_eq!(heart, 1, "heart01=1 on Ayumu after LiveStart condition passes");
 }
 
 // ====================================================================
@@ -434,10 +433,10 @@ fn sayaka_use_limit_enforced() {
     // Second activation should fail due to use_limit=1
     let result = game.try_activate_ability(sayaka);
     assert!(result.is_err(),
-        "FIXED: use_limit=1 now enforced for Sayaka activation");
+        "use_limit=1 now enforced for Sayaka activation");
     let under_after_second = game.state.player1.stage.get_under_cards(MemberArea::Center).len();
     assert_eq!(under_after_second, under_after_first,
-        "FIXED: no additional card placed under");
+        "no additional card placed under");
 }
 
 #[test]
@@ -458,7 +457,7 @@ fn sayaka_live_start_per_unit_counts_hand_not_under() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
-    let heart = game.state.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
+    let heart = game.state.mods.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
     assert_eq!(heart, 3, "3 heart05 from 3 members under (per_unit_type=under_member)");
 }
 
@@ -476,7 +475,7 @@ fn sayaka_live_start_zero_under_still_gets_hand_count() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
-    let heart = game.state.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
+    let heart = game.state.mods.get_heart_modifier(sayaka, rabuka_engine::card::HeartColor::Heart05);
     assert_eq!(heart, 0, "0 heart05 when no members under");
 }
 

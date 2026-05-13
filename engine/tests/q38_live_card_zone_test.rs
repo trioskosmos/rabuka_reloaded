@@ -39,7 +39,7 @@ fn eutopia_q38_score_condition_checks_live_card_count() {
     game.pass(); // LiveCardSetP2 → FirstAttackerPerformance (LiveStart triggers)
 
     // Only 1 live card in zone, needs 3 → no bonus
-    assert_eq!(game.state.get_score_modifier(eutopia), 0,
+    assert_eq!(game.state.mods.get_score_modifier(eutopia), 0,
         "Q38: Only 1 live card, needs 3 → no score");
 }
 
@@ -75,7 +75,7 @@ fn eutopia_q38_three_live_cards_score_plus_2() {
 
     while game.has_pending_choice() { game.select_indices(&[0]); }
 
-    assert_eq!(game.state.get_score_modifier(eutopia), 2,
+    assert_eq!(game.state.mods.get_score_modifier(eutopia), 2,
         "Q38: 3 live cards → score +2");
 }
 
@@ -112,6 +112,6 @@ fn rainbow_q38_member_on_stage_per_live_card_blade() {
 
     // 1 live card in zone → per_unit → gain blade
     eprintln!("[RAINBOW] blade_mod = {:?}", game.state.mods.blade_modifiers.get(&rainbow));
-    assert!(game.state.get_blade_modifier(rainbow) >= 1,
+    assert!(game.state.mods.get_blade_modifier(rainbow) >= 1,
         "Q38: 1 live card in zone, Rainbow on stage → blade gained");
 }

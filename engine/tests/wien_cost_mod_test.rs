@@ -25,7 +25,7 @@ fn wien_low_energy_no_cost_modifier() {
 
     // Recalc should NOT add cost mod (9 < 10)
     game.state.recalculate_constant_blade_modifiers();
-    assert_eq!(game.state.get_cost_modifier(wien), 0,
+    assert_eq!(game.state.mods.get_cost_modifier(wien), 0,
         "no cost modifier when energy < 10");
 }
 
@@ -49,7 +49,7 @@ fn wien_high_energy_cost_modifier_applied() {
 
     // Recalc SHOULD add +4 cost mod (10 >= 10)
     game.state.recalculate_constant_blade_modifiers();
-    assert_eq!(game.state.get_cost_modifier(wien), 4,
+    assert_eq!(game.state.mods.get_cost_modifier(wien), 4,
         "+4 cost modifier when energy >= 10");
 }
 
@@ -67,21 +67,21 @@ fn wien_cost_modifier_dynamic() {
 
     // At 9 energy: no modifier
     game.state.recalculate_constant_blade_modifiers();
-    assert_eq!(game.state.get_cost_modifier(wien), 0,
+    assert_eq!(game.state.mods.get_cost_modifier(wien), 0,
         "no modifier at 9 energy");
 
     // Add 1 more → 10 energy
     game.state.player1.energy_zone.cards.push(energy_id);
     game.state.player1.energy_zone.active_energy_count += 1;
     game.state.recalculate_constant_blade_modifiers();
-    assert_eq!(game.state.get_cost_modifier(wien), 4,
+    assert_eq!(game.state.mods.get_cost_modifier(wien), 4,
         "+4 modifier at 10 energy");
 
     // Remove 1 → back to 9
     game.state.player1.energy_zone.cards.pop();
     game.state.player1.energy_zone.active_energy_count -= 1;
     game.state.recalculate_constant_blade_modifiers();
-    assert_eq!(game.state.get_cost_modifier(wien), 0,
+    assert_eq!(game.state.mods.get_cost_modifier(wien), 0,
         "modifier removed when energy drops back to 9");
 }
 
@@ -96,15 +96,15 @@ fn wien_cost_modifier_cleared_on_leave() {
     game.state.player1.stage.stage = [-1, wien, -1];
     game.give_energy(10);
     game.state.recalculate_constant_blade_modifiers();
-    assert_eq!(game.state.get_cost_modifier(wien), 4,
+    assert_eq!(game.state.mods.get_cost_modifier(wien), 4,
         "+4 modifier while on stage with 10 energy");
 
     // Remove from stage
     game.state.player1.stage.stage[1] = -1;
     game.state.player1.waitroom.cards.push(wien);
-    game.state.clear_modifiers_for_card(wien);
+    game.state.mods.clear_all_for_card(wien);
     game.state.recalculate_constant_blade_modifiers();
 
-    assert_eq!(game.state.get_cost_modifier(wien), 0,
+    assert_eq!(game.state.mods.get_cost_modifier(wien), 0,
         "modifier cleared after card leaves stage");
 }

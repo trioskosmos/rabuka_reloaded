@@ -47,7 +47,7 @@ fn miracle_stay_tune_both_conditions_met_score_plus_1() {
 
     while game.has_pending_choice() { game.select_indices(&[]); }
 
-    let mod_val = game.state.get_score_modifier(card);
+    let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 1, "Both conditions met → score +1");
 }
 
@@ -78,7 +78,7 @@ fn miracle_stay_tune_fewer_than_3_distinct_members_no_score() {
 
     while game.has_pending_choice() { game.select_indices(&[]); }
 
-    let mod_val = game.state.get_score_modifier(card);
+    let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Only 1 distinct member → no score");
 }
 
@@ -109,7 +109,7 @@ fn miracle_stay_tune_empty_success_zone_no_score() {
 
     while game.has_pending_choice() { game.select_indices(&[]); }
 
-    let mod_val = game.state.get_score_modifier(card);
+    let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Empty success zone → no score");
 }
 
@@ -138,6 +138,6 @@ fn miracle_stay_tune_neither_condition_no_score() {
 
     while game.has_pending_choice() { game.select_indices(&[]); }
 
-    let mod_val = game.state.get_score_modifier(card);
+    let mod_val = game.state.mods.get_score_modifier(card);
     assert_eq!(mod_val, 0, "Neither condition met → no score");
 }

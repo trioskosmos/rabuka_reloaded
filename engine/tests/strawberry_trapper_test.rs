@@ -76,10 +76,10 @@ fn strawberry_trapper_q132_conditions_met_score_plus_2() {
     }
     while game.has_pending_choice() { game.select_indices(&[]); }
 
-    let score_mod = game.state.get_score_modifier(strawberry);
+    let score_mod = game.state.mods.get_score_modifier(strawberry);
     // GAP: Riko auto-trigger infinite loop prevents LiveSuccess from resolving properly.
     // Score modifier may or may not be applied depending on how the loop is resolved.
-    assert!(score_mod == 0 || score_mod == 2,
+    assert_eq!(score_mod, 2,
         "Q132: Score +2 expected, got {}", score_mod);
 }
 
@@ -113,7 +113,7 @@ fn strawberry_trapper_insufficient_heart05_no_score() {
     game.pass();
     game.pass();
 
-    assert_eq!(game.state.get_score_modifier(strawberry), 0,
+    assert_eq!(game.state.mods.get_score_modifier(strawberry), 0,
         "No score bonus when heart05 total < 4");
 }
 
@@ -148,7 +148,7 @@ fn strawberry_trapper_no_opponent_success_no_score() {
     game.pass();
     game.pass();
 
-    assert_eq!(game.state.get_score_modifier(strawberry), 0,
+    assert_eq!(game.state.mods.get_score_modifier(strawberry), 0,
         "No score bonus when opponent did not succeed without excess heart");
 }
 

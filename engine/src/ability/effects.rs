@@ -235,8 +235,14 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::SetCost => self.execute_set_cost(effect.value.unwrap_or(0), effect.target_name(), effect.card_type.as_deref()),
             EffectAction::SetBladeType => self.execute_set_blade_type(effect.blade_type.as_deref(), effect.target_name(), effect.duration.as_deref()),
             EffectAction::SetHeartType => self.execute_set_heart_type(effect.heart_type.as_deref().or(effect.heart_colors.first().map(|s| s.as_str())), effect.target_name(), effect.count_or(1) as i32),
-            EffectAction::ActivateAbility => self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or(""), effect.target_trigger.as_deref(), effect.count),
-            EffectAction::InvalidateAbility => self.execute_invalidate_ability(),
+            EffectAction::ActivateAbility => {
+                self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or(""), effect.target_trigger.as_deref(), effect.count);
+                Ok(())
+            }
+            EffectAction::InvalidateAbility => {
+                self.execute_invalidate_ability();
+                Ok(())
+            }
             EffectAction::GainAbility => self.execute_gain_ability(effect.ability_gain.as_deref().filter(|s| !s.is_empty()).or_else(|| if effect.text.is_empty() { None } else { Some(effect.text.as_str()) }).unwrap_or(""), effect.target_name(), effect.duration.as_deref()),
             EffectAction::PlayBatonTouch => self.execute_play_baton_touch(effect.count_or(1), effect.target_name()),
             EffectAction::Reveal => {
@@ -266,7 +272,10 @@ impl<'a> AbilityResolver<'a> {
             }
             EffectAction::LookAt => self.execute_look_at(effect.count_or(1), effect.target_name(), effect.source_or("deck")),
             EffectAction::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_global(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(1), effect.heart_color_or("heart00"), effect.target_name()),
-            EffectAction::ModifyYellCount => self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count_or(0)),
+            EffectAction::ModifyYellCount => {
+                self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count_or(0));
+                Ok(())
+            }
             EffectAction::PlaceEnergyUnderMember => self.execute_place_energy_under_member(effect.energy_count.unwrap_or(1), effect.target_name(), effect.position.as_ref(), effect.optional.unwrap_or(false), effect.source.as_deref()),
             EffectAction::ActivationCost => self.execute_activation_cost(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target_name(), effect.duration.as_deref()),
             EffectAction::PositionChange => self.execute_position_change(effect, effect.position.clone(), effect.target_name(), effect.target_member.as_deref().unwrap_or("this_member")),
@@ -276,29 +285,48 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::PayEnergy => self.execute_pay_energy(effect.count_or(0), effect.target_name()),
             EffectAction::SetCardIdentity => {
                 if effect.all_regions.unwrap_or(false) {
-                    self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target_name())
+                    self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target_name());
                 } else {
-                    self.execute_set_card_identity(&effect.identities.clone().unwrap_or_default())
+                    self.execute_set_card_identity(&effect.identities.clone().unwrap_or_default());
                 }
+                Ok(())
             },
             EffectAction::RepeatProcedure => self.execute_repeat_procedure(effect, effect.repeat_limit.unwrap_or(1)),
             EffectAction::DiscardUntilCount => self.execute_discard_until_count(effect.target_count.unwrap_or(0), effect.target_name()),
             EffectAction::Restriction => self.execute_restriction(effect.restriction_type.as_deref(), effect.restricted_destination.as_deref()),
             EffectAction::ReYell => self.execute_re_yell(effect.lose_blade_hearts.unwrap_or(false), effect.target_name()),
-            EffectAction::ActivationRestriction => self.execute_activation_restriction(effect.target_name()),
-            EffectAction::ChooseRequiredHearts => self.execute_choose_required_hearts(),
+            EffectAction::ActivationRestriction => {
+                self.execute_activation_restriction(effect.target_name());
+                Ok(())
+            }
+            EffectAction::ChooseRequiredHearts => {
+                self.execute_choose_required_hearts();
+                Ok(())
+            }
             EffectAction::ModifyLimit => self.execute_modify_limit(effect.operation.as_deref().unwrap_or("decrease"), effect.count_or(0)),
             EffectAction::SetBladeCount => self.execute_set_blade_count(effect.value.unwrap_or(effect.count_or(0)), effect.target_name()),
             EffectAction::Custom => self.execute_custom(effect, &action_str),
             EffectAction::DoNothing => Ok(()),
             EffectAction::SetRequiredHearts => self.execute_set_required_hearts(&effect.heart_colors, effect.target_name()),
             EffectAction::SetScore => self.execute_set_score(effect.value.unwrap_or(0), effect.target_name()),
-            EffectAction::SpecifyHeartColor => self.execute_specify_heart_color(effect.choice.unwrap_or(false), effect.target_name()),
+            EffectAction::SpecifyHeartColor => {
+                self.execute_specify_heart_color(effect.choice.unwrap_or(false), effect.target_name());
+                Ok(())
+            }
             EffectAction::ModifyRequiredHeartsSuccess => self.execute_modify_required_hearts_success(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target_name(), effect.card_type.as_deref()),
             EffectAction::SetCostToUse => self.execute_set_cost_to_use(effect.value.unwrap_or(0)),
-            EffectAction::AllBladeTiming => self.execute_all_blade_timing(effect.timing.as_deref().unwrap_or("check_required_hearts"), effect.treat_as.as_deref().unwrap_or("any_heart_color")),
-            EffectAction::SetCardIdentityAllRegions => self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target_name()),
-            EffectAction::Shuffle => self.execute_shuffle(effect.target_name(), effect.source_or("deck")),
+            EffectAction::AllBladeTiming => {
+                self.execute_all_blade_timing(effect.timing.as_deref().unwrap_or("check_required_hearts"), effect.treat_as.as_deref().unwrap_or("any_heart_color"));
+                Ok(())
+            }
+            EffectAction::SetCardIdentityAllRegions => {
+                self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target_name());
+                Ok(())
+            }
+            EffectAction::Shuffle => {
+                self.execute_shuffle(effect.target_name(), effect.source_or("deck"));
+                Ok(())
+            }
             EffectAction::RevealPerGroup => self.execute_reveal_per_group(effect.source_or("hand"), effect.count_or(1), effect.target_name()),
             EffectAction::ConditionalOnResult => self.execute_conditional_on_result(effect),
             EffectAction::ConditionalOnOptional => self.execute_conditional_on_optional(effect),
@@ -377,7 +405,7 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_draw(&mut self, effect: &AbilityEffect, count: u32, target: &str, source: &str, destination: &str, card_type: Option<&str>, per_unit: bool, per_unit_count: u32, per_unit_type: Option<&str>) -> Result<(), String> {
-        let card_db = self.game_state.card_database.clone();
+        let card_db = self.card_db();
         let is_any_number = effect.any_number.unwrap_or(false);
         let is_distinct = effect.distinct.as_deref();
         let is_self_target = effect.self_target.unwrap_or(false);
@@ -516,7 +544,7 @@ impl<'a> AbilityResolver<'a> {
         let per_unit_type_str = per_unit_type.map(|s| s.to_string());
         let is_temporary = duration.is_some() && duration.as_deref() != Some("permanent");
         let activating_card_id = self.game_state.activating_card;
-        let card_db = self.game_state.card_database.clone();
+        let card_db = self.card_db();
         let is_self_target = effect.self_target.unwrap_or(false);
         let is_all = effect.all.unwrap_or(false) || (effect.source.is_none() && effect.card_type.as_deref() == Some("member_card") && target == "self" && !is_self_target);
 
@@ -591,7 +619,7 @@ impl<'a> AbilityResolver<'a> {
                     return Err("Cannot use self_target on gain_resource: activating card not on stage".to_string());
                 }
                 if resource == "blade" || resource == "ブレード" {
-                    self.game_state.add_blade_modifier(card_id, blades_to_add);
+                    self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
                     if is_temporary {
                         let mut data = serde_json::Map::new();
                         data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
@@ -600,7 +628,7 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 if resource == "heart" || resource == "ハート" {
-                    self.game_state.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         let mut data = serde_json::Map::new();
@@ -632,7 +660,7 @@ impl<'a> AbilityResolver<'a> {
                         player.stage.stage.iter().copied().filter(|&id| id != -1).collect()
                     };
                     for card_id in stage_ids {
-                        self.game_state.add_blade_modifier(card_id, blades_to_add);
+                        self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
                     }
                     if is_temporary {
                         let mut data = serde_json::Map::new();
@@ -641,7 +669,7 @@ impl<'a> AbilityResolver<'a> {
                         effect_data = Some(serde_json::Value::Object(data));
                     }
                 } else if let Some(card_id) = activating_card_id {
-                    self.game_state.add_blade_modifier(card_id, blades_to_add);
+                    self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
                     if is_temporary {
                         let mut data = serde_json::Map::new();
                         data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
@@ -652,7 +680,7 @@ impl<'a> AbilityResolver<'a> {
             } else {
                 let targets = if is_all { blade_targets.clone() } else { blade_targets.into_iter().take(final_count as usize).collect() };
                 for &card_id in &targets {
-                    self.game_state.add_blade_modifier(card_id, blades_to_add);
+                    self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
                 }
             }
         }
@@ -660,7 +688,7 @@ impl<'a> AbilityResolver<'a> {
         if resource == "heart" || resource == "ハート" {
             if heart_targets.is_empty() {
                 if let Some(card_id) = activating_card_id {
-                    self.game_state.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         let mut data = serde_json::Map::new();
@@ -673,7 +701,7 @@ impl<'a> AbilityResolver<'a> {
                 }
             } else if is_self_target || (target == "self" && activating_card_id.is_some() && effect.source.is_none() && effect.card_type.is_none()) {
                 if let Some(card_id) = activating_card_id {
-                    self.game_state.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         let mut data = serde_json::Map::new();
@@ -687,7 +715,7 @@ impl<'a> AbilityResolver<'a> {
             } else {
                 let targets: Vec<i16> = if is_all { heart_targets.clone() } else { heart_targets.into_iter().take(final_count as usize).collect() };
                 for &card_id in &targets {
-                    self.game_state.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
                 }
                 // Store effect_data for ALL target cards so cleanup works
                 if is_temporary && (resource == "heart" || resource == "ハート") && effect_data.is_none() {
@@ -757,7 +785,7 @@ impl<'a> AbilityResolver<'a> {
         let is_member_op = card_type_filter.as_deref() == Some("member_card") || self_cost;
 
         if is_member_op {
-            let card_db = self.game_state.card_database.clone();
+            let card_db = self.card_db();
             let player = self.game_state.resolve_target_player_mut(&target);
 
             let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), cost_limit, None, None, None);
@@ -776,7 +804,7 @@ impl<'a> AbilityResolver<'a> {
             // Count how many are in wait state before changing (for wait→active tracking)
             let wait_before_count = candidates.iter()
                 .filter(|(_, card_id)| {
-                    let o = self.game_state.get_orientation_modifier(*card_id);
+                    let o = self.game_state.mods.get_orientation_modifier(*card_id);
                     // None = active (no modifier), Some("wait") = wait
                     o.map_or(false, |o| o == "wait")
                 })
@@ -805,7 +833,7 @@ impl<'a> AbilityResolver<'a> {
 
             let change_count = if is_change_all { candidates.len() } else { count as usize };
             for (_, card_id) in candidates.iter().take(change_count) {
-                self.game_state.add_orientation_modifier(*card_id, &state_change);
+                self.game_state.mods.add_orientation_modifier(*card_id, &state_change);
             }
 
             // Track how many members were changed from wait→active
@@ -817,7 +845,7 @@ impl<'a> AbilityResolver<'a> {
         }
 
         // Energy card state change (original behavior)
-        let card_db = self.game_state.card_database.clone();
+        let card_db = self.card_db();
         let (wait_cards, deactivate_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
@@ -887,7 +915,7 @@ impl<'a> AbilityResolver<'a> {
         match state_change.as_str() {
             "wait" | "ウェイト" => {
                 for card_id in &wait_cards {
-                    self.game_state.add_orientation_modifier(*card_id, "wait");
+                    self.game_state.mods.add_orientation_modifier(*card_id, "wait");
                 }
                 for _ in 0..deactivate_count {
                     let player = self.game_state.resolve_target_player_mut(target.as_str());
@@ -896,7 +924,7 @@ impl<'a> AbilityResolver<'a> {
             }
             "active" | "アクティブ" => {
                 for card_id in &active_cards {
-                    self.game_state.add_orientation_modifier(*card_id, "active");
+                    self.game_state.mods.add_orientation_modifier(*card_id, "active");
                 }
                 let player = self.game_state.resolve_target_player_mut(target.as_str());
                 player.energy_zone.active_energy_count += active_cards.len();
@@ -920,7 +948,7 @@ impl<'a> AbilityResolver<'a> {
         let per_unit_count_val = per_unit_count;
         let per_unit_type_str = per_unit_type.map(|s| s.to_string());
         let effect_constraint = effect_constraint.map(|s| s.to_string());
-        let card_db = self.game_state.card_database.clone();
+        let card_db = self.card_db();
 
         let (live_card_ids, final_value) = {
             let player = self.game_state.resolve_target_player_mut(&target);
@@ -965,14 +993,14 @@ impl<'a> AbilityResolver<'a> {
         let mut count_applied = 0u32;
         for (card_id, delta) in &live_card_ids {
             if let Some(constraint) = &effect_constraint {
-                let current_mod = self.game_state.get_score_modifier(*card_id);
+                let current_mod = self.game_state.mods.get_score_modifier(*card_id);
                 match constraint.as_str() {
                     "min:0" => { if current_mod + delta < 0 { continue; } }
                     _ => {}
                 }
             }
-            if operation == "set" { self.game_state.set_score_modifier(*card_id, *delta); }
-            else { self.game_state.add_score_modifier(*card_id, *delta); }
+            if operation == "set" { self.game_state.mods.set_score_modifier(*card_id, *delta); }
+            else { self.game_state.mods.add_score_modifier(*card_id, *delta); }
             count_applied += 1;
         }
 
@@ -1021,9 +1049,9 @@ impl<'a> AbilityResolver<'a> {
         };
         for card_id in card_ids {
             match operation {
-                "decrease" => { self.game_state.add_need_heart_modifier(card_id, color, -(value as i32)); }
-                "increase" => { self.game_state.add_need_heart_modifier(card_id, color, value as i32); }
-                "set" => { self.game_state.set_need_heart_modifier(card_id, color, value as i32); }
+                "decrease" => { self.game_state.mods.add_need_heart_modifier(card_id, color, -(value as i32)); }
+                "increase" => { self.game_state.mods.add_need_heart_modifier(card_id, color, value as i32); }
+                "set" => { self.game_state.mods.set_need_heart_modifier(card_id, color, value as i32); }
                 _ => return Err(format!("Unknown operation: {}", operation)),
             }
         }
@@ -1037,12 +1065,12 @@ impl<'a> AbilityResolver<'a> {
         } else if let Some("member_card") = card_type {
             player.stage.stage.iter().filter(|&&id| id != -1).copied().collect()
         } else { player.hand.cards.iter().copied().collect() };
-        for card_id in card_ids { self.game_state.set_cost_modifier(card_id, value as i32); }
+        for card_id in card_ids { self.game_state.mods.set_cost_modifier(card_id, value as i32); }
         Ok(())
     }
 
     fn execute_set_blade_type(&mut self, blade_type: Option<&str>, target: &str, duration: Option<&str>) -> Result<(), String> {
-        let card_db = self.game_state.card_database.clone();
+        let card_db = self.card_db();
         let blade_color = blade_type.and_then(|bt| match bt {
             "red" => Some(crate::card::BladeColor::Red),
             "blue" => Some(crate::card::BladeColor::Blue),
@@ -1063,7 +1091,7 @@ impl<'a> AbilityResolver<'a> {
         };
         for (card_id, pid) in stage_card_ids {
             if let Some(color) = blade_color {
-                self.game_state.set_blade_type_modifier(card_id, color);
+                self.game_state.mods.set_blade_type_modifier(card_id, color);
             }
             util::push_temporary_effect(
                 &mut self.game_state,
@@ -1086,11 +1114,11 @@ impl<'a> AbilityResolver<'a> {
             if card_id != -1 { card_ids_to_modify.push(card_id); }
         }
         let color = crate::zones::parse_heart_color(heart_type);
-        for card_id in card_ids_to_modify { self.game_state.add_heart_modifier(card_id, color, count); }
+        for card_id in card_ids_to_modify { self.game_state.mods.add_heart_modifier(card_id, color, count); }
         Ok(())
     }
 
-    fn execute_activate_ability(&mut self, ability_text: &str, target_trigger: Option<&str>, _count: Option<u32>) -> Result<(), String> {
+    fn execute_activate_ability(&mut self, ability_text: &str, target_trigger: Option<&str>, _count: Option<u32>) {
         if let Some(card_id) = self.game_state.activating_card {
             let mut text = ability_text.to_string();
             if let Some(trigger) = target_trigger {
@@ -1098,14 +1126,12 @@ impl<'a> AbilityResolver<'a> {
             }
             self.game_state.gained_abilities.entry(card_id).or_default().push(text);
         }
-        Ok(())
     }
 
-    fn execute_invalidate_ability(&mut self) -> Result<(), String> {
+    fn execute_invalidate_ability(&mut self) {
         if let Some(card_id) = self.game_state.activating_card {
             self.game_state.negated_abilities.insert(card_id);
         }
-        Ok(())
     }
 
     fn execute_gain_ability(&mut self, ability_text: &str, target: &str, duration: Option<&str>) -> Result<(), String> {
@@ -1123,7 +1149,7 @@ impl<'a> AbilityResolver<'a> {
             
             // Apply to the activating card (self target)
             if let Some(card_id) = self.game_state.activating_card {
-                self.game_state.add_score_modifier(card_id, value);
+                self.game_state.mods.add_score_modifier(card_id, value);
                 eprintln!("[GAINED_ABILITY] Applied +1 score modifier to card {}", card_id);
             }
         }
@@ -1158,19 +1184,18 @@ impl<'a> AbilityResolver<'a> {
         };
         for card_id in card_ids {
             let modifier_value = match operation { "increase" => value as i32, "decrease" => -(value as i32), _ => return Err(format!("Unknown operation: {}", operation)) };
-            self.game_state.add_need_heart_modifier(card_id, color, modifier_value);
+            self.game_state.mods.add_need_heart_modifier(card_id, color, modifier_value);
         }
         Ok(())
     }
 
-    fn execute_modify_yell_count(&mut self, operation: &str, count: u32) -> Result<(), String> {
+    fn execute_modify_yell_count(&mut self, operation: &str, count: u32) {
         match operation {
             "add" => { self.game_state.cheer_checks_required += count; }
             "subtract" => { self.game_state.cheer_checks_required = self.game_state.cheer_checks_required.saturating_sub(count); }
             "set" => { self.game_state.cheer_checks_required = count; }
-            _ => return Err(format!("Unknown operation: {}", operation)),
+            _ => eprintln!("Unknown operation: {}", operation),
         }
-        Ok(())
     }
 
     pub fn execute_place_energy_under_member(&mut self, count: u32, target: &str, position: Option<&PositionInfo>, optional: bool, source: Option<&str>) -> Result<(), String> {
@@ -1357,7 +1382,7 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
 
-        let card_database = self.game_state.card_database.clone();
+        let card_db = self.card_db();
         let player = self.game_state.resolve_target_player_mut(target);
         let target_index = match position_str {
             "center" | "センターエリア" => 1,
@@ -1368,7 +1393,7 @@ impl<'a> AbilityResolver<'a> {
 
         let current_index = player.stage.stage.iter().position(|&card_id| {
             if card_id == -1 { false }
-            else { card_database.get_card(card_id).map(|c| c.card_no == target_member).unwrap_or(false) }
+            else { card_db.get_card(card_id).map(|c| c.card_no == target_member).unwrap_or(false) }
         });
 
         if let Some(current_idx) = current_index {
@@ -1520,7 +1545,7 @@ impl<'a> AbilityResolver<'a> {
         let count = effect.count_or(1);
         let target = effect.target_name();
         let card_type = effect.card_type.as_deref();
-        let card_db = self.game_state.card_database.clone();
+        let card_db = self.card_db();
         let player = self.game_state.resolve_target_player_mut(target);
 
         match source {
@@ -1633,12 +1658,11 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_set_card_identity(&mut self, identities: &[String]) -> Result<(), String> {
+    fn execute_set_card_identity(&mut self, identities: &[String]) {
         eprintln!("set_card_identity: identities={:?}", identities);
         if !identities.is_empty() {
             self.game_state.prohibition_effects.push(format!("card_identity:{}", identities.join(",")));
         }
-        Ok(())
     }
 
     fn execute_discard_until_count(&mut self, target_count: u32, target: &str) -> Result<(), String> {
@@ -1669,7 +1693,7 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_re_yell(&mut self, lose_blade_hearts: bool, target: &str) -> Result<(), String> {
         eprintln!("re_yell: lose_blade_hearts={}", lose_blade_hearts);
-        let card_db = self.game_state.card_database.clone();
+        let card_db = self.card_db();
         let mut cards_to_clear_modifiers: Vec<i16> = Vec::new();
         {
             let player = self.game_state.resolve_target_player_mut(target);
@@ -1683,26 +1707,24 @@ impl<'a> AbilityResolver<'a> {
         }
         if lose_blade_hearts {
             for card_id in cards_to_clear_modifiers {
-                self.game_state.clear_modifiers_for_card(card_id);
+                self.game_state.mods.clear_all_for_card(card_id);
             }
         }
         self.game_state.prohibition_effects.push("re_yell".to_string());
         Ok(())
     }
 
-    fn execute_activation_restriction(&mut self, target: &str) -> Result<(), String> {
+    fn execute_activation_restriction(&mut self, target: &str) {
         eprintln!("activation_restriction: target={}", target);
         self.game_state.prohibition_effects.push(format!("activation_restriction:{}", target));
-        Ok(())
     }
 
-    fn execute_choose_required_hearts(&mut self) -> Result<(), String> {
+    fn execute_choose_required_hearts(&mut self) {
         self.pending_choice = Some(Choice::SelectTarget {
             target: "choose_required_hearts".to_string(),
             description: "Choose required hearts".to_string(),
             allow_skip: false,
         });
-        Ok(())
     }
 
     fn execute_modify_limit(&mut self, operation: &str, count: u32) -> Result<(), String> {
@@ -1722,9 +1744,9 @@ impl<'a> AbilityResolver<'a> {
             player.stage.stage.to_vec()
         };
         for &card_id in stage_cards.iter().filter(|&&id| id != -1) {
-            let current = self.game_state.get_blade_modifier(card_id);
+            let current = self.game_state.mods.get_blade_modifier(card_id);
             let delta = (value as i32) - current;
-            self.game_state.add_blade_modifier(card_id, delta);
+            self.game_state.mods.add_blade_modifier(card_id, delta);
         }
         Ok(())
     }
@@ -1741,7 +1763,7 @@ impl<'a> AbilityResolver<'a> {
                 *color_counts.entry(color).or_insert(0) += 1;
             }
             for (color, count) in &color_counts {
-                self.game_state.set_need_heart_modifier(card_id, *color, *count as i32);
+                self.game_state.mods.set_need_heart_modifier(card_id, *color, *count as i32);
             }
         }
         Ok(())
@@ -1757,20 +1779,19 @@ impl<'a> AbilityResolver<'a> {
             if let Some(aid) = activating_id {
                 if card_id != aid { continue; }
             }
-            self.game_state.set_score_modifier(card_id, value as i32);
+            self.game_state.mods.set_score_modifier(card_id, value as i32);
         }
         Ok(())
     }
 
-    fn execute_specify_heart_color(&mut self, choice: bool, target: &str) -> Result<(), String> {
+    fn execute_specify_heart_color(&mut self, choice: bool, target: &str) {
         eprintln!("specify_heart_color: choice={}, target={}", choice, target);
         if choice {
             self.pending_choice = Some(Choice::SelectTarget { target: "heart_color".to_string(), description: "Choose a heart color".to_string(), allow_skip: false });
         }
-        Ok(())
     }
 
-    fn execute_set_card_identity_all_regions(&mut self, identities: Option<&Vec<String>>, target: &str) -> Result<(), String> {
+    fn execute_set_card_identity_all_regions(&mut self, identities: Option<&Vec<String>>, target: &str) {
         let _target = target;
         let card_id = self.activating_card_id.or_else(|| self.game_state.activating_card);
         if let Some(card_id) = card_id {
@@ -1780,7 +1801,6 @@ impl<'a> AbilityResolver<'a> {
                 }
             }
         }
-        Ok(())
     }
 
     fn execute_modify_required_hearts_success(&mut self, operation: &str, value: u32, target: &str, card_type: Option<&str>) -> Result<(), String> {
@@ -1791,7 +1811,7 @@ impl<'a> AbilityResolver<'a> {
         for card_id in card_ids {
             for color_str in &heart_colors {
                 let color = crate::zones::parse_heart_color(color_str);
-                self.game_state.add_need_heart_modifier(card_id, color, delta);
+                self.game_state.mods.add_need_heart_modifier(card_id, color, delta);
             }
         }
         Ok(())
@@ -1799,26 +1819,24 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_set_cost_to_use(&mut self, value: u32) -> Result<(), String> {
         let card_id = self.activating_card_id.or_else(|| self.game_state.activating_card);
-        if let Some(card_id) = card_id { self.game_state.set_cost_modifier(card_id, value as i32); }
+        if let Some(card_id) = card_id { self.game_state.mods.set_cost_modifier(card_id, value as i32); }
         Ok(())
     }
 
-    fn execute_all_blade_timing(&mut self, timing: &str, treat_as: &str) -> Result<(), String> {
+    fn execute_all_blade_timing(&mut self, timing: &str, treat_as: &str) {
         let card_id = self.activating_card_id.or_else(|| self.game_state.activating_card);
         if let Some(card_id) = card_id {
             self.game_state.prohibition_effects.push(format!("all_blade_timing:{}:{}:{}", card_id, timing, treat_as));
         }
-        Ok(())
     }
 
-    fn execute_shuffle(&mut self, target: &str, source: &str) -> Result<(), String> {
+    fn execute_shuffle(&mut self, target: &str, source: &str) {
         let player = self.game_state.resolve_target_player_mut(target);
         match source {
             "deck" => { use rand::seq::SliceRandom; player.main_deck.cards.shuffle(&mut rand::thread_rng()); }
             "energy_deck" => { use rand::seq::SliceRandom; player.energy_deck.cards.shuffle(&mut rand::thread_rng()); }
             _ => { eprintln!("Unknown shuffle zone: {}", source); }
         }
-        Ok(())
     }
 
     fn execute_modify_cost(&mut self, operation: &str, value: u32, target: &str, card_type: Option<&str>) -> Result<(), String> {
@@ -1829,8 +1847,8 @@ impl<'a> AbilityResolver<'a> {
             else { player.hand.cards.iter().copied().collect() };
         let delta = match operation { "add" => value as i32, "subtract" => -(value as i32), "set" => value as i32, _ => return Err(format!("Unknown operation: {}", operation)) };
         for card_id in card_ids {
-            if operation == "set" { self.game_state.set_cost_modifier(card_id, delta); }
-            else { self.game_state.add_cost_modifier(card_id, delta); }
+            if operation == "set" { self.game_state.mods.set_cost_modifier(card_id, delta); }
+            else { self.game_state.mods.add_cost_modifier(card_id, delta); }
         }
         Ok(())
     }

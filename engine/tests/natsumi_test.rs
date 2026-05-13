@@ -43,7 +43,7 @@ fn natsumi_live_start_blade_per_2_hand() {
     game.pass(); // FirstAttackerPerformance (LiveStart fires here)
 
     // LiveStart fired: per_unit(hand, 2) → 6 hand cards ÷ 2 = 3 blade
-    let blade_mod = game.state.get_blade_modifier(natsumi);
+    let blade_mod = game.state.mods.get_blade_modifier(natsumi);
     assert_eq!(blade_mod, 3,
         "6 hand cards should give 3 blade (per 2 cards): 6/2*1=3");
 }

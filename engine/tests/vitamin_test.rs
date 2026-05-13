@@ -68,7 +68,7 @@ fn vitamin_q128_hand_greater_triggers_score() {
     assert!(p1_hand > p2_hand,
         "P1 hand ({}) must be > P2 hand ({}) for condition to pass", p1_hand, p2_hand);
 
-    let score_mod = game.state.get_score_modifier(vitamin);
+    let score_mod = game.state.mods.get_score_modifier(vitamin);
     assert_eq!(score_mod, 1,
         "Q128: Score +1 when P1 hand > P2 hand at LiveSuccess");
 }
@@ -109,7 +109,7 @@ fn vitamin_q119_score_locked_after_resolution() {
     game.pass();
 
     // Score should be +1 after LiveSuccess resolution
-    assert_eq!(game.state.get_score_modifier(vitamin), 1,
+    assert_eq!(game.state.mods.get_score_modifier(vitamin), 1,
         "Q119: Score should be +1 after LiveSuccess ability resolves");
 
     // Now change hand counts dramatically — the score modifier should NOT change
@@ -118,7 +118,7 @@ fn vitamin_q119_score_locked_after_resolution() {
 
     // The score modifier is locked in from the LiveSuccess evaluation
     // Even if P1 hand < P2 hand now, the already-applied score stays
-    assert_eq!(game.state.get_score_modifier(vitamin), 1,
+    assert_eq!(game.state.mods.get_score_modifier(vitamin), 1,
         "Q119: Score stays +1 even after hand counts change post-resolution");
 }
 
@@ -151,8 +151,8 @@ fn vitamin_hand_less_or_equal_no_score() {
     game.pass();
     game.pass();
 
-    let _score_mod = game.state.get_score_modifier(vitamin);
-    let score_mod = game.state.get_score_modifier(vitamin);
+    let _score_mod = game.state.mods.get_score_modifier(vitamin);
+    let score_mod = game.state.mods.get_score_modifier(vitamin);
     assert_eq!(score_mod, 0,
         "No score bonus when P1 hand <= P2 hand");
 }

@@ -671,7 +671,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }}
                 if cost.state_change.as_deref() == Some("wait") && cost.self_cost == Some(true) {
                     if let Some(id) = self.game_state.activating_card {
-                        self.game_state.add_orientation_modifier(id, "wait");
+                        self.game_state.mods.add_orientation_modifier(id, "wait");
                     }
                 }
                 eprintln!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
@@ -823,11 +823,11 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     player.hand.add_card(*card_id);
                 }
                 // Apply state_change and record movement (same as move_cards executor)
-                self.game_state.clear_modifiers_for_card(*card_id);
+                self.game_state.mods.clear_all_for_card(*card_id);
                 self.game_state.record_card_movement(*card_id);
                 if let Some(ref sc) = state_change {
                     if sc == "wait" {
-                        self.game_state.add_orientation_modifier(*card_id, "wait");
+                        self.game_state.mods.add_orientation_modifier(*card_id, "wait");
                     }
                 }
             }
@@ -971,7 +971,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             _ => return Err(format!("Unknown zone: {}", zone)),
         }
-        for cid in moved { self.game_state.clear_modifiers_for_card(cid); }
+        for cid in moved { self.game_state.mods.clear_all_for_card(cid); }
         Ok(())
     }
 

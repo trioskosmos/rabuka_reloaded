@@ -56,4 +56,14 @@ fn test_yoshiko_filter_logic() {
     
     println!("Matching indices: {:?}", matching_indices);
     println!("Cards that would be moved: {:?}", matching_indices.iter().map(|&i| stage_data[i]).collect::<Vec<_>>());
+
+    // Stage: [Chika (Aqours), Yoshiko (Aqours, excluded), Riko (Aqours)]
+    // Filter: member_card, Aqours, exclude_self=yoshiko
+    // Expected matches: Chika (index 0) and Riko (index 2), NOT Yoshiko (index 1)
+    assert_eq!(matching_indices, vec![0usize, 2],
+        "filter should match Chika (idx=0) and Riko (idx=2), excluding Yoshiko (idx=1)");
+    assert_eq!(stage_data[matching_indices[0]], chika,
+        "first match should be Chika");
+    assert_eq!(stage_data[matching_indices[1]], riko,
+        "second match should be Riko");
 }

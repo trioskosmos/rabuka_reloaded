@@ -53,7 +53,7 @@ fn smile_q224_live_success_score_plus_1() {
         .or_else(|| game.state.player1.success_live_card_zone.cards.first())
         .copied().unwrap_or(smile);
 
-    let score_mod = game.state.get_score_modifier(mod_id);
+    let score_mod = game.state.mods.get_score_modifier(mod_id);
     assert_eq!(score_mod, 1,
         "LiveSuccess condition met → +1 score (got {})", score_mod);
 }

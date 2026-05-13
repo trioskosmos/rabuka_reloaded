@@ -561,7 +561,7 @@ impl<'a> AbilityResolver<'a> {
         // --- STEP 3: Apply state_change to moved cards ---
         if let Some(ref sc) = effect.state_change {
             if sc == "wait" {
-                for card_id in &moved_cards { self.game_state.add_orientation_modifier(*card_id, "wait"); }
+                for card_id in &moved_cards { self.game_state.mods.add_orientation_modifier(*card_id, "wait"); }
                 if destination == "energy_zone" {
                     {
                         let p = match tgt.as_deref().unwrap_or("self") {
@@ -573,7 +573,7 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
             } else if sc == "active" {
-                for card_id in &moved_cards { self.game_state.add_orientation_modifier(*card_id, "active"); }
+                for card_id in &moved_cards { self.game_state.mods.add_orientation_modifier(*card_id, "active"); }
                 if destination == "energy_zone" {
                     let p = match tgt.as_ref().map(|s| s.as_str()).unwrap_or("self") {
                         "self" => &mut self.game_state.player1,
@@ -585,7 +585,7 @@ impl<'a> AbilityResolver<'a> {
             }
         }
 
-        for card_id in &moved_cards { self.game_state.clear_modifiers_for_card(*card_id); }
+        for card_id in &moved_cards { self.game_state.mods.clear_all_for_card(*card_id); }
         for card_id in &moved_cards { self.game_state.record_card_movement(*card_id); }
         
         // Store moved cards on the resolver for chained condition checking

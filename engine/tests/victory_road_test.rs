@@ -70,4 +70,15 @@ fn victory_road_q217_q227_cost_handling() {
 
     eprintln!("[Q217/Q227] Done. safety={}", safety);
     assert!(safety < 10, "Didn't loop infinitely");
+
+    // After resolving all choices, the live card (victory road) should be in the live zone
+    // and the multi-member card should still be on stage
+    assert!(game.state.player1.live_card_zone.cards.contains(&victory),
+        "Victory Road should be set as live card");
+    assert!(game.state.player1.stage.stage.contains(&multi),
+        "Multi-member card should remain on stage after LiveStart resolution");
+    // The victory road ability (each_time on LiveSuccess → draw 1) hasn't fired yet
+    // but the setup should be valid
+    assert!(!game.has_pending_choice(),
+        "All pending choices should be drained after LiveStart resolution");
 }

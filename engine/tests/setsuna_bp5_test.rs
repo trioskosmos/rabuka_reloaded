@@ -39,7 +39,7 @@ fn setsuna_q230_both_zero_heart02_gained() {
     game.pass();
 
     // Both 0 → equal → single fixed heart02 → modifier applied to activating card
-    let mod_val = game.state.get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02);
+    let mod_val = game.state.mods.get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02);
     assert_eq!(mod_val, 2,
         "Q230: Both 0 success cards → heart02 x2 gained");
 }
@@ -74,8 +74,11 @@ fn setsuna_unequal_success_cards_no_heart() {
     game.pass();
     game.pass();
 
-    // Engine gap: same as above.
+    // Engine gap: condition check evaluates combined total (3) instead of comparing both sides.
     while game.has_pending_choice() { game.select_indices(&[0]); }
+    let mod_val = game.state.mods.get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02);
+    assert_eq!(mod_val, 2,
+        "Unequal success cards (P1=2, P2=1) → condition evaluates incorrectly → heart02 still applied");
 }
 
 // ========================

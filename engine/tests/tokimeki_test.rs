@@ -45,7 +45,7 @@ fn tokimeki_q216_missing_hearts_no_score() {
     game.pass();
     game.pass();
 
-    let has_mod = game.state.get_score_modifier(tokimeki);
+    let has_mod = game.state.mods.get_score_modifier(tokimeki);
     assert_eq!(has_mod, 0,
         "Q216: Missing heart01/03/06 → no +1 score");
 }
@@ -77,7 +77,7 @@ fn tokimeki_all_6_colors_collectively_score_plus_1() {
     game.pass();
     game.pass();
 
-    assert_eq!(game.state.get_score_modifier(tokimeki), 1,
+    assert_eq!(game.state.mods.get_score_modifier(tokimeki), 1,
         "Q216: All 6 colors collectively → +1 score");
 }
 
@@ -108,6 +108,6 @@ fn tokimeki_q232_modifier_separate_from_base_score() {
     game.pass();
     game.pass();
 
-    assert_eq!(game.state.get_score_modifier(tokimeki), 1,
+    assert_eq!(game.state.mods.get_score_modifier(tokimeki), 1,
         "Q232: All 6 colors → Modifier +1 applied");
 }

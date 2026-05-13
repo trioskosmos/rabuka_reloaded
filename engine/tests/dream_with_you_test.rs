@@ -34,7 +34,7 @@ fn dream_with_you_q116_blade_10_score_plus_1() {
 
     while game.has_pending_choice() { game.select_indices(&[]); }
 
-    let mod_val = game.state.get_score_modifier(dream);
+    let mod_val = game.state.mods.get_score_modifier(dream);
     assert_eq!(mod_val, 1, "Blade ≥10 → score +1");
 }
 
@@ -65,7 +65,7 @@ fn dream_with_you_q116_blade_6_no_score() {
 
     while game.has_pending_choice() { game.select_indices(&[]); }
 
-    let mod_val = game.state.get_score_modifier(dream);
+    let mod_val = game.state.mods.get_score_modifier(dream);
     eprintln!("[DREAM] score_mod={}", mod_val);
     assert_eq!(mod_val, 0, "Blade <10 → no score");
 }

@@ -61,7 +61,7 @@ fn advance_to_live_start(game: &mut TestGame) {
 #[allow(dead_code)]
 fn assert_score(game: &TestGame, expected: i32) {
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    assert_eq!(game.state.get_score_modifier(live_card_id), expected);
+    assert_eq!(game.state.mods.get_score_modifier(live_card_id), expected);
 }
 
 fn assert_energy(game: &TestGame, active: usize, total: usize) {
@@ -171,6 +171,10 @@ fn ai_screeam_answer_both_gain_blade() {
 
     // Verify blade modifiers were applied
     assert!(!game.has_pending_choice(), "No more pending choices after blade gain");
+    assert!(game.state.mods.get_blade_modifier(p1_member) > 0,
+        "P1 member should have gained blade modifier");
+    assert!(game.state.mods.get_blade_modifier(p2_member) > 0,
+        "P2 member should have gained blade modifier");
 }
 
 // ====================================================================
@@ -212,7 +216,7 @@ fn distortion_q97_all_active_no_catchu_score_plus_1() {
     assert!(!game.has_pending_choice(), "No pending choices expected");
 
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    let score_mod = game.state.get_score_modifier(live_card_id);
+    let score_mod = game.state.mods.get_score_modifier(live_card_id);
     assert_eq!(score_mod, 1, "Score should be +1 when all energy active (Q97)");
 }
 
@@ -237,7 +241,7 @@ fn distortion_q96_score_permanent_after_energy_used() {
     advance_to_live_start(&mut game);
 
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    assert_eq!(game.state.get_score_modifier(live_card_id), 1,
+    assert_eq!(game.state.mods.get_score_modifier(live_card_id), 1,
         "Score should be +1 initially (Q96 precondition)");
 
     // Q96: Later making energy non-all-active doesn't undo score +1
@@ -247,7 +251,7 @@ fn distortion_q96_score_permanent_after_energy_used() {
         "Energy should not be all-active anymore");
 
     // Score modifier should still be +1
-    assert_eq!(game.state.get_score_modifier(live_card_id), 1,
+    assert_eq!(game.state.mods.get_score_modifier(live_card_id), 1,
         "Score +1 is permanent even after energy becomes non-all-active (Q96)");
 }
 
@@ -293,7 +297,7 @@ fn distortion_basic_energy_refresh_with_catchu() {
 
     // Now all energy active → score +1 should fire
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    assert_eq!(game.state.get_score_modifier(live_card_id), 1,
+    assert_eq!(game.state.mods.get_score_modifier(live_card_id), 1,
         "Score should be +1 when all energy becomes active");
 }
 
@@ -327,7 +331,7 @@ fn distortion_no_refresh_when_no_wait_energy() {
     assert!(!game.has_pending_choice(), "No pending choices expected");
 
     let live_card_id = game.state.player1.live_card_zone.cards[0];
-    assert_eq!(game.state.get_score_modifier(live_card_id), 1,
+    assert_eq!(game.state.mods.get_score_modifier(live_card_id), 1,
         "Score +1 even with no wait energy (all already active)");
 }
 
@@ -355,7 +359,7 @@ fn distortion_max_cap_8_wait_refresh_6_only() {
     assert_eq!(game.state.player1.energy_zone.active_energy_count, 6,
         "Only 6 of 8 wait cards should be refreshed (capped by max)");
     assert_eq!(game.state.player1.energy_zone.cards.len(), 8);
-    assert_eq!(game.state.get_score_modifier(
+    assert_eq!(game.state.mods.get_score_modifier(
         game.state.player1.live_card_zone.cards[0]), 0,
         "Not all active -> no +1");
 }
@@ -382,7 +386,7 @@ fn distortion_exact_max_boundary_6_wait_all_refreshed() {
     advance_to_live_start(&mut game);
     assert!(!game.has_pending_choice());
     assert_energy(&game, 6, 6);
-    assert_eq!(game.state.get_score_modifier(
+    assert_eq!(game.state.mods.get_score_modifier(
         game.state.player1.live_card_zone.cards[0]), 1);
 }
 
@@ -408,7 +412,7 @@ fn distortion_same_name_catchu_condition_not_met() {
     advance_to_live_start(&mut game);
     assert!(!game.has_pending_choice());
     assert_energy(&game, 3, 7);
-    assert_eq!(game.state.get_score_modifier(
+    assert_eq!(game.state.mods.get_score_modifier(
         game.state.player1.live_card_zone.cards[0]), 0);
 }
 
@@ -437,7 +441,7 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
     assert!(!game.has_pending_choice());
     assert_eq!(game.state.player1.energy_zone.active_energy_count, 7);
     let total_score: i32 = game.state.player1.live_card_zone.cards.iter()
-        .map(|&cid| game.state.get_score_modifier(cid))
+        .map(|&cid| game.state.mods.get_score_modifier(cid))
         .sum();
     // Q103 answer: +1 total. Current engine gives +4 because both duplicate
     // cards share the same database ID, so "このカード" scoping can't distinguish them.
@@ -608,8 +612,8 @@ fn nico_q168_both_appear_from_discard() {
     assert!(p1_members.contains(&cheap_p1), "P1 should have their cheap member on stage");
     assert!(p2_members.contains(&cheap_p2), "P2 should have their cheap member on stage");
     // Verify wait state on the placed cards
-    assert_eq!(game.state.get_orientation_modifier(cheap_p1), Some(&"wait".to_string()), "P1's cheap member should be in wait state");
-    assert_eq!(game.state.get_orientation_modifier(cheap_p2), Some(&"wait".to_string()), "P2's cheap member should be in wait state");
+    assert_eq!(game.state.mods.get_orientation_modifier(cheap_p1), Some(&"wait".to_string()), "P1's cheap member should be in wait state");
+    assert_eq!(game.state.mods.get_orientation_modifier(cheap_p2), Some(&"wait".to_string()), "P2's cheap member should be in wait state");
 }
 
 #[test]
@@ -666,7 +670,7 @@ fn nico_q170_turn_player_appears_first() {
     // Verify P1 got their cheap member in wait state
     let p1_members: Vec<i16> = game.state.player1.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
     assert!(p1_members.contains(&cheap_p1), "P1 should have their cheap member");
-    assert_eq!(game.state.get_orientation_modifier(cheap_p1), Some(&"wait".to_string()), "P1's member should be in wait state");
+    assert_eq!(game.state.mods.get_orientation_modifier(cheap_p1), Some(&"wait".to_string()), "P1's member should be in wait state");
 }
 
 // ── Q181: Area freed when appeared card leaves → new card can appear ──
@@ -709,7 +713,7 @@ fn nico_q181_area_freed_after_card_leaves() {
     // The appeared member (cheap) is in a stage area now (center)
     let cheap_area = game.state.player1.stage.stage.iter().position(|&id| id == cheap);
     assert!(cheap_area.is_some(), "Cheap member should be on P1's stage");
-    assert_eq!(game.state.get_orientation_modifier(cheap), Some(&"wait".to_string()), "P1's member should be in wait state");
+    assert_eq!(game.state.mods.get_orientation_modifier(cheap), Some(&"wait".to_string()), "P1's member should be in wait state");
 
     // Move the appeared member to discard (simulating removal)
     let removed_id = game.state.player1.stage.stage[cheap_area.unwrap()];
@@ -798,7 +802,7 @@ fn nico_cost_filter_only_shows_eligible() {
     let p1_has_cheap = game.state.player1.stage.stage.iter().filter(|&&id| id == cheap).count();
     assert_eq!(p1_has_cheap, 1, "Cost-2 card should appear on stage exactly once");
     assert!(!p1_has_expensive, "Cost-9 card should NOT appear on stage");
-    assert_eq!(game.state.get_orientation_modifier(cheap), Some(&"wait".to_string()), "P1's cheap member should be in wait state");
+    assert_eq!(game.state.mods.get_orientation_modifier(cheap), Some(&"wait".to_string()), "P1's cheap member should be in wait state");
 
     // Verify the expensive card is still in the discard (was never a candidate)
     assert!(game.state.player1.waitroom.cards.contains(&expensive),
@@ -1071,7 +1075,7 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
     } else {
         panic!("P1 live card disappeared");
     };
-    assert_eq!(game.state.get_score_modifier(p1_target), 1,
+    assert_eq!(game.state.mods.get_score_modifier(p1_target), 1,
         "P1 should get +1 when P1 hearts > P2 hearts (Q150)");
     // P2 live card failed heart satisfaction (only 2 hearts, needs 15) → removed
     // So P2 gets no score modifier (can't test condition since card didn't survive)
@@ -1191,9 +1195,9 @@ fn hareruya_q64_waitroom_only_five_distinct_liella_condition_met() {
     }
 
     let card_id = game.state.player1.live_card_zone.cards[0];
-    let h02_mod = game.state.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart02);
-    let h03_mod = game.state.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart03);
-    let h06_mod = game.state.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart06);
+    let h02_mod = game.state.mods.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart02);
+    let h03_mod = game.state.mods.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart03);
+    let h06_mod = game.state.mods.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart06);
     assert!(h02_mod >= 2, "heart02 should be set >= 2 by set_required_hearts (got {})", h02_mod);
     assert!(h03_mod >= 2, "heart03 should be set >= 2 by set_required_hearts (got {})", h03_mod);
     assert!(h06_mod >= 2, "heart06 should be set >= 2 by set_required_hearts (got {})", h06_mod);
@@ -1231,7 +1235,7 @@ fn hareruya_q74_multiname_distinct_counting() {
 
     // Q74: Verify condition was met (need_heart modifiers set)
     let card_id = game.state.player1.live_card_zone.cards[0];
-    let h02_mod = game.state.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart02);
+    let h02_mod = game.state.mods.get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart02);
     assert_eq!(h02_mod, 2, "set_required_hearts should fire with 5 distinct Liella! names (Q74)");
 }
 

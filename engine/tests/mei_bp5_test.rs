@@ -55,8 +55,22 @@ fn mei_bp5_q235_debut_look_and_select_with_multiname() {
     let on_stage = game.state.player1.stage.stage[0];
     assert_eq!(on_stage, mei, "Mei should be on stage");
 
-    // Q235: Multi-name cards can be handled in the look_and_select flow
-    eprintln!("[Mei Q235] Debut ability fired successfully with multi-name card in deck");
+    // Resolve the look_and_select choice: accept all cards to hand
+    if game.has_pending_choice() {
+        game.select_indices(&[0, 1, 2, 3, 4]);  // select all 5 looked-at cards
+    }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Q235: Multi-name card should either be in hand (added) or in waitroom (discarded)
+    let multiname_in_hand = game.state.player1.hand.cards.contains(&multiname);
+    let multiname_in_waitroom = game.state.player1.waitroom.cards.contains(&multiname);
+    assert!(multiname_in_hand || multiname_in_waitroom,
+        "Multi-name card should have been either added to hand or discarded to waitroom during look_and_select");
+    // Deck should have fewer cards (look_and_select removes from deck top)
+    assert!(!game.state.player1.main_deck.cards.contains(&multiname),
+        "Multi-name card should no longer be in the deck (removed by look_and_select)");
 }
 
 

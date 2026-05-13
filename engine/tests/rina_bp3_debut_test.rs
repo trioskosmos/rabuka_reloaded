@@ -43,7 +43,7 @@ fn cost_paid_applies_wait_state() {
     if game.has_pending_choice() { game.select_indices(&[]); }
 
     // Verify Rin is in wait state
-    let orientation = game.state.get_orientation_modifier(rin).cloned();
+    let orientation = game.state.mods.get_orientation_modifier(rin).cloned();
     assert_eq!(orientation, Some("wait".to_string()),
         "Rin should be in wait state after paying optional cost");
 }
@@ -73,7 +73,7 @@ fn cost_skipped_does_not_apply_wait_state() {
     if game.has_pending_choice() { game.select_indices(&[]); }
 
     // Verify Rin is NOT in wait state
-    let orientation = game.state.get_orientation_modifier(rin).cloned();
+    let orientation = game.state.mods.get_orientation_modifier(rin).cloned();
     assert!(orientation.is_none() || orientation == Some("active".to_string()),
         "Rin should NOT be in wait state after skipping optional cost");
 }

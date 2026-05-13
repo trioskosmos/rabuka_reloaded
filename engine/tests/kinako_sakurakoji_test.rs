@@ -24,7 +24,7 @@ fn kinako_q94_debut_grants_2_blade() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(kinako, rabuka_engine::zones::MemberArea::LeftSide);
 
-    assert_eq!(game.state.get_blade_modifier(kinako), 2,
+    assert_eq!(game.state.mods.get_blade_modifier(kinako), 2,
         "Debut grants 2 blade (Q94)");
 }
 
@@ -44,6 +44,6 @@ fn kinako_q171_blade_live_end_duration() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(kinako, rabuka_engine::zones::MemberArea::LeftSide);
 
-    assert_eq!(game.state.get_blade_modifier(kinako), 2,
+    assert_eq!(game.state.mods.get_blade_modifier(kinako), 2,
         "2 blade granted with live_end duration (Q171)");
 }

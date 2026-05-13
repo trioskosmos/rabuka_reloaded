@@ -73,7 +73,13 @@ fn emma_bp5_q215_no_energy_cost_fails_gracefully() {
     game.state.player1.hand.cards.push(filler);
     // No energy given
 
-    game.activate_ability(emma);
-    // Cost fails (no energy), no crash
-    eprintln!("[EMMA] no energy: activation completed");
+    let result = game.try_activate_ability(emma);
+    // Cost succeeds (place 0 energy under member), effect fails silently
+    assert!(result.is_ok(),
+        "Activation with 0 energy should not panic/crash");
+    // State unchanged — no energy to remove, no cards moved
+    assert_eq!(game.state.player1.stage.stage[1], emma,
+        "Emma should remain on stage after activation with 0 energy");
+    assert_eq!(game.state.player1.energy_zone.cards.len(), 0,
+        "Energy zone should still be empty after activation with 0 energy");
 }
