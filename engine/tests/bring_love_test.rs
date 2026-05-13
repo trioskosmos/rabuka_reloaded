@@ -20,7 +20,7 @@ fn bring_love_q225_multiname_counts_as_one_member() {
     assert_eq!(stage_ids[0], multi, "Multi-name card occupies the slot");
 
     // Verify the card's name contains '&' separating 3 individuals
-    let card = game.state.card_database.get_card(multi).unwrap();
+    let card = game.state.card_database.get_card(multi).expect("Multi-name card should exist");
     let name = &card.name;
     let parts: Vec<&str> = name.split('&').collect();
     assert!(parts.len() >= 3, "Multi-name card has 3+ individual names");

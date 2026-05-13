@@ -356,7 +356,7 @@ fn rina_debit_triggers_with_target_in_discard() {
     // Instead, manually trigger the debut ability.
     // 登場 ability doesn't trigger via try_activate_ability — it's not 起動
     // Instead, place the card on stage and check the ability was parsed
-    let card = db.get_card_by_no("PL!N-PR-026-PR").unwrap();
+    let card = db.get_card_by_no("PL!N-PR-026-PR").expect("Rina PR card should exist");
     let has_debut = card.abilities.iter().any(|a| a.triggers.as_deref() == Some("登場"));
     assert!(has_debut, "Rina has 登場 ability");
 }

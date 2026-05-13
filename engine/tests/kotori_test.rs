@@ -57,7 +57,7 @@ fn kotori_q208_multiname_and_single_coexist() {
     assert_eq!(member_count, 2, "2 cards = 2 members (Q208)");
 
     // The multi-name card's OTHER names (かのん, 花帆) are unique
-    let card = game.db.get_card(multi).unwrap();
+    let card = game.db.get_card(multi).expect("Multi-name card should exist");
     assert!(card.name.contains("かのん"));
     assert!(card.name.contains("花帆"));
 

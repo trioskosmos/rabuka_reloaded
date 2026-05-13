@@ -21,6 +21,8 @@ fn test_yoshiko_filter_logic() {
     let stage_data = game.player().stage.stage.clone();
     let card_db = game.state.card_database.clone();
     
+    assert!(game.state.card_database.get_card(chika).is_some(), "Chika card should exist in DB");
+    assert!(game.state.card_database.get_card(riko).is_some(), "Riko card should exist in DB");
     println!("Stage: {:?}", stage_data);
     
     // Test the filter that should be used by the ability

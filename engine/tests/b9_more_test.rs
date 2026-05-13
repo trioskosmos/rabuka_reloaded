@@ -32,7 +32,8 @@ fn cutie_panther_live_start_reduce_hearts() {
 fn kaguya_live_success_recover() {
     let db = load_real_database();
     let kaguya = db.get_card_id("PL!-pb1-031-L").expect("Card exists");
-    assert!(!db.get_card(kaguya).unwrap().abilities.is_empty(), "Card should have abilities");
+    let kaguya_card = db.get_card(kaguya).expect("Kaguya card exists");
+    assert!(!kaguya_card.abilities.is_empty(), "Card should have abilities");
 }
 
 /// Kaguya live success ability: verify it can recover a μ's member from cheer-revealed cards.
@@ -87,7 +88,7 @@ fn kaguya_live_success_cheer_recover() {
 fn mijuku_dreamer_live_success_timing() {
     let db = load_real_database();
     let card = db.get_card_id("PL!S-bp2-022-L").expect("Card exists");
-    let c = db.get_card(card).unwrap();
+    let c = db.get_card(card).expect("Mijuku card should exist");
     assert!(!c.abilities.is_empty());
 }
 
@@ -96,7 +97,7 @@ fn mijuku_dreamer_live_success_timing() {
 fn tiny_stars_live_success_timing() {
     let db = load_real_database();
     let card = db.get_card_id("PL!SP-bp1-024-L").expect("Card exists");
-    let c = db.get_card(card).unwrap();
+    let c = db.get_card(card).expect("Tiny Stars card should exist");
     assert!(!c.abilities.is_empty());
 }
 
@@ -105,6 +106,6 @@ fn tiny_stars_live_success_timing() {
 fn kanan_live_success_timing() {
     let db = load_real_database();
     let card = db.get_card_id("PL!S-pb1-003-R").expect("Card exists");
-    let c = db.get_card(card).unwrap();
+    let c = db.get_card(card).expect("Kanan card should exist");
     assert!(!c.abilities.is_empty());
 }

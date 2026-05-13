@@ -45,8 +45,7 @@ fn test_yoshiko_card_identities() {
     if let Some(yoshiko_card) = game.state.card_database.get_card(yoshiko) {
         assert_eq!(yoshiko_card.unit.as_deref(), Some("GuiltyKiss"),
             "Yoshiko should belong to GuiltyKiss unit");
-        assert!(yoshiko_card.name.contains("善子") || yoshiko_card.name.contains("Yoshiko"),
-            "Card name should reference Yoshiko");
+        assert_eq!(yoshiko_card.name, "津島善子", "Card name should be 津島善子");
     }
 
     if let Some(chika_card) = game.state.card_database.get_card(chika) {

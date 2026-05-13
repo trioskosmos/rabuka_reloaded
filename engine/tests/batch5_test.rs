@@ -13,7 +13,7 @@ use helpers::*;
 fn maki_sd1_q125_restriction_parsed() {
     let db = load_real_database();
     let card = db.get_card_id("PL!-sd1-006-SD").expect("Card exists");
-    let card_data = db.get_card(card).unwrap();
+    let card_data = db.get_card(card).expect("Maki card should exist");
     let has_restriction = card_data.abilities.iter().any(|a| {
         a.full_text.contains("成功ライブカード")
     });
@@ -54,7 +54,7 @@ fn you_s3_q153_live_success_draw_if_fewer_revealed() {
 fn hanamaru_s3_q155_constant_cost_increase() {
     let db = load_real_database();
     let card = db.get_card_id("PL!S-bp3-016-N").expect("Card exists");
-    let card_data = db.get_card(card).unwrap();
+    let card_data = db.get_card(card).expect("Hanamaru card should exist");
     assert!(!card_data.abilities.is_empty(), "Card should have abilities");
     let constant_ability = card_data.abilities.iter().any(|a| {
         a.triggers.as_ref().map_or(false, |t| t == "常時")

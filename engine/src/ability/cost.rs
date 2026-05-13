@@ -379,7 +379,8 @@ impl<'a> AbilityResolver<'a> {
                     cost.position.as_ref(),
                     cost.optional.unwrap_or(false),
                     cost.source.as_deref(),
-                )
+                );
+                Ok(())
             }
             Some("custom") => {
                 if cost.destination.as_deref() == Some("under_member") {
@@ -389,7 +390,7 @@ impl<'a> AbilityResolver<'a> {
                         cost.position.as_ref(),
                         cost.optional.unwrap_or(false),
                         None,
-                    )?;
+                    );
                 }
                 Ok(())
             }

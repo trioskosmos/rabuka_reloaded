@@ -36,7 +36,7 @@ fn mia_q190_heart_selection_excludes_heart00() {
     if game.has_pending_choice() {
         // Verify the choice options don't include heart00
         if let Some(ref pc) = game.state.pending_choice {
-            let json = pc.as_object().unwrap();
+            let json = pc.as_object().expect("pending_choice should be an object");
             if let Some(opts) = json.get("options").and_then(|o| o.as_array()) {
                 for opt in opts {
                     let s = opt.as_str().unwrap_or("");

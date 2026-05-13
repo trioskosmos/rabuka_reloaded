@@ -240,10 +240,12 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 "discard" => {
-                    let filter = util::filter_from_parts_full(card_type_filter, group_name, cost_limit, None, character_filter.as_ref(), name_fragments.as_ref(), None, None);
+                    let filter = util::filter_from_parts_full(card_type_filter, group_name, cost_limit, effect.cost_limit_operator.as_deref(), character_filter.as_ref(), name_fragments.as_ref(), None, None);
                     let mut idxs = util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
                     idxs.retain(|&i| i < player.waitroom.cards.len());
                     if effect.self_target.unwrap_or(false) { if let Some(aid) = activating_card_id { idxs.retain(|&i| i < player.waitroom.cards.len() && player.waitroom.cards[i] == aid); } }
+                    // For max=true, allow selecting fewer than count cards
+                    let can_skip = is_max || effect.optional.unwrap_or(false);
                     match classify_selection(&idxs, count, is_all, InsufficientBehavior::Silent)? {
                         SelectionOutcome::Exact(indices) => indices.iter().rev().map(|&i| player.waitroom.cards.remove(i)).collect(),
                         SelectionOutcome::Prompt => {
@@ -253,7 +255,7 @@ impl<'a> AbilityResolver<'a> {
                                 card_type: card_type_filter.map(|s| s.to_string()),
                                 count,
                                 description: format!("Select {} card(s) from discard", count),
-                                allow_skip: false,
+                                allow_skip: can_skip,
                                 cost_limit,
                                 cost_limit_operator: effect.cost_limit_operator.clone(),
                                 group: group_name.map(|s| s.to_string()),
@@ -477,13 +479,14 @@ impl<'a> AbilityResolver<'a> {
                 "under_member" => {
                     // Move from under_member to destination needs a choice.
                     // Delegate to place_energy_under_member for choice creation.
-                    return self.execute_place_energy_under_member(
+                    self.execute_place_energy_under_member(
                         count as u32,
                         effect.target_name(),
                         effect.position.as_ref(),
                         effect.optional.unwrap_or(false),
                         Some("under_member"),
                     );
+                    return Ok(());
                 }
                 _ => { return Err(format!("Unknown source zone: {}", source)); }
             };

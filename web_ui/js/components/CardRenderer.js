@@ -145,8 +145,8 @@ export const CardRenderer = {
         // Rust backend format: card_no, name, card_type, orientation
         // Support both hidden field and card_no === -2/-1 for hidden cards
         const isHidden = resolvedCard.hidden || resolvedCard.is_hidden || resolvedCard.card_no === -2 || resolvedCard.card_no === -1;
-        // Engine sends card_type as string enum
-        const isLive = resolvedCard.card_type === 'Live' || resolvedCard.card_type === 'ライブ';
+        // Engine sends card_type as string enum; static database uses `type`
+        const isLive = resolvedCard.card_type === 'Live' || resolvedCard.card_type === 'ライブ' || resolvedCard.type === 'ライブ';
 
         // 1. Determine CSS Classes
         const classNames = ['card'];

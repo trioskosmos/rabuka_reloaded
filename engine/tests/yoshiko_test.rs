@@ -92,8 +92,8 @@ fn yoshiko_q154_wrong_cost_aqours_in_deck_not_deployed() {
     let in_deck = game.state.player1.main_deck.cards.contains(&aqours_member);
     eprintln!("[YOSHIKO] aqours_member on_stage={} in_deck={}", on_stage, in_deck);
     // Card must be in exactly one place: either deployed to stage (if cost matched) or still in deck
-    assert!(on_stage || in_deck,
-        "Aqours member should be either on stage (if cost matched) or still in deck (if cost != yoshiko_cost + 2)");
+    assert!(in_deck,
+        "Aqours member should still be in deck (cost didn't match yoshiko_cost + 2)");
     assert!(!(on_stage && in_deck),
         "Aqours member should not be in both stage and deck simultaneously");
 }

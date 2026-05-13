@@ -259,6 +259,64 @@ fn you_q124_two_plays_both_reject_blade_hearts() {
         "Blade-only card should NOT be in hand");
 }
 
+/// Select 2 qualifying cards, verify ability ends with exactly 2 in hand
+#[test]
+fn you_select_2_then_ends() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let you = game.id("PL!S-bp2-005-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let qualifying1 = game.id("PL!S-sd1-001-SD");
+    let qualifying2 = game.id("PL!S-sd1-002-SD");
+
+    game.state.player1.hand.cards.push(you);
+    game.state.player1.hand.cards.push(filler);
+
+    fill_deck_to_40(&mut game, vec![qualifying1, qualifying2, filler, filler, filler, filler, filler]);
+
+    game.give_energy(13);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(you, MemberArea::LeftSide);
+
+    if game.has_pending_choice() { game.select_indices(&[]); }
+    if game.has_pending_choice() { game.select_indices(&[0, 1]); }
+
+    assert!(!game.has_pending_choice(), "Ability should end after selecting 2");
+    assert!(game.state.player1.hand.cards.contains(&qualifying1), "Qualifying1 should be in hand");
+    assert!(game.state.player1.hand.cards.contains(&qualifying2), "Qualifying2 should be in hand");
+}
+
+/// Select 3 qualifying cards, verify ability ends with all 3 in hand
+#[test]
+fn you_select_3_then_ends() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let you = game.id("PL!S-bp2-005-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let qualifying1 = game.id("PL!S-sd1-001-SD");
+    let qualifying2 = game.id("PL!S-sd1-002-SD");
+    let qualifying3 = game.id("PL!S-sd1-003-SD");
+
+    game.state.player1.hand.cards.push(you);
+    game.state.player1.hand.cards.push(filler);
+
+    fill_deck_to_40(&mut game, vec![qualifying1, qualifying2, qualifying3, filler, filler, filler, filler]);
+
+    game.give_energy(13);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(you, MemberArea::LeftSide);
+
+    if game.has_pending_choice() { game.select_indices(&[]); }
+    if game.has_pending_choice() { game.select_indices(&[0, 1, 2]); }
+
+    assert!(!game.has_pending_choice(), "Ability should end after selecting 3");
+    assert!(game.state.player1.hand.cards.contains(&qualifying1), "Qualifying1 should be in hand");
+    assert!(game.state.player1.hand.cards.contains(&qualifying2), "Qualifying2 should be in hand");
+    assert!(game.state.player1.hand.cards.contains(&qualifying3), "Qualifying3 should be in hand");
+}
+
 fn fill_deck_to_40(game: &mut TestGame, top_cards: Vec<i16>) {
     game.state.player1.main_deck.cards.extend(top_cards);
     let filler = game.id("PL!-sd1-010-SD");

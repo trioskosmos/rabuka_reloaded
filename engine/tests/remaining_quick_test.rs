@@ -64,8 +64,7 @@ fn eternalize_q204_zero_niko_hearts_unchanged() {
 
     // card_count_condition counts ALL members without group filtering.
     // With only 1 member (< threshold 2), the condition fails → no modifier.
-    assert!(game.state.mods.need_heart_modifiers.get(&live).is_none()
-        || game.state.mods.need_heart_modifiers.get(&live).unwrap().is_empty(),
+    assert!(game.state.mods.need_heart_modifiers.get(&live).is_none(),
         "Q204: 1 member (<2) → condition fails → no modification");
 }
 
@@ -92,5 +91,5 @@ fn cara_tesoro_q203_live_start_fires() {
     while game.has_pending_choice() { game.select_option(0); }
 
     let mod_val = game.state.mods.get_score_modifier(cara);
-    assert!(mod_val >= 0, "Q203: Score modifier evaluated");
+    assert_eq!(mod_val, 0, "Q203: Score modifier evaluated to 0");
 }

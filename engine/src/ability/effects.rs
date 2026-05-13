@@ -1,26 +1,67 @@
-use crate::card::{AbilityEffect, PositionInfo};
-use super::types::{Choice, ExecutionContext};
-use super::resolver::AbilityResolver;
-use super::util;
 use super::debug::AbDebug;
+use super::resolver::AbilityResolver;
+use super::types::{Choice, ExecutionContext};
+use super::util;
+use crate::card::{AbilityEffect, PositionInfo};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum EffectAction {
-    Sequential, ConditionalAlternative, LookAndSelect,
-    Draw, DrawCard, DrawUntilCount, DiscardCard, MoveCards,
-    GainResource, ChangeState, ModifyScore, ModifyRequiredHearts,
-    SetCost, SetBladeType, SetHeartType, ActivateAbility,
-    InvalidateAbility, GainAbility, PlayBatonTouch, Reveal,
-    Select, LookAt, ModifyRequiredHeartsGlobal, ModifyYellCount,
-    PlaceEnergyUnderMember, ActivationCost, PositionChange, FormationChange, Appear,
-    Choice, PayEnergy, SetCardIdentity, RepeatProcedure,
-    DiscardUntilCount, Restriction, ReYell, ActivationRestriction,
-    ChooseRequiredHearts, ModifyLimit, SetBladeCount, DoNothing,
-    SetRequiredHearts, SetScore, SpecifyHeartColor,
-    ModifyRequiredHeartsSuccess, SetCostToUse, AllBladeTiming,
-    SetCardIdentityAllRegions, Shuffle, RevealPerGroup,
-    ConditionalOnResult, ConditionalOnOptional, ModifyCost,
-    RevealUntilLiveCard, SelectCards, Custom,
+    Sequential,
+    ConditionalAlternative,
+    LookAndSelect,
+    Draw,
+    DrawCard,
+    DrawUntilCount,
+    DiscardCard,
+    MoveCards,
+    GainResource,
+    ChangeState,
+    ModifyScore,
+    ModifyRequiredHearts,
+    SetCost,
+    SetBladeType,
+    SetHeartType,
+    ActivateAbility,
+    InvalidateAbility,
+    GainAbility,
+    PlayBatonTouch,
+    Reveal,
+    Select,
+    LookAt,
+    ModifyRequiredHeartsGlobal,
+    ModifyYellCount,
+    PlaceEnergyUnderMember,
+    ActivationCost,
+    PositionChange,
+    FormationChange,
+    Appear,
+    Choice,
+    PayEnergy,
+    SetCardIdentity,
+    RepeatProcedure,
+    DiscardUntilCount,
+    Restriction,
+    ReYell,
+    ActivationRestriction,
+    ChooseRequiredHearts,
+    ModifyLimit,
+    SetBladeCount,
+    DoNothing,
+    SetRequiredHearts,
+    SetScore,
+    SpecifyHeartColor,
+    ModifyRequiredHeartsSuccess,
+    SetCostToUse,
+    AllBladeTiming,
+    SetCardIdentityAllRegions,
+    Shuffle,
+    RevealPerGroup,
+    ConditionalOnResult,
+    ConditionalOnOptional,
+    ModifyCost,
+    RevealUntilLiveCard,
+    SelectCards,
+    Custom,
 }
 
 impl EffectAction {
@@ -82,7 +123,10 @@ impl EffectAction {
             "reveal_until_live_card" => Self::RevealUntilLiveCard,
             "select_cards" => Self::SelectCards,
             "custom" => Self::Custom,
-            _ => { eprintln!("Unknown effect action: '{}'", s); Self::DoNothing }
+            _ => {
+                eprintln!("Unknown effect action: '{}'", s);
+                Self::DoNothing
+            }
         }
     }
 }
@@ -110,15 +154,21 @@ pub(crate) fn draw_cards_for_player(
                 .matches_card(card_db, card);
             if matches_type {
                 match destination {
-                    "hand" | "discard" | "deck_top" | "deck_bottom" | "deck" |
-                    "energy_zone" | "live_card_zone" | "success_live_zone" | "stage" => {
+                    "hand" | "discard" | "deck_top" | "deck_bottom" | "deck" | "energy_zone"
+                    | "live_card_zone" | "success_live_zone" | "stage" => {
                         util::place_card_in_zone(player, card, destination, None, false, 1);
                     }
-                    _ => { player.hand.add_card(card); }
+                    _ => {
+                        player.hand.add_card(card);
+                    }
                 }
                 drawn += 1;
-            } else { player.main_deck.cards.push(card); }
-        } else { break; }
+            } else {
+                player.main_deck.cards.push(card);
+            }
+        } else {
+            break;
+        }
     }
     Ok(())
 }
@@ -127,9 +177,10 @@ impl<'a> AbilityResolver<'a> {
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
-        println!("DEBUG: execute_effect - action: {}, source: {}, destination: {}", 
-            effect.action, 
-            effect.source_or("none"), 
+        println!(
+            "DEBUG: execute_effect - action: {}, source: {}, destination: {}",
+            effect.action,
+            effect.source_or("none"),
             effect.destination.as_deref().unwrap_or("none")
         );
         if !self.can_activate_effect(effect) {
@@ -162,19 +213,29 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
 
-        let replacement_effects: Vec<crate::game_state::ReplacementEffect> = self.game_state.get_replacement_effects_for_event(&action_str)
-            .iter().map(|r| (*r).clone()).collect();
+        let replacement_effects: Vec<crate::game_state::ReplacementEffect> = self
+            .game_state
+            .get_replacement_effects_for_event(&action_str)
+            .iter()
+            .map(|r| (*r).clone())
+            .collect();
         if !replacement_effects.is_empty() {
             for replacement in &replacement_effects {
                 if replacement.is_choice_based {
-                    let description = format!("Apply replacement effect for action '{}'?", action_str);
-                    self.pending_choice = Some(Choice::SelectTarget { target: "apply_replacement".to_string(), description, allow_skip: false });
+                    let description =
+                        format!("Apply replacement effect for action '{}'?", action_str);
+                    self.pending_choice = Some(Choice::SelectTarget {
+                        target: "apply_replacement".to_string(),
+                        description,
+                        allow_skip: false,
+                    });
                     return Err("Pending choice required: apply replacement effect".to_string());
                 } else {
                     for replacement_effect in &replacement.replacement_effects {
                         self.execute_effect(replacement_effect)?;
                     }
-                    self.game_state.mark_replacement_effect_applied(replacement.card_id);
+                    self.game_state
+                        .mark_replacement_effect_applied(replacement.card_id);
                 }
             }
             return Ok(());
@@ -185,19 +246,26 @@ impl<'a> AbilityResolver<'a> {
                 let original_event = effect.replaces_event.clone();
                 let is_choice_based = effect.choice_based.unwrap_or(false);
                 let card_id = self.game_state.activating_card.unwrap_or(-1);
-                let player_id = if self.game_state.current_turn_phase == crate::game_state::TurnPhase::FirstAttackerNormal {
+                let player_id = if self.game_state.current_turn_phase
+                    == crate::game_state::TurnPhase::FirstAttackerNormal
+                {
                     self.game_state.player1.id.clone()
                 } else {
                     self.game_state.player2.id.clone()
                 };
                 if let Some(event) = original_event {
-                    self.game_state.add_replacement_effect(card_id, player_id, event.clone(), vec![effect.clone()], is_choice_based);
+                    self.game_state.add_replacement_effect(
+                        card_id,
+                        player_id,
+                        event.clone(),
+                        vec![effect.clone()],
+                        is_choice_based,
+                    );
                 }
                 return Ok(());
             }
         }
 
-        
         // Handle target="both" generically: execute once for each player.
         // position_change handles "both" internally (opponent choice first, then self).
         let is_position_change = effect.action.as_str() == "position_change";
@@ -221,80 +289,305 @@ impl<'a> AbilityResolver<'a> {
 
         let action = EffectAction::from_action(&action_str);
         match action {
-            EffectAction::Sequential => self.execute_sequential_effect(effect, effect.conditional.unwrap_or(false), effect.is_further.unwrap_or(false)),
+            EffectAction::Sequential => self.execute_sequential_effect(
+                effect,
+                effect.conditional.unwrap_or(false),
+                effect.is_further.unwrap_or(false),
+            ),
             EffectAction::ConditionalAlternative => self.execute_conditional_alternative(effect),
             EffectAction::LookAndSelect => self.execute_look_and_select(effect),
             EffectAction::SelectCards => self.execute_select_cards(effect),
-            EffectAction::Draw | EffectAction::DrawCard => self.execute_draw(effect, effect.count_or(1), effect.target_name(), effect.source_or("deck"), effect.destination.as_deref().unwrap_or("hand"), effect.card_type.as_deref(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref()),
-            EffectAction::DrawUntilCount => self.execute_draw_until_count(effect.target_count.unwrap_or(0), effect.target_name(), effect.destination.as_deref().unwrap_or("hand")),
+            EffectAction::Draw | EffectAction::DrawCard => self.execute_draw(
+                effect,
+                effect.count_or(1),
+                effect.target_name(),
+                effect.source_or("deck"),
+                effect.destination.as_deref().unwrap_or("hand"),
+                effect.card_type.as_deref(),
+                effect.per_unit.unwrap_or(false),
+                effect.per_unit_count.unwrap_or(1),
+                effect.per_unit_type.as_deref(),
+            ),
+            EffectAction::DrawUntilCount => {
+                self.execute_draw_until_count(
+                    effect.target_count.unwrap_or(0),
+                    effect.target_name(),
+                    effect.destination.as_deref().unwrap_or("hand"),
+                );
+                Ok(())
+            }
             EffectAction::DiscardCard | EffectAction::MoveCards => self.execute_move_cards(effect),
-            EffectAction::GainResource => self.execute_gain_resource(effect, effect.resource.as_deref().unwrap_or(""), effect.resource_icon_count.unwrap_or(effect.count_or(1)), effect.target_name(), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group_name(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), &effect.heart_colors, effect.resource_icon_count, effect.heart_selection.unwrap_or(false), effect.sign.as_deref()),
-            EffectAction::ChangeState => self.execute_change_state(effect.state_change.as_deref().unwrap_or(""), effect.target_name(), effect.count_or(0), effect.max.unwrap_or(false), effect.card_type.as_deref(), effect.cost_limit, effect.optional.unwrap_or(false), effect.group_name(), effect.self_cost.unwrap_or(false), effect.source.as_deref(), effect.destination.as_deref(), effect.cost_limit_operator.clone()),
-            EffectAction::ModifyScore => self.execute_modify_score(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target_name(), effect.duration.as_deref(), effect.card_type.as_deref(), effect.group_name(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.per_unit_type.as_deref(), effect.effect_constraint.as_deref(), effect.self_target.unwrap_or(false), &effect.heart_colors),
-            EffectAction::ModifyRequiredHearts => self.execute_modify_required_hearts(effect.operation.as_deref().unwrap_or("decrease"), effect.value.or(effect.count).unwrap_or(0), effect.heart_color_or("heart00"), effect.target_name(), effect.per_unit.unwrap_or(false), effect.per_unit_count.unwrap_or(1), effect.group_name(), effect.timing_condition.as_deref(), effect.location.as_deref()),
-            EffectAction::SetCost => self.execute_set_cost(effect.value.unwrap_or(0), effect.target_name(), effect.card_type.as_deref()),
-            EffectAction::SetBladeType => self.execute_set_blade_type(effect.blade_type.as_deref(), effect.target_name(), effect.duration.as_deref()),
-            EffectAction::SetHeartType => self.execute_set_heart_type(effect.heart_type.as_deref().or(effect.heart_colors.first().map(|s| s.as_str())), effect.target_name(), effect.count_or(1) as i32),
+            EffectAction::GainResource => self.execute_gain_resource(
+                effect,
+                effect.resource.as_deref().unwrap_or(""),
+                effect.resource_icon_count.unwrap_or(effect.count_or(1)),
+                effect.target_name(),
+                effect.duration.as_deref(),
+                effect.card_type.as_deref(),
+                effect.group_name(),
+                effect.per_unit.unwrap_or(false),
+                effect.per_unit_count.unwrap_or(1),
+                effect.per_unit_type.as_deref(),
+                &effect.heart_colors,
+                effect.resource_icon_count,
+                effect.heart_selection.unwrap_or(false),
+                effect.sign.as_deref(),
+            ),
+            EffectAction::ChangeState => self.execute_change_state(
+                effect.state_change.as_deref().unwrap_or(""),
+                effect.target_name(),
+                effect.count_or(0),
+                effect.max.unwrap_or(false),
+                effect.card_type.as_deref(),
+                effect.cost_limit,
+                effect.optional.unwrap_or(false),
+                effect.group_name(),
+                effect.self_cost.unwrap_or(false),
+                effect.source.as_deref(),
+                effect.destination.as_deref(),
+                effect.cost_limit_operator.clone(),
+            ),
+            EffectAction::ModifyScore => self.execute_modify_score(
+                effect.operation.as_deref().unwrap_or("add"),
+                effect.value.unwrap_or(0),
+                effect.target_name(),
+                effect.duration.as_deref(),
+                effect.card_type.as_deref(),
+                effect.group_name(),
+                effect.per_unit.unwrap_or(false),
+                effect.per_unit_count.unwrap_or(1),
+                effect.per_unit_type.as_deref(),
+                effect.effect_constraint.as_deref(),
+                effect.self_target.unwrap_or(false),
+                &effect.heart_colors,
+            ),
+            EffectAction::ModifyRequiredHearts => self.execute_modify_required_hearts(
+                effect.operation.as_deref().unwrap_or("decrease"),
+                effect.value.or(effect.count).unwrap_or(0),
+                effect.heart_color_or("heart00"),
+                effect.target_name(),
+                effect.per_unit.unwrap_or(false),
+                effect.per_unit_count.unwrap_or(1),
+                effect.group_name(),
+                effect.timing_condition.as_deref(),
+                effect.location.as_deref(),
+            ),
+            EffectAction::SetCost => {
+                self.execute_set_cost(
+                    effect.value.unwrap_or(0),
+                    effect.target_name(),
+                    effect.card_type.as_deref(),
+                );
+                Ok(())
+            }
+            EffectAction::SetBladeType => {
+                self.execute_set_blade_type(
+                    effect.blade_type.as_deref(),
+                    effect.target_name(),
+                    effect.duration.as_deref(),
+                );
+                Ok(())
+            }
+            EffectAction::SetHeartType => {
+                self.execute_set_heart_type(
+                    effect
+                        .heart_type
+                        .as_deref()
+                        .or(effect.heart_colors.first().map(|s| s.as_str())),
+                    effect.target_name(),
+                    effect.count_or(1) as i32,
+                );
+                Ok(())
+            }
             EffectAction::ActivateAbility => {
-                self.execute_activate_ability(effect.ability_text.as_deref().unwrap_or(""), effect.target_trigger.as_deref(), effect.count);
+                self.execute_activate_ability(
+                    effect.ability_text.as_deref().unwrap_or(""),
+                    effect.target_trigger.as_deref(),
+                    effect.count,
+                );
                 Ok(())
             }
             EffectAction::InvalidateAbility => {
                 self.execute_invalidate_ability();
                 Ok(())
             }
-            EffectAction::GainAbility => self.execute_gain_ability(effect.ability_gain.as_deref().filter(|s| !s.is_empty()).or_else(|| if effect.text.is_empty() { None } else { Some(effect.text.as_str()) }).unwrap_or(""), effect.target_name(), effect.duration.as_deref()),
-            EffectAction::PlayBatonTouch => self.execute_play_baton_touch(effect.count_or(1), effect.target_name()),
+            EffectAction::GainAbility => self.execute_gain_ability(
+                effect
+                    .ability_gain
+                    .as_deref()
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| {
+                        if effect.text.is_empty() {
+                            None
+                        } else {
+                            Some(effect.text.as_str())
+                        }
+                    })
+                    .unwrap_or(""),
+                effect.target_name(),
+                effect.duration.as_deref(),
+            ),
+            EffectAction::PlayBatonTouch => {
+                self.execute_play_baton_touch(effect.count_or(1), effect.target_name())
+            }
             EffectAction::Reveal => {
-                if effect.multiple_targets.unwrap_or(false) && effect.source.as_deref() == Some("deck_top") {
-                    let chosen = self.game_state.ability_queue.current_entry().and_then(|e| e.conditional_choice.clone()).or_else(|| effect.card_type.clone());
-                    return self.execute_reveal_until_target(effect.target_name(), chosen.as_deref());
+                if effect.multiple_targets.unwrap_or(false)
+                    && effect.source.as_deref() == Some("deck_top")
+                {
+                    let chosen = self
+                        .game_state
+                        .ability_queue
+                        .current_entry()
+                        .and_then(|e| e.conditional_choice.clone())
+                        .or_else(|| effect.card_type.clone());
+                    return self
+                        .execute_reveal_until_target(effect.target_name(), chosen.as_deref());
                 }
-                self.execute_reveal(effect.source_or("hand"), effect.count_or(1), effect.target_name(), effect.card_type.as_deref(), &effect.heart_colors)
+                self.execute_reveal(
+                    effect.source_or("hand"),
+                    effect.count_or(1),
+                    effect.target_name(),
+                    effect.card_type.as_deref(),
+                    &effect.heart_colors,
+                )
             }
             EffectAction::Select => {
                 let has_heart_colors = !effect.heart_colors.is_empty();
                 let has_heart_icons = effect.text.contains("heart_");
-                if effect.source.is_none() && effect.card_type.is_none() && (has_heart_colors || has_heart_icons) {
+                if effect.source.is_none()
+                    && effect.card_type.is_none()
+                    && (has_heart_colors || has_heart_icons)
+                {
                     let heart_colors = if !effect.heart_colors.is_empty() {
                         effect.heart_colors.clone()
                     } else {
                         crate::ability::util::extract_heart_colors_from_text(&effect.text)
                     };
                     if !heart_colors.is_empty() {
-                        self.execute_select_heart_color(effect.count_or(1), &heart_colors, effect.target_name())
+                        {
+                            self.execute_select_heart_color(
+                                effect.count_or(1),
+                                &heart_colors,
+                                effect.target_name(),
+                            );
+                            Ok(())
+                        }
                     } else {
-                        self.execute_select(if effect.card_type.as_deref() == Some("member_card") { "stage" } else { effect.source_or("hand") }, effect.count_or(1), effect.target_name(), effect.card_type.as_deref(), effect.distinct.as_deref(), &effect.heart_colors, effect.or_card_types.clone(), effect.exclude_selected.unwrap_or(false))
+                        self.execute_select(
+                            if effect.card_type.as_deref() == Some("member_card") {
+                                "stage"
+                            } else {
+                                effect.source_or("hand")
+                            },
+                            effect.count_or(1),
+                            effect.target_name(),
+                            effect.card_type.as_deref(),
+                            effect.distinct.as_deref(),
+                            &effect.heart_colors,
+                            effect.or_card_types.clone(),
+                            effect.exclude_selected.unwrap_or(false),
+                        )
                     }
                 } else {
-                    self.execute_select(if effect.card_type.as_deref() == Some("member_card") { "stage" } else { effect.source_or("hand") }, effect.count_or(1), effect.target_name(), effect.card_type.as_deref(), effect.distinct.as_deref(), &effect.heart_colors, effect.or_card_types.clone(), effect.exclude_selected.unwrap_or(false))
+                    self.execute_select(
+                        if effect.card_type.as_deref() == Some("member_card") {
+                            "stage"
+                        } else {
+                            effect.source_or("hand")
+                        },
+                        effect.count_or(1),
+                        effect.target_name(),
+                        effect.card_type.as_deref(),
+                        effect.distinct.as_deref(),
+                        &effect.heart_colors,
+                        effect.or_card_types.clone(),
+                        effect.exclude_selected.unwrap_or(false),
+                    )
                 }
             }
-            EffectAction::LookAt => self.execute_look_at(effect.count_or(1), effect.target_name(), effect.source_or("deck")),
-            EffectAction::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_global(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(1), effect.heart_color_or("heart00"), effect.target_name()),
+            EffectAction::LookAt => self.execute_look_at(
+                effect.count_or(1),
+                effect.target_name(),
+                effect.source_or("deck"),
+            ),
+            EffectAction::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_global(
+                effect.operation.as_deref().unwrap_or("increase"),
+                effect.value.unwrap_or(1),
+                effect.heart_color_or("heart00"),
+                effect.target_name(),
+            ),
             EffectAction::ModifyYellCount => {
-                self.execute_modify_yell_count(effect.operation.as_deref().unwrap_or("subtract"), effect.count_or(0));
+                self.execute_modify_yell_count(
+                    effect.operation.as_deref().unwrap_or("subtract"),
+                    effect.count_or(0),
+                );
                 Ok(())
             }
-            EffectAction::PlaceEnergyUnderMember => self.execute_place_energy_under_member(effect.energy_count.unwrap_or(1), effect.target_name(), effect.position.as_ref(), effect.optional.unwrap_or(false), effect.source.as_deref()),
-            EffectAction::ActivationCost => self.execute_activation_cost(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target_name(), effect.duration.as_deref()),
-            EffectAction::PositionChange => self.execute_position_change(effect, effect.position.clone(), effect.target_name(), effect.target_member.as_deref().unwrap_or("this_member")),
+            EffectAction::PlaceEnergyUnderMember => {
+                self.execute_place_energy_under_member(
+                    effect.energy_count.unwrap_or(1),
+                    effect.target_name(),
+                    effect.position.as_ref(),
+                    effect.optional.unwrap_or(false),
+                    effect.source.as_deref(),
+                );
+                Ok(())
+            }
+            EffectAction::ActivationCost => {
+                self.execute_activation_cost(
+                    effect.operation.as_deref().unwrap_or("increase"),
+                    effect.value.unwrap_or(0),
+                    effect.target_name(),
+                    effect.duration.as_deref(),
+                );
+                Ok(())
+            }
+            EffectAction::PositionChange => self.execute_position_change(
+                effect,
+                effect.position.clone(),
+                effect.target_name(),
+                effect.target_member.as_deref().unwrap_or("this_member"),
+            ),
             EffectAction::FormationChange => self.execute_formation_change(effect),
             EffectAction::Appear => self.execute_appear(effect),
-            EffectAction::Choice => self.execute_choice(effect.choice_options.as_ref(), effect.choice_type.as_deref(), effect.options.as_ref()),
-            EffectAction::PayEnergy => self.execute_pay_energy(effect.count_or(0), effect.target_name()),
+            EffectAction::Choice => self.execute_choice(
+                effect.choice_options.as_ref(),
+                effect.choice_type.as_deref(),
+                effect.options.as_ref(),
+            ),
+            EffectAction::PayEnergy => {
+                self.execute_pay_energy(effect.count_or(0), effect.target_name());
+                Ok(())
+            }
             EffectAction::SetCardIdentity => {
                 if effect.all_regions.unwrap_or(false) {
-                    self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target_name());
+                    self.execute_set_card_identity_all_regions(
+                        effect.identities.as_ref(),
+                        effect.target_name(),
+                    );
                 } else {
                     self.execute_set_card_identity(&effect.identities.clone().unwrap_or_default());
                 }
                 Ok(())
-            },
-            EffectAction::RepeatProcedure => self.execute_repeat_procedure(effect, effect.repeat_limit.unwrap_or(1)),
-            EffectAction::DiscardUntilCount => self.execute_discard_until_count(effect.target_count.unwrap_or(0), effect.target_name()),
-            EffectAction::Restriction => self.execute_restriction(effect.restriction_type.as_deref(), effect.restricted_destination.as_deref()),
-            EffectAction::ReYell => self.execute_re_yell(effect.lose_blade_hearts.unwrap_or(false), effect.target_name()),
+            }
+            EffectAction::RepeatProcedure => {
+                self.execute_repeat_procedure(effect, effect.repeat_limit.unwrap_or(1))
+            }
+            EffectAction::DiscardUntilCount => self.execute_discard_until_count(
+                effect.target_count.unwrap_or(0),
+                effect.target_name(),
+            ),
+            EffectAction::Restriction => self.execute_restriction(
+                effect.restriction_type.as_deref(),
+                effect.restricted_destination.as_deref(),
+            ),
+            EffectAction::ReYell => {
+                self.execute_re_yell(
+                    effect.lose_blade_hearts.unwrap_or(false),
+                    effect.target_name(),
+                );
+                Ok(())
+            }
             EffectAction::ActivationRestriction => {
                 self.execute_activation_restriction(effect.target_name());
                 Ok(())
@@ -303,39 +596,85 @@ impl<'a> AbilityResolver<'a> {
                 self.execute_choose_required_hearts();
                 Ok(())
             }
-            EffectAction::ModifyLimit => self.execute_modify_limit(effect.operation.as_deref().unwrap_or("decrease"), effect.count_or(0)),
-            EffectAction::SetBladeCount => self.execute_set_blade_count(effect.value.unwrap_or(effect.count_or(0)), effect.target_name()),
-            EffectAction::Custom => self.execute_custom(effect, &action_str),
-            EffectAction::DoNothing => Ok(()),
-            EffectAction::SetRequiredHearts => self.execute_set_required_hearts(&effect.heart_colors, effect.target_name()),
-            EffectAction::SetScore => self.execute_set_score(effect.value.unwrap_or(0), effect.target_name()),
-            EffectAction::SpecifyHeartColor => {
-                self.execute_specify_heart_color(effect.choice.unwrap_or(false), effect.target_name());
+            EffectAction::ModifyLimit => self.execute_modify_limit(
+                effect.operation.as_deref().unwrap_or("decrease"),
+                effect.count_or(0),
+            ),
+            EffectAction::SetBladeCount => {
+                self.execute_set_blade_count(
+                    effect.value.unwrap_or(effect.count_or(0)),
+                    effect.target_name(),
+                );
                 Ok(())
             }
-            EffectAction::ModifyRequiredHeartsSuccess => self.execute_modify_required_hearts_success(effect.operation.as_deref().unwrap_or("increase"), effect.value.unwrap_or(0), effect.target_name(), effect.card_type.as_deref()),
+            EffectAction::Custom => self.execute_custom(effect, &action_str),
+            EffectAction::DoNothing => Ok(()),
+            EffectAction::SetRequiredHearts => {
+                self.execute_set_required_hearts(&effect.heart_colors, effect.target_name());
+                Ok(())
+            }
+            EffectAction::SetScore => {
+                self.execute_set_score(effect.value.unwrap_or(0), effect.target_name());
+                Ok(())
+            }
+            EffectAction::SpecifyHeartColor => {
+                self.execute_specify_heart_color(
+                    effect.choice.unwrap_or(false),
+                    effect.target_name(),
+                );
+                Ok(())
+            }
+            EffectAction::ModifyRequiredHeartsSuccess => {
+                self.execute_modify_required_hearts_success(
+                    effect.operation.as_deref().unwrap_or("increase"),
+                    effect.value.unwrap_or(0),
+                    effect.target_name(),
+                    effect.card_type.as_deref(),
+                );
+                Ok(())
+            }
             EffectAction::SetCostToUse => self.execute_set_cost_to_use(effect.value.unwrap_or(0)),
             EffectAction::AllBladeTiming => {
-                self.execute_all_blade_timing(effect.timing.as_deref().unwrap_or("check_required_hearts"), effect.treat_as.as_deref().unwrap_or("any_heart_color"));
+                self.execute_all_blade_timing(
+                    effect.timing.as_deref().unwrap_or("check_required_hearts"),
+                    effect.treat_as.as_deref().unwrap_or("any_heart_color"),
+                );
                 Ok(())
             }
             EffectAction::SetCardIdentityAllRegions => {
-                self.execute_set_card_identity_all_regions(effect.identities.as_ref(), effect.target_name());
+                self.execute_set_card_identity_all_regions(
+                    effect.identities.as_ref(),
+                    effect.target_name(),
+                );
                 Ok(())
             }
             EffectAction::Shuffle => {
                 self.execute_shuffle(effect.target_name(), effect.source_or("deck"));
                 Ok(())
             }
-            EffectAction::RevealPerGroup => self.execute_reveal_per_group(effect.source_or("hand"), effect.count_or(1), effect.target_name()),
+            EffectAction::RevealPerGroup => self.execute_reveal_per_group(
+                effect.source_or("hand"),
+                effect.count_or(1),
+                effect.target_name(),
+            ),
             EffectAction::ConditionalOnResult => self.execute_conditional_on_result(effect),
             EffectAction::ConditionalOnOptional => self.execute_conditional_on_optional(effect),
-            EffectAction::ModifyCost => self.execute_modify_cost(effect.operation.as_deref().unwrap_or("add"), effect.value.unwrap_or(0), effect.target_name(), effect.card_type.as_deref()),
-            EffectAction::RevealUntilLiveCard => self.execute_reveal_until_live_card(effect.target_name()),
+            EffectAction::ModifyCost => {
+                self.execute_modify_cost(
+                    effect.operation.as_deref().unwrap_or("add"),
+                    effect.value.unwrap_or(0),
+                    effect.target_name(),
+                    effect.card_type.as_deref(),
+                );
+                Ok(())
+            }
+            EffectAction::RevealUntilLiveCard => {
+                self.execute_reveal_until_live_card(effect.target_name())
+            }
         }
     }
 
-// ===== LEAF EFFECTS (all data directly from AbilityEffect params) =====
+    // ===== LEAF EFFECTS (all data directly from AbilityEffect params) =====
 
     fn execute_custom(&mut self, effect: &AbilityEffect, action_str: &str) -> Result<(), String> {
         // Handle "custom" actions that could not be parsed into a standard action type.
@@ -345,24 +684,43 @@ impl<'a> AbilityResolver<'a> {
         if effect.placement_order.as_deref() == Some("any_order") {
             let mut routed = effect.clone();
             routed.action = "move_cards".into();
-            if routed.source.is_none() { routed.source = Some("looked_at".into()); }
-            if routed.destination.is_none() { routed.destination = Some("deck_top".into()); }
+            if routed.source.is_none() {
+                routed.source = Some("looked_at".into());
+            }
+            if routed.destination.is_none() {
+                routed.destination = Some("deck_top".into());
+            }
             return self.execute_move_cards(&routed);
         }
 
         // 2) Limit modification: "枚数を1枚増やす" → modify_limit
-        if effect.count == Some(1) && action_str.contains("枚数を") && (action_str.contains("増やす") || action_str.contains("増やす")) {
+        if effect.count == Some(1)
+            && action_str.contains("枚数を")
+            && (action_str.contains("増やす") || action_str.contains("増やす"))
+        {
             return self.execute_modify_limit("increase", 1);
         }
 
         // 3) Complex conditional scoring / gain_ability: has duration or grants continuous effect
-        if effect.duration.is_some() || action_str.contains("常時") || action_str.contains("ライブ終了まで") {
-            let text = if effect.text.is_empty() { action_str } else { &effect.text };
-            return self.execute_gain_ability(text, effect.target.as_deref().unwrap_or("self"), effect.duration.as_deref());
+        if effect.duration.is_some()
+            || action_str.contains("常時")
+            || action_str.contains("ライブ終了まで")
+        {
+            let text = if effect.text.is_empty() {
+                action_str
+            } else {
+                &effect.text
+            };
+            return self.execute_gain_ability(
+                text,
+                effect.target.as_deref().unwrap_or("self"),
+                effect.duration.as_deref(),
+            );
         }
 
         // 4) reveal_until_chosen_card: handle the reveal and card movement logic
-        if action_str.contains("reveal_until_chosen_card") || action_str.contains("公開されるまで") {
+        if action_str.contains("reveal_until_chosen_card") || action_str.contains("公開されるまで")
+        {
             return self.execute_reveal_until_chosen_card(effect);
         }
 
@@ -372,27 +730,32 @@ impl<'a> AbilityResolver<'a> {
 
     fn execute_reveal_until_chosen_card(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         // Get the chosen card type from the effect or from the current ability queue entry
-        let chosen_card_type = self.game_state.ability_queue.current_entry()
+        let chosen_card_type = self
+            .game_state
+            .ability_queue
+            .current_entry()
             .and_then(|e| e.conditional_choice.clone())
             .or_else(|| effect.card_type.clone());
 
         if let Some(card_type) = chosen_card_type {
             // Use the existing reveal_until_target functionality
             self.execute_reveal_until_target(effect.target_name(), Some(&card_type))?;
-            
+
             // After reveal, we need to move the chosen card to hand and others to discard
             // The looked_at_cards should contain: [chosen_card, other_revealed_cards...]
             if !self.looked_at_cards.is_empty() {
                 let chosen_card = self.looked_at_cards[0];
                 let other_cards = self.looked_at_cards[1..].to_vec();
-                
+
                 // Move chosen card to hand
-                let player = self.game_state.resolve_target_player_mut(effect.target_name());
+                let player = self
+                    .game_state
+                    .resolve_target_player_mut(effect.target_name());
                 player.hand.cards.push(chosen_card);
-                
+
                 // Move other cards to discard
                 player.waitroom.cards.extend(other_cards);
-                
+
                 // Clear looked_at_cards
                 self.looked_at_cards.clear();
             }
@@ -400,11 +763,22 @@ impl<'a> AbilityResolver<'a> {
             // If no card type was chosen, just clear any looked_at_cards
             self.looked_at_cards.clear();
         }
-        
+
         Ok(())
     }
 
-    fn execute_draw(&mut self, effect: &AbilityEffect, count: u32, target: &str, source: &str, destination: &str, card_type: Option<&str>, per_unit: bool, per_unit_count: u32, per_unit_type: Option<&str>) -> Result<(), String> {
+    fn execute_draw(
+        &mut self,
+        effect: &AbilityEffect,
+        count: u32,
+        target: &str,
+        source: &str,
+        destination: &str,
+        card_type: Option<&str>,
+        per_unit: bool,
+        per_unit_count: u32,
+        per_unit_type: Option<&str>,
+    ) -> Result<(), String> {
         let card_db = self.card_db();
         let is_any_number = effect.any_number.unwrap_or(false);
         let is_distinct = effect.distinct.as_deref();
@@ -413,8 +787,34 @@ impl<'a> AbilityResolver<'a> {
         if target == "both" {
             let card_db1 = card_db.clone();
             let card_db2 = card_db.clone();
-            { let p1 = &mut self.game_state.player1; draw_cards_for_player(p1, count, source, destination, card_type, is_any_number, is_distinct, &card_db1, None)?; }
-            { let p2 = &mut self.game_state.player2; draw_cards_for_player(p2, count, source, destination, card_type, is_any_number, is_distinct, &card_db2, None)?; }
+            {
+                let p1 = &mut self.game_state.player1;
+                draw_cards_for_player(
+                    p1,
+                    count,
+                    source,
+                    destination,
+                    card_type,
+                    is_any_number,
+                    is_distinct,
+                    &card_db1,
+                    None,
+                )?;
+            }
+            {
+                let p2 = &mut self.game_state.player2;
+                draw_cards_for_player(
+                    p2,
+                    count,
+                    source,
+                    destination,
+                    card_type,
+                    is_any_number,
+                    is_distinct,
+                    &card_db2,
+                    None,
+                )?;
+            }
             return Ok(());
         }
 
@@ -424,14 +824,29 @@ impl<'a> AbilityResolver<'a> {
         let final_count = if per_unit {
             let multiplier = util::calculate_per_unit_multiplier(per_unit, per_unit_type, player);
             count * multiplier * per_unit_count
-        } else { count };
+        } else {
+            count
+        };
 
         if is_self_target {
             if let Some(activating_id) = activating_id {
                 if !player.stage.stage.contains(&activating_id) {
-                    return Err("Cannot draw with self_target: activating card not on target's stage".to_string());
+                    return Err(
+                        "Cannot draw with self_target: activating card not on target's stage"
+                            .to_string(),
+                    );
                 }
-                draw_cards_for_player(player, final_count, source, destination, card_type, is_any_number, is_distinct, &card_db, Some(activating_id))?;
+                draw_cards_for_player(
+                    player,
+                    final_count,
+                    source,
+                    destination,
+                    card_type,
+                    is_any_number,
+                    is_distinct,
+                    &card_db,
+                    Some(activating_id),
+                )?;
                 return Ok(());
             }
         }
@@ -467,14 +882,27 @@ impl<'a> AbilityResolver<'a> {
                             } else {
                                 player.main_deck.cards.push(card);
                             }
-                        } else { break; }
+                        } else {
+                            break;
+                        }
                     }
-                    let drawn_distinct = util::apply_distinct_filter(&drawn, Some(distinct), &card_db);
+                    let drawn_distinct =
+                        util::apply_distinct_filter(&drawn, Some(distinct), &card_db);
                     for card in drawn_distinct {
                         util::place_card_in_zone(player, card, destination, None, false, 1);
                     }
                 } else {
-                    draw_cards_for_player(player, final_count, source, destination, card_type, is_any_number, is_distinct, &card_db, None)?;
+                    draw_cards_for_player(
+                        player,
+                        final_count,
+                        source,
+                        destination,
+                        card_type,
+                        is_any_number,
+                        is_distinct,
+                        &card_db,
+                        None,
+                    )?;
                 }
             }
             "discard" => {
@@ -484,7 +912,9 @@ impl<'a> AbilityResolver<'a> {
                     if let Some(card) = player.waitroom.cards.pop() {
                         cards.push(card);
                         drawn += 1;
-                    } else { break; }
+                    } else {
+                        break;
+                    }
                 }
                 if let Some(distinct) = is_distinct {
                     cards = util::apply_distinct_filter(&cards, Some(distinct), &card_db);
@@ -493,22 +923,36 @@ impl<'a> AbilityResolver<'a> {
                     player.hand.add_card(card);
                 }
             }
-            _ => { eprintln!("Draw from source '{}' not yet implemented", source); }
+            _ => {
+                eprintln!("Draw from source '{}' not yet implemented", source);
+            }
         }
         Ok(())
     }
 
-    fn execute_draw_until_count(&mut self, target_count: u32, target: &str, destination: &str) -> Result<(), String> {
+    fn execute_draw_until_count(&mut self, target_count: u32, target: &str, destination: &str) {
         let player = self.game_state.resolve_target_player_mut(target);
         let current_count = match destination {
             "hand" => player.hand.len(),
-            _ => { return Ok(()); }
+            _ => {
+                return;
+            }
         };
         let to_draw = (target_count as usize).saturating_sub(current_count);
-        self.execute_draw(&AbilityEffect::default(), to_draw as u32, target, "deck", destination, None, false, 1, None)
+        let _ = self.execute_draw(
+            &AbilityEffect::default(),
+            to_draw as u32,
+            target,
+            "deck",
+            destination,
+            None,
+            false,
+            1,
+            None,
+        );
     }
 
-    fn execute_select_heart_color(&mut self, count: u32, heart_colors: &[String], _target: &str) -> Result<(), String> {
+    fn execute_select_heart_color(&mut self, count: u32, heart_colors: &[String], _target: &str) {
         let mut unique_colors: Vec<String> = Vec::new();
         for c in heart_colors {
             if !unique_colors.contains(c) {
@@ -519,21 +963,31 @@ impl<'a> AbilityResolver<'a> {
             if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                 entry.conditional_choice = Some(unique_colors[0].clone());
             }
-            return Ok(());
+            return;
         }
         self.pending_choice = Some(Choice::SelectHeartColor {
             count: count as usize,
             options: unique_colors,
             description: "Choose a heart color".to_string(),
         });
-        Ok(())
     }
 
     fn execute_gain_resource(
-        &mut self, effect: &AbilityEffect, resource: &str, count: u32, target: &str, duration: Option<&str>,
-        card_type: Option<&str>, group_name: Option<&str>, per_unit: bool, per_unit_count: u32,
-        per_unit_type: Option<&str>, heart_colors: &[String],
-        _resource_icon_count: Option<u32>, heart_selection: bool, sign: Option<&str>,
+        &mut self,
+        effect: &AbilityEffect,
+        resource: &str,
+        count: u32,
+        target: &str,
+        duration: Option<&str>,
+        card_type: Option<&str>,
+        group_name: Option<&str>,
+        per_unit: bool,
+        per_unit_count: u32,
+        per_unit_type: Option<&str>,
+        heart_colors: &[String],
+        _resource_icon_count: Option<u32>,
+        heart_selection: bool,
+        sign: Option<&str>,
     ) -> Result<(), String> {
         let resource = resource.to_string();
         let target = target.to_string();
@@ -546,17 +1000,31 @@ impl<'a> AbilityResolver<'a> {
         let activating_card_id = self.game_state.activating_card;
         let card_db = self.card_db();
         let is_self_target = effect.self_target.unwrap_or(false);
-        let is_all = effect.all.unwrap_or(false) || (effect.source.is_none() && effect.card_type.as_deref() == Some("member_card") && target == "self" && !is_self_target);
+        let is_all = effect.all.unwrap_or(false)
+            || (effect.source.is_none()
+                && effect.card_type.as_deref() == Some("member_card")
+                && target == "self"
+                && !is_self_target);
 
-        let single_fixed_heart: Option<String> = if (resource == "heart" || resource == "ハート") && (!heart_colors.is_empty() || heart_selection || effect.heart_type.is_some()) {
+        let single_fixed_heart: Option<String> = if (resource == "heart" || resource == "ハート")
+            && (!heart_colors.is_empty() || heart_selection || effect.heart_type.is_some())
+        {
             let colors = if heart_colors.is_empty() {
                 if let Some(ref ht) = effect.heart_type {
                     vec![ht.clone()]
                 } else {
-                    vec!["heart01".into(), "heart02".into(), "heart03".into(),
-                         "heart04".into(), "heart05".into(), "heart06".into()]
+                    vec![
+                        "heart01".into(),
+                        "heart02".into(),
+                        "heart03".into(),
+                        "heart04".into(),
+                        "heart05".into(),
+                        "heart06".into(),
+                    ]
                 }
-            } else { heart_colors.to_vec() };
+            } else {
+                heart_colors.to_vec()
+            };
             let mut unique_colors: Vec<String> = Vec::new();
             for c in colors {
                 if !unique_colors.contains(&c) {
@@ -573,24 +1041,46 @@ impl<'a> AbilityResolver<'a> {
                 });
                 return Ok(());
             }
-        } else { None };
+        } else {
+            None
+        };
 
         let single_fixed_heart = single_fixed_heart.or_else(|| {
             if resource == "heart" || resource == "ハート" {
-                self.game_state.ability_queue.current_entry()
+                self.game_state
+                    .ability_queue
+                    .current_entry()
                     .and_then(|e| e.conditional_choice.clone())
-            } else { None }
+            } else {
+                None
+            }
         });
 
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), None, None, None, None);
+            let filter = util::filter_from_parts(
+                card_type_filter.as_deref(),
+                group_filter.as_deref(),
+                None,
+                None,
+                None,
+                None,
+            );
 
             let final_count = if per_unit {
-                let matching_count = util::resolve_per_unit_count(true, per_unit_type_str.as_deref(), player, &card_db, &filter, &[]);
+                let matching_count = util::resolve_per_unit_count(
+                    true,
+                    per_unit_type_str.as_deref(),
+                    player,
+                    &card_db,
+                    &filter,
+                    &[],
+                );
                 (matching_count / per_unit_count_val) * count
-            } else { count };
+            } else {
+                count
+            };
 
             let has_blade_filter = card_type_filter.is_some() || group_filter.is_some();
             let blade_targets: Vec<i16> = if has_blade_filter || is_all {
@@ -599,42 +1089,83 @@ impl<'a> AbilityResolver<'a> {
                 vec![]
             };
 
-            let heart_color_inner = single_fixed_heart.clone().or_else(|| heart_colors.first().map(|s| s.to_string()));
+            let heart_color_inner = single_fixed_heart
+                .clone()
+                .or_else(|| heart_colors.first().map(|s| s.to_string()));
             let heart_targets: Vec<i16> = if resource == "heart" || resource == "ハート" {
                 util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true)
-            } else { vec![] };
+            } else {
+                vec![]
+            };
 
             (blade_targets, heart_targets, heart_color_inner, final_count)
         };
 
         let mut effect_data: Option<serde_json::Value> = None;
         let is_negative = sign == Some("negative");
-        let blades_to_add = if is_negative { -(final_count as i32) } else { final_count as i32 };
-        let heart_to_add = if is_negative { -(final_count as i32) } else { final_count as i32 };
-        let heart_color_val = crate::zones::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
+        let blades_to_add = if is_negative {
+            -(final_count as i32)
+        } else {
+            final_count as i32
+        };
+        let heart_to_add = if is_negative {
+            -(final_count as i32)
+        } else {
+            final_count as i32
+        };
+        let heart_color_val =
+            crate::zones::parse_heart_color(heart_color_str.as_deref().unwrap_or("heart00"));
 
         if is_self_target {
             if let Some(card_id) = activating_card_id {
-                if !self.game_state.resolve_target_player_mut(&target).stage.stage.contains(&card_id) {
-                    return Err("Cannot use self_target on gain_resource: activating card not on stage".to_string());
+                if !self
+                    .game_state
+                    .resolve_target_player_mut(&target)
+                    .stage
+                    .stage
+                    .contains(&card_id)
+                {
+                    return Err(
+                        "Cannot use self_target on gain_resource: activating card not on stage"
+                            .to_string(),
+                    );
                 }
                 if resource == "blade" || resource == "ブレード" {
-                    self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
+                    self.game_state
+                        .mods
+                        .add_blade_modifier(card_id, blades_to_add);
                     if is_temporary {
                         let mut data = serde_json::Map::new();
-                        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
-                        data.insert("amount".to_string(), serde_json::Value::Number(blades_to_add.into()));
+                        data.insert(
+                            "card_id".to_string(),
+                            serde_json::Value::Number(card_id.into()),
+                        );
+                        data.insert(
+                            "amount".to_string(),
+                            serde_json::Value::Number(blades_to_add.into()),
+                        );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
                 }
                 if resource == "heart" || resource == "ハート" {
-                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state
+                        .mods
+                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         let mut data = serde_json::Map::new();
-                        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
-                        data.insert("amount".to_string(), serde_json::Value::Number(heart_to_add.into()));
-                        data.insert("color".to_string(), serde_json::Value::String(color_name.to_string()));
+                        data.insert(
+                            "card_id".to_string(),
+                            serde_json::Value::Number(card_id.into()),
+                        );
+                        data.insert(
+                            "amount".to_string(),
+                            serde_json::Value::Number(heart_to_add.into()),
+                        );
+                        data.insert(
+                            "color".to_string(),
+                            serde_json::Value::String(color_name.to_string()),
+                        );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
                 }
@@ -657,30 +1188,58 @@ impl<'a> AbilityResolver<'a> {
                 if is_all {
                     let stage_ids: Vec<i16> = {
                         let player = self.game_state.resolve_target_player(&target);
-                        player.stage.stage.iter().copied().filter(|&id| id != -1).collect()
+                        player
+                            .stage
+                            .stage
+                            .iter()
+                            .copied()
+                            .filter(|&id| id != -1)
+                            .collect()
                     };
                     for card_id in stage_ids {
-                        self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
+                        self.game_state
+                            .mods
+                            .add_blade_modifier(card_id, blades_to_add);
                     }
                     if is_temporary {
                         let mut data = serde_json::Map::new();
                         data.insert("all_cards".to_string(), serde_json::Value::Bool(true));
-                        data.insert("amount".to_string(), serde_json::Value::Number(blades_to_add.into()));
+                        data.insert(
+                            "amount".to_string(),
+                            serde_json::Value::Number(blades_to_add.into()),
+                        );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
                 } else if let Some(card_id) = activating_card_id {
-                    self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
+                    self.game_state
+                        .mods
+                        .add_blade_modifier(card_id, blades_to_add);
                     if is_temporary {
                         let mut data = serde_json::Map::new();
-                        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
-                        data.insert("amount".to_string(), serde_json::Value::Number(blades_to_add.into()));
+                        data.insert(
+                            "card_id".to_string(),
+                            serde_json::Value::Number(card_id.into()),
+                        );
+                        data.insert(
+                            "amount".to_string(),
+                            serde_json::Value::Number(blades_to_add.into()),
+                        );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
                 }
             } else {
-                let targets = if is_all { blade_targets.clone() } else { blade_targets.into_iter().take(final_count as usize).collect() };
+                let targets = if is_all {
+                    blade_targets.clone()
+                } else {
+                    blade_targets
+                        .into_iter()
+                        .take(final_count as usize)
+                        .collect()
+                };
                 for &card_id in &targets {
-                    self.game_state.mods.add_blade_modifier(card_id, blades_to_add);
+                    self.game_state
+                        .mods
+                        .add_blade_modifier(card_id, blades_to_add);
                 }
             }
         }
@@ -688,43 +1247,85 @@ impl<'a> AbilityResolver<'a> {
         if resource == "heart" || resource == "ハート" {
             if heart_targets.is_empty() {
                 if let Some(card_id) = activating_card_id {
-                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state
+                        .mods
+                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         let mut data = serde_json::Map::new();
-                        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
-                        data.insert("amount".to_string(), serde_json::Value::Number(heart_to_add.into()));
-                        data.insert("color".to_string(), serde_json::Value::String(color_name.to_string()));
+                        data.insert(
+                            "card_id".to_string(),
+                            serde_json::Value::Number(card_id.into()),
+                        );
+                        data.insert(
+                            "amount".to_string(),
+                            serde_json::Value::Number(heart_to_add.into()),
+                        );
+                        data.insert(
+                            "color".to_string(),
+                            serde_json::Value::String(color_name.to_string()),
+                        );
                         effect_data = Some(serde_json::Value::Object(data));
                         eprintln!("[EFFECT_DATA] stored heart effect_data (empty targets): card_id={} amount={} color={}", card_id, heart_to_add, color_name);
                     }
                 }
-            } else if is_self_target || (target == "self" && activating_card_id.is_some() && effect.source.is_none() && effect.card_type.is_none()) {
+            } else if is_self_target
+                || (target == "self"
+                    && activating_card_id.is_some()
+                    && effect.source.is_none()
+                    && effect.card_type.is_none())
+            {
                 if let Some(card_id) = activating_card_id {
-                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state
+                        .mods
+                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         let mut data = serde_json::Map::new();
-                        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
-                        data.insert("amount".to_string(), serde_json::Value::Number(heart_to_add.into()));
-                        data.insert("color".to_string(), serde_json::Value::String(color_name.to_string()));
+                        data.insert(
+                            "card_id".to_string(),
+                            serde_json::Value::Number(card_id.into()),
+                        );
+                        data.insert(
+                            "amount".to_string(),
+                            serde_json::Value::Number(heart_to_add.into()),
+                        );
+                        data.insert(
+                            "color".to_string(),
+                            serde_json::Value::String(color_name.to_string()),
+                        );
                         effect_data = Some(serde_json::Value::Object(data));
                         eprintln!("[EFFECT_DATA] stored heart effect_data (complex path): card_id={} amount={} color={}", card_id, heart_to_add, color_name);
                     }
                 }
             } else {
-                let targets: Vec<i16> = if is_all { heart_targets.clone() } else { heart_targets.into_iter().take(final_count as usize).collect() };
+                let targets: Vec<i16> = if is_all {
+                    heart_targets.clone()
+                } else {
+                    heart_targets
+                        .into_iter()
+                        .take(final_count as usize)
+                        .collect()
+                };
                 for &card_id in &targets {
-                    self.game_state.mods.add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    self.game_state
+                        .mods
+                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
                 }
                 // Store effect_data for ALL target cards so cleanup works
-                if is_temporary && (resource == "heart" || resource == "ハート") && effect_data.is_none() {
+                if is_temporary
+                    && (resource == "heart" || resource == "ハート")
+                    && effect_data.is_none()
+                {
                     let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                     let cards_json: Vec<serde_json::Value> = targets.iter().map(|&cid| {
                         serde_json::json!({"card_id": cid, "amount": heart_to_add, "color": color_name})
                     }).collect();
                     effect_data = Some(serde_json::Value::Array(cards_json.clone()));
-                    eprintln!("[EFFECT_DATA] stored heart effect_data: {:?} for targets {:?}", cards_json, targets);
+                    eprintln!(
+                        "[EFFECT_DATA] stored heart effect_data: {:?} for targets {:?}",
+                        cards_json, targets
+                    );
                 }
             }
         }
@@ -743,9 +1344,18 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_change_state(
-        &mut self, state_change: &str, target: &str, count: u32, max: bool, card_type: Option<&str>,
-        cost_limit: Option<u32>, optional: bool, group_name: Option<&str>, self_cost: bool,
-        source: Option<&str>, destination: Option<&str>,
+        &mut self,
+        state_change: &str,
+        target: &str,
+        count: u32,
+        max: bool,
+        card_type: Option<&str>,
+        cost_limit: Option<u32>,
+        optional: bool,
+        group_name: Option<&str>,
+        self_cost: bool,
+        source: Option<&str>,
+        destination: Option<&str>,
         cost_limit_operator: Option<String>,
     ) -> Result<(), String> {
         let state_change = state_change.to_string();
@@ -788,10 +1398,19 @@ impl<'a> AbilityResolver<'a> {
             let card_db = self.card_db();
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), cost_limit, None, None, None);
+            let filter = util::filter_from_parts(
+                card_type_filter.as_deref(),
+                group_filter.as_deref(),
+                cost_limit,
+                None,
+                None,
+                None,
+            );
             let mut candidates: Vec<(usize, i16)> = Vec::new();
             for (i, slot_id) in player.stage.stage.iter().enumerate() {
-                if *slot_id == -1 { continue; }
+                if *slot_id == -1 {
+                    continue;
+                }
                 if filter.matches(&card_db, *slot_id, false) {
                     candidates.push((i, *slot_id));
                 }
@@ -802,7 +1421,8 @@ impl<'a> AbilityResolver<'a> {
             }
 
             // Count how many are in wait state before changing (for wait→active tracking)
-            let wait_before_count = candidates.iter()
+            let wait_before_count = candidates
+                .iter()
                 .filter(|(_, card_id)| {
                     let o = self.game_state.mods.get_orientation_modifier(*card_id);
                     // None = active (no modifier), Some("wait") = wait
@@ -831,9 +1451,15 @@ impl<'a> AbilityResolver<'a> {
                 return Ok(());
             }
 
-            let change_count = if is_change_all { candidates.len() } else { count as usize };
+            let change_count = if is_change_all {
+                candidates.len()
+            } else {
+                count as usize
+            };
             for (_, card_id) in candidates.iter().take(change_count) {
-                self.game_state.mods.add_orientation_modifier(*card_id, &state_change);
+                self.game_state
+                    .mods
+                    .add_orientation_modifier(*card_id, &state_change);
             }
 
             // Track how many members were changed from wait→active
@@ -849,17 +1475,32 @@ impl<'a> AbilityResolver<'a> {
         let (wait_cards, deactivate_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), cost_limit, None, None, None);
-            let valid_indices = util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
+            let filter = util::filter_from_parts(
+                card_type_filter.as_deref(),
+                group_filter.as_deref(),
+                cost_limit,
+                None,
+                None,
+                None,
+            );
+            let valid_indices =
+                util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
 
             // When max=true, cap count to available cards (no error, no prompt)
             let effective_count = if max {
                 let available = match state_change.as_str() {
-                    "active" | "アクティブ" => player.energy_zone.cards.len().saturating_sub(player.energy_zone.active_energy_count),
+                    "active" | "アクティブ" => player
+                        .energy_zone
+                        .cards
+                        .len()
+                        .saturating_sub(player.energy_zone.active_energy_count),
                     _ => player.energy_zone.active_energy_count,
                 };
                 let capped = (count as usize).min(available) as u32;
-                eprintln!("[ENERGY] max=true: count={} available={} effective={}", count, available, capped);
+                eprintln!(
+                    "[ENERGY] max=true: count={} available={} effective={}",
+                    count, available, capped
+                );
                 capped
             } else {
                 eprintln!("[ENERGY] max=false: count={} effectve={}", count, count);
@@ -867,42 +1508,74 @@ impl<'a> AbilityResolver<'a> {
             };
 
             if valid_indices.len() < effective_count as usize {
-                return Err(format!("Not enough energy cards to deactivate: need {}, have {}", effective_count, valid_indices.len()));
+                return Err(format!(
+                    "Not enough energy cards to deactivate: need {}, have {}",
+                    effective_count,
+                    valid_indices.len()
+                ));
             }
 
             if !max && valid_indices.len() > effective_count as usize {
                 self.pending_choice = Some(Choice::SelectCard {
-                    zone: "energy_zone".to_string(), card_type: card_type_filter.clone(),
+                    zone: "energy_zone".to_string(),
+                    card_type: card_type_filter.clone(),
                     count: effective_count as usize,
-                    description: format!("Select {} energy card(s) to deactivate (set to wait)", effective_count),
+                    description: format!(
+                        "Select {} energy card(s) to deactivate (set to wait)",
+                        effective_count
+                    ),
                     allow_skip: false,
-                    cost_limit: None, cost_limit_operator: None, group: None, characters: None,
-                filtered_indices: None,
-                is_select_action: false,
-            });
+                    cost_limit: None,
+                    cost_limit_operator: None,
+                    group: None,
+                    characters: None,
+                    filtered_indices: None,
+                    is_select_action: false,
+                });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
             }
 
-            let wait_cards: Vec<i16> = valid_indices.iter().take(effective_count as usize).filter_map(|i| {
-                if *i < player.energy_zone.cards.len() { Some(player.energy_zone.cards[*i]) } else { None }
-            }).collect();
+            let wait_cards: Vec<i16> = valid_indices
+                .iter()
+                .take(effective_count as usize)
+                .filter_map(|i| {
+                    if *i < player.energy_zone.cards.len() {
+                        Some(player.energy_zone.cards[*i])
+                    } else {
+                        None
+                    }
+                })
+                .collect();
 
             (wait_cards, effective_count)
         };
 
-        eprintln!("[ENERGY] Building active_cards: deactivate_count={} max={}", deactivate_count, max);
+        eprintln!(
+            "[ENERGY] Building active_cards: deactivate_count={} max={}",
+            deactivate_count, max
+        );
         // Build active_cards separately (cannot be inside the closure due to borrow conflict)
-        eprintln!("[ENERGY] Building active_cards: deactivate_count={} max={}", deactivate_count, max);
-        let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ" {
+        eprintln!(
+            "[ENERGY] Building active_cards: deactivate_count={} max={}",
+            deactivate_count, max
+        );
+        let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ"
+        {
             let player = self.game_state.resolve_target_player(&target);
             let mut result = Vec::new();
             let mut active_count = 0u32;
             for i in 0..player.energy_zone.cards.len() {
-                if active_count >= deactivate_count { break; }
+                if active_count >= deactivate_count {
+                    break;
+                }
                 if let Some(&card_id) = player.energy_zone.cards.get(i) {
-                    let matches_type = card_type_filter.as_deref().map_or(true, |ct| util::card_matches_type(&card_db, card_id, Some(ct)));
-                    let matches_grp = group_filter.as_deref().map_or(true, |gf| util::card_matches_group_str(&card_db, card_id, Some(gf)));
+                    let matches_type = card_type_filter.as_deref().map_or(true, |ct| {
+                        util::card_matches_type(&card_db, card_id, Some(ct))
+                    });
+                    let matches_grp = group_filter.as_deref().map_or(true, |gf| {
+                        util::card_matches_group_str(&card_db, card_id, Some(gf))
+                    });
                     if matches_type && matches_grp {
                         result.push(card_id);
                         active_count += 1;
@@ -910,21 +1583,28 @@ impl<'a> AbilityResolver<'a> {
                 }
             }
             result
-        } else { vec![] };
+        } else {
+            vec![]
+        };
 
         match state_change.as_str() {
             "wait" | "ウェイト" => {
                 for card_id in &wait_cards {
-                    self.game_state.mods.add_orientation_modifier(*card_id, "wait");
+                    self.game_state
+                        .mods
+                        .add_orientation_modifier(*card_id, "wait");
                 }
                 for _ in 0..deactivate_count {
                     let player = self.game_state.resolve_target_player_mut(target.as_str());
-                    player.energy_zone.active_energy_count = player.energy_zone.active_energy_count.saturating_sub(1);
+                    player.energy_zone.active_energy_count =
+                        player.energy_zone.active_energy_count.saturating_sub(1);
                 }
             }
             "active" | "アクティブ" => {
                 for card_id in &active_cards {
-                    self.game_state.mods.add_orientation_modifier(*card_id, "active");
+                    self.game_state
+                        .mods
+                        .add_orientation_modifier(*card_id, "active");
                 }
                 let player = self.game_state.resolve_target_player_mut(target.as_str());
                 player.energy_zone.active_energy_count += active_cards.len();
@@ -935,9 +1615,18 @@ impl<'a> AbilityResolver<'a> {
     }
 
     fn execute_modify_score(
-        &mut self, operation: &str, value: u32, target: &str, duration: Option<&str>,
-        card_type: Option<&str>, group_name: Option<&str>, per_unit: bool, per_unit_count: u32,
-        per_unit_type: Option<&str>, effect_constraint: Option<&str>, self_target: bool,
+        &mut self,
+        operation: &str,
+        value: u32,
+        target: &str,
+        duration: Option<&str>,
+        card_type: Option<&str>,
+        group_name: Option<&str>,
+        per_unit: bool,
+        per_unit_count: u32,
+        per_unit_type: Option<&str>,
+        effect_constraint: Option<&str>,
+        self_target: bool,
         heart_colors: &[String],
     ) -> Result<(), String> {
         let operation = operation.to_string();
@@ -953,23 +1642,46 @@ impl<'a> AbilityResolver<'a> {
         let (live_card_ids, final_value) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
-            let filter = util::filter_from_parts(card_type_filter.as_deref(), group_filter.as_deref(), None, None, None, None);
+            let filter = util::filter_from_parts(
+                card_type_filter.as_deref(),
+                group_filter.as_deref(),
+                None,
+                None,
+                None,
+                None,
+            );
 
             let final_value = if per_unit {
-                let matching_count = util::resolve_per_unit_count(true, per_unit_type_str.as_deref(), player, &card_db, &filter, heart_colors);
+                let matching_count = util::resolve_per_unit_count(
+                    true,
+                    per_unit_type_str.as_deref(),
+                    player,
+                    &card_db,
+                    &filter,
+                    heart_colors,
+                );
                 value * matching_count * per_unit_count_val
-            } else { value };
+            } else {
+                value
+            };
 
             let candidate_ids: Vec<i16> = match card_type_filter.as_deref() {
-                Some("member_card") => util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true),
+                Some("member_card") => {
+                    util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true)
+                }
                 _ => player.live_card_zone.cards.iter().copied().collect(),
             };
-            let target_card_ids: Vec<(i16, i32)> = candidate_ids.iter()
+            let target_card_ids: Vec<(i16, i32)> = candidate_ids
+                .iter()
                 .filter(|&&card_id| {
-                    if !filter.matches(&card_db, card_id, false) { return false; }
+                    if !filter.matches(&card_db, card_id, false) {
+                        return false;
+                    }
                     if self_target {
                         if let Some(activating_id) = self.activating_card_id {
-                            if card_id != activating_id { return false; }
+                            if card_id != activating_id {
+                                return false;
+                            }
                         }
                     }
                     true
@@ -982,11 +1694,20 @@ impl<'a> AbilityResolver<'a> {
                         _ => 0i32,
                     };
                     (card_id, delta)
-                }).collect();
+                })
+                .collect();
 
-            eprintln!("[SCORE] ids={:?} final_value={} self_target={} target={} activating_id={:?}",
-                target_card_ids.iter().map(|(id, d)| format!("id={} delta={}", id, d)).collect::<Vec<_>>(),
-                final_value, self_target, target, self.activating_card_id);
+            eprintln!(
+                "[SCORE] ids={:?} final_value={} self_target={} target={} activating_id={:?}",
+                target_card_ids
+                    .iter()
+                    .map(|(id, d)| format!("id={} delta={}", id, d))
+                    .collect::<Vec<_>>(),
+                final_value,
+                self_target,
+                target,
+                self.activating_card_id
+            );
             (target_card_ids, final_value)
         };
 
@@ -995,12 +1716,19 @@ impl<'a> AbilityResolver<'a> {
             if let Some(constraint) = &effect_constraint {
                 let current_mod = self.game_state.mods.get_score_modifier(*card_id);
                 match constraint.as_str() {
-                    "min:0" => { if current_mod + delta < 0 { continue; } }
+                    "min:0" => {
+                        if current_mod + delta < 0 {
+                            continue;
+                        }
+                    }
                     _ => {}
                 }
             }
-            if operation == "set" { self.game_state.mods.set_score_modifier(*card_id, *delta); }
-            else { self.game_state.mods.add_score_modifier(*card_id, *delta); }
+            if operation == "set" {
+                self.game_state.mods.set_score_modifier(*card_id, *delta);
+            } else {
+                self.game_state.mods.add_score_modifier(*card_id, *delta);
+            }
             count_applied += 1;
         }
 
@@ -1009,17 +1737,37 @@ impl<'a> AbilityResolver<'a> {
             &format!("modify_score_{}", operation),
             duration.as_deref(),
             &target,
-            &format!("Modify score by {} {} (applied to {} cards)", operation, final_value, count_applied),
+            &format!(
+                "Modify score by {} {} (applied to {} cards)",
+                operation, final_value, count_applied
+            ),
             None,
         );
         Ok(())
     }
 
-    fn execute_modify_required_hearts(&mut self, operation: &str, mut value: u32, heart_color: &str, target: &str, per_unit: bool, per_unit_count: u32, group_name: Option<&str>, timing_condition: Option<&str>, _location: Option<&str>) -> Result<(), String> {
+    fn execute_modify_required_hearts(
+        &mut self,
+        operation: &str,
+        mut value: u32,
+        heart_color: &str,
+        target: &str,
+        per_unit: bool,
+        per_unit_count: u32,
+        group_name: Option<&str>,
+        timing_condition: Option<&str>,
+        _location: Option<&str>,
+    ) -> Result<(), String> {
         if per_unit {
             let card_db = &self.game_state.card_database;
             let player = self.game_state.resolve_target_player(target);
-            let stage_cards: Vec<i16> = player.stage.stage.iter().filter(|&&id| id != -1).copied().collect();
+            let stage_cards: Vec<i16> = player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect();
             let mut count = 0u32;
             for &card_id in &stage_cards {
                 if let Some(g) = group_name {
@@ -1032,7 +1780,9 @@ impl<'a> AbilityResolver<'a> {
                         "appeared_or_moved_this_turn" => {
                             let moved = self.game_state.has_card_moved_this_turn(card_id);
                             let appeared = self.game_state.has_card_appeared_this_turn(card_id);
-                            if !moved && !appeared { continue; }
+                            if !moved && !appeared {
+                                continue;
+                            }
                         }
                         _ => {}
                     }
@@ -1040,7 +1790,10 @@ impl<'a> AbilityResolver<'a> {
                 count += 1;
             }
             value = count * per_unit_count;
-            eprintln!("[MODIFY_HEARTS] per_unit count={} value={} group={:?} timing={:?}", count, value, group_name, timing_condition);
+            eprintln!(
+                "[MODIFY_HEARTS] per_unit count={} value={} group={:?} timing={:?}",
+                count, value, group_name, timing_condition
+            );
         }
         let color = crate::zones::parse_heart_color(heart_color);
         let card_ids: Vec<i16> = {
@@ -1049,27 +1802,55 @@ impl<'a> AbilityResolver<'a> {
         };
         for card_id in card_ids {
             match operation {
-                "decrease" => { self.game_state.mods.add_need_heart_modifier(card_id, color, -(value as i32)); }
-                "increase" => { self.game_state.mods.add_need_heart_modifier(card_id, color, value as i32); }
-                "set" => { self.game_state.mods.set_need_heart_modifier(card_id, color, value as i32); }
+                "decrease" => {
+                    self.game_state
+                        .mods
+                        .add_need_heart_modifier(card_id, color, -(value as i32));
+                }
+                "increase" => {
+                    self.game_state
+                        .mods
+                        .add_need_heart_modifier(card_id, color, value as i32);
+                }
+                "set" => {
+                    self.game_state
+                        .mods
+                        .set_need_heart_modifier(card_id, color, value as i32);
+                }
                 _ => return Err(format!("Unknown operation: {}", operation)),
             }
         }
         Ok(())
     }
 
-    fn execute_set_cost(&mut self, value: u32, target: &str, card_type: Option<&str>) -> Result<(), String> {
+    fn execute_set_cost(&mut self, value: u32, target: &str, card_type: Option<&str>) {
         let player = self.game_state.resolve_target_player_mut(target);
         let card_ids: Vec<i16> = if let Some("live_card") = card_type {
             player.live_card_zone.cards.iter().copied().collect()
         } else if let Some("member_card") = card_type {
-            player.stage.stage.iter().filter(|&&id| id != -1).copied().collect()
-        } else { player.hand.cards.iter().copied().collect() };
-        for card_id in card_ids { self.game_state.mods.set_cost_modifier(card_id, value as i32); }
-        Ok(())
+            player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect()
+        } else {
+            player.hand.cards.iter().copied().collect()
+        };
+        for card_id in card_ids {
+            self.game_state
+                .mods
+                .set_cost_modifier(card_id, value as i32);
+        }
     }
 
-    fn execute_set_blade_type(&mut self, blade_type: Option<&str>, target: &str, duration: Option<&str>) -> Result<(), String> {
+    fn execute_set_blade_type(
+        &mut self,
+        blade_type: Option<&str>,
+        target: &str,
+        duration: Option<&str>,
+    ) {
         let card_db = self.card_db();
         let blade_color = blade_type.and_then(|bt| match bt {
             "red" => Some(crate::card::BladeColor::Red),
@@ -1084,10 +1865,16 @@ impl<'a> AbilityResolver<'a> {
         });
         let stage_card_ids: Vec<(i16, String)> = {
             let player = self.game_state.resolve_target_player(target);
-            (0..3).filter_map(|i| {
-                let id = player.stage.stage[i];
-                if id == -1 { None } else { Some((id, player.id.clone())) }
-            }).collect()
+            (0..3)
+                .filter_map(|i| {
+                    let id = player.stage.stage[i];
+                    if id == -1 {
+                        None
+                    } else {
+                        Some((id, player.id.clone()))
+                    }
+                })
+                .collect()
         };
         for (card_id, pid) in stage_card_ids {
             if let Some(color) = blade_color {
@@ -1098,33 +1885,53 @@ impl<'a> AbilityResolver<'a> {
                 &format!("set_blade_type:{}", blade_type.unwrap_or("")),
                 duration,
                 &pid,
-                &format!("Set blade type to {} for {}", blade_type.unwrap_or(""), card_db.get_card(card_id).map(|c| c.name.as_str()).unwrap_or("unknown")),
+                &format!(
+                    "Set blade type to {} for {}",
+                    blade_type.unwrap_or(""),
+                    card_db
+                        .get_card(card_id)
+                        .map(|c| c.name.as_str())
+                        .unwrap_or("unknown")
+                ),
                 None,
             );
         }
-        Ok(())
     }
 
-    fn execute_set_heart_type(&mut self, heart_type: Option<&str>, target: &str, count: i32) -> Result<(), String> {
+    fn execute_set_heart_type(&mut self, heart_type: Option<&str>, target: &str, count: i32) {
         let heart_type = heart_type.unwrap_or("heart00");
         let player = self.game_state.resolve_target_player_mut(target);
         let mut card_ids_to_modify: Vec<i16> = Vec::new();
         for index in 0..3 {
             let card_id = player.stage.stage[index];
-            if card_id != -1 { card_ids_to_modify.push(card_id); }
+            if card_id != -1 {
+                card_ids_to_modify.push(card_id);
+            }
         }
         let color = crate::zones::parse_heart_color(heart_type);
-        for card_id in card_ids_to_modify { self.game_state.mods.add_heart_modifier(card_id, color, count); }
-        Ok(())
+        for card_id in card_ids_to_modify {
+            self.game_state
+                .mods
+                .add_heart_modifier(card_id, color, count);
+        }
     }
 
-    fn execute_activate_ability(&mut self, ability_text: &str, target_trigger: Option<&str>, _count: Option<u32>) {
+    fn execute_activate_ability(
+        &mut self,
+        ability_text: &str,
+        target_trigger: Option<&str>,
+        _count: Option<u32>,
+    ) {
         if let Some(card_id) = self.game_state.activating_card {
             let mut text = ability_text.to_string();
             if let Some(trigger) = target_trigger {
                 text = format!("{}_trigger:{}", text, trigger);
             }
-            self.game_state.gained_abilities.entry(card_id).or_default().push(text);
+            self.game_state
+                .gained_abilities
+                .entry(card_id)
+                .or_default()
+                .push(text);
         }
     }
 
@@ -1134,26 +1941,38 @@ impl<'a> AbilityResolver<'a> {
         }
     }
 
-    fn execute_gain_ability(&mut self, ability_text: &str, target: &str, duration: Option<&str>) -> Result<(), String> {
+    fn execute_gain_ability(
+        &mut self,
+        ability_text: &str,
+        target: &str,
+        duration: Option<&str>,
+    ) -> Result<(), String> {
         // Store the gained ability for tracking purposes
         if let Some(card_id) = self.game_state.activating_card {
-            self.game_state.gained_abilities.entry(card_id).or_default().push(ability_text.to_string());
+            self.game_state
+                .gained_abilities
+                .entry(card_id)
+                .or_default()
+                .push(ability_text.to_string());
         }
-        
+
         // Parse and apply the gained ability effect immediately
         // Handle common gained ability patterns
         if ability_text.contains("スコアを+1") || ability_text.contains("スコアを＋1") {
             // This is a score modifier effect
             let value = 1; // +1 score
             let _operation = "add";
-            
+
             // Apply to the activating card (self target)
             if let Some(card_id) = self.game_state.activating_card {
                 self.game_state.mods.add_score_modifier(card_id, value);
-                eprintln!("[GAINED_ABILITY] Applied +1 score modifier to card {}", card_id);
+                eprintln!(
+                    "[GAINED_ABILITY] Applied +1 score modifier to card {}",
+                    card_id
+                );
             }
         }
-        
+
         util::push_temporary_effect(
             &mut self.game_state,
             &format!("gain_ability:{}", ability_text),
@@ -1168,39 +1987,70 @@ impl<'a> AbilityResolver<'a> {
     fn execute_play_baton_touch(&mut self, count: u32, target: &str) -> Result<(), String> {
         eprintln!("play_baton_touch: count={}, target={}", count, target);
         if self.game_state.baton_touch_count == 0 {
-            return Err("Baton touch condition not met: card was not played via baton touch".to_string());
+            return Err(
+                "Baton touch condition not met: card was not played via baton touch".to_string(),
+            );
         }
-        self.game_state.prohibition_effects.push(format!("baton_touch_allowed:{}", count));
+        self.game_state
+            .prohibition_effects
+            .push(format!("baton_touch_allowed:{}", count));
         Ok(())
     }
 
-
-
-    fn execute_modify_required_hearts_global(&mut self, operation: &str, value: u32, heart_color: &str, target: &str) -> Result<(), String> {
+    fn execute_modify_required_hearts_global(
+        &mut self,
+        operation: &str,
+        value: u32,
+        heart_color: &str,
+        target: &str,
+    ) -> Result<(), String> {
         let color = crate::zones::parse_heart_color(heart_color);
         let card_ids: Vec<i16> = {
             let player = self.game_state.resolve_target_player_mut(target);
             player.live_card_zone.cards.to_vec()
         };
         for card_id in card_ids {
-            let modifier_value = match operation { "increase" => value as i32, "decrease" => -(value as i32), _ => return Err(format!("Unknown operation: {}", operation)) };
-            self.game_state.mods.add_need_heart_modifier(card_id, color, modifier_value);
+            let modifier_value = match operation {
+                "increase" => value as i32,
+                "decrease" => -(value as i32),
+                _ => return Err(format!("Unknown operation: {}", operation)),
+            };
+            self.game_state
+                .mods
+                .add_need_heart_modifier(card_id, color, modifier_value);
         }
         Ok(())
     }
 
     fn execute_modify_yell_count(&mut self, operation: &str, count: u32) {
         match operation {
-            "add" => { self.game_state.cheer_checks_required += count; }
-            "subtract" => { self.game_state.cheer_checks_required = self.game_state.cheer_checks_required.saturating_sub(count); }
-            "set" => { self.game_state.cheer_checks_required = count; }
+            "add" => {
+                self.game_state.cheer_checks_required += count;
+            }
+            "subtract" => {
+                self.game_state.cheer_checks_required =
+                    self.game_state.cheer_checks_required.saturating_sub(count);
+            }
+            "set" => {
+                self.game_state.cheer_checks_required = count;
+            }
             _ => eprintln!("Unknown operation: {}", operation),
         }
     }
 
-    pub fn execute_place_energy_under_member(&mut self, count: u32, target: &str, position: Option<&PositionInfo>, optional: bool, source: Option<&str>) -> Result<(), String> {
+    pub fn execute_place_energy_under_member(
+        &mut self,
+        count: u32,
+        target: &str,
+        position: Option<&PositionInfo>,
+        optional: bool,
+        source: Option<&str>,
+    ) {
         // Check if we're moving from under_member to energy_deck (Awakening case)
-        println!("DEBUG: execute_place_energy_under_member - source: {:?}", source);
+        println!(
+            "DEBUG: execute_place_energy_under_member - source: {:?}",
+            source
+        );
         if source == Some("under_member") {
             // Handle moving from under_member to energy_deck
             let player = self.game_state.resolve_target_player_mut(target);
@@ -1209,35 +2059,42 @@ impl<'a> AbilityResolver<'a> {
                 Some("left") | Some("左側") => 0,
                 Some("right") | Some("右側") => 2,
                 None => {
-                    if player.stage.stage[1] != -1 { 1 }
-                    else if player.stage.stage[0] != -1 { 0 }
-                    else if player.stage.stage[2] != -1 { 2 }
-                    else { return Ok(()); }
+                    if player.stage.stage[1] != -1 {
+                        1
+                    } else if player.stage.stage[0] != -1 {
+                        0
+                    } else if player.stage.stage[2] != -1 {
+                        2
+                    } else {
+                        return;
+                    }
                 }
                 _ => 1,
             };
-            
+
             if player.stage.stage[target_index] == -1 {
-                return Ok(());
+                return;
             }
-            
+
             let area = match target_index {
                 0 => crate::zones::MemberArea::LeftSide,
                 1 => crate::zones::MemberArea::Center,
                 _ => crate::zones::MemberArea::RightSide,
             };
-            
+
             let under_cards = player.stage.get_under_cards(area);
             if under_cards.is_empty() {
-                return Ok(());
+                return;
             }
-            
+
             // Create choice to select cards to move
             self.pending_choice = Some(Choice::SelectCard {
                 zone: "under_member".to_string(),
                 card_type: Some("energy_card".to_string()),
                 count: under_cards.len().min(count as usize),
-                description: format!("Select energy cards to move from under member to energy deck"),
+                description: format!(
+                    "Select energy cards to move from under member to energy deck"
+                ),
                 allow_skip: optional, // Allow skip if optional
                 cost_limit: None,
                 cost_limit_operator: None,
@@ -1247,13 +2104,15 @@ impl<'a> AbilityResolver<'a> {
                 is_select_action: false,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-            return Ok(());
+            return;
         }
-        
+
         // Original logic: move from energy_zone to under_member
         // This should only execute if source is NOT "under_member"
         if optional {
-            let is_activation = self.current_ability.as_ref()
+            let is_activation = self
+                .current_ability
+                .as_ref()
                 .and_then(|a| a.triggers.as_ref())
                 .map_or(false, |t| t == crate::triggers::ACTIVATION);
             if !is_activation {
@@ -1265,33 +2124,51 @@ impl<'a> AbilityResolver<'a> {
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some("optional_cost".to_string());
                 }
-                return Ok(());
+                return;
             }
         }
         let player = self.game_state.resolve_target_player_mut(target);
         let mut energy_cards = Vec::new();
         for _ in 0..count {
-            if let Some(energy_card) = player.energy_zone.cards.pop() { energy_cards.push(energy_card); }
-            else { break; }
+            if let Some(energy_card) = player.energy_zone.cards.pop() {
+                energy_cards.push(energy_card);
+            } else {
+                break;
+            }
         }
-        if energy_cards.is_empty() { return Ok(()); }
-        player.energy_zone.active_energy_count = player.energy_zone.active_energy_count.saturating_sub(energy_cards.len());
+        if energy_cards.is_empty() {
+            return;
+        }
+        player.energy_zone.active_energy_count = player
+            .energy_zone
+            .active_energy_count
+            .saturating_sub(energy_cards.len());
         let target_index = match position.and_then(|p| p.get_position()) {
             Some("center") | Some("中央") => 1,
             Some("left") | Some("左側") => 0,
             Some("right") | Some("右側") => 2,
             None => {
-                if player.stage.stage[1] != -1 { 1 }
-                else if player.stage.stage[0] != -1 { 0 }
-                else if player.stage.stage[2] != -1 { 2 }
-                else { for card in energy_cards { player.energy_deck.cards.push(card); } return Ok(()); }
+                if player.stage.stage[1] != -1 {
+                    1
+                } else if player.stage.stage[0] != -1 {
+                    0
+                } else if player.stage.stage[2] != -1 {
+                    2
+                } else {
+                    for card in energy_cards {
+                        player.energy_deck.cards.push(card);
+                    }
+                    return;
+                }
             }
             _ => 1,
         };
         if player.stage.stage[target_index] == -1 {
             // Rule 10.5.4: Energy without a member goes to energy deck
-            for card in energy_cards { player.energy_deck.cards.push(card); }
-            return Ok(());
+            for card in energy_cards {
+                player.energy_deck.cards.push(card);
+            }
+            return;
         }
         // Rule 10.5.3: Energy placed under member — track it for recycling
         let area = match target_index {
@@ -1302,13 +2179,20 @@ impl<'a> AbilityResolver<'a> {
         for card in energy_cards {
             player.stage.place_under_card(area, card);
         }
-        Ok(())
     }
 
-    fn execute_activation_cost(&mut self, operation: &str, value: u32, target: &str, duration: Option<&str>) -> Result<(), String> {
+    fn execute_activation_cost(
+        &mut self,
+        operation: &str,
+        value: u32,
+        target: &str,
+        duration: Option<&str>,
+    ) {
         let prohibition_text = format!("activation_cost_{}_{}", operation, value);
         match target {
-            "self" | "opponent" => { self.game_state.prohibition_effects.push(prohibition_text); }
+            "self" | "opponent" => {
+                self.game_state.prohibition_effects.push(prohibition_text);
+            }
             _ => {}
         }
         util::push_temporary_effect(
@@ -1319,12 +2203,19 @@ impl<'a> AbilityResolver<'a> {
             &format!("Modify activation cost by {} {}", operation, value),
             None,
         );
-        Ok(())
     }
 
-    fn execute_position_change(&mut self, effect: &AbilityEffect, position: Option<PositionInfo>, target: &str, target_member: &str) -> Result<(), String> {
+    fn execute_position_change(
+        &mut self,
+        effect: &AbilityEffect,
+        position: Option<PositionInfo>,
+        target: &str,
+        target_member: &str,
+    ) -> Result<(), String> {
         // Check source_position from effect (new parser field), fall back to position param
-        let source_pos = effect.source_position.as_deref()
+        let source_pos = effect
+            .source_position
+            .as_deref()
             .or_else(|| position.as_ref().and_then(|p| p.get_position()));
         let position_str = source_pos.unwrap_or("");
 
@@ -1340,12 +2231,90 @@ impl<'a> AbilityResolver<'a> {
             } else {
                 let mut self_effect = effect.clone();
                 self_effect.target = Some("self".to_string());
-                self.execute_position_change(&self_effect, position.clone(), "self", target_member)?;
+                self.execute_position_change(
+                    &self_effect,
+                    position.clone(),
+                    "self",
+                    target_member,
+                )?;
             }
             return Ok(());
         }
 
         if target_member == "this_member" {
+            // Handle "multiple_targets=true" (それぞれ) pattern: iterate all stage members.
+            if effect.multiple_targets.unwrap_or(false) {
+                let target_m = effect.target.as_deref().unwrap_or("self");
+                let card_db = self.card_db();
+                let mut card_ids: Vec<i16> = Vec::new();
+                {
+                    let player = self.game_state.resolve_target_player_mut(target_m);
+                    for i in 0..3 {
+                        if player.stage.stage[i] != -1 {
+                            card_ids.push(player.stage.stage[i]);
+                        }
+                    }
+                }
+                if card_ids.is_empty() {
+                    return Ok(());
+                }
+                let card_nos: Vec<String> = card_ids
+                    .iter()
+                    .filter_map(|&cid| card_db.get_card(cid).map(|c| c.card_no.clone()))
+                    .collect();
+                if card_nos.is_empty() {
+                    return Ok(());
+                }
+
+                // First card: create choice for destination
+                let first_card_id = card_ids[0];
+                let current_idx = {
+                    let player = self.game_state.resolve_target_player_mut(target_m);
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .position(|&id| id == first_card_id)
+                };
+                let pos_name = match current_idx {
+                    Some(0) => "Left",
+                    Some(1) => "Center",
+                    Some(2) => "Right",
+                    _ => "?",
+                };
+
+                if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some(format!("position_change:self:{}", card_nos[0]));
+                }
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "position|destination".to_string(),
+                    description: format!(
+                        "Choose destination for {} (currently at {})",
+                        card_db
+                            .get_card(first_card_id)
+                            .map(|c| c.name.as_str())
+                            .unwrap_or("member"),
+                        pos_name
+                    ),
+                    allow_skip: effect.optional.unwrap_or(false),
+                });
+
+                // Save remaining cards as pending_sequential_actions
+                if card_nos.len() > 1 {
+                    let mut remaining: Vec<AbilityEffect> = Vec::new();
+                    for cn in &card_nos[1..] {
+                        let mut sub = AbilityEffect::default();
+                        sub.action = "position_change".to_string();
+                        sub.target = Some(target_m.to_string());
+                        sub.target_member = Some(cn.clone());
+                        sub.optional = effect.optional;
+                        remaining.push(sub);
+                    }
+                    self.game_state.pending_sequential_actions = Some(remaining);
+                }
+                return Ok(());
+            }
+
             if !position_str.is_empty() {
                 // Position is SOURCE ("member AT center"). Find that member on
                 // the target's stage and create choice to pick destination.
@@ -1357,7 +2326,7 @@ impl<'a> AbilityResolver<'a> {
                     _ => return Err(format!("Unknown position: {}", position_str)),
                 };
                 if player.stage.stage[pos_idx] == -1 {
-                    return Ok(());  // no member at source → skip this side
+                    return Ok(()); // no member at source → skip this side
                 }
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some(format!("position_change:{}", target));
@@ -1365,7 +2334,7 @@ impl<'a> AbilityResolver<'a> {
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
                     description: "Choose destination for position change".to_string(),
-                    allow_skip: false,
+                    allow_skip: effect.optional.unwrap_or(false),
                 });
                 return Ok(());
             }
@@ -1377,7 +2346,7 @@ impl<'a> AbilityResolver<'a> {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "position|destination".to_string(),
                 description: "Choose destination for position change".to_string(),
-                allow_skip: false,
+                allow_skip: effect.optional.unwrap_or(false),
             });
             return Ok(());
         }
@@ -1392,33 +2361,67 @@ impl<'a> AbilityResolver<'a> {
         };
 
         let current_index = player.stage.stage.iter().position(|&card_id| {
-            if card_id == -1 { false }
-            else { card_db.get_card(card_id).map(|c| c.card_no == target_member).unwrap_or(false) }
+            if card_id == -1 {
+                false
+            } else {
+                card_db
+                    .get_card(card_id)
+                    .map(|c| c.card_no == target_member)
+                    .unwrap_or(false)
+            }
         });
 
         if let Some(current_idx) = current_index {
-            let from_area = match current_idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
-            let to_area = match target_index { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
-            let (target_id, source_id) = (player.stage.stage[target_index], player.stage.stage[current_idx]);
+            let from_area = match current_idx {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            let to_area = match target_index {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            let (target_id, source_id) = (
+                player.stage.stage[target_index],
+                player.stage.stage[current_idx],
+            );
             if let Ok(_) = player.stage.position_change(from_area, to_area) {
                 let _ = player;
                 self.game_state.record_card_movement(target_id);
                 if source_id != -1 {
                     self.game_state.record_card_movement(source_id);
                 }
-            } else { return Err(format!("Failed to move member from {:?} to {:?}", from_area, to_area)); }
-        } else { return Err(format!("Member not found: {}", target_member)); }
+            } else {
+                return Err(format!(
+                    "Failed to move member from {:?} to {:?}",
+                    from_area, to_area
+                ));
+            }
+        } else {
+            return Err(format!("Member not found: {}", target_member));
+        }
         self.game_state.position_change_occurred_this_turn = true;
         Ok(())
     }
 
-    pub fn execute_position_change_with_destination(&mut self, effect: &AbilityEffect, destination: &str) -> Result<(), String> {
+    pub fn execute_position_change_with_destination(
+        &mut self,
+        effect: &AbilityEffect,
+        destination: &str,
+    ) -> Result<(), String> {
         let raw_target = effect.target.as_deref().unwrap_or("self");
         // "both" at resolution time means "self" (the ability controller resolves choices)
-        let target = if raw_target == "both" { "self" } else { raw_target };
+        let target = if raw_target == "both" {
+            "self"
+        } else {
+            raw_target
+        };
         let target_member = effect.target_member.as_deref().unwrap_or("this_member");
         // Check source_position first (new parser field), fall back to position
-        let source_position = effect.source_position.as_deref()
+        let source_position = effect
+            .source_position
+            .as_deref()
             .or_else(|| effect.position.as_ref().and_then(|p| p.get_position()));
 
         // Reject destination if it matches exclude_position
@@ -1436,7 +2439,10 @@ impl<'a> AbilityResolver<'a> {
                 _ => -1,
             };
             if exclude_idx == dest_idx {
-                return Err(format!("Destination {} is excluded by exclude_position={}", destination, exclude));
+                return Err(format!(
+                    "Destination {} is excluded by exclude_position={}",
+                    destination, exclude
+                ));
             }
         }
 
@@ -1457,14 +2463,25 @@ impl<'a> AbilityResolver<'a> {
                 _ => return Err(format!("Unknown source position: {}", source)),
             };
             if player.stage.stage[source_idx] == -1 {
-                return Ok(());  // no member at source, skip
+                return Ok(()); // no member at source, skip
             }
             if source_idx == target_index {
-                return Ok(());  // same position, no move needed
+                return Ok(()); // same position, no move needed
             }
-            let from_area2 = match source_idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
-            let to_area2 = match target_index { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
-            let (target_id2, source_id2) = (player.stage.stage[target_index], player.stage.stage[source_idx]);
+            let from_area2 = match source_idx {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            let to_area2 = match target_index {
+                0 => crate::zones::MemberArea::LeftSide,
+                1 => crate::zones::MemberArea::Center,
+                _ => crate::zones::MemberArea::RightSide,
+            };
+            let (target_id2, source_id2) = (
+                player.stage.stage[target_index],
+                player.stage.stage[source_idx],
+            );
             player.stage.position_change(from_area2, to_area2)?;
             let _ = player;
             self.game_state.record_card_movement(target_id2);
@@ -1475,25 +2492,94 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
 
+        // Handle specific card_no (for "multiple_targets" each-member pattern)
+        if let Some(ref card_no) = effect.target_member {
+            if card_no != "this_member" {
+                let card_db = self.card_db();
+                let player = self.game_state.resolve_target_player_mut(target);
+                let current_index = player.stage.stage.iter().position(|&cid| {
+                    if cid == -1 {
+                        false
+                    } else {
+                        card_db
+                            .get_card(cid)
+                            .map(|c| c.card_no == *card_no)
+                            .unwrap_or(false)
+                    }
+                });
+                if let Some(current_idx) = current_index {
+                    if current_idx == target_index {
+                        return Ok(());
+                    }
+                    let from_area = match current_idx {
+                        0 => crate::zones::MemberArea::LeftSide,
+                        1 => crate::zones::MemberArea::Center,
+                        _ => crate::zones::MemberArea::RightSide,
+                    };
+                    let to_area = match target_index {
+                        0 => crate::zones::MemberArea::LeftSide,
+                        1 => crate::zones::MemberArea::Center,
+                        _ => crate::zones::MemberArea::RightSide,
+                    };
+                    let (target_id, source_id) = (
+                        player.stage.stage[target_index],
+                        player.stage.stage[current_idx],
+                    );
+                    player.stage.position_change(from_area, to_area)?;
+                    let _ = player;
+                    self.game_state.record_card_movement(target_id);
+                    if source_id != -1 {
+                        self.game_state.record_card_movement(source_id);
+                    }
+                }
+                self.game_state.position_change_occurred_this_turn = true;
+                return Ok(());
+            }
+        }
+
         if target_member == "this_member" {
             if let Some(activating_card_id) = self.activating_card_id {
                 let player = self.game_state.resolve_target_player_mut(target);
 
-                let current_index = player.stage.stage.iter().position(|&card_id| card_id == activating_card_id);
+                let current_index = player
+                    .stage
+                    .stage
+                    .iter()
+                    .position(|&card_id| card_id == activating_card_id);
 
                 if let Some(current_idx) = current_index {
-                    if current_idx == target_index { return Ok(()); }
-                    let from_area3 = match current_idx { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
-                    let to_area3 = match target_index { 0 => crate::zones::MemberArea::LeftSide, 1 => crate::zones::MemberArea::Center, _ => crate::zones::MemberArea::RightSide };
-                    let (target_id3, source_id3) = (player.stage.stage[target_index], player.stage.stage[current_idx]);
+                    if current_idx == target_index {
+                        return Ok(());
+                    }
+                    let from_area3 = match current_idx {
+                        0 => crate::zones::MemberArea::LeftSide,
+                        1 => crate::zones::MemberArea::Center,
+                        _ => crate::zones::MemberArea::RightSide,
+                    };
+                    let to_area3 = match target_index {
+                        0 => crate::zones::MemberArea::LeftSide,
+                        1 => crate::zones::MemberArea::Center,
+                        _ => crate::zones::MemberArea::RightSide,
+                    };
+                    let (target_id3, source_id3) = (
+                        player.stage.stage[target_index],
+                        player.stage.stage[current_idx],
+                    );
                     player.stage.position_change(from_area3, to_area3)?;
                     let _ = player;
                     self.game_state.record_card_movement(target_id3);
                     if source_id3 != -1 {
                         self.game_state.record_card_movement(source_id3);
                     }
-                } else { return Err(format!("Activating card {} not found on stage", activating_card_id)); }
-            } else { return Err("No activating card for position change".to_string()); }
+                } else {
+                    return Err(format!(
+                        "Activating card {} not found on stage",
+                        activating_card_id
+                    ));
+                }
+            } else {
+                return Err("No activating card for position change".to_string());
+            }
         }
         self.game_state.position_change_occurred_this_turn = true;
         Ok(())
@@ -1518,25 +2604,50 @@ impl<'a> AbilityResolver<'a> {
 
         if members.len() == 1 {
             // Single member: just position change, not formation change
-            return self.execute_position_change(effect, effect.position.clone(), target, "this_member");
+            return self.execute_position_change(
+                effect,
+                effect.position.clone(),
+                target,
+                "this_member",
+            );
         }
 
         // Execute as sequential single position changes
-        for &(src_idx, _) in &members {
-            let mut sub = AbilityEffect::default();
-            sub.action = "position_change".to_string();
-            sub.target = Some(target.to_string());
-            sub.source_position = Some(match src_idx {
+        // First member creates the choice directly
+        if let Some(&(first_src, _)) = members.first() {
+            let mut first_sub = AbilityEffect::default();
+            first_sub.action = "position_change".to_string();
+            first_sub.target = Some(target.to_string());
+            first_sub.source_position = Some(match first_src {
                 0 => "left_side".to_string(),
                 1 => "center".to_string(),
                 2 => "right_side".to_string(),
                 _ => unreachable!(),
             });
-            let _ = self.execute_effect(&sub);
-        }
+            first_sub.optional = effect.optional;
 
-        self.game_state.formation_change_occurred_this_turn = true;
-        Ok(())
+            // Save remaining members as pending_sequential_actions
+            if members.len() > 1 {
+                let mut remaining: Vec<AbilityEffect> = Vec::new();
+                for &(src_idx, _) in &members[1..] {
+                    let mut sub = AbilityEffect::default();
+                    sub.action = "position_change".to_string();
+                    sub.target = Some(target.to_string());
+                    sub.source_position = Some(match src_idx {
+                        0 => "left_side".to_string(),
+                        1 => "center".to_string(),
+                        2 => "right_side".to_string(),
+                        _ => unreachable!(),
+                    });
+                    sub.optional = effect.optional;
+                    remaining.push(sub);
+                }
+                self.game_state.pending_sequential_actions = Some(remaining);
+            }
+            self.game_state.formation_change_occurred_this_turn = true;
+            self.execute_effect(&first_sub)?;
+        }
+        return Ok(());
     }
 
     fn execute_appear(&mut self, effect: &AbilityEffect) -> Result<(), String> {
@@ -1558,29 +2669,59 @@ impl<'a> AbilityResolver<'a> {
                         if matches_type {
                             match destination {
                                 "stage" => {
-                                    if player.stage.stage[1] == -1 { player.stage.stage[1] = card; player.areas_locked_this_turn.insert(crate::zones::MemberArea::Center); }
-                                    else if player.stage.stage[0] == -1 { player.stage.stage[0] = card; player.areas_locked_this_turn.insert(crate::zones::MemberArea::LeftSide); }
-                                    else if player.stage.stage[2] == -1 { player.stage.stage[2] = card; player.areas_locked_this_turn.insert(crate::zones::MemberArea::RightSide); }
-                                    else { player.hand.add_card(card); }
+                                    if player.stage.stage[1] == -1 {
+                                        player.stage.stage[1] = card;
+                                        player
+                                            .areas_locked_this_turn
+                                            .insert(crate::zones::MemberArea::Center);
+                                    } else if player.stage.stage[0] == -1 {
+                                        player.stage.stage[0] = card;
+                                        player
+                                            .areas_locked_this_turn
+                                            .insert(crate::zones::MemberArea::LeftSide);
+                                    } else if player.stage.stage[2] == -1 {
+                                        player.stage.stage[2] = card;
+                                        player
+                                            .areas_locked_this_turn
+                                            .insert(crate::zones::MemberArea::RightSide);
+                                    } else {
+                                        player.hand.add_card(card);
+                                    }
                                     cards_to_record.push(card);
                                 }
                                 "hand" => player.hand.add_card(card),
                                 "discard" => player.waitroom.add_card(card),
-                                _ => { eprintln!("Appear destination '{}' not implemented", destination); }
+                                _ => {
+                                    eprintln!(
+                                        "Appear destination '{}' not implemented",
+                                        destination
+                                    );
+                                }
                             }
                             appeared += 1;
-                        } else { player.main_deck.cards.push(card); }
-                    } else { break; }
+                        } else {
+                            player.main_deck.cards.push(card);
+                        }
+                    } else {
+                        break;
+                    }
                 }
-                for card_id in cards_to_record { self.game_state.record_card_movement(card_id); }
+                for card_id in cards_to_record {
+                    self.game_state.record_card_movement(card_id);
+                }
             }
             "discard" => {
                 let mut appeared = 0;
                 let mut indices_to_remove = Vec::new();
                 for (i, card) in player.waitroom.cards.iter().enumerate() {
-                    if appeared >= count { break; }
+                    if appeared >= count {
+                        break;
+                    }
                     let matches_type = util::card_matches_type(&card_db, *card, card_type);
-                    if matches_type { indices_to_remove.push(i); appeared += 1; }
+                    if matches_type {
+                        indices_to_remove.push(i);
+                        appeared += 1;
+                    }
                 }
                 for i in indices_to_remove.into_iter().rev() {
                     let card = player.waitroom.cards.remove(i);
@@ -1588,15 +2729,28 @@ impl<'a> AbilityResolver<'a> {
                 }
             }
             "hand" => {
-                let eligible: Vec<i16> = player.hand.cards.iter().copied().filter(|&cid| {
-                    if let Some(ct) = card_type {
-                        if !util::card_matches_type(&card_db, cid, Some(ct)) { return false; }
-                    }
-                    if !util::card_matches_cost_limit_op(&card_db, cid, effect.cost_limit, effect.cost_limit_operator.as_deref()) {
-                        return false;
-                    }
-                    true
-                }).collect();
+                let eligible: Vec<i16> = player
+                    .hand
+                    .cards
+                    .iter()
+                    .copied()
+                    .filter(|&cid| {
+                        if let Some(ct) = card_type {
+                            if !util::card_matches_type(&card_db, cid, Some(ct)) {
+                                return false;
+                            }
+                        }
+                        if !util::card_matches_cost_limit_op(
+                            &card_db,
+                            cid,
+                            effect.cost_limit,
+                            effect.cost_limit_operator.as_deref(),
+                        ) {
+                            return false;
+                        }
+                        true
+                    })
+                    .collect();
                 if let Some(&card_id) = eligible.first() {
                     if let Some(idx) = player.hand.cards.iter().position(|&c| c == card_id) {
                         player.hand.cards.remove(idx);
@@ -1610,7 +2764,12 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_choice(&mut self, choice_options: Option<&Vec<String>>, choice_type: Option<&str>, options: Option<&Vec<AbilityEffect>>) -> Result<(), String> {
+    fn execute_choice(
+        &mut self,
+        choice_options: Option<&Vec<String>>,
+        choice_type: Option<&str>,
+        options: Option<&Vec<AbilityEffect>>,
+    ) -> Result<(), String> {
         let options_json = options
             .and_then(|opts| serde_json::to_string(opts).ok())
             .or_else(|| choice_options.and_then(|opts| serde_json::to_string(opts).ok()));
@@ -1625,10 +2784,14 @@ impl<'a> AbilityResolver<'a> {
             entry.conditional_choice = options_json;
         }
         if let Some(effect_options) = options {
-            let description = effect_options.iter()
-                .map(|o| o.answers.as_ref()
-                    .map(|a| a.join(", "))
-                    .unwrap_or_else(|| o.text.clone()))
+            let description = effect_options
+                .iter()
+                .map(|o| {
+                    o.answers
+                        .as_ref()
+                        .map(|a| a.join(", "))
+                        .unwrap_or_else(|| o.text.clone())
+                })
                 .collect::<Vec<_>>()
                 .join(" / ");
             self.pending_choice = Some(Choice::SelectTarget {
@@ -1652,46 +2815,77 @@ impl<'a> AbilityResolver<'a> {
         Ok(())
     }
 
-    fn execute_pay_energy(&mut self, count: u32, target: &str) -> Result<(), String> {
+    fn execute_pay_energy(&mut self, count: u32, target: &str) {
         let player = self.game_state.resolve_target_player_mut(target);
-        if count > 0 { if let Err(e) = player.energy_zone.pay_energy(count as usize) { return Err(e); } }
-        Ok(())
+        if count > 0 {
+            if let Err(e) = player.energy_zone.pay_energy(count as usize) {
+                eprintln!("{}", e);
+            }
+        }
     }
 
     fn execute_set_card_identity(&mut self, identities: &[String]) {
         eprintln!("set_card_identity: identities={:?}", identities);
         if !identities.is_empty() {
-            self.game_state.prohibition_effects.push(format!("card_identity:{}", identities.join(",")));
+            self.game_state
+                .prohibition_effects
+                .push(format!("card_identity:{}", identities.join(",")));
         }
     }
 
-    fn execute_discard_until_count(&mut self, target_count: u32, target: &str) -> Result<(), String> {
+    fn execute_discard_until_count(
+        &mut self,
+        target_count: u32,
+        target: &str,
+    ) -> Result<(), String> {
         let player = self.game_state.resolve_target_player_mut(target);
         let current_count = player.hand.cards.len();
-        if current_count <= target_count as usize { return Ok(()); }
+        if current_count <= target_count as usize {
+            return Ok(());
+        }
         let cards_to_discard = current_count - target_count as usize;
         self.pending_choice = Some(Choice::select_card(
-                "hand".to_string(),
-                cards_to_discard,
-                format!("Discard {} cards from hand (target: {} cards in hand)", cards_to_discard, target_count),
-                false,
-            ));
+            "hand".to_string(),
+            cards_to_discard,
+            format!(
+                "Discard {} cards from hand (target: {} cards in hand)",
+                cards_to_discard, target_count
+            ),
+            false,
+        ));
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }
 
-    fn execute_restriction(&mut self, restriction_type: Option<&str>, restricted_destination: Option<&str>) -> Result<(), String> {
-        eprintln!("restriction: type={:?}, destination={:?}", restriction_type, restricted_destination);
-        self.game_state.prohibition_effects.push(format!("restriction:{}:{}", restriction_type.unwrap_or("unknown"), restricted_destination.unwrap_or("")));
+    fn execute_restriction(
+        &mut self,
+        restriction_type: Option<&str>,
+        restricted_destination: Option<&str>,
+    ) -> Result<(), String> {
+        eprintln!(
+            "restriction: type={:?}, destination={:?}",
+            restriction_type, restricted_destination
+        );
+        self.game_state.prohibition_effects.push(format!(
+            "restriction:{}:{}",
+            restriction_type.unwrap_or("unknown"),
+            restricted_destination.unwrap_or("")
+        ));
         // Handle cannot_activate restrictions — store for checking during Active phase
-        if restriction_type == Some("cannot_activate") || restriction_type == Some("cannot_activate_by_effect") {
-            let target = self.game_state.activating_card.map(|_| "self".to_string()).unwrap_or("opponent".to_string());
+        if restriction_type == Some("cannot_activate")
+            || restriction_type == Some("cannot_activate_by_effect")
+        {
+            let target = self
+                .game_state
+                .activating_card
+                .map(|_| "self".to_string())
+                .unwrap_or("opponent".to_string());
             self.game_state.cannot_activate_members.push(target);
         }
         Ok(())
     }
 
-    fn execute_re_yell(&mut self, lose_blade_hearts: bool, target: &str) -> Result<(), String> {
+    fn execute_re_yell(&mut self, lose_blade_hearts: bool, target: &str) {
         eprintln!("re_yell: lose_blade_hearts={}", lose_blade_hearts);
         let card_db = self.card_db();
         let mut cards_to_clear_modifiers: Vec<i16> = Vec::new();
@@ -1699,8 +2893,12 @@ impl<'a> AbilityResolver<'a> {
             let player = self.game_state.resolve_target_player_mut(target);
             for i in 0..3 {
                 if player.stage.stage[i] != -1 {
-                    if let Some(card_id) = player.remove_member_from_stage_with_recycling(i, &card_db) {
-                        if lose_blade_hearts { cards_to_clear_modifiers.push(card_id); }
+                    if let Some(card_id) =
+                        player.remove_member_from_stage_with_recycling(i, &card_db)
+                    {
+                        if lose_blade_hearts {
+                            cards_to_clear_modifiers.push(card_id);
+                        }
                     }
                 }
             }
@@ -1710,13 +2908,16 @@ impl<'a> AbilityResolver<'a> {
                 self.game_state.mods.clear_all_for_card(card_id);
             }
         }
-        self.game_state.prohibition_effects.push("re_yell".to_string());
-        Ok(())
+        self.game_state
+            .prohibition_effects
+            .push("re_yell".to_string());
     }
 
     fn execute_activation_restriction(&mut self, target: &str) {
         eprintln!("activation_restriction: target={}", target);
-        self.game_state.prohibition_effects.push(format!("activation_restriction:{}", target));
+        self.game_state
+            .prohibition_effects
+            .push(format!("activation_restriction:{}", target));
     }
 
     fn execute_choose_required_hearts(&mut self) {
@@ -1730,14 +2931,22 @@ impl<'a> AbilityResolver<'a> {
     fn execute_modify_limit(&mut self, operation: &str, count: u32) -> Result<(), String> {
         eprintln!("modify_limit: operation={}, count={}", operation, count);
         match operation {
-            "decrease" => { self.game_state.prohibition_effects.push(format!("limit_decrease:{}", count)); }
-            "increase" => { self.game_state.prohibition_effects.push(format!("limit_increase:{}", count)); }
+            "decrease" => {
+                self.game_state
+                    .prohibition_effects
+                    .push(format!("limit_decrease:{}", count));
+            }
+            "increase" => {
+                self.game_state
+                    .prohibition_effects
+                    .push(format!("limit_increase:{}", count));
+            }
             _ => {}
         }
         Ok(())
     }
 
-    fn execute_set_blade_count(&mut self, value: u32, target: &str) -> Result<(), String> {
+    fn execute_set_blade_count(&mut self, value: u32, target: &str) {
         eprintln!("set_blade_count: value={}, target={}", value, target);
         let stage_cards: Vec<i16> = {
             let player = self.game_state.resolve_target_player_mut(target);
@@ -1748,28 +2957,29 @@ impl<'a> AbilityResolver<'a> {
             let delta = (value as i32) - current;
             self.game_state.mods.add_blade_modifier(card_id, delta);
         }
-        Ok(())
     }
 
-    fn execute_set_required_hearts(&mut self, heart_colors: &[String], target: &str) -> Result<(), String> {
+    fn execute_set_required_hearts(&mut self, heart_colors: &[String], target: &str) {
         let card_ids: Vec<i16> = {
             let player = self.game_state.resolve_target_player_mut(target);
             player.live_card_zone.cards.to_vec()
         };
         for card_id in card_ids {
-            let mut color_counts: std::collections::HashMap<crate::card::HeartColor, u32> = std::collections::HashMap::new();
+            let mut color_counts: std::collections::HashMap<crate::card::HeartColor, u32> =
+                std::collections::HashMap::new();
             for color_str in heart_colors {
                 let color = crate::zones::parse_heart_color(color_str);
                 *color_counts.entry(color).or_insert(0) += 1;
             }
             for (color, count) in &color_counts {
-                self.game_state.mods.set_need_heart_modifier(card_id, *color, *count as i32);
+                self.game_state
+                    .mods
+                    .set_need_heart_modifier(card_id, *color, *count as i32);
             }
         }
-        Ok(())
     }
 
-    fn execute_set_score(&mut self, value: u32, target: &str) -> Result<(), String> {
+    fn execute_set_score(&mut self, value: u32, target: &str) {
         let activating_id = self.activating_card_id;
         let card_ids: Vec<i16> = {
             let player = self.game_state.resolve_target_player_mut(target);
@@ -1777,79 +2987,165 @@ impl<'a> AbilityResolver<'a> {
         };
         for &card_id in &card_ids {
             if let Some(aid) = activating_id {
-                if card_id != aid { continue; }
+                if card_id != aid {
+                    continue;
+                }
             }
-            self.game_state.mods.set_score_modifier(card_id, value as i32);
+            self.game_state
+                .mods
+                .set_score_modifier(card_id, value as i32);
         }
-        Ok(())
     }
 
     fn execute_specify_heart_color(&mut self, choice: bool, target: &str) {
         eprintln!("specify_heart_color: choice={}, target={}", choice, target);
         if choice {
-            self.pending_choice = Some(Choice::SelectTarget { target: "heart_color".to_string(), description: "Choose a heart color".to_string(), allow_skip: false });
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "heart_color".to_string(),
+                description: "Choose a heart color".to_string(),
+                allow_skip: false,
+            });
         }
     }
 
-    fn execute_set_card_identity_all_regions(&mut self, identities: Option<&Vec<String>>, target: &str) {
+    fn execute_set_card_identity_all_regions(
+        &mut self,
+        identities: Option<&Vec<String>>,
+        target: &str,
+    ) {
         let _target = target;
-        let card_id = self.activating_card_id.or_else(|| self.game_state.activating_card);
+        let card_id = self
+            .activating_card_id
+            .or_else(|| self.game_state.activating_card);
         if let Some(card_id) = card_id {
             if let Some(identities) = identities {
                 for identity in identities {
-                    self.game_state.prohibition_effects.push(format!("card_identity:{}:{}", card_id, identity));
+                    self.game_state
+                        .prohibition_effects
+                        .push(format!("card_identity:{}:{}", card_id, identity));
                 }
             }
         }
     }
 
-    fn execute_modify_required_hearts_success(&mut self, operation: &str, value: u32, target: &str, card_type: Option<&str>) -> Result<(), String> {
+    fn execute_modify_required_hearts_success(
+        &mut self,
+        operation: &str,
+        value: u32,
+        target: &str,
+        card_type: Option<&str>,
+    ) {
         let player = self.game_state.resolve_target_player_mut(target);
-        let card_ids: Vec<i16> = if let Some("live_card") = card_type { player.success_live_card_zone.cards.iter().copied().collect() } else { vec![] };
-        let delta = match operation { "increase" => value as i32, "decrease" => -(value as i32), _ => return Err(format!("Unknown operation: {}", operation)) };
-        let heart_colors = ["heart00", "heart01", "heart02", "heart03", "heart04", "heart05", "heart06"];
+        let card_ids: Vec<i16> = if let Some("live_card") = card_type {
+            player
+                .success_live_card_zone
+                .cards
+                .iter()
+                .copied()
+                .collect()
+        } else {
+            vec![]
+        };
+        let delta = match operation {
+            "increase" => value as i32,
+            "decrease" => -(value as i32),
+            _ => {
+                eprintln!("Unknown operation: {}", operation);
+                return;
+            }
+        };
+        let heart_colors = [
+            "heart00", "heart01", "heart02", "heart03", "heart04", "heart05", "heart06",
+        ];
         for card_id in card_ids {
             for color_str in &heart_colors {
                 let color = crate::zones::parse_heart_color(color_str);
-                self.game_state.mods.add_need_heart_modifier(card_id, color, delta);
+                self.game_state
+                    .mods
+                    .add_need_heart_modifier(card_id, color, delta);
             }
+        }
+    }
+
+    fn execute_set_cost_to_use(&mut self, value: u32) -> Result<(), String> {
+        let card_id = self
+            .activating_card_id
+            .or_else(|| self.game_state.activating_card);
+        if let Some(card_id) = card_id {
+            self.game_state
+                .mods
+                .set_cost_modifier(card_id, value as i32);
         }
         Ok(())
     }
 
-    fn execute_set_cost_to_use(&mut self, value: u32) -> Result<(), String> {
-        let card_id = self.activating_card_id.or_else(|| self.game_state.activating_card);
-        if let Some(card_id) = card_id { self.game_state.mods.set_cost_modifier(card_id, value as i32); }
-        Ok(())
-    }
-
     fn execute_all_blade_timing(&mut self, timing: &str, treat_as: &str) {
-        let card_id = self.activating_card_id.or_else(|| self.game_state.activating_card);
+        let card_id = self
+            .activating_card_id
+            .or_else(|| self.game_state.activating_card);
         if let Some(card_id) = card_id {
-            self.game_state.prohibition_effects.push(format!("all_blade_timing:{}:{}:{}", card_id, timing, treat_as));
+            self.game_state.prohibition_effects.push(format!(
+                "all_blade_timing:{}:{}:{}",
+                card_id, timing, treat_as
+            ));
         }
     }
 
     fn execute_shuffle(&mut self, target: &str, source: &str) {
         let player = self.game_state.resolve_target_player_mut(target);
         match source {
-            "deck" => { use rand::seq::SliceRandom; player.main_deck.cards.shuffle(&mut rand::thread_rng()); }
-            "energy_deck" => { use rand::seq::SliceRandom; player.energy_deck.cards.shuffle(&mut rand::thread_rng()); }
-            _ => { eprintln!("Unknown shuffle zone: {}", source); }
+            "deck" => {
+                use rand::seq::SliceRandom;
+                player.main_deck.cards.shuffle(&mut rand::thread_rng());
+            }
+            "energy_deck" => {
+                use rand::seq::SliceRandom;
+                player.energy_deck.cards.shuffle(&mut rand::thread_rng());
+            }
+            _ => {
+                eprintln!("Unknown shuffle zone: {}", source);
+            }
         }
     }
 
-    fn execute_modify_cost(&mut self, operation: &str, value: u32, target: &str, card_type: Option<&str>) -> Result<(), String> {
+    fn execute_modify_cost(
+        &mut self,
+        operation: &str,
+        value: u32,
+        target: &str,
+        card_type: Option<&str>,
+    ) {
         let player = self.game_state.resolve_target_player_mut(target);
-        let card_ids: Vec<i16> = if let Some("live_card") = card_type { player.live_card_zone.cards.iter().copied().collect() }
-            else if let Some("member_card") = card_type { player.stage.stage.iter().filter(|&&id| id != -1).copied().collect() }
-            else if let Some("energy_card") = card_type { player.energy_zone.cards.iter().copied().collect() }
-            else { player.hand.cards.iter().copied().collect() };
-        let delta = match operation { "add" => value as i32, "subtract" => -(value as i32), "set" => value as i32, _ => return Err(format!("Unknown operation: {}", operation)) };
+        let card_ids: Vec<i16> = if let Some("live_card") = card_type {
+            player.live_card_zone.cards.iter().copied().collect()
+        } else if let Some("member_card") = card_type {
+            player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect()
+        } else if let Some("energy_card") = card_type {
+            player.energy_zone.cards.iter().copied().collect()
+        } else {
+            player.hand.cards.iter().copied().collect()
+        };
+        let delta = match operation {
+            "add" => value as i32,
+            "subtract" => -(value as i32),
+            "set" => value as i32,
+            _ => {
+                eprintln!("Unknown operation: {}", operation);
+                return;
+            }
+        };
         for card_id in card_ids {
-            if operation == "set" { self.game_state.mods.set_cost_modifier(card_id, delta); }
-            else { self.game_state.mods.add_cost_modifier(card_id, delta); }
+            if operation == "set" {
+                self.game_state.mods.set_cost_modifier(card_id, delta);
+            } else {
+                self.game_state.mods.add_cost_modifier(card_id, delta);
+            }
         }
-        Ok(())
     }
 }

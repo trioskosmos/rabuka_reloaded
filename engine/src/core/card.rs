@@ -222,7 +222,7 @@ impl CardDatabase {
 
     pub fn save_mapping(&self) {
         if let Ok(mapping) = serde_json::to_string_pretty(&self.card_no_to_id) {
-            let _ = std::fs::write("card_id_mapping.json", mapping);
+            std::fs::write("card_id_mapping.json", mapping).expect("Failed to save card ID mapping");
         }
     }
     

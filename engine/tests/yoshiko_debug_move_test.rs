@@ -84,4 +84,8 @@ fn test_yoshiko_debug_move_execution() {
     let after_waitroom = &game.player().waitroom.cards;
     assert!(!after_waitroom.contains(&yoshiko),
         "Yoshiko should NOT be in waitroom (wait doesn't remove from stage)");
+
+    // Hand card was discarded as cost
+    assert_eq!(game.player().hand.cards.len(), 0, "Hand card was discarded as cost");
+    assert!(game.player().waitroom.cards.contains(&hand_card), "Hand card should be in waitroom");
 }

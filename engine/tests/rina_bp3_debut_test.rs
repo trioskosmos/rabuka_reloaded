@@ -74,8 +74,8 @@ fn cost_skipped_does_not_apply_wait_state() {
 
     // Verify Rin is NOT in wait state
     let orientation = game.state.mods.get_orientation_modifier(rin).cloned();
-    assert!(orientation.is_none() || orientation == Some("active".to_string()),
-        "Rin should NOT be in wait state after skipping optional cost");
+    assert_eq!(orientation, None,
+        "Rin should have no orientation modifier after skipping optional cost");
 }
 
 // ===== EFFECT: Look at top 2, select any number, discard rest =====

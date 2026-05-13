@@ -53,7 +53,7 @@ fn kasumi_q76_appear_on_occupied_area() {
 
     // Simulate ability effect: Kasumi from discard → stage replaces filler
     game.state.player1.waitroom.cards.push(kasumi);
-    let idx = game.state.player1.waitroom.cards.iter().position(|&c| c == kasumi).unwrap();
+    let idx = game.state.player1.waitroom.cards.iter().position(|&c| c == kasumi).expect("Kasumi should be in waitroom");
     game.state.player1.waitroom.cards.remove(idx);
 
     // Q76: Place on occupied area — the existing member (filler) is replaced
@@ -97,7 +97,7 @@ fn kasumi_q63_ability_appearance_no_cost_paid() {
     game.state.player1.stage.stage[0] = -1;
 
     // Simulate: remove from waitroom, place on stage
-    let idx = game.state.player1.waitroom.cards.iter().position(|&c| c == kasumi).unwrap();
+    let idx = game.state.player1.waitroom.cards.iter().position(|&c| c == kasumi).expect("Kasumi should be in waitroom");
     game.state.player1.waitroom.cards.remove(idx);
     game.state.player1.stage.stage[1] = kasumi;
 
