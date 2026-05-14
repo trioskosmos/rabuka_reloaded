@@ -1,7 +1,7 @@
 use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, Keyword};
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Orientation {
@@ -41,7 +41,7 @@ impl std::fmt::Display for MemberArea {
 
 impl std::str::FromStr for MemberArea {
     type Err = String;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "left" => Ok(MemberArea::LeftSide),
@@ -60,9 +60,15 @@ pub fn check_trigger_position(triggers: Option<&str>, card_position: MemberArea)
         None => return true,
     };
     // Check each position requirement
-    if trig.contains("左サイド") && card_position != MemberArea::LeftSide { return false; }
-    if trig.contains("右サイド") && card_position != MemberArea::RightSide { return false; }
-    if trig.contains("センター") && card_position != MemberArea::Center { return false; }
+    if trig.contains("左サイド") && card_position != MemberArea::LeftSide {
+        return false;
+    }
+    if trig.contains("右サイド") && card_position != MemberArea::RightSide {
+        return false;
+    }
+    if trig.contains("センター") && card_position != MemberArea::Center {
+        return false;
+    }
     true
 }
 
@@ -78,7 +84,7 @@ pub fn check_effect_position(effect_pos: Option<&str>, card_position: MemberArea
 }
 
 // CardInZone removed for performance - use i16 IDs directly
-use crate::constants::{STAGE_SIZE, EMPTY_SLOT};
+use crate::constants::{EMPTY_SLOT, STAGE_SIZE};
 
 // Orientation and other state tracked in GameState modifiers
 
@@ -87,7 +93,7 @@ pub struct Stage {
     // Rule 5.3: Stage - Where member cards are placed during Main Phase
     // Has three areas: Left Side, Center, Right Side
     // Use EMPTY_SLOT to indicate empty slot (like old engine)
-    pub stage: [i16; STAGE_SIZE],  // [left_side, center, right_side]
+    pub stage: [i16; STAGE_SIZE], // [left_side, center, right_side]
     // Rule 4.5.5: Cards (member or energy) placed under a member card
     // Index 0 = left side, 1 = center, 2 = right side
     pub under_cards: [SmallVec<[i16; 4]>; STAGE_SIZE],
@@ -96,7 +102,7 @@ pub struct Stage {
 impl Stage {
     pub fn new() -> Self {
         Stage {
-            stage: [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT],  // [left_side, center, right_side], EMPTY_SLOT indicates empty
+            stage: [EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT], // [left_side, center, right_side], EMPTY_SLOT indicates empty
             under_cards: [SmallVec::new(), SmallVec::new(), SmallVec::new()],
         }
     }
@@ -114,7 +120,11 @@ impl Stage {
             MemberArea::RightSide => 2,
         };
         let card_id = self.stage[index];
-        if card_id == EMPTY_SLOT { None } else { Some(card_id) }
+        if card_id == EMPTY_SLOT {
+            None
+        } else {
+            Some(card_id)
+        }
     }
 
     pub fn set_area(&mut self, area: MemberArea, card_id: i16) {
@@ -133,7 +143,9 @@ impl Stage {
     /// Swap the contents (member card + under-cards) of two stage slots by index.
     /// Rule 4.5.5.3: Under-cards move with the member when changing areas.
     pub fn swap_stage_slots(&mut self, from_idx: usize, to_idx: usize) {
-        if from_idx >= STAGE_SIZE || to_idx >= STAGE_SIZE || from_idx == to_idx { return; }
+        if from_idx >= STAGE_SIZE || to_idx >= STAGE_SIZE || from_idx == to_idx {
+            return;
+        }
         self.stage.swap(from_idx, to_idx);
         self.under_cards.swap(from_idx, to_idx);
     }
@@ -161,7 +173,11 @@ impl Stage {
     /// - Member cards under → go to waitroom
     /// - Energy cards under → go to energy deck
     /// Returns (waitroom_cards, energy_deck_cards)
-    pub fn recycle_under_cards(&mut self, area: MemberArea, card_db: &CardDatabase) -> (SmallVec<[i16; 4]>, SmallVec<[i16; 4]>) {
+    pub fn recycle_under_cards(
+        &mut self,
+        area: MemberArea,
+        card_db: &CardDatabase,
+    ) -> (SmallVec<[i16; 4]>, SmallVec<[i16; 4]>) {
         let index = match area {
             MemberArea::LeftSide => 0,
             MemberArea::Center => 1,
@@ -202,7 +218,11 @@ impl Stage {
         self.stage[index] != -1
     }
 
-    pub fn position_change(&mut self, from_area: MemberArea, to_area: MemberArea) -> Result<i16, String> {
+    pub fn position_change(
+        &mut self,
+        from_area: MemberArea,
+        to_area: MemberArea,
+    ) -> Result<i16, String> {
         // Rule 11.10: Position Change - move member to different area
         // Rule 11.10.2: If destination has a member, it swaps positions
         // Rule 4.5.5.3: Under-cards move with the member
@@ -247,7 +267,10 @@ impl Stage {
         Ok(card_id)
     }
 
-    pub fn formation_change(&mut self, assignments: Vec<(MemberArea, MemberArea)>) -> Result<(), String> {
+    pub fn formation_change(
+        &mut self,
+        assignments: Vec<(MemberArea, MemberArea)>,
+    ) -> Result<(), String> {
         // Rule 11.11: Formation Change - move all members to specified areas
         // Rule 11.11.2: Cannot move multiple members to same area
         let mut target_areas = std::collections::HashSet::new();
@@ -264,13 +287,22 @@ impl Stage {
         Ok(())
     }
 
-    pub fn total_blades(&self, card_db: &CardDatabase, blade_modifiers: &HashMap<i16, i32>, orientation_modifiers: &HashMap<i16, String>) -> u32 {
+    pub fn total_blades(
+        &self,
+        card_db: &CardDatabase,
+        blade_modifiers: &HashMap<i16, i32>,
+        orientation_modifiers: &HashMap<i16, String>,
+    ) -> u32 {
         let mut total = 0;
         for &card_id in &self.stage {
             if card_id != -1 {
                 // Rule 5.1 / QA line 1784-1785: Wait-state members' blades
                 // do NOT count toward yell/cheer card count.
-                if orientation_modifiers.get(&card_id).map(|o| o == "wait").unwrap_or(false) {
+                if orientation_modifiers
+                    .get(&card_id)
+                    .map(|o| o == "wait")
+                    .unwrap_or(false)
+                {
                     continue;
                 }
                 if let Some(card) = card_db.get_card(card_id) {
@@ -312,14 +344,17 @@ impl Stage {
     }
 
     pub fn get_available_hearts(
-        &self, card_db: &CardDatabase,
+        &self,
+        card_db: &CardDatabase,
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
     ) -> BaseHeart {
         let mut hearts = HashMap::new();
 
         for &card_id in &self.stage {
-            if card_id == -1 { continue; }
+            if card_id == -1 {
+                continue;
+            }
 
             if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
                 *hearts.entry(override_color).or_insert(0) += override_count;
@@ -357,12 +392,14 @@ pub fn parse_heart_color(s: &str) -> HeartColor {
 #[derive(Debug, Clone)]
 pub struct LiveCardZone {
     // Rule 5.2: Live Card Zone - Where member and live cards are placed during Live Card Set Phase
-    pub cards: SmallVec<[i16; MAX_LIVE_CARDS]>,  // Card IDs - stack-allocated for up to MAX_LIVE_CARDS cards
+    pub cards: SmallVec<[i16; MAX_LIVE_CARDS]>, // Card IDs - stack-allocated for up to MAX_LIVE_CARDS cards
 }
 
 impl LiveCardZone {
     pub fn new() -> Self {
-        LiveCardZone { cards: SmallVec::new() }
+        LiveCardZone {
+            cards: SmallVec::new(),
+        }
     }
 
     pub fn can_place_card(&self, _card_db: &CardDatabase, _card_id: i16) -> bool {
@@ -373,7 +410,10 @@ impl LiveCardZone {
     pub fn add_card(&mut self, card_id: i16, _card_db: &CardDatabase) -> Result<(), String> {
         if !self.can_place_card(_card_db, card_id) {
             if let Some(card) = _card_db.get_card(card_id) {
-                return Err(format!("Cannot place energy card '{}' in live card zone", card.name));
+                return Err(format!(
+                    "Cannot place energy card '{}' in live card zone",
+                    card.name
+                ));
             }
             return Err("Cannot place unknown card in live card zone".to_string());
         }
@@ -382,9 +422,16 @@ impl LiveCardZone {
     }
 
     pub fn get_live_cards(&self, card_db: &CardDatabase) -> Vec<i16> {
-        self.cards.iter().filter(|&&card_id| {
-            card_db.get_card(card_id).map(|c| c.is_live()).unwrap_or(false)
-        }).copied().collect()
+        self.cards
+            .iter()
+            .filter(|&&card_id| {
+                card_db
+                    .get_card(card_id)
+                    .map(|c| c.is_live())
+                    .unwrap_or(false)
+            })
+            .copied()
+            .collect()
     }
 
     pub fn clear(&mut self) -> SmallVec<[i16; 3]> {
@@ -395,7 +442,18 @@ impl LiveCardZone {
         self.cards.len()
     }
 
-    pub fn calculate_live_score(&self, card_db: &CardDatabase, cheer_blade_heart_count: u32, stage_hearts: Option<&crate::card::BaseHeart>, need_heart_modifiers: Option<&std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>>) -> u32 {
+    pub fn calculate_live_score(
+        &self,
+        card_db: &CardDatabase,
+        cheer_blade_heart_count: u32,
+        stage_hearts: Option<&crate::card::BaseHeart>,
+        need_heart_modifiers: Option<
+            &std::collections::HashMap<
+                i16,
+                std::collections::HashMap<crate::card::HeartColor, i32>,
+            >,
+        >,
+    ) -> u32 {
         let mut total_score = 0;
 
         for card_id in &self.cards {
@@ -413,27 +471,47 @@ impl LiveCardZone {
                                     *entry = (*entry as i32 + delta).max(0) as u32;
                                 }
                                 Some(adjusted)
-                            } else { None }
-                        } else { None };
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
                         let ref_need = effective_need.as_ref().unwrap_or(need_heart);
                         let satisfied = stage_hearts.map_or(false, |sh| {
-                            let wildcard_count = *sh.hearts.get(&crate::card::HeartColor::Heart00).unwrap_or(&0);
+                            let wildcard_count = *sh
+                                .hearts
+                                .get(&crate::card::HeartColor::Heart00)
+                                .unwrap_or(&0);
                             for (color, needed_amount) in &ref_need.hearts {
                                 if let Some(&provided_amount) = sh.hearts.get(color) {
                                     if provided_amount + wildcard_count >= *needed_amount {
-                                        let remaining_needed = if provided_amount >= *needed_amount { 0 } else { *needed_amount - provided_amount };
-                                        if remaining_needed > wildcard_count { return false; }
-                                    } else if *needed_amount > wildcard_count { return false; }
-                                } else if *needed_amount > wildcard_count { return false; }
+                                        let remaining_needed = if provided_amount >= *needed_amount
+                                        {
+                                            0
+                                        } else {
+                                            *needed_amount - provided_amount
+                                        };
+                                        if remaining_needed > wildcard_count {
+                                            return false;
+                                        }
+                                    } else if *needed_amount > wildcard_count {
+                                        return false;
+                                    }
+                                } else if *needed_amount > wildcard_count {
+                                    return false;
+                                }
                             }
                             true
                         });
-                        if satisfied { total_score += 1; }
+                        if satisfied {
+                            total_score += 1;
+                        }
                     }
                 }
             }
         }
-        
+
         total_score + cheer_blade_heart_count
     }
 
@@ -457,13 +535,13 @@ use crate::constants::{MAX_ENERGY_CARDS, MAX_LIVE_CARDS};
 #[derive(Debug, Clone)]
 pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
-    pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>,  // Card IDs - stack-allocated for up to MAX_ENERGY_CARDS energy cards
-    pub active_energy_count: usize,  // Simple count of active energy cards (simpler than HashSet)
+    pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>, // Card IDs - stack-allocated for up to MAX_ENERGY_CARDS energy cards
+    pub active_energy_count: usize, // Simple count of active energy cards (simpler than HashSet)
 }
 
 impl EnergyZone {
     pub fn new() -> Self {
-        EnergyZone { 
+        EnergyZone {
             cards: SmallVec::new(),
             active_energy_count: 0,
         }
@@ -471,15 +549,22 @@ impl EnergyZone {
 
     pub fn can_place_card(&self, card_db: &CardDatabase, card_id: i16) -> bool {
         // Rule 7.2: Only energy cards can be placed in Energy Zone
-        card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or_else(|| false)
+        card_db
+            .get_card(card_id)
+            .map(|c| c.is_energy())
+            .unwrap_or_else(|| false)
     }
 
     pub fn add_card(&mut self, card_id: i16, card_db: &CardDatabase) -> Result<(), String> {
         // Rule 7.2: Only energy cards can be placed in Energy Zone
-        if !card_db.get_card(card_id).map(|c| c.is_energy()).unwrap_or_else(|| false) {
+        if !card_db
+            .get_card(card_id)
+            .map(|c| c.is_energy())
+            .unwrap_or_else(|| false)
+        {
             return Err("Only energy cards can be placed in Energy Zone".to_string());
         }
-        
+
         // New energy cards start in Active state (Rule 7.4)
         self.cards.push(card_id);
         self.active_energy_count += 1;
@@ -504,18 +589,23 @@ impl EnergyZone {
             false
         }
     }
-    
+
     pub fn pay_energy(&mut self, amount: usize) -> Result<(), String> {
         // Rule 5.9: Pay energy by decrementing active count
         // eprintln!("pay_energy called: amount={}, active_energy_count={}", amount, self.active_energy_count);
-        
+
         if self.active_energy_count >= amount {
             self.active_energy_count -= amount;
             // eprintln!("pay_energy result: success, remaining active_energy_count={}", self.active_energy_count);
             Ok(())
         } else {
             // eprintln!("pay_energy result: failed, active_energy_count={}", self.active_energy_count);
-            Err(format!("Could not pay {} energy (only {} active energy available, {} total energy cards)", amount, self.active_energy_count, self.cards.len()))
+            Err(format!(
+                "Could not pay {} energy (only {} active energy available, {} total energy cards)",
+                amount,
+                self.active_energy_count,
+                self.cards.len()
+            ))
         }
     }
 
@@ -575,7 +665,7 @@ impl MainDeck {
 
 #[derive(Debug, Clone)]
 pub struct EnergyDeck {
-    pub cards: SmallVec<[i16; 20]>,  // Card IDs - stack-allocated for up to 20 energy cards
+    pub cards: SmallVec<[i16; 20]>, // Card IDs - stack-allocated for up to 20 energy cards
 }
 
 impl EnergyDeck {
@@ -601,12 +691,14 @@ impl EnergyDeck {
 #[derive(Debug, Clone)]
 pub struct Hand {
     // Rule 5.4: Hand - Where cards drawn from main deck are held
-    pub cards: SmallVec<[i16; 7]>,  // Card IDs - stack-allocated for up to 7 cards
+    pub cards: SmallVec<[i16; 7]>, // Card IDs - stack-allocated for up to 7 cards
 }
 
 impl Hand {
     pub fn new() -> Self {
-        Hand { cards: SmallVec::new() }
+        Hand {
+            cards: SmallVec::new(),
+        }
     }
 
     pub fn add_card(&mut self, card_id: i16) {
@@ -634,12 +726,14 @@ impl Hand {
 pub struct Waitroom {
     // Rule 5.5: Waitroom - Where used cards are placed
     // Used for refresh when main deck is empty
-    pub cards: SmallVec<[i16; 30]>,  // Card IDs - stack-allocated for typical sizes
+    pub cards: SmallVec<[i16; 30]>, // Card IDs - stack-allocated for typical sizes
 }
 
 impl Waitroom {
     pub fn new() -> Self {
-        Waitroom { cards: SmallVec::new() }
+        Waitroom {
+            cards: SmallVec::new(),
+        }
     }
 
     pub fn add_card(&mut self, card_id: i16) {
@@ -668,12 +762,14 @@ impl Waitroom {
 pub struct SuccessLiveCardZone {
     // Rule 5.6: Success Live Card Zone - Where won live cards are placed
     // Victory condition: 3 cards in this zone
-    pub cards: SmallVec<[i16; 3]>,  // Card IDs - stack-allocated for victory condition (max 3)
+    pub cards: SmallVec<[i16; 3]>, // Card IDs - stack-allocated for victory condition (max 3)
 }
 
 impl SuccessLiveCardZone {
     pub fn new() -> Self {
-        SuccessLiveCardZone { cards: SmallVec::new() }
+        SuccessLiveCardZone {
+            cards: SmallVec::new(),
+        }
     }
 
     pub fn add_card(&mut self, card_id: i16) {
@@ -688,12 +784,14 @@ impl SuccessLiveCardZone {
 #[derive(Debug, Clone)]
 pub struct ExclusionZone {
     // Rule 5.7: Exclusion Zone - Where excluded cards are placed
-    pub cards: SmallVec<[i16; 10]>,  // Card IDs - stack-allocated for up to 10 cards
+    pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards
 }
 
 impl ExclusionZone {
     pub fn new() -> Self {
-        ExclusionZone { cards: SmallVec::new() }
+        ExclusionZone {
+            cards: SmallVec::new(),
+        }
     }
 
     pub fn add_card(&mut self, card_id: i16, _face_up: bool) {
@@ -705,12 +803,14 @@ impl ExclusionZone {
 #[derive(Debug, Clone, Default)]
 pub struct ResolutionZone {
     // Rule 5.8: Resolution Zone - Temporary holding area for cards being resolved
-    pub cards: SmallVec<[i16; 10]>,  // Card IDs - stack-allocated for up to 10 cards
+    pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards
 }
 
 impl ResolutionZone {
     pub fn new() -> Self {
-        ResolutionZone { cards: SmallVec::new() }
+        ResolutionZone {
+            cards: SmallVec::new(),
+        }
     }
 
     pub fn add_card(&mut self, card_id: i16) {

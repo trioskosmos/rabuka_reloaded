@@ -342,68 +342,23 @@ impl Player {
                 None
             };
 
-            match stage_area {
-                crate::zones::MemberArea::LeftSide => {
-                    // If area is occupied (with or without baton touch), send existing member to waitroom
+            let index = match stage_area {
+                crate::zones::MemberArea::LeftSide => 0,
+                crate::zones::MemberArea::Center => 1,
+                crate::zones::MemberArea::RightSide => 2,
+            };
 
-                    if self.stage.stage[0] != -1 {
-                        if let Some(old_card) =
-                            self.remove_member_from_stage_with_recycling(0, card_db)
-                        {
-                            self.waitroom.cards.push(old_card);
-                        }
-                    }
-
-                    self.stage.stage[0] = card_id;
-
-                    // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
-                    // Area is unlocked for baton touch (the arriving card can still be replaced again)
-                    if !baton_touch_used {
-                        self.areas_locked_this_turn
-                            .insert(crate::zones::MemberArea::LeftSide);
-                    }
+            if self.stage.stage[index] != -1 {
+                if let Some(old_card) = self.remove_member_from_stage_with_recycling(index, card_db)
+                {
+                    self.waitroom.cards.push(old_card);
                 }
+            }
 
-                crate::zones::MemberArea::Center => {
-                    // If area is occupied (with or without baton touch), send existing member to waitroom
+            self.stage.stage[index] = card_id;
 
-                    if self.stage.stage[1] != -1 {
-                        if let Some(old_card) =
-                            self.remove_member_from_stage_with_recycling(1, card_db)
-                        {
-                            self.waitroom.cards.push(old_card);
-                        }
-                    }
-
-                    self.stage.stage[1] = card_id;
-
-                    // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage
-                    if !baton_touch_used {
-                        self.areas_locked_this_turn
-                            .insert(crate::zones::MemberArea::Center);
-                    }
-                }
-
-                crate::zones::MemberArea::RightSide => {
-                    // If area is occupied (with or without baton touch), send existing member to waitroom
-
-                    if self.stage.stage[2] != -1 {
-                        if let Some(old_card) =
-                            self.remove_member_from_stage_with_recycling(2, card_db)
-                        {
-                            self.waitroom.cards.push(old_card);
-                        }
-                    }
-
-                    self.stage.stage[2] = card_id;
-
-                    // Rule 9.6.2.1.2.1: Lock area when card moves from non-stage to stage (for baton touch restriction)
-
-                    if !baton_touch_used {
-                        self.areas_locked_this_turn
-                            .insert(crate::zones::MemberArea::RightSide);
-                    }
-                }
+            if !baton_touch_used {
+                self.areas_locked_this_turn.insert(stage_area);
             }
 
             // Send replaced member to waitroom if baton touch was used

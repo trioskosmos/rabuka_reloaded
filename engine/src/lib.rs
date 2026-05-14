@@ -4,7 +4,6 @@
 pub mod core;
 pub use core::card;
 pub use core::card_loader;
-pub use core::config;
 pub use core::constants;
 pub use core::game_state;
 pub use core::player;

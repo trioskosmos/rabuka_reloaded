@@ -1,6 +1,5 @@
 pub mod card;
 pub mod card_loader;
-pub mod config;
 pub mod constants;
 pub mod game_modifiers;
 pub mod game_state;

@@ -102,107 +102,10 @@ impl super::TurnEngine {
                     game_state.process_pending_auto_abilities(&first_attacker_id);
                     return;
                 }
-                Phase::FirstAttackerPerformance => {
-                    let perf_data = {
-                        let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                        let player_id = game_state.first_attacker().id.clone();
-                        let card_db = game_state.card_database.clone();
-                        let bm = game_state.mods.blade_modifiers.clone();
-                        let ho = game_state.mods.heart_override.clone();
-                        let hm = game_state.mods.heart_modifiers.clone();
-                        let btm = game_state.mods.blade_type_modifiers.clone();
-                        let om = game_state.mods.orientation_modifiers.clone();
-                        Self::player_perform_live(
-                            game_state.first_attacker_mut(),
-                            &mut resolution_zone,
-                            &player_id,
-                            &card_db,
-                            &bm,
-                            &ho,
-                            &hm,
-                            &btm,
-                            &om,
-                        )
-                    };
-                    let player_id = game_state.player1.id.clone();
-                    let turn = game_state.turn_number;
-                    let note_icons = perf_data.note_icons;
-                    for cid in &perf_data.revealed_ids {
-                        game_state.revealed_cards.push(*cid);
-                    }
-                    for cid in &perf_data.revealed_ids {
-                        game_state.player1_cheer_revealed_cards.push(*cid);
-                    }
-                    game_state.player1_cheer_blade_heart_count = perf_data.yell_count + note_icons;
-                    let snap = crate::turn::live::build_snapshot(
-                        turn,
-                        &player_id,
-                        &perf_data,
-                        &game_state.card_database,
-                        &game_state.player1,
-                        note_icons,
-                    );
-                    game_state.performance_snapshots.push(snap);
-                    let p1_id = game_state.player1.id.clone();
-                    Self::trigger_auto_abilities_for_player(game_state, &p1_id);
-                    game_state.process_pending_auto_abilities(&p1_id);
-                    // Trigger auto abilities again after draw effects are resolved
-                    if perf_data.draw_effects_occurred {
-                        Self::trigger_auto_abilities_for_player(game_state, &p1_id);
-                        game_state.process_pending_auto_abilities(&p1_id);
-                    }
-                    game_state.current_phase = Phase::SecondAttackerPerformance;
-                }
-                Phase::SecondAttackerPerformance => {
-                    let perf_data = {
-                        let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
-                        let player_id = game_state.second_attacker().id.clone();
-                        let card_db = game_state.card_database.clone();
-                        let bm = game_state.mods.blade_modifiers.clone();
-                        let ho = game_state.mods.heart_override.clone();
-                        let hm = game_state.mods.heart_modifiers.clone();
-                        let btm = game_state.mods.blade_type_modifiers.clone();
-                        let om = game_state.mods.orientation_modifiers.clone();
-                        Self::player_perform_live(
-                            game_state.second_attacker_mut(),
-                            &mut resolution_zone,
-                            &player_id,
-                            &card_db,
-                            &bm,
-                            &ho,
-                            &hm,
-                            &btm,
-                            &om,
-                        )
-                    };
-                    let player_id = game_state.player2.id.clone();
-                    let turn = game_state.turn_number;
-                    let note_icons = perf_data.note_icons;
-                    for cid in &perf_data.revealed_ids {
-                        game_state.revealed_cards.push(*cid);
-                    }
-                    for cid in &perf_data.revealed_ids {
-                        game_state.player2_cheer_revealed_cards.push(*cid);
-                    }
-                    game_state.player2_cheer_blade_heart_count = perf_data.yell_count + note_icons;
-                    let snap = crate::turn::live::build_snapshot(
-                        turn,
-                        &player_id,
-                        &perf_data,
-                        &game_state.card_database,
-                        &game_state.player2,
-                        note_icons,
-                    );
-                    game_state.performance_snapshots.push(snap);
-                    let p2_id = game_state.player2.id.clone();
-                    Self::trigger_auto_abilities_for_player(game_state, &p2_id);
-                    game_state.process_pending_auto_abilities(&p2_id);
-                    // Trigger auto abilities again after draw effects are resolved
-                    if perf_data.draw_effects_occurred {
-                        Self::trigger_auto_abilities_for_player(game_state, &p2_id);
-                        game_state.process_pending_auto_abilities(&p2_id);
-                    }
-                    game_state.current_phase = Phase::LiveVictoryDetermination;
+                Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance => {
+                    let is_first =
+                        matches!(game_state.current_phase, Phase::FirstAttackerPerformance);
+                    Self::execute_performance_phase(game_state, is_first);
                 }
                 Phase::LiveVictoryDetermination => {
                     Self::execute_live_victory_determination(game_state);
@@ -221,6 +124,88 @@ impl super::TurnEngine {
                 _ => {}
             }
         }
+    }
+
+    fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
+        let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
+        let card_db = game_state.card_database.clone();
+        let bm = game_state.mods.blade_modifiers.clone();
+        let ho = game_state.mods.heart_override.clone();
+        let hm = game_state.mods.heart_modifiers.clone();
+        let btm = game_state.mods.blade_type_modifiers.clone();
+        let om = game_state.mods.orientation_modifiers.clone();
+
+        let player = if is_first {
+            game_state.first_attacker_mut()
+        } else {
+            game_state.second_attacker_mut()
+        };
+        let performer_id = player.id.clone();
+        let perf_data = Self::player_perform_live(
+            player,
+            &mut resolution_zone,
+            &performer_id,
+            &card_db,
+            &bm,
+            &ho,
+            &hm,
+            &btm,
+            &om,
+        );
+        drop(resolution_zone);
+
+        let turn = game_state.turn_number;
+        let note_icons = perf_data.note_icons;
+        for cid in &perf_data.revealed_ids {
+            game_state.revealed_cards.push(*cid);
+        }
+
+        if is_first {
+            for cid in &perf_data.revealed_ids {
+                game_state.player1_cheer_revealed_cards.push(*cid);
+            }
+            game_state.player1_cheer_blade_heart_count = perf_data.yell_count + note_icons;
+            let snap = crate::turn::live::build_snapshot(
+                turn,
+                &game_state.player1.id,
+                &perf_data,
+                &game_state.card_database,
+                &game_state.player1,
+                note_icons,
+            );
+            game_state.performance_snapshots.push(snap);
+        } else {
+            for cid in &perf_data.revealed_ids {
+                game_state.player2_cheer_revealed_cards.push(*cid);
+            }
+            game_state.player2_cheer_blade_heart_count = perf_data.yell_count + note_icons;
+            let snap = crate::turn::live::build_snapshot(
+                turn,
+                &game_state.player2.id,
+                &perf_data,
+                &game_state.card_database,
+                &game_state.player2,
+                note_icons,
+            );
+            game_state.performance_snapshots.push(snap);
+        }
+
+        let pid = if is_first {
+            game_state.player1.id.clone()
+        } else {
+            game_state.player2.id.clone()
+        };
+        Self::trigger_auto_abilities_for_player(game_state, &pid);
+        game_state.process_pending_auto_abilities(&pid);
+        if perf_data.draw_effects_occurred {
+            Self::trigger_auto_abilities_for_player(game_state, &pid);
+            game_state.process_pending_auto_abilities(&pid);
+        }
+        game_state.current_phase = if is_first {
+            Phase::SecondAttackerPerformance
+        } else {
+            Phase::LiveVictoryDetermination
+        };
     }
 
     pub(crate) fn handle_mulligan_selection(

@@ -69,27 +69,22 @@ impl<'a> AbilityResolver<'a> {
         zone_name: &str,
         _prompt_desc: &str,
     ) -> Result<Option<Vec<usize>>, String> {
-        let filter = util::filter_from_parts(card_type, group_name, cost_limit, None, None, None, None);
+        let filter =
+            util::filter_from_parts(card_type, group_name, cost_limit, None, None, None, None);
         let idxs = util::matching_indices(cards, card_db, &filter, false);
         if idxs.is_empty() || idxs.len() < count {
             return Err(format!("Not enough cards in {}: need {}", zone_name, count));
         }
         if idxs.len() > count {
-            self.pending_choice = Some(Choice::SelectCard {
-                zone: zone_name.to_string(),
-                card_type: None,
-                count: 0,
-                description: format!("Select {} card(s) to {} for cost", count, zone_name),
-                allow_skip: true,
-                cost_limit: None,
-                cost_limit_operator: None,
-                group: None,
-                characters: None,
-                filtered_indices: None,
-                is_select_action: false,
-                heart_colors: vec![],
-                name_fragments: None,
-            });
+            self.pending_choice = Some(
+                Choice::select_cards(
+                    zone_name.to_string(),
+                    0,
+                    format!("Select {} card(s) to {} for cost", count, zone_name),
+                    true,
+                )
+                .build(),
+            );
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);
         }
@@ -354,7 +349,12 @@ impl<'a> AbilityResolver<'a> {
                 // Mark effect as started when a pending choice comes from effect
                 // execution (not cost). This prevents RWC from re-entering the
                 // ability after the effect's choice resolves.
-                let is_paid = cost_already_paid || self.game_state.ability_queue.current_entry().map_or(false, |e| e.cost_paid);
+                let is_paid = cost_already_paid
+                    || self
+                        .game_state
+                        .ability_queue
+                        .current_entry()
+                        .map_or(false, |e| e.cost_paid);
                 if is_paid {
                     if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                         entry.effect_started = true;

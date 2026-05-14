@@ -449,21 +449,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         if max_count > selected_count && remaining > 0 {
                             let remaining_max = max_count - selected_count;
                             let card_type = card_type.clone();
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "looked_at".to_string(),
-                                card_type,
-                                count: remaining_max,
-                                description: format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
-                                allow_skip: true,
-                                cost_limit: select_action_entry.as_ref().and_then(|sa| sa.cost_limit),
-                                cost_limit_operator: select_action_entry.as_ref().and_then(|sa| sa.cost_limit_operator.clone()),
-                                group: select_action_entry.as_ref().and_then(|sa| sa.group_names.as_ref()).and_then(|v| v.first().cloned()),
-                                characters: select_action_entry.as_ref().and_then(|sa| sa.characters.clone()),
-                                filtered_indices: None,
-                                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-                            });
+                            self.pending_choice = Some(Choice::select_cards(
+                                "looked_at",
+                                remaining_max,
+                                format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
+                                true,
+                            )
+                            .card_type(card_type)
+                            .cost_limit(
+                                select_action_entry.as_ref().and_then(|sa| sa.cost_limit),
+                                select_action_entry.as_ref().and_then(|sa| sa.cost_limit_operator.clone()),
+                            )
+                            .group(select_action_entry.as_ref().and_then(|sa| sa.group_names.as_ref()).and_then(|v| v.first().cloned()))
+                            .characters(select_action_entry.as_ref().and_then(|sa| sa.characters.clone()))
+                            .build());
                             self.execution_context = context.clone();
                             return Ok(());
                         }
@@ -1744,26 +1743,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 "Select up to {} more card(s) from the {} remaining looked-at cards",
                 remaining_selections, remaining_available
             );
-            self.pending_choice = Some(Choice::SelectCard {
-                zone: "looked_at".to_string(),
-                card_type: select_action.as_ref().and_then(|sa| sa.card_type.clone()),
-                count: remaining_selections,
-                description,
-                allow_skip: true,
-                cost_limit: select_action.as_ref().and_then(|sa| sa.cost_limit),
-                cost_limit_operator: select_action
-                    .as_ref()
-                    .and_then(|sa| sa.cost_limit_operator.clone()),
-                group: select_action
-                    .as_ref()
-                    .and_then(|sa| sa.group_names.as_ref())
-                    .and_then(|v| v.first().cloned()),
-                characters: select_action.as_ref().and_then(|sa| sa.characters.clone()),
-                filtered_indices: None,
-                is_select_action: false,
-                heart_colors: vec![],
-                name_fragments: None,
-            });
+            self.pending_choice = Some(
+                Choice::select_cards("looked_at", remaining_selections, description, true)
+                    .card_type(select_action.as_ref().and_then(|sa| sa.card_type.clone()))
+                    .cost_limit(
+                        select_action.as_ref().and_then(|sa| sa.cost_limit),
+                        select_action
+                            .as_ref()
+                            .and_then(|sa| sa.cost_limit_operator.clone()),
+                    )
+                    .group(
+                        select_action
+                            .as_ref()
+                            .and_then(|sa| sa.group_names.as_ref())
+                            .and_then(|v| v.first().cloned()),
+                    )
+                    .characters(select_action.as_ref().and_then(|sa| sa.characters.clone()))
+                    .build(),
+            );
             return Ok(());
         }
 

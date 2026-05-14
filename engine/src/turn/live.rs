@@ -238,6 +238,28 @@ impl super::TurnEngine {
         }
     }
 
+    fn process_player_live_result(
+        player: &mut crate::player::Player,
+        won: bool,
+        must_skip: bool,
+        can_place: bool,
+    ) {
+        let card_count = player.live_card_zone.cards.len();
+        if won && !must_skip && card_count > 0 {
+            let card_id = player.live_card_zone.cards.remove(card_count - 1);
+            if can_place {
+                player.success_live_card_zone.cards.push(card_id);
+            } else {
+                player.waitroom.cards.push(card_id);
+            }
+        }
+        while !player.live_card_zone.cards.is_empty() {
+            player
+                .waitroom
+                .add_card(player.live_card_zone.cards.remove(0));
+        }
+    }
+
     fn move_live_to_success_and_handle_wins(
         game_state: &mut GameState,
         player1_won: bool,
@@ -245,67 +267,32 @@ impl super::TurnEngine {
     ) {
         let p1_id = game_state.player1.id.clone();
         let p2_id = game_state.player2.id.clone();
-
         let p1_cards = game_state.player1.live_card_zone.cards.len();
         let p2_cards = game_state.player2.live_card_zone.cards.len();
         let p1_must_skip = player1_won && player2_won && p1_cards >= 2;
         let p2_must_skip = player1_won && player2_won && p2_cards >= 2;
 
-        if player1_won && !p1_must_skip && p1_cards > 0 {
-            let card_id = game_state.player1.live_card_zone.cards.remove(p1_cards - 1);
-            eprintln!(
-                "[LIVE] REMOVED from p1 lcz: {} (p1_cards={})",
-                card_id, p1_cards
-            );
-            if game_state.can_place_card_in_zone(card_id, "success_live_zone", &p1_id) {
-                game_state
-                    .player1
-                    .success_live_card_zone
-                    .cards
-                    .push(card_id);
-            } else {
-                game_state.player1.waitroom.cards.push(card_id);
-            }
-            while !game_state.player1.live_card_zone.cards.is_empty() {
-                game_state
-                    .player1
-                    .waitroom
-                    .add_card(game_state.player1.live_card_zone.cards.remove(0));
-            }
-        } else {
-            while !game_state.player1.live_card_zone.cards.is_empty() {
-                game_state
-                    .player1
-                    .waitroom
-                    .add_card(game_state.player1.live_card_zone.cards.remove(0));
-            }
-        }
+        let p1_top = game_state.player1.live_card_zone.cards.last().copied();
+        let p2_top = game_state.player2.live_card_zone.cards.last().copied();
+        let p1_can_place = p1_top.map_or(false, |cid| {
+            game_state.can_place_card_in_zone(cid, "success_live_zone", &p1_id)
+        });
+        let p2_can_place = p2_top.map_or(false, |cid| {
+            game_state.can_place_card_in_zone(cid, "success_live_zone", &p2_id)
+        });
 
-        if player2_won && !p2_must_skip && p2_cards > 0 {
-            let card_id = game_state.player2.live_card_zone.cards.remove(p2_cards - 1);
-            if game_state.can_place_card_in_zone(card_id, "success_live_zone", &p2_id) {
-                game_state
-                    .player2
-                    .success_live_card_zone
-                    .cards
-                    .push(card_id);
-            } else {
-                game_state.player2.waitroom.cards.push(card_id);
-            }
-            while !game_state.player2.live_card_zone.cards.is_empty() {
-                game_state
-                    .player2
-                    .waitroom
-                    .add_card(game_state.player2.live_card_zone.cards.remove(0));
-            }
-        } else {
-            while !game_state.player2.live_card_zone.cards.is_empty() {
-                game_state
-                    .player2
-                    .waitroom
-                    .add_card(game_state.player2.live_card_zone.cards.remove(0));
-            }
-        }
+        Self::process_player_live_result(
+            &mut game_state.player1,
+            player1_won,
+            p1_must_skip,
+            p1_can_place,
+        );
+        Self::process_player_live_result(
+            &mut game_state.player2,
+            player2_won,
+            p2_must_skip,
+            p2_can_place,
+        );
     }
 
     pub fn player_perform_live(

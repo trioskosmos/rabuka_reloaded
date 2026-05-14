@@ -62,7 +62,10 @@ impl GameModifiers {
     }
 
     pub fn add_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {
-        let colors = self.heart_modifiers.entry(card_id).or_insert_with(HashMap::new);
+        let colors = self
+            .heart_modifiers
+            .entry(card_id)
+            .or_insert_with(HashMap::new);
         *colors.entry(color).or_insert(0) += delta;
     }
 
@@ -81,7 +84,8 @@ impl GameModifiers {
     }
 
     pub fn get_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
-        self.heart_modifiers.get(&card_id)
+        self.heart_modifiers
+            .get(&card_id)
             .and_then(|colors| colors.get(&color))
             .copied()
             .unwrap_or(0)
@@ -112,23 +116,31 @@ impl GameModifiers {
     }
 
     pub fn add_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {
-        let colors = self.need_heart_modifiers.entry(card_id).or_insert_with(HashMap::new);
+        let colors = self
+            .need_heart_modifiers
+            .entry(card_id)
+            .or_insert_with(HashMap::new);
         *colors.entry(color).or_insert(0) += delta;
     }
 
     pub fn get_need_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
-        self.need_heart_modifiers.get(&card_id)
+        self.need_heart_modifiers
+            .get(&card_id)
             .and_then(|colors| colors.get(&color))
             .copied()
             .unwrap_or(0)
     }
 
     pub fn set_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i32) {
-        self.need_heart_modifiers.entry(card_id).or_default().insert(color, value);
+        self.need_heart_modifiers
+            .entry(card_id)
+            .or_default()
+            .insert(color, value);
     }
 
     pub fn add_orientation_modifier(&mut self, card_id: i16, orientation: &str) {
-        self.orientation_modifiers.insert(card_id, orientation.to_string());
+        self.orientation_modifiers
+            .insert(card_id, orientation.to_string());
     }
 
     pub fn add_cost_modifier(&mut self, card_id: i16, delta: i32) {

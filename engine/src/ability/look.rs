@@ -74,24 +74,25 @@ impl<'a> AbilityResolver<'a> {
                 )
             };
 
-            let choice = Choice::SelectCard {
-                zone: "looked_at".to_string(),
-                card_type: select_action.card_type.clone(),
-                count: max_select,
-                description: description.clone(),
-                allow_skip: optional || is_max || any_number || available_count == 0,
-                cost_limit: select_action.cost_limit,
-                cost_limit_operator: select_action.cost_limit_operator.clone(),
-                group: select_action
+            let choice = Choice::select_cards(
+                "looked_at",
+                max_select,
+                description.clone(),
+                optional || is_max || any_number || available_count == 0,
+            )
+            .card_type(select_action.card_type.clone())
+            .cost_limit(
+                select_action.cost_limit,
+                select_action.cost_limit_operator.clone(),
+            )
+            .group(
+                select_action
                     .group_names
                     .as_ref()
                     .and_then(|v| v.first().cloned()),
-                characters: select_action.characters.clone(),
-                filtered_indices: None,
-                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-            };
+            )
+            .characters(select_action.characters.clone())
+            .build();
             println!(
                 "DEBUG: Creating choice - available_count: {}, max_select: {}, description: {}",
                 available_count, max_select, description
@@ -162,31 +163,33 @@ impl<'a> AbilityResolver<'a> {
                     choices_count, allow_skip
                 );
 
-                self.pending_choice = Some(Choice::SelectCard {
-                    zone: source.to_string(),
-                    card_type: card_type.map(|s| s.to_string()),
-                    count: choices_count,
-                    description: format!("Select card(s) to reveal from {}", source),
-                    allow_skip,
-                    cost_limit: self.current_effect.as_ref().and_then(|e| e.cost_limit),
-                    cost_limit_operator: self
-                        .current_effect
-                        .as_ref()
-                        .and_then(|e| e.cost_limit_operator.clone()),
-                    group: self
-                        .current_effect
-                        .as_ref()
-                        .and_then(|e| e.group_names.as_ref())
-                        .and_then(|v| v.first().cloned()),
-                    characters: self
-                        .current_effect
-                        .as_ref()
-                        .and_then(|e| e.characters.clone()),
-                    filtered_indices: None,
-                    is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-                });
+                self.pending_choice = Some(
+                    Choice::select_cards(
+                        source.to_string(),
+                        choices_count,
+                        format!("Select card(s) to reveal from {}", source),
+                        allow_skip,
+                    )
+                    .card_type(card_type.map(|s| s.to_string()))
+                    .cost_limit(
+                        self.current_effect.as_ref().and_then(|e| e.cost_limit),
+                        self.current_effect
+                            .as_ref()
+                            .and_then(|e| e.cost_limit_operator.clone()),
+                    )
+                    .group(
+                        self.current_effect
+                            .as_ref()
+                            .and_then(|e| e.group_names.as_ref())
+                            .and_then(|v| v.first().cloned()),
+                    )
+                    .characters(
+                        self.current_effect
+                            .as_ref()
+                            .and_then(|e| e.characters.clone()),
+                    )
+                    .build(),
+                );
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
             } else {
@@ -346,31 +349,34 @@ impl<'a> AbilityResolver<'a> {
         if self.looked_at_cards.len() < count as usize {
             return Ok(()); // Not enough distinct cards — skip silently
         }
-        self.pending_choice = Some(Choice::SelectCard {
-            zone: source.to_string(),
-            card_type: card_type.map(|s| s.to_string()),
-            count: count as usize,
-            description: format!("Select {} card(s) from {}", count, source),
-            allow_skip: optional,
-            cost_limit: self.current_effect.as_ref().and_then(|e| e.cost_limit),
-            cost_limit_operator: self
-                .current_effect
-                .as_ref()
-                .and_then(|e| e.cost_limit_operator.clone()),
-            group: self
-                .current_effect
-                .as_ref()
-                .and_then(|e| e.group_names.as_ref())
-                .and_then(|v| v.first().cloned()),
-            characters: self
-                .current_effect
-                .as_ref()
-                .and_then(|e| e.characters.clone()),
-            filtered_indices: None,
-            is_select_action: true,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+        self.pending_choice = Some(
+            Choice::select_cards(
+                source.to_string(),
+                count as usize,
+                format!("Select {} card(s) from {}", count, source),
+                optional,
+            )
+            .card_type(card_type.map(|s| s.to_string()))
+            .cost_limit(
+                self.current_effect.as_ref().and_then(|e| e.cost_limit),
+                self.current_effect
+                    .as_ref()
+                    .and_then(|e| e.cost_limit_operator.clone()),
+            )
+            .group(
+                self.current_effect
+                    .as_ref()
+                    .and_then(|e| e.group_names.as_ref())
+                    .and_then(|v| v.first().cloned()),
+            )
+            .characters(
+                self.current_effect
+                    .as_ref()
+                    .and_then(|e| e.characters.clone()),
+            )
+            .is_select_action(true)
+            .build(),
+        );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }

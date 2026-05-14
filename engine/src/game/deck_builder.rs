@@ -1,12 +1,11 @@
-use crate::card::{Card, CardDatabase};
+use crate::card::CardDatabase;
 use std::collections::{HashMap, VecDeque};
-use std::vec::Vec;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct Deck {
-    pub main_deck: VecDeque<i16>,  // Card IDs
-    pub energy_deck: VecDeque<i16>,  // Card IDs
+    pub main_deck: VecDeque<i16>,   // Card IDs
+    pub energy_deck: VecDeque<i16>, // Card IDs
 }
 
 impl Deck {
@@ -28,7 +27,10 @@ impl Deck {
 pub struct DeckBuilder;
 
 impl DeckBuilder {
-    pub fn build_deck_from_database(card_db: &Arc<CardDatabase>, card_numbers: Vec<String>) -> Result<Deck, String> {
+    pub fn build_deck_from_database(
+        card_db: &Arc<CardDatabase>,
+        card_numbers: Vec<String>,
+    ) -> Result<Deck, String> {
         let mut main_deck: VecDeque<i16> = VecDeque::new();
         let mut energy_deck: VecDeque<i16> = VecDeque::new();
 
@@ -45,7 +47,7 @@ impl DeckBuilder {
 
             // Try to find card with flexible matching (case-insensitive, fullwidth normalization)
             let card_id = card_db.get_card_id(&card_no);
-            
+
             if let Some(card_id) = card_id {
                 if let Some(card) = card_db.get_card(card_id) {
                     match card.card_type {
@@ -70,7 +72,10 @@ impl DeckBuilder {
 
         // Log missing cards for debugging
         if !missing_cards.is_empty() {
-            eprintln!("Warning: {} cards not found in database:", missing_cards.len());
+            eprintln!(
+                "Warning: {} cards not found in database:",
+                missing_cards.len()
+            );
             for card_no in &missing_cards {
                 eprintln!("  - {}", card_no);
             }
@@ -79,19 +84,31 @@ impl DeckBuilder {
         // Validate deck composition with priority on 12 live + 48 member
         let total_main = member_count + live_count;
         if total_main < 60 {
-            eprintln!("Warning: Main deck has {} cards (expected 60): {} member + {} live", total_main, member_count, live_count);
+            eprintln!(
+                "Warning: Main deck has {} cards (expected 60): {} member + {} live",
+                total_main, member_count, live_count
+            );
         }
 
         if live_count < 12 {
-            eprintln!("Warning: Main deck has {} live cards (expected 12)", live_count);
+            eprintln!(
+                "Warning: Main deck has {} live cards (expected 12)",
+                live_count
+            );
         }
 
         if member_count < 48 {
-            eprintln!("Warning: Main deck has {} member cards (expected 48)", member_count);
+            eprintln!(
+                "Warning: Main deck has {} member cards (expected 48)",
+                member_count
+            );
         }
 
         if energy_count != 12 {
-            eprintln!("Warning: Energy deck has {} energy cards (expected 12)", energy_count);
+            eprintln!(
+                "Warning: Energy deck has {} energy cards (expected 12)",
+                energy_count
+            );
         }
 
         Ok(Deck {
@@ -100,18 +117,17 @@ impl DeckBuilder {
         })
     }
 
-    pub fn build_deck_from_cards(cards: Vec<Card>) -> Result<Deck, String> {
-        // This method is deprecated in favor of build_deck_from_database
-        // For backward compatibility, convert cards to card IDs
-        let card_db = Arc::new(CardDatabase::load_or_create(cards.clone()));
-        let card_numbers: Vec<String> = cards.iter().map(|c| c.card_no.clone()).collect();
-        Self::build_deck_from_database(&card_db, card_numbers)
-    }
-    
-    pub fn add_default_energy_cards_from_database(deck: &mut Deck, card_db: &Arc<CardDatabase>) -> Result<(), String> {
+    pub fn add_default_energy_cards_from_database(
+        deck: &mut Deck,
+        card_db: &Arc<CardDatabase>,
+    ) -> Result<(), String> {
         let current_count = deck.energy_deck.len();
-        let needed = if current_count < 12 { 12 - current_count } else { 0 };
-        
+        let needed = if current_count < 12 {
+            12 - current_count
+        } else {
+            0
+        };
+
         if needed > 0 {
             let mut energy_card_ids: Vec<i16> = Vec::new();
             for (card_id, card) in card_db.cards.iter() {
@@ -125,56 +141,22 @@ impl DeckBuilder {
 
             if energy_card_ids.len() < needed {
                 // If not enough unique energy cards, reuse the ones we found
-                eprintln!("Warning: Only found {} energy cards, need {}", energy_card_ids.len(), needed);
+                eprintln!(
+                    "Warning: Only found {} energy cards, need {}",
+                    energy_card_ids.len(),
+                    needed
+                );
             }
 
             for card_id in energy_card_ids {
                 deck.energy_deck.push_back(card_id);
             }
         } else {
-            eprintln!("Energy deck already has {} cards (12 required)", deck.energy_deck.len());
+            eprintln!(
+                "Energy deck already has {} cards (12 required)",
+                deck.energy_deck.len()
+            );
         }
         Ok(())
-    }
-
-    pub fn add_default_energy_cards(deck: &mut Deck, all_cards: &HashMap<String, Card>) -> Result<(), String> {
-        if deck.energy_deck.is_empty() {
-            // Add default energy cards
-            let energy_cards: Vec<&Card> = all_cards.values()
-                .filter(|c| c.is_energy())
-                .take(12)
-                .collect();
-
-            if energy_cards.len() < 12 {
-                return Err(format!("Not enough energy cards available: found {}", energy_cards.len()));
-            }
-
-            for _card in energy_cards {
-                // This is deprecated - use add_default_energy_cards_from_database instead
-                // For now, we'll need to map card to card_id, but we don't have a mapping here
-                // This function should not be used anymore
-                return Err("add_default_energy_cards is deprecated, use add_default_energy_cards_from_database".to_string());
-            }
-        }
-        Ok(())
-    }
-    
-    pub fn build_deck_from_card_map(cards: &HashMap<String, Card>, card_numbers: Vec<String>) -> Result<Deck, String> {
-        let mut deck_cards = Vec::new();
-        let mut missing_cards = Vec::new();
-        
-        for card_no in &card_numbers {
-            if let Some(card) = cards.get(card_no) {
-                deck_cards.push(card.clone());
-            } else {
-                missing_cards.push(card_no.clone());
-            }
-        }
-        
-        if !missing_cards.is_empty() {
-            eprintln!("Warning: {} cards not found in database", missing_cards.len());
-        }
-        
-        Self::build_deck_from_cards(deck_cards)
     }
 }

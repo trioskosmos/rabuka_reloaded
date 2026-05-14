@@ -280,21 +280,19 @@ impl<'a> AbilityResolver<'a> {
                                 cards
                             }
                             SelectionOutcome::Prompt => {
-                                self.pending_choice = Some(Choice::SelectCard {
-                                    zone: "stage".to_string(),
-                                    card_type: card_type_filter.map(|s| s.to_string()),
-                                    count,
-                                    description: format!("Select {} card(s) from stage", count),
-                                    allow_skip: false,
-                                    cost_limit,
-                                    cost_limit_operator: effect.cost_limit_operator.clone(),
-                                    group: group_name.map(|s| s.to_string()),
-                                    characters: character_filter.clone(),
-                                    filtered_indices: None,
-                                    is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                                self.pending_choice = Some(
+                                    Choice::select_cards(
+                                        "stage",
+                                        count,
+                                        format!("Select {} card(s) from stage", count),
+                                        false,
+                                    )
+                                    .card_type(card_type_filter.map(|s| s.to_string()))
+                                    .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                                    .group(group_name.map(|s| s.to_string()))
+                                    .characters(character_filter.clone())
+                                    .build(),
+                                );
                                 self.execution_context =
                                     ExecutionContext::SingleEffect { effect_index: 0 };
                                 return Ok(());
@@ -332,21 +330,19 @@ impl<'a> AbilityResolver<'a> {
                         SelectionOutcome::Prompt | SelectionOutcome::Skip => {
                             // Always prompt for hand selection - optional determines if skip is allowed
                             let is_optional = effect.optional.unwrap_or(false);
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "hand".to_string(),
-                                card_type: card_type_filter.map(|s| s.to_string()),
-                                count,
-                                description: format!("Select {} card(s) from hand", count),
-                                allow_skip: is_optional,
-                                cost_limit,
-                                cost_limit_operator: effect.cost_limit_operator.clone(),
-                                group: group_name.map(|s| s.to_string()),
-                                characters: character_filter.clone(),
-                                filtered_indices: None,
-                                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                            self.pending_choice = Some(
+                                Choice::select_cards(
+                                    "hand",
+                                    count,
+                                    format!("Select {} card(s) from hand", count),
+                                    is_optional,
+                                )
+                                .card_type(card_type_filter.map(|s| s.to_string()))
+                                .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                                .group(group_name.map(|s| s.to_string()))
+                                .characters(character_filter.clone())
+                                .build(),
+                            );
                             self.execution_context =
                                 ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
@@ -386,21 +382,19 @@ impl<'a> AbilityResolver<'a> {
                             if vacated_stage_area.is_some() {
                                 self.game_state.last_vacated_stage_area = vacated_stage_area;
                             }
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "discard".to_string(),
-                                card_type: card_type_filter.map(|s| s.to_string()),
-                                count,
-                                description: format!("Select {} card(s) from discard", count),
-                                allow_skip: can_skip,
-                                cost_limit,
-                                cost_limit_operator: effect.cost_limit_operator.clone(),
-                                group: group_name.map(|s| s.to_string()),
-                                characters: character_filter.clone(),
-                                filtered_indices: None,
-                                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                            self.pending_choice = Some(
+                                Choice::select_cards(
+                                    "discard",
+                                    count,
+                                    format!("Select {} card(s) from discard", count),
+                                    can_skip,
+                                )
+                                .card_type(card_type_filter.map(|s| s.to_string()))
+                                .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                                .group(group_name.map(|s| s.to_string()))
+                                .characters(character_filter.clone())
+                                .build(),
+                            );
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -412,7 +406,9 @@ impl<'a> AbilityResolver<'a> {
                         None,
                         None,
                         None,
-                        character_filter.as_ref(), None, None,
+                        character_filter.as_ref(),
+                        None,
+                        None,
                     );
                     let mut idxs =
                         util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
@@ -436,21 +432,19 @@ impl<'a> AbilityResolver<'a> {
                             .map(|&i| player.energy_zone.cards.remove(i))
                             .collect(),
                         SelectionOutcome::Prompt => {
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "energy_zone".to_string(),
-                                card_type: card_type_filter.map(|s| s.to_string()),
-                                count,
-                                description: format!("Select {} card(s) from energy zone", count),
-                                allow_skip: false,
-                                cost_limit,
-                                cost_limit_operator: effect.cost_limit_operator.clone(),
-                                group: group_name.map(|s| s.to_string()),
-                                characters: character_filter.clone(),
-                                filtered_indices: None,
-                                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                            self.pending_choice = Some(
+                                Choice::select_cards(
+                                    "energy_zone",
+                                    count,
+                                    format!("Select {} card(s) from energy zone", count),
+                                    false,
+                                )
+                                .card_type(card_type_filter.map(|s| s.to_string()))
+                                .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                                .group(group_name.map(|s| s.to_string()))
+                                .characters(character_filter.clone())
+                                .build(),
+                            );
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -462,7 +456,9 @@ impl<'a> AbilityResolver<'a> {
                         group_name,
                         cost_limit,
                         None,
-                        character_filter.as_ref(), None, None,
+                        character_filter.as_ref(),
+                        None,
+                        None,
                     );
                     let mut idxs = util::matching_indices(
                         &player.live_card_zone.cards,
@@ -490,24 +486,16 @@ impl<'a> AbilityResolver<'a> {
                             .map(|&i| player.live_card_zone.cards.remove(i))
                             .collect(),
                         SelectionOutcome::Prompt => {
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "live_card_zone".to_string(),
-                                card_type: Some("live_card".to_string()),
-                                count,
-                                description: format!(
-                                    "Select {} card(s) from live card zone",
-                                    count
-                                ),
-                                allow_skip: false,
-                                cost_limit: None,
-                                cost_limit_operator: None,
-                                group: None,
-                                characters: None,
-                                filtered_indices: None,
-                                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                            self.pending_choice = Some(
+                                Choice::select_cards(
+                                    "live_card_zone",
+                                    count,
+                                    format!("Select {} card(s) from live card zone", count),
+                                    false,
+                                )
+                                .card_type(Some("live_card".to_string()))
+                                .build(),
+                            );
                             self.execution_context =
                                 ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
@@ -521,7 +509,9 @@ impl<'a> AbilityResolver<'a> {
                         None,
                         None,
                         None,
-                        character_filter.as_ref(), None, None,
+                        character_filter.as_ref(),
+                        None,
+                        None,
                     );
                     let mut idxs = util::matching_indices(
                         &player.success_live_card_zone.cards,
@@ -549,21 +539,15 @@ impl<'a> AbilityResolver<'a> {
                             .map(|&i| player.success_live_card_zone.cards.remove(i))
                             .collect(),
                         SelectionOutcome::Prompt => {
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "success_live_zone".to_string(),
-                                card_type: None,
-                                count,
-                                description: format!("Select {} card(s) from success live zone", count),
-                                allow_skip: false,
-                                cost_limit: None,
-                                cost_limit_operator: None,
-                                group: None,
-                                characters: None,
-                                filtered_indices: None,
-                                is_select_action: false,
-                                heart_colors: vec![],
-                                name_fragments: None,
-                            });
+                            self.pending_choice = Some(
+                                Choice::select_cards(
+                                    "success_live_zone",
+                                    count,
+                                    format!("Select {} card(s) from success live zone", count),
+                                    false,
+                                )
+                                .build(),
+                            );
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -575,7 +559,9 @@ impl<'a> AbilityResolver<'a> {
                         group_name,
                         None,
                         None,
-                        character_filter.as_ref(), None, None,
+                        character_filter.as_ref(),
+                        None,
+                        None,
                     );
                     let mut idxs =
                         util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
@@ -596,21 +582,19 @@ impl<'a> AbilityResolver<'a> {
                             if vacated_stage_area.is_some() {
                                 self.game_state.last_vacated_stage_area = vacated_stage_area;
                             }
-                            self.pending_choice = Some(Choice::SelectCard {
-                                zone: "discard".to_string(),
-                                card_type: card_type_filter.map(|s| s.to_string()),
-                                count,
-                                description: format!("Select {} card(s) from discard", count),
-                                allow_skip: false,
-                                cost_limit,
-                                cost_limit_operator: effect.cost_limit_operator.clone(),
-                                group: group_name.map(|s| s.to_string()),
-                                characters: character_filter.clone(),
-                                filtered_indices: None,
-                                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                            self.pending_choice = Some(
+                                Choice::select_cards(
+                                    "discard",
+                                    count,
+                                    format!("Select {} card(s) from discard", count),
+                                    false,
+                                )
+                                .card_type(card_type_filter.map(|s| s.to_string()))
+                                .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                                .group(group_name.map(|s| s.to_string()))
+                                .characters(character_filter.clone())
+                                .build(),
+                            );
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -638,21 +622,19 @@ impl<'a> AbilityResolver<'a> {
                         let taken: Vec<i16> = self.looked_at_cards.drain(..count).collect();
                         taken
                     } else if idxs.len() > count && !is_all {
-                        self.pending_choice = Some(Choice::SelectCard {
-                            zone: "looked_at".to_string(),
-                            card_type: card_type_filter.map(|s| s.to_string()),
-                            count,
-                            description: format!("Select {} card(s) from looked-at cards", count),
-                            allow_skip: false,
-                            cost_limit,
-                            cost_limit_operator: effect.cost_limit_operator.clone(),
-                            group: group_name.map(|s| s.to_string()),
-                            characters: character_filter.clone(),
-                            filtered_indices: None,
-                            is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                "looked_at",
+                                count,
+                                format!("Select {} card(s) from looked-at cards", count),
+                                false,
+                            )
+                            .card_type(card_type_filter.map(|s| s.to_string()))
+                            .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                            .group(group_name.map(|s| s.to_string()))
+                            .characters(character_filter.clone())
+                            .build(),
+                        );
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     } else {
@@ -701,21 +683,19 @@ impl<'a> AbilityResolver<'a> {
                     if selected.len() < count {
                         vec![]
                     } else if selected.len() > count {
-                        self.pending_choice = Some(Choice::SelectCard {
-                            zone: "selected_cards".to_string(),
-                            card_type: card_type_filter.map(|s| s.to_string()),
-                            count,
-                            description: format!("Select {} card(s) from selected cards", count),
-                            allow_skip: false,
-                            cost_limit,
-                            cost_limit_operator: effect.cost_limit_operator.clone(),
-                            group: group_name.map(|s| s.to_string()),
-                            characters: character_filter.clone(),
-                            filtered_indices: None,
-                            is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                "selected_cards",
+                                count,
+                                format!("Select {} card(s) from selected cards", count),
+                                false,
+                            )
+                            .card_type(card_type_filter.map(|s| s.to_string()))
+                            .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                            .group(group_name.map(|s| s.to_string()))
+                            .characters(character_filter.clone())
+                            .build(),
+                        );
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     } else {
@@ -766,21 +746,19 @@ impl<'a> AbilityResolver<'a> {
                             }
                             self.game_state.revealed_cards.push(c);
                         }
-                        self.pending_choice = Some(Choice::SelectCard {
-                            zone: "revealed_cards".to_string(),
-                            card_type: card_type_filter.map(|s| s.to_string()),
-                            count,
-                            description: format!("Select {} card(s) from revealed cards", count),
-                            allow_skip: false,
-                            cost_limit,
-                            cost_limit_operator: effect.cost_limit_operator.clone(),
-                            group: group_name.map(|s| s.to_string()),
-                            characters: character_filter.clone(),
-                            filtered_indices: None,
-                            is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                "revealed_cards",
+                                count,
+                                format!("Select {} card(s) from revealed cards", count),
+                                false,
+                            )
+                            .card_type(card_type_filter.map(|s| s.to_string()))
+                            .cost_limit(cost_limit, effect.cost_limit_operator.clone())
+                            .group(group_name.map(|s| s.to_string()))
+                            .characters(character_filter.clone())
+                            .build(),
+                        );
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     }

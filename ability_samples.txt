@@ -1,0 +1,149 @@
+=== ABILITY #0 ===
+  triggers: 起動
+  full_text: {{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。
+  use_limit: None
+  COST:
+    text: このメンバーをステージから控え室に置く
+    source: stage
+    zone: stage
+    destination: discard
+    card_type: member_card
+    self_cost: True
+    type: move_cards
+  EFFECT:
+    text: 自分の控え室からライブカードを1枚手札に加える
+    source: discard
+    destination: hand
+    count: 1
+    card_type: live_card
+    target: self
+    action: move_cards
+
+---
+
+=== ABILITY #2 ===
+  triggers: 登場
+  full_text: {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。
+  use_limit: None
+  COST:
+    text: 手札を1枚控え室に置いてもよい
+    source: hand
+    zone: hand
+    destination: discard
+    count: 1
+    optional: True
+    type: move_cards
+  EFFECT:
+    text: 自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く
+    action: look_and_select
+    look_action: {'text': '自分のデッキの上からカードを3枚見る。', 'source': 'deck_top', 'count': 3, 'target': 'self', 'action': 'look_at'}
+    select_action: {'action': 'select_cards', 'discard_remaining': True, 'destination': 'hand', 'count': 1}
+
+---
+
+=== ABILITY #4 ===
+  triggers: ライブ開始時
+  full_text: {{live_start.png|ライブ開始時}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+  use_limit: None
+  COST:
+    text: {{icon_energy.png|E}}支払ってもよい
+    optional: True
+    type: pay_energy
+    energy: 1
+    zone: energy_zone
+    count: 1
+  EFFECT:
+    text: {{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る
+    duration: live_end
+    action: gain_resource
+    resource: blade
+    count: 2
+
+---
+
+=== ABILITY #25 ===
+  triggers: 登場
+  full_text: {{toujyou.png|登場}}エネルギーを2枚アクティブにする。
+  use_limit: None
+  COST:
+    null
+  EFFECT:
+    text: エネルギーを2枚アクティブにする
+    state_change: active
+    count: 2
+    action: change_state
+    card_type: energy_card
+
+---
+
+=== ABILITY #40 ===
+  triggers: 常時
+  full_text: {{jyouji.png|常時}}相手のライブカード置き場にあるすべてのライブカードは、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる。
+  use_limit: None
+  COST:
+    null
+  EFFECT:
+    text: 相手のライブカード置き場にあるすべてのライブカードは、成功させるための必要ハートが{{heart_00.png|heart0}}多くなる
+    action: restriction
+    restriction_type: modify_required_hearts_global
+    operation: increase
+    target: opponent
+    all: True
+
+---
+
+=== ABILITY #68 ===
+  triggers: ライブ開始時
+  full_text: {{live_start.png|ライブ開始時}}カードを1枚引く。相手のステージにいるコスト9以下のメンバーを1人までウェイトにする。
+  use_limit: None
+  COST:
+    null
+  EFFECT:
+    text: カードを1枚引く。相手のステージにいるコスト9以下のメンバーを1人までウェイトにする
+    action: sequential
+    actions: [{'text': 'カードを1枚引く', 'count': 1, 'action': 'draw_card', 'source': 'deck', 'destination': 'hand'}, {'text': '相手のステージにいるコスト9以下のメンバーを1人までウェイトにする', 'cost_limit': 9, 'cost_limit_operator': '<=', 'state_change': 'wait', 'count': 1, 'card_type': 'member_card', 'target': 'opponent', 'max': True, 'action': 'change_state'}]
+
+---
+
+=== ABILITY #135 ===
+  triggers: 起動
+  full_text: {{kidou.png|起動}}{{turn1.png|ターン1回}}手札を2枚控え室に置く：自分の控え室から必要ハートに{{heart_06.png|heart06}}を3以上含むライブカードを1枚手札に加える。
+  use_limit: 1
+  COST:
+    text: 手札を2枚控え室に置く
+    source: hand
+    zone: hand
+    destination: discard
+    count: 2
+    type: move_cards
+  EFFECT:
+    text: 自分の控え室から必要ハートに{{heart_06.png|heart06}}を3以上含むライブカードを1枚手札に加える
+    source: discard
+    destination: hand
+    count: 1
+    card_type: live_card
+    target: self
+    action: move_cards
+
+---
+
+=== ABILITY #189 ===
+  triggers: 登場
+  full_text: {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く。
+  use_limit: None
+  COST:
+    text: 手札を1枚控え室に置いてもよい
+    source: hand
+    zone: hand
+    destination: discard
+    count: 1
+    optional: True
+    type: move_cards
+  EFFECT:
+    text: 自分のデッキの上からカードを5枚見る。その中から『Liella!』のカードを1枚まで公開して手札に加えてもよい。残りを控え室に置く
+    action: look_and_select
+    look_action: {'text': '自分のデッキの上からカードを5枚見る。', 'source': 'deck_top', 'count': 5, 'target': 'self', 'action': 'look_at'}
+    select_action: {'action': 'select_cards', 'destination': 'hand', 'discard_remaining': True, 'reveal': True, 'count': 1, 'max': True, 'optional': True, 'group_names': ['Liella!']}
+
+---
+

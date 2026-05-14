@@ -1064,7 +1064,9 @@ impl<'a> AbilityResolver<'a> {
                 group_filter.as_deref(),
                 None,
                 None,
-                None, None, None,
+                None,
+                None,
+                None,
             );
 
             let final_count = if per_unit {
@@ -1392,7 +1394,9 @@ impl<'a> AbilityResolver<'a> {
                 group_filter.as_deref(),
                 cost_limit,
                 None,
-                None, None, None,
+                None,
+                None,
+                None,
             );
             let mut candidates: Vec<(usize, i16)> = Vec::new();
             for (i, slot_id) in player.stage.stage.iter().enumerate() {
@@ -1422,21 +1426,18 @@ impl<'a> AbilityResolver<'a> {
             let is_change_all = count == 0;
 
             if !is_change_all && candidates.len() > count as usize {
-                self.pending_choice = Some(Choice::SelectCard {
-                    zone: "stage".to_string(),
-                    card_type: card_type_filter.clone(),
-                    count: count as usize,
-                    description: format!("Select {} member(s) to change state", count),
-                    allow_skip: false,
-                    cost_limit,
-                    cost_limit_operator: cost_limit_operator.clone(),
-                    group: group_filter.clone(),
-                    filtered_indices: None,
-                    characters: None,
-                    is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                self.pending_choice = Some(
+                    Choice::select_cards(
+                        "stage",
+                        count as usize,
+                        format!("Select {} member(s) to change state", count),
+                        false,
+                    )
+                    .card_type(card_type_filter.clone())
+                    .cost_limit(cost_limit, cost_limit_operator.clone())
+                    .group(group_filter.clone())
+                    .build(),
+                );
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
             }
@@ -1462,15 +1463,17 @@ impl<'a> AbilityResolver<'a> {
 
         // Energy card state change (original behavior) — delegated
         return self.execute_energy_state_change(
-            &state_change, &target, count, max,
-            card_type_filter.as_deref(), group_filter.as_deref(),
+            &state_change,
+            &target,
+            count,
+            max,
+            card_type_filter.as_deref(),
+            group_filter.as_deref(),
         );
     }
 
     /// Place energy from deck to energy zone with specific state (wait/active).
-    fn execute_energy_placement(
-        &mut self, state_change: &str, target: &str, count: u32,
-    ) {
+    fn execute_energy_placement(&mut self, state_change: &str, target: &str, count: u32) {
         let player = self.game_state.resolve_target_player_mut(target);
         for _ in 0..count {
             if let Some(energy_id) = player.energy_deck.draw() {
@@ -1485,8 +1488,12 @@ impl<'a> AbilityResolver<'a> {
     /// Change the state of energy zone cards (wait/active).
     fn execute_energy_state_change(
         &mut self,
-        state_change: &str, target: &str, count: u32, max: bool,
-        card_type_filter: Option<&str>, group_filter: Option<&str>,
+        state_change: &str,
+        target: &str,
+        count: u32,
+        max: bool,
+        card_type_filter: Option<&str>,
+        group_filter: Option<&str>,
     ) -> Result<(), String> {
         let card_db = self.card_db();
         let (wait_cards, deactivate_count) = {
@@ -1497,7 +1504,9 @@ impl<'a> AbilityResolver<'a> {
                 group_filter,
                 None,
                 None,
-                None, None, None,
+                None,
+                None,
+                None,
             );
             let valid_indices =
                 util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
@@ -1532,24 +1541,19 @@ impl<'a> AbilityResolver<'a> {
 
             if !max && valid_indices.len() > effective_count as usize {
                 if state_change != "active" && state_change != "アクティブ" {
-                    self.pending_choice = Some(Choice::SelectCard {
-                        zone: "energy_zone".to_string(),
-                        card_type: card_type_filter.map(|s| s.to_string()),
-                        count: effective_count as usize,
-                        description: format!(
-                            "Select {} energy card(s) to deactivate (set to wait)",
-                            effective_count
-                        ),
-                        allow_skip: false,
-                        cost_limit: None,
-                        cost_limit_operator: None,
-                        group: None,
-                        characters: None,
-                        filtered_indices: None,
-                        is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+                    self.pending_choice = Some(
+                        Choice::select_cards(
+                            "energy_zone",
+                            effective_count as usize,
+                            format!(
+                                "Select {} energy card(s) to deactivate (set to wait)",
+                                effective_count
+                            ),
+                            false,
+                        )
+                        .card_type(card_type_filter.map(|s| s.to_string()))
+                        .build(),
+                    );
                     self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                     return Ok(());
                 }
@@ -1570,7 +1574,8 @@ impl<'a> AbilityResolver<'a> {
             (wait_cards, effective_count)
         };
 
-        let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ" {
+        let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ"
+        {
             let player = self.game_state.resolve_target_player(target);
             let mut result = Vec::new();
             let mut active_count = 0u32;
@@ -1599,7 +1604,9 @@ impl<'a> AbilityResolver<'a> {
         match state_change {
             "wait" | "ウェイト" => {
                 for card_id in &wait_cards {
-                    self.game_state.mods.add_orientation_modifier(*card_id, "wait");
+                    self.game_state
+                        .mods
+                        .add_orientation_modifier(*card_id, "wait");
                 }
                 for _ in 0..deactivate_count {
                     let player = self.game_state.resolve_target_player_mut(target);
@@ -1609,7 +1616,9 @@ impl<'a> AbilityResolver<'a> {
             }
             "active" | "アクティブ" => {
                 for card_id in &active_cards {
-                    self.game_state.mods.add_orientation_modifier(*card_id, "active");
+                    self.game_state
+                        .mods
+                        .add_orientation_modifier(*card_id, "active");
                 }
                 let player = self.game_state.resolve_target_player_mut(target);
                 player.energy_zone.active_energy_count += active_cards.len();
@@ -1652,7 +1661,9 @@ impl<'a> AbilityResolver<'a> {
                 group_filter.as_deref(),
                 None,
                 None,
-                None, None, None,
+                None,
+                None,
+                None,
             );
 
             let final_value = if per_unit {
@@ -2092,23 +2103,16 @@ impl<'a> AbilityResolver<'a> {
             }
 
             // Create choice to select cards to move
-            self.pending_choice = Some(Choice::SelectCard {
-                zone: "under_member".to_string(),
-                card_type: Some("energy_card".to_string()),
-                count: under_cards.len().min(count as usize),
-                description: format!(
-                    "Select energy cards to move from under member to energy deck"
-                ),
-                allow_skip: optional, // Allow skip if optional
-                cost_limit: None,
-                cost_limit_operator: None,
-                group: None,
-                characters: None,
-                filtered_indices: None,
-                is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+            self.pending_choice = Some(
+                Choice::select_cards(
+                    "under_member",
+                    under_cards.len().min(count as usize),
+                    "Select energy cards to move from under member to energy deck",
+                    optional,
+                )
+                .card_type(Some("energy_card".to_string()))
+                .build(),
+            );
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return;
         }
@@ -2902,24 +2906,18 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
         let cards_to_discard = current_count - target_count as usize;
-        self.pending_choice = Some(Choice::SelectCard {
-            zone: "hand".to_string(),
-            card_type: None,
-            count: cards_to_discard,
-            description: format!(
-                "Discard {} cards from hand (target: {} cards in hand)",
-                cards_to_discard, target_count
-            ),
-            allow_skip: false,
-            cost_limit: None,
-            cost_limit_operator: None,
-            group: None,
-            characters: None,
-            filtered_indices: None,
-            is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
-        });
+        self.pending_choice = Some(
+            Choice::select_cards(
+                "hand",
+                cards_to_discard,
+                format!(
+                    "Discard {} cards from hand (target: {} cards in hand)",
+                    cards_to_discard, target_count
+                ),
+                false,
+            )
+            .build(),
+        );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }
