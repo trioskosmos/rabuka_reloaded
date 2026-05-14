@@ -32,6 +32,7 @@ impl GameState {
                             trigger_type,
                             completed: false,
                             cost_paid: false,
+                            cost_paid_index: 0,
                             pending_choice_result: None,
                             choice_card_no: None,
                             conditional_choice: None,

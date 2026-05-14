@@ -48,13 +48,18 @@ impl<'a> AbilityResolver<'a> {
         match cost.cost_type.as_deref() {
             Some("sequential_cost") => {
                 if let Some(ref costs) = cost.costs {
-                    for sub_cost in costs {
-                        if let Err(e) = self.validate_cost(sub_cost) {
+                    let start_idx = self.game_state.ability_queue.current_entry()
+                        .map_or(0, |e| e.cost_paid_index);
+                    for i in start_idx..costs.len() {
+                        if let Err(e) = self.validate_cost(&costs[i]) {
                             return Err(format!("Cannot pay sequential cost: {}", e));
                         }
                     }
-                    for sub_cost in costs {
-                        self.pay_cost(sub_cost)?;
+                    for i in start_idx..costs.len() {
+                        self.pay_cost(&costs[i])?;
+                        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                            entry.cost_paid_index = i + 1;
+                        }
                         if self.pending_choice.is_some() {
                             return Ok(());
                         }

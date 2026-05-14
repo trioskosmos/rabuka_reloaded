@@ -43,6 +43,7 @@ pub struct AbilityQueueEntry {
     /// Whether the cost has been fully paid (for re-entry after cost choice)
     pub cost_paid: bool,
     /// Stored choice result for resumption
+    pub cost_paid_index: usize,
     pub pending_choice_result: Option<crate::ability::types::ChoiceResult>,
     /// Discriminator for choice handlers ("choice", "choice_string", "optional_cost", "position_change")
     pub choice_card_no: Option<String>,

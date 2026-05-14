@@ -123,3 +123,5 @@ pub mod yoshiko_main_effect_only_test;
 pub mod yoshiko_single_target_test;
 pub mod yoshiko_test;
 pub mod you_debut_test;
+pub mod eli_sequential_cost_test;
+pub mod look_and_select_test;

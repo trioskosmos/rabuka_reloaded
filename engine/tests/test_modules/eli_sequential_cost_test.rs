@@ -1,6 +1,6 @@
 /// Tests for PL!-bp5-002-R (Ayase Eli) — sequential_cost with wait + optional discard
-mod helpers;
-use helpers::*;
+use crate::helpers::*;
+
 
 /// Sequential cost: put to wait (optional), discard 1 (optional) → look at 5 from deck,
 /// select cost≥9 μ's member to hand, discard rest.

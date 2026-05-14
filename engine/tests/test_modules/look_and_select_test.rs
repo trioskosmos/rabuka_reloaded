@@ -5,15 +5,15 @@
 ///       その中から好きな枚数を好きな順番でデッキの上に置き、残りを控え室に置く。
 ///
 /// Bug: any_number=true ended after first selection instead of batch selecting
-mod helpers;
+use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
 /// Select 1 out of 2 looked-at cards with any_number=true.
 /// The selected card goes to deck top; the remaining card goes to discard.
 #[test]
 fn look_and_select_any_number_partial_selection() {
-    let db = helpers::load_real_database();
-    let mut game = helpers::TestGame::new(db);
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
 
     let card = game.id("PL!HS-bp2-016-N");
     let filler = game.id("PL!-sd1-010-SD");
@@ -49,8 +49,8 @@ fn look_and_select_any_number_partial_selection() {
 /// Both go to deck top, none to discard.
 #[test]
 fn look_and_select_any_number_full_selection() {
-    let db = helpers::load_real_database();
-    let mut game = helpers::TestGame::new(db);
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
 
     let card = game.id("PL!HS-bp2-016-N");
     let filler = game.id("PL!-sd1-010-SD");
@@ -96,8 +96,8 @@ fn look_and_select_any_number_full_selection() {
 /// Both go to discard.
 #[test]
 fn look_and_select_any_number_skip_all() {
-    let db = helpers::load_real_database();
-    let mut game = helpers::TestGame::new(db);
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
 
     let card = game.id("PL!HS-bp2-016-N");
     let filler = game.id("PL!-sd1-010-SD");

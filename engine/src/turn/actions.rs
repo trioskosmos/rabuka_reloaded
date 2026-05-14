@@ -353,33 +353,31 @@ impl super::TurnEngine {
                 cost_was_paid, effect_started, had_pending_sequential, saved_ctx);
             game_state.pending_choice = None;
             game_state.activating_card = None;
-            // Update execution context after choice resolution (cleared by resume_execution
-            // when look_and_select finalizes, so the caller knows effect can continue)
-            let ctx_after = ctx.clone();
-            if let Some(e) = game_state.ability_queue.current_entry_mut() {
-                e.execution_context = Some(ctx);
-            }
-            // Check if optional sequential cost was skipped — if so, skip effect
-            // Only applies to sequential_cost where the whole cost is optional
+            // Determine what to do based on ability state BEFORE any moves:
+            //   1. Optional cost was skipped → complete, recheck auto-triggers
+            //   2. Cost paid, effect not started → run the effect  
+            //   3. Everything else → complete (effect done or stale state)
             let optional_skipped = game_state.ability_queue.current_entry().map_or(false, |e| {
                 e.cost_paid
                     && !e.optional_cost_was_paid
                     && e.choice_card_no.as_deref() == Some("optional_sequential_cost")
             });
+            let ctx_is_clear = saved_ctx == ExecutionContext::None || ctx == ExecutionContext::None;
+            if let Some(e) = game_state.ability_queue.current_entry_mut() {
+                e.execution_context = Some(ctx);
+            }
+            let effect_ready = cost_was_paid
+                && !had_pending_sequential
+                && ctx_is_clear
+                && !effect_started;
+
             if optional_skipped {
                 game_state.ability_queue.complete_current();
                 let player_id = game_state.active_player().id.clone();
                 game_state.process_pending_auto_abilities(&player_id);
-            } else if cost_was_paid
-                && !had_pending_sequential
-                && (saved_ctx == ExecutionContext::None || ctx_after == ExecutionContext::None)
-                && !effect_started
-            {
+            } else if effect_ready {
                 eprintln!("RWC: calling process_current_ability");
                 game_state.process_current_ability();
-                // Only check for new auto-triggers if the ability created a pending choice.
-                // If it auto-resolved (no pending choice), the ability completed and
-                // re-checking triggers would re-queue the same trigger.
                 if game_state.pending_choice.is_some()
                     || game_state.ability_queue.is_waiting_for_choice().is_some()
                 {
@@ -390,16 +388,11 @@ impl super::TurnEngine {
                         .unwrap_or_else(|| "p1".to_string());
                     game_state.process_pending_auto_abilities(&player_id);
                 }
-            } else if cost_was_paid
-                && !had_pending_sequential
-                && saved_ctx == ExecutionContext::None
-                && effect_started
-            {
-                game_state.ability_queue.complete_current();
-                let active_player_id = game_state.active_player().id.clone();
-                game_state.process_pending_auto_abilities(&active_player_id);
             } else if cost_was_paid {
+                // Effect done or post-finalization — complete and recheck triggers
                 game_state.ability_queue.complete_current();
+                let player_id = game_state.active_player().id.clone();
+                game_state.process_pending_auto_abilities(&player_id);
             } else {
                 game_state.ability_queue.complete_current();
                 let player_id = game_state.active_player().id.clone();
