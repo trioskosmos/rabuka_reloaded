@@ -53,7 +53,6 @@ enum EffectAction {
     ModifyRequiredHeartsSuccess,
     SetCostToUse,
     AllBladeTiming,
-    SetCardIdentityAllRegions,
     Shuffle,
     RevealPerGroup,
     ConditionalOnResult,
@@ -114,7 +113,7 @@ impl EffectAction {
             "modify_required_hearts_success" => Self::ModifyRequiredHeartsSuccess,
             "set_cost_to_use" => Self::SetCostToUse,
             "all_blade_timing" => Self::AllBladeTiming,
-            "set_card_identity_all_regions" => Self::SetCardIdentityAllRegions,
+            "set_card_identity_all_regions" => Self::SetCardIdentity,
             "shuffle" => Self::Shuffle,
             "reveal_per_group" => Self::RevealPerGroup,
             "conditional_on_result" => Self::ConditionalOnResult,
@@ -208,8 +207,8 @@ impl<'a> AbilityResolver<'a> {
         self.game_state.reset_replacement_effect_flags();
         let action_str = effect.action.clone();
 
-        // Empty action with opponent_action means it was entirely handled by opponent
-        if action_str.is_empty() && effect.action_by.is_some() {
+        // Empty action or opponent_action means it was entirely handled by opponent
+        if effect.action_by.is_some() {
             return Ok(());
         }
 
@@ -530,6 +529,7 @@ impl<'a> AbilityResolver<'a> {
                     effect.position.as_ref(),
                     effect.optional.unwrap_or(false),
                     effect.source.as_deref(),
+                    effect.destination.as_deref(),
                 );
                 Ok(())
             }
@@ -638,13 +638,6 @@ impl<'a> AbilityResolver<'a> {
                 self.execute_all_blade_timing(
                     effect.timing.as_deref().unwrap_or("check_required_hearts"),
                     effect.treat_as.as_deref().unwrap_or("any_heart_color"),
-                );
-                Ok(())
-            }
-            EffectAction::SetCardIdentityAllRegions => {
-                self.execute_set_card_identity_all_regions(
-                    effect.identities.as_ref(),
-                    effect.target_name(),
                 );
                 Ok(())
             }
@@ -1358,6 +1351,9 @@ impl<'a> AbilityResolver<'a> {
         destination: Option<&str>,
         cost_limit_operator: Option<String>,
     ) -> Result<(), String> {
+        eprintln!("[EXEC_CHANGE_STATE] state_change={} card_type={:?} group={:?} count={} is_member_op={}",
+            state_change, card_type, group_name, count,
+            card_type.as_ref().map_or(false, |ct| *ct == "member_card") || self_cost);
         let state_change = state_change.to_string();
         let target = target.to_string();
         let card_type_filter = card_type.map(|s| s.to_string());
@@ -1425,10 +1421,13 @@ impl<'a> AbilityResolver<'a> {
                 .iter()
                 .filter(|(_, card_id)| {
                     let o = self.game_state.mods.get_orientation_modifier(*card_id);
-                    // None = active (no modifier), Some("wait") = wait
                     o.map_or(false, |o| o == "wait")
                 })
                 .count();
+            for (ci, cid) in &candidates {
+                let o = self.game_state.mods.get_orientation_modifier(*cid);
+                eprintln!("[WAIT_BEFORE] candidate[{}]={} orient={:?}", ci, cid, o);
+            }
 
             // count=0 means "change all matching" (no limit)
             let is_change_all = count == 0;
@@ -1464,14 +1463,44 @@ impl<'a> AbilityResolver<'a> {
 
             // Track how many members were changed from wait→active
             if state_change == "active" {
+                eprintln!(
+                    "[SET_LAST_COUNT] setting to {} (was {})",
+                    wait_before_count, self.game_state.last_state_change_wait_to_active_count
+                );
                 self.game_state.last_state_change_wait_to_active_count = wait_before_count as u32;
             }
 
             return Ok(());
         }
 
-        // Energy card state change (original behavior)
+        // Energy card state change
         let card_db = self.card_db();
+
+        // For "active" state change on energy: auto-activate wait cards (no choice needed)
+        if card_type_filter.as_deref() == Some("energy_card")
+            && (state_change == "active" || state_change == "アクティブ")
+        {
+            let card_ids: Vec<i16> = {
+                let player = self.game_state.resolve_target_player_mut(&target);
+                let wait_count = player
+                    .energy_zone
+                    .cards
+                    .len()
+                    .saturating_sub(player.energy_zone.active_energy_count as usize);
+                let activate_count = (count as usize).min(wait_count);
+                player.energy_zone.active_energy_count += activate_count;
+                player.energy_zone.cards.to_vec()
+            };
+            for &cid in &card_ids {
+                let o = self.game_state.mods.get_orientation_modifier(cid);
+                if o.map_or(false, |o| o == "wait") {
+                    self.game_state.mods.clear_all_for_card(cid);
+                }
+            }
+            return Ok(());
+        }
+
+        eprintln!("[EXEC_ENERGY_BLOCK] About to enter energy closure");
         let (wait_cards, deactivate_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
@@ -1507,6 +1536,12 @@ impl<'a> AbilityResolver<'a> {
                 count
             };
 
+            eprintln!(
+                "[ENERGY_VALID] valid_indices.len={} effective_count={} max={}",
+                valid_indices.len(),
+                effective_count,
+                max
+            );
             if valid_indices.len() < effective_count as usize {
                 return Err(format!(
                     "Not enough energy cards to deactivate: need {}, have {}",
@@ -1563,26 +1598,48 @@ impl<'a> AbilityResolver<'a> {
         let active_cards: Vec<i16> = if state_change == "active" || state_change == "アクティブ"
         {
             let player = self.game_state.resolve_target_player(&target);
-            let mut result = Vec::new();
-            let mut active_count = 0u32;
-            for i in 0..player.energy_zone.cards.len() {
-                if active_count >= deactivate_count {
-                    break;
-                }
-                if let Some(&card_id) = player.energy_zone.cards.get(i) {
-                    let matches_type = card_type_filter.as_deref().map_or(true, |ct| {
-                        util::card_matches_type(&card_db, card_id, Some(ct))
-                    });
-                    let matches_grp = group_filter.as_deref().map_or(true, |gf| {
-                        util::card_matches_group_str(&card_db, card_id, Some(gf))
-                    });
-                    if matches_type && matches_grp {
-                        result.push(card_id);
-                        active_count += 1;
+            let is_energy = card_type_filter.as_deref() == Some("energy_card");
+            if is_energy {
+                let mut result = Vec::new();
+                let mut active_count = 0u32;
+                for i in 0..player.energy_zone.cards.len() {
+                    if active_count >= deactivate_count {
+                        break;
+                    }
+                    if let Some(&card_id) = player.energy_zone.cards.get(i) {
+                        let matches_type = card_type_filter.as_deref().map_or(true, |ct| {
+                            util::card_matches_type(&card_db, card_id, Some(ct))
+                        });
+                        let matches_grp = group_filter.as_deref().map_or(true, |gf| {
+                            util::card_matches_group_str(&card_db, card_id, Some(gf))
+                        });
+                        if matches_type && matches_grp {
+                            result.push(card_id);
+                            active_count += 1;
+                        }
                     }
                 }
+                result
+            } else {
+                // Activate stage members (e.g. Printemps members)
+                let mut result = Vec::new();
+                for i in 0..3 {
+                    let cid = player.stage.stage[i];
+                    if cid == -1 {
+                        continue;
+                    }
+                    let matches_type = card_type_filter
+                        .as_deref()
+                        .map_or(true, |ct| util::card_matches_type(&card_db, cid, Some(ct)));
+                    let matches_grp = group_filter.as_deref().map_or(true, |gf| {
+                        util::card_matches_group_str(&card_db, cid, Some(gf))
+                    });
+                    if matches_type && matches_grp {
+                        result.push(cid);
+                    }
+                }
+                result
             }
-            result
         } else {
             vec![]
         };
@@ -1590,6 +1647,7 @@ impl<'a> AbilityResolver<'a> {
         match state_change.as_str() {
             "wait" | "ウェイト" => {
                 for card_id in &wait_cards {
+                    self.game_state.mods.clear_all_for_card(*card_id);
                     self.game_state
                         .mods
                         .add_orientation_modifier(*card_id, "wait");
@@ -1606,8 +1664,18 @@ impl<'a> AbilityResolver<'a> {
                         .mods
                         .add_orientation_modifier(*card_id, "active");
                 }
-                let player = self.game_state.resolve_target_player_mut(target.as_str());
-                player.energy_zone.active_energy_count += active_cards.len();
+                let is_energy = card_type_filter.as_deref() == Some("energy_card");
+                if is_energy {
+                    let player = self.game_state.resolve_target_player_mut(target.as_str());
+                    player.energy_zone.active_energy_count += active_cards.len();
+                }
+                // Track wait→active count for state_change_condition
+                eprintln!(
+                    "[ACTIVE_TRACK] adding {} to count (was {})",
+                    active_cards.len(),
+                    self.game_state.last_state_change_wait_to_active_count
+                );
+                self.game_state.last_state_change_wait_to_active_count += active_cards.len() as u32;
             }
             _ => {}
         }
@@ -2045,6 +2113,7 @@ impl<'a> AbilityResolver<'a> {
         position: Option<&PositionInfo>,
         optional: bool,
         source: Option<&str>,
+        destination: Option<&str>,
     ) {
         // Check if we're moving from under_member to energy_deck (Awakening case)
         println!(
@@ -2052,46 +2121,54 @@ impl<'a> AbilityResolver<'a> {
             source
         );
         if source == Some("under_member") {
-            // Handle moving from under_member to energy_deck
-            let player = self.game_state.resolve_target_player_mut(target);
-            let target_index = match position.and_then(|p| p.get_position()) {
-                Some("center") | Some("中央") => 1,
-                Some("left") | Some("左側") => 0,
-                Some("right") | Some("右側") => 2,
-                None => {
-                    if player.stage.stage[1] != -1 {
-                        1
-                    } else if player.stage.stage[0] != -1 {
-                        0
-                    } else if player.stage.stage[2] != -1 {
-                        2
-                    } else {
-                        return;
+            // Handle moving from under_member — default destination is energy_deck
+            let actual_dst = destination.unwrap_or("energy_deck");
+            let (area, under_count) = {
+                let player = self.game_state.resolve_target_player_mut(target);
+                let target_index = match position.and_then(|p| p.get_position()) {
+                    Some("center") | Some("中央") => 1,
+                    Some("left") | Some("左側") => 0,
+                    Some("right") | Some("右側") => 2,
+                    None => {
+                        if player.stage.stage[1] != -1 {
+                            1
+                        } else if player.stage.stage[0] != -1 {
+                            0
+                        } else if player.stage.stage[2] != -1 {
+                            2
+                        } else {
+                            return;
+                        }
                     }
+                    _ => 1,
+                };
+                if player.stage.stage[target_index] == -1 {
+                    return;
                 }
-                _ => 1,
+                let area = match target_index {
+                    0 => crate::zones::MemberArea::LeftSide,
+                    1 => crate::zones::MemberArea::Center,
+                    _ => crate::zones::MemberArea::RightSide,
+                };
+                let uc = player.stage.get_under_cards(area);
+                if uc.is_empty() {
+                    return;
+                }
+                (area, uc.len())
             };
 
-            if player.stage.stage[target_index] == -1 {
-                return;
+            // Store the destination on the queue entry so handle_select_card can read it
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                if let Some(ref mut ef) = entry.ability.effect {
+                    ef.destination = Some(actual_dst.to_string());
+                }
             }
 
-            let area = match target_index {
-                0 => crate::zones::MemberArea::LeftSide,
-                1 => crate::zones::MemberArea::Center,
-                _ => crate::zones::MemberArea::RightSide,
-            };
-
-            let under_cards = player.stage.get_under_cards(area);
-            if under_cards.is_empty() {
-                return;
-            }
-
-            // Create choice to select cards to move
+            // Create choice to select cards to move (any_number — select all if count > available)
             self.pending_choice = Some(Choice::SelectCard {
                 zone: "under_member".to_string(),
                 card_type: Some("energy_card".to_string()),
-                count: under_cards.len().min(count as usize),
+                count: under_count,
                 description: format!(
                     "Select energy cards to move from under member to energy deck"
                 ),

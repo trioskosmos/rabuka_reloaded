@@ -1650,7 +1650,7 @@ fn turn_limit_prevents_second_activation() {
     }
 
     // Second activation in same turn should fail
-    let result = game.try_activate_ability(chika);
+    let _result = game.try_activate_ability(chika);
     // The ability might still be selectable but should fail during cost/effect
     // Just verify no crash and at least one activation happened
 }

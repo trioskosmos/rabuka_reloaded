@@ -580,6 +580,10 @@ pub fn place_card_in_zone(
             player.energy_zone.cards.push(card_id);
             true
         }
+        "energy_deck" => {
+            player.energy_deck.cards.push(card_id);
+            true
+        }
         "live_card_zone" => {
             player.live_card_zone.cards.push(card_id);
             true

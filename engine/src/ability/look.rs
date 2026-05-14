@@ -17,28 +17,18 @@ impl<'a> AbilityResolver<'a> {
 
         if let Some(ref select_action) = effect.compound.select_action {
             let placement_order = select_action.placement_order.as_deref();
-            let any_number;
-            let count;
-            let optional;
-            if select_action.action == "sequential" {
-                let first_move = select_action
-                    .compound
-                    .actions
-                    .as_ref()
-                    .and_then(|actions| actions.iter().find(|a| a.action == "move_cards"));
-                any_number = first_move.and_then(|a| a.any_number).unwrap_or(false);
-                count = first_move.and_then(|a| a.count).unwrap_or(1);
-                optional = first_move.and_then(|a| a.optional).unwrap_or(false);
-            } else {
-                any_number = select_action.any_number.unwrap_or(false);
-                count = select_action.count.unwrap_or(1);
-                optional = select_action.optional.unwrap_or(false);
-            }
+            let any_number = select_action.any_number.unwrap_or(false);
+            let count = select_action.count.unwrap_or(1);
+            let optional = select_action.optional.unwrap_or(false);
 
             let card_db = &self.game_state.card_database;
             let card_type_filter = select_action.card_type.as_deref();
             let heart_colors_filter = &select_action.heart_colors;
-            let has_filter = card_type_filter.is_some() || !heart_colors_filter.is_empty();
+            let cost_limit = select_action.cost_limit;
+            let cost_limit_operator = select_action.cost_limit_operator.as_deref();
+            let has_filter = card_type_filter.is_some()
+                || !heart_colors_filter.is_empty()
+                || cost_limit.is_some();
             if has_filter {
                 println!(
                     "DEBUG: Filtering looked_at_cards - before: {}",
@@ -51,6 +41,12 @@ impl<'a> AbilityResolver<'a> {
                                 card_db,
                                 card_id,
                                 heart_colors_filter,
+                            )
+                            && super::util::card_matches_cost_limit_op(
+                                card_db,
+                                card_id,
+                                cost_limit,
+                                cost_limit_operator,
                             )
                     });
                 println!(
@@ -111,10 +107,13 @@ impl<'a> AbilityResolver<'a> {
                 count: max_select,
                 description: description.clone(),
                 allow_skip: optional || is_max || any_number || available_count == 0,
-                cost_limit: None,
-                cost_limit_operator: None,
-                group: None,
-                characters: None,
+                cost_limit: select_action.cost_limit,
+                cost_limit_operator: select_action.cost_limit_operator.clone(),
+                group: select_action
+                    .group_names
+                    .as_ref()
+                    .and_then(|v| v.first().cloned()),
+                characters: select_action.characters.clone(),
                 filtered_indices: None,
                 is_select_action: false,
             };
@@ -194,9 +193,16 @@ impl<'a> AbilityResolver<'a> {
                     count: choices_count,
                     description: format!("Select card(s) to reveal from {}", source),
                     allow_skip,
-                    cost_limit: None,
-                    cost_limit_operator: None,
-                    group: None,
+                    cost_limit: self.current_effect.as_ref().and_then(|e| e.cost_limit),
+                    cost_limit_operator: self
+                        .current_effect
+                        .as_ref()
+                        .and_then(|e| e.cost_limit_operator.clone()),
+                    group: self
+                        .current_effect
+                        .as_ref()
+                        .and_then(|e| e.group_names.as_ref())
+                        .and_then(|v| v.first().cloned()),
                     characters: None,
                     filtered_indices: None,
                     is_select_action: false,
@@ -240,6 +246,31 @@ impl<'a> AbilityResolver<'a> {
         for card_id in &card_ids {
             self.game_state.revealed_cards.push(*card_id);
         }
+
+        if !card_ids.is_empty() {
+            let names: Vec<String> = card_ids
+                .iter()
+                .filter_map(|id| card_db.get_card(*id))
+                .map(|c| c.name.clone())
+                .collect();
+            let turn = self.game_state.turn_number;
+            let master = self.game_state.ability_master_id();
+            let player_label = match (target, master.as_deref()) {
+                ("self", Some("player2") | Some("p2")) => "P2",
+                ("self", _) => "P1",
+                ("opponent", Some("player2") | Some("p2")) => "P1",
+                ("opponent", _) => "P2",
+                (_, _) => "P1",
+            };
+            self.game_state.rule_log.push(format!(
+                "[Turn {}] {} reveals {} from {}",
+                turn,
+                player_label,
+                names.join(", "),
+                source
+            ));
+        }
+
         Ok(())
     }
     pub fn execute_select(
@@ -450,6 +481,26 @@ impl<'a> AbilityResolver<'a> {
                 self.game_state.revealed_cards.push(card_id);
             }
         }
+
+        if !card_ids.is_empty() {
+            let turn = self.game_state.turn_number;
+            let master = self.game_state.ability_master_id();
+            let player_label = match (target, master.as_deref()) {
+                ("self", Some("player2") | Some("p2")) => "P2",
+                ("self", _) => "P1",
+                ("opponent", Some("player2") | Some("p2")) => "P1",
+                ("opponent", _) => "P2",
+                (_, _) => "P1",
+            };
+            self.game_state.rule_log.push(format!(
+                "[Turn {}] {} reveals {} cards from {} per group",
+                turn,
+                player_label,
+                card_ids.len(),
+                source
+            ));
+        }
+
         Ok(())
     }
     /// Draw from deck until `termination_check` passes, refreshing from waitroom if deck empties.
@@ -499,6 +550,31 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
             }
+        }
+
+        if !all_revealed.is_empty() {
+            let turn = self.game_state.turn_number;
+            let master = self.game_state.ability_master_id();
+            let player_label = match (target, master.as_deref()) {
+                ("self", Some("player2") | Some("p2")) => "P2",
+                ("self", _) => "P1",
+                ("opponent", Some("player2") | Some("p2")) => "P1",
+                ("opponent", _) => "P2",
+                (_, _) => "P1",
+            };
+            let found_str = matched_idx.map(|_| " (found target)").unwrap_or("");
+            let names: Vec<String> = all_revealed
+                .iter()
+                .filter_map(|id| card_db.get_card(*id))
+                .map(|c| c.name.clone())
+                .collect();
+            self.game_state.rule_log.push(format!(
+                "[Turn {}] {} reveals {} from deck{}",
+                turn,
+                player_label,
+                names.join(", "),
+                found_str
+            ));
         }
 
         (all_revealed, matched_idx)

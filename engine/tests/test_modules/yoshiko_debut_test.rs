@@ -19,6 +19,7 @@ fn get_cost(game: &TestGame, card_id: i16) -> u32 {
         .unwrap_or(99)
 }
 
+#[allow(dead_code)]
 fn card_name(game: &TestGame, card_id: i16) -> String {
     game.state
         .card_database

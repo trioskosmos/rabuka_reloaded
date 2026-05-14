@@ -34,8 +34,22 @@ fn wao_wao_q178_activate_3_printemps_score_plus_1() {
     let printemps_c = game.id("PL!-sd1-008-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
+    // Hand: WAO-WAO as the live card for this performance
+    game.state.player1.hand.cards.push(wao_wao);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
     // Stage: 3 Printemps members in wait (left, center, right)
+    // BUT set AFTER advance_to_live_start so the active phase
+    // refresh doesn't clear the wait orientation.
     game.state.player1.stage.stage = [printemps_a, printemps_b, printemps_c];
+
+    advance_to_live_start(&mut game);
+    game.set_live_card(wao_wao);
+
+    // Now set wait states (active phase has already passed)
     game.state
         .mods
         .add_orientation_modifier(printemps_a, "wait");
@@ -46,15 +60,6 @@ fn wao_wao_q178_activate_3_printemps_score_plus_1() {
         .mods
         .add_orientation_modifier(printemps_c, "wait");
 
-    // Hand: WAO-WAO as the live card for this performance
-    game.state.player1.hand.cards.push(wao_wao);
-    for _ in 0..10 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
-    advance_to_live_start(&mut game);
-    game.set_live_card(wao_wao);
     game.pass();
     game.pass();
 

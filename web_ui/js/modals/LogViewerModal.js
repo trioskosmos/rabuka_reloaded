@@ -459,29 +459,60 @@ LogViewerModal._resolveCardNameFromBody = (body) => {
     if (!body) return null;
     const triggerMatch = body.match(/\[TRIGGER:\d+\]\s*(.*?):\s/i);
     const rustMatch = body.match(/(\[Rule .*?\]|\[Activated\]|\[Turn Start\]|\[Turn End\]|\[Triggered\])\s*(.*?):\s/i);
-    if (!triggerMatch && !rustMatch) return null;
-    const cardName = triggerMatch ? triggerMatch[1] : rustMatch[2];
-    return cardName?.trim() || null;
+    if (triggerMatch || rustMatch) {
+        const cardName = triggerMatch ? triggerMatch[1] : rustMatch[2];
+        return cardName?.trim() || null;
+    }
+    const revealMatch = body.match(/reveals\s+(.+?)\s+from\s/i);
+    if (revealMatch) {
+        const names = revealMatch[1].split(',').map(n => n.trim()).filter(n => n);
+        return names[0] || null;
+    }
+    return null;
 };
 
 // Helper: add card image to a modal entry element
 LogViewerModal._addCardImage = (el, body) => {
-    const cardName = LogViewerModal._resolveCardNameFromBody(body);
-    if (!cardName) return;
-    const cardData = State.resolveCardDataByName(cardName);
-    if (!cardData || !cardData.card_no) return;
+    const names = LogViewerModal._getAllCardNames(body);
+    if (names.length === 0) return;
 
-    const imgPath = resolveCardImagePath(cardData.card_no);
-    if (imgPath) {
-        const img = document.createElement('img');
-        img.src = imgPath;
-        img.className = 'log-viewer-card-thumb';
-        img.alt = cardData.name || cardName;
-        img.loading = 'lazy';
-        el.insertBefore(img, el.firstChild);
+    const fragment = document.createDocumentFragment();
+    names.forEach(name => {
+        const cardData = State.resolveCardDataByName(name);
+        if (cardData && cardData.card_no) {
+            const imgPath = resolveCardImagePath(cardData.card_no);
+            if (imgPath) {
+                const img = document.createElement('img');
+                img.src = imgPath;
+                img.className = 'log-viewer-card-thumb';
+                img.alt = cardData.name || name;
+                img.loading = 'lazy';
+                fragment.appendChild(img);
+            }
+            if (!el.dataset.cardId) {
+                Tooltips.attachCardData(el, cardData);
+            }
+        }
+    });
+    if (fragment.childNodes.length > 0) {
+        el.insertBefore(fragment, el.firstChild);
     }
+};
 
-    Tooltips.attachCardData(el, cardData);
+// Helper: get all card names from a log entry body
+LogViewerModal._getAllCardNames = (body) => {
+    if (!body) return [];
+    const triggerMatch = body.match(/\[TRIGGER:\d+\]\s*(.*?):\s/i);
+    const rustMatch = body.match(/(\[Rule .*?\]|\[Activated\]|\[Turn Start\]|\[Turn End\]|\[Triggered\])\s*(.*?):\s/i);
+    if (triggerMatch || rustMatch) {
+        const name = triggerMatch ? triggerMatch[1] : rustMatch[2];
+        return name?.trim() ? [name.trim()] : [];
+    }
+    const revealMatch = body.match(/reveals\s+(.+?)\s+from\s/i);
+    if (revealMatch) {
+        return revealMatch[1].split(',').map(n => n.trim()).filter(n => n);
+    }
+    return [];
 };
 
 // Export for global use

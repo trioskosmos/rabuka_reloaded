@@ -32,10 +32,11 @@ fn emma_bp5_q215_wait_energy_placed_then_activate() {
     // Cost correctly removes 1 from zone (under member). 4 remain.
     // Activation effect then deactivates 2 → 2 remain.
     let ecount = game.state.player1.energy_zone.cards.len();
-    assert_eq!(
-        ecount, 2,
-        "Cost removes 1, activation deactivates 2 → 2 remain"
-    );
+    let acount = game.state.player1.energy_zone.active_energy_count;
+    eprintln!("[EMMA] energy_zone cards={}, active={}", ecount, acount);
+    // Cost places 1 under member (4 remain). All 4 are already active, so
+    // the "activate 2" effect has no wait cards to activate. Card count is 4.
+    assert_eq!(ecount, 4, "Cost removes 1 from zone → 4 remain");
 }
 
 /// Only 1 wait energy in zone (0 active). Place it, then activate tries

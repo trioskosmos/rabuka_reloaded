@@ -576,28 +576,61 @@ export const LogRenderer = {
         } else if (rustAbilityMatch) {
             cardName = rustAbilityMatch[2].trim();
         }
+        if (!cardName) {
+            const revealMatch = body.match(/reveals\s+(.+?)\s+from\s/i);
+            if (revealMatch) {
+                const names = revealMatch[1].split(',').map(n => n.trim()).filter(n => n);
+                cardName = names[0] || null;
+            }
+        }
         if (!cardName) return null;
         const cardData = State.resolveCardDataByName(cardName) || State.resolveCardDataByName(cardName.replace(/^["']|["']$/g, ''));
         if (!cardData || !cardData.card_no) return null;
         return cardData;
     },
 
+    getAllCardNamesFromBody: (body) => {
+        if (!body) return [];
+        const abilityMatch = body.match(/\[TRIGGER:\d+\]\s*(.*?):\s/);
+        const rustAbilityMatch = body.match(/(\[Rule .*?\]|\[Activated\]|\[Turn Start\]|\[Turn End\]|\[Triggered\])\s*(.*?):\s/);
+        if (abilityMatch || rustAbilityMatch) {
+            const match = abilityMatch || rustAbilityMatch;
+            const name = (abilityMatch ? match[1] : match[2]).trim();
+            return name ? [name] : [];
+        }
+        const revealMatch = body.match(/reveals\s+(.+?)\s+from\s/i);
+        if (revealMatch) {
+            return revealMatch[1].split(',').map(n => n.trim()).filter(n => n);
+        }
+        return [];
+    },
+
     enrichLogEntryWithCard: (entryEl, body, currentLang, showFriendlyAbilities) => {
         if (!entryEl || !body) return;
-        const cardData = LogRenderer.resolveCardFromBody(body);
-        if (!cardData) return;
+        const cardNames = LogRenderer.getAllCardNamesFromBody(body);
+        if (cardNames.length === 0) return;
 
-        const imgPath = resolveCardImagePath(cardData.card_no);
-        if (imgPath) {
-            const img = document.createElement('img');
-            img.src = imgPath;
-            img.className = 'log-card-thumb';
-            img.alt = cardData.name || 'Card';
-            img.loading = 'lazy';
-            entryEl.insertBefore(img, entryEl.firstChild);
+        const fragment = document.createDocumentFragment();
+        cardNames.forEach(name => {
+            const cardData = State.resolveCardDataByName(name) || State.resolveCardDataByName(name.replace(/^["']|["']$/g, ''));
+            if (cardData && cardData.card_no) {
+                const imgPath = resolveCardImagePath(cardData.card_no);
+                if (imgPath) {
+                    const img = document.createElement('img');
+                    img.src = imgPath;
+                    img.className = 'log-card-thumb';
+                    img.alt = cardData.name || name;
+                    img.loading = 'lazy';
+                    fragment.appendChild(img);
+                }
+                if (!entryEl.dataset.cardId && cardData.id !== undefined) {
+                    Tooltips.attachCardData(entryEl, cardData);
+                }
+            }
+        });
+        if (fragment.childNodes.length > 0) {
+            entryEl.insertBefore(fragment, entryEl.firstChild);
         }
-
-        Tooltips.attachCardData(entryEl, cardData);
     },
 
     appendFullAbility: (containerEl, cardData) => {

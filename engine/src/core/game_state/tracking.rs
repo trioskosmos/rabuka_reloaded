@@ -1,5 +1,4 @@
 impl GameState {
-
     pub fn can_play_turn1_ability(&self, ability_id: &str) -> bool {
         !self.turn1_abilities_played.contains(ability_id)
     }
@@ -17,8 +16,17 @@ impl GameState {
         *self.turn2_abilities_played.entry(ability_id).or_insert(0) += 1;
     }
 
-    pub fn can_activate_area_ability(&self, player_id: &str, card_no: &str, area: crate::zones::MemberArea) -> bool {
-        let player = if player_id == self.player1.id { &self.player1 } else { &self.player2 };
+    pub fn can_activate_area_ability(
+        &self,
+        player_id: &str,
+        card_no: &str,
+        area: crate::zones::MemberArea,
+    ) -> bool {
+        let player = if player_id == self.player1.id {
+            &self.player1
+        } else {
+            &self.player2
+        };
         if let Some(card_in_zone) = player.stage.get_area(area) {
             if let Some(card) = self.card_database.get_card(card_in_zone) {
                 card.card_no == card_no
@@ -49,6 +57,7 @@ impl GameState {
         self.baton_touch_count = 0;
         self.baton_touch_zero_cost = false;
         self.baton_touch_replaced_member_cost = None;
+        self.baton_touch_arriving_card_id = None;
         self.clear_area_placement_tracking();
     }
 
@@ -78,8 +87,10 @@ impl GameState {
 
     pub fn check_required_hearts(&self) -> Result<bool, String> {
         if self.cheer_checks_done < self.cheer_checks_required {
-            return Err(format!("Cannot check required hearts: {} of {} cheer checks completed",
-                self.cheer_checks_done, self.cheer_checks_required));
+            return Err(format!(
+                "Cannot check required hearts: {} of {} cheer checks completed",
+                self.cheer_checks_done, self.cheer_checks_required
+            ));
         }
         Ok(true)
     }
@@ -111,5 +122,4 @@ impl GameState {
             player.waitroom.cards.push(card_id);
         }
     }
-
 }

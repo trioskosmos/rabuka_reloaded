@@ -865,67 +865,47 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             return false;
         }
 
-        if appearance {
-            match location {
-                "stage" => {
-                    let stage_ids: Vec<i16> = player
-                        .stage
-                        .stage
-                        .iter()
-                        .filter(|&&id| id != -1)
-                        .copied()
-                        .collect();
-                    if stage_ids.is_empty() {
-                        return false;
-                    }
-                    if let Some(ref chars) = condition.characters {
-                        eprintln!(
-                            "[APPEARANCE] checking characters: {:?} against stage_ids={:?}",
-                            chars, stage_ids
-                        );
-                        if chars.is_empty() {
-                            return !stage_ids.is_empty();
-                        }
-                        let stage_card_names: Vec<String> = stage_ids
-                            .iter()
-                            .filter_map(|&cid| {
-                                self.game_state
-                                    .card_database
-                                    .get_card(cid)
-                                    .map(|c| c.name.clone())
-                            })
-                            .collect();
-                        eprintln!("[APPEARANCE] stage card names: {:?}", stage_card_names);
-                        let result = chars.iter().all(|name| {
-                            stage_card_names
-                                .iter()
-                                .any(|cname| cname.contains(name.as_str()))
-                        });
-                        eprintln!("[APPEARANCE] result={}", result);
-                        result
-                    } else {
-                        eprintln!(
-                            "[APPEARANCE] no characters filter, stage_ids={:?}",
-                            stage_ids
-                        );
-                        !stage_ids.is_empty()
-                    }
-                }
+        let zone_has_cards = |loc: &str| -> bool {
+            match loc {
+                "stage" => player.stage.stage.iter().any(|&id| id != -1),
                 "hand" => !player.hand.cards.is_empty(),
                 "discard" => !player.waitroom.cards.is_empty(),
                 _ => true,
             }
-        } else {
-            match location {
-                "stage" => {
-                    player.stage.stage[0] == -1
-                        && player.stage.stage[1] == -1
-                        && player.stage.stage[2] == -1
+        };
+
+        if appearance {
+            if location == "stage" {
+                let stage_ids: Vec<i16> = player
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&id| id != -1)
+                    .copied()
+                    .collect();
+                if stage_ids.is_empty() {
+                    return false;
                 }
-                "hand" => player.hand.cards.is_empty(),
-                "discard" => player.waitroom.cards.is_empty(),
-                _ => true,
+                if let Some(ref chars) = condition.characters {
+                    let stage_card_names: Vec<String> = stage_ids
+                        .iter()
+                        .filter_map(|&cid| {
+                            self.game_state
+                                .card_database
+                                .get_card(cid)
+                                .map(|c| c.name.clone())
+                        })
+                        .collect();
+                    return chars.iter().all(|name| {
+                        stage_card_names
+                            .iter()
+                            .any(|cname| cname.contains(name.as_str()))
+                    });
+                }
             }
+            zone_has_cards(location)
+        } else {
+            !zone_has_cards(location)
         }
     }
 
@@ -1117,7 +1097,33 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "notmoved" => true,
-            "baton_touch" => condition.baton_touch_trigger.unwrap_or(false),
+            "baton_touch" => {
+                if !condition.baton_touch_trigger.unwrap_or(false) {
+                    return false;
+                }
+                // Check the arriving baton-touch card's cost and group
+                if let Some(arriving_id) = self.game_state.baton_touch_arriving_card_id {
+                    if let Some(card) = self.game_state.card_database.get_card(arriving_id) {
+                        if let Some(cost_limit) = condition.cost_limit {
+                            let cost = card.cost.unwrap_or(0) as u32;
+                            if cost < cost_limit {
+                                return false;
+                            }
+                        }
+                        if let Some(groups) = &condition.group_names {
+                            let card_groups: &str = &card.group;
+                            if !groups.iter().any(|g| card_groups.contains(g.as_str())) {
+                                return false;
+                            }
+                        }
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            }
             _ => match location {
                 "stage" => {
                     player.stage.stage[0] != -1
@@ -1235,6 +1241,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             if let Some(target_count) = condition.count {
                 if condition.operator.as_deref() == Some(">=") {
                     let actual = self.game_state.last_state_change_wait_to_active_count;
+                    eprintln!(
+                        "[STATE_CHANGE_CHECK] actual={} target={}",
+                        actual, target_count
+                    );
                     return actual >= target_count;
                 }
             }

@@ -38,13 +38,17 @@ fn konata_q77_debuted_this_turn_activates_energy() {
         game.select_indices(&[0]);
     }
 
-    // Condition passed (result=true in log). The change_state effect runs
-    // but targets stage members (parser missed energy context). The key
-    // Q77 assertion is: condition evaluated correctly based on debut count.
+    // Ab#0: cost 2E, draw 1. Ab#1: cost discard hand→waitroom, activate 2E (condition PASSED).
+    // Net active change: -2 (ab#0 cost) +2 (ab#1 activation) = 0.
+    // Hand: originally 1 card. Ab#0 draws +1→2. Ab#1 discards 1→1. Net: 1.
     let active_after = game.state.player1.energy_zone.active_energy_count;
+    assert_eq!(
+        active_after, active_before,
+        "Ab#0 cost 2E + Ab#1 activate 2E = net 0 change"
+    );
     assert!(
-        active_after < active_before,
-        "Energy consumed by cost — condition passed"
+        game.state.player1.waitroom.cards.contains(&niji_member),
+        "Ab#1 cost (discard niji_member) was paid"
     );
 }
 

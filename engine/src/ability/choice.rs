@@ -45,35 +45,70 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
 
         self.resume_execution(context.clone())?;
+        eprintln!(
+            "[FINALIZE_CHOICE] pending={:?} selected={:?} context={:?}",
+            self.game_state
+                .pending_sequential_actions
+                .as_ref()
+                .map(|p| p.len()),
+            self.selected_cards,
+            context
+        );
         if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
             for (i, action) in pending.iter().enumerate() {
+                eprintln!(
+                    "[FINALIZE_EXEC] i={} action={:?} selected={:?}",
+                    i, action.action, self.selected_cards
+                );
                 self.execute_effect(action)?;
                 if self.pending_choice.is_some() {
-                    if self.game_state.pending_sequential_actions.is_none() {
-                        let remaining = pending[i + 1..].to_vec();
-                        self.game_state.pending_sequential_actions = if remaining.is_empty() {
-                            None
-                        } else {
-                            Some(remaining)
-                        };
+                    // Only store outer remaining if non-empty and nested didn't store.
+                    if i + 1 < pending.len()
+                        && self
+                            .game_state
+                            .pending_sequential_actions
+                            .as_ref()
+                            .map_or(true, |p| p.is_empty())
+                    {
+                        self.game_state.pending_sequential_actions =
+                            Some(pending[i + 1..].to_vec());
                     }
                     return Ok(());
                 }
             }
             self.game_state.pending_sequential_actions = None;
-            if should_preserve && self.pending_choice.is_some() {
-                self.pending_choice = None;
-            }
         }
         Ok(())
     }
 
     fn reveal_selected_looked_at(&mut self, indices: &[usize]) {
+        let mut revealed_ids = Vec::new();
         for &idx in indices.iter() {
             if idx < self.looked_at_cards.len() {
-                self.game_state
-                    .revealed_cards
-                    .push(self.looked_at_cards[idx]);
+                let cid = self.looked_at_cards[idx];
+                self.game_state.revealed_cards.push(cid);
+                revealed_ids.push(cid);
+            }
+        }
+        if !revealed_ids.is_empty() {
+            let card_db = &self.game_state.card_database;
+            let names: Vec<String> = revealed_ids
+                .iter()
+                .filter_map(|id| card_db.get_card(*id))
+                .map(|c| c.name.clone())
+                .collect();
+            if !names.is_empty() {
+                let turn = self.game_state.turn_number;
+                self.game_state.rule_log.push(format!(
+                    "[Turn {}] P{} reveals {} from looked-at cards",
+                    turn,
+                    if std::ptr::eq(self.game_state.active_player(), &self.game_state.player1) {
+                        1
+                    } else {
+                        2
+                    },
+                    names.join(", ")
+                ));
             }
         }
     }
@@ -207,6 +242,29 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             if card_ids.len() < count {
                 return Err("Not enough valid cards to reveal for cost".to_string());
             }
+            if !card_ids.is_empty() {
+                let card_db = &self.game_state.card_database;
+                let names: Vec<String> = card_ids
+                    .iter()
+                    .filter_map(|id| card_db.get_card(*id))
+                    .map(|c| c.name.clone())
+                    .collect();
+                let turn = self.game_state.turn_number;
+                let player_num =
+                    if std::ptr::eq(self.game_state.active_player(), &self.game_state.player1) {
+                        1
+                    } else {
+                        2
+                    };
+                if !names.is_empty() {
+                    self.game_state.rule_log.push(format!(
+                        "[Turn {}] P{} reveals {} from hand as cost",
+                        turn,
+                        player_num,
+                        names.join(", ")
+                    ));
+                }
+            }
             for card_id in card_ids {
                 self.game_state.revealed_cards.push(card_id);
                 self.revealed_cost_cards.push(card_id);
@@ -268,15 +326,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
                 "energy_zone" => {
-                    let player = self.game_state.active_player_mut();
-                    for &idx in indices.iter().rev() {
-                        if idx < player.energy_zone.cards.len()
-                            && validate_card(player.energy_zone.cards[idx])
-                        {
-                            player
-                                .waitroom
-                                .add_card(player.energy_zone.cards.remove(idx));
-                        }
+                    let to_mark: Vec<i16> = {
+                        let player = self.game_state.active_player_mut();
+                        indices
+                            .iter()
+                            .filter_map(|&idx| {
+                                if idx < player.energy_zone.cards.len()
+                                    && validate_card(player.energy_zone.cards[idx])
+                                {
+                                    Some(player.energy_zone.cards[idx])
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect()
+                    };
+                    for cid in to_mark {
+                        self.game_state.mods.clear_all_for_card(cid);
+                        self.game_state.mods.add_orientation_modifier(cid, "wait");
                     }
                 }
                 "discard" => {
@@ -335,39 +402,27 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     };
                     self.reveal_selected_looked_at(&mapped_indices);
 
-                    let entry_effect_sa = || -> Option<Box<AbilityEffect>> {
-                        self.game_state
-                            .ability_queue
-                            .current_entry()
-                            .and_then(|e| e.ability.effect.as_ref())
-                            .and_then(|ef| ef.compound.select_action.clone())
-                    };
-                    let is_select_cards = entry_effect_sa()
-                        .map(|sa| sa.action == "select_cards" || sa.action == "sequential")
+                    let select_action_entry = self
+                        .game_state
+                        .ability_queue
+                        .current_entry()
+                        .and_then(|e| e.ability.effect.as_ref())
+                        .and_then(|ef| ef.compound.select_action.clone());
+                    let is_select_cards = select_action_entry
+                        .as_ref()
+                        .map(|sa| sa.action == "select_cards")
                         .unwrap_or(false);
 
                     if is_select_cards {
                         self.handle_select_cards_looked_at(&mapped_indices)?;
-                        // Return early only for order prompts (any_order), not for multi-selection
                         if matches!(self.pending_choice, Some(Choice::SelectTarget { ref target, .. }) if target == "order")
                         {
                             return Ok(());
                         }
                     } else if let ExecutionContext::LookAndSelect { .. } = self.execution_context {
-                        if let Some(ref select_action) = entry_effect_sa() {
-                            if select_action.action == "select_cards"
-                                || select_action.action == "sequential"
-                            {
-                                self.handle_select_cards_looked_at(&mapped_indices)?;
-                                self.looked_at_cards = self.game_state.looked_at_cards.clone();
-                            } else if let Some(ref actions) = select_action.compound.actions {
-                                self.game_state.pending_sequential_actions = Some(actions.clone());
-                                self.handle_select_cards_looked_at(&mapped_indices)?;
-                                self.looked_at_cards = self.game_state.looked_at_cards.clone();
-                            } else {
-                                self.handle_select_cards_looked_at(&mapped_indices)?;
-                                self.looked_at_cards = self.game_state.looked_at_cards.clone();
-                            }
+                        if let Some(ref select_action) = select_action_entry {
+                            self.handle_select_cards_looked_at(&mapped_indices)?;
+                            self.looked_at_cards = self.game_state.looked_at_cards.clone();
                         } else {
                             self.handle_select_cards_looked_at(&mapped_indices)?;
                             self.looked_at_cards = self.game_state.looked_at_cards.clone();
@@ -377,14 +432,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         self.looked_at_cards = self.game_state.looked_at_cards.clone();
                     }
 
-                    // Check if we can select more cards (for "up to X" abilities)
+                    // Check if we can select more cards (for round-based "up to X" abilities).
+                    // Skip for any_number — the frontend handles batch selection in one shot.
                     if is_select_cards && !mapped_indices.is_empty() {
+                        let is_any_number = select_action_entry
+                            .as_ref()
+                            .and_then(|sa| sa.any_number)
+                            .unwrap_or(false);
                         let max_count = count;
                         let selected_count = mapped_indices.len();
                         let remaining = self.game_state.looked_at_cards.len();
 
                         // If user can select more and there are remaining cards, create new choice
-                        if max_count > selected_count && remaining > 0 {
+                        if !is_any_number && max_count > selected_count && remaining > 0 {
                             let remaining_max = max_count - selected_count;
                             let card_type = card_type.clone();
                             self.pending_choice = Some(Choice::SelectCard {
@@ -425,42 +485,42 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     return self.finalize_choice(&context);
                 }
                 "under_member" => {
+                    let dst = self.game_state.entry_destination().map(|s| s.to_string());
+                    let dst_str = dst.as_deref().unwrap_or("hand").to_string();
                     let player = self.game_state.active_player_mut();
-                    let area_order = [
-                        crate::zones::MemberArea::Center,
-                        crate::zones::MemberArea::LeftSide,
-                        crate::zones::MemberArea::RightSide,
-                    ];
-                    let mut cards_to_move = Vec::new();
+                    let mut cards_to_move: Vec<(usize, i16)> = Vec::new();
                     for &idx in indices.iter() {
                         let mut global_idx = 0;
                         let mut found = false;
-                        for area in &area_order {
-                            let under = player.stage.get_under_cards(*area);
-                            if idx < global_idx + under.len() {
-                                let card_id = under[idx - global_idx];
-                                cards_to_move.push((*area, card_id));
+                        for si in 0..3 {
+                            if idx < global_idx + player.stage.under_cards[si].len() {
+                                cards_to_move
+                                    .push((si, player.stage.under_cards[si][idx - global_idx]));
                                 found = true;
                                 break;
                             }
-                            global_idx += under.len();
+                            global_idx += player.stage.under_cards[si].len();
                         }
                         if !found {
                             return Err(format!("Card at index {} not found in under_member", idx));
                         }
                     }
-                    let _ = player;
-                    for (area, card_id) in cards_to_move {
-                        let under = &mut self.game_state.player1.stage.under_cards[match area {
-                            crate::zones::MemberArea::LeftSide => 0,
-                            crate::zones::MemberArea::Center => 1,
-                            crate::zones::MemberArea::RightSide => 2,
-                        }];
-                        if let Some(pos) = under.iter().position(|&c| c == card_id) {
-                            under.remove(pos);
-                            self.game_state.player1.energy_deck.cards.push(card_id);
+                    let selected_ids: Vec<i16> =
+                        cards_to_move.iter().map(|&(_, cid)| cid).collect();
+                    std::mem::drop(player);
+                    let player = self.game_state.active_player_mut();
+                    for (si, card_id) in &cards_to_move {
+                        if let Some(pos) = player.stage.under_cards[*si]
+                            .iter()
+                            .position(|&c| c == *card_id)
+                        {
+                            player.stage.under_cards[*si].remove(pos);
+                            crate::ability::util::place_card_in_zone(
+                                player, *card_id, &dst_str, None, false, 1,
+                            );
                         }
                     }
+                    self.selected_cards = selected_ids;
                     return self.finalize_choice(&context);
                 }
                 _ => {}
@@ -516,6 +576,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         }
                     }
                     self.selected_cards = cards;
+                    // Sync to queue entry BEFORE finalize_choice, because the resolver
+                    // will be recreated for sub-choices and must restore selected_cards.
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.selected_card_ids = self.selected_cards.clone();
+                    }
+                    // Finalize to process pending sequential actions
+                    return self.finalize_choice(&context);
                 } else {
                     self.execute_selected_cards_from_zone(
                         "discard",
@@ -530,17 +597,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "looked_at" => {
-                eprintln!("[LOOKED_AT_DEBUG] handle_select_card looked_at indices={:?}, self.looked_at_cards.len()={}", indices, self.looked_at_cards.len());
                 self.reveal_selected_looked_at(indices);
-                let has_compound = self
-                    .game_state
-                    .ability_queue
-                    .current_entry()
-                    .and_then(|e| e.ability.effect.as_ref())
-                    .and_then(|ef| ef.compound.select_action.as_ref())
-                    .map(|sa| sa.action == "select_cards" || sa.action == "sequential")
-                    .unwrap_or(false);
-
                 self.handle_select_cards_looked_at(indices)?;
             }
             "revealed_cards" => {
@@ -564,6 +621,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             "energy_zone" => self.execute_selected_energy_zone_cards(indices, count)?,
             "selected_cards" => {
+                eprintln!(
+                    "[SELECTED_CARDS_BEFORE] self.selected_cards={:?} indices={:?}",
+                    self.selected_cards, indices
+                );
                 let mut cards = Vec::new();
                 for &i in indices.iter() {
                     if i < self.selected_cards.len() {
@@ -571,44 +632,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
                 self.selected_cards = cards;
-            }
-            "under_member" => {
-                let player = self.game_state.active_player_mut();
-                let area_order = [
-                    crate::zones::MemberArea::Center,
-                    crate::zones::MemberArea::LeftSide,
-                    crate::zones::MemberArea::RightSide,
-                ];
-                let mut cards_to_move = Vec::new();
-                for &idx in indices.iter() {
-                    let mut global_idx = 0;
-                    let mut found = false;
-                    for area in &area_order {
-                        let under = player.stage.get_under_cards(*area);
-                        if idx < global_idx + under.len() {
-                            let card_id = under[idx - global_idx];
-                            cards_to_move.push((*area, card_id));
-                            found = true;
-                            break;
-                        }
-                        global_idx += under.len();
-                    }
-                    if !found {
-                        return Err(format!("Card at index {} not found in under_member", idx));
-                    }
-                }
-                let _ = player;
-                for (area, card_id) in cards_to_move {
-                    let under = &mut self.game_state.player1.stage.under_cards[match area {
-                        crate::zones::MemberArea::LeftSide => 0,
-                        crate::zones::MemberArea::Center => 1,
-                        crate::zones::MemberArea::RightSide => 2,
-                    }];
-                    if let Some(pos) = under.iter().position(|&c| c == card_id) {
-                        under.remove(pos);
-                        self.game_state.player1.energy_deck.cards.push(card_id);
-                    }
-                }
+                eprintln!(
+                    "[SELECTED_CARDS_AFTER] self.selected_cards={:?}",
+                    self.selected_cards
+                );
             }
             _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
         }
@@ -920,6 +947,25 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         self.game_state.mods.add_orientation_modifier(id, "wait");
                     }
                 }
+                // Handle sequential_cost sub-costs — pay each after user confirmed
+                if let Some(ref costs) = cost.costs {
+                    for sub_cost in costs {
+                        if sub_cost.state_change.as_deref() == Some("wait")
+                            && sub_cost.self_cost == Some(true)
+                        {
+                            if let Some(id) = self.game_state.activating_card {
+                                self.game_state.mods.add_orientation_modifier(id, "wait");
+                            }
+                        } else if let Err(e) = self.pay_cost(sub_cost) {
+                            eprintln!("Warning: sub-cost payment error: {}", e);
+                        }
+                        // If a sub-cost creates a choice (e.g. move_cards), return and let the
+                        // main loop handle it. The choice will be resolved and flow returns here.
+                        if self.pending_choice.is_some() {
+                            return Ok(());
+                        }
+                    }
+                }
                 eprintln!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
                     cost.cost_type, self.game_state.entry_cost().is_some(), 
                     self.game_state.entry_effect().map(|e| e.action.clone()));
@@ -930,6 +976,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         cost.position.as_ref(),
                         false,
                         cost.source.as_deref(),
+                        None,
                     );
                 }
             }
@@ -963,6 +1010,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         effect.position.as_ref(),
                         false,
                         effect.source.as_deref(),
+                        None,
                     );
                 }
             }
@@ -1465,41 +1513,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             .current_entry()
             .and_then(|e| e.ability.effect.as_ref())
             .and_then(|ef| ef.compound.select_action.clone());
-        let is_sequential = select_action
-            .as_ref()
-            .map(|sa| sa.action == "sequential")
-            .unwrap_or(false);
-        let (destination, discard_remaining, placement_order) = if is_sequential {
-            let first_move = select_action
+        let (destination, discard_remaining, placement_order) = (
+            select_action
                 .as_ref()
-                .and_then(|sa| sa.compound.actions.as_ref())
-                .and_then(|actions| {
-                    actions.iter().find(|a| {
-                        a.action == "move_cards" && a.source.as_deref() == Some("looked_at")
-                    })
-                });
-            (
-                first_move
-                    .and_then(|a| a.destination.clone())
-                    .unwrap_or_else(|| "hand".to_string()),
-                first_move.and_then(|a| a.discard_remaining).unwrap_or(true),
-                first_move.and_then(|a| a.placement_order.clone()),
-            )
-        } else {
-            (
-                select_action
-                    .as_ref()
-                    .and_then(|sa| sa.destination.clone())
-                    .unwrap_or_else(|| "hand".to_string()),
-                select_action
-                    .as_ref()
-                    .and_then(|sa| sa.discard_remaining)
-                    .unwrap_or(true),
-                select_action
-                    .as_ref()
-                    .and_then(|sa| sa.placement_order.clone()),
-            )
-        };
+                .and_then(|sa| sa.destination.clone())
+                .unwrap_or_else(|| "hand".to_string()),
+            select_action
+                .as_ref()
+                .and_then(|sa| sa.discard_remaining)
+                .unwrap_or(true),
+            select_action
+                .as_ref()
+                .and_then(|sa| sa.placement_order.clone()),
+        );
         println!("DEBUG: handle_select_cards_looked_at - destination: {}, discard_remaining: {}, placement_order: {:?}", destination, discard_remaining, placement_order);
 
         // If game_state.looked_at_cards was reset (resolver recreation), restore from selected_cards
@@ -1524,6 +1550,29 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             "DEBUG: Selected {} cards: {:?}",
             selected_count, selected_cards
         );
+
+        // Validate selected cards against cost_limit from the select_action
+        {
+            let card_db = &self.game_state.card_database;
+            let cost_limit = select_action.as_ref().and_then(|sa| sa.cost_limit);
+            let cost_limit_operator = select_action
+                .as_ref()
+                .and_then(|sa| sa.cost_limit_operator.as_deref());
+            selected_cards.retain(|&cid| {
+                super::util::card_matches_cost_limit_op(
+                    card_db,
+                    cid,
+                    cost_limit,
+                    cost_limit_operator,
+                )
+            });
+            if selected_cards.len() != selected_count {
+                println!(
+                    "DEBUG: Post-filter removed {} cards that don't match cost_limit",
+                    selected_count - selected_cards.len()
+                );
+            }
+        }
 
         // Extract remaining cards
         let remaining_cards: Vec<i16> = looked_at.drain(..).collect();
@@ -1587,13 +1636,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         // Check for multi-selection: if user selected at least 1 but fewer than max,
         // keep remaining for another pick. If they selected 0, treat as "done".
+        // Skip for any_number — the frontend handles batch selection in one shot.
+        let is_any_number = select_action
+            .as_ref()
+            .and_then(|sa| sa.any_number)
+            .unwrap_or(false);
         let max_select = select_action.as_ref().and_then(|sa| sa.count).unwrap_or(1) as usize;
         let is_max_or_optional = select_action
             .as_ref()
             .map(|sa| sa.max.unwrap_or(false) || sa.optional.unwrap_or(false))
             .unwrap_or(false);
 
-        if selected_count > 0
+        if !is_any_number
+            && selected_count > 0
             && is_max_or_optional
             && max_select > selected_count
             && !remaining_cards.is_empty()
@@ -1652,16 +1707,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         _count: usize,
     ) -> Result<(), String> {
         let player = self.game_state.resolve_target_player_mut("self");
-        let mut indices_to_remove: Vec<usize> = indices.iter().copied().collect();
-        indices_to_remove.sort_by(|a, b| b.cmp(a));
-        for i in indices_to_remove {
+        let mut to_mark: Vec<i16> = Vec::new();
+        for &i in indices {
             if i < player.energy_zone.cards.len() {
-                player.energy_zone.cards.remove(i);
+                to_mark.push(player.energy_zone.cards[i]);
             }
         }
         let deactivated_count = indices.len();
         if player.energy_zone.active_energy_count >= deactivated_count {
             player.energy_zone.active_energy_count -= deactivated_count;
+        }
+        std::mem::drop(player);
+        for cid in to_mark {
+            self.game_state.mods.clear_all_for_card(cid);
+            self.game_state.mods.add_orientation_modifier(cid, "wait");
         }
         Ok(())
     }

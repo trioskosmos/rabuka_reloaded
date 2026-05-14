@@ -1,12 +1,10 @@
 use crate::helpers::*;
-use rabuka_engine::turn::TurnEngine;
-use rabuka_engine::zones::MemberArea;
 
 /// Test to verify group matching is working
 #[test]
 fn test_yoshiko_group_matching() {
     let db = load_real_database();
-    let mut game = TestGame::new(db);
+    let game = TestGame::new(db);
 
     let yoshiko = game.id("PL!S-bp3-006-R＋");
     let chika = game.id("PL!S-bp2-001-R");
@@ -17,7 +15,7 @@ fn test_yoshiko_group_matching() {
 
     for (name, card_id) in [("Yoshiko", yoshiko), ("Chika", chika), ("Riko", riko)] {
         if let Some(card) = game.state.card_database.get_card(card_id) {
-            let matches_unit = card.unit.as_deref() == Some("Aqours");
+            let _matches_unit = card.unit.as_deref() == Some("Aqours");
             let matches_group = card.group == "Aqours";
             let matches_series = card.series.contains("サンシャイン");
 

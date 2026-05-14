@@ -353,7 +353,18 @@ impl super::TurnEngine {
                 cost_was_paid, effect_started, had_pending_sequential, saved_ctx);
             game_state.pending_choice = None;
             game_state.activating_card = None;
-            if cost_was_paid
+            // Check if optional sequential cost was skipped — if so, skip effect
+            // Only applies to sequential_cost where the whole cost is optional
+            let optional_skipped = game_state.ability_queue.current_entry().map_or(false, |e| {
+                e.cost_paid
+                    && !e.optional_cost_was_paid
+                    && e.choice_card_no.as_deref() == Some("optional_sequential_cost")
+            });
+            if optional_skipped {
+                game_state.ability_queue.complete_current();
+                let player_id = game_state.active_player().id.clone();
+                game_state.process_pending_auto_abilities(&player_id);
+            } else if cost_was_paid
                 && !had_pending_sequential
                 && saved_ctx == ExecutionContext::None
                 && !effect_started
@@ -385,6 +396,8 @@ impl super::TurnEngine {
                 game_state.ability_queue.complete_current();
             } else {
                 game_state.ability_queue.complete_current();
+                let player_id = game_state.active_player().id.clone();
+                game_state.process_pending_auto_abilities(&player_id);
             }
         }
         Ok(())

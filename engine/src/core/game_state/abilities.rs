@@ -248,7 +248,7 @@ impl GameState {
 
     /// Resolve which player "self" refers to based on the ability master's player_id.
     /// The ability queue entry stores which player activated this ability.
-    fn ability_master_id(&self) -> Option<String> {
+    pub fn ability_master_id(&self) -> Option<String> {
         self.ability_queue
             .current_entry()
             .map(|e| e.player_id.clone())

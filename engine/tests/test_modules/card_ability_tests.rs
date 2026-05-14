@@ -3,8 +3,6 @@
 /// This file contains detailed tests for individual card abilities,
 /// focusing on edge cases, condition validation, and proper card selection.
 use crate::helpers::*;
-use rabuka_engine::game_setup::ActionType;
-use rabuka_engine::turn::TurnEngine;
 
 // ====================================================================
 //  大沢瑠璃乃 (PL!HS-bp2-005) — 登場 trigger with member condition
@@ -259,8 +257,8 @@ fn rurino_ozora_cost_payment_success() {
     let mirakura_card = game.id("PL!HS-pb1-003-R");
     game.add_to_discard(mirakura_card);
 
-    let initial_hand_size = game.state.player1.hand.cards.len();
-    let initial_discard_size = game.state.player1.waitroom.cards.len();
+    let _initial_hand_size = game.state.player1.hand.cards.len();
+    let _initial_discard_size = game.state.player1.waitroom.cards.len();
 
     // Play Rurino to trigger 登場
     game.play_to_stage(rurino, rabuka_engine::zones::MemberArea::Center);

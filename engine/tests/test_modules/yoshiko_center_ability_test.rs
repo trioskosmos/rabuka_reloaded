@@ -29,8 +29,8 @@ fn test_yoshiko_center_ability_basic_success() {
     // Give player enough energy
     game.give_energy(5);
 
-    let initial_hand_size = game.player().hand.cards.len();
-    let initial_discard_size = game.player().waitroom.cards.len();
+    let _initial_hand_size = game.player().hand.cards.len();
+    let _initial_discard_size = game.player().waitroom.cards.len();
     let initial_stage_count = game
         .player()
         .stage

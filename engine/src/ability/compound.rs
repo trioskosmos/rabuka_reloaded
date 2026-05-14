@@ -87,6 +87,9 @@ impl<'a> AbilityResolver<'a> {
                     match self.execute_effect(&action_to_execute) {
                         Ok(_) => {
                             if self.pending_choice.is_some() {
+                                // A nested sequential may have already stored its remaining
+                                // actions in pending_sequential_actions. Don't overwrite
+                                // if the current action had no remaining.
                                 let current_was_optional = action.optional.unwrap_or(false);
                                 let remaining = if current_was_optional {
                                     let mut actions: Vec<AbilityEffect> =
@@ -98,12 +101,9 @@ impl<'a> AbilityResolver<'a> {
                                 } else {
                                     repeat_actions[i + 1..].to_vec()
                                 };
-                                self.game_state.pending_sequential_actions = if remaining.is_empty()
-                                {
-                                    None
-                                } else {
-                                    Some(remaining)
-                                };
+                                if !remaining.is_empty() {
+                                    self.game_state.pending_sequential_actions = Some(remaining);
+                                }
                                 return Ok(());
                             }
                         }
@@ -118,11 +118,9 @@ impl<'a> AbilityResolver<'a> {
                             } else {
                                 repeat_actions[i + 1..].to_vec()
                             };
-                            self.game_state.pending_sequential_actions = if remaining.is_empty() {
-                                None
-                            } else {
-                                Some(remaining)
-                            };
+                            if !remaining.is_empty() {
+                                self.game_state.pending_sequential_actions = Some(remaining);
+                            }
                             return Ok(());
                         }
                         Err(e) => return Err(e),

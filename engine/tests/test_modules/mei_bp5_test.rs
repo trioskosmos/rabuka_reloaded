@@ -63,7 +63,7 @@ fn mei_bp5_q235_debut_look_and_select_with_multiname() {
 
     // Q235: Multi-name card should either be in hand (added) or in waitroom (discarded)
     let multiname_in_hand = game.state.player1.hand.cards.contains(&multiname);
-    let multiname_in_waitroom = game.state.player1.waitroom.cards.contains(&multiname);
+    let _multiname_in_waitroom = game.state.player1.waitroom.cards.contains(&multiname);
     assert!(
         multiname_in_hand,
         "Multi-name card should have been added to hand (was first card selected for add)"

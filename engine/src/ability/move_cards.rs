@@ -678,6 +678,11 @@ impl<'a> AbilityResolver<'a> {
                 "selected_cards" => {
                     // Cards previously selected by a "select" action, stored in entry.selected_card_ids.
                     // Find and remove them from whatever zone they're in, then move to destination.
+                    eprintln!(
+                        "[MOVE_SELECTED] self.selected_cards={:?} (len={})",
+                        self.selected_cards,
+                        self.selected_cards.len()
+                    );
                     let selected = self.selected_cards.clone();
                     if selected.len() < count {
                         vec![]
@@ -778,6 +783,7 @@ impl<'a> AbilityResolver<'a> {
                         effect.position.as_ref(),
                         effect.optional.unwrap_or(false),
                         Some("under_member"),
+                        effect.destination.as_deref(),
                     );
                     return Ok(());
                 }

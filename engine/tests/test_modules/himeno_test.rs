@@ -43,13 +43,8 @@ fn himeno_q82_dodo_live_card_selectable() {
     );
     game.select_indices(&[2]);
 
-    // Reveal choice: select the card to reveal (index 0 = the only matching card)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-
-    // Resolve any remaining sub-choices (move to hand, discard rest)
-    if game.has_pending_choice() {
+    // Resolve any remaining sub-choices (reveal, move to hand, discard rest)
+    while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 
@@ -94,10 +89,7 @@ fn himeno_q82_identity_live_card_selectable() {
         "Should have look_and_select choice"
     );
     game.select_indices(&[2]); // select identity
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    } // reveal identity
-    if game.has_pending_choice() {
+    while game.has_pending_choice() {
         game.select_indices(&[]);
     } // resolve remaining
 

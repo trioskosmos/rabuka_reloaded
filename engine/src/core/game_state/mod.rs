@@ -1,15 +1,17 @@
+use crate::ability_queue::AbilityQueue;
 use crate::card::CardDatabase;
 use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::core::game_modifiers::GameModifiers;
 use crate::player::Player;
 use crate::zones::ResolutionZone;
-use crate::ability_queue::AbilityQueue;
 use std::sync::Arc;
 
-pub use crate::types::{AbilityTrigger, Duration, GameResult, Phase, ReplacementEffect, TemporaryEffect, TurnPhase,
-    PerformanceSnapshot, LiveCardResult, MemberContribution, YellCardResult, Breakdown,
-    HeartSource, BladeSource, Allocation, EffectEntry, ScoreLine, TriggeredAbility, Adjustment, AbilityBonus,
-    LivePerformanceData};
+pub use crate::types::{
+    AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource, Breakdown, Duration,
+    EffectEntry, GameResult, HeartSource, LiveCardResult, LivePerformanceData, MemberContribution,
+    PerformanceSnapshot, Phase, ReplacementEffect, ScoreLine, TemporaryEffect, TriggeredAbility,
+    TurnPhase, YellCardResult,
+};
 
 #[derive(Debug, Clone)]
 pub struct GameState {
@@ -64,6 +66,7 @@ pub struct GameState {
     pub player1_rps_choice: Option<i32>,
     pub player2_rps_choice: Option<i32>,
     pub baton_touch_replaced_member_cost: Option<u32>,
+    pub baton_touch_arriving_card_id: Option<i16>,
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
     // --- 1-byte aligned (bool, enum) ---
@@ -92,15 +95,31 @@ pub struct GameState {
 
 impl GameState {
     pub fn phase_invariant(&self) -> bool {
-        if matches!(self.current_phase, Phase::RockPaperScissors | Phase::ChooseFirstAttacker | Phase::MulliganP1Turn | Phase::MulliganP2Turn) {
+        if matches!(
+            self.current_phase,
+            Phase::RockPaperScissors
+                | Phase::ChooseFirstAttacker
+                | Phase::MulliganP1Turn
+                | Phase::MulliganP2Turn
+        ) {
             return true;
         }
         match self.current_turn_phase {
             TurnPhase::FirstAttackerNormal | TurnPhase::SecondAttackerNormal => {
-                matches!(self.current_phase, Phase::Active | Phase::Energy | Phase::Draw | Phase::Main)
+                matches!(
+                    self.current_phase,
+                    Phase::Active | Phase::Energy | Phase::Draw | Phase::Main
+                )
             }
             TurnPhase::Live => {
-                matches!(self.current_phase, Phase::LiveCardSetP1Turn | Phase::LiveCardSetP2Turn | Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance | Phase::LiveVictoryDetermination)
+                matches!(
+                    self.current_phase,
+                    Phase::LiveCardSetP1Turn
+                        | Phase::LiveCardSetP2Turn
+                        | Phase::FirstAttackerPerformance
+                        | Phase::SecondAttackerPerformance
+                        | Phase::LiveVictoryDetermination
+                )
             }
         }
     }
@@ -157,6 +176,7 @@ impl GameState {
             player1_rps_choice: None,
             player2_rps_choice: None,
             baton_touch_replaced_member_cost: None,
+            baton_touch_arriving_card_id: None,
             // 2-byte aligned
             activating_card: None,
             // 1-byte aligned
@@ -182,7 +202,10 @@ impl GameState {
             self_no_excess_heart_this_turn: false,
             performance_snapshots: Vec::new(),
         };
-        debug_assert!(state.phase_invariant(), "GameState phase invariant violated after creation");
+        debug_assert!(
+            state.phase_invariant(),
+            "GameState phase invariant violated after creation"
+        );
         state
     }
 
@@ -196,7 +219,7 @@ impl GameState {
                 TurnPhase::FirstAttackerNormal => self.first_attacker(),
                 TurnPhase::SecondAttackerNormal => self.second_attacker(),
                 TurnPhase::Live => self.first_attacker(),
-            }
+            },
         }
     }
 
@@ -208,15 +231,27 @@ impl GameState {
             Phase::LiveCardSetP2Turn => &mut self.player2,
             _ => match self.current_turn_phase {
                 TurnPhase::FirstAttackerNormal => {
-                    if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
+                    if self.player1.is_first_attacker {
+                        &mut self.player1
+                    } else {
+                        &mut self.player2
+                    }
                 }
                 TurnPhase::SecondAttackerNormal => {
-                    if self.player1.is_first_attacker { &mut self.player2 } else { &mut self.player1 }
+                    if self.player1.is_first_attacker {
+                        &mut self.player2
+                    } else {
+                        &mut self.player1
+                    }
                 }
                 TurnPhase::Live => {
-                    if self.player1.is_first_attacker { &mut self.player1 } else { &mut self.player2 }
+                    if self.player1.is_first_attacker {
+                        &mut self.player1
+                    } else {
+                        &mut self.player2
+                    }
                 }
-            }
+            },
         }
     }
 

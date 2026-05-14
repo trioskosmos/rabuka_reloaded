@@ -123,6 +123,15 @@ export default defineConfig({
         } else {
           console.log('card_image_mapping.json not found:', mappingSrc);
         }
+        // Copy deck_converter.html to dist/
+        const converterSrc = resolve(__dirname, 'deck_converter.html');
+        const converterDest = resolve(__dirname, 'dist', 'deck_converter.html');
+        if (existsSync(converterSrc)) {
+          copyFileSync(converterSrc, converterDest);
+          console.log('deck_converter.html copied successfully');
+        } else {
+          console.log('deck_converter.html not found:', converterSrc);
+        }
         console.log('Asset copying complete');
       },
     },

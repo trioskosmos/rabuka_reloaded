@@ -25,6 +25,17 @@ impl super::TurnEngine {
                     game_state.player1.activate_all_energy();
                     game_state.player2.activate_all_energy();
                     game_state.recalculate_constant_blade_modifiers();
+                    // Refresh all waited stage members to active
+                    for player in [&mut game_state.player1, &mut game_state.player2].iter_mut() {
+                        for &card_id in player.stage.stage.iter() {
+                            if card_id != -1 {
+                                let orient = game_state.mods.get_orientation_modifier(card_id);
+                                if orient == Some(&"wait".to_string()) {
+                                    game_state.mods.add_orientation_modifier(card_id, "active");
+                                }
+                            }
+                        }
+                    }
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
                 }
@@ -351,6 +362,7 @@ impl super::TurnEngine {
 
         if baton_touch_used {
             game_state.record_baton_touch();
+            game_state.baton_touch_arriving_card_id = Some(card_id);
         }
 
         Self::trigger_debut_abilities(
