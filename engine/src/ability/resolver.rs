@@ -69,7 +69,7 @@ impl<'a> AbilityResolver<'a> {
         zone_name: &str,
         _prompt_desc: &str,
     ) -> Result<Option<Vec<usize>>, String> {
-        let filter = util::filter_from_parts(card_type, group_name, cost_limit, None, None, None);
+        let filter = util::filter_from_parts(card_type, group_name, cost_limit, None, None, None, None);
         let idxs = util::matching_indices(cards, card_db, &filter, false);
         if idxs.is_empty() || idxs.len() < count {
             return Err(format!("Not enough cards in {}: need {}", zone_name, count));
@@ -87,8 +87,8 @@ impl<'a> AbilityResolver<'a> {
                 characters: None,
                 filtered_indices: None,
                 is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
+                heart_colors: vec![],
+                name_fragments: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);
@@ -277,7 +277,7 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if self.pending_choice.is_some() {
-            if !cost_already_paid && ability.cost.is_some() {
+            if !cost_already_paid {
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.cost_paid = true;
                 }
@@ -325,6 +325,13 @@ impl<'a> AbilityResolver<'a> {
             }
         }
 
+        // Mark cost as paid when it auto-resolved without creating a pending choice.
+        if !cost_already_paid && ability.cost.is_some() && self.pending_choice.is_none() {
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+            }
+        }
+
         if let Some(ref effect) = ability.effect {
             if let Err(e) = self.execute_effect(effect) {
                 dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
@@ -332,6 +339,9 @@ impl<'a> AbilityResolver<'a> {
             }
             if self.pending_choice.is_some() {
                 if !cost_already_paid {
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.cost_paid = true;
+                    }
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() {
                             eprintln!("[USE_LIMIT] inserting key={}", key);
@@ -339,6 +349,15 @@ impl<'a> AbilityResolver<'a> {
                                 .turn_limited_abilities_used
                                 .insert(key.clone());
                         }
+                    }
+                }
+                // Mark effect as started when a pending choice comes from effect
+                // execution (not cost). This prevents RWC from re-entering the
+                // ability after the effect's choice resolves.
+                let is_paid = cost_already_paid || self.game_state.ability_queue.current_entry().map_or(false, |e| e.cost_paid);
+                if is_paid {
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.effect_started = true;
                     }
                 }
                 self.store_pending_choice();

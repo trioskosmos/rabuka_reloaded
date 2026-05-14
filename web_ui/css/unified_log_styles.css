@@ -355,3 +355,46 @@
         overflow-y: auto;
     }
 }
+
+/* Ability debug entry grouping */
+.ability-debug-group {
+    background: rgba(74, 158, 255, 0.04);
+    border-left: 2px solid rgba(74, 158, 255, 0.15);
+    margin: 2px 0;
+    border-radius: 3px;
+}
+
+.ability-debug-header .log-entry-content {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent-gold, #e8c84a);
+}
+
+.ability-debug-thumb {
+    width: 18px;
+    height: 25px;
+}
+
+.ability-debug-details .log-entry {
+    padding: 1px 6px 1px 20px;
+    border-left: none;
+}
+
+.ability-debug-details .log-entry-icon {
+    font-size: 0.65rem;
+    min-width: 14px;
+    text-align: center;
+    opacity: 0.7;
+}
+
+.ability-debug-details .log-entry-icon.ab-cond { color: #ff9800; }
+.ability-debug-details .log-entry-icon.ab-cost { color: #e040fb; }
+.ability-debug-details .log-entry-icon.ab-effect { color: #4caf50; }
+.ability-debug-details .log-entry-icon.ab-trigger { color: #ff5722; }
+
+.ability-debug-details .log-entry-content {
+    font-size: 0.65rem;
+    color: var(--text-secondary, #999);
+    font-family: 'Consolas', 'Courier New', monospace;
+    white-space: pre-wrap;
+}

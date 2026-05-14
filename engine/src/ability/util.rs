@@ -197,6 +197,7 @@ pub struct CardFilter<'a> {
     pub cost_limit: Option<u32>,
     pub cost_operator: Option<&'a str>,
     pub characters: Option<&'a Vec<String>>,
+    pub exclude_characters: Option<&'a Vec<String>>,
     pub heart_colors: &'a [String],
     pub name_fragments: Option<&'a Vec<String>>,
     pub distinct: Option<&'a str>,
@@ -278,6 +279,11 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
+        if let Some(ex_ch) = self.exclude_characters {
+            if card_matches_characters(db, id, Some(ex_ch)) {
+                return false;
+            }
+        }
         if !self.heart_colors.is_empty() {
             if !card_matches_heart_colors(db, id, self.heart_colors) {
                 return false;
@@ -334,6 +340,7 @@ impl<'a> CardFilter<'a> {
             cost_limit: effect.cost_limit,
             cost_operator: effect.cost_limit_operator.as_deref(),
             characters: effect.characters.as_ref(),
+            exclude_characters: effect.exclude_characters.as_ref(),
             heart_colors: &effect.heart_colors,
             name_fragments: None,
             distinct: None,
@@ -364,6 +371,7 @@ impl<'a> CardFilter<'a> {
                 cost_limit: *cost_limit,
                 cost_operator: cost_limit_operator.as_deref(),
                 characters: characters.as_ref(),
+                exclude_characters: None,
                 heart_colors: &[],
                 name_fragments: None,
                 distinct: None,
@@ -391,6 +399,7 @@ pub fn filter_from_parts<'a>(
     cost_limit: Option<u32>,
     cost_operator: Option<&'a str>,
     characters: Option<&'a Vec<String>>,
+    exclude_characters: Option<&'a Vec<String>>,
     exclude_self: Option<i16>,
 ) -> CardFilter<'a> {
     CardFilter {
@@ -399,6 +408,7 @@ pub fn filter_from_parts<'a>(
         cost_limit,
         cost_operator,
         characters,
+        exclude_characters,
         exclude_self,
         ..CardFilter::default()
     }

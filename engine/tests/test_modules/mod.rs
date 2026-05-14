@@ -52,6 +52,7 @@ pub mod konata_test;
 pub mod kotori_test;
 pub mod ladybug_test;
 pub mod link_to_future_test;
+pub mod live_success_rules_test;
 pub mod ll_joint_test;
 pub mod love_u_test;
 pub mod maki_appear_test;

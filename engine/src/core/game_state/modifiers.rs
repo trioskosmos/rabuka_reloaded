@@ -1,14 +1,196 @@
 impl GameState {
+    /// Re-evaluate all constant (常時) abilities on all stage members.
+    /// Handles gain_resource(blade, heart), modify_score, modify_cost.
+    /// Clears old constant-derived values and re-applies those whose conditions pass.
+    pub fn recalculate_constants(&mut self) {
+        struct Entry {
+            card_id: i16,
+            effect: crate::card::AbilityEffect,
+        }
+        let mut entries: Vec<Entry> = Vec::new();
+        for &cid in self
+            .player1
+            .stage
+            .stage
+            .iter()
+            .chain(self.player2.stage.stage.iter())
+        {
+            if cid == -1 {
+                continue;
+            }
+            let card = match self.card_database.get_card(cid) {
+                Some(c) => c,
+                None => continue,
+            };
+            for ability in &card.abilities {
+                if ability
+                    .triggers
+                    .as_ref()
+                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
+                {
+                    if let Some(ref effect) = ability.effect {
+                        entries.push(Entry {
+                            card_id: cid,
+                            effect: effect.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        let mut exp_blade: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
+        let mut exp_cost: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
+        let mut exp_score: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
+        let mut exp_heart: std::collections::HashMap<i16, std::collections::HashMap<String, i32>> =
+            std::collections::HashMap::new();
+
+        // Compute stage positions for all entries before creating resolver
+        let mut entry_positions: std::collections::HashMap<i16, Option<usize>> =
+            std::collections::HashMap::new();
+        for &cid in self
+            .player1
+            .stage
+            .stage
+            .iter()
+            .chain(self.player2.stage.stage.iter())
+        {
+            if cid == -1 {
+                continue;
+            }
+            let pos = self
+                .player1
+                .stage
+                .stage
+                .iter()
+                .position(|&c| c == cid)
+                .or_else(|| self.player2.stage.stage.iter().position(|&c| c == cid));
+            entry_positions.insert(cid, pos);
+        }
+
+        {
+            let resolver = crate::ability::resolver::AbilityResolver::new(self);
+            for e in &entries {
+                // Check effect-level position requirement against pre-computed positions
+                if let Some(ref pos) = e.effect.position {
+                    let pos_str = pos.get_position();
+                    let card_pos = entry_positions.get(&e.card_id).copied().flatten();
+                    let pos_ok = match (pos_str, card_pos) {
+                        (Some("center"), Some(1)) => true,
+                        (Some("left") | Some("left_side"), Some(0)) => true,
+                        (Some("right") | Some("right_side"), Some(2)) => true,
+                        (None, _) => true,
+                        _ => false,
+                    };
+                    if !pos_ok {
+                        continue;
+                    }
+                }
+
+                let cond_met = e
+                    .effect
+                    .condition
+                    .as_ref()
+                    .map_or(true, |c| resolver.evaluate_condition(c));
+                if !cond_met {
+                    continue;
+                }
+
+                match e.effect.action.as_str() {
+                    "gain_resource" => match e.effect.resource.as_deref().unwrap_or("") {
+                        "blade" | "ブレード" => {
+                            let n = e
+                                .effect
+                                .resource_icon_count
+                                .unwrap_or(e.effect.count.unwrap_or(1))
+                                as i32;
+                            *exp_blade.entry(e.card_id).or_insert(0) += n;
+                        }
+                        "heart" | "ハート" => {
+                            let n = e.effect.count.unwrap_or(1);
+                            for hc in &e.effect.heart_colors {
+                                *exp_heart
+                                    .entry(e.card_id)
+                                    .or_default()
+                                    .entry(hc.clone())
+                                    .or_insert(0) += n as i32;
+                            }
+                        }
+                        _ => {}
+                    },
+                    "modify_score" => {
+                        *exp_score.entry(e.card_id).or_insert(0) +=
+                            e.effect.value.unwrap_or(0) as i32;
+                    }
+                    "modify_cost" => {
+                        *exp_cost.entry(e.card_id).or_insert(0) +=
+                            e.effect.value.unwrap_or(0) as i32;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Blade
+        let old_blade = std::mem::take(&mut self.mods.constant_blade_bonuses);
+        for (cid, val) in &old_blade {
+            self.mods.remove_blade_modifier(*cid, *val);
+        }
+        for (&cid, &val) in &exp_blade {
+            self.mods.add_blade_modifier(cid, val);
+        }
+        self.mods.constant_blade_bonuses = exp_blade;
+
+        // Cost
+        let old_cost = std::mem::take(&mut self.mods.constant_cost_bonuses);
+        for (cid, val) in &old_cost {
+            self.mods.remove_cost_modifier(*cid, *val);
+        }
+        for (&cid, &val) in &exp_cost {
+            self.mods.add_cost_modifier(cid, val);
+        }
+        self.mods.constant_cost_bonuses = exp_cost;
+
+        // Heart — clear old constant heart modifiers
+        for cid in exp_heart.keys() {
+            self.mods.need_heart_modifiers.remove(cid);
+        }
+        for (cid, cols) in &exp_heart {
+            for (color_str, delta) in cols {
+                let hc = crate::card::parse_heart_color(color_str);
+                self.mods.add_need_heart_modifier(*cid, hc, *delta);
+            }
+        }
+    }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {
         let mut blade_abilities: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
-        for &cid in self.player1.stage.stage.iter().chain(self.player2.stage.stage.iter()) {
-            if cid == -1 { continue; }
-            let card = match self.card_database.get_card(cid) { Some(c) => c, None => continue };
+        for &cid in self
+            .player1
+            .stage
+            .stage
+            .iter()
+            .chain(self.player2.stage.stage.iter())
+        {
+            if cid == -1 {
+                continue;
+            }
+            let card = match self.card_database.get_card(cid) {
+                Some(c) => c,
+                None => continue,
+            };
             for ability in &card.abilities {
-                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
+                if ability
+                    .triggers
+                    .as_ref()
+                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
+                {
                     if let Some(ref effect) = ability.effect {
-                        if effect.action == "gain_resource" && matches!(effect.resource.as_deref(), Some("blade") | Some("ブレード")) {
+                        if effect.action == "gain_resource"
+                            && matches!(
+                                effect.resource.as_deref(),
+                                Some("blade") | Some("ブレード")
+                            )
+                        {
                             blade_abilities.push((cid, effect.clone()));
                         }
                     }
@@ -20,28 +202,52 @@ impl GameState {
         {
             let resolver = crate::ability::resolver::AbilityResolver::new(self);
             for &(cid, ref effect) in &blade_abilities {
-                let cond_met = effect.condition.as_ref().map_or(true, |c| resolver.evaluate_condition(c));
+                let cond_met = effect
+                    .condition
+                    .as_ref()
+                    .map_or(true, |c| resolver.evaluate_condition(c));
                 if cond_met {
-                    let count = effect.resource_icon_count.unwrap_or(effect.count.unwrap_or(1));
+                    let count = effect
+                        .resource_icon_count
+                        .unwrap_or(effect.count.unwrap_or(1));
                     *expected.entry(cid).or_insert(0) += count as i32;
                 }
             }
         }
 
         let old_bonuses = std::mem::take(&mut self.mods.constant_blade_bonuses);
-        for (cid, old) in &old_bonuses { self.mods.remove_blade_modifier(*cid, *old); }
-        for (&cid, &new_val) in &expected { self.mods.add_blade_modifier(cid, new_val); }
+        for (cid, old) in &old_bonuses {
+            self.mods.remove_blade_modifier(*cid, *old);
+        }
+        for (&cid, &new_val) in &expected {
+            self.mods.add_blade_modifier(cid, new_val);
+        }
         self.mods.constant_blade_bonuses = expected;
         self.recalculate_constant_cost_modifiers();
     }
 
     pub fn recalculate_constant_cost_modifiers(&mut self) {
         let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
-        for &cid in self.player1.stage.stage.iter().chain(self.player2.stage.stage.iter()) {
-            if cid == -1 { continue; }
-            let card = match self.card_database.get_card(cid) { Some(c) => c, None => continue };
+        for &cid in self
+            .player1
+            .stage
+            .stage
+            .iter()
+            .chain(self.player2.stage.stage.iter())
+        {
+            if cid == -1 {
+                continue;
+            }
+            let card = match self.card_database.get_card(cid) {
+                Some(c) => c,
+                None => continue,
+            };
             for ability in &card.abilities {
-                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::CONSTANT)) {
+                if ability
+                    .triggers
+                    .as_ref()
+                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
+                {
                     if let Some(ref effect) = ability.effect {
                         if effect.action == "modify_cost" {
                             cost_abilities.push((cid, effect.clone()));
@@ -55,34 +261,59 @@ impl GameState {
         {
             let resolver = crate::ability::resolver::AbilityResolver::new(self);
             for &(cid, ref effect) in &cost_abilities {
-                let cond_met = effect.condition.as_ref().map_or(true, |c| resolver.evaluate_condition(c));
+                let cond_met = effect
+                    .condition
+                    .as_ref()
+                    .map_or(true, |c| resolver.evaluate_condition(c));
                 if cond_met {
                     let value = effect.value.unwrap_or(0) as i32;
                     let op = effect.operation.as_deref().unwrap_or("add");
                     match op {
                         "add" => *expected.entry(cid).or_insert(0) += value,
-                        "set" => { expected.insert(cid, value); },
-                        _ => {},
+                        "set" => {
+                            expected.insert(cid, value);
+                        }
+                        _ => {}
                     }
                 }
             }
         }
 
         let old_bonuses = std::mem::take(&mut self.mods.constant_cost_bonuses);
-        for (cid, old) in &old_bonuses { self.mods.remove_cost_modifier(*cid, *old); }
-        for (&cid, &new_val) in &expected { self.mods.add_cost_modifier(cid, new_val); }
+        for (cid, old) in &old_bonuses {
+            self.mods.remove_cost_modifier(*cid, *old);
+        }
+        for (&cid, &new_val) in &expected {
+            self.mods.add_cost_modifier(cid, new_val);
+        }
         self.mods.constant_cost_bonuses = expected;
     }
 
-    pub fn set_heart_override(&mut self, card_id: i16, color: crate::card::HeartColor, count: u32, duration: &str) {
+    pub fn set_heart_override(
+        &mut self,
+        card_id: i16,
+        color: crate::card::HeartColor,
+        count: u32,
+        duration: &str,
+    ) {
         self.mods.set_heart_override(card_id, color, count);
         let mut data = serde_json::Map::new();
-        data.insert("card_id".to_string(), serde_json::Value::Number(card_id.into()));
-        data.insert("color".to_string(), serde_json::Value::String(format!("{:?}", color)));
+        data.insert(
+            "card_id".to_string(),
+            serde_json::Value::Number(card_id.into()),
+        );
+        data.insert(
+            "color".to_string(),
+            serde_json::Value::String(format!("{:?}", color)),
+        );
         data.insert("count".to_string(), serde_json::Value::Number(count.into()));
         self.temporary_effects.push(TemporaryEffect {
             effect_type: "heart_override".to_string(),
-            duration: match duration { "live_end" => Duration::LiveEnd, "this_turn" => Duration::ThisTurn, _ => Duration::ThisLive },
+            duration: match duration {
+                "live_end" => Duration::LiveEnd,
+                "this_turn" => Duration::ThisTurn,
+                _ => Duration::ThisLive,
+            },
             created_turn: self.turn_number,
             created_phase: self.current_phase.clone(),
             target_player_id: String::new(),
@@ -127,7 +358,10 @@ impl GameState {
     }
 
     pub fn record_auto_ability_trigger(&mut self, card_id: &str) {
-        *self.auto_ability_trigger_counts.entry(card_id.to_string()).or_insert(0) += 1;
+        *self
+            .auto_ability_trigger_counts
+            .entry(card_id.to_string())
+            .or_insert(0) += 1;
     }
 
     pub fn get_auto_ability_trigger_count(&self, card_id: &str) -> u32 {
@@ -295,7 +529,10 @@ impl GameState {
     }
 
     pub fn add_gained_ability(&mut self, card_id: i16, ability_type: String) {
-        self.gained_abilities.entry(card_id).or_insert_with(Vec::new).push(ability_type);
+        self.gained_abilities
+            .entry(card_id)
+            .or_insert_with(Vec::new)
+            .push(ability_type);
     }
 
     pub fn remove_gained_abilities(&mut self, card_id: i16) {
@@ -303,7 +540,9 @@ impl GameState {
     }
 
     pub fn has_gained_ability(&self, card_id: i16, ability_type: &str) -> bool {
-        self.gained_abilities.get(&card_id).map_or(false, |a| a.iter().any(|x| x == ability_type))
+        self.gained_abilities
+            .get(&card_id)
+            .map_or(false, |a| a.iter().any(|x| x == ability_type))
     }
 
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {

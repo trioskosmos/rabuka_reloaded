@@ -335,6 +335,14 @@ export const LogRenderer = {
 
         let groupedLogs = [];
         let currentGroup = null;
+        let currentAbGroup = null;
+
+        const flushAbGroup = () => {
+            if (currentAbGroup) {
+                groupedLogs.push({ type: 'ability_debug', ...currentAbGroup });
+                currentAbGroup = null;
+            }
+        };
 
         [...logData].reverse().forEach((entry) => {
             const idMatch = entry.match(/\[Turn \d+\] \[ID: (\d+)\] (.*)/);
@@ -344,19 +352,40 @@ export const LogRenderer = {
             const turnPrefix = turnMatch ? turnMatch[0] : "";
 
             if (executionId) {
+                flushAbGroup();
                 if (!currentGroup || currentGroup.id !== executionId) {
                     currentGroup = { id: executionId, entries: [], turnPrefix };
                     groupedLogs.push(currentGroup);
                 }
                 currentGroup.entries.push(body);
+            } else if (body.startsWith('[AB]')) {
+                currentGroup = null;
+                const abLine = body.replace(/^\[AB\]\s*/, '');
+                if (/^ABILITY\s/.test(abLine)) {
+                    flushAbGroup();
+                    const cardMatch = abLine.match(/^ABILITY\s+"([^"]+)"/);
+                    currentAbGroup = {
+                        cardName: cardMatch ? cardMatch[1] : '',
+                        header: abLine,
+                        entries: [],
+                        turnPrefix
+                    };
+                } else if (currentAbGroup) {
+                    currentAbGroup.entries.push(abLine);
+                }
             } else {
+                flushAbGroup();
                 currentGroup = null;
                 groupedLogs.push({ entry, body, turnPrefix });
             }
         });
+        flushAbGroup();
 
         groupedLogs.forEach(group => {
-            if (group.entries) {
+            if (group.type === 'ability_debug') {
+                const block = LogRenderer.createAbilityDebugBlock(group, currentLang, showFriendlyAbilities);
+                section.appendChild(block);
+            } else if (group.entries) {
                 const block = LogRenderer.createGroupedLogBlock(group, currentLang, showFriendlyAbilities);
                 section.appendChild(block);
             } else {
@@ -461,6 +490,84 @@ export const LogRenderer = {
         }
 
         return div;
+    },
+
+    createAbilityDebugBlock: (group, currentLang, showFriendlyAbilities) => {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = 'log-group-block ability-debug-group';
+
+        const cardName = group.cardName || '';
+        const headerText = cardName
+            ? `${group.turnPrefix} P1 activates ${cardName}'s ability`
+            : `${group.turnPrefix} Ability evaluation`;
+
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'log-entry ability group-header ability-debug-header';
+        const hasDetails = group.entries.length > 0;
+        headerDiv.innerHTML = `
+            <div class="log-entry-icon">⚡</div>
+            <div class="log-entry-content">${headerText}</div>
+            ${hasDetails ? '<div class="log-group-toggle">▼</div>' : ''}
+        `;
+        blockDiv.appendChild(headerDiv);
+
+        const cardData = State.resolveCardDataByName(cardName);
+        if (cardData && cardData.card_no) {
+            const imgPath = resolveCardImagePath(cardData.card_no);
+            if (imgPath) {
+                const img = document.createElement('img');
+                img.src = imgPath;
+                img.className = 'log-card-thumb ability-debug-thumb';
+                img.alt = cardName;
+                img.loading = 'lazy';
+                headerDiv.insertBefore(img, headerDiv.firstChild);
+            }
+            Tooltips.attachCardData(headerDiv, cardData);
+        }
+
+        if (hasDetails) {
+            const detailsContainer = document.createElement('div');
+            detailsContainer.className = 'log-group-details ability-debug-details';
+
+            group.entries.forEach(line => {
+                const trimmed = line.trim();
+                if (!trimmed) return;
+                const div = document.createElement('div');
+                div.className = 'log-entry effect detail';
+
+                let icon = '•';
+                let cls = '';
+
+                if (/^TRIGGER\s/.test(trimmed)) {
+                    icon = '⚡';
+                    cls = 'ab-trigger';
+                } else if (/^COND\s/.test(trimmed)) {
+                    icon = '🔍';
+                    cls = 'ab-cond';
+                } else if (/^COST\s/.test(trimmed)) {
+                    icon = '💠';
+                    cls = 'ab-cost';
+                } else if (/^EFFECT\s/.test(trimmed)) {
+                    icon = '➜';
+                    cls = 'ab-effect';
+                } else {
+                    icon = '•';
+                }
+
+                const text = trimmed.replace(/^(TRIGGER|COND|COST|EFFECT|ABILITY|TEXT)\s*/, '');
+                const displayText = text || trimmed;
+
+                div.innerHTML = `
+                    <div class="log-entry-icon ${cls}">${icon}</div>
+                    <div class="log-entry-content">${displayText}</div>
+                `;
+                detailsContainer.appendChild(div);
+            });
+
+            blockDiv.appendChild(detailsContainer);
+        }
+
+        return blockDiv;
     },
 
     formatLogEntry: (body, turnPrefix, currentLang, showFriendlyAbilities) => {

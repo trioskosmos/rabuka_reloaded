@@ -203,7 +203,9 @@ impl<'a> AbilityResolver<'a> {
             .game_state
             .ability_queue
             .current_entry()
-            .map_or(true, |e| e.optional_cost_was_paid || !e.cost_paid);
+            .map_or(true, |e| {
+                e.optional_cost_was_paid || !e.cost_paid || e.ability.cost.is_none()
+            });
         if !cost_was_paid {
             return Ok(());
         }

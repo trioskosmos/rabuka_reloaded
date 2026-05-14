@@ -425,6 +425,11 @@ impl GameState {
     }
 
     pub fn should_trigger_live_success(&self, player: &Player) -> bool {
+        // Rule 8.3.15-8.3.16: Heart requirements gate whether the live succeeds.
+        // If the live card's need_heart isn't satisfied by stage hearts, the live fails
+        // and all cards leave the zone. By the time we reach LiveVictoryDetermination
+        // (8.4.4), only cards that passed the heart check remain. However, since some
+        // test scenarios may skip the performance phase pipeline, we re-check here.
         if self.current_phase != Phase::LiveVictoryDetermination {
             return false;
         }

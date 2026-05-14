@@ -22,7 +22,7 @@ impl super::TurnEngine {
                 Phase::Active => {
                     game_state.reset_keyword_tracking();
                     game_state.reset_keyword_tracking();
-                    game_state.recalculate_constant_blade_modifiers();
+                    game_state.recalculate_constants();
                     // Rule 7.4.1: Only the turn player activates their wait cards
                     let to_activate: Vec<i16> = {
                         let turn_player = game_state.active_player();
@@ -50,7 +50,7 @@ impl super::TurnEngine {
                     game_state.current_phase = Phase::Energy;
                 }
                 Phase::Energy => {
-                    game_state.recalculate_constant_blade_modifiers();
+                    game_state.recalculate_constants();
                     Self::check_timing(game_state);
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
@@ -59,12 +59,12 @@ impl super::TurnEngine {
                 Phase::Draw => {
                     Self::check_timing(game_state);
                     let _drawn = game_state.active_player_mut().draw_card();
-                    game_state.recalculate_constant_blade_modifiers();
+                    game_state.recalculate_constants();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Main;
                 }
                 Phase::Main => {
-                    game_state.recalculate_constant_blade_modifiers();
+                    game_state.recalculate_constants();
                     Self::check_timing(game_state);
                     if game_state.current_turn_phase
                         == crate::game_state::TurnPhase::FirstAttackerNormal
@@ -90,7 +90,7 @@ impl super::TurnEngine {
                     return;
                 }
                 Phase::LiveCardSetP2Turn => {
-                    game_state.recalculate_constant_blade_modifiers();
+                    game_state.recalculate_constants();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::FirstAttackerPerformance;
                     let first_attacker_id = if game_state.player1.is_first_attacker {
@@ -384,7 +384,7 @@ impl super::TurnEngine {
         );
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
         game_state.process_pending_auto_abilities(&player_id);
-        game_state.recalculate_constant_blade_modifiers();
+        game_state.recalculate_constants();
 
         if baton_touch_used {
             for area in [

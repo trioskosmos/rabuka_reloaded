@@ -3,8 +3,14 @@ use super::util;
 use crate::card::AbilityEffect;
 
 impl<'a> super::resolver::AbilityResolver<'a> {
-    pub fn resume_execution(&mut self, _context: ExecutionContext) -> Result<(), String> {
-        self.execution_context = ExecutionContext::None;
+    pub fn resume_execution(&mut self, context: ExecutionContext) -> Result<(), String> {
+        // Clear the execution context if finalizing a look_and_select — otherwise the
+        // caller's saved_ctx check (actions.rs:369) prevents process_current_ability.
+        if matches!(context, ExecutionContext::LookAndSelect { .. })
+            && self.pending_choice.is_none()
+        {
+            self.execution_context = ExecutionContext::None;
+        }
         Ok(())
     }
 
@@ -281,6 +287,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             cost_limit,
             cost_operator: cost_limit_operator.as_deref(),
             characters: characters.as_ref(),
+            exclude_characters: None,
             heart_colors: &[],
             name_fragments: None,
             distinct: None,
@@ -430,7 +437,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
                     // Check if we can select more cards (for round-based "up to X" abilities).
                     if is_select_cards && !mapped_indices.is_empty() {
-                        let any_number = select_action_entry
+                        let _any_number = select_action_entry
                             .as_ref()
                             .and_then(|sa| sa.any_number)
                             .unwrap_or(false);
@@ -494,7 +501,8 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
                 "under_member" => {
                     let dst = self.game_state.entry_destination().map(|s| s.to_string());
-                    let dst_str = dst.as_deref().unwrap_or("hand").to_string();
+                    // Default to energy_deck for under_member operations (place_energy_under_member)
+                    let dst_str = dst.as_deref().unwrap_or("energy_deck").to_string();
                     let player = self.game_state.active_player_mut();
                     let mut cards_to_move: Vec<(usize, i16)> = Vec::new();
                     for &idx in indices.iter() {
@@ -1005,7 +1013,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         cost.position.as_ref(),
                         false,
                         cost.source.as_deref(),
-                        None,
                     );
                 }
             }
@@ -1039,7 +1046,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         effect.position.as_ref(),
                         false,
                         effect.source.as_deref(),
-                        None,
                     );
                 }
             }

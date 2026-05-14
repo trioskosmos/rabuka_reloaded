@@ -462,6 +462,8 @@ pub struct AbilityCost {
     #[serde(default)]
     pub characters: Option<Vec<String>>,
     #[serde(default)]
+    pub exclude_characters: Option<Vec<String>>,
+    #[serde(default)]
     pub group_names: Option<Vec<String>>,
     #[serde(default)]
     pub placement_order: Option<String>,
@@ -619,6 +621,7 @@ pub struct AbilityEffect {
     /// characters filter for card selection
     #[serde(default)]
     pub characters: Option<Vec<String>>,
+    pub exclude_characters: Option<Vec<String>>,
     /// source_card reference (e.g. "cost_card" for activate_ability)
     #[serde(default)]
     pub source_card: Option<String>,
@@ -764,6 +767,7 @@ pub struct Condition {
     pub target: Option<String>,
     pub group_names: Option<Vec<String>>,
     pub characters: Option<Vec<String>>,
+    pub exclude_characters: Option<Vec<String>>,
     pub state: Option<String>,
     pub position: Option<PositionInfo>,
     pub temporal_scope: Option<String>,
@@ -883,13 +887,10 @@ impl Card {
 
             for (color, &needed_amount) in &need_heart.hearts {
                 if *color == HeartColor::Heart00 {
-                    // heart0: uses remaining hearts after specific-color consumption
-                    let remaining =
-                        (total_all - consumed_by_color).max(0) + wildcard_remaining.max(0);
-                    if remaining < needed_amount as i32 {
+                    // heart0: total hearts of any color (Rule 8.2.8) — specific color hearts also count
+                    if total_all + wildcard_remaining.max(0) < needed_amount as i32 {
                         return false;
                     }
-                    consumed_by_color += needed_amount as i32;
                 } else {
                     let provided = *provided_hearts.hearts.get(color).unwrap_or(&0) as i32;
                     if provided + wildcard_remaining < needed_amount as i32 {

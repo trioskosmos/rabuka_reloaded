@@ -116,6 +116,46 @@ export function resolveCardImagePath(cardNo) {
         const with2 = cardNo.replace(/＋/g, '2');
         return fixImgPath(`img/cards_webp/${with2}.webp`);
     }
+    
+    // 6. Rarity fallback: use rare_list from card database to find alternative rarities
+    //    e.g. PL!SP-bp2-024-SECL → PL!SP-bp2-024-L (same card, different rarity)
+    if (State.staticCardDatabase && State.cardImageMapping) {
+        const cardEntry = State.staticCardDatabase[cardNo];
+        const rareList = cardEntry?.rare_list;
+        if (rareList && rareList.length > 1) {
+            for (const entry of rareList) {
+                const altCardNo = entry.card_no;
+                if (altCardNo !== cardNo) {
+                    const altMapped = State.cardImageMapping[altCardNo];
+                    if (altMapped) return fixImgPath(altMapped);
+                }
+            }
+        }
+    }
+
+    // 7. Desperate fallback: strip the last rarity segment and try base-key match
+    const rarityFallback = resolveCardImagePath._rarityCache || (() => {
+        const cache = {};
+        if (State.cardImageMapping) {
+            for (const key of Object.keys(State.cardImageMapping)) {
+                const base = key.replace(/-[^-]+$/, '');
+                if (!cache[base]) cache[base] = [];
+                cache[base].push(key);
+            }
+        }
+        resolveCardImagePath._rarityCache = cache;
+        return cache;
+    })();
+    const baseKey = cardNo.replace(/-[^-]+$/, '');
+    if (baseKey !== cardNo && rarityFallback[baseKey]) {
+        for (const alt of rarityFallback[baseKey]) {
+            if (alt !== cardNo) {
+                const mappedAlt = State.cardImageMapping?.[alt];
+                if (mappedAlt) return fixImgPath(mappedAlt);
+            }
+        }
+    }
+
     return fixImgPath(`img/cards_webp/${cardNo}.webp`);
 }
 

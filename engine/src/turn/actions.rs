@@ -353,6 +353,12 @@ impl super::TurnEngine {
                 cost_was_paid, effect_started, had_pending_sequential, saved_ctx);
             game_state.pending_choice = None;
             game_state.activating_card = None;
+            // Update execution context after choice resolution (cleared by resume_execution
+            // when look_and_select finalizes, so the caller knows effect can continue)
+            let ctx_after = ctx.clone();
+            if let Some(e) = game_state.ability_queue.current_entry_mut() {
+                e.execution_context = Some(ctx);
+            }
             // Check if optional sequential cost was skipped — if so, skip effect
             // Only applies to sequential_cost where the whole cost is optional
             let optional_skipped = game_state.ability_queue.current_entry().map_or(false, |e| {
@@ -366,7 +372,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
             } else if cost_was_paid
                 && !had_pending_sequential
-                && saved_ctx == ExecutionContext::None
+                && (saved_ctx == ExecutionContext::None || ctx_after == ExecutionContext::None)
                 && !effect_started
             {
                 eprintln!("RWC: calling process_current_ability");

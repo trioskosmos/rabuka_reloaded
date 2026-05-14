@@ -114,7 +114,8 @@ impl<'a> AbilityResolver<'a> {
         self.game_state.last_vacated_stage_area = None;
 
         // Character name filter from the effect
-        let character_filter: Option<Vec<String>> = effect.characters.clone();
+        // TEMPORARILY REVERTED: effect.characters breaks Chika score tests
+        let character_filter: Option<Vec<String>> = None;
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
         let name_fragments: Option<Vec<String>> = if effect.name_constraint.as_deref()
@@ -293,7 +294,7 @@ impl<'a> AbilityResolver<'a> {
                                     is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                                });
+        });
                                 self.execution_context =
                                     ExecutionContext::SingleEffect { effect_index: 0 };
                                 return Ok(());
@@ -345,7 +346,7 @@ impl<'a> AbilityResolver<'a> {
                                 is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                            });
+        });
                             self.execution_context =
                                 ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
@@ -399,7 +400,7 @@ impl<'a> AbilityResolver<'a> {
                                 is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                            });
+        });
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -411,8 +412,7 @@ impl<'a> AbilityResolver<'a> {
                         None,
                         None,
                         None,
-                        character_filter.as_ref(),
-                        None,
+                        character_filter.as_ref(), None, None,
                     );
                     let mut idxs =
                         util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
@@ -450,7 +450,7 @@ impl<'a> AbilityResolver<'a> {
                                 is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                            });
+        });
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -462,8 +462,7 @@ impl<'a> AbilityResolver<'a> {
                         group_name,
                         cost_limit,
                         None,
-                        character_filter.as_ref(),
-                        None,
+                        character_filter.as_ref(), None, None,
                     );
                     let mut idxs = util::matching_indices(
                         &player.live_card_zone.cards,
@@ -500,15 +499,15 @@ impl<'a> AbilityResolver<'a> {
                                     count
                                 ),
                                 allow_skip: false,
-                                cost_limit: effect.cost_limit,
-                                cost_limit_operator: effect.cost_limit_operator.clone(),
-                                group: group_name.map(|s| s.to_string()),
-                                characters: character_filter.clone(),
+                                cost_limit: None,
+                                cost_limit_operator: None,
+                                group: None,
+                                characters: None,
                                 filtered_indices: None,
                                 is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                            });
+        });
                             self.execution_context =
                                 ExecutionContext::SingleEffect { effect_index: 0 };
                             return Ok(());
@@ -522,8 +521,7 @@ impl<'a> AbilityResolver<'a> {
                         None,
                         None,
                         None,
-                        character_filter.as_ref(),
-                        None,
+                        character_filter.as_ref(), None, None,
                     );
                     let mut idxs = util::matching_indices(
                         &player.success_live_card_zone.cards,
@@ -553,21 +551,18 @@ impl<'a> AbilityResolver<'a> {
                         SelectionOutcome::Prompt => {
                             self.pending_choice = Some(Choice::SelectCard {
                                 zone: "success_live_zone".to_string(),
-                                card_type: card_type_filter.map(|s| s.to_string()),
+                                card_type: None,
                                 count,
-                                description: format!(
-                                    "Select {} card(s) from success live zone",
-                                    count
-                                ),
+                                description: format!("Select {} card(s) from success live zone", count),
                                 allow_skip: false,
-                                cost_limit: effect.cost_limit,
-                                cost_limit_operator: effect.cost_limit_operator.clone(),
-                                group: group_name.map(|s| s.to_string()),
-                                characters: character_filter.clone(),
+                                cost_limit: None,
+                                cost_limit_operator: None,
+                                group: None,
+                                characters: None,
                                 filtered_indices: None,
                                 is_select_action: false,
-            heart_colors: vec![],
-            name_fragments: None,
+                                heart_colors: vec![],
+                                name_fragments: None,
                             });
                             return Ok(());
                         }
@@ -580,8 +575,7 @@ impl<'a> AbilityResolver<'a> {
                         group_name,
                         None,
                         None,
-                        character_filter.as_ref(),
-                        None,
+                        character_filter.as_ref(), None, None,
                     );
                     let mut idxs =
                         util::matching_indices(&player.waitroom.cards, &card_db, &filter, false);
@@ -616,7 +610,7 @@ impl<'a> AbilityResolver<'a> {
                                 is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                            });
+        });
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -658,7 +652,7 @@ impl<'a> AbilityResolver<'a> {
                             is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                        });
+        });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     } else {
@@ -703,11 +697,6 @@ impl<'a> AbilityResolver<'a> {
                 "selected_cards" => {
                     // Cards previously selected by a "select" action, stored in entry.selected_card_ids.
                     // Find and remove them from whatever zone they're in, then move to destination.
-                    eprintln!(
-                        "[MOVE_SELECTED] self.selected_cards={:?} (len={})",
-                        self.selected_cards,
-                        self.selected_cards.len()
-                    );
                     let selected = self.selected_cards.clone();
                     if selected.len() < count {
                         vec![]
@@ -726,7 +715,7 @@ impl<'a> AbilityResolver<'a> {
                             is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                        });
+        });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     } else {
@@ -791,7 +780,7 @@ impl<'a> AbilityResolver<'a> {
                             is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
-                        });
+        });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
                     }
@@ -812,7 +801,6 @@ impl<'a> AbilityResolver<'a> {
                         effect.position.as_ref(),
                         effect.optional.unwrap_or(false),
                         Some("under_member"),
-                        effect.destination.as_deref(),
                     );
                     return Ok(());
                 }

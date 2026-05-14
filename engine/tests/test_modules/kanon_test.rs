@@ -69,12 +69,11 @@ fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
     game.pass();
     game.pass();
 
-    // LiveSuccess should NOT fire when the live card's need_heart requirements
-    // are not met by stage members (no heart01/heart03 on stage, only wildcard).
-    // The optional cost choice should not appear at all.
+    // Rule 8.3.16: Live card fails heart requirement → cards move to waitroom.
+    // LiveSuccess should NOT fire. No pending choice, no energy deducted.
     assert!(
         !game.has_pending_choice(),
-        "Q92: LiveSuccess should not fire — insufficient hearts for live card"
+        "Q92: LiveSuccess must NOT fire when the live card's need_heart is unmet"
     );
     let energy_spent = energy_before - game.state.player1.energy_zone.active_energy_count;
     assert_eq!(

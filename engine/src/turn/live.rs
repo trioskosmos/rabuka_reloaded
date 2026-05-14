@@ -319,6 +319,22 @@ impl super::TurnEngine {
         blade_type_modifiers: &HashMap<i16, BladeColor>,
         orientation_modifiers: &HashMap<i16, String>,
     ) -> LivePerformanceData {
+        // Q32/Rule 8.3.6: If the live card zone is empty, no yell, no card processing.
+        if player.live_card_zone.cards.is_empty() {
+            return LivePerformanceData {
+                yell_count: 0,
+                note_icons: 0,
+                revealed_ids: Vec::new(),
+                member_contributions: Vec::new(),
+                yell_cards: Vec::new(),
+                total_hearts: [0; 7],
+                allocations: Vec::new(),
+                heart_sources: Vec::new(),
+                blade_sources: Vec::new(),
+                draw_effects_occurred: false,
+            };
+        }
+
         let total_blade =
             player
                 .stage
