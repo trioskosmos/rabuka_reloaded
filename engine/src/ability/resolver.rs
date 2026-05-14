@@ -75,12 +75,21 @@ impl<'a> AbilityResolver<'a> {
             return Err(format!("Not enough cards in {}: need {}", zone_name, count));
         }
         if idxs.len() > count {
-            self.pending_choice = Some(Choice::select_card(
-                zone_name.to_string(),
-                0,
-                format!("Select {} card(s) to {} for cost", count, zone_name),
-                true,
-            ));
+            self.pending_choice = Some(Choice::SelectCard {
+                zone: zone_name.to_string(),
+                card_type: None,
+                count: 0,
+                description: format!("Select {} card(s) to {} for cost", count, zone_name),
+                allow_skip: true,
+                cost_limit: None,
+                cost_limit_operator: None,
+                group: None,
+                characters: None,
+                filtered_indices: None,
+                is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
+            });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(None);
         }

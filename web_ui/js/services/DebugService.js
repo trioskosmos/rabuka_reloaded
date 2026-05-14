@@ -108,6 +108,7 @@ export const DebugService = {
             rule_log: raw.rule_log,
             bytecode_log: raw.bytecode_log,
             performance_history: (raw.performance_history || []).map(slimPerf),
+            performance_results: raw.performance_results || {},
             action_history: State.actionHistory || []
         };
 

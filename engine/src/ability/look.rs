@@ -22,47 +22,20 @@ impl<'a> AbilityResolver<'a> {
             let optional = select_action.optional.unwrap_or(false);
 
             let card_db = &self.game_state.card_database;
-            let card_type_filter = select_action.card_type.as_deref();
-            let heart_colors_filter = &select_action.heart_colors;
-            let cost_limit = select_action.cost_limit;
-            let cost_limit_operator = select_action.cost_limit_operator.as_deref();
-            let has_filter = card_type_filter.is_some()
-                || !heart_colors_filter.is_empty()
-                || cost_limit.is_some();
+            let filter = super::util::CardFilter::from_effect(select_action);
+            let has_filter = filter.card_type.is_some()
+                || !filter.heart_colors.is_empty()
+                || filter.cost_limit.is_some();
             if has_filter {
-                println!(
-                    "DEBUG: Filtering looked_at_cards - before: {}",
-                    self.looked_at_cards.len()
-                );
-                let (matching, non_matching): (Vec<_>, Vec<_>) =
-                    self.looked_at_cards.iter().partition(|&&card_id| {
-                        super::util::card_matches_type(card_db, card_id, card_type_filter)
-                            && super::util::card_matches_heart_colors(
-                                card_db,
-                                card_id,
-                                heart_colors_filter,
-                            )
-                            && super::util::card_matches_cost_limit_op(
-                                card_db,
-                                card_id,
-                                cost_limit,
-                                cost_limit_operator,
-                            )
-                    });
-                println!(
-                    "DEBUG: Filtering results - matching: {}, non_matching: {}",
-                    matching.len(),
-                    non_matching.len()
-                );
+                let (matching, non_matching): (Vec<_>, Vec<_>) = self
+                    .looked_at_cards
+                    .iter()
+                    .partition(|&&card_id| filter.matches(card_db, card_id, false));
                 self.looked_at_cards = matching;
                 let player = self.game_state.resolve_target_player_mut("self");
                 for &card_id in &non_matching {
                     player.waitroom.add_card(card_id);
                 }
-                println!(
-                    "DEBUG: After filtering - looked_at_cards.len(): {}",
-                    self.looked_at_cards.len()
-                );
             }
 
             // Always sync to game_state so handle_select_cards_looked_at can access them
@@ -116,6 +89,8 @@ impl<'a> AbilityResolver<'a> {
                 characters: select_action.characters.clone(),
                 filtered_indices: None,
                 is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
             };
             println!(
                 "DEBUG: Creating choice - available_count: {}, max_select: {}, description: {}",
@@ -203,9 +178,14 @@ impl<'a> AbilityResolver<'a> {
                         .as_ref()
                         .and_then(|e| e.group_names.as_ref())
                         .and_then(|v| v.first().cloned()),
-                    characters: None,
+                    characters: self
+                        .current_effect
+                        .as_ref()
+                        .and_then(|e| e.characters.clone()),
                     filtered_indices: None,
                     is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -372,12 +352,24 @@ impl<'a> AbilityResolver<'a> {
             count: count as usize,
             description: format!("Select {} card(s) from {}", count, source),
             allow_skip: optional,
-            cost_limit: None,
-            cost_limit_operator: None,
-            group: None,
-            characters: None,
+            cost_limit: self.current_effect.as_ref().and_then(|e| e.cost_limit),
+            cost_limit_operator: self
+                .current_effect
+                .as_ref()
+                .and_then(|e| e.cost_limit_operator.clone()),
+            group: self
+                .current_effect
+                .as_ref()
+                .and_then(|e| e.group_names.as_ref())
+                .and_then(|v| v.first().cloned()),
+            characters: self
+                .current_effect
+                .as_ref()
+                .and_then(|e| e.characters.clone()),
             filtered_indices: None,
             is_select_action: true,
+            heart_colors: vec![],
+            name_fragments: None,
         });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())

@@ -34,7 +34,6 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
     game.state.player1.hand.cards.push(sumire);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.stage.stage = [liella1, liella2, -1];
-    game.state.player1.waitroom.cards.push(liella1);
     game.give_energy(20);
 
     advance_to_turn2(&mut game);
@@ -79,7 +78,6 @@ fn sumire_no_baton_touch_no_draw() {
     game.state.player1.hand.cards.push(filler);
     // Empty the center area so targeting it doesn't auto-trigger baton touch
     game.state.player1.stage.stage = [liella1, -1, liella2];
-    game.state.player1.waitroom.cards.push(liella1);
     game.give_energy(25);
 
     let hand_before = game.state.player1.hand.cards.len();

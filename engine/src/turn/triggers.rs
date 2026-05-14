@@ -1,19 +1,36 @@
-use crate::game_state::{GameState, AbilityTrigger};
+use crate::game_state::{AbilityTrigger, GameState};
 
 impl super::TurnEngine {
-    pub(crate) fn trigger_debut_abilities(game_state: &mut GameState, player_id: &str, card_no: &str, _cost_paid: u32, baton_touch_used: bool) {
+    pub(crate) fn trigger_debut_abilities(
+        game_state: &mut GameState,
+        player_id: &str,
+        card_no: &str,
+        _cost_paid: u32,
+        baton_touch_used: bool,
+    ) {
         let player_id_clone = player_id.to_string();
         let card_no_clone = card_no.to_string();
         let mut abilities_to_trigger = Vec::new();
 
         let _played_card_cost = {
-            let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
-            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            let areas = [
+                crate::zones::MemberArea::LeftSide,
+                crate::zones::MemberArea::Center,
+                crate::zones::MemberArea::RightSide,
+            ];
             let mut found_cost = None;
             for area in areas {
                 if let Some(card_id) = player.stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
-                        if card.card_no == card_no_clone { found_cost = Some(card.cost); break; }
+                        if card.card_no == card_no_clone {
+                            found_cost = Some(card.cost);
+                            break;
+                        }
                     }
                 }
             }
@@ -21,22 +38,39 @@ impl super::TurnEngine {
         };
 
         {
-            let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
-            let areas = [crate::zones::MemberArea::LeftSide, crate::zones::MemberArea::Center, crate::zones::MemberArea::RightSide];
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            let areas = [
+                crate::zones::MemberArea::LeftSide,
+                crate::zones::MemberArea::Center,
+                crate::zones::MemberArea::RightSide,
+            ];
             for area in areas {
                 if let Some(card_id) = player.stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         if card.card_no == card_no_clone {
                             for ability in &card.abilities {
-                                if ability.triggers.as_ref().map_or(false, |t| t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN)) {
+                                if ability.triggers.as_ref().map_or(false, |t| {
+                                    t.contains(crate::triggers::DEBUT)
+                                        || t.contains(crate::triggers::DEBUT_EN)
+                                }) {
                                     // Skip abilities that require baton touch if baton touch wasn't used
-                                    if !baton_touch_used && ability.effect.as_ref()
-                                        .and_then(|e| e.condition.as_ref())
-                                        .map_or(false, |c| c.baton_touch_trigger.unwrap_or(false))
+                                    if !baton_touch_used
+                                        && ability
+                                            .effect
+                                            .as_ref()
+                                            .and_then(|e| e.condition.as_ref())
+                                            .map_or(false, |c| {
+                                                c.baton_touch_trigger.unwrap_or(false)
+                                            })
                                     {
                                         continue;
                                     }
-                                    let ability_id = format!("{}_{}", card_no_clone, ability.full_text);
+                                    let ability_id =
+                                        format!("{}_{}", card_no_clone, ability.full_text);
                                     abilities_to_trigger.push((ability_id, card_no_clone.clone()));
                                 }
                             }
@@ -48,7 +82,13 @@ impl super::TurnEngine {
         }
 
         for (ability_id, card_no) in abilities_to_trigger {
-            game_state.trigger_auto_ability(ability_id, AbilityTrigger::Debut, player_id_clone.clone(), Some(card_no), None);
+            game_state.trigger_auto_ability(
+                ability_id,
+                AbilityTrigger::Debut,
+                player_id_clone.clone(),
+                Some(card_no),
+                None,
+            );
         }
     }
 
@@ -57,11 +97,19 @@ impl super::TurnEngine {
         let mut abilities_to_trigger = Vec::new();
 
         {
-            let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
                     for ability in &card.abilities {
-                        if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
+                        if ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t == crate::triggers::LIVE_START)
+                        {
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card.card_no.clone()));
                         }
@@ -72,7 +120,11 @@ impl super::TurnEngine {
                 if card_id != -1 {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         for ability in &card.abilities {
-                            if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_START) {
+                            if ability
+                                .triggers
+                                .as_ref()
+                                .map_or(false, |t| t == crate::triggers::LIVE_START)
+                            {
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
                             }
@@ -82,10 +134,23 @@ impl super::TurnEngine {
             }
         }
 
-        eprintln!("[LIVE_START_TRIGGER] triggering {} abilities for player {}", abilities_to_trigger.len(), player_id);
+        eprintln!(
+            "[LIVE_START_TRIGGER] triggering {} abilities for player {}",
+            abilities_to_trigger.len(),
+            player_id
+        );
         for (ability_id, card_no) in abilities_to_trigger {
-            eprintln!("[LIVE_START_TRIGGER]   ability={} card_no={}", ability_id, card_no);
-            game_state.trigger_auto_ability(ability_id, AbilityTrigger::LiveStart, player_id_clone.clone(), Some(card_no), None);
+            eprintln!(
+                "[LIVE_START_TRIGGER]   ability={} card_no={}",
+                ability_id, card_no
+            );
+            game_state.trigger_auto_ability(
+                ability_id,
+                AbilityTrigger::LiveStart,
+                player_id_clone.clone(),
+                Some(card_no),
+                None,
+            );
         }
     }
 
@@ -94,13 +159,26 @@ impl super::TurnEngine {
         let mut abilities_to_trigger = Vec::new();
 
         {
-            let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
-            eprintln!("[AUTO_TRIGGER] checking stage for player {} stage={:?}", player_id, player.stage.stage);
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            eprintln!(
+                "[AUTO_TRIGGER] checking stage for player {} stage={:?}",
+                player_id, player.stage.stage
+            );
             for &card_id in &player.stage.stage {
-                if card_id == -1 { continue; }
+                if card_id == -1 {
+                    continue;
+                }
                 if let Some(card) = game_state.card_database.get_card(card_id) {
                     for ability in &card.abilities {
-                        if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::AUTO) {
+                        if ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t == crate::triggers::AUTO)
+                        {
                             // Prevent infinite re-trigger loops: only fire when the card itself
                             // has moved to the referenced zone for movement-based conditions.
                             if let Some(ref effect) = ability.effect {
@@ -108,9 +186,15 @@ impl super::TurnEngine {
                                     if condition.location.as_deref() == Some("discard")
                                         && condition.card_type.as_deref() == Some("member_card")
                                     {
-                                        let in_discard = game_state.player1.waitroom.cards.contains(&card_id)
+                                        let in_discard = game_state
+                                            .player1
+                                            .waitroom
+                                            .cards
+                                            .contains(&card_id)
                                             || game_state.player2.waitroom.cards.contains(&card_id);
-                                        if !in_discard { continue; }
+                                        if !in_discard {
+                                            continue;
+                                        }
                                     }
                                 }
                             }
@@ -123,7 +207,13 @@ impl super::TurnEngine {
         }
 
         for (ability_id, card_no) in abilities_to_trigger {
-            game_state.trigger_auto_ability(ability_id, AbilityTrigger::Auto, player_id_clone.clone(), Some(card_no), None);
+            game_state.trigger_auto_ability(
+                ability_id,
+                AbilityTrigger::Auto,
+                player_id_clone.clone(),
+                Some(card_no),
+                None,
+            );
         }
     }
 
@@ -131,15 +221,39 @@ impl super::TurnEngine {
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger = Vec::new();
 
+        // LiveSuccess only triggers when the live card's need_heart is satisfied
+        if !game_state.should_trigger_live_success(if player_id_clone == game_state.player1.id {
+            &game_state.player1
+        } else {
+            &game_state.player2
+        }) {
+            return;
+        }
+
         {
-            let player = if player_id_clone == game_state.player1.id { &game_state.player1 } else { &game_state.player2 };
-            for (_area, index) in [(crate::zones::MemberArea::LeftSide, 0), (crate::zones::MemberArea::Center, 1), (crate::zones::MemberArea::RightSide, 2)] {
+            let player = if player_id_clone == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            for (_area, index) in [
+                (crate::zones::MemberArea::LeftSide, 0),
+                (crate::zones::MemberArea::Center, 1),
+                (crate::zones::MemberArea::RightSide, 2),
+            ] {
                 let card_id = player.stage.stage[index];
                 if card_id != -1 {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         for ability in &card.abilities {
-                            if ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS) {
-                                eprintln!("[TRIGGER] live_success stage: card={} trigger={:?}", card.card_no, ability.triggers);
+                            if ability
+                                .triggers
+                                .as_ref()
+                                .map_or(false, |t| t == crate::triggers::LIVE_SUCCESS)
+                            {
+                                eprintln!(
+                                    "[TRIGGER] live_success stage: card={} trigger={:?}",
+                                    card.card_no, ability.triggers
+                                );
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((ability_id, card.card_no.clone()));
                             }
@@ -150,8 +264,14 @@ impl super::TurnEngine {
             for card_id in &player.live_card_zone.cards {
                 if let Some(card) = game_state.card_database.get_card(*card_id) {
                     for ability in &card.abilities {
-                        let trigger_match = ability.triggers.as_ref().map_or(false, |t| t == crate::triggers::LIVE_SUCCESS || t.contains(crate::triggers::LIVE_SUCCESS_EN));
-                        eprintln!("[TRIGGER] live_success live_card: card={} trigger={:?} match={}", card.card_no, ability.triggers, trigger_match);
+                        let trigger_match = ability.triggers.as_ref().map_or(false, |t| {
+                            t == crate::triggers::LIVE_SUCCESS
+                                || t.contains(crate::triggers::LIVE_SUCCESS_EN)
+                        });
+                        eprintln!(
+                            "[TRIGGER] live_success live_card: card={} trigger={:?} match={}",
+                            card.card_no, ability.triggers, trigger_match
+                        );
                         if trigger_match {
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             abilities_to_trigger.push((ability_id, card.card_no.clone()));
@@ -162,7 +282,13 @@ impl super::TurnEngine {
         }
 
         for (ability_id, card_no) in abilities_to_trigger {
-            game_state.trigger_auto_ability(ability_id, AbilityTrigger::LiveSuccess, player_id_clone.clone(), Some(card_no), None);
+            game_state.trigger_auto_ability(
+                ability_id,
+                AbilityTrigger::LiveSuccess,
+                player_id_clone.clone(),
+                Some(card_no),
+                None,
+            );
         }
     }
 }

@@ -345,6 +345,7 @@ impl<'a> AbilityResolver<'a> {
                 effect.source.as_deref(),
                 effect.destination.as_deref(),
                 effect.cost_limit_operator.clone(),
+                effect.characters.clone(),
             ),
             EffectAction::ModifyScore => self.execute_modify_score(
                 effect.operation.as_deref().unwrap_or("add"),
@@ -993,11 +994,15 @@ impl<'a> AbilityResolver<'a> {
         let activating_card_id = self.game_state.activating_card;
         let card_db = self.card_db();
         let is_self_target = effect.self_target.unwrap_or(false);
+        let wants_single_target = effect.exclude_self.unwrap_or(false)
+            || effect.group_names.is_some()
+            || effect.characters.is_some();
         let is_all = effect.all.unwrap_or(false)
             || (effect.source.is_none()
                 && effect.card_type.as_deref() == Some("member_card")
                 && target == "self"
-                && !is_self_target);
+                && !is_self_target
+                && !wants_single_target);
 
         let single_fixed_heart: Option<String> = if (resource == "heart" || resource == "ハート")
             && (!heart_colors.is_empty() || heart_selection || effect.heart_type.is_some())
@@ -1049,6 +1054,14 @@ impl<'a> AbilityResolver<'a> {
             }
         });
 
+        // Apply exclude_self: remove the activating card from any target list
+        let exclude_self = effect.exclude_self.unwrap_or(false);
+        let self_target_id = if exclude_self {
+            activating_card_id
+        } else {
+            None
+        };
+
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = self.game_state.resolve_target_player_mut(&target);
 
@@ -1093,6 +1106,20 @@ impl<'a> AbilityResolver<'a> {
 
             (blade_targets, heart_targets, heart_color_inner, final_count)
         };
+
+        // Filter exclude_self from targets
+        let blade_targets: Vec<i16> = blade_targets
+            .into_iter()
+            .filter(|&id| self_target_id.map_or(true, |sid| id != sid))
+            .collect();
+        let heart_targets: Vec<i16> = heart_targets
+            .into_iter()
+            .filter(|&id| self_target_id.map_or(true, |sid| id != sid))
+            .collect();
+
+        // When not is_all and not is_self_target, apply to all matching filtered
+        // targets (blade_targets / heart_targets). The frontend should handle
+        // singleton-choice UX if only 1 member is the intended target.
 
         let mut effect_data: Option<serde_json::Value> = None;
         let is_negative = sign == Some("negative");
@@ -1350,10 +1377,14 @@ impl<'a> AbilityResolver<'a> {
         source: Option<&str>,
         destination: Option<&str>,
         cost_limit_operator: Option<String>,
+        characters: Option<Vec<String>>,
     ) -> Result<(), String> {
         eprintln!("[EXEC_CHANGE_STATE] state_change={} card_type={:?} group={:?} count={} is_member_op={}",
             state_change, card_type, group_name, count,
             card_type.as_ref().map_or(false, |ct| *ct == "member_card") || self_cost);
+
+        // Make characters available to choice creation below
+        let characters_owned = characters;
         let state_change = state_change.to_string();
         let target = target.to_string();
         let card_type_filter = card_type.map(|s| s.to_string());
@@ -1443,8 +1474,10 @@ impl<'a> AbilityResolver<'a> {
                     cost_limit_operator: cost_limit_operator.clone(),
                     group: group_filter.clone(),
                     filtered_indices: None,
-                    characters: None,
+                    characters: characters_owned.clone(),
                     is_select_action: false,
+                    heart_colors: vec![],
+                    name_fragments: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -1560,12 +1593,14 @@ impl<'a> AbilityResolver<'a> {
                         effective_count
                     ),
                     allow_skip: false,
-                    cost_limit: None,
-                    cost_limit_operator: None,
-                    group: None,
-                    characters: None,
+                    cost_limit,
+                    cost_limit_operator: cost_limit_operator.clone(),
+                    group: group_filter.clone(),
+                    characters: characters_owned.clone(),
                     filtered_indices: None,
                     is_select_action: false,
+                    heart_colors: vec![],
+                    name_fragments: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 return Ok(());
@@ -2123,7 +2158,7 @@ impl<'a> AbilityResolver<'a> {
         if source == Some("under_member") {
             // Handle moving from under_member — default destination is energy_deck
             let actual_dst = destination.unwrap_or("energy_deck");
-            let (area, under_count) = {
+            let (_area, under_count) = {
                 let player = self.game_state.resolve_target_player_mut(target);
                 let target_index = match position.and_then(|p| p.get_position()) {
                     Some("center") | Some("中央") => 1,
@@ -2179,6 +2214,8 @@ impl<'a> AbilityResolver<'a> {
                 characters: None,
                 filtered_indices: None,
                 is_select_action: false,
+                heart_colors: vec![],
+                name_fragments: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return;
@@ -2973,15 +3010,24 @@ impl<'a> AbilityResolver<'a> {
             return Ok(());
         }
         let cards_to_discard = current_count - target_count as usize;
-        self.pending_choice = Some(Choice::select_card(
-            "hand".to_string(),
-            cards_to_discard,
-            format!(
+        self.pending_choice = Some(Choice::SelectCard {
+            zone: "hand".to_string(),
+            card_type: None,
+            count: cards_to_discard,
+            description: format!(
                 "Discard {} cards from hand (target: {} cards in hand)",
                 cards_to_discard, target_count
             ),
-            false,
-        ));
+            allow_skip: false,
+            cost_limit: None,
+            cost_limit_operator: None,
+            group: None,
+            characters: None,
+            filtered_indices: None,
+            is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
+        });
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }

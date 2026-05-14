@@ -951,34 +951,46 @@ def _try_temporal_turn_phase(text):
 
 
 def _try_baton_touch(text):
-    if "バトンタッチして登場した" not in text:
+    if (
+        "バトンタッチして登場した" not in text
+        and "バトンタッチして控え室に置か" not in text
+    ):
         return None
+    is_to_stage = "バトンタッチして登場した" in text
     result = {
-        "type": "location_condition",
-        "location": "stage",
+        "type": "movement_condition",
+        "movement": "baton_touch",
         "target": "self",
         "baton_touch_trigger": True,
         "text": text,
     }
+    if is_to_stage:
+        result["location"] = "stage"
+    else:
+        result["location"] = "discard"
     m = re.search(r"「([^」]+)」からバトンタッチ", text)
     if m:
         result["baton_touch_source"] = m.group(1)
     m = re.search(r"『([^』]+)』からバトンタッチ", text)
     if m:
         result["baton_touch_group"] = m.group(1)
+    # Extract cost limit (e.g., "コスト10以上" → cost_limit=10, operator=">=")
+    cm = re.search(r"コスト(\d+)(以上|以下|より大きい|より小さい|未満)", text)
+    if cm:
+        result["cost_limit"] = int(cm.group(1))
+        op_map = {
+            "以上": ">=",
+            "以下": "<=",
+            "より大きい": ">",
+            "より小さい": "<",
+            "未満": "<",
+        }
+        result["cost_limit_operator"] = op_map.get(cm.group(2), ">=")
     gns = extract_group_names(text)
     if gns:
         result["group_names"] = gns
-    if "コスト" in text:
-        if "低い" in text:
-            result["comparison_type"] = "cost"
-            result["operator"] = "<"
-        elif "高い" in text:
-            result["comparison_type"] = "cost"
-            result["operator"] = ">"
     if "このメンバー以外" in text or "ほかのメンバー" in text:
         result["exclude_self"] = True
-    # Check for ability negation in baton touch context
     if "能力を持たない" in text or "能力も持たない" in text:
         result["ability_negation"] = True
     return result
@@ -1360,6 +1372,13 @@ def _try_live_mid(text):
 
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
+    # Character names: 「A」か「B」か「C」がいる (any number of names OR-ed)
+    cm = re.search(r"((?:「[^」]+」か? ?)+)がいる", text)
+    if cm:
+        names = re.findall(r"「([^」]+)」", cm.group(1))
+        if names:
+            condition["characters"] = names
+
     # Use positional check for non-contiguous comparison patterns
     # Target
     tgt = extract_target(text)
@@ -2979,7 +2998,14 @@ def parse_cost(text: str) -> Dict[str, Any]:
                 ):
                     part = part.strip() + "し"
                 cost_parts.append(parse_cost(part.strip()))
-            return {"text": text, "type": "sequential_cost", "costs": cost_parts}
+            result = {"text": text, "type": "sequential_cost", "costs": cost_parts}
+            # Propagate optional to the outer sequential if any sub-cost is optional
+            if any(cp.get("optional") for cp in cost_parts):
+                result["optional"] = True
+                # Also make each sub-cost optional so they don't create their own choices
+                for cp in cost_parts:
+                    cp["optional"] = True
+            return result
 
     # Reveal cost (公開する/公開し)
     if "公開する" in text or "公開し" in text:

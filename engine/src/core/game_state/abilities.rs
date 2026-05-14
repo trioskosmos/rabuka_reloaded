@@ -424,8 +424,22 @@ impl GameState {
             || self.current_phase == Phase::SecondAttackerPerformance
     }
 
-    pub fn should_trigger_live_success(&self, _player: &Player) -> bool {
-        self.current_phase == Phase::LiveVictoryDetermination
+    pub fn should_trigger_live_success(&self, player: &Player) -> bool {
+        if self.current_phase != Phase::LiveVictoryDetermination {
+            return false;
+        }
+        if player.live_card_zone.cards.is_empty() {
+            return false;
+        }
+        let stage_hearts = player.calculate_stage_hearts(&self.card_database);
+        for card_id in &player.live_card_zone.cards {
+            if let Some(card) = self.card_database.get_card(*card_id) {
+                if card.satisfies_heart_requirement(&stage_hearts) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     pub fn can_place_card_in_zone(&self, card_id: i16, zone: &str, _player_id: &str) -> bool {

@@ -193,6 +193,7 @@ pub fn card_matches_name_constraint(
 pub struct CardFilter<'a> {
     pub card_type: Option<&'a str>,
     pub group: Option<&'a str>,
+    pub groups: Option<&'a Vec<String>>,
     pub cost_limit: Option<u32>,
     pub cost_operator: Option<&'a str>,
     pub characters: Option<&'a Vec<String>>,
@@ -254,6 +255,16 @@ impl<'a> CardFilter<'a> {
         }
         if let Some(g) = self.group {
             if !card_matches_group_str(db, id, Some(g)) {
+                if let Some(gs) = self.groups {
+                    if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+        } else if let Some(gs) = self.groups {
+            if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) {
                 return false;
             }
         }
@@ -308,6 +319,60 @@ impl<'a> CardFilter<'a> {
             .iter()
             .filter(|&&id| self.matches(db, id, false))
             .count() as u32
+    }
+
+    /// Build from an AbilityEffect — single source of filter field extraction.
+    pub fn from_effect(effect: &'a crate::card::AbilityEffect) -> Self {
+        CardFilter {
+            card_type: effect.card_type.as_deref(),
+            group: effect
+                .group_names
+                .as_ref()
+                .and_then(|v| v.first())
+                .map(|s| s.as_str()),
+            groups: effect.group_names.as_ref().map(|v| v.as_ref()),
+            cost_limit: effect.cost_limit,
+            cost_operator: effect.cost_limit_operator.as_deref(),
+            characters: effect.characters.as_ref(),
+            heart_colors: &effect.heart_colors,
+            name_fragments: None,
+            distinct: None,
+            exclude_self: if effect.exclude_self.unwrap_or(false) {
+                Some(-1)
+            } else {
+                None
+            },
+            original_blade_limit: None,
+            original_blade_operator: None,
+        }
+    }
+
+    /// Build from a Choice::SelectCard — reads filter fields the choice advertised.
+    pub fn from_choice(choice: &'a crate::ability::types::Choice) -> Self {
+        match choice {
+            crate::ability::types::Choice::SelectCard {
+                card_type,
+                cost_limit,
+                cost_limit_operator,
+                group,
+                characters,
+                ..
+            } => CardFilter {
+                card_type: card_type.as_deref(),
+                group: group.as_deref(),
+                groups: None,
+                cost_limit: *cost_limit,
+                cost_operator: cost_limit_operator.as_deref(),
+                characters: characters.as_ref(),
+                heart_colors: &[],
+                name_fragments: None,
+                distinct: None,
+                exclude_self: None,
+                original_blade_limit: None,
+                original_blade_operator: None,
+            },
+            _ => CardFilter::default(),
+        }
     }
 }
 

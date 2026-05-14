@@ -7,6 +7,7 @@ pub mod b8_live_timing_test;
 pub mod b9_more_test;
 pub mod batch5_test;
 pub mod batch_nico_bp4_hanayo_test;
+pub mod baton_touch_test;
 pub mod bring_love_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;

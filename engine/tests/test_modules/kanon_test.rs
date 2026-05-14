@@ -69,16 +69,17 @@ fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
     game.pass();
     game.pass();
 
-    // LiveSuccess fires during LiveVictoryDetermination but the live cannot succeed
-    // (no hearts on stage), so the optional cost (pay 6E → score +1) cannot actually be paid.
-    // The pending choice should still appear; selecting "pay" returns without deducting energy.
-    if game.has_pending_choice() {
-        game.select_option(1); // attempt to pay, but live fails so no energy deducted
-    }
+    // LiveSuccess should NOT fire when the live card's need_heart requirements
+    // are not met by stage members (no heart01/heart03 on stage, only wildcard).
+    // The optional cost choice should not appear at all.
+    assert!(
+        !game.has_pending_choice(),
+        "Q92: LiveSuccess should not fire — insufficient hearts for live card"
+    );
     let energy_spent = energy_before - game.state.player1.energy_zone.active_energy_count;
     assert_eq!(
         energy_spent, 0,
-        "Q92: optional cost not deducted when live cannot succeed (no hearts on stage)"
+        "Q92: no energy deducted when LiveSuccess does not fire"
     );
 }
 

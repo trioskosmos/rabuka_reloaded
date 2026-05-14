@@ -149,6 +149,7 @@ pub struct LiveCardResult {
     pub filled: [u32; 7],
     pub adjustments: Vec<Adjustment>,
     pub card_id: i16,
+    pub card_no: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -164,6 +165,7 @@ pub struct MemberContribution {
     pub draw_icons: u32,
     pub ability_heart_bonuses: Vec<AbilityBonus>,
     pub ability_blade_bonuses: Vec<AbilityBonus>,
+    pub card_no: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -172,6 +174,7 @@ pub struct YellCardResult {
     pub blade_hearts: [u32; 7],
     pub note_icons: u32,
     pub draw_icons: u32,
+    pub card_no: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

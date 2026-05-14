@@ -348,6 +348,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let p2_cards: &[i16] = util::zone_cards(&self.game_state.player2, location);
 
         let group = group_names.and_then(|g| g.first().map(|s| s.as_str()));
+        let characters = condition.characters.as_ref();
 
         match target {
             "either" => {
@@ -363,7 +364,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     group,
                     cost_limit,
                     operator,
-                    &|cid| self.check_original_blade_filter(condition, cid),
+                    &|cid| {
+                        self.check_original_blade_filter(condition, cid)
+                            && characters.map_or(true, |chars| {
+                                crate::ability::util::card_matches_characters(
+                                    card_db,
+                                    cid,
+                                    Some(chars),
+                                )
+                            })
+                    },
                 );
                 let c2 = util::count_matching_with_blade(
                     p2_cards,
@@ -372,7 +382,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     group,
                     cost_limit,
                     operator,
-                    &|cid| self.check_original_blade_filter(condition, cid),
+                    &|cid| {
+                        self.check_original_blade_filter(condition, cid)
+                            && characters.map_or(true, |chars| {
+                                crate::ability::util::card_matches_characters(
+                                    card_db,
+                                    cid,
+                                    Some(chars),
+                                )
+                            })
+                    },
                 );
                 if all_areas {
                     let p1_stage: &[i16] = &self.game_state.player1.stage.stage;
@@ -404,7 +423,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     group,
                     cost_limit,
                     operator,
-                    &|cid| self.check_original_blade_filter(condition, cid),
+                    &|cid| {
+                        self.check_original_blade_filter(condition, cid)
+                            && characters.map_or(true, |chars| {
+                                crate::ability::util::card_matches_characters(
+                                    card_db,
+                                    cid,
+                                    Some(chars),
+                                )
+                            })
+                    },
                 );
                 let opp_count = util::count_matching_with_blade(
                     p1p2(!self_is_p1),
@@ -413,7 +441,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     group,
                     cost_limit,
                     operator,
-                    &|cid| self.check_original_blade_filter(condition, cid),
+                    &|cid| {
+                        self.check_original_blade_filter(condition, cid)
+                            && characters.map_or(true, |chars| {
+                                crate::ability::util::card_matches_characters(
+                                    card_db,
+                                    cid,
+                                    Some(chars),
+                                )
+                            })
+                    },
                 );
                 if operator.is_some() {
                     return if compare_counts(operator, self_count, opp_count) {
@@ -449,7 +486,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     group,
                     cost_limit,
                     operator,
-                    &|cid| self.check_original_blade_filter(condition, cid),
+                    &|cid| {
+                        self.check_original_blade_filter(condition, cid)
+                            && characters.map_or(true, |chars| {
+                                crate::ability::util::card_matches_characters(
+                                    card_db,
+                                    cid,
+                                    Some(chars),
+                                )
+                            })
+                    },
                 );
                 if all_areas {
                     if player.stage.stage.iter().filter(|&&c| c != -1).count() != 3 {
@@ -675,65 +721,44 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_db = &self.game_state.card_database;
 
         let location = condition.location.as_deref().unwrap_or("");
-        let group_names = condition.group_names.as_ref();
-        let group = condition
-            .group_names
-            .as_ref()
-            .and_then(|gn| gn.first().map(|s| s.as_str()));
         let hc: &[String] = condition
             .heart_colors
             .as_ref()
             .map(|v| v.as_slice())
             .unwrap_or(&[]);
 
-        // Helper: count cards in a zone filtered by type + heart + group
-        let count_filtered = |zone_source: &[i16], ct: &str| -> usize {
-            zone_source
-                .iter()
-                .filter(|&&cid| {
-                    let type_ok = match ct {
-                        "live_card" => card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false),
-                        "member_card" => card_db
-                            .get_card(cid)
-                            .map(|c| c.is_member())
-                            .unwrap_or(false),
-                        "energy_card" => card_db
-                            .get_card(cid)
-                            .map(|c| c.is_energy())
-                            .unwrap_or(false),
-                        _ => true,
-                    };
-                    if !type_ok {
-                        return false;
-                    }
-                    if !hc.is_empty()
-                        && !crate::ability::util::card_matches_heart_colors(card_db, cid, hc)
-                    {
-                        return false;
-                    }
-                    if let Some(g) = group {
-                        crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
-                    } else if let Some(gn) = group_names {
-                        gn.iter().any(|g| {
-                            crate::ability::util::card_matches_group_str(card_db, cid, Some(g))
-                        })
-                    } else {
-                        true
-                    }
-                })
-                .count()
+        // Build a CardFilter from the condition's filter fields
+        let cond_filter = crate::ability::util::CardFilter {
+            card_type: condition.card_type.as_deref(),
+            group: condition
+                .group_names
+                .as_ref()
+                .and_then(|v| v.first())
+                .map(|s| s.as_str()),
+            groups: condition.group_names.as_ref().map(|v| v.as_ref()),
+            cost_limit: None,
+            cost_operator: None,
+            characters: condition.characters.as_ref(),
+            heart_colors: hc,
+            name_fragments: None,
+            distinct: None,
+            exclude_self: None,
+            original_blade_limit: None,
+            original_blade_operator: None,
         };
 
         // Explicit source: preceding_moved — check against the resolver's moved_cards
         // (set by a prior move_cards action in the same sequential chain)
         if condition.source.as_deref() == Some("preceding_moved") {
-            let actual = count_filtered(&self.moved_cards, card_type) as u32;
+            let actual = cond_filter.count(&self.moved_cards, &card_db);
             return compare_counts(condition.operator.as_deref(), actual, count);
         }
 
         // Resolve location to an actual card list
         let actual = match location {
-            "revealed_cards" => count_filtered(&self.game_state.revealed_cards, card_type),
+            "revealed_cards" => {
+                cond_filter.count(&self.game_state.revealed_cards, &card_db) as usize
+            }
             "stage" => {
                 if condition.unit.as_deref() == Some("types") {
                     // Count distinct heart color types present across all stage members
@@ -758,38 +783,39 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                     present.len()
                 } else {
-                    count_filtered(&player.stage.stage, card_type)
+                    cond_filter.count(&player.stage.stage, &card_db) as usize
                 }
             }
-            "hand" => count_filtered(&player.hand.cards, card_type),
+            "hand" => cond_filter.count(&player.hand.cards, &card_db) as usize,
             "discard" | "waitroom" => {
                 // Check recently moved cards first (chained from a preceding move_cards action)
                 if let Some(ref moved) = self.game_state.recently_moved_cards {
-                    count_filtered(moved, card_type)
+                    cond_filter.count(moved, &card_db) as usize
                 } else {
-                    count_filtered(&player.waitroom.cards, card_type)
+                    cond_filter.count(&player.waitroom.cards, &card_db) as usize
                 }
             }
-            "deck" => count_filtered(&player.main_deck.cards, card_type),
-            "energy_zone" => count_filtered(&player.energy_zone.cards, card_type),
-            "live_card_zone" => count_filtered(&player.live_card_zone.cards, card_type),
+            "deck" => cond_filter.count(&player.main_deck.cards, &card_db) as usize,
+            "energy_zone" => cond_filter.count(&player.energy_zone.cards, &card_db) as usize,
+            "live_card_zone" => cond_filter.count(&player.live_card_zone.cards, &card_db) as usize,
             "success_live_zone" | "success_live_card_zone" => {
                 if target == "either" || target == "both" {
-                    let p1 = count_filtered(
+                    let p1 = cond_filter.count(
                         &self.game_state.player1.success_live_card_zone.cards,
-                        card_type,
-                    );
-                    let p2 = count_filtered(
+                        &card_db,
+                    ) as usize;
+                    let p2 = cond_filter.count(
                         &self.game_state.player2.success_live_card_zone.cards,
-                        card_type,
-                    );
+                        &card_db,
+                    ) as usize;
                     eprintln!(
                         "[SUCCESS_ZONE_DEBUG] either mode: p1={}, p2={}, card_type={:?}",
                         p1, p2, card_type
                     );
                     p1 + p2
                 } else {
-                    let count = count_filtered(&player.success_live_card_zone.cards, card_type);
+                    let count =
+                        cond_filter.count(&player.success_live_card_zone.cards, &card_db) as usize;
                     eprintln!(
                         "[SUCCESS_ZONE_DEBUG] self mode: player={}, count={}, card_type={:?}",
                         target, count, card_type
@@ -800,10 +826,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             // No explicit location: use recently_moved if available, otherwise infer from card_type
             "" => {
                 if let Some(ref moved) = self.game_state.recently_moved_cards {
-                    count_filtered(moved, card_type)
+                    cond_filter.count(moved, &card_db) as usize
                 } else {
                     match card_type {
-                        "live_card" => count_filtered(&player.waitroom.cards, card_type),
+                        "live_card" => cond_filter.count(&player.waitroom.cards, &card_db) as usize,
                         "member_card" => {
                             if condition.aggregate.as_deref() == Some("total") {
                                 player.stage.total_blades(
@@ -1111,8 +1137,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             }
                         }
                         if let Some(groups) = &condition.group_names {
-                            let card_groups: &str = &card.group;
-                            if !groups.iter().any(|g| card_groups.contains(g.as_str())) {
+                            if !groups.iter().any(|g| {
+                                crate::ability::util::card_matches_group_str(
+                                    &self.game_state.card_database,
+                                    arriving_id,
+                                    Some(g),
+                                )
+                            }) {
                                 return false;
                             }
                         }

@@ -1,9 +1,9 @@
+use crate::ability::debug::AbDebug;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::player::Player;
-use crate::zones::Orientation;
-use crate::ability::debug::AbDebug;
 use crate::types::PerformanceSnapshot;
+use crate::zones::Orientation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -74,24 +74,32 @@ pub struct GameStateDisplay {
     pub performance_history: Vec<PerformanceSnapshot>,
 }
 
-pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option<Orientation>, blade_modifier: i32) -> Option<CardDisplay> {
+pub fn card_to_display(
+    card_id: i16,
+    card_db: &CardDatabase,
+    orientation: Option<Orientation>,
+    blade_modifier: i32,
+) -> Option<CardDisplay> {
     card_db.get_card(card_id).map(|card| {
         let base_heart = card.base_heart.as_ref().map(|bh| {
-            bh.hearts.iter().map(|(color, count)| {
-                let color_str = match color {
-                    crate::card::HeartColor::Heart00 => "heart00",
-                    crate::card::HeartColor::Heart01 => "heart01",
-                    crate::card::HeartColor::Heart02 => "heart02",
-                    crate::card::HeartColor::Heart03 => "heart03",
-                    crate::card::HeartColor::Heart04 => "heart04",
-                    crate::card::HeartColor::Heart05 => "heart05",
-                    crate::card::HeartColor::Heart06 => "heart06",
-                    crate::card::HeartColor::BAll => "b_all",
-                    crate::card::HeartColor::Draw => "draw",
-                    crate::card::HeartColor::Score => "score",
-                };
-                (color_str.to_string(), *count)
-            }).collect()
+            bh.hearts
+                .iter()
+                .map(|(color, count)| {
+                    let color_str = match color {
+                        crate::card::HeartColor::Heart00 => "heart00",
+                        crate::card::HeartColor::Heart01 => "heart01",
+                        crate::card::HeartColor::Heart02 => "heart02",
+                        crate::card::HeartColor::Heart03 => "heart03",
+                        crate::card::HeartColor::Heart04 => "heart04",
+                        crate::card::HeartColor::Heart05 => "heart05",
+                        crate::card::HeartColor::Heart06 => "heart06",
+                        crate::card::HeartColor::BAll => "b_all",
+                        crate::card::HeartColor::Draw => "draw",
+                        crate::card::HeartColor::Score => "score",
+                    };
+                    (color_str.to_string(), *count)
+                })
+                .collect()
         });
         CardDisplay {
             card_no: card.card_no.clone(),
@@ -100,7 +108,11 @@ pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option
             orientation: orientation.map(|o| format!("{:?}", o)),
             base_heart,
             blade: card.blade,
-            total_blade: ((card.blade as i32) + blade_modifier).max(0) as u32,
+            total_blade: if orientation == Some(Orientation::Wait) {
+                0
+            } else {
+                ((card.blade as i32) + blade_modifier).max(0) as u32
+            },
             id: card_id,
         }
     })
@@ -108,28 +120,87 @@ pub fn card_to_display(card_id: i16, card_db: &CardDatabase, orientation: Option
 
 pub fn zone_to_display(card_ids: &[i16], card_db: &CardDatabase) -> ZoneDisplay {
     ZoneDisplay {
-        cards: card_ids.iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
+        cards: card_ids
+            .iter()
+            .filter_map(|&id| card_to_display(id, card_db, None, 0))
+            .collect(),
     }
 }
 
-pub fn stage_to_display(stage: &crate::zones::Stage, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, orientation_modifiers: &std::collections::HashMap<i16, String>) -> StageDisplay {
+pub fn stage_to_display(
+    stage: &crate::zones::Stage,
+    card_db: &CardDatabase,
+    blade_modifiers: &std::collections::HashMap<i16, i32>,
+    orientation_modifiers: &std::collections::HashMap<i16, String>,
+) -> StageDisplay {
     let blade_mod = |cid: i16| blade_modifiers.get(&cid).copied().unwrap_or(0);
-    let orientation = |cid: i16| orientation_modifiers.get(&cid).map(|o| match o.as_str() {
-        "wait" => Orientation::Wait,
-        _ => Orientation::Active,
-    });
+    let orientation = |cid: i16| {
+        orientation_modifiers.get(&cid).map(|o| match o.as_str() {
+            "wait" => Orientation::Wait,
+            _ => Orientation::Active,
+        })
+    };
     StageDisplay {
-        left_side: if stage.stage[0] != -1 { card_to_display(stage.stage[0], card_db, orientation(stage.stage[0]), blade_mod(stage.stage[0])) } else { None },
-        center: if stage.stage[1] != -1 { card_to_display(stage.stage[1], card_db, orientation(stage.stage[1]), blade_mod(stage.stage[1])) } else { None },
-        right_side: if stage.stage[2] != -1 { card_to_display(stage.stage[2], card_db, orientation(stage.stage[2]), blade_mod(stage.stage[2])) } else { None },
-        left_under: stage.under_cards[0].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
-        center_under: stage.under_cards[1].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
-        right_under: stage.under_cards[2].iter().filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
+        left_side: if stage.stage[0] != -1 {
+            card_to_display(
+                stage.stage[0],
+                card_db,
+                orientation(stage.stage[0]),
+                blade_mod(stage.stage[0]),
+            )
+        } else {
+            None
+        },
+        center: if stage.stage[1] != -1 {
+            card_to_display(
+                stage.stage[1],
+                card_db,
+                orientation(stage.stage[1]),
+                blade_mod(stage.stage[1]),
+            )
+        } else {
+            None
+        },
+        right_side: if stage.stage[2] != -1 {
+            card_to_display(
+                stage.stage[2],
+                card_db,
+                orientation(stage.stage[2]),
+                blade_mod(stage.stage[2]),
+            )
+        } else {
+            None
+        },
+        left_under: stage.under_cards[0]
+            .iter()
+            .filter_map(|&id| card_to_display(id, card_db, None, 0))
+            .collect(),
+        center_under: stage.under_cards[1]
+            .iter()
+            .filter_map(|&id| card_to_display(id, card_db, None, 0))
+            .collect(),
+        right_under: stage.under_cards[2]
+            .iter()
+            .filter_map(|&id| card_to_display(id, card_db, None, 0))
+            .collect(),
     }
 }
 
-pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifiers: &std::collections::HashMap<i16, i32>, score_modifiers: &std::collections::HashMap<i16, i32>, heart_modifiers: &std::collections::HashMap<i16, std::collections::HashMap<crate::card::HeartColor, i32>>, orientation_modifiers: &std::collections::HashMap<i16, String>) -> PlayerDisplay {
-    let energy_cards: Vec<(i16, Option<Orientation>)> = player.energy_zone.cards.iter()
+pub fn player_to_display(
+    player: &Player,
+    card_db: &CardDatabase,
+    blade_modifiers: &std::collections::HashMap<i16, i32>,
+    score_modifiers: &std::collections::HashMap<i16, i32>,
+    heart_modifiers: &std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    >,
+    orientation_modifiers: &std::collections::HashMap<i16, String>,
+) -> PlayerDisplay {
+    let energy_cards: Vec<(i16, Option<Orientation>)> = player
+        .energy_zone
+        .cards
+        .iter()
         .enumerate()
         .map(|(i, &card_id)| {
             let orientation = if i < player.energy_zone.active_energy_count {
@@ -142,8 +213,11 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
         .collect();
 
     let energy_display = ZoneDisplay {
-        cards: energy_cards.iter()
-            .filter_map(|(card_id, orientation)| card_to_display(*card_id, card_db, *orientation, 0))
+        cards: energy_cards
+            .iter()
+            .filter_map(|(card_id, orientation)| {
+                card_to_display(*card_id, card_db, *orientation, 0)
+            })
             .collect(),
     };
 
@@ -151,7 +225,7 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
 
     // Calculate total hearts including modifiers (7 elements: heart00-heart06)
     let mut total_hearts = vec![0u32; 7];
-    
+
     // Add base hearts from stage cards
     for &card_id in &player.stage.stage {
         if card_id != -1 {
@@ -174,7 +248,7 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
             }
         }
     }
-    
+
     // Add heart modifiers from stage cards
     for &card_id in &player.stage.stage {
         if card_id != -1 {
@@ -199,15 +273,23 @@ pub fn player_to_display(player: &Player, card_db: &CardDatabase, blade_modifier
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display(&player.hand.cards, card_db),
-        stage: stage_to_display(&player.stage, card_db, blade_modifiers, orientation_modifiers),
+        stage: stage_to_display(
+            &player.stage,
+            card_db,
+            blade_modifiers,
+            orientation_modifiers,
+        ),
         live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
         success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards, card_db),
         waitroom: waitroom_display.clone(),
         discard: waitroom_display,
         main_deck_count: player.main_deck.len(),
         energy_deck_count: player.energy_deck.cards.len(),
-        last_resolution_cards: player.last_resolution_cards.iter()
-            .filter_map(|&id| card_to_display(id, card_db, None, 0)).collect(),
+        last_resolution_cards: player
+            .last_resolution_cards
+            .iter()
+            .filter_map(|&id| card_to_display(id, card_db, None, 0))
+            .collect(),
         score_modifiers: score_modifiers.clone(),
         total_hearts,
     }
@@ -220,7 +302,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     if let Some(ref pc) = game_state.pending_choice {
         if let Some(cards) = pc.get("selection_cards").and_then(|v| v.as_array()) {
             for val in cards {
-                if let Some(id) = val.get("id").and_then(|v| v.as_i64()).or_else(|| val.as_i64()) {
+                if let Some(id) = val
+                    .get("id")
+                    .and_then(|v| v.as_i64())
+                    .or_else(|| val.as_i64())
+                {
                     looked_ids.push(id as i16);
                 }
             }
@@ -247,8 +333,22 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
-        player1: player_to_display(&game_state.player1, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers, &game_state.mods.orientation_modifiers),
-        player2: player_to_display(&game_state.player2, &game_state.card_database, &game_state.mods.blade_modifiers, &game_state.mods.score_modifiers, &game_state.mods.heart_modifiers, &game_state.mods.orientation_modifiers),
+        player1: player_to_display(
+            &game_state.player1,
+            &game_state.card_database,
+            &game_state.mods.blade_modifiers,
+            &game_state.mods.score_modifiers,
+            &game_state.mods.heart_modifiers,
+            &game_state.mods.orientation_modifiers,
+        ),
+        player2: player_to_display(
+            &game_state.player2,
+            &game_state.card_database,
+            &game_state.mods.blade_modifiers,
+            &game_state.mods.score_modifiers,
+            &game_state.mods.heart_modifiers,
+            &game_state.mods.orientation_modifiers,
+        ),
         pending_choice: game_state.pending_choice.clone(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
         rule_log,

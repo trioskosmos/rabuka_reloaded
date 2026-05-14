@@ -1372,6 +1372,13 @@ def _try_live_mid(text):
 
 def _extract_generic_fields(condition, text):
     """Extract all generic fields from text into condition dict (no early return)."""
+    # Character names: 「A」か「B」か「C」がいる (any number of names OR-ed)
+    cm = re.search(r"((?:「[^」]+」か? ?)+)がいる", text)
+    if cm:
+        names = re.findall(r"「([^」]+)」", cm.group(1))
+        if names:
+            condition["characters"] = names
+
     # Use positional check for non-contiguous comparison patterns
     # Target
     tgt = extract_target(text)

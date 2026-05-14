@@ -17,7 +17,7 @@ pub enum CardType {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum HeartColor {
     #[serde(rename = "heart00")]
-    Heart00,  // Index 0 - wildcard, can be treated as any heart01-heart06
+    Heart00, // Index 0 - wildcard, can be treated as any heart01-heart06
     #[serde(rename = "heart01")]
     Heart01,
     #[serde(rename = "heart02")]
@@ -31,11 +31,11 @@ pub enum HeartColor {
     #[serde(rename = "heart06")]
     Heart06,
     #[serde(rename = "b_all")]
-    BAll,  // Blade heart wildcard
+    BAll, // Blade heart wildcard
     #[serde(rename = "draw")]
-    Draw,  // Special heart type for drawing cards
+    Draw, // Special heart type for drawing cards
     #[serde(rename = "score")]
-    Score,  // Special heart type for score bonus
+    Score, // Special heart type for score bonus
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -53,21 +53,21 @@ pub enum BladeColor {
     #[serde(rename = "紫")]
     Purple,
     #[serde(rename = "all")]
-    All,  // All blade types
+    All, // All blade types
 }
 
 // Rule 11: Keywords
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum Keyword {
-    Turn1,          // Rule 11.1: First turn only
-    Turn2,          // Rule 11.2: Second turn only
-    Debut,          // Rule 11.3: First time this member is placed on stage
-    LiveStart,      // Rule 11.4: When live card set phase begins
-    LiveSuccess,    // Rule 11.5: When live is successful
-    Center,         // Rule 11.6: Center position
-    LeftSide,       // Rule 11.7: Left side position
-    RightSide,      // Rule 11.8: Right side position
-    PositionChange, // Rule 11.9: Member moves to different position
+    Turn1,           // Rule 11.1: First turn only
+    Turn2,           // Rule 11.2: Second turn only
+    Debut,           // Rule 11.3: First time this member is placed on stage
+    LiveStart,       // Rule 11.4: When live card set phase begins
+    LiveSuccess,     // Rule 11.5: When live is successful
+    Center,          // Rule 11.6: Center position
+    LeftSide,        // Rule 11.7: Left side position
+    RightSide,       // Rule 11.8: Right side position
+    PositionChange,  // Rule 11.9: Member moves to different position
     FormationChange, // Rule 11.10: Multiple members move simultaneously
 }
 
@@ -92,12 +92,14 @@ impl<'de> Deserialize<'de> for BladeHeart {
             #[serde(flatten)]
             hearts: HashMap<String, u32>,
         }
-        
+
         let raw = RawBladeHeart::deserialize(deserializer)?;
-        let hearts = raw.hearts.into_iter().map(|(k, v)| {
-            (parse_heart_color(&k), v)
-        }).collect();
-        
+        let hearts = raw
+            .hearts
+            .into_iter()
+            .map(|(k, v)| (parse_heart_color(&k), v))
+            .collect();
+
         Ok(BladeHeart { hearts })
     }
 }
@@ -117,12 +119,14 @@ impl<'de> Deserialize<'de> for BaseHeart {
             #[serde(flatten)]
             hearts: HashMap<String, u32>,
         }
-        
+
         let raw = RawBaseHeart::deserialize(deserializer)?;
-        let hearts = raw.hearts.into_iter().map(|(k, v)| {
-            (parse_heart_color(&k), v)
-        }).collect();
-        
+        let hearts = raw
+            .hearts
+            .into_iter()
+            .map(|(k, v)| (parse_heart_color(&k), v))
+            .collect();
+
         Ok(BaseHeart { hearts })
     }
 }
@@ -162,7 +166,7 @@ pub struct Card {
     #[serde(skip)]
     pub abilities: Vec<Ability>,
     #[serde(skip)]
-    pub card_id: i16,  // Database ID for optimization
+    pub card_id: i16, // Database ID for optimization
 }
 
 #[derive(Debug, Clone)]
@@ -184,7 +188,9 @@ impl CardDatabase {
     /// Create a copy of an existing card with a new unique ID.
     /// Used to give each card copy its own ID for per-copy modifier tracking.
     pub fn create_copy(&mut self, template_id: i16) -> i16 {
-        let card = self.cards.get(&template_id)
+        let card = self
+            .cards
+            .get(&template_id)
             .expect("Template card not found")
             .clone();
         let copy_id = self.next_id;
@@ -195,7 +201,7 @@ impl CardDatabase {
 
     pub fn load_or_create(cards: Vec<Card>) -> Self {
         let mut db = Self::new();
-        
+
         // Try to load existing mapping
         if let Ok(mapping) = std::fs::read_to_string("card_id_mapping.json") {
             if let Ok(loaded_mapping) = serde_json::from_str::<HashMap<String, i16>>(&mapping) {
@@ -203,7 +209,7 @@ impl CardDatabase {
                 db.next_id = db.card_no_to_id.values().max().copied().unwrap_or(0) + 1;
             }
         }
-        
+
         // Add cards, assigning IDs if not already mapped
         for card in cards {
             if !db.card_no_to_id.contains_key(&card.card_no) {
@@ -213,19 +219,19 @@ impl CardDatabase {
             let card_id = db.card_no_to_id[&card.card_no];
             db.cards.insert(card_id, card);
         }
-        
-        // Save mapping
-        
-        db
 
+        // Save mapping
+
+        db
     }
 
     pub fn save_mapping(&self) {
         if let Ok(mapping) = serde_json::to_string_pretty(&self.card_no_to_id) {
-            std::fs::write("card_id_mapping.json", mapping).expect("Failed to save card ID mapping");
+            std::fs::write("card_id_mapping.json", mapping)
+                .expect("Failed to save card ID mapping");
         }
     }
-    
+
     pub fn get_card(&self, card_id: i16) -> Option<&Card> {
         self.cards.get(&card_id)
     }
@@ -252,7 +258,7 @@ impl CardDatabase {
         }
         None
     }
-    
+
     /// Normalize card_no for lookup: uppercase, fullwidth → halfwidth
     fn normalize_card_no(card_no: &str) -> String {
         card_no
@@ -278,7 +284,11 @@ impl CardDatabase {
     pub fn get_card_names(&self, card_id: i16) -> Vec<String> {
         if let Some(card) = self.cards.get(&card_id) {
             // Handle both regular '&' and full-width '＆' separators
-            card.name.replace('＆', "&").split('&').map(|s| s.to_string()).collect()
+            card.name
+                .replace('＆', "&")
+                .split('&')
+                .map(|s| s.to_string())
+                .collect()
         } else {
             Vec::new()
         }
@@ -287,7 +297,9 @@ impl CardDatabase {
     /// Check if card has any of the given names (for multi-name cards)
     pub fn card_has_any_name(&self, card_id: i16, names: &[&str]) -> bool {
         let card_names = self.get_card_names(card_id);
-        names.iter().any(|&name| card_names.iter().any(|cn| cn.contains(name)))
+        names
+            .iter()
+            .any(|&name| card_names.iter().any(|cn| cn.contains(name)))
     }
 }
 
@@ -359,7 +371,9 @@ fn map_series_to_group(series: &str) -> String {
     match series {
         "ラブライブ！" => "μ's".to_string(),
         "ラブライブ！サンシャイン!!" => "Aqours".to_string(),
-        "ラブライブ！虹ヶ咲学園スクールアイドル同好会" => "虹ヶ咲".to_string(),
+        "ラブライブ！虹ヶ咲学園スクールアイドル同好会" => {
+            "虹ヶ咲".to_string()
+        }
         "ラブライブ！スーパースター!!" => "Liella!".to_string(),
         "蓮ノ空女学院スクールアイドルクラブ" => "蓮ノ空".to_string(),
         _ => String::new(),
@@ -385,12 +399,14 @@ impl<'de> Deserialize<'de> for SpecialHeart {
             #[serde(flatten)]
             hearts: HashMap<String, u32>,
         }
-        
+
         let raw = RawSpecialHeart::deserialize(deserializer)?;
-        let hearts = raw.hearts.into_iter().map(|(k, v)| {
-            (parse_heart_color(&k), v)
-        }).collect();
-        
+        let hearts = raw
+            .hearts
+            .into_iter()
+            .map(|(k, v)| (parse_heart_color(&k), v))
+            .collect();
+
         Ok(SpecialHeart { hearts })
     }
 }
@@ -667,23 +683,34 @@ pub struct AbilityEffect {
 
 impl AbilityEffect {
     /// Returns the target player string, defaulting to "self".
-    pub fn target_name(&self) -> &str { self.target.as_deref().unwrap_or("self") }
+    pub fn target_name(&self) -> &str {
+        self.target.as_deref().unwrap_or("self")
+    }
 
     /// Returns the source zone string with a static default.
-    pub fn source_or(&self, default: &'static str) -> &str { self.source.as_deref().unwrap_or(default) }
+    pub fn source_or(&self, default: &'static str) -> &str {
+        self.source.as_deref().unwrap_or(default)
+    }
 
     /// Returns the count with a caller-provided default.
-    pub fn count_or(&self, n: u32) -> u32 { self.count.unwrap_or(n) }
+    pub fn count_or(&self, n: u32) -> u32 {
+        self.count.unwrap_or(n)
+    }
 
     /// Returns the first group name, if any.
     pub fn group_name(&self) -> Option<&str> {
-        self.group_names.as_ref().and_then(|gn| gn.first().map(|s| s.as_str()))
+        self.group_names
+            .as_ref()
+            .and_then(|gn| gn.first().map(|s| s.as_str()))
     }
 
     /// Returns the first heart color as a string reference, or a static default.
     /// For single-color operations like modify_required_hearts.
     pub fn heart_color_or(&self, default: &'static str) -> &str {
-        self.heart_colors.first().map(|s| s.as_str()).unwrap_or(default)
+        self.heart_colors
+            .first()
+            .map(|s| s.as_str())
+            .unwrap_or(default)
     }
 }
 
@@ -842,53 +869,39 @@ impl Card {
     pub fn has_blade_heart(&self) -> bool {
         self.blade_heart.is_some() || self.blade > 0
     }
-    
+
     pub fn satisfies_heart_requirement(&self, provided_hearts: &BaseHeart) -> bool {
         // Rule 8.2.8: Check if provided hearts satisfy card's need_heart requirement
         // Heart00 (index 0) is wildcard and can substitute for any heart01-heart06
         if let Some(ref need_heart) = self.need_heart {
-            let wildcard_count = *provided_hearts.hearts.get(&HeartColor::Heart00).unwrap_or(&0);
-            
-            // Count total hearts available for heart0 requirements (any color can be used)
-            let total_hearts_for_heart0: u32 = provided_hearts.hearts.values().sum();
-            
-            for (color, needed_amount) in &need_heart.hearts {
+            let mut wildcard_remaining = *provided_hearts
+                .hearts
+                .get(&HeartColor::Heart00)
+                .unwrap_or(&0) as i32;
+            let total_all: i32 = provided_hearts.hearts.values().sum::<u32>() as i32;
+            let mut consumed_by_color: i32 = 0;
+
+            for (color, &needed_amount) in &need_heart.hearts {
                 if *color == HeartColor::Heart00 {
-                    // heart0 requirement: any heart color can fulfill this
-                    if total_hearts_for_heart0 < *needed_amount {
+                    // heart0: uses remaining hearts after specific-color consumption
+                    let remaining =
+                        (total_all - consumed_by_color).max(0) + wildcard_remaining.max(0);
+                    if remaining < needed_amount as i32 {
                         return false;
                     }
+                    consumed_by_color += needed_amount as i32;
                 } else {
-                    // Specific heart color requirement
-                    let wildcard_count = wildcard_count;
-                    if let Some(&provided_amount) = provided_hearts.hearts.get(color) {
-                        if provided_amount + wildcard_count >= *needed_amount {
-                            // Subtract the specific hearts first, then use wildcard if needed
-                            let remaining_needed = if provided_amount >= *needed_amount {
-                                0
-                            } else {
-                                *needed_amount - provided_amount
-                            };
-                            if remaining_needed > wildcard_count {
-                                return false;
-                            }
-                        } else {
-                            // Not enough even with wildcard
-                            if *needed_amount > wildcard_count {
-                                return false;
-                            }
-                        }
-                    } else {
-                        // No specific hearts available, use wildcard
-                        if *needed_amount > wildcard_count {
-                            return false;
-                        }
+                    let provided = *provided_hearts.hearts.get(color).unwrap_or(&0) as i32;
+                    if provided + wildcard_remaining < needed_amount as i32 {
+                        return false;
                     }
+                    let shortfall = (needed_amount as i32 - provided).max(0);
+                    wildcard_remaining -= shortfall;
+                    consumed_by_color += provided.min(needed_amount as i32);
                 }
             }
             true
         } else {
-            // No heart requirement
             true
         }
     }

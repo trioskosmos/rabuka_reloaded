@@ -22,20 +22,30 @@ impl super::TurnEngine {
                 Phase::Active => {
                     game_state.reset_keyword_tracking();
                     game_state.reset_keyword_tracking();
-                    game_state.player1.activate_all_energy();
-                    game_state.player2.activate_all_energy();
                     game_state.recalculate_constant_blade_modifiers();
-                    // Refresh all waited stage members to active
-                    for player in [&mut game_state.player1, &mut game_state.player2].iter_mut() {
-                        for &card_id in player.stage.stage.iter() {
-                            if card_id != -1 {
-                                let orient = game_state.mods.get_orientation_modifier(card_id);
-                                if orient == Some(&"wait".to_string()) {
-                                    game_state.mods.add_orientation_modifier(card_id, "active");
+                    // Rule 7.4.1: Only the turn player activates their wait cards
+                    let to_activate: Vec<i16> = {
+                        let turn_player = game_state.active_player();
+                        turn_player
+                            .stage
+                            .stage
+                            .iter()
+                            .filter_map(|&cid| {
+                                if cid != -1
+                                    && game_state.mods.get_orientation_modifier(cid)
+                                        == Some(&"wait".to_string())
+                                {
+                                    Some(cid)
+                                } else {
+                                    None
                                 }
-                            }
-                        }
+                            })
+                            .collect()
+                    };
+                    for &cid in &to_activate {
+                        game_state.mods.add_orientation_modifier(cid, "active");
                     }
+                    game_state.active_player_mut().activate_all_energy();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
                 }
@@ -351,7 +361,7 @@ impl super::TurnEngine {
             .unwrap_or_default();
         let player_id = player.id.clone();
 
-        let (cost_paid, baton_touch_used, replaced_member_cost) =
+        let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) =
             player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
         game_state.record_card_movement(card_id);
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
@@ -416,6 +426,48 @@ impl super::TurnEngine {
                     );
                 }
             }
+        }
+
+        // Check the replaced (baton-touched) member's auto abilities for movement triggers.
+        // e.g. "when baton-touched to waitroom by cost 10+ 蓮ノ空 → activate 2 energy"
+        if let Some(replaced_id) = replaced_member_id {
+            let abilities: Vec<(String, String)> = game_state
+                .card_database
+                .get_card(replaced_id)
+                .map(|card| {
+                    card.abilities
+                        .iter()
+                        .filter(|ability| {
+                            ability
+                                .triggers
+                                .as_ref()
+                                .map_or(false, |t| t == crate::triggers::AUTO)
+                                && ability
+                                    .effect
+                                    .as_ref()
+                                    .and_then(|e| e.condition.as_ref())
+                                    .and_then(|c| c.location.as_deref())
+                                    .map_or(false, |loc| loc == "discard" || loc == "waitroom")
+                        })
+                        .map(|ability| {
+                            (
+                                format!("{}_{}", card.card_no, ability.full_text),
+                                card.card_no.clone(),
+                            )
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            for (ability_id, card_no) in abilities {
+                game_state.trigger_auto_ability(
+                    ability_id,
+                    crate::game_state::AbilityTrigger::Auto,
+                    player_id.clone(),
+                    Some(card_no),
+                    None,
+                );
+            }
+            game_state.process_pending_auto_abilities(&player_id);
         }
 
         Ok(())

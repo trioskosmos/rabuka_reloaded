@@ -114,8 +114,7 @@ impl<'a> AbilityResolver<'a> {
         self.game_state.last_vacated_stage_area = None;
 
         // Character name filter from the effect
-        // TEMPORARILY REVERTED: effect.characters breaks Chika score tests
-        let character_filter: Option<Vec<String>> = None;
+        let character_filter: Option<Vec<String>> = effect.characters.clone();
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
         let name_fragments: Option<Vec<String>> = if effect.name_constraint.as_deref()
@@ -292,6 +291,8 @@ impl<'a> AbilityResolver<'a> {
                                     characters: character_filter.clone(),
                                     filtered_indices: None,
                                     is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                                 });
                                 self.execution_context =
                                     ExecutionContext::SingleEffect { effect_index: 0 };
@@ -342,6 +343,8 @@ impl<'a> AbilityResolver<'a> {
                                 characters: character_filter.clone(),
                                 filtered_indices: None,
                                 is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                             });
                             self.execution_context =
                                 ExecutionContext::SingleEffect { effect_index: 0 };
@@ -394,6 +397,8 @@ impl<'a> AbilityResolver<'a> {
                                 characters: character_filter.clone(),
                                 filtered_indices: None,
                                 is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                             });
                             return Ok(());
                         }
@@ -443,6 +448,8 @@ impl<'a> AbilityResolver<'a> {
                                 characters: character_filter.clone(),
                                 filtered_indices: None,
                                 is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                             });
                             return Ok(());
                         }
@@ -493,12 +500,14 @@ impl<'a> AbilityResolver<'a> {
                                     count
                                 ),
                                 allow_skip: false,
-                                cost_limit: None,
-                                cost_limit_operator: None,
-                                group: None,
-                                characters: None,
+                                cost_limit: effect.cost_limit,
+                                cost_limit_operator: effect.cost_limit_operator.clone(),
+                                group: group_name.map(|s| s.to_string()),
+                                characters: character_filter.clone(),
                                 filtered_indices: None,
                                 is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                             });
                             self.execution_context =
                                 ExecutionContext::SingleEffect { effect_index: 0 };
@@ -542,12 +551,24 @@ impl<'a> AbilityResolver<'a> {
                             .map(|&i| player.success_live_card_zone.cards.remove(i))
                             .collect(),
                         SelectionOutcome::Prompt => {
-                            self.pending_choice = Some(Choice::select_card(
-                                "success_live_zone".to_string(),
+                            self.pending_choice = Some(Choice::SelectCard {
+                                zone: "success_live_zone".to_string(),
+                                card_type: card_type_filter.map(|s| s.to_string()),
                                 count,
-                                format!("Select {} card(s) from success live zone", count),
-                                false,
-                            ));
+                                description: format!(
+                                    "Select {} card(s) from success live zone",
+                                    count
+                                ),
+                                allow_skip: false,
+                                cost_limit: effect.cost_limit,
+                                cost_limit_operator: effect.cost_limit_operator.clone(),
+                                group: group_name.map(|s| s.to_string()),
+                                characters: character_filter.clone(),
+                                filtered_indices: None,
+                                is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
+                            });
                             return Ok(());
                         }
                         SelectionOutcome::Skip => vec![],
@@ -593,6 +614,8 @@ impl<'a> AbilityResolver<'a> {
                                 characters: character_filter.clone(),
                                 filtered_indices: None,
                                 is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                             });
                             return Ok(());
                         }
@@ -633,6 +656,8 @@ impl<'a> AbilityResolver<'a> {
                             characters: character_filter.clone(),
                             filtered_indices: None,
                             is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
@@ -699,6 +724,8 @@ impl<'a> AbilityResolver<'a> {
                             characters: character_filter.clone(),
                             filtered_indices: None,
                             is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());
@@ -762,6 +789,8 @@ impl<'a> AbilityResolver<'a> {
                             characters: character_filter.clone(),
                             filtered_indices: None,
                             is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         return Ok(());

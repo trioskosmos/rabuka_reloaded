@@ -54,8 +54,8 @@ fn kaguya_live_success_cheer_recover() {
     let filler = game.id("PL!-sd1-010-SD");
     let bladed_member = game.id("PL!S-sd1-003-SD"); // Has blades to trigger cheer
 
-    // Stage: 1 member with blade (needed for cheer)
-    game.state.player1.stage.stage = [bladed_member, -1, -1];
+    // Stage: bladed member for cheer + member with heart06 for live success requirement
+    game.state.player1.stage.stage = [bladed_member, member, -1];
     game.state.player1.hand.cards.push(kaguya);
     game.state.player1.hand.cards.push(filler); // For optional discard cost
 

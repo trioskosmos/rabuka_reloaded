@@ -32,11 +32,12 @@ fn start_true_dreams_q66_opponent_no_card_score_higher() {
     let mut game = TestGame::new(db.clone());
 
     let start = game.id("PL!SP-bp1-023-L");
-    let member = game.id("PL!-sd1-001-SD");
+    let member2 = game.id("PL!-sd1-001-SD"); // heart03=2, heart06=1
+    let member1 = game.id("PL!S-sd1-003-SD"); // heart02=1
     let filler = game.id("PL!-sd1-010-SD");
 
-    // Stage: a member so the live can proceed
-    game.state.player1.stage.stage = [member, -1, -1];
+    // Stage: 2 members covering heart02, heart03, heart06 for live success
+    game.state.player1.stage.stage = [member1, member2, -1];
     game.state.player1.hand.cards.push(start);
     // Seed main deck with fillers for live draws
     for _ in 0..10 {

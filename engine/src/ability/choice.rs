@@ -134,6 +134,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     characters,
                     filtered_indices,
                     is_select_action,
+                    ..
                 }),
                 ChoiceResult::CardSelected { indices },
             ) => {
@@ -273,22 +274,21 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
 
         let card_db = self.game_state.card_database.clone();
-        let validate_card = |cid: i16| -> bool {
-            util::card_matches_type(&card_db, cid, card_type.as_deref())
-                && util::card_matches_cost_limit_op(
-                    &card_db,
-                    cid,
-                    cost_limit,
-                    cost_limit_operator.as_deref(),
-                )
-                && util::card_matches_group_str(&card_db, cid, group.as_deref())
-                && match &characters {
-                    Some(chars) if !chars.is_empty() => {
-                        util::card_matches_characters(&card_db, cid, Some(chars))
-                    }
-                    _ => true,
-                }
+        let validate_filter = util::CardFilter {
+            card_type: card_type.as_deref(),
+            group: group.as_deref(),
+            groups: None,
+            cost_limit,
+            cost_operator: cost_limit_operator.as_deref(),
+            characters: characters.as_ref(),
+            heart_colors: &[],
+            name_fragments: None,
+            distinct: None,
+            exclude_self: None,
+            original_blade_limit: None,
+            original_blade_operator: None,
         };
+        let validate_card = |cid: i16| -> bool { validate_filter.matches(&card_db, cid, false) };
 
         if allow_skip && !indices.is_empty() {
             match zone {
@@ -377,10 +377,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     indices,
                     count,
                     card_type.as_deref(),
-                    None,
-                    None,
-                    None,
-                    None,
+                    cost_limit,
+                    cost_limit_operator.as_deref(),
+                    group.as_deref(),
+                    characters.as_ref(),
                 )?,
                 "looked_at" => {
                     eprintln!("[HSC1_LOOKED_AT] START: looked_cards.len()={}, indices={:?}, filtered_indices={:?}, is_select_cards={}",
@@ -420,22 +420,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             return Ok(());
                         }
                     } else if let ExecutionContext::LookAndSelect { .. } = self.execution_context {
-                        if let Some(ref select_action) = select_action_entry {
-                            self.handle_select_cards_looked_at(&mapped_indices)?;
-                            self.looked_at_cards = self.game_state.looked_at_cards.clone();
-                        } else {
-                            self.handle_select_cards_looked_at(&mapped_indices)?;
-                            self.looked_at_cards = self.game_state.looked_at_cards.clone();
-                        }
+                        if let Some(_) = select_action_entry {}
+                        self.handle_select_cards_looked_at(&mapped_indices)?;
+                        self.looked_at_cards = self.game_state.looked_at_cards.clone();
                     } else {
                         self.handle_select_cards_looked_at(&mapped_indices)?;
                         self.looked_at_cards = self.game_state.looked_at_cards.clone();
                     }
 
                     // Check if we can select more cards (for round-based "up to X" abilities).
-                    // Skip for any_number — the frontend handles batch selection in one shot.
                     if is_select_cards && !mapped_indices.is_empty() {
-                        let is_any_number = select_action_entry
+                        let any_number = select_action_entry
                             .as_ref()
                             .and_then(|sa| sa.any_number)
                             .unwrap_or(false);
@@ -444,7 +439,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         let remaining = self.game_state.looked_at_cards.len();
 
                         // If user can select more and there are remaining cards, create new choice
-                        if !is_any_number && max_count > selected_count && remaining > 0 {
+                        if max_count > selected_count && remaining > 0 {
                             let remaining_max = max_count - selected_count;
                             let card_type = card_type.clone();
                             self.pending_choice = Some(Choice::SelectCard {
@@ -453,12 +448,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 count: remaining_max,
                                 description: format!("Select up to {} more card(s) from the {} remaining looked-at cards", remaining_max, remaining),
                                 allow_skip: true,
-                                cost_limit: None,
-                                cost_limit_operator: None,
-                                group: None,
-                                characters: None,
+                                cost_limit: select_action_entry.as_ref().and_then(|sa| sa.cost_limit),
+                                cost_limit_operator: select_action_entry.as_ref().and_then(|sa| sa.cost_limit_operator.clone()),
+                                group: select_action_entry.as_ref().and_then(|sa| sa.group_names.as_ref()).and_then(|v| v.first().cloned()),
+                                characters: select_action_entry.as_ref().and_then(|sa| sa.characters.clone()),
                                 filtered_indices: None,
                                 is_select_action: false,
+            heart_colors: vec![],
+            name_fragments: None,
                             });
                             self.execution_context = context.clone();
                             return Ok(());
@@ -468,10 +465,21 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     return self.finalize_choice(&context);
                 }
                 "revealed_cards" => {
-                    let cards: Vec<i16> = indices
-                        .iter()
-                        .map(|&i| self.game_state.revealed_cards.remove(i))
-                        .collect();
+                    let cards: Vec<i16> = {
+                        let revealed = &mut self.game_state.revealed_cards;
+                        let mut result = Vec::new();
+                        let mut removed: Vec<usize> = indices.to_vec();
+                        removed.sort_by(|a, b| b.cmp(a));
+                        for &i in &removed {
+                            if i < revealed.len() {
+                                let cid = revealed.remove(i);
+                                if validate_card(cid) {
+                                    result.push(cid);
+                                }
+                            }
+                        }
+                        result
+                    };
                     self.selected_cards = cards;
                     // Move selected cards to destination
                     let dst = self.game_state.entry_destination().map(|s| s.to_string());
@@ -507,7 +515,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                     let selected_ids: Vec<i16> =
                         cards_to_move.iter().map(|&(_, cid)| cid).collect();
-                    std::mem::drop(player);
+                    let _ = player;
                     let player = self.game_state.active_player_mut();
                     for (si, card_id) in &cards_to_move {
                         if let Some(pos) = player.stage.under_cards[*si]
@@ -537,6 +545,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     indices
                 };
                 if !hand_idx.is_empty() || allow_skip {
+                    // Validate count for non-skip selections: must meet the required count
+                    if !hand_idx.is_empty() && count > 0 && hand_idx.len() < count {
+                        return Err(format!(
+                            "Not enough cards selected: need {}, got {}",
+                            count,
+                            hand_idx.len()
+                        ));
+                    }
                     self.execute_selected_cards_from_zone(
                         "hand",
                         hand_idx,
@@ -560,10 +576,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 indices,
                 count,
                 card_type.as_deref(),
-                None,
-                None,
-                None,
-                None,
+                cost_limit,
+                cost_limit_operator.as_deref(),
+                group.as_deref(),
+                characters.as_ref(),
             )?,
             "discard" => {
                 if is_select_action {
@@ -619,7 +635,20 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     crate::ability::util::place_card_in_zone(player, cid, dst_str, None, false, 1);
                 }
             }
-            "energy_zone" => self.execute_selected_energy_zone_cards(indices, count)?,
+            "energy_zone" => {
+                let filtered: Vec<usize> = {
+                    let player = self.game_state.active_player();
+                    indices
+                        .iter()
+                        .filter(|&&i| {
+                            i < player.energy_zone.cards.len()
+                                && validate_card(player.energy_zone.cards[i])
+                        })
+                        .copied()
+                        .collect()
+                };
+                self.execute_selected_energy_zone_cards(&filtered, count)?;
+            }
             "selected_cards" => {
                 eprintln!(
                     "[SELECTED_CARDS_BEFORE] self.selected_cards={:?} indices={:?}",
@@ -921,11 +950,13 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             self.pending_choice = None;
             if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
+                entry.effect_started = true;
                 entry.optional_cost_was_paid = false;
             }
             return Ok(());
         }
         // "pay_optional_cost" or "1" from select_option(1)
+        self.pending_choice = None; // Clear the stale choice before processing sub-costs
         if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
             entry.optional_cost_was_paid = true;
         }
@@ -959,8 +990,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                         } else if let Err(e) = self.pay_cost(sub_cost) {
                             eprintln!("Warning: sub-cost payment error: {}", e);
                         }
-                        // If a sub-cost creates a choice (e.g. move_cards), return and let the
-                        // main loop handle it. The choice will be resolved and flow returns here.
                         if self.pending_choice.is_some() {
                             return Ok(());
                         }
@@ -1312,6 +1341,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         match zone {
             "hand" => {
+                // Pre-validate: reject if any selected card fails the filter
+                for &i in indices {
+                    if i < player.hand.cards.len() && !passes(player.hand.cards[i]) {
+                        return Err(
+                            "Selected hand card does not match required filters".to_string()
+                        );
+                    }
+                }
                 let dest = destination.as_deref().unwrap_or("discard");
                 let mut idxs: Vec<usize> = indices.iter().copied().collect();
                 idxs.sort_by(|a, b| b.cmp(a));
@@ -1360,6 +1397,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "deck" => {
+                // Pre-validate: reject if any selected card fails the filter
+                for &i in indices {
+                    if i < player.main_deck.cards.len() && !passes(player.main_deck.cards[i]) {
+                        return Err(
+                            "Selected deck card does not match required filters".to_string()
+                        );
+                    }
+                }
                 let mut idxs: Vec<usize> = indices.iter().copied().collect();
                 idxs.sort_by(|a, b| b.cmp(a));
                 for i in idxs {
@@ -1380,6 +1425,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if dest == "stage" && player.stage.stage.iter().all(|&id| id != -1) {
                     eprintln!("[DISCARD_ZONE] stage is full, cannot place cards from discard");
                     return Ok(());
+                }
+                // Pre-validate: reject if any selected card fails the filter
+                for &i in indices {
+                    if i < player.waitroom.cards.len() && !passes(player.waitroom.cards[i]) {
+                        return Err(
+                            "Selected discard card does not match required filters".to_string()
+                        );
+                    }
                 }
                 let mut idxs: Vec<usize> = indices.iter().copied().collect();
                 idxs.sort_by(|a, b| b.cmp(a));
@@ -1479,16 +1532,30 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "stage" => {
+                // Pre-validate: reject if any selected card fails the filter
                 for &idx in indices {
+                    if idx < 3 && player.stage.stage[idx] != -1 && !passes(player.stage.stage[idx])
+                    {
+                        return Err(
+                            "Selected stage card does not match required filters".to_string()
+                        );
+                    }
                     if idx < 3 && player.stage.stage[idx] != -1 {
-                        let card_id = player.stage.stage[idx];
-                        if passes(card_id) {
-                            self.selected_cards.push(card_id);
-                        }
+                        self.selected_cards.push(player.stage.stage[idx]);
                     }
                 }
             }
             "revealed_cards" => {
+                // Pre-validate: reject if any selected card fails the filter
+                for &idx in indices {
+                    if idx < self.game_state.revealed_cards.len()
+                        && !passes(self.game_state.revealed_cards[idx])
+                    {
+                        return Err(
+                            "Selected revealed card does not match required filters".to_string()
+                        );
+                    }
+                }
                 for &idx in indices.iter().rev() {
                     if idx < self.game_state.revealed_cards.len() {
                         let card_id = self.game_state.revealed_cards.remove(idx);
@@ -1634,26 +1701,33 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             self.game_state.active_player().hand.cards
         );
 
-        // Check for multi-selection: if user selected at least 1 but fewer than max,
+        // Check for multi-selection: if user selected at least 1 but fewer than total,
         // keep remaining for another pick. If they selected 0, treat as "done".
-        // Skip for any_number — the frontend handles batch selection in one shot.
-        let is_any_number = select_action
+        let any_number = select_action
             .as_ref()
             .and_then(|sa| sa.any_number)
             .unwrap_or(false);
-        let max_select = select_action.as_ref().and_then(|sa| sa.count).unwrap_or(1) as usize;
-        let is_max_or_optional = select_action
+        let json_count = select_action.as_ref().and_then(|sa| sa.count).unwrap_or(1) as usize;
+        let total_available = selected_count + remaining_cards.len();
+        // For any_number, max is all cards. Otherwise use json_count (with max/optional).
+        let max_select = if any_number {
+            total_available
+        } else {
+            json_count
+        };
+        let can_select_more = select_action
             .as_ref()
-            .map(|sa| sa.max.unwrap_or(false) || sa.optional.unwrap_or(false))
+            .map(|sa| sa.max.unwrap_or(false) || sa.optional.unwrap_or(false) || any_number)
             .unwrap_or(false);
 
-        if !is_any_number
-            && selected_count > 0
-            && is_max_or_optional
+        if selected_count > 0
+            && can_select_more
             && max_select > selected_count
             && !remaining_cards.is_empty()
         {
-            // Persist remaining cards in both game_state and queue entry for next resolver
+            // Sync self.looked_at_cards BEFORE early return so resolver.take_looked_at()
+            // returns the updated state, not the pre-selection original.
+            self.looked_at_cards = remaining_cards.clone();
             self.game_state.looked_at_cards = remaining_cards.clone();
             if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                 entry.selected_card_ids = remaining_cards;
@@ -1670,12 +1744,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 count: remaining_selections,
                 description,
                 allow_skip: true,
-                cost_limit: None,
-                cost_limit_operator: None,
-                group: None,
-                characters: None,
+                cost_limit: select_action.as_ref().and_then(|sa| sa.cost_limit),
+                cost_limit_operator: select_action
+                    .as_ref()
+                    .and_then(|sa| sa.cost_limit_operator.clone()),
+                group: select_action
+                    .as_ref()
+                    .and_then(|sa| sa.group_names.as_ref())
+                    .and_then(|v| v.first().cloned()),
+                characters: select_action.as_ref().and_then(|sa| sa.characters.clone()),
                 filtered_indices: None,
                 is_select_action: false,
+                heart_colors: vec![],
+                name_fragments: None,
             });
             return Ok(());
         }
@@ -1717,7 +1798,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         if player.energy_zone.active_energy_count >= deactivated_count {
             player.energy_zone.active_energy_count -= deactivated_count;
         }
-        std::mem::drop(player);
+        let _ = player;
         for cid in to_mark {
             self.game_state.mods.clear_all_for_card(cid);
             self.game_state.mods.add_orientation_modifier(cid, "wait");

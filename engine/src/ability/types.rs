@@ -16,6 +16,10 @@ pub enum Choice {
         filtered_indices: Option<Vec<usize>>,
         #[serde(default)]
         is_select_action: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        heart_colors: Vec<String>,
+        #[serde(default)]
+        name_fragments: Option<Vec<String>>,
     },
     SelectTarget {
         target: String,
@@ -52,9 +56,17 @@ pub enum ChoiceResult {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExecutionContext {
     None,
-    SingleEffect { effect_index: usize },
-    LookAndSelect { step: LookAndSelectStep },
-    MoveCardsPosition { card_id: i16, state_change: Option<String>, target: String },
+    SingleEffect {
+        effect_index: usize,
+    },
+    LookAndSelect {
+        step: LookAndSelectStep,
+    },
+    MoveCardsPosition {
+        card_id: i16,
+        state_change: Option<String>,
+        target: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -65,23 +77,14 @@ pub enum LookAndSelectStep {
 }
 
 impl Choice {
-    /// Construct a SelectCard choice with sensible defaults for optional fields.
-    pub fn select_card(
-        zone: String, count: usize, description: String, allow_skip: bool,
-    ) -> Self {
-        Choice::SelectCard {
-            zone, card_type: None, count, description, allow_skip,
-            cost_limit: None, cost_limit_operator: None, group: None,
-            characters: None, filtered_indices: None, is_select_action: false,
-        }
-    }
-
     /// Convert to the JSON format expected by the frontend.
     /// Flattens enum variants and adds frontend-specific fields (choose_count, v_remaining, title).
     pub fn to_frontend_json(&self) -> Option<Value> {
         let mut json = serde_json::to_value(self).ok()?;
         match self {
-            Choice::SelectCard { count, description, .. } => {
+            Choice::SelectCard {
+                count, description, ..
+            } => {
                 let obj = json.as_object_mut()?;
                 if let Some(inner) = obj.remove("SelectCard") {
                     if let Some(mut fields) = inner.as_object().cloned() {
@@ -92,7 +95,11 @@ impl Choice {
                     }
                 }
             }
-            Choice::SelectTarget { target: _, description, allow_skip } => {
+            Choice::SelectTarget {
+                target: _,
+                description,
+                allow_skip,
+            } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectTarget") {
                         if let Some(mut fields) = inner.as_object().cloned() {
@@ -103,7 +110,11 @@ impl Choice {
                     }
                 }
             }
-            Choice::SelectPosition { position: _, description, allow_skip } => {
+            Choice::SelectPosition {
+                position: _,
+                description,
+                allow_skip,
+            } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectPosition") {
                         if let Some(mut fields) = inner.as_object().cloned() {
@@ -114,23 +125,37 @@ impl Choice {
                     }
                 }
             }
-            Choice::SelectHeartColor { options, description, .. } => {
+            Choice::SelectHeartColor {
+                options,
+                description,
+                ..
+            } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectHeartColor") {
                         if let Some(mut fields) = inner.as_object().cloned() {
                             fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert("options".into(), serde_json::to_value(options).unwrap_or_default());
+                            fields.insert(
+                                "options".into(),
+                                serde_json::to_value(options).unwrap_or_default(),
+                            );
                             *obj = fields;
                         }
                     }
                 }
             }
-            Choice::SelectHeartType { options, description, .. } => {
+            Choice::SelectHeartType {
+                options,
+                description,
+                ..
+            } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectHeartType") {
                         if let Some(mut fields) = inner.as_object().cloned() {
                             fields.insert("title".into(), Value::String(description.clone()));
-                            fields.insert("options".into(), serde_json::to_value(options).unwrap_or_default());
+                            fields.insert(
+                                "options".into(),
+                                serde_json::to_value(options).unwrap_or_default(),
+                            );
                             *obj = fields;
                         }
                     }
