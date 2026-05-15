@@ -84,9 +84,9 @@ fn test_yoshiko_debug_move_execution() {
         "matched card should be Chika"
     );
 
-    // After activation: Yoshiko's cost sets self to wait but doesn't remove from stage
+    // After activation: Chika should be removed from stage, Yoshiko stays in wait state
     let after_stage = game.player().stage.stage.clone();
-    assert_eq!(after_stage[0], chika, "Chika should remain on left side");
+    assert_eq!(after_stage[0], -1, "Chika should be removed from left side to discard");
     assert_eq!(
         after_stage[1], yoshiko,
         "Yoshiko stays on center (set to wait, not removed from stage)"

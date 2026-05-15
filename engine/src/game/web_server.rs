@@ -1433,7 +1433,7 @@ async fn rooms_leave(data: web::Data<AppState>, req: web::Json<serde_json::Value
 
 async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequest>>) -> impl Responder {
 
-    let card_database = data.card_database.clone();
+    let mut card_database = data.card_database.clone();
     let deck_lists = data.deck_lists.clone();
 
     // Map frontend deck names to deck file names
@@ -1497,7 +1497,7 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
         }
     };
 
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers1) {
 
         Ok(mut deck) => {
 
@@ -1521,7 +1521,7 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
 
 
 
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers2) {
 
         Ok(mut deck) => {
 
@@ -1555,8 +1555,8 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
         }
     }
 
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &mut card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &mut card_database);
 
 
 

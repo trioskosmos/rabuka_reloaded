@@ -150,16 +150,32 @@ impl GameState {
         }
         self.mods.constant_cost_bonuses = exp_cost;
 
-        // Heart — clear old constant heart modifiers
-        for cid in exp_heart.keys() {
-            self.mods.need_heart_modifiers.remove(cid);
+        // Score
+        let old_score = std::mem::take(&mut self.mods.constant_score_bonuses);
+        for (cid, val) in &old_score {
+            self.mods.remove_score_modifier(*cid, *val);
+        }
+        for (&cid, &val) in &exp_score {
+            self.mods.add_score_modifier(cid, val);
+        }
+        self.mods.constant_score_bonuses = exp_score;
+
+        // Heart — clear old constant heart modifiers first, then re-apply new ones.
+        // Must drain the OLD map so bonuses from cards that left the stage are removed.
+        let old_heart = std::mem::take(&mut self.mods.constant_heart_bonuses);
+        for (cid, cols) in &old_heart {
+            for (color_str, &delta) in cols {
+                let hc = crate::card::parse_heart_color(color_str);
+                self.mods.remove_heart_modifier(*cid, hc, delta);
+            }
         }
         for (cid, cols) in &exp_heart {
             for (color_str, delta) in cols {
                 let hc = crate::card::parse_heart_color(color_str);
-                self.mods.add_need_heart_modifier(*cid, hc, *delta);
+                self.mods.add_heart_modifier(*cid, hc, *delta);
             }
         }
+        self.mods.constant_heart_bonuses = exp_heart;
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {

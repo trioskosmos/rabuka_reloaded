@@ -3202,10 +3202,16 @@ impl<'a> AbilityResolver<'a> {
             let player = self.game_state.resolve_target_player_mut(target);
             player.live_card_zone.cards.iter().copied().collect()
         };
+        // Only filter by activating card when there is no explicit player target
+        // (i.e. target defaults to "self" meaning "this card", not "this player's zone").
+        // When a specific player zone is targeted (e.g. opponent), apply to all cards there.
+        let filter_to_activating = activating_id.is_some() && target == "self";
         for &card_id in &card_ids {
-            if let Some(aid) = activating_id {
-                if card_id != aid {
-                    continue;
+            if filter_to_activating {
+                if let Some(aid) = activating_id {
+                    if card_id != aid {
+                        continue;
+                    }
                 }
             }
             self.game_state

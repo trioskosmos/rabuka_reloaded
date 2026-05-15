@@ -627,8 +627,17 @@ impl GameState {
         }
 
         if !expired_indices.is_empty() {
-            // Clear heart_color_multiplier when live ends (LiveEnd effects expire)
-            self.mods.heart_color_multiplier.clear();
+            // Clear heart_color_multiplier only when a live-scoped effect expires.
+            // ThisTurn effects expiring between turns must NOT wipe the multiplier mid-live.
+            let any_live_scoped_expired = expired_indices.iter().any(|&i| {
+                matches!(
+                    self.temporary_effects[i].duration,
+                    Duration::LiveEnd | Duration::ThisLive | Duration::AsLongAs | Duration::Unless
+                )
+            });
+            if any_live_scoped_expired {
+                self.mods.heart_color_multiplier.clear();
+            }
         }
 
         for i in expired_indices.into_iter().rev() {

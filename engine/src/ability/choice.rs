@@ -317,6 +317,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
                 "stage" => {
                     let mut last_vacated = None;
+                    let mut moved_ids = Vec::new();
                     {
                         let player = self.game_state.active_player_mut();
                         for &idx in indices.iter().rev() {
@@ -329,12 +330,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 {
                                     player.waitroom.add_card(card_id);
                                     last_vacated = Some(idx);
+                                    moved_ids.push(card_id);
                                 }
                             }
                         }
                     }
                     if let Some(pos) = last_vacated {
                         self.game_state.last_vacated_stage_area = Some(pos);
+                    }
+                    if !moved_ids.is_empty() {
+                        self.moved_cards = moved_ids.clone();
+                        self.game_state.recently_moved_cards = Some(moved_ids);
                     }
                 }
                 "energy_zone" => {
@@ -677,6 +683,46 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     "[SELECTED_CARDS_AFTER] self.selected_cards={:?}",
                     self.selected_cards
                 );
+            }
+            "stage" => {
+                // Move selected stage card(s) to the destination zone.
+                // Used by effects like Yoshiko (move chosen Aqours member off stage).
+                let dst = self.game_state.entry_destination().map(|s| s.to_string());
+                let dst_str = dst.as_deref().unwrap_or("discard").to_string();
+                let mut moved_ids: Vec<i16> = Vec::new();
+                let mut last_vacated: Option<usize> = None;
+                {
+                    let player = self.game_state.active_player_mut();
+                    for &idx in indices.iter().rev() {
+                        if idx < 3
+                            && player.stage.stage[idx] != -1
+                            && validate_card(player.stage.stage[idx])
+                        {
+                            if let Some(card_id) =
+                                player.remove_member_from_stage_with_recycling(idx, &card_db)
+                            {
+                                crate::ability::util::place_card_in_zone(
+                                    player,
+                                    card_id,
+                                    &dst_str,
+                                    None,
+                                    false,
+                                    1,
+                                );
+                                moved_ids.push(card_id);
+                                last_vacated = Some(idx);
+                            }
+                        }
+                    }
+                }
+                if let Some(pos) = last_vacated {
+                    self.game_state.last_vacated_stage_area = Some(pos);
+                }
+                self.selected_cards = moved_ids.clone();
+                if !moved_ids.is_empty() {
+                    self.moved_cards = moved_ids.clone();
+                    self.game_state.recently_moved_cards = Some(moved_ids);
+                }
             }
             _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
         }

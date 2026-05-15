@@ -44,9 +44,8 @@ class Seq(Rule):
             if m is None:
                 return None
             pos, res = m
-            if res is not None:
-                results.append(res)
-        return pos, results if len(results) != 1 else results[0]
+            results.append(res)
+        return pos, results
 
 
 class OneOf(Rule):
@@ -112,7 +111,11 @@ class Map(Rule):
     def match(self, text: str, pos: int = 0):
         m = self.rule.match(text, pos)
         if m:
-            return m[0], self.fn(m[1])
+            res = self.fn(m[1])
+            # If map function explicitly returns None, treat it as a parse failure
+            if res is None:
+                return None
+            return m[0], res
         return None
 
 

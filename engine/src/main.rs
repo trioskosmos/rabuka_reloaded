@@ -80,7 +80,7 @@ fn initialize_game() {
     };
 
     // Create CardDatabase from loaded cards
-    let card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
+    let mut card_database = Arc::new(rabuka_engine::card::CardDatabase::load_or_create(cards));
 
     // Load sample decks from game/decks
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
@@ -99,7 +99,7 @@ fn initialize_game() {
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
 
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers1) {
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers1) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -111,7 +111,7 @@ fn initialize_game() {
         }
     };
 
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&card_database, card_numbers2) {
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers2) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -124,8 +124,8 @@ fn initialize_game() {
     };
 
     // Add default energy cards if needed
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &card_database);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &mut card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &mut card_database);
 
     // Initialize players with decks
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);

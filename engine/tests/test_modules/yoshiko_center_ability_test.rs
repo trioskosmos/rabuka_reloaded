@@ -10,9 +10,10 @@ fn test_yoshiko_center_ability_basic_success() {
 
     // Setup: Get Yoshiko and other Aqours members
     let yoshiko = game.id("PL!S-bp3-006-R＋"); // 津島善子
-    let chika = game.id("PL!S-bp2-001-R"); // 高海千歌 (Aqours, cost 4)
-    let riko = game.id("PL!S-bp2-002-R"); // 桜内梨子 (Aqours, cost 4)
-    let hand_card = game.id("PL!-sd1-010-SD"); // Random hand card to discard
+    let chika = game.id("PL!S-bp2-001-R"); // Chika Takami (Aqours, cost 9)
+    let riko = game.id("PL!S-bp2-002-R"); // Riko Sakurauchi (Aqours, cost 4)
+    let hand_card = game.id("PL!-sd1-010-SD"); // Generic hand card to discard
+    let dia = game.id("PL!S-bp2-004-R"); // Dia Kurosawa (Aqours, cost 11)
 
     // Setup: Place Yoshiko in center position
     game.add_to_stage(MemberArea::Center, yoshiko);
@@ -23,8 +24,7 @@ fn test_yoshiko_center_ability_basic_success() {
     game.add_to_hand(hand_card);
 
     // Put higher cost Aqours members in discard for summoning
-    let you = game.id("PL!S-bp2-003-R"); // You Watanabe (Aqours, cost 6)
-    game.add_to_discard(you); // You can be summoned if Riko (cost 4) is sent to discard (4+2=6)
+    game.add_to_discard(dia); // Dia (cost 11) can be summoned if Chika (cost 9) is sent to discard (9+2=11)
 
     // Give player enough energy
     game.give_energy(5);
@@ -70,11 +70,14 @@ fn test_yoshiko_center_ability_basic_success() {
         "Hand card should be in discard (paid as cost)"
     );
 
-    // Verify the conditional summon effect moved a card from discard to hand
-    // (since the stage selection was resolved as no-op, the summon places its card in hand)
+    // Verify sub-action 1: Dia should be summoned from discard to the area vacated by Chika (LeftSide, index 0)
     assert!(
-        game.player().hand.cards.contains(&you),
-        "You should be summoned to hand from discard"
+        game.player().stage.stage[0] == dia,
+        "Dia should be summoned to the stage from discard"
+    );
+    assert!(
+        !game.player().waitroom.cards.contains(&dia),
+        "Dia should no longer be in discard"
     );
 
     // Verify conditional effect: New member summoned to same area where stage member was removed
