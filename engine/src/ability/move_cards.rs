@@ -50,6 +50,47 @@ fn remove_cards_from_hand(player: &mut crate::player::Player, indices: &[usize])
 }
 
 impl<'a> AbilityResolver<'a> {
+    fn resolve_cost_limit_reference(
+        &self,
+        effect: &AbilityEffect,
+    ) -> Result<Option<u32>, String> {
+        let reference = match effect.cost_reference.as_deref() {
+            Some(r) => r,
+            None => return Ok(effect.cost_limit),
+        };
+
+        let offset = effect.cost_offset.unwrap_or(0);
+        let referenced_id = match reference {
+            "previous_moved_card" => self
+                .moved_cards
+                .last()
+                .copied()
+                .or_else(|| {
+                    self.game_state
+                        .recently_moved_cards
+                        .as_ref()
+                        .and_then(|cards| cards.last().copied())
+                }),
+            _ => None,
+        }
+        .ok_or_else(|| format!("Unknown or unresolved cost reference: {}", reference))?;
+
+        let base_cost = self
+            .game_state
+            .card_database
+            .get_card(referenced_id)
+            .and_then(|c| c.cost)
+            .ok_or_else(|| {
+                format!(
+                    "Referenced card {} has no base cost for relative cost filter",
+                    referenced_id
+                )
+            })?;
+
+        let resolved = (base_cost as i32).saturating_add(offset).max(0) as u32;
+        Ok(Some(resolved))
+    }
+
     pub fn execute_move_cards(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         // Resolve dynamic_count if count is not explicitly set
         let count = if effect.count.is_some() {
@@ -70,6 +111,7 @@ impl<'a> AbilityResolver<'a> {
         } else {
             0
         };
+        let cost_limit = self.resolve_cost_limit_reference(effect)?;
         let group_name = effect.group_name();
 
         // Handle or_card_types: let the player pick which type to search for
@@ -104,7 +146,6 @@ impl<'a> AbilityResolver<'a> {
         };
         let card_type_filter: Option<&str> = card_type_owned.as_deref();
         let tgt = effect.target.clone();
-        let cost_limit = effect.cost_limit;
         let is_self_cost = effect.self_cost.unwrap_or(false);
         let exclude_self = effect.exclude_self.unwrap_or(false);
         let is_max = effect.max.unwrap_or(false);

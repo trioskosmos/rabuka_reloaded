@@ -1,7 +1,9 @@
 use crate::helpers::*;
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
-    for _ in 0..5 { game.pass(); }
+    for _ in 0..5 {
+        game.pass();
+    }
 }
 fn advance_to_live_start(game: &mut TestGame) {
     game.pass();
@@ -25,7 +27,9 @@ fn triple_discard_gives_blade() {
     game.state.player1.hand.cards.push(hand);
     game.state.player1.hand.cards.push(live);
     game.state.player1.hand.cards.push(filler);
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
@@ -34,7 +38,13 @@ fn triple_discard_gives_blade() {
     assert!(game.has_pending_choice(), "Optional cost should appear");
     game.select_indices(&[0]); // hand copy at index 0 — matches characters
 
-    let blade = game.state.mods.blade_modifiers.get(&stage).copied().unwrap_or(0);
+    let blade = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage)
+        .copied()
+        .unwrap_or(0);
     assert_eq!(blade, 1, "1 card discarded → 1 blade, got {}", blade);
 }
 
@@ -52,14 +62,24 @@ fn triple_no_matching_zero_blades() {
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.hand.cards.push(live);
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
 
-    while game.has_pending_choice() { game.select_indices(&[]); }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
-    let blade = game.state.mods.blade_modifiers.get(&triple).copied().unwrap_or(0);
+    let blade = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&triple)
+        .copied()
+        .unwrap_or(0);
     assert_eq!(blade, 0, "No matching → 0 blades, got {}", blade);
 }

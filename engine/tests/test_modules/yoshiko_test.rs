@@ -4,6 +4,7 @@
 /// Q154: When no matching Aqours member exists in deck, the search ends silently
 /// (no error, no add).
 use crate::helpers::*;
+use rabuka_engine::turn::TurnEngine;
 
 /// Activate Yoshiko's ability with enough energy, no matching Aqours member in deck.
 /// The ability should search, find nothing, and end without addition.
@@ -125,5 +126,62 @@ fn yoshiko_q154_wrong_cost_aqours_in_deck_not_deployed() {
     assert!(
         !(on_stage && in_deck),
         "Aqours member should not be in both stage and deck simultaneously"
+    );
+}
+
+/// Test case 9: Conditional summon uses sacrificed member cost + 2.
+#[test]
+fn test_yoshiko_center_ability_cost_plus_two_same_area() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let yoshiko = game.id("PL!S-bp3-006-R\u{ff0b}");
+    let sacrificial_member = game.id("PL!S-bp2-001-R"); // cost 9
+    let summoned_member = game.id("PL!S-bp2-004-R"); // cost 11 = 9 + 2
+    let wrong_cost_member = game.id("PL!S-bp2-002-R"); // cost 4, should stay put
+    let hand_card = game.id("PL!-sd1-010-SD");
+
+    // Yoshiko in Center, one other Aqours member on stage to sacrifice.
+    game.state.player1.stage.stage = [sacrificial_member, yoshiko, -1];
+    game.state.player1.hand.cards.push(hand_card);
+
+    // Put both the valid +2 card and a wrong-cost Aqours decoy in discard.
+    game.state.player1.waitroom.cards.push(summoned_member);
+    game.state.player1.waitroom.cards.push(wrong_cost_member);
+
+    game.give_energy(15);
+
+    game.activate_ability(yoshiko);
+
+    // Resolve any prompts from the stage sacrifice / hand discard.
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let player_id = game.state.player1.id.clone();
+    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+
+    assert!(
+        game.player().waitroom.cards.contains(&sacrificial_member),
+        "Sacrificed member should be sent to discard"
+    );
+    assert_eq!(
+        game.player().stage.stage[0],
+        summoned_member,
+        "Cost+2 Aqours member should be placed in the vacated area"
+    );
+    assert_eq!(
+        game.player().stage.stage[1],
+        yoshiko,
+        "Yoshiko should remain in Center"
+    );
+    assert!(
+        game.player().waitroom.cards.contains(&wrong_cost_member),
+        "Wrong-cost Aqours member should remain in discard"
+    );
+    assert!(
+        !game.player().stage.stage.contains(&wrong_cost_member),
+        "Wrong-cost Aqours member should not be placed on stage"
     );
 }

@@ -47,10 +47,7 @@ fn miracle_wave_q182_excess_heart_score_4() {
     game.pass(); // → LiveVictoryDetermination (set)
     game.pass(); // → Active (processes LiveVictoryDetermination)
 
-    let mod_val = game
-        .state
-        .mods
-        .get_score_modifier(game.id("PL!S-bp3-019-L"));
+    let mod_val = game.state.mods.get_score_modifier(wave);
     assert_eq!(
         mod_val, 4,
         "Excess heart ≥2 → score should be set to 4 (got {})",

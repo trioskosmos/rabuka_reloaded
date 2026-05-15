@@ -1886,6 +1886,19 @@ def _fill_defaults(action, text):
             d = extract_destination(text)
             if d:
                 action["destination"] = d
+        # Relative cost search: "そのメンバーのコストに2を足した数に等しいコスト"
+        # This references the card moved by the previous sub-action.
+        if (
+            action.get("source") == "discard"
+            and action.get("destination") == "same_area"
+            and "そのメンバーのコストに" in text
+            and "足した数に等しいコスト" in text
+        ):
+            m = re.search(r"コストに(\d+)を足した数に等しいコスト", text)
+            if m:
+                action["cost_reference"] = "previous_moved_card"
+                action["cost_offset"] = int(m.group(1))
+                action.setdefault("cost_limit_operator", "=")
         if "card_type" not in action:
             ct = _infer_card_type(text, action)
             if ct:

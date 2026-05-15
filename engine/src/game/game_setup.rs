@@ -699,9 +699,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                         if stage_card_ids[area_idx] != -1 {
                             let existing_member_id = stage_card_ids[area_idx];
-                            if !active_player.areas_locked_this_turn.contains(area)
-                                && game_state.baton_touch_count < 1
-                            {
+                            if !active_player.areas_locked_this_turn.contains(area) {
                                 // Check if existing member has cannot_baton_touch restriction
                                 let has_baton_touch_protection = game_state
                                     .card_database

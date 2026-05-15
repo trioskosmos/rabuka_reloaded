@@ -2,50 +2,29 @@
 
 ## Changes Made (388/388 tests passing)
 
-### Engine: Condition Evaluation Fixes
-
+### Instance ID System (new!)
 | File | What | Why |
-|------|------|-----|
-| `engine/src/ability/condition.rs` | `evaluate_card_count_condition`: resolve `target="self"` using `activating_card_id` by scanning all player zones (stage, hand, live_card_zone, energy_zone) instead of `ability_queue.current_entry()` | Queue entry is cleaned up before nested sequential-action conditions run; was returning wrong player |
-| `engine/src/ability/condition.rs` | `evaluate_location_condition` → `calculate_location_value`: same `activating_card_id`-based player resolution for `target="self"` | Same root cause: queue entry gone → wrong player checked for appearance‑trigger conditions |
-| `engine/src/ability/condition.rs` | `check_location_distinct`: same `activating_card_id`-based player resolution | Consistency with above |
-| `engine/src/ability/condition.rs` | Removed `game_state.recently_moved_cards` fallback in the no-location (`""`) branch of `evaluate_card_count_condition` | An earlier sub-action's draw+discard set `recently_moved_cards`, causing later sub-actions to count 1 moved card instead of 3 stage members |
+|------|------|------|
+| `tests/helpers/mod.rs` | `id()` now **pops** from the copy pool (returns unique ID each call). Added `id_ref()` for stable-reference pattern (peeks, returns same ID). | Multiple copies of the same card on stage now get **distinct numeric IDs** → `recalculate_constants` applies per-card modifiers correctly instead of accumulating shared modifiers. Fixes "3 copies → +6 blade instead of +2 each". |
+| `tests/helpers/mod.rs` | Retained `new_id()` (same as `id()` now — both pop). | Backward compat for tests that explicitly used `new_id()`. |
+| Various test files | Fixed 5 tests that called `game.id("x")` twice expecting the same ID (now store in a variable). | `id()` now returns a different ID each call, so `set_live_card(game.id("x"))` would search for a different copy than `game.state.hand.push(game.id("x"))` stored. |
 
-### Engine: Baton Touch Duplicate Fix
-
+### LiveStart Trigger Fix (new!)
 | File | What | Why |
-|------|------|-----|
-| `engine/src/core/player.rs` | Guarded unconditional old-card removal with `if !baton_touch_used` | When baton-touch, the old member was pushed to waitroom TWICE (once by the unconditional block, once by the baton-touch-specific block) |
-| `engine/src/core/player.rs` | Moved `cannot_baton_touch` protection check BEFORE energy payment | Was after — if check failed, energy had already been spent and new card already on stage, leaving corrupted state |
+|------|------|------|
+| `triggers.rs` | `trigger_live_start_abilities` now passes the **numeric stage card ID** as `explicit_card_id` to `trigger_auto_ability`. | `search_player_zones_for_card` searches **hand first**, then stage. It found the hand copy (same `card_no`) before the stage copy, setting `activating_card_id` to the hand/discarded copy instead of the stage copy. Blade/score modifiers were applied to the wrong card. |
 
-### Engine: Mulligan Selection Fix
-
+### Card ID Determinism (re-applied)
 | File | What | Why |
-|------|------|-----|
-| `engine/src/game/game_setup.rs` | `SelectMulligan` action now passes `card_indices: Some(vec![hand_index])` instead of `card_index` + `stage_area` | The dispatch only forwards `card_indices` and `card_id`, never `card_index`; `stage_area` was a copy-paste artifact |
-| `engine/src/turn/phases.rs` | `handle_mulligan_selection` simplified to consume `card_indices[0]` directly | Removed `get_card_index_by_id()` linear search that always found the first duplicate, making the second copy impossible to independently mulligan |
+|------|------|------|
+| `card.rs` | `load_or_create` now sorts cards by `card_no` before assigning sequential IDs. | Eliminates non-deterministic ID assignment from HashMap iteration order — same cards always get same numeric IDs across runs. |
+| `card.rs` | Removed dead `Card.card_id` field (was `#[serde(skip)]`, always `0`, never read). | Dead code cleanup. |
+| `card.rs` | Removed `save_mapping()` and mapping file loading (`card_id_mapping.json`). | Unused — IDs are now deterministic via `card_no` sort. |
+| — | Deleted `engine/card_id_mapping.json` and `root_files/card_id_mapping.json`. | Stale files with incompatible mappings. |
 
-## Remaining Issues
-
-### 1. Instance IDs for Modifier Tracking (stage duplicates)
-
-**Problem**: If 3 copies of the same card are on stage, all share the same numeric ID. A 常時 ability that gives "this card +2 blade" would accumulate as +6 total instead of +2 per copy.
-
-**Current state**: The test helper infrastructure already has a `copy_pool` (`TestGame::new()` pre-creates 5 copies per template). `new_id()` returns distinct copies by popping from the pool. However `id()` peeks (returns the same copy every call), so patterns like `for _ in 0..5 { deck.push(game.id("filler")) }` still push the same ID.
-
-**Candidate fix**: Change `id()` to pop from the pool, add `id_ref()` for stable-reference patterns. This is NOT yet implemented because it would require auditing every test for patterns that call `id()` twice expecting the same ID.
-
-### 2. Card ID Determinism
-
-**Current state**: IDs are assigned from arbitrary HashMap iteration order (non‑deterministic). Reverted `sort_by(card_no)` + removed `card_id_mapping.json` and dead `Card.card_id` field in the revert.
-
-**Needed**: Re-apply deterministic sorting and dead-code cleanup after instance ID fix.
-
-### 3. For Examination (user-reported)
-
-- PL!-pb1-011-R (Eli) BiBi group check returns `actual=0` despite BiBi cards on stage — should be fixed by the `calculate_location_value` / `check_location_distinct` player-resolution fix in `condition.rs`
-- `cannot_baton_touch` protection check order — fixed
-
-## Test Strategy
-
-All changes verified by running `cargo test` — 388/388 passing.
+### Earlier Fixes (still in place)
+| File | What |
+|------|------|
+| `condition.rs` | Player resolution via `activating_card_id` for `evaluate_card_count_condition`, `calculate_location_value`, `check_location_distinct`. Removed `recently_moved_cards` fallback. |
+| `player.rs` | Baton touch: guarded unconditional removal with `if !baton_touch_used` (eliminates duplicate waitroom push). Moved `cannot_baton_touch` check before energy payment. |
+| `game_setup.rs` + `phases.rs` | Mulligan: uses `card_indices` directly instead of `get_card_index_by_id` (fixes duplicate-card selection). |

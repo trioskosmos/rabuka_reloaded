@@ -94,7 +94,7 @@ impl super::TurnEngine {
 
     pub fn trigger_live_start_abilities(game_state: &mut GameState, player_id: &str) {
         let player_id_clone = player_id.to_string();
-        let mut abilities_to_trigger = Vec::new();
+        let mut abilities_to_trigger: Vec<(String, String, Option<i16>)> = Vec::new();
 
         {
             let player = if player_id_clone == game_state.player1.id {
@@ -111,7 +111,7 @@ impl super::TurnEngine {
                             .map_or(false, |t| t == crate::triggers::LIVE_START)
                         {
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                            abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                            abilities_to_trigger.push((ability_id, card.card_no.clone(), None));
                         }
                     }
                 }
@@ -126,7 +126,11 @@ impl super::TurnEngine {
                                 .map_or(false, |t| t == crate::triggers::LIVE_START)
                             {
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
-                                abilities_to_trigger.push((ability_id, card.card_no.clone()));
+                                abilities_to_trigger.push((
+                                    ability_id,
+                                    card.card_no.clone(),
+                                    Some(card_id),
+                                ));
                             }
                         }
                     }
@@ -139,7 +143,7 @@ impl super::TurnEngine {
             abilities_to_trigger.len(),
             player_id
         );
-        for (ability_id, card_no) in abilities_to_trigger {
+        for (ability_id, card_no, explicit_card_id) in abilities_to_trigger {
             eprintln!(
                 "[LIVE_START_TRIGGER]   ability={} card_no={}",
                 ability_id, card_no
@@ -149,7 +153,7 @@ impl super::TurnEngine {
                 AbilityTrigger::LiveStart,
                 player_id_clone.clone(),
                 Some(card_no),
-                None,
+                explicit_card_id,
             );
         }
     }
