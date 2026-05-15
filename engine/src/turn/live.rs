@@ -38,15 +38,17 @@ impl super::TurnEngine {
     }
 
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
+        let p1_mult = &game_state.mods.heart_color_multiplier.clone();
+        let p2_mult = &game_state.mods.heart_color_multiplier.clone();
         game_state.player1.stage_hearts = Some(
             game_state
                 .player1
-                .calculate_stage_hearts(&game_state.card_database),
+                .calculate_stage_hearts(&game_state.card_database, p1_mult),
         );
         game_state.player2.stage_hearts = Some(
             game_state
                 .player2
-                .calculate_stage_hearts(&game_state.card_database),
+                .calculate_stage_hearts(&game_state.card_database, p2_mult),
         );
 
         let player1_id = game_state.player1.id.clone();

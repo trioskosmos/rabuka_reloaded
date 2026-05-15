@@ -437,7 +437,8 @@ impl GameState {
         if player.live_card_zone.cards.is_empty() {
             return false;
         }
-        let stage_hearts = player.calculate_stage_hearts(&self.card_database);
+        let stage_hearts =
+            player.calculate_stage_hearts(&self.card_database, &self.mods.heart_color_multiplier);
         for card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*card_id) {
                 if card.satisfies_heart_requirement(&stage_hearts) {
@@ -623,6 +624,11 @@ impl GameState {
             if is_expired {
                 expired_indices.push(i);
             }
+        }
+
+        if !expired_indices.is_empty() {
+            // Clear heart_color_multiplier when live ends (LiveEnd effects expire)
+            self.mods.heart_color_multiplier.clear();
         }
 
         for i in expired_indices.into_iter().rev() {

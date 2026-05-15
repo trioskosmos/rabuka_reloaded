@@ -32,6 +32,7 @@ pub mod gameplay_test;
 pub mod hanamaru_test;
 pub mod hanamusubi_test;
 pub mod hanano_test;
+pub mod heart_override_test;
 pub mod hanayo_test;
 pub mod hazuki_test;
 pub mod himeno_test;

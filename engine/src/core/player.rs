@@ -466,22 +466,29 @@ impl Player {
 
     /// Calculate the total hearts provided by all members on stage
     /// Used for heart satisfaction bonus calculation during live
-    pub fn calculate_stage_hearts(&self, card_db: &CardDatabase) -> crate::card::BaseHeart {
+    pub fn calculate_stage_hearts(
+        &self,
+        card_db: &CardDatabase,
+        heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
+    ) -> crate::card::BaseHeart {
         use crate::card::HeartColor;
         use std::collections::HashMap;
 
         let mut total_hearts: HashMap<HeartColor, u32> = HashMap::new();
 
-        // Collect hearts from all members on stage
         for &card_id in &self.stage.stage {
             if card_id == crate::constants::EMPTY_SLOT {
                 continue;
             }
             if let Some(card) = card_db.get_card(card_id) {
-                // Add base hearts from the card
                 if let Some(ref base_heart) = card.base_heart {
-                    for (color, count) in &base_heart.hearts {
-                        *total_hearts.entry(*color).or_insert(0) += count;
+                    if let Some(override_color) = heart_color_multiplier.get(&card_id) {
+                        let total: u32 = base_heart.hearts.values().sum();
+                        *total_hearts.entry(*override_color).or_insert(0) += total;
+                    } else {
+                        for (color, count) in &base_heart.hearts {
+                            *total_hearts.entry(*color).or_insert(0) += count;
+                        }
                     }
                 }
             }

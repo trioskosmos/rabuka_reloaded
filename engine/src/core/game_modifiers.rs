@@ -15,6 +15,7 @@ pub struct GameModifiers {
     pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, i32>>,
     pub constant_blade_bonuses: HashMap<i16, i32>,
     pub constant_cost_bonuses: HashMap<i16, i32>,
+    pub heart_color_multiplier: HashMap<i16, HeartColor>,
 }
 
 impl GameModifiers {
@@ -30,6 +31,7 @@ impl GameModifiers {
             need_heart_modifiers: HashMap::new(),
             constant_blade_bonuses: HashMap::new(),
             constant_cost_bonuses: HashMap::new(),
+            heart_color_multiplier: HashMap::new(),
         }
     }
 
@@ -177,5 +179,6 @@ impl GameModifiers {
         self.cost_modifiers.remove(&card_id);
         self.constant_blade_bonuses.remove(&card_id);
         self.constant_cost_bonuses.remove(&card_id);
+        self.heart_color_multiplier.remove(&card_id);
     }
 }
