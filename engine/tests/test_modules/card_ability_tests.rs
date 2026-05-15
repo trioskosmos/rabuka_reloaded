@@ -410,3 +410,139 @@ fn rurino_ozora_different_stage_positions() {
         "Should have 1 other member when Rurino is right"
     );
 }
+
+// ====================================================================
+//  大沢瑠璃乃 (PL!HS-bp1-005-R) — 登場:  discard up to 3 → draw equal to discarded
+// ====================================================================
+// 登場: 手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。
+//
+// Cost: optional, discard up to 3 from hand
+// Effect: draw cards equal to number actually discarded
+// ====================================================================
+
+/// Discard 2 cards → draw exactly 2
+#[test]
+fn rurino_bp1_discard_2_draw_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rurino = game.id("PL!HS-bp1-005-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = rurino;
+    game.give_energy(1);
+
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    // Activate the ability
+    game.activate_ability(rurino);
+
+    // Optional cost: select which cards to discard (choose 2 out of 3)
+    game.select_indices(&[0, 1]);
+    // Effect fires: draw = discarded count = 2
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 2 + 2,
+        "hand: 3 before - 2 discarded + 2 drawn = 3"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        2,
+        "2 cards discarded to waitroom"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 2,
+        "2 cards drawn from deck"
+    );
+}
+
+/// Discard 0 cards (skip optional cost) → draw 0
+#[test]
+fn rurino_bp1_discard_0_draw_0() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rurino = game.id("PL!HS-bp1-005-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = rurino;
+    game.give_energy(1);
+
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.activate_ability(rurino);
+
+    // Select 0 cards (skip by selecting empty)
+    game.select_indices(&[]);
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "no discard, no draw — hand unchanged"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        0,
+        "no cards discarded"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before,
+        "no cards drawn from deck"
+    );
+}
+
+/// Discard 3 cards → draw 3
+#[test]
+fn rurino_bp1_discard_3_draw_3() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let rurino = game.id("PL!HS-bp1-005-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = rurino;
+    game.give_energy(1);
+
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.activate_ability(rurino);
+
+    game.select_indices(&[0, 1, 2]);
+
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 3 + 3,
+        "hand: 3 before - 3 discarded + 3 drawn = 3"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        3,
+        "3 cards discarded to waitroom"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 3,
+        "3 cards drawn from deck"
+    );
+}

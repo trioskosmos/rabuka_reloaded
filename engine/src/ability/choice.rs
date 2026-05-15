@@ -1346,7 +1346,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         match zone {
             "hand" => {
-                // Pre-validate: reject if any selected card fails the filter
                 for &i in indices {
                     if i < player.hand.cards.len() && !passes(player.hand.cards[i]) {
                         return Err(
@@ -1357,6 +1356,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 let dest = destination.as_deref().unwrap_or("discard");
                 let mut idxs: Vec<usize> = indices.iter().copied().collect();
                 idxs.sort_by(|a, b| b.cmp(a));
+                let mut moved_cards: Vec<i16> = Vec::new();
                 for i in idxs {
                     if i < player.hand.cards.len() {
                         let card_id = player.hand.cards.remove(i);
@@ -1394,11 +1394,16 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 }
                                 _ => player.waitroom.add_card(card_id),
                             }
-                            moved.push(card_id);
+                            moved_cards.push(card_id);
                         } else {
                             player.hand.cards.insert(i, card_id);
                         }
                     }
+                }
+                if dest == "discard" || dest == "waitroom" {
+                    let count = moved_cards.len() as u32;
+                    eprintln!("[DISCARD_TRACK] setting last_cost_discard_count={}", count);
+                    self.game_state.mods.last_cost_discard_count = count;
                 }
             }
             "deck" => {

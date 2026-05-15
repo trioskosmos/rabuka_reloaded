@@ -114,8 +114,7 @@ impl<'a> AbilityResolver<'a> {
         self.game_state.last_vacated_stage_area = None;
 
         // Character name filter from the effect
-        // TEMPORARILY REVERTED: effect.characters breaks Chika score tests
-        let character_filter: Option<Vec<String>> = None;
+        let character_filter: Option<Vec<String>> = effect.characters.clone();
 
         // Resolve name_constraint (e.g. "contains_all" from a revealed card)
         let name_fragments: Option<Vec<String>> = if effect.name_constraint.as_deref()

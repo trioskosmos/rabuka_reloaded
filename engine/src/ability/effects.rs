@@ -297,17 +297,24 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::ConditionalAlternative => self.execute_conditional_alternative(effect),
             EffectAction::LookAndSelect => self.execute_look_and_select(effect),
             EffectAction::SelectCards => self.execute_select_cards(effect),
-            EffectAction::Draw | EffectAction::DrawCard => self.execute_draw(
-                effect,
-                effect.count_or(1),
-                effect.target_name(),
-                effect.source_or("deck"),
-                effect.destination.as_deref().unwrap_or("hand"),
-                effect.card_type.as_deref(),
-                effect.per_unit.unwrap_or(false),
-                effect.per_unit_count.unwrap_or(1),
-                effect.per_unit_type.as_deref(),
-            ),
+            EffectAction::Draw | EffectAction::DrawCard => {
+                let draw_count = if effect.count == Some(0) {
+                    self.moved_cards.len() as u32
+                } else {
+                    effect.count_or(1)
+                };
+                self.execute_draw(
+                    effect,
+                    draw_count,
+                    effect.target_name(),
+                    effect.source_or("deck"),
+                    effect.destination.as_deref().unwrap_or("hand"),
+                    effect.card_type.as_deref(),
+                    effect.per_unit.unwrap_or(false),
+                    effect.per_unit_count.unwrap_or(1),
+                    effect.per_unit_type.as_deref(),
+                )
+            }
             EffectAction::DrawUntilCount => {
                 self.execute_draw_until_count(
                     effect.target_count.unwrap_or(0),
@@ -1000,6 +1007,7 @@ impl<'a> AbilityResolver<'a> {
         let activating_card_id = self.game_state.activating_card;
         let card_db = self.card_db();
         let is_self_target = effect.self_target.unwrap_or(false);
+        let last_discard_count = self.game_state.mods.last_cost_discard_count;
         let is_all = effect.all.unwrap_or(false)
             || (effect.source.is_none()
                 && effect.card_type.as_deref() == Some("member_card")
@@ -1070,7 +1078,7 @@ impl<'a> AbilityResolver<'a> {
             );
 
             let final_count = if per_unit {
-                let matching_count = util::resolve_per_unit_count(
+                let mut matching_count = util::resolve_per_unit_count(
                     true,
                     per_unit_type_str.as_deref(),
                     player,
@@ -1078,6 +1086,14 @@ impl<'a> AbilityResolver<'a> {
                     &filter,
                     &[],
                 );
+                // For per_unit_type="discard", prefer the per-cost tracked count.
+                // This gives exact discard count for abilities like LL-bp2-001
+                // (cost: discard named characters → gain blade per discarded card).
+                // Falls back to total waitroom count when tracking is 0
+                // (other abilities like Ren which count all Liella! in waitroom).
+                if per_unit_type_str.as_deref() == Some("discard") && last_discard_count > 0 {
+                    matching_count = last_discard_count;
+                }
                 (matching_count / per_unit_count_val) * count
             } else {
                 count

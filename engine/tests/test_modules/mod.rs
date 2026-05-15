@@ -3,6 +3,7 @@ pub mod awake_test;
 pub mod ayumu_azuna_test;
 pub mod ayumu_pb1_test;
 pub mod b7_constant_ability_test;
+pub mod blade_per_discard_test;
 pub mod b8_live_timing_test;
 pub mod b9_more_test;
 pub mod batch5_test;

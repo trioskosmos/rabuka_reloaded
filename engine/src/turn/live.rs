@@ -709,82 +709,16 @@ pub fn build_snapshot(
 }
 
 pub fn snapshot_to_rule_log(snap: &crate::types::PerformanceSnapshot) -> Vec<String> {
-    let mut lines = Vec::new();
-    let heart_labels = ["h00", "h01", "h02", "h03", "h04", "h05", "h06"];
-    let fmt_hearts = |arr: &[u32; 7]| {
-        arr.iter()
-            .enumerate()
-            .filter(|(_, &v)| v > 0)
-            .map(|(i, v)| format!("{}:{}", heart_labels[i], v))
-            .collect::<Vec<_>>()
-            .join(" ")
-    };
-
-    lines.push(format!(
-        "[PF] ── Player {} Performance (Turn {}) ──",
-        snap.player_id, snap.turn
-    ));
-    for mc in &snap.member_contributions {
-        let card_str = if mc.card_no.is_empty() {
-            format!("#{}", mc.source_id)
-        } else {
-            mc.card_no.clone()
-        };
-        let bh = fmt_hearts(&mc.base_hearts);
-        let bh_display = if bh.is_empty() { "—".to_string() } else { bh };
-        lines.push(format!(
-            "[PF]  ├ Stage: {}  ★{}  ♥[{}]",
-            card_str, mc.base_blades, bh_display
-        ));
-        if mc.bonus_hearts.iter().any(|&v| v > 0) || mc.bonus_blades > 0 {
-            let bh_bonus = fmt_hearts(&mc.bonus_hearts);
-            lines.push(format!(
-                "[PF]  │   bonus ★+{} ♥[{}]",
-                mc.bonus_blades, bh_bonus
-            ));
-        }
-    }
-    lines.push(format!("[PF]  ├ Yell: {} cards", snap.yell_count));
-    for yc in &snap.yell_cards {
-        let card_str = if yc.card_no.is_empty() {
-            format!("#{}", yc.card_id)
-        } else {
-            yc.card_no.clone()
-        };
-        let bh = fmt_hearts(&yc.blade_hearts);
-        lines.push(format!(
-            "[PF]  │   {}  ♥[{}]  ♪{}  ⎋{}",
-            card_str, bh, yc.note_icons, yc.draw_icons
-        ));
-    }
-    let total_h = fmt_hearts(&snap.total_hearts);
-    lines.push(format!("[PF]  ├ Total hearts: [{}]", total_h));
-    for live in &snap.lives {
-        let result_str = if live.passed { "PASS" } else { "FAIL" };
-        let card_str = if live.card_no.is_empty() {
-            format!("#{}", live.card_id)
-        } else {
-            live.card_no.clone()
-        };
-        let need_h = fmt_hearts(&live.required);
-        let filled_h = fmt_hearts(&live.filled);
-        let spare_h = fmt_hearts(&live.spare);
-        lines.push(format!(
-            "[PF]  ├ Live: {}  need[{}]  filled[{}]  spare[{}]  score:{}  → {}",
-            card_str, need_h, filled_h, spare_h, live.score, result_str
-        ));
-    }
-    let outcome = if snap.p0_wins {
-        "Player 1 wins"
-    } else if snap.p1_wins {
-        "Player 2 wins"
-    } else {
-        "No winner"
-    };
     let pass_str = if snap.success { "PASS" } else { "FAIL" };
-    lines.push(format!(
-        "[PF]  └ Score: {}  {}  → {}",
-        snap.total_score, pass_str, outcome
-    ));
-    lines
+    let outcome = if snap.p0_wins {
+        "P1 wins"
+    } else if snap.p1_wins {
+        "P2 wins"
+    } else {
+        ""
+    };
+    vec![format!(
+        "[Turn {}] P{} Performance: {} yell cards, score {} {} {}",
+        snap.turn, snap.player_id, snap.yell_count, snap.total_score, pass_str, outcome
+    )]
 }

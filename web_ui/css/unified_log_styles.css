@@ -398,3 +398,15 @@
     font-family: 'Consolas', 'Courier New', monospace;
     white-space: pre-wrap;
 }
+
+/* Performance phase log entry */
+.log-entry.performance {
+    border-left-color: var(--accent-gold, #e8c84a);
+    background: rgba(232, 200, 74, 0.06);
+}
+
+.log-entry.performance .log-entry-content {
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--accent-gold, #e8c84a);
+}

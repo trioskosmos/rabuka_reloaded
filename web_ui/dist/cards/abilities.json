@@ -8057,7 +8057,7 @@
         ],
         "optional": true,
         "exclude_self": true,
-        "characters": [
+        "exclude_characters": [
           "鬼塚冬毬"
         ],
         "type": "move_cards"

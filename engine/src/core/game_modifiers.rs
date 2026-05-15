@@ -16,6 +16,8 @@ pub struct GameModifiers {
     pub constant_blade_bonuses: HashMap<i16, i32>,
     pub constant_cost_bonuses: HashMap<i16, i32>,
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
+    /// Number of cards moved from hand to discard by the most recent cost payment.
+    pub last_cost_discard_count: u32,
 }
 
 impl GameModifiers {
@@ -32,6 +34,7 @@ impl GameModifiers {
             constant_blade_bonuses: HashMap::new(),
             constant_cost_bonuses: HashMap::new(),
             heart_color_multiplier: HashMap::new(),
+            last_cost_discard_count: 0,
         }
     }
 
