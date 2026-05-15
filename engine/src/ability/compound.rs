@@ -159,6 +159,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "primary|alternative".to_string(),
                 description,
                 allow_skip: false,
+            options: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(());
@@ -252,6 +253,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "conditional_optional".to_string(),
                 description: format!("{}?", desc),
                 allow_skip: true,
+            options: None,
             });
             return Ok(());
         }

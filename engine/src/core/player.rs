@@ -322,6 +322,27 @@ impl Player {
                 false
             };
 
+            // Check cannot_baton_touch protection BEFORE paying energy
+            if baton_touch_used {
+                if let Some(member_id) = self.stage.get_area(stage_area) {
+                    let has_protection =
+                        card_db.get_card(member_id).map_or(false, |existing_card| {
+                            existing_card.abilities.iter().any(|a| {
+                                a.effect.as_ref().map_or(false, |ef| {
+                                    ef.restriction_type.as_deref() == Some("cannot_baton_touch")
+                                })
+                            })
+                        });
+                    if has_protection {
+                        self.hand.cards.insert(hand_index, card_id);
+                        return Err(
+                            "Cannot baton touch: member has baton touch discard protection"
+                                .to_string(),
+                        );
+                    }
+                }
+            }
+
             // Rule 9.6.2.3.1: Pay energy equal to cost
 
             if cost_to_pay > 0 {
@@ -348,7 +369,7 @@ impl Player {
                 crate::zones::MemberArea::RightSide => 2,
             };
 
-            if self.stage.stage[index] != -1 {
+            if !baton_touch_used && self.stage.stage[index] != -1 {
                 if let Some(old_card) = self.remove_member_from_stage_with_recycling(index, card_db)
                 {
                     self.waitroom.cards.push(old_card);
@@ -364,20 +385,6 @@ impl Player {
             // Send replaced member to waitroom if baton touch was used
 
             if let Some(member_id) = replaced_member {
-                // Check if replaced member has baton touch discard protection
-                // (parsed as restriction_type: "cannot_baton_touch" in abilities.json)
-                let has_protection = card_db.get_card(member_id).map_or(false, |existing_card| {
-                    existing_card.abilities.iter().any(|a| {
-                        a.effect.as_ref().map_or(false, |ef| {
-                            ef.restriction_type.as_deref() == Some("cannot_baton_touch")
-                        })
-                    })
-                });
-                if has_protection {
-                    return Err(
-                        "Cannot baton touch: member has baton touch discard protection".to_string(),
-                    );
-                }
                 self.waitroom.cards.push(member_id);
                 // Rule 10.5.3-10.5.4: Recycle under-cards of the replaced member
                 let (member_under, energy_under) =

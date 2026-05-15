@@ -241,9 +241,11 @@ impl super::TurnEngine {
                     "choice" | "choice_string" | "conditional_optional" => card_id
                         .map(|id| id.to_string())
                         .unwrap_or_else(|| "0".into()),
-                    _ => card_id
-                        .map(|id| id.to_string())
-                        .unwrap_or_else(|| "0".into()),
+                    _ => match card_id {
+                        Some(-1) => "skip".to_string(),
+                        Some(id) => id.to_string(),
+                        None => "0".into(),
+                    },
                 };
                 Ok(crate::ability::types::ChoiceResult::TargetSelected { target: selected })
             }
@@ -355,7 +357,7 @@ impl super::TurnEngine {
             game_state.activating_card = None;
             // Determine what to do based on ability state BEFORE any moves:
             //   1. Optional cost was skipped → complete, recheck auto-triggers
-            //   2. Cost paid, effect not started → run the effect  
+            //   2. Cost paid, effect not started → run the effect
             //   3. Everything else → complete (effect done or stale state)
             let optional_skipped = game_state.ability_queue.current_entry().map_or(false, |e| {
                 e.cost_paid
@@ -366,10 +368,8 @@ impl super::TurnEngine {
             if let Some(e) = game_state.ability_queue.current_entry_mut() {
                 e.execution_context = Some(ctx);
             }
-            let effect_ready = cost_was_paid
-                && !had_pending_sequential
-                && ctx_is_clear
-                && !effect_started;
+            let effect_ready =
+                cost_was_paid && !had_pending_sequential && ctx_is_clear && !effect_started;
 
             if optional_skipped {
                 game_state.ability_queue.complete_current();

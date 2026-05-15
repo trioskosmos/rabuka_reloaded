@@ -301,13 +301,18 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             match zone {
                 "hand" => {
                     let player = self.game_state.active_player_mut();
+                    let mut discard_count = 0u32;
                     for &idx in indices.iter().rev() {
                         if idx < player.hand.cards.len() {
                             if validate_card(player.hand.cards[idx]) {
                                 player.waitroom.add_card(player.hand.cards[idx]);
                                 player.hand.remove_card(idx);
+                                discard_count += 1;
                             }
                         }
+                    }
+                    if discard_count > 0 {
+                        self.game_state.mods.last_cost_discard_count = discard_count;
                     }
                 }
                 "stage" => {
@@ -675,6 +680,12 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             }
             _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
         }
+        eprintln!(
+            "[ARN] handle_select_card: selected_cards.len()={}, zone={:?} allow_skip={}",
+            self.selected_cards.len(),
+            zone,
+            allow_skip
+        );
         if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
             entry.selected_card_ids = self.selected_cards.clone();
         }
@@ -863,6 +874,31 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         choice_card_no: Option<String>,
         selected: &str,
     ) -> Result<(), String> {
+        if selected == "skip" {
+            self.pending_choice = None;
+            self.clear_choice_meta();
+            if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
+                for (i, action) in pending.iter().enumerate() {
+                    if let Err(e) = self.execute_effect(action) {
+                        eprintln!(
+                            "Failed to execute pending action after position change skip: {}",
+                            e
+                        );
+                    }
+                    if self.pending_choice.is_some() {
+                        let remaining = pending[i + 1..].to_vec();
+                        self.game_state.pending_sequential_actions = if remaining.is_empty() {
+                            None
+                        } else {
+                            Some(remaining)
+                        };
+                        return Ok(());
+                    }
+                }
+                self.game_state.pending_sequential_actions = None;
+            }
+            return Ok(());
+        }
         if let Some(effect) = self.game_state.entry_effect().cloned() {
             let mut modified = effect.clone();
             let dest = match selected {
@@ -1081,6 +1117,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn handle_position_destination(&mut self, selected: &str) -> Result<(), String> {
+        if selected == "skip" {
+            self.pending_choice = None;
+            return Ok(());
+        }
         let dest = match selected {
             "0" | "left" => "left_side",
             "1" | "center" => "center",
@@ -1405,6 +1445,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     eprintln!("[DISCARD_TRACK] setting last_cost_discard_count={}", count);
                     self.game_state.mods.last_cost_discard_count = count;
                 }
+                if !moved_cards.is_empty() {
+                    self.game_state.recently_moved_cards = Some(moved_cards.clone());
+                }
             }
             "deck" => {
                 // Pre-validate: reject if any selected card fails the filter
@@ -1539,6 +1582,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             self.game_state.mods.add_orientation_modifier(cid, "wait");
                         }
                     }
+                }
+                if !card_ids_moved.is_empty() {
+                    self.game_state.recently_moved_cards = Some(card_ids_moved.clone());
                 }
             }
             "stage" => {
@@ -1682,6 +1728,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", card_count),
                 allow_skip: false,
+                options: None,
             });
             self.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Finalize {

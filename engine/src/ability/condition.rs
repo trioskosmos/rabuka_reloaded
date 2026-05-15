@@ -425,7 +425,31 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 self_count
             }
             _ => {
-                let player = self.game_state.resolve_target_player(target);
+                let player = if target == "self" {
+                    self.activating_card_id
+                        .and_then(|cid| {
+                            let p1 = &self.game_state.player1;
+                            let p2 = &self.game_state.player2;
+                            if p1.stage.stage.contains(&cid)
+                                || p1.hand.cards.contains(&cid)
+                                || p1.live_card_zone.cards.contains(&cid)
+                                || p1.energy_zone.cards.contains(&cid)
+                            {
+                                Some(p1)
+                            } else if p2.stage.stage.contains(&cid)
+                                || p2.hand.cards.contains(&cid)
+                                || p2.live_card_zone.cards.contains(&cid)
+                                || p2.energy_zone.cards.contains(&cid)
+                            {
+                                Some(p2)
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| self.game_state.resolve_target_player(target))
+                } else {
+                    self.game_state.resolve_target_player(target)
+                };
                 let revealed_vec: Vec<i16> = if location == "revealed_cards" {
                     self.game_state.revealed_cards.iter().copied().collect()
                 } else {
@@ -473,9 +497,32 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         eprintln!(
             "[DISTINCT] check: target={target} location={location} group_names={group_names:?}"
         );
-        let player = self
-            .game_state
-            .resolve_target_player(if target == "either" { "self" } else { target });
+        let distinct_target = if target == "either" { "self" } else { target };
+        let player = if distinct_target == "self" {
+            self.activating_card_id
+                .and_then(|cid| {
+                    let p1 = &self.game_state.player1;
+                    let p2 = &self.game_state.player2;
+                    if p1.stage.stage.contains(&cid)
+                        || p1.hand.cards.contains(&cid)
+                        || p1.live_card_zone.cards.contains(&cid)
+                        || p1.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p1)
+                    } else if p2.stage.stage.contains(&cid)
+                        || p2.hand.cards.contains(&cid)
+                        || p2.live_card_zone.cards.contains(&cid)
+                        || p2.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p2)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| self.game_state.resolve_target_player(distinct_target))
+        } else {
+            self.game_state.resolve_target_player(distinct_target)
+        };
         let mut card_ids: Vec<i16> = match location {
             "stage" => player.stage.stage.to_vec(),
             "hand" => player.hand.cards.to_vec(),
@@ -612,7 +659,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 group_names.and_then(|g| g.first().map(|s| s.as_str())),
                 condition.cost_limit,
                 operator,
-                None, None, None,
+                None,
+                None,
+                None,
             );
             let matching_count = util::count_matching(&combined, card_db, &filter, false);
             compare_counts(operator, matching_count, count_threshold)
@@ -668,7 +717,31 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_type = condition.card_type.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let count = condition.count.unwrap_or(1);
-        let player = self.game_state.resolve_target_player(target);
+        let player = if target == "self" {
+            self.activating_card_id
+                .and_then(|cid| {
+                    let p1 = &self.game_state.player1;
+                    let p2 = &self.game_state.player2;
+                    if p1.stage.stage.contains(&cid)
+                        || p1.hand.cards.contains(&cid)
+                        || p1.live_card_zone.cards.contains(&cid)
+                        || p1.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p1)
+                    } else if p2.stage.stage.contains(&cid)
+                        || p2.hand.cards.contains(&cid)
+                        || p2.live_card_zone.cards.contains(&cid)
+                        || p2.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p2)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| self.game_state.resolve_target_player(target))
+        } else {
+            self.game_state.resolve_target_player(target)
+        };
         let exclude_self = condition.exclude_self.unwrap_or(false);
         let activating_id = self.activating_card_id;
         let card_db = &self.game_state.card_database;
@@ -796,52 +869,48 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     count
                 }
             }
-            // No explicit location: use recently_moved if available, otherwise infer from card_type
-            "" => {
-                if let Some(ref moved) = self.game_state.recently_moved_cards {
-                    count_filtered(moved, card_type)
-                } else {
-                    match card_type {
-                        "live_card" => count_filtered(&player.waitroom.cards, card_type),
-                        "member_card" => {
-                            if condition.aggregate.as_deref() == Some("total") {
-                                player.stage.total_blades(
-                                    card_db,
-                                    &self.game_state.mods.blade_modifiers,
-                                    &self.game_state.mods.orientation_modifiers,
-                                ) as usize
-                            } else {
-                                let mut stage_count = player
-                                    .stage
-                                    .stage
-                                    .iter()
-                                    .filter(|&&id| {
-                                        id != -1 && {
-                                            if hc.is_empty() {
-                                                true
-                                            } else {
-                                                crate::ability::util::card_matches_heart_colors(
-                                                    card_db, id, hc,
-                                                )
-                                            }
-                                        }
-                                    })
-                                    .count();
-                                if exclude_self {
-                                    if let Some(cid) = activating_id {
-                                        if player.stage.stage.iter().any(|&id| id == cid) {
-                                            stage_count = stage_count.saturating_sub(1);
-                                        }
+            // No explicit location: infer from card_type (don't use recently_moved_cards
+            // as fallback — that breaks sequential conditions where an earlier action moved
+            // cards but the later condition still refers to the stage)
+            "" => match card_type {
+                "live_card" => count_filtered(&player.waitroom.cards, card_type),
+                "member_card" => {
+                    if condition.aggregate.as_deref() == Some("total") {
+                        player.stage.total_blades(
+                            card_db,
+                            &self.game_state.mods.blade_modifiers,
+                            &self.game_state.mods.orientation_modifiers,
+                        ) as usize
+                    } else {
+                        let mut stage_count = player
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| {
+                                id != -1 && {
+                                    if hc.is_empty() {
+                                        true
+                                    } else {
+                                        crate::ability::util::card_matches_heart_colors(
+                                            card_db, id, hc,
+                                        )
                                     }
                                 }
-                                stage_count
+                            })
+                            .count();
+                        if exclude_self {
+                            if let Some(cid) = activating_id {
+                                if player.stage.stage.iter().any(|&id| id == cid) {
+                                    stage_count = stage_count.saturating_sub(1);
+                                }
                             }
                         }
-                        "energy_card" => player.energy_zone.cards.len(),
-                        _ => 0,
+                        stage_count
                     }
                 }
-            }
+                "energy_card" => player.energy_zone.cards.len(),
+                _ => 0,
+            },
             _ => 0,
         } as u32;
         let passed = compare_counts(condition.operator.as_deref(), actual, count);

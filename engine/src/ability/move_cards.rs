@@ -89,6 +89,7 @@ impl<'a> AbilityResolver<'a> {
                             target: "choice_string".to_string(),
                             description: format!("Pick card type: {:?}", or_types),
                             allow_skip: false,
+                        options: None,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                         self.game_state.ability_queue.current_entry_mut().map(|e| {
@@ -801,6 +802,7 @@ impl<'a> AbilityResolver<'a> {
                     target: "order".to_string(),
                     description: format!("Choose order for cards on deck ({} cards)", taken_count),
                     allow_skip: false,
+                options: None,
                 });
                 self.execution_context = ExecutionContext::LookAndSelect {
                     step: LookAndSelectStep::Finalize {

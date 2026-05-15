@@ -25,6 +25,8 @@ pub enum Choice {
         target: String,
         description: String,
         allow_skip: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        options: Option<Vec<String>>,
     },
     SelectPosition {
         position: String,
@@ -147,6 +149,33 @@ impl ChoiceBuilder {
 }
 
 impl Choice {
+    pub fn select_target(
+        target: impl Into<String>,
+        description: impl Into<String>,
+        allow_skip: bool,
+    ) -> Self {
+        Choice::SelectTarget {
+            target: target.into(),
+            description: description.into(),
+            allow_skip,
+            options: None,
+        }
+    }
+
+    pub fn select_target_with_options(
+        target: impl Into<String>,
+        description: impl Into<String>,
+        allow_skip: bool,
+        options: Vec<String>,
+    ) -> Self {
+        Choice::SelectTarget {
+            target: target.into(),
+            description: description.into(),
+            allow_skip,
+            options: Some(options),
+        }
+    }
+
     pub fn select_cards(
         zone: impl Into<String>,
         count: usize,
@@ -192,12 +221,21 @@ impl Choice {
                 target: _,
                 description,
                 allow_skip,
+                options,
             } => {
                 if let Some(obj) = json.as_object_mut() {
                     if let Some(inner) = obj.remove("SelectTarget") {
                         if let Some(mut fields) = inner.as_object().cloned() {
                             fields.insert("title".into(), Value::String(description.clone()));
                             fields.insert("allow_skip".into(), Value::Bool(*allow_skip));
+                            if let Some(opts) = options {
+                                fields.insert(
+                                    "options".into(),
+                                    Value::Array(
+                                        opts.iter().map(|o| Value::String(o.clone())).collect(),
+                                    ),
+                                );
+                            }
                             *obj = fields;
                         }
                     }

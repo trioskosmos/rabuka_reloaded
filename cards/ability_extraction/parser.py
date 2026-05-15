@@ -1984,6 +1984,10 @@ def _fill_defaults(action, text):
             ):
                 if a == "change_state" and action.get("group_names"):
                     pass
+                elif a == "draw_card" and (
+                    "置いた枚数分" in text or "置いた枚数" in text
+                ):
+                    action["count"] = 0
                 else:
                     action["count"] = 1
     # Fix remaining custom actions that have enough parsed info
@@ -2945,7 +2949,7 @@ def _extract_basic_cost_fields(cost, text):
     for name in name_matches:
         idx = text.find(f"「{name}」")
         if idx >= 0:
-            after = text[idx + len(f"「{name}」"):idx + len(f"「{name}」") + 3]
+            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
             if after.startswith("以外"):
                 exclude_chars.append(name)
             else:
@@ -3069,7 +3073,7 @@ def parse_cost(text: str) -> Dict[str, Any]:
     for name in names:
         idx = text.find(f"「{name}」")
         if idx >= 0:
-            after = text[idx + len(f"「{name}」"):idx + len(f"「{name}」") + 3]
+            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
             if after.startswith("以外"):
                 exclude_chars.append(name)
             else:

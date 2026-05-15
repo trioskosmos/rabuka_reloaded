@@ -124,6 +124,18 @@ def extract_dynamic_count(text):
                 'mode': 'max'
             }
     
+    if 'その枚数に' in text and 'を足した枚数' in text:
+        # Pattern: "その枚数にNを足した枚数" - count based on the previous moved/discarded cards plus N
+        count_match = re.search(r'その枚数に(\d+)を足した(?:枚数|数)', text)
+        if count_match:
+            return {
+                'type': 'dynamic_count',
+                'reference': 'previous_moved_cards',
+                'mode': 'equals',
+                'calculation': 'add',
+                'calculation_value': int(count_match.group(1))
+            }
+
     if 'に等しい枚数' in text or 'に等しい数' in text:
         # Pattern: "Xに等しい枚数" - count equals X
         count_match = re.search(r'(.+?)に等しい(?:枚数|数)', text)

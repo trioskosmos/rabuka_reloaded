@@ -174,6 +174,53 @@ pub(crate) fn draw_cards_for_player(
 }
 
 impl<'a> AbilityResolver<'a> {
+    fn resolve_dynamic_count(&self, dc: &crate::card::DynamicCount) -> u32 {
+        let mut count = match dc.reference.as_deref() {
+            Some("previous_moved_cards") | Some("previous_move") => {
+                if !self.moved_cards.is_empty() {
+                    self.moved_cards.len() as u32
+                } else if let Some(ref moved_cards) = self.game_state.recently_moved_cards {
+                    moved_cards.len() as u32
+                } else {
+                    self.game_state.mods.last_cost_discard_count
+                }
+            }
+            Some("previous_draw") => {
+                if self.last_draw_count > 0 {
+                    self.last_draw_count
+                } else if let Some(ref moved_cards) = self.game_state.recently_moved_cards {
+                    moved_cards.len() as u32
+                } else {
+                    0
+                }
+            }
+            Some("revealed_cards") => {
+                if !self.game_state.player1_cheer_revealed_cards.is_empty() {
+                    self.game_state.player1_cheer_revealed_cards.len() as u32
+                } else {
+                    self.game_state.revealed_cards.len() as u32
+                }
+            }
+            _ => match dc.count_type.as_str() {
+                "revealed_cards" => {
+                    if !self.game_state.player1_cheer_revealed_cards.is_empty() {
+                        self.game_state.player1_cheer_revealed_cards.len() as u32
+                    } else {
+                        self.game_state.revealed_cards.len() as u32
+                    }
+                }
+                _ => 0,
+            },
+        };
+
+        if let Some(ref calculation) = dc.calculation {
+            if calculation == "add" {
+                count += dc.calculation_value.unwrap_or(0);
+            }
+        }
+
+        count
+    }
     pub fn execute_effect(&mut self, effect: &AbilityEffect) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
@@ -228,6 +275,7 @@ impl<'a> AbilityResolver<'a> {
                         target: "apply_replacement".to_string(),
                         description,
                         allow_skip: false,
+                        options: None,
                     });
                     return Err("Pending choice required: apply replacement effect".to_string());
                 } else {
@@ -298,8 +346,29 @@ impl<'a> AbilityResolver<'a> {
             EffectAction::LookAndSelect => self.execute_look_and_select(effect),
             EffectAction::SelectCards => self.execute_select_cards(effect),
             EffectAction::Draw | EffectAction::DrawCard => {
-                let draw_count = if effect.count == Some(0) {
-                    self.moved_cards.len() as u32
+                let draw_count = if let Some(ref dc) = effect.dynamic_count {
+                    self.resolve_dynamic_count(dc)
+                } else if effect.count == Some(0) {
+                    let resolved = if !self.moved_cards.is_empty() {
+                        eprintln!(
+                            "[ARN] draw_count: using self.moved_cards={}",
+                            self.moved_cards.len()
+                        );
+                        self.moved_cards.len() as u32
+                    } else if let Some(ref moved_cards) = self.game_state.recently_moved_cards {
+                        eprintln!(
+                            "[ARN] draw_count: using recently_moved_cards={}",
+                            moved_cards.len()
+                        );
+                        moved_cards.len() as u32
+                    } else {
+                        eprintln!(
+                            "[ARN] draw_count: falling back to last_cost_discard_count={}",
+                            self.game_state.mods.last_cost_discard_count
+                        );
+                        self.game_state.mods.last_cost_discard_count
+                    };
+                    resolved
                 } else {
                     effect.count_or(1)
                 };
@@ -867,6 +936,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "draw_any_number".to_string(),
                 description: format!("Choose how many cards to draw (0-{})", available),
                 allow_skip: effect.optional.unwrap_or(false),
+                options: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(());
@@ -1385,6 +1455,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "pay_optional_cost:skip_optional_cost".to_string(),
                 description: format!("Change state to {} (pay optional cost)?", state_change),
                 allow_skip: optional,
+                options: None,
             });
             if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                 entry.choice_card_no = Some("change_state".to_string());
@@ -2146,6 +2217,7 @@ impl<'a> AbilityResolver<'a> {
                     target: "pay_optional_cost:skip_optional_cost".to_string(),
                     description: "Place energy under member? (pay or skip)".to_string(),
                     allow_skip: false,
+                    options: None,
                 });
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some("optional_cost".to_string());
@@ -2309,6 +2381,10 @@ impl<'a> AbilityResolver<'a> {
                     _ => "?",
                 };
 
+                let valid_destinations = self.compute_valid_position_destinations(effect, target_m);
+                if valid_destinations.is_empty() {
+                    return Ok(());
+                }
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some(format!("position_change:self:{}", card_nos[0]));
                 }
@@ -2323,6 +2399,7 @@ impl<'a> AbilityResolver<'a> {
                         pos_name
                     ),
                     allow_skip: effect.optional.unwrap_or(false),
+                    options: Some(valid_destinations),
                 });
 
                 // Save remaining cards as pending_sequential_actions
@@ -2354,6 +2431,10 @@ impl<'a> AbilityResolver<'a> {
                 if player.stage.stage[pos_idx] == -1 {
                     return Ok(()); // no member at source → skip this side
                 }
+                let valid_destinations = self.compute_valid_position_destinations(effect, target);
+                if valid_destinations.is_empty() {
+                    return Ok(());
+                }
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some(format!("position_change:{}", target));
                 }
@@ -2361,11 +2442,16 @@ impl<'a> AbilityResolver<'a> {
                     target: "position|destination".to_string(),
                     description: "Choose destination for position change".to_string(),
                     allow_skip: effect.optional.unwrap_or(false),
+                    options: Some(valid_destinations),
                 });
                 return Ok(());
             }
 
             // No position specified: create choice for destination (move activating card).
+            let valid_destinations = self.compute_valid_position_destinations(effect, target);
+            if valid_destinations.is_empty() {
+                return Ok(());
+            }
             if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                 entry.choice_card_no = Some("position_change:self".to_string());
             }
@@ -2373,6 +2459,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "position|destination".to_string(),
                 description: "Choose destination for position change".to_string(),
                 allow_skip: effect.optional.unwrap_or(false),
+                options: Some(valid_destinations),
             });
             return Ok(());
         }
@@ -2414,6 +2501,11 @@ impl<'a> AbilityResolver<'a> {
                     .get_card(card_id)
                     .map(|c| c.name.clone())
                     .unwrap_or_else(|| "member".to_string());
+                let valid_destinations =
+                    self.compute_valid_position_destinations(effect, &target_m);
+                if valid_destinations.is_empty() {
+                    return Ok(());
+                }
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some(format!("position_change:self:{}", card_no));
                 }
@@ -2424,6 +2516,7 @@ impl<'a> AbilityResolver<'a> {
                         card_name, pos_name
                     ),
                     allow_skip: optional,
+                    options: Some(valid_destinations),
                 });
             }
             return Ok(());
@@ -2481,6 +2574,45 @@ impl<'a> AbilityResolver<'a> {
         }
         self.game_state.position_change_occurred_this_turn = true;
         Ok(())
+    }
+
+    fn compute_valid_position_destinations(
+        &self,
+        effect: &AbilityEffect,
+        target: &str,
+    ) -> Vec<String> {
+        let card_db = self.card_db();
+        let player = self.game_state.resolve_target_player(target);
+        let activating_card_id = self.game_state.activating_card;
+        let group_names = effect.group_names.as_ref();
+        let exclude_self = effect.exclude_self.unwrap_or(false);
+
+        let position_names = ["left", "center", "right"];
+        let mut valid = Vec::new();
+
+        for (i, pos_name) in position_names.iter().enumerate() {
+            let card_id = player.stage.stage[i];
+            if card_id == -1 {
+                continue;
+            }
+
+            if exclude_self && Some(card_id) == activating_card_id {
+                continue;
+            }
+
+            if let Some(gn) = group_names {
+                let matches = gn.iter().any(|g| {
+                    super::util::card_matches_group_str(&card_db, card_id, Some(g.as_str()))
+                });
+                if !matches {
+                    continue;
+                }
+            }
+
+            valid.push(pos_name.to_string());
+        }
+
+        valid
     }
 
     pub fn execute_position_change_with_destination(
@@ -2876,18 +3008,21 @@ impl<'a> AbilityResolver<'a> {
                 target: "choice".to_string(),
                 description,
                 allow_skip: false,
+                options: None,
             });
         } else if let Some(string_options) = choice_options {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice_string".to_string(),
                 description: format!("Choose one: {}", string_options.join(", ")),
                 allow_skip: false,
+                options: None,
             });
         } else if let Some(ct) = choice_type {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
                 description: format!("Choose: {}", ct),
                 allow_skip: false,
+                options: None,
             });
         }
         Ok(())
@@ -3006,6 +3141,7 @@ impl<'a> AbilityResolver<'a> {
             target: "choose_required_hearts".to_string(),
             description: "Choose required hearts".to_string(),
             allow_skip: false,
+            options: None,
         });
     }
 
@@ -3085,6 +3221,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "heart_color".to_string(),
                 description: "Choose a heart color".to_string(),
                 allow_skip: false,
+                options: None,
             });
         }
     }

@@ -89,6 +89,7 @@ impl<'a> AbilityResolver<'a> {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
                     allow_skip: false,
+                options: None,
                 });
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some("choice_cost".to_string());
@@ -314,6 +315,7 @@ impl<'a> AbilityResolver<'a> {
                             cost_description
                         ),
                         allow_skip: true,
+                    options: None,
                     });
                     if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());
@@ -422,6 +424,7 @@ impl<'a> AbilityResolver<'a> {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),
                         allow_skip: true,
+                    options: None,
                     });
                     if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());
