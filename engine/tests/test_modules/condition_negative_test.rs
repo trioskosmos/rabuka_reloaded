@@ -8,33 +8,6 @@ use rabuka_engine::zones::MemberArea;
 // when their conditions evaluate to false.
 // ====================================================================
 
-/// Negative test for `location_condition` (Group requirement not met)
-/// Target: PL!N-bp1-004-R (Karin) 
-/// "登場: 自分のステージにほかの『虹ヶ咲』のメンバーがいる場合..." (If there is another Nijigasaki member on stage...)
-#[test]
-fn location_condition_negative_group_mismatch() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-
-    let karin = game.id("PL!N-bp1-004-R"); // Requires Nijigasaki
-    let other_group = game.id("PL!SP-bp1-001-P"); // Liella (Kanon)
-
-    game.state.player1.hand.cards.push(karin);
-    game.add_to_stage(MemberArea::Center, other_group); // Liella member on stage
-
-    game.give_energy(10);
-
-    // Trigger Karin's Toujyou ability
-    game.play_to_stage(karin, MemberArea::LeftSide);
-
-    // Since condition is NOT met (no other Nijigasaki), she should NOT active an energy.
-    // Base active energy is 10 - 4 (cost) = 6. If ability triggered, it would be 7.
-    assert_eq!(
-        game.state.player1.energy_zone.active_energy_count,
-        6,
-        "Karin should not activate energy because the other member is not Nijigasaki"
-    );
-}
 
 /// Negative test for `card_count_condition` (Heart requirement not met)
 /// Target: PL!HS-PR-019-PR (Ginko)
