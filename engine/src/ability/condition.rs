@@ -488,10 +488,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 && util::card_matches_type(card_db, id, card_type_filter)
                                 && util::card_matches_group_str(card_db, id, group)
                                 && util::card_matches_cost_limit_op(
-                                    card_db,
-                                    id,
-                                    cost_limit,
-                                    operator,
+                                    card_db, id, cost_limit, operator,
                                 )
                                 && self.check_original_blade_filter(condition, id)
                         })
@@ -990,6 +987,24 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     if stage_ids.is_empty() {
                         return false;
                     }
+                    // Check position constraint (e.g. "左サイドに登場した場合")
+                    if let Some(ref pos) = condition.position {
+                        let pos_str = pos.get_position();
+                        let pos_idx = match pos_str {
+                            Some("left") | Some("leftside") => 0,
+                            Some("center") | Some("centre") => 1,
+                            Some("right") | Some("rightside") => 2,
+                            _ => {
+                                eprintln!("[APPEARANCE] unknown position: {:?}", pos_str);
+                                return false;
+                            }
+                        };
+
+                        if pos_idx >= player.stage.stage.len() || player.stage.stage[pos_idx] == -1
+                        {
+                            return false;
+                        }
+                    }
                     if let Some(ref chars) = condition.characters {
                         eprintln!(
                             "[APPEARANCE] checking characters: {:?} against stage_ids={:?}",
@@ -1213,7 +1228,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         match movement {
             "moved" => {
-                if let Some(state) = movement_state {
+                let base_check = if let Some(state) = movement_state {
                     match state {
                         "to_stage" => {
                             player.stage.stage[0] != -1
@@ -1226,7 +1241,31 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 } else {
                     true
+                };
+                if !base_check {
+                    return false;
                 }
+                // Check cost_limit on moved cards
+                if let Some(cost_limit) = condition.cost_limit {
+                    let op = condition.cost_limit_operator.as_deref().unwrap_or(">=");
+                    if let Some(ref moved) = self.game_state.recently_moved_cards {
+                        if !moved.iter().any(|&cid| {
+                            self.game_state
+                                .card_database
+                                .get_card(cid)
+                                .map_or(false, |c| {
+                                    c.cost.map_or(false, |cost| {
+                                        compare_counts(Some(op), cost, cost_limit)
+                                    })
+                                })
+                        }) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                true
             }
             "notmoved" => true,
             "baton_touch" => {
@@ -1234,13 +1273,57 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if !triggered {
                     return false;
                 }
-                if let Some(source_name) = condition.baton_touch_source.as_deref() {
-                    if let Some(replaced_id) = self.game_state.baton_touch_replaced_member_id {
-                        if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
-                            return card.name.contains(source_name);
+                if self.game_state.baton_touch_count == 0 {
+                    return false;
+                }
+                let replaced_id = match self.game_state.baton_touch_replaced_member_id {
+                    Some(id) => id,
+                    None => return false,
+                };
+                // Check group_names: replaced card must belong to specified group
+                if let Some(ref groups) = condition.group_names {
+                    if !groups.is_empty() {
+                        let group_ok = groups.iter().any(|g| {
+                            crate::ability::util::card_matches_group_str(
+                                &self.game_state.card_database,
+                                replaced_id,
+                                Some(g),
+                            )
+                        });
+                        if !group_ok {
+                            return false;
                         }
                     }
-                    return false;
+                }
+                // Check baton_touch_source: replaced card's name must match
+                if let Some(source_name) = condition.baton_touch_source.as_deref() {
+                    if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
+                        if !card.name.contains(source_name) {
+                            return false;
+                        }
+                    } else {
+                        return false;
+                    }
+                }
+                // Check cost comparison (e.g. "lower cost than this member")
+                if condition.comparison_type.as_deref() == Some("cost") {
+                    if let Some(replaced_cost) = self.game_state.baton_touch_replaced_member_cost {
+                        if let Some(activating_id) = self.game_state.activating_card {
+                            if let Some(card) =
+                                self.game_state.card_database.get_card(activating_id)
+                            {
+                                if let Some(current_cost) = card.cost {
+                                    if !compare_counts(
+                                        condition.operator.as_deref(),
+                                        replaced_cost,
+                                        current_cost,
+                                    ) {
+                                        return false;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
                 true
             }

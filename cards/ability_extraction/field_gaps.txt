@@ -1,0 +1,807 @@
+
+============================================================
+  CONDITIONS
+============================================================
+
+  ability_negation_condition (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['text', 'type']
+
+  appearance_condition (10 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['all_areas', 'appearance', 'baton_touch_trigger', 'characters', 'location', 'position', 'target', 'text', 'type']
+  Always present:     ['appearance', 'location', 'text', 'type']
+  Sometimes present:  ['all_areas', 'baton_touch_trigger', 'characters', 'position', 'target']
+    all_areas: 2/10
+    baton_touch_trigger: 2/10
+    characters: 3/10
+    position: 3/10
+    target: 6/10
+
+  card_count_condition (62 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['aggregate', 'card_property', 'card_type', 'count', 'exclude_self', 'group_names', 'location', 'operator', 'scope', 'target', 'text', 'type', 'unit']
+  Always present:     ['count', 'operator', 'text', 'type']
+  Sometimes present:  ['aggregate', 'card_property', 'card_type', 'exclude_self', 'group_names', 'location', 'scope', 'target', 'unit']
+    aggregate: 3/62
+    card_property: 1/62
+    card_type: 28/62
+    exclude_self: 1/62
+    group_names: 14/62
+    location: 57/62
+    scope: 3/62
+    target: 59/62
+    unit: 14/62
+
+  comparison_condition (52 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['aggregate', 'card_type', 'comparison_target', 'comparison_type', 'cost_limit', 'count', 'exclude_self', 'group_names', 'heart_colors', 'location', 'locations', 'operator', 'resource_type', 'scope', 'target', 'temporal', 'temporal_scope', 'text', 'type', 'values']
+  Always present:     ['text', 'type']
+  Sometimes present:  ['aggregate', 'card_type', 'comparison_target', 'comparison_type', 'cost_limit', 'count', 'exclude_self', 'group_names', 'heart_colors', 'location', 'locations', 'operator', 'resource_type', 'scope', 'target', 'temporal', 'temporal_scope', 'values']
+    aggregate: 20/52
+    card_type: 27/52
+    comparison_target: 22/52
+    comparison_type: 32/52
+    cost_limit: 6/52
+    count: 24/52
+    exclude_self: 1/52
+    group_names: 4/52
+    heart_colors: 4/52
+    location: 27/52
+    locations: 8/52
+    operator: 48/52
+    resource_type: 8/52
+    scope: 1/52
+    target: 37/52
+    temporal: 2/52
+    temporal_scope: 2/52
+    values: 1/52
+
+  energy_state_condition (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['state', 'text', 'type']
+
+  group_condition (34 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['aggregate', 'all_areas', 'all_members', 'card_type', 'count', 'exclude_self', 'group_names', 'heart_colors', 'location', 'locations', 'negation', 'operator', 'target', 'text', 'type']
+  Always present:     ['group_names', 'text', 'type']
+  Sometimes present:  ['aggregate', 'all_areas', 'all_members', 'card_type', 'count', 'exclude_self', 'heart_colors', 'location', 'locations', 'negation', 'operator', 'target']
+    aggregate: 4/34
+    all_areas: 1/34
+    all_members: 7/34
+    card_type: 33/34
+    count: 7/34
+    exclude_self: 1/34
+    heart_colors: 4/34
+    location: 31/34
+    locations: 2/34
+    negation: 1/34
+    operator: 7/34
+    target: 33/34
+
+  location_condition (63 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['aggregate', 'card_property', 'card_type', 'characters', 'comparison_type', 'cost_limit', 'count', 'distinct', 'exclude_self', 'group_names', 'heart_colors', 'heart_type', 'location', 'locations', 'negation', 'operator', 'scope', 'target', 'temporal', 'temporal_scope', 'text', 'type', 'unit']
+  Always present:     ['text', 'type']
+  Sometimes present:  ['aggregate', 'card_property', 'card_type', 'characters', 'comparison_type', 'cost_limit', 'count', 'distinct', 'exclude_self', 'group_names', 'heart_colors', 'heart_type', 'location', 'locations', 'negation', 'operator', 'scope', 'target', 'temporal', 'temporal_scope', 'unit']
+    aggregate: 8/63
+    card_property: 3/63
+    card_type: 38/63
+    characters: 7/63
+    comparison_type: 2/63
+    cost_limit: 1/63
+    count: 18/63
+    distinct: 12/63
+    exclude_self: 5/63
+    group_names: 7/63
+    heart_colors: 22/63
+    heart_type: 1/63
+    location: 61/63
+    locations: 15/63
+    negation: 7/63
+    operator: 18/63
+    scope: 5/63
+    target: 53/63
+    temporal: 1/63
+    temporal_scope: 1/63
+    unit: 8/63
+
+  movement_condition (20 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['ability_negation', 'baton_touch_source', 'baton_touch_trigger', 'comparison_type', 'cost_limit', 'cost_limit_operator', 'exclude_self', 'group_names', 'location', 'movement', 'movement_state', 'operator', 'target', 'text', 'type']
+  Always present:     ['movement', 'text', 'type']
+  Sometimes present:  ['ability_negation', 'baton_touch_source', 'baton_touch_trigger', 'comparison_type', 'cost_limit', 'cost_limit_operator', 'exclude_self', 'group_names', 'location', 'movement_state', 'operator', 'target']
+    ability_negation: 1/20
+    baton_touch_source: 4/20
+    baton_touch_trigger: 13/20
+    comparison_type: 1/20
+    cost_limit: 1/20
+    cost_limit_operator: 1/20
+    exclude_self: 1/20
+    group_names: 5/20
+    location: 13/20
+    movement_state: 6/20
+    operator: 1/20
+    target: 13/20
+
+  or_condition (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['aggregate', 'conditions', 'text', 'type']
+  Always present:     ['conditions', 'text', 'type']
+  Sometimes present:  ['aggregate']
+    aggregate: 1/2
+
+  state_change_condition (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['from_state', 'phase', 'text', 'to_state', 'type']
+  Always present:     ['from_state', 'text', 'to_state', 'type']
+  Sometimes present:  ['phase']
+    phase: 1/2
+
+  state_condition (3 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['state', 'text', 'type']
+
+  temporal_condition (15 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['card_type', 'condition', 'count', 'location', 'phase', 'position', 'target', 'temporal', 'text', 'type']
+  Always present:     ['text', 'type']
+  Sometimes present:  ['card_type', 'condition', 'count', 'location', 'phase', 'position', 'target', 'temporal']
+    card_type: 9/15
+    condition: 8/15
+    count: 3/15
+    location: 5/15
+    phase: 1/15
+    position: 1/15
+    target: 6/15
+    temporal: 14/15
+
+
+
+============================================================
+  COSTS
+============================================================
+
+  cost (209 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['card_type', 'characters', 'cost_limit', 'cost_limit_operator', 'costs', 'count', 'destination', 'energy', 'exclude_characters', 'exclude_self', 'group_names', 'optional', 'options', 'placement_order', 'same_unit_name', 'self_cost', 'shuffle', 'source', 'state_change', 'target', 'text', 'type', 'zone']
+  Always present:     ['type']
+  Sometimes present:  ['card_type', 'characters', 'cost_limit', 'cost_limit_operator', 'costs', 'count', 'destination', 'energy', 'exclude_characters', 'exclude_self', 'group_names', 'optional', 'options', 'placement_order', 'same_unit_name', 'self_cost', 'shuffle', 'source', 'state_change', 'target', 'text', 'zone']
+    card_type: 43/209
+    characters: 4/209
+    cost_limit: 1/209
+    cost_limit_operator: 1/209
+    costs: 24/209
+    count: 157/209
+    destination: 101/209
+    energy: 54/209
+    exclude_characters: 1/209
+    exclude_self: 2/209
+    group_names: 10/209
+    optional: 140/209
+    options: 1/209
+    placement_order: 1/209
+    same_unit_name: 2/209
+    self_cost: 22/209
+    shuffle: 1/209
+    source: 103/209
+    state_change: 22/209
+    target: 3/209
+    text: 208/209
+    zone: 155/209
+
+
+
+============================================================
+  EFFECTS
+============================================================
+
+  activate_ability (3 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['ability_text', 'action', 'count', 'parenthetical', 'source_card', 'target', 'target_trigger', 'text']
+  Always present:     ['ability_text', 'action', 'count', 'target', 'target_trigger', 'text']
+  Sometimes present:  ['parenthetical', 'source_card']
+    parenthetical: 1/3
+    source_card: 1/3
+
+  appear (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'group_names', 'optional', 'parenthetical', 'source', 'target', 'text']
+  Always present:     ['action', 'card_type', 'cost_limit', 'cost_limit_operator', 'count', 'optional', 'source', 'text']
+  Sometimes present:  ['condition', 'group_names', 'parenthetical', 'target']
+    condition: 1/2
+    group_names: 1/2
+    parenthetical: 1/2
+    target: 1/2
+
+  change_state (52 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'blade_limit', 'blade_limit_operator', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'exclude_self', 'group_names', 'location', 'max', 'optional', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'state_change', 'target', 'text']
+  Always present:     ['action', 'card_type', 'state_change', 'text']
+  Sometimes present:  ['all', 'blade_limit', 'blade_limit_operator', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'exclude_self', 'group_names', 'location', 'max', 'optional', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'target']
+    all: 5/52
+    blade_limit: 6/52
+    blade_limit_operator: 6/52
+    condition: 20/52
+    cost_limit: 11/52
+    cost_limit_operator: 11/52
+    count: 47/52
+    exclude_self: 2/52
+    group_names: 4/52
+    location: 1/52
+    max: 7/52
+    optional: 1/52
+    original_value: 8/52
+    parenthetical: 4/52
+    per_unit: 1/52
+    per_unit_count: 1/52
+    per_unit_type: 1/52
+    position: 1/52
+    target: 27/52
+
+  choice (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'choice_maker', 'choice_type', 'options', 'parenthetical', 'question', 'text']
+  Always present:     ['action', 'choice_maker', 'choice_type', 'options', 'question', 'text']
+  Sometimes present:  ['all', 'parenthetical']
+    all: 1/2
+    parenthetical: 1/2
+
+  conditional_alternative (7 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'activation_condition_parsed', 'activation_position', 'alternative_effect', 'condition', 'parenthetical', 'position', 'primary_effect', 'text']
+  Always present:     ['action', 'alternative_effect', 'primary_effect', 'text']
+  Sometimes present:  ['activation_condition_parsed', 'activation_position', 'condition', 'parenthetical', 'position']
+    activation_condition_parsed: 1/7
+    activation_position: 1/7
+    condition: 2/7
+    parenthetical: 1/7
+    position: 1/7
+
+  conditional_on_optional (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'conditional_action', 'conditional_negation', 'optional_action', 'text']
+
+  conditional_on_result (9 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'followup_action', 'heart_colors', 'original_value', 'primary_effect', 'result_condition', 'text']
+  Always present:     ['action', 'followup_action', 'primary_effect', 'result_condition', 'text']
+  Sometimes present:  ['all', 'heart_colors', 'original_value']
+    all: 3/9
+    heart_colors: 1/9
+    original_value: 1/9
+
+  discard_until_count (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'condition', 'count', 'destination', 'multiple_targets', 'source', 'target', 'target_count', 'text']
+
+  draw_card (92 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'activation_condition_parsed', 'activation_position', 'all', 'card_type', 'condition', 'count', 'destination', 'duration', 'dynamic_count', 'group_names', 'heart_colors', 'location', 'multiple_targets', 'optional', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'source', 'state', 'target', 'text', 'trigger_condition', 'trigger_type']
+  Always present:     ['action', 'text']
+  Sometimes present:  ['activation_condition_parsed', 'activation_position', 'all', 'card_type', 'condition', 'count', 'destination', 'duration', 'dynamic_count', 'group_names', 'heart_colors', 'location', 'multiple_targets', 'optional', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'source', 'state', 'target', 'trigger_condition', 'trigger_type']
+    activation_condition_parsed: 2/92
+    activation_position: 1/92
+    all: 1/92
+    card_type: 1/92
+    condition: 31/92
+    count: 90/92
+    destination: 91/92
+    duration: 1/92
+    dynamic_count: 2/92
+    group_names: 2/92
+    heart_colors: 1/92
+    location: 2/92
+    multiple_targets: 1/92
+    optional: 1/92
+    parenthetical: 4/92
+    per_unit: 4/92
+    per_unit_count: 4/92
+    per_unit_type: 4/92
+    source: 91/92
+    state: 1/92
+    target: 8/92
+    trigger_condition: 2/92
+    trigger_type: 2/92
+
+  draw_until_count (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'condition', 'count', 'destination', 'source', 'target', 'target_count', 'text']
+  Always present:     ['action', 'count', 'destination', 'source', 'target_count', 'text']
+  Sometimes present:  ['condition', 'target']
+    condition: 1/2
+    target: 1/2
+
+  formation_change (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'card_type', 'condition', 'multiple_targets', 'optional', 'parenthetical', 'target', 'text']
+
+  gain_ability (21 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['ability_gain', 'action', 'activation_condition_parsed', 'activation_position', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'duration', 'exclude_self', 'group_names', 'heart_colors', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'target', 'text', 'trigger_condition', 'trigger_type']
+  Always present:     ['ability_gain', 'action', 'text']
+  Sometimes present:  ['activation_condition_parsed', 'activation_position', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'duration', 'exclude_self', 'group_names', 'heart_colors', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'target', 'trigger_condition', 'trigger_type']
+    activation_condition_parsed: 1/21
+    activation_position: 1/21
+    card_type: 5/21
+    condition: 11/21
+    cost_limit: 1/21
+    cost_limit_operator: 1/21
+    count: 9/21
+    duration: 18/21
+    exclude_self: 1/21
+    group_names: 2/21
+    heart_colors: 1/21
+    parenthetical: 2/21
+    per_unit: 1/21
+    per_unit_count: 1/21
+    per_unit_type: 1/21
+    position: 1/21
+    target: 2/21
+    trigger_condition: 1/21
+    trigger_type: 1/21
+
+  gain_resource (166 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'activation_position', 'all', 'card_type', 'characters', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_color', 'heart_colors', 'heart_selection', 'location', 'max', 'multiple_targets', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'resource', 'self_target', 'sign', 'state', 'target', 'text', 'trigger_condition', 'trigger_type']
+  Always present:     ['action', 'resource']
+  Sometimes present:  ['activation_position', 'all', 'card_type', 'characters', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_color', 'heart_colors', 'heart_selection', 'location', 'max', 'multiple_targets', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'self_target', 'sign', 'state', 'target', 'text', 'trigger_condition', 'trigger_type']
+    activation_position: 2/166
+    all: 2/166
+    card_type: 44/166
+    characters: 4/166
+    condition: 73/166
+    cost_limit: 1/166
+    cost_limit_operator: 1/166
+    count: 164/166
+    distinct: 1/166
+    duration: 136/166
+    exclude_self: 13/166
+    group_names: 22/166
+    group_reference: 1/166
+    heart_color: 58/166
+    heart_colors: 55/166
+    heart_selection: 5/166
+    location: 9/166
+    max: 1/166
+    multiple_targets: 1/166
+    original_value: 6/166
+    parenthetical: 5/166
+    per_unit: 19/166
+    per_unit_count: 19/166
+    per_unit_type: 18/166
+    position: 7/166
+    self_target: 1/166
+    sign: 1/166
+    state: 2/166
+    target: 46/166
+    text: 162/166
+    trigger_condition: 3/166
+    trigger_type: 4/166
+
+  invalidate_ability (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'self_target', 'text']
+
+  look_and_select (60 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'exclude_self', 'group_names', 'heart_colors', 'location', 'look_action', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'select_action', 'target', 'text']
+  Always present:     ['action', 'select_action', 'text']
+  Sometimes present:  ['exclude_self', 'group_names', 'heart_colors', 'location', 'look_action', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'target']
+    exclude_self: 1/60
+    group_names: 1/60
+    heart_colors: 7/60
+    location: 1/60
+    look_action: 59/60
+    original_value: 1/60
+    parenthetical: 1/60
+    per_unit: 1/60
+    per_unit_count: 1/60
+    per_unit_type: 1/60
+    target: 1/60
+
+  look_at (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'count', 'group_names', 'location', 'per_unit', 'per_unit_count', 'per_unit_type', 'source', 'target', 'text']
+  Always present:     ['action', 'count', 'source', 'target', 'text']
+  Sometimes present:  ['group_names', 'location', 'per_unit', 'per_unit_count', 'per_unit_type']
+    group_names: 1/2
+    location: 1/2
+    per_unit: 1/2
+    per_unit_count: 1/2
+    per_unit_type: 1/2
+
+  modify_cost (11 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'destination', 'duration', 'dynamic_count', 'group_names', 'location', 'operation', 'per_unit', 'per_unit_count', 'per_unit_type', 'source', 'target', 'text', 'value']
+  Always present:     ['action', 'operation', 'text']
+  Sometimes present:  ['card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'destination', 'duration', 'dynamic_count', 'group_names', 'location', 'per_unit', 'per_unit_count', 'per_unit_type', 'source', 'target', 'value']
+    card_type: 9/11
+    condition: 5/11
+    cost_limit: 1/11
+    cost_limit_operator: 1/11
+    count: 2/11
+    destination: 3/11
+    duration: 3/11
+    dynamic_count: 2/11
+    group_names: 1/11
+    location: 7/11
+    per_unit: 4/11
+    per_unit_count: 4/11
+    per_unit_type: 4/11
+    source: 3/11
+    target: 4/11
+    value: 8/11
+
+  modify_required_hearts (20 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'condition', 'count', 'group_names', 'heart_color', 'heart_colors', 'location', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'self_target', 'target', 'text', 'timing_condition']
+  Always present:     ['action', 'text']
+  Sometimes present:  ['condition', 'count', 'group_names', 'heart_color', 'heart_colors', 'location', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'self_target', 'target', 'timing_condition']
+    condition: 11/20
+    count: 19/20
+    group_names: 2/20
+    heart_color: 19/20
+    heart_colors: 13/20
+    location: 6/20
+    per_unit: 7/20
+    per_unit_count: 7/20
+    per_unit_type: 7/20
+    position: 1/20
+    self_target: 17/20
+    target: 6/20
+    timing_condition: 1/20
+
+  modify_score (65 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'card_type', 'condition', 'distinct', 'duration', 'group_names', 'heart_colors', 'location', 'operation', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'self_target', 'source', 'state', 'target', 'text', 'value']
+  Always present:     ['action', 'operation', 'text', 'value']
+  Sometimes present:  ['card_type', 'condition', 'distinct', 'duration', 'group_names', 'heart_colors', 'location', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'self_target', 'source', 'state', 'target']
+    card_type: 1/65
+    condition: 54/65
+    distinct: 1/65
+    duration: 8/65
+    group_names: 2/65
+    heart_colors: 7/65
+    location: 6/65
+    parenthetical: 8/65
+    per_unit: 7/65
+    per_unit_count: 7/65
+    per_unit_type: 7/65
+    position: 1/65
+    self_target: 53/65
+    source: 1/65
+    state: 1/65
+    target: 8/65
+
+  modify_yell_count (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'condition', 'count', 'duration', 'exclude_self', 'operation', 'text']
+
+  move_cards (200 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'activation_condition_parsed', 'activation_position', 'all', 'any_number', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'cost_offset', 'cost_reference', 'count', 'destination', 'duration', 'dynamic_count', 'exclude_self', 'group_names', 'heart_colors', 'max', 'multiple_targets', 'name_constraint', 'name_constraint_source', 'optional', 'or_card_types', 'original_value', 'parenthetical', 'placement_order', 'position', 'quoted_text', 'self_target', 'source', 'state_change', 'target', 'text']
+  Always present:     ['action', 'destination', 'source']
+  Sometimes present:  ['activation_condition_parsed', 'activation_position', 'all', 'any_number', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'cost_offset', 'cost_reference', 'count', 'duration', 'dynamic_count', 'exclude_self', 'group_names', 'heart_colors', 'max', 'multiple_targets', 'name_constraint', 'name_constraint_source', 'optional', 'or_card_types', 'original_value', 'parenthetical', 'placement_order', 'position', 'quoted_text', 'self_target', 'state_change', 'target', 'text']
+    activation_condition_parsed: 4/200
+    activation_position: 2/200
+    all: 7/200
+    any_number: 1/200
+    card_type: 196/200
+    condition: 37/200
+    cost_limit: 21/200
+    cost_limit_operator: 22/200
+    cost_offset: 1/200
+    cost_reference: 1/200
+    count: 191/200
+    duration: 2/200
+    dynamic_count: 16/200
+    exclude_self: 6/200
+    group_names: 59/200
+    heart_colors: 5/200
+    max: 10/200
+    multiple_targets: 3/200
+    name_constraint: 1/200
+    name_constraint_source: 1/200
+    optional: 15/200
+    or_card_types: 1/200
+    original_value: 1/200
+    parenthetical: 8/200
+    placement_order: 7/200
+    position: 1/200
+    quoted_text: 6/200
+    self_target: 2/200
+    state_change: 21/200
+    target: 147/200
+    text: 198/200
+
+  opponent_action (4 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'action_by', 'activation_position', 'opponent_action', 'parenthetical', 'text']
+  Always present:     ['action', 'action_by', 'opponent_action', 'text']
+  Sometimes present:  ['activation_position', 'parenthetical']
+    activation_position: 1/4
+    parenthetical: 1/4
+
+  pay_energy (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'count', 'energy', 'exclude_self', 'optional', 'text']
+  Always present:     ['action', 'count', 'energy', 'optional', 'text']
+  Sometimes present:  ['exclude_self']
+    exclude_self: 1/2
+
+  place_energy_under_member (6 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'any_number', 'card_type', 'condition', 'count', 'destination', 'energy_count', 'optional', 'source', 'state_change', 'target', 'target_member', 'text']
+  Always present:     ['action', 'card_type', 'destination', 'energy_count', 'target', 'text']
+  Sometimes present:  ['any_number', 'condition', 'count', 'optional', 'source', 'state_change', 'target_member']
+    any_number: 1/6
+    condition: 1/6
+    count: 4/6
+    optional: 4/6
+    source: 2/6
+    state_change: 1/6
+    target_member: 2/6
+
+  play_baton_touch (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'count', 'text']
+
+  position_change (16 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'card_type', 'condition', 'count', 'destination', 'exclude_position', 'exclude_self', 'group_names', 'multiple_targets', 'optional', 'parenthetical', 'position', 'source_position', 'target', 'text']
+  Always present:     ['action', 'card_type', 'text']
+  Sometimes present:  ['condition', 'count', 'destination', 'exclude_position', 'exclude_self', 'group_names', 'multiple_targets', 'optional', 'parenthetical', 'position', 'source_position', 'target']
+    condition: 7/16
+    count: 4/16
+    destination: 2/16
+    exclude_position: 1/16
+    exclude_self: 2/16
+    group_names: 3/16
+    multiple_targets: 2/16
+    optional: 6/16
+    parenthetical: 5/16
+    position: 1/16
+    source_position: 1/16
+    target: 13/16
+
+  re_yell (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'lose_blade_hearts', 'text']
+
+  repeat_procedure (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'max_repeats', 'optional', 'text']
+
+  restriction (11 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'card_type', 'condition', 'count', 'destination', 'duration', 'heart_colors', 'operation', 'phase', 'restriction_type', 'self_target', 'target', 'text']
+  Always present:     ['action', 'restriction_type', 'text']
+  Sometimes present:  ['all', 'card_type', 'condition', 'count', 'destination', 'duration', 'heart_colors', 'operation', 'phase', 'self_target', 'target']
+    all: 1/11
+    card_type: 6/11
+    condition: 4/11
+    count: 6/11
+    destination: 1/11
+    duration: 3/11
+    heart_colors: 3/11
+    operation: 3/11
+    phase: 1/11
+    self_target: 1/11
+    target: 7/11
+
+  reveal (6 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'card_type', 'count', 'exclude_self', 'location', 'multiple_targets', 'per_unit', 'per_unit_count', 'per_unit_type', 'self_target', 'source', 'target', 'text']
+  Always present:     ['action', 'count', 'source']
+  Sometimes present:  ['all', 'card_type', 'exclude_self', 'location', 'multiple_targets', 'per_unit', 'per_unit_count', 'per_unit_type', 'self_target', 'target', 'text']
+    all: 2/6
+    card_type: 1/6
+    exclude_self: 1/6
+    location: 1/6
+    multiple_targets: 1/6
+    per_unit: 1/6
+    per_unit_count: 1/6
+    per_unit_type: 1/6
+    self_target: 1/6
+    target: 5/6
+    text: 5/6
+
+  reveal_until_live_card (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'exclude_self', 'source', 'target']
+
+  select (38 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'card_type', 'characters', 'cost_limit', 'cost_limit_operator', 'count', 'distinct', 'duration', 'dynamic_count', 'exclude_selected', 'exclude_self', 'group_names', 'heart_colors', 'multiple_targets', 'optional', 'or_card_types', 'quoted_text', 'source', 'target', 'text']
+  Always present:     ['action']
+  Sometimes present:  ['all', 'card_type', 'characters', 'cost_limit', 'cost_limit_operator', 'count', 'distinct', 'duration', 'dynamic_count', 'exclude_selected', 'exclude_self', 'group_names', 'heart_colors', 'multiple_targets', 'optional', 'or_card_types', 'quoted_text', 'source', 'target', 'text']
+    all: 6/38
+    card_type: 11/38
+    characters: 1/38
+    cost_limit: 3/38
+    cost_limit_operator: 3/38
+    count: 37/38
+    distinct: 1/38
+    duration: 1/38
+    dynamic_count: 1/38
+    exclude_selected: 1/38
+    exclude_self: 4/38
+    group_names: 6/38
+    heart_colors: 12/38
+    multiple_targets: 1/38
+    optional: 2/38
+    or_card_types: 1/38
+    quoted_text: 3/38
+    source: 4/38
+    target: 11/38
+    text: 35/38
+
+  sequential (148 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'actions', 'activation_condition_parsed', 'activation_position', 'all', 'character_effects', 'condition', 'conditional', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_colors', 'location', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'target', 'text', 'trigger_condition', 'trigger_type']
+  Always present:     ['action', 'actions']
+  Sometimes present:  ['activation_condition_parsed', 'activation_position', 'all', 'character_effects', 'condition', 'conditional', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_colors', 'location', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'target', 'text', 'trigger_condition', 'trigger_type']
+    activation_condition_parsed: 1/148
+    activation_position: 1/148
+    all: 7/148
+    character_effects: 1/148
+    condition: 31/148
+    conditional: 25/148
+    distinct: 2/148
+    duration: 4/148
+    exclude_self: 9/148
+    group_names: 1/148
+    group_reference: 1/148
+    heart_colors: 33/148
+    location: 2/148
+    original_value: 7/148
+    parenthetical: 9/148
+    per_unit: 2/148
+    per_unit_count: 2/148
+    per_unit_type: 2/148
+    target: 5/148
+    text: 146/148
+    trigger_condition: 2/148
+    trigger_type: 2/148
+
+  set_blade_count (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'card_type', 'count', 'duration', 'group_names', 'original_value', 'position', 'target', 'text']
+
+  set_blade_type (2 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'blade_type', 'duration', 'text']
+
+  set_card_identity (3 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'all', 'all_regions', 'card_type', 'count', 'group_names', 'identities', 'self_target', 'text']
+  Always present:     ['action', 'text']
+  Sometimes present:  ['all', 'all_regions', 'card_type', 'count', 'group_names', 'identities', 'self_target']
+    all: 1/3
+    all_regions: 1/3
+    card_type: 2/3
+    count: 2/3
+    group_names: 1/3
+    identities: 1/3
+    self_target: 1/3
+
+  set_required_hearts (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'condition', 'count', 'heart_colors', 'parenthetical', 'self_target', 'text']
+
+  set_score (1 instance(s))
+  -------------------------------------------------------
+  ALL fields present: ['action', 'condition', 'self_target', 'text', 'value']
+
+
+######################################################################
+  CROSS-REFERENCE: DATA FIELDS vs ENGINE CODE (TRIAGED)
+  =======================================================
+  
+  REAL BUGS FIXED:
+    1. position in appearance_condition → FIXED (condition.rs: evaluate_appearance_condition)
+    2. cost_limit_operator in movement_condition → FIXED (condition.rs: evaluate_movement_condition adds cost_limit check)
+  
+  FALSE POSITIVES (fields consumed indirectly):
+    - scope: dead field — engine uses `target=both` instead. No bug.
+    - heart_color: alias'd to heart_type via serde. Consumed as fallback.
+    - group_names in move_cards: consumed via group_name() accessor.
+    - activation_condition_parsed/*_position/trigger_*: consumed by trigger system, not effect handler.
+    - parenthetical: consumed by parenthetical extraction in parser (not engine handler).
+    - original_value: consumed by comparison system.
+    - blade_limit/blade_limit_operator: consumed by change_state effect handler (filter check).
+    - energy in pay_energy: consumed via `effect.count` which maps to energy count.
+    - any_number: consumed via `effect.any_number` in move_cards handler.
+    - characters/group_reference/state: consumed via filter infrastructure.
+    - cost_limit_operator (Condition): struct doesn't have field. Parser artifact. Use default ">=".
+  
+  NOW FIXED:
+    3. cost_limit_operator in movement_condition → FIXED (added to Condition struct + condition.rs reads it)
+  
+  =======================================================
+######################################################################
+
+
+############################################################
+  ENGINE COVERAGE CHECK
+############################################################
+
+  --- Condition: appearance_condition ---
+  Data fields: ['all_areas', 'appearance', 'baton_touch_trigger', 'characters', 'location', 'position', 'target', 'text', 'type']
+  ** MISSING from engine (condition.rs): ['position']
+
+  --- Condition: card_count_condition ---
+  Data fields: ['aggregate', 'card_property', 'card_type', 'count', 'exclude_self', 'group_names', 'location', 'operator', 'scope', 'target', 'text', 'type', 'unit']
+  ** MISSING from engine (condition.rs): ['scope']
+
+  --- Condition: comparison_condition ---
+  Data fields: ['aggregate', 'card_type', 'comparison_target', 'comparison_type', 'cost_limit', 'count', 'exclude_self', 'group_names', 'heart_colors', 'location', 'locations', 'operator', 'resource_type', 'scope', 'target', 'temporal', 'temporal_scope', 'text', 'type', 'values']
+  ** MISSING from engine (condition.rs): ['scope', 'temporal_scope']
+
+  --- Condition: energy_state_condition ---
+  Data fields: ['state', 'text', 'type']
+  OK - All fields accounted for
+
+  --- Condition: group_condition ---
+  Data fields: ['aggregate', 'all_areas', 'all_members', 'card_type', 'count', 'exclude_self', 'group_names', 'heart_colors', 'location', 'locations', 'negation', 'operator', 'target', 'text', 'type']
+  OK - All fields accounted for
+
+  --- Condition: location_condition ---
+  Data fields: ['aggregate', 'card_property', 'card_type', 'characters', 'comparison_type', 'cost_limit', 'count', 'distinct', 'exclude_self', 'group_names', 'heart_colors', 'heart_type', 'location', 'locations', 'negation', 'operator', 'scope', 'target', 'temporal', 'temporal_scope', 'text', 'type', 'unit']
+  ** MISSING from engine (condition.rs): ['scope', 'temporal_scope']
+
+  --- Condition: movement_condition ---
+  Data fields: ['ability_negation', 'baton_touch_source', 'baton_touch_trigger', 'comparison_type', 'cost_limit', 'cost_limit_operator', 'exclude_self', 'group_names', 'location', 'movement', 'movement_state', 'operator', 'target', 'text', 'type']
+  ** MISSING from engine (condition.rs): ['cost_limit_operator']
+
+  --- Condition: state_condition ---
+  Data fields: ['state', 'text', 'type']
+  OK - All fields accounted for
+
+  --- Effect: change_state ---
+  Data fields: ['action', 'all', 'blade_limit', 'blade_limit_operator', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'exclude_self', 'group_names', 'location', 'max', 'optional', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'state_change', 'target', 'text']
+  ** MISSING from engine (effects.rs): ['blade_limit', 'blade_limit_operator', 'original_value', 'parenthetical']
+
+  --- Effect: draw_card ---
+  Data fields: ['action', 'activation_condition_parsed', 'activation_position', 'all', 'card_type', 'condition', 'count', 'destination', 'duration', 'dynamic_count', 'group_names', 'heart_colors', 'location', 'multiple_targets', 'optional', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'source', 'state', 'target', 'text', 'trigger_condition', 'trigger_type']
+  ** MISSING from engine (effects.rs): ['activation_condition_parsed', 'activation_position', 'parenthetical', 'state', 'trigger_condition', 'trigger_type']
+
+  --- Effect: gain_ability ---
+  Data fields: ['ability_gain', 'action', 'activation_condition_parsed', 'activation_position', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'duration', 'exclude_self', 'group_names', 'heart_colors', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'target', 'text', 'trigger_condition', 'trigger_type']
+  ** MISSING from engine (effects.rs): ['ability_gain', 'activation_condition_parsed', 'activation_position', 'parenthetical', 'trigger_condition', 'trigger_type']
+
+  --- Effect: gain_resource ---
+  Data fields: ['action', 'activation_position', 'all', 'card_type', 'characters', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_color', 'heart_colors', 'heart_selection', 'location', 'max', 'multiple_targets', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'resource', 'self_target', 'sign', 'state', 'target', 'text', 'trigger_condition', 'trigger_type']
+  ** MISSING from engine (effects.rs): ['activation_position', 'characters', 'group_reference', 'heart_color', 'original_value', 'parenthetical', 'state', 'trigger_condition', 'trigger_type']
+
+  --- Effect: modify_cost ---
+  Data fields: ['action', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'count', 'destination', 'duration', 'dynamic_count', 'group_names', 'location', 'operation', 'per_unit', 'per_unit_count', 'per_unit_type', 'source', 'target', 'text', 'value']
+  OK - All fields accounted for
+
+  --- Effect: modify_required_hearts ---
+  Data fields: ['action', 'condition', 'count', 'group_names', 'heart_color', 'heart_colors', 'location', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'self_target', 'target', 'text', 'timing_condition']
+  ** MISSING from engine (effects.rs): ['heart_color']
+
+  --- Effect: modify_score ---
+  Data fields: ['action', 'card_type', 'condition', 'distinct', 'duration', 'group_names', 'heart_colors', 'location', 'operation', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'position', 'self_target', 'source', 'state', 'target', 'text', 'value']
+  ** MISSING from engine (effects.rs): ['parenthetical', 'state']
+
+  --- Effect: move_cards ---
+  Data fields: ['action', 'activation_condition_parsed', 'activation_position', 'all', 'any_number', 'card_type', 'condition', 'cost_limit', 'cost_limit_operator', 'cost_offset', 'cost_reference', 'count', 'destination', 'duration', 'dynamic_count', 'exclude_self', 'group_names', 'heart_colors', 'max', 'multiple_targets', 'name_constraint', 'name_constraint_source', 'optional', 'or_card_types', 'original_value', 'parenthetical', 'placement_order', 'position', 'quoted_text', 'self_target', 'source', 'state_change', 'target', 'text']
+  ** MISSING from engine (move_cards.rs): ['action', 'activation_condition_parsed', 'activation_position', 'any_number', 'condition', 'duration', 'group_names', 'heart_colors', 'multiple_targets', 'original_value', 'parenthetical', 'quoted_text']
+
+  --- Effect: pay_energy ---
+  Data fields: ['action', 'count', 'energy', 'exclude_self', 'optional', 'text']
+  ** MISSING from engine (effects.rs): ['energy']
+
+  --- Effect: select ---
+  Data fields: ['action', 'all', 'card_type', 'characters', 'cost_limit', 'cost_limit_operator', 'count', 'distinct', 'duration', 'dynamic_count', 'exclude_selected', 'exclude_self', 'group_names', 'heart_colors', 'multiple_targets', 'optional', 'or_card_types', 'quoted_text', 'source', 'target', 'text']
+  ** MISSING from engine (choice.rs): ['dynamic_count', 'exclude_selected', 'multiple_targets', 'or_card_types', 'quoted_text']
+
+  --- Effect: sequential ---
+  Data fields: ['action', 'actions', 'activation_condition_parsed', 'activation_position', 'all', 'character_effects', 'condition', 'conditional', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_colors', 'location', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'target', 'text', 'trigger_condition', 'trigger_type']
+  ** MISSING from engine (compound.rs): ['activation_condition_parsed', 'activation_position', 'all', 'character_effects', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_colors', 'location', 'original_value', 'parenthetical', 'trigger_condition', 'trigger_type']
+
+
+Done.

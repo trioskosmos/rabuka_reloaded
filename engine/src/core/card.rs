@@ -762,6 +762,8 @@ pub struct Condition {
     pub exclude_self: Option<bool>,
     pub any_of: Option<Vec<String>>,
     pub cost_limit: Option<u32>,
+    #[serde(default)]
+    pub cost_limit_operator: Option<String>,
     pub negation: Option<bool>,
     pub baton_touch_trigger: Option<bool>,
     pub baton_touch_source: Option<String>,
@@ -871,7 +873,6 @@ impl Card {
                 .unwrap_or(&0) as i32;
             let total_all: i32 = provided_hearts.hearts.values().sum::<u32>() as i32;
 
-
             for (color, &needed_amount) in &need_heart.hearts {
                 if *color == HeartColor::Heart00 {
                     // heart0: total hearts of any color (Rule 8.2.8) — specific color hearts also count
@@ -885,7 +886,6 @@ impl Card {
                     }
                     let shortfall = (needed_amount as i32 - provided).max(0);
                     wildcard_remaining -= shortfall;
-
                 }
             }
             true

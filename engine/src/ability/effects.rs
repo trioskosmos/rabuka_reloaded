@@ -1149,9 +1149,13 @@ impl<'a> AbilityResolver<'a> {
             );
 
             let final_count = if per_unit {
+                // If the effect has an explicit location, use that as the count zone
+                // instead of the generic per_unit_type → zone mapping.
+                let effective_per_unit_type =
+                    effect.location.as_deref().or(per_unit_type_str.as_deref());
                 let mut matching_count = util::resolve_per_unit_count(
                     true,
-                    per_unit_type_str.as_deref(),
+                    effective_per_unit_type,
                     player,
                     &card_db,
                     &filter,

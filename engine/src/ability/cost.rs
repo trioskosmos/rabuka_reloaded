@@ -89,7 +89,7 @@ impl<'a> AbilityResolver<'a> {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
                     allow_skip: false,
-                options: None,
+                    options: None,
                 });
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some("choice_cost".to_string());
@@ -303,6 +303,49 @@ impl<'a> AbilityResolver<'a> {
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
                 if optional && !is_activation {
+                    // For non-self_cost change_state, verify candidates exist before prompting
+                    if state_change == "wait" && cost.self_cost != Some(true) {
+                        let count = cost.count.unwrap_or(1) as usize;
+                        let exclude_self = cost.exclude_self.unwrap_or(false);
+                        let activating_id = self.game_state.activating_card;
+                        let card_db = &self.game_state.card_database;
+                        let group_names = cost.group_names.as_ref();
+
+                        let stage_cards: Vec<i16> = self
+                            .game_state
+                            .resolve_target_player(target)
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| id != -1)
+                            .copied()
+                            .collect();
+                        let candidates: Vec<i16> = stage_cards
+                            .into_iter()
+                            .filter(|id| !(exclude_self && activating_id == Some(*id)))
+                            .filter(|id| {
+                                super::util::card_matches_type(
+                                    card_db,
+                                    *id,
+                                    cost.card_type.as_deref(),
+                                )
+                            })
+                            .filter(|id| {
+                                group_names.as_ref().map_or(true, |gn| {
+                                    gn.iter().any(|g| {
+                                        super::util::card_matches_group_str(
+                                            card_db,
+                                            *id,
+                                            Some(g.as_str()),
+                                        )
+                                    })
+                                })
+                            })
+                            .collect();
+                        if candidates.is_empty() {
+                            return Ok(());
+                        }
+                    }
                     let cost_description = if state_change == "wait" {
                         "Put this member to wait state"
                     } else {
@@ -315,7 +358,7 @@ impl<'a> AbilityResolver<'a> {
                             cost_description
                         ),
                         allow_skip: true,
-                    options: None,
+                        options: None,
                     });
                     if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());
@@ -424,7 +467,7 @@ impl<'a> AbilityResolver<'a> {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),
                         allow_skip: true,
-                    options: None,
+                        options: None,
                     });
                     if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());

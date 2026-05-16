@@ -1082,9 +1082,70 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             .map_err(|e| e)?;
                     }
                 }
-                if cost.state_change.as_deref() == Some("wait") && cost.self_cost == Some(true) {
-                    if let Some(id) = self.game_state.activating_card {
-                        self.game_state.mods.add_orientation_modifier(id, "wait");
+                if cost.state_change.as_deref() == Some("wait") {
+                    if cost.self_cost == Some(true) {
+                        if let Some(id) = self.game_state.activating_card {
+                            self.game_state.mods.add_orientation_modifier(id, "wait");
+                        }
+                    } else {
+                        let target = cost.target.as_deref().unwrap_or("self");
+                        let count = cost.count.unwrap_or(1) as usize;
+                        let card_db = &self.game_state.card_database;
+                        let group_names = cost.group_names.as_ref();
+                        let exclude_self = cost.exclude_self.unwrap_or(false);
+                        let activating_id = self.game_state.activating_card;
+                        let state_change = cost.state_change.as_deref().unwrap_or("");
+
+                        let stage_cards: Vec<i16> = self
+                            .game_state
+                            .resolve_target_player(target)
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| id != -1)
+                            .copied()
+                            .collect();
+                        let candidates: Vec<i16> = stage_cards
+                            .into_iter()
+                            .filter(|id| !(exclude_self && activating_id == Some(*id)))
+                            .filter(|id| {
+                                super::util::card_matches_type(
+                                    card_db,
+                                    *id,
+                                    cost.card_type.as_deref(),
+                                )
+                            })
+                            .filter(|id| {
+                                let group_ok = match group_names {
+                                    Some(gn) => gn.iter().any(|g| {
+                                        super::util::card_matches_group_str(
+                                            card_db,
+                                            *id,
+                                            Some(g.as_str()),
+                                        )
+                                    }),
+                                    None => true,
+                                };
+                                group_ok
+                            })
+                            .collect();
+
+                        if candidates.is_empty() {
+                            return Err("No matching members on stage to change state".to_string());
+                        }
+
+                        let to_wait: Vec<i16> = candidates.into_iter().take(count).collect();
+                        for &card_id in &to_wait {
+                            if state_change == "wait" {
+                                self.game_state
+                                    .mods
+                                    .add_orientation_modifier(card_id, "wait");
+                            } else if state_change == "rest" || state_change == "rested" {
+                                self.game_state
+                                    .mods
+                                    .add_orientation_modifier(card_id, "rest");
+                            }
+                        }
                     }
                 }
                 // Handle sequential_cost sub-costs — pay each after user confirmed

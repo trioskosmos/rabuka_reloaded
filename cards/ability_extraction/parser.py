@@ -989,6 +989,10 @@ def _try_baton_touch(text):
     gns = extract_group_names(text)
     if gns:
         result["group_names"] = gns
+    # Extract cost comparison (e.g. "コストが低い" → comparison_type=cost, operator=<)
+    if "コスト" in text and ("低い" in text or "高い" in text):
+        result["comparison_type"] = "cost"
+        result["operator"] = "<" if "低い" in text else ">"
     if "このメンバー以外" in text or "ほかのメンバー" in text:
         result["exclude_self"] = True
     if "能力を持たない" in text or "能力も持たない" in text:

@@ -57,6 +57,7 @@ impl GameState {
         self.baton_touch_count = 0;
         self.baton_touch_zero_cost = false;
         self.baton_touch_replaced_member_cost = None;
+        self.baton_touch_replaced_member_id = None;
         self.baton_touch_arriving_card_id = None;
         self.clear_area_placement_tracking();
     }

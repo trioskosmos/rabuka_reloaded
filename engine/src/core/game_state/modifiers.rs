@@ -458,6 +458,7 @@ impl GameState {
         self.baton_touch_count = 0;
         self.baton_touch_zero_cost = false;
         self.baton_touch_replaced_member_cost = None;
+        self.baton_touch_replaced_member_id = None;
     }
 
     pub fn record_card_movement(&mut self, card_id: i16) {

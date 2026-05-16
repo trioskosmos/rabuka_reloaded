@@ -176,6 +176,196 @@ fn position_change_skip_optional() {
     assert_ne!(game.state.player1.stage.stage[2], -1);
 }
 
+/// Filter destinations by group_names and exclude_self.
+///
+/// Card: PL!HS-pb1-006-R (安養寺姫芽) ab#0
+/// ライブ開始時: 自分のステージにいる他の『みらくらぱーく！』のメンバーがいるエリアに
+/// ポジションチェンジしてもよい。そうした場合、ライブ終了時まで、heart01+bladeを得る。
+///   action: sequential [ position_change(group_names=[みらくらぱーく！], exclude_self, optional),
+///                         gain_resource(blade, conditional) ]
+#[test]
+fn position_change_filters_by_group_names() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let himeno = game.id("PL!HS-pb1-006-R");
+    let member_same = game.id("PL!HS-sd1-014-SD"); // みらくらぱーく！ member
+    let member_other = game.id("PL!-sd1-010-SD"); // non-group filler
+
+    // Place members on stage
+    game.state.player1.stage.stage = [member_other, member_same, -1];
+
+    // Put himeno in hand and play to stage
+    game.state.player1.hand.cards.push(himeno);
+    game.give_energy(11);
+    game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::RightSide);
+
+    // Play himeno to RightSide — debut/live trigger will fire later.
+    // Advance to live start to trigger the ability
+    game.pass(); // Main -> Active
+    game.pass(); // Active -> Energy
+    game.pass(); // Energy -> Draw
+    game.pass(); // Draw -> Main
+    game.pass(); // Main -> LiveCardSetP1Turn
+
+    // Set a live card so live starts
+    game.state
+        .player1
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    game.pass(); // LiveCardSetP1 -> LiveCardSetP2Turn
+    game.state
+        .player2
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    game.pass(); // LiveCardSetP2 -> FirstAttackerPerformance
+
+    // The live start trigger fires and the sequential effect starts.
+    // First sub-action: position_change with group_names=[みらくらぱーく！], exclude_self=true
+    // Only Center (member_same) should be offered — Left (member_other) should NOT.
+    if game.has_pending_choice() {
+        let choice_type = game.pending_choice_type();
+        // Should be a position choice (SelectTarget with position|destination)
+        // or possibly a select card choice
+        game.dbg_choice();
+    }
+
+    // The position change should only offer the Center area (みらくらぱーく！ member)
+    // We'll check by looking at the generated actions
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let position_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == rabuka_engine::game_setup::ActionType::ChoicePosition)
+        .collect();
+
+    // Should have exactly 1 position option (Center, the only valid destination)
+    assert_eq!(
+        position_actions.len(),
+        1,
+        "Only Center (みらくらぱーく！ member) should be offered as destination"
+    );
+    if let Some(ref params) = position_actions[0].parameters {
+        assert_eq!(
+            params.stage_area.as_deref(),
+            Some("center"),
+            "Only Center should be a valid position change destination"
+        );
+    }
+}
+
+/// Filter by group_names with exclude_self: own position should be excluded.
+#[test]
+fn position_change_group_names_excludes_self() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let himeno = game.id("PL!HS-pb1-006-R");
+    let member_same_a = game.id("PL!HS-sd1-014-SD"); // みらくらぱーく！ member (cost 9)
+    let member_same_b = game.id("PL!HS-sd1-006-SD"); // みらくらぱーく！ member (cost 15)
+
+    // Place a みらくらぱーく！ member on stage
+    game.state.player1.stage.stage = [member_same_a, -1, -1];
+
+    // Put himeno in hand and play to stage — himeno is also みらくらぱーく！
+    game.state.player1.hand.cards.push(himeno);
+    game.give_energy(11);
+    game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::Center);
+
+    // Add another みらくらぱーく！ member on stage
+    game.state.player1.stage.stage[2] = member_same_b;
+
+    // Now stage has: [member_same_a, himeno, member_same_b]
+    // If himeno activates position_change with group_names=[みらくらぱーく！], exclude_self=true,
+    // only Left and Right should be offered (not Center, which is himeno's own position).
+
+    // Advance to live start
+    game.pass(); // Main -> Active
+    game.pass(); // Active -> Energy
+    game.pass(); // Energy -> Draw
+    game.pass(); // Draw -> Main
+    game.pass(); // Main -> LiveCardSetP1Turn
+
+    game.state
+        .player1
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    game.pass(); // LiveCardSetP1 -> LiveCardSetP2Turn
+    game.state
+        .player2
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    game.pass(); // LiveCardSetP2 -> FirstAttackerPerformance
+
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let position_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == rabuka_engine::game_setup::ActionType::ChoicePosition)
+        .collect();
+
+    // Should have 2 position options (Left and Right, excluding Center=self)
+    assert_eq!(
+        position_actions.len(),
+        2,
+        "Left and Right should be offered, Center (self) should be excluded"
+    );
+}
+
+/// No matching group members → position change should be skipped silently.
+#[test]
+fn position_change_skip_when_no_valid_destinations() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let himeno = game.id("PL!HS-pb1-006-R");
+    let member_other = game.id("PL!-sd1-010-SD"); // non-group filler
+
+    // Stage has only non-group members
+    game.state.player1.stage.stage = [member_other, -1, -1];
+
+    // Put himeno in hand and play to stage
+    game.state.player1.hand.cards.push(himeno);
+    game.give_energy(11);
+    game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::RightSide);
+
+    // Advance to live start
+    game.pass(); // Main -> Active
+    game.pass(); // Active -> Energy
+    game.pass(); // Energy -> Draw
+    game.pass(); // Draw -> Main
+    game.pass(); // Main -> LiveCardSetP1Turn
+
+    game.state
+        .player1
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    game.pass(); // LiveCardSetP1 -> LiveCardSetP2Turn
+    game.state
+        .player2
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    game.pass(); // LiveCardSetP2 -> FirstAttackerPerformance
+
+    // No valid destinations → position change should be skipped
+    // No position choice should appear
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let position_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == rabuka_engine::game_setup::ActionType::ChoicePosition)
+        .collect();
+
+    assert_eq!(
+        position_actions.len(),
+        0,
+        "No position choice should appear when no valid group member destinations exist"
+    );
+}
+
 /// Verify card movement tracking.
 #[test]
 fn position_change_tracks_card_movement() {

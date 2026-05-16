@@ -784,6 +784,7 @@ pub fn resolve_per_unit_count(
         }
         Some("discard") => "waitroom",
         Some("live_card_zone") => "live_card_zone",
+        Some("success_live_zone") | Some("success_live_card_zone") => "success_live_zone",
         _ => return 1,
     };
     if zone == "under_member" {

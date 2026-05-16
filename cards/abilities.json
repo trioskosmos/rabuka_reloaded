@@ -8854,7 +8854,9 @@
           "location": "stage",
           "group_names": [
             "みらくらぱーく！"
-          ]
+          ],
+          "comparison_type": "cost",
+          "operator": "<"
         },
         "action": "gain_resource",
         "resource": "heart",
