@@ -20,6 +20,8 @@ pub enum Choice {
         heart_colors: Vec<String>,
         #[serde(default)]
         name_fragments: Option<Vec<String>>,
+        #[serde(default)]
+        target_player_id: Option<String>,
     },
     SelectTarget {
         target: String,
@@ -92,6 +94,7 @@ pub struct ChoiceBuilder {
     is_select_action: bool,
     heart_colors: Vec<String>,
     name_fragments: Option<Vec<String>>,
+    target_player_id: Option<String>,
 }
 
 impl ChoiceBuilder {
@@ -110,6 +113,7 @@ impl ChoiceBuilder {
             is_select_action: self.is_select_action,
             heart_colors: self.heart_colors,
             name_fragments: self.name_fragments,
+            target_player_id: self.target_player_id,
         }
     }
 
@@ -144,6 +148,10 @@ impl ChoiceBuilder {
     }
     pub fn is_select_action(mut self, v: bool) -> Self {
         self.is_select_action = v;
+        self
+    }
+    pub fn target_player_id(mut self, v: Option<String>) -> Self {
+        self.target_player_id = v;
         self
     }
 }
@@ -196,6 +204,7 @@ impl Choice {
             is_select_action: false,
             heart_colors: vec![],
             name_fragments: None,
+            target_player_id: None,
         }
     }
 

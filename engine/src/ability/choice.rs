@@ -140,6 +140,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     characters,
                     filtered_indices,
                     is_select_action,
+                    ref target_player_id,
                     ..
                 }),
                 ChoiceResult::CardSelected { indices },
@@ -158,6 +159,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     characters.clone(),
                     filtered_indices.clone(),
                     *is_select_action,
+                    target_player_id.clone(),
                 )
             }
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
@@ -197,6 +199,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         characters: Option<Vec<String>>,
         filtered_indices: Option<Vec<usize>>,
         is_select_action: bool,
+        target_player_id: Option<String>,
     ) -> Result<(), String> {
         println!(
             "DEBUG: handle_select_card - zone: '{}', indices: {:?}, context: {:?}",
@@ -685,43 +688,56 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 );
             }
             "stage" => {
-                // Move selected stage card(s) to the destination zone.
-                // Used by effects like Yoshiko (move chosen Aqours member off stage).
-                let dst = self.game_state.entry_destination().map(|s| s.to_string());
-                let dst_str = dst.as_deref().unwrap_or("discard").to_string();
-                let mut moved_ids: Vec<i16> = Vec::new();
-                let mut last_vacated: Option<usize> = None;
-                {
-                    let player = self.game_state.active_player_mut();
-                    for &idx in indices.iter().rev() {
-                        if idx < 3
-                            && player.stage.stage[idx] != -1
-                            && validate_card(player.stage.stage[idx])
-                        {
-                            if let Some(card_id) =
-                                player.remove_member_from_stage_with_recycling(idx, &card_db)
-                            {
-                                crate::ability::util::place_card_in_zone(
-                                    player,
-                                    card_id,
-                                    &dst_str,
-                                    None,
-                                    false,
-                                    1,
-                                );
-                                moved_ids.push(card_id);
-                                last_vacated = Some(idx);
+                if is_select_action {
+                    // Select card(s) for a state change or similar effect
+                    // without moving them off stage.
+                    let player = self
+                        .game_state
+                        .resolve_target_player_mut(target_player_id.as_deref().unwrap_or("self"));
+                    let mut cards: Vec<i16> = Vec::new();
+                    for &idx in indices.iter() {
+                        if idx < 3 && player.stage.stage[idx] != -1 {
+                            let cid = player.stage.stage[idx];
+                            if validate_card(cid) {
+                                cards.push(cid);
                             }
                         }
                     }
-                }
-                if let Some(pos) = last_vacated {
-                    self.game_state.last_vacated_stage_area = Some(pos);
-                }
-                self.selected_cards = moved_ids.clone();
-                if !moved_ids.is_empty() {
-                    self.moved_cards = moved_ids.clone();
-                    self.game_state.recently_moved_cards = Some(moved_ids);
+                    self.selected_cards = cards;
+                } else {
+                    // Move selected stage card(s) to the destination zone.
+                    // Used by effects like Yoshiko (move chosen Aqours member off stage).
+                    let dst = self.game_state.entry_destination().map(|s| s.to_string());
+                    let dst_str = dst.as_deref().unwrap_or("discard").to_string();
+                    let mut moved_ids: Vec<i16> = Vec::new();
+                    let mut last_vacated: Option<usize> = None;
+                    {
+                        let player = self.game_state.active_player_mut();
+                        for &idx in indices.iter().rev() {
+                            if idx < 3
+                                && player.stage.stage[idx] != -1
+                                && validate_card(player.stage.stage[idx])
+                            {
+                                if let Some(card_id) =
+                                    player.remove_member_from_stage_with_recycling(idx, &card_db)
+                                {
+                                    crate::ability::util::place_card_in_zone(
+                                        player, card_id, &dst_str, None, false, 1,
+                                    );
+                                    moved_ids.push(card_id);
+                                    last_vacated = Some(idx);
+                                }
+                            }
+                        }
+                    }
+                    if let Some(pos) = last_vacated {
+                        self.game_state.last_vacated_stage_area = Some(pos);
+                    }
+                    self.selected_cards = moved_ids.clone();
+                    if !moved_ids.is_empty() {
+                        self.moved_cards = moved_ids.clone();
+                        self.game_state.recently_moved_cards = Some(moved_ids);
+                    }
                 }
             }
             _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
@@ -942,6 +958,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     }
                 }
                 self.game_state.pending_sequential_actions = None;
+            }
+            self.execution_context = ExecutionContext::None;
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.execution_context = None;
             }
             return Ok(());
         }

@@ -128,6 +128,11 @@ impl<'a> AbilityResolver<'a> {
                 }
             }
         }
+        // Clear context so resume_with_choice doesn't re-process the ability.
+        self.execution_context = ExecutionContext::None;
+        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+            entry.execution_context = None;
+        }
         Ok(())
     }
 
@@ -159,7 +164,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "primary|alternative".to_string(),
                 description,
                 allow_skip: false,
-            options: None,
+                options: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
             return Ok(());
@@ -253,7 +258,7 @@ impl<'a> AbilityResolver<'a> {
                 target: "conditional_optional".to_string(),
                 description: format!("{}?", desc),
                 allow_skip: true,
-            options: None,
+                options: None,
             });
             return Ok(());
         }

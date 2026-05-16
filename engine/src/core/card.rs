@@ -870,7 +870,7 @@ impl Card {
                 .get(&HeartColor::Heart00)
                 .unwrap_or(&0) as i32;
             let total_all: i32 = provided_hearts.hearts.values().sum::<u32>() as i32;
-            let mut consumed_by_color: i32 = 0;
+
 
             for (color, &needed_amount) in &need_heart.hearts {
                 if *color == HeartColor::Heart00 {
@@ -885,7 +885,7 @@ impl Card {
                     }
                     let shortfall = (needed_amount as i32 - provided).max(0);
                     wildcard_remaining -= shortfall;
-                    consumed_by_color += provided.min(needed_amount as i32);
+
                 }
             }
             true

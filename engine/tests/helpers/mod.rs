@@ -174,6 +174,12 @@ impl TestGame {
 
     /// Play a member card from hand onto the stage.
     pub fn play_to_stage(&mut self, card_id: i16, area: MemberArea) {
+        self.try_play_to_stage(card_id, area)
+            .expect("play_to_stage failed");
+    }
+
+    /// Attempt to play a member card from hand onto the stage. Returns Result.
+    pub fn try_play_to_stage(&mut self, card_id: i16, area: MemberArea) -> Result<(), String> {
         TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::PlayMemberToStage,
@@ -182,7 +188,6 @@ impl TestGame {
             Some(area),
             Some(false),
         )
-        .expect("play_to_stage failed");
     }
 
     /// Activate the first 起動 (activation) ability on a stage card.

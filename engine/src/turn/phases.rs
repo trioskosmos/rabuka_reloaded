@@ -351,6 +351,7 @@ impl super::TurnEngine {
         game_state.record_card_movement(card_id);
         game_state.baton_touch_zero_cost = baton_touch_used && cost_paid == 0;
         game_state.baton_touch_replaced_member_cost = replaced_member_cost;
+        game_state.baton_touch_replaced_member_id = replaced_member_id;
 
         game_state.active_player_mut().debut_count_this_turn += 1;
         game_state.record_card_appearance(card_id);

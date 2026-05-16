@@ -110,6 +110,7 @@ pub mod tokimeki_test;
 pub mod totemari_test;
 pub mod toubatsu_test;
 pub mod umi_q228_test;
+pub mod untested_abilities_test;
 pub mod victory_road_test;
 pub mod vitamin_test;
 pub mod wao_wao_test;

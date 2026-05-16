@@ -1229,7 +1229,21 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "notmoved" => true,
-            "baton_touch" => condition.baton_touch_trigger.unwrap_or(false),
+            "baton_touch" => {
+                let triggered = condition.baton_touch_trigger.unwrap_or(false);
+                if !triggered {
+                    return false;
+                }
+                if let Some(source_name) = condition.baton_touch_source.as_deref() {
+                    if let Some(replaced_id) = self.game_state.baton_touch_replaced_member_id {
+                        if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
+                            return card.name.contains(source_name);
+                        }
+                    }
+                    return false;
+                }
+                true
+            }
             _ => match location {
                 "stage" => {
                     player.stage.stage[0] != -1

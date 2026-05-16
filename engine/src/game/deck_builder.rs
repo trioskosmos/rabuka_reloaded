@@ -1,5 +1,5 @@
 use crate::card::CardDatabase;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]

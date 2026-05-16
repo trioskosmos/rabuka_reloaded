@@ -630,6 +630,7 @@ impl<'a> AbilityResolver<'a> {
                 effect.choice_options.as_ref(),
                 effect.choice_type.as_deref(),
                 effect.options.as_ref(),
+                effect.choice_maker.as_deref(),
             ),
             EffectAction::PayEnergy => {
                 self.execute_pay_energy(effect.count_or(0), effect.target_name());
@@ -1486,12 +1487,22 @@ impl<'a> AbilityResolver<'a> {
                 None,
             );
             let mut candidates: Vec<(usize, i16)> = Vec::new();
-            for (i, slot_id) in player.stage.stage.iter().enumerate() {
-                if *slot_id == -1 {
-                    continue;
+
+            // If we have selected cards from a previous choice, use them
+            if !self.selected_cards.is_empty() {
+                for &card_id in &self.selected_cards {
+                    if let Some(pos) = player.stage.stage.iter().position(|&id| id == card_id) {
+                        candidates.push((pos, card_id));
+                    }
                 }
-                if filter.matches(&card_db, *slot_id, false) {
-                    candidates.push((i, *slot_id));
+            } else {
+                for (i, slot_id) in player.stage.stage.iter().enumerate() {
+                    if *slot_id == -1 {
+                        continue;
+                    }
+                    if filter.matches(&card_db, *slot_id, false) {
+                        candidates.push((i, *slot_id));
+                    }
                 }
             }
 
@@ -1499,20 +1510,11 @@ impl<'a> AbilityResolver<'a> {
                 return Err("No matching members on stage to change state".to_string());
             }
 
-            // Count how many are in wait state before changing (for wait→active tracking)
-            let wait_before_count = candidates
-                .iter()
-                .filter(|(_, card_id)| {
-                    let o = self.game_state.mods.get_orientation_modifier(*card_id);
-                    // None = active (no modifier), Some("wait") = wait
-                    o.map_or(false, |o| o == "wait")
-                })
-                .count();
-
             // count=0 means "change all matching" (no limit)
             let is_change_all = count == 0;
 
-            if !is_change_all && candidates.len() > count as usize {
+            if !is_change_all && candidates.len() > count as usize && self.selected_cards.is_empty()
+            {
                 self.pending_choice = Some(
                     Choice::select_cards(
                         "stage",
@@ -1523,18 +1525,48 @@ impl<'a> AbilityResolver<'a> {
                     .card_type(card_type_filter.clone())
                     .cost_limit(cost_limit, cost_limit_operator.clone())
                     .group(group_filter.clone())
+                    .is_select_action(true)
+                    .target_player_id(Some(target.clone()))
                     .build(),
                 );
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                // Store a re-apply effect so finalize_choice applies the state
+                // change to the selected target after the choice is resolved.
+                self.game_state.pending_sequential_actions =
+                    Some(vec![crate::card::AbilityEffect {
+                        action: "change_state".to_string(),
+                        state_change: Some(state_change.clone()),
+                        target: Some(target.clone()),
+                        count: Some(count),
+                        card_type: card_type_filter.clone(),
+                        cost_limit,
+                        group_names: group_filter.clone().map(|g| vec![g]),
+                        self_cost: Some(self_cost),
+                        cost_limit_operator,
+                        ..Default::default()
+                    }]);
                 return Ok(());
             }
 
             let change_count = if is_change_all {
                 candidates.len()
             } else {
-                count as usize
+                count.min(candidates.len() as u32) as usize
             };
-            for (_, card_id) in candidates.iter().take(change_count) {
+
+            let actual_targets = candidates.iter().take(change_count).collect::<Vec<_>>();
+
+            // Count how many are in wait state before changing (for wait→active tracking)
+            let wait_before_count = actual_targets
+                .iter()
+                .filter(|(_, card_id)| {
+                    let o = self.game_state.mods.get_orientation_modifier(*card_id);
+                    // None = active (no modifier), Some("wait") = wait
+                    o.map_or(false, |o| o == "wait")
+                })
+                .count();
+
+            for (_, card_id) in actual_targets {
                 self.game_state
                     .mods
                     .add_orientation_modifier(*card_id, &state_change);
@@ -2979,6 +3011,7 @@ impl<'a> AbilityResolver<'a> {
         choice_options: Option<&Vec<String>>,
         choice_type: Option<&str>,
         options: Option<&Vec<AbilityEffect>>,
+        choice_maker: Option<&str>,
     ) -> Result<(), String> {
         let options_json = options
             .and_then(|opts| serde_json::to_string(opts).ok())
@@ -2992,6 +3025,19 @@ impl<'a> AbilityResolver<'a> {
                 Some("choice".to_string())
             };
             entry.conditional_choice = options_json;
+
+            // Set choice_player_id based on choice_maker
+            if choice_maker == Some("opponent") {
+                let current_player_id = entry.player_id.clone();
+                let opponent_id = if current_player_id == "p1" {
+                    "p2".to_string()
+                } else {
+                    "p1".to_string()
+                };
+                entry.choice_player_id = Some(opponent_id);
+            } else {
+                entry.choice_player_id = Some(entry.player_id.clone());
+            }
         }
         if let Some(effect_options) = options {
             let description = effect_options

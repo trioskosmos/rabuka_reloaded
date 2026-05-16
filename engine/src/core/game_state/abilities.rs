@@ -40,6 +40,7 @@ impl GameState {
                             selected_card_ids: Vec::new(),
                             effect_started: false,
                             optional_cost_was_paid: false,
+                            choice_player_id: None,
                         };
 
                         self.ability_queue.enqueue(entry);
@@ -242,6 +243,12 @@ impl GameState {
                             serde_json::Value::String(card.name.clone()),
                         );
                     }
+                }
+                if let Some(ref pid) = entry.choice_player_id {
+                    obj.insert(
+                        "choice_player_id".into(),
+                        serde_json::Value::String(pid.clone()),
+                    );
                 }
             }
         }
