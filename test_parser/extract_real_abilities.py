@@ -37,8 +37,9 @@ def main():
         print(f"Error: {abilities_json} not found.")
         return
 
-    with open(abilities_json, encoding='utf-8') as f:
-        data = json.load(f)
+    with open(abilities_json, 'rb') as f:
+        content = f.read().decode('utf-8', errors='ignore')
+        data = json.loads(content)
         unique_abilities = data.get("unique_abilities", [])
 
     parser = AbilityParser()

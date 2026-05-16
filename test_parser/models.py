@@ -14,38 +14,47 @@ class Cost(BaseParserModel):
 
 class Condition(BaseParserModel):
     type: str
-    # Common fields across many conditions
-    target: Optional[Literal["self", "opponent", "both", "either"]] = None
+    # Common fields
+    target: Optional[str] = None
     location: Optional[str] = None
-    card_type: Optional[Literal["member_card", "live_card", "energy_card"]] = None
+    locations: Optional[List[str]] = None
+    card_type: Optional[str] = None
     count: Optional[int] = None
-    comparison_operator: Optional[Literal["=", ">", "<", ">=", "<=", "contains"]] = None
+    comparison_operator: Optional[str] = None
     unit: Optional[str] = None
 
-    # Compound/Or conditions
+    # Compound
     conditions: Optional[List[Condition]] = None
     logical_operator: Optional[Literal["and", "or"]] = None
 
-    # Temporal conditions
+    # Temporal
     temporal: Optional[str] = None
     phase: Optional[str] = None
 
-    # Movement/Appearance
-    movement: Optional[str] = None
-    appearance: Optional[bool] = None
+    # Characters & Groups
     characters: Optional[List[str]] = None
+    group_names: Optional[List[str]] = None
+    all_members: Optional[bool] = None
 
-    # State/Energy
+    # State & Energy
     state: Optional[str] = None
     resource_type: Optional[str] = None
     negation: Optional[bool] = None
+    heart_colors: Optional[List[str]] = None
+
+    # Comparison details
+    comparison_target: Optional[str] = None
+    comparison_type: Optional[str] = None
+    aggregate: Optional[str] = None
 
     # Others
-    group_names: Optional[List[str]] = None
     card_property: Optional[str] = None
     distinct: Optional[bool] = None
     exclude_self: Optional[bool] = None
     all_areas: Optional[bool] = None
+    cost_limit: Optional[int] = None
+    position: Optional[str] = None
+    movement: Optional[str] = None
 
 
 class Action(BaseParserModel):
@@ -57,19 +66,31 @@ class Action(BaseParserModel):
     count: Optional[int] = None
     card_type: Optional[str] = None
     optional: Optional[bool] = None
+    
+    # Characters & Groups
+    characters: Optional[List[str]] = None
+    group_names: Optional[List[str]] = None
+    
     # Sequential/Compound
     actions: Optional[List[Action]] = None
+    
     # For look_and_select
     look_action: Optional[Action] = None
     select_action: Optional[Action] = None
     discard_remaining: Optional[bool] = None
+    
     # Resource related
     resource: Optional[str] = None
     heart_colors: Optional[List[str]] = None
+    
     # State related
     state_change: Optional[str] = None
-    # Duration
+    
+    # Others
     duration: Optional[str] = None
+    cost_limit: Optional[int] = None
+    position: Optional[str] = None
+    exclude_self: Optional[bool] = None
 
 
 class UnknownAction(Action):

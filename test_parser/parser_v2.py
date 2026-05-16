@@ -3,6 +3,10 @@ from grammar import Str, Regex, OneOf, Seq, Opt, Many, Map, Capture, Parser, tok
 from models import Ability, Action, Cost, Condition, UnknownAction
 from patterns import get_patterns
 
+# Mark Action as Cost
+class ActionCostWrapper:
+    def __init__(self, action):
+        self.action = action
 
 class AbilityParser:
     def __init__(self):
@@ -45,8 +49,9 @@ class AbilityParser:
             self.t(Str("した")), self.t(Str("された")), self.t(Str("その")),
             self.t(Str("これにより")), self.t(Str("につき")), self.t(Str("ため")),
             self.t(Str("残りを")), self.t(Str("好きな")), self.t(Str("好きな枚数を")),
-            self.t(Str("コスト")), self.number,
-            Map(Regex(r"「([^」]+)」"), lambda x: f"nested:{x[1]}")
+            self.t(Str("コスト")), self.number, self.t(Str("以外")),
+            self.t(Str("合計")), self.t(Str("のみ")), self.t(Str("枚につき")),
+            Map(Regex(r"「([^」]+)」"), lambda x: f"bracketed:{x[1]}")
         )
 
         # --- Assembly Helpers ---
@@ -55,26 +60,38 @@ class AbilityParser:
             base, suffixes = v_tuple
             return base + "".join(suffixes)
 
+        def is_ability_text(text):
+            # Expanded ability detection
+            keywords = ["。", "、", "：", "する", "を得る", "引く", "置く", "加える", "登場", "移動"]
+            return any(x in text for x in keywords)
+
         def enrich_fields(data, parts):
-            for p in parts:
+            for i, p in enumerate(parts):
                 if isinstance(p, dict):
                     if p.get("type") == "count":
                         data["count"] = p["value"]
                         if p.get("unit"): data["unit"] = p["unit"]
-                elif isinstance(p, tuple) and len(p) == 3: # Cost limit (cost, num, op)
-                    if p[0] == "コスト":
-                        data["card_property"] = f"cost_{p[2]}_{p[1]}"
+                elif isinstance(p, tuple) and len(p) == 3: # Cost limit
+                    data["cost_limit"] = p[1]
+                    data["comparison_operator"] = p[2]
                 elif isinstance(p, str):
-                    if p.startswith("nested:"):
-                        data["nested_text"] = p[7:]
+                    if p.startswith("bracketed:"):
+                        content = p[10:]
+                        if is_ability_text(content):
+                            if "actions" not in data: data["actions"] = []
+                            data["actions"].append(Action(type="nested_ability", text=content))
+                        else:
+                            if "characters" not in data: data["characters"] = []
+                            data["characters"].append(content)
                     elif p.endswith("から") or p.endswith("にある"):
                         data["source"] = p
-                    elif p.endswith("に"):
-                        data["destination"] = p
+                    elif p.endswith("に") or p.endswith("置き場") or p.endswith("ゾーン"):
+                        data["location"] = p if not data.get("location") else data["location"]
+                        data["destination"] = p if p.endswith("に") else data.get("destination")
                     elif p in ["自分", "相手", "このメンバー"]:
                         data["target"] = p
                     elif "カード" in p or "メンバー" in p or "ライブ" in p:
-                        data["card_type"] = p
+                        if not data.get("card_type"): data["card_type"] = p
                     elif p in ["以上", "以下", "より多い", "より少ない", "超", "未満"]:
                         data["comparison_operator"] = p
                     elif p.startswith("『"):
@@ -82,8 +99,18 @@ class AbilityParser:
                         data["group_names"].append(p.strip("『』"))
                     elif p in ["ライブ終了時まで", "ライブ終了まで", "このターンの間", "ターン終了時まで"]:
                         data["duration"] = p
-                    elif "以外" in p:
+                        data["temporal"] = p
+                    elif p == "以外":
                         data["exclude_self"] = True
+                    elif p == "合計":
+                        data["aggregate"] = "total"
+                    elif p == "のみ":
+                        data["all_members"] = True
+                    elif p == "枚につき":
+                        # Per-unit logic: usually preceded by a count or condition
+                        data["per_unit"] = True
+                        if i > 0 and isinstance(parts[i-1], str) and "カード" in parts[i-1]:
+                            data["per_unit_type"] = parts[i-1]
 
         def assemble_action(parts, verb_tuple, raw_text):
             full_verb = get_full_verb(verb_tuple)
@@ -108,6 +135,8 @@ class AbilityParser:
         def assemble_condition(parts, terminator, raw_text):
             data = {"text": raw_text.strip(), "type": "comparison"}
             enrich_fields(data, parts)
+            if any(x in raw_text for x in ["いない", "持たない", "なかった"]):
+                data["negation"] = True
             return Condition(**{k:v for k,v in data.items() if k in Condition.model_fields})
 
         # --- Sentences ---
@@ -128,17 +157,24 @@ class AbilityParser:
         )
 
         self.action_cost_sentence = Map(
-            Capture(Seq(self.action_sentence, self.colon)),
-            lambda x: x[0][0] # Return the Action from the sequence, but keep it as cost
+            Seq(self.action_sentence, self.colon),
+            lambda x: ActionCostWrapper(x[0])
         )
 
-        # --- The Noise-Resilient Bag ---
+        # Compound Sentence (XかつY)
+        self.compound_condition = Map(
+            Capture(Seq(self.condition_sentence, self.t(OneOf(Str("かつ"), Str("または"), Str("、"))), self.condition_sentence)),
+            lambda x: Condition(type="compound", text=x[1], conditions=[x[0][0], x[0][2]], logical_operator="and" if "かつ" in x[0][1] else "or")
+        )
+
+        # --- The Bag ---
         self.trash = Map(Regex(r"."), lambda x: None)
 
         self.ability_block = OneOf(
             self.trigger_icon,
             self.energy_cost,
             self.action_cost_sentence,
+            self.compound_condition,
             self.condition_sentence,
             self.action_sentence,
             self.colon, self.comma, self.period,
@@ -154,7 +190,7 @@ class AbilityParser:
             res, _ = self.ability_rule.parse(clean_text, debug=debug)
             
             triggers = []
-            cost = None
+            costs = []
             condition = None
             effects = []
 
@@ -167,14 +203,18 @@ class AbilityParser:
                         if trigger_text not in triggers:
                             triggers.append(trigger_text)
                 elif isinstance(item, Cost):
-                    cost = item
+                    costs.append(item)
+                elif isinstance(item, ActionCostWrapper):
+                    costs.append(item.action)
                 elif isinstance(item, Condition):
                     condition = item
                 elif isinstance(item, Action):
                     effects.append(item)
 
+            final_cost = costs[0] if len(costs) == 1 else (costs if costs else None)
+
             return Ability(
-                cost=cost,
+                cost=final_cost,
                 condition=condition,
                 effects=effects,
                 raw_text=original_text
@@ -185,14 +225,3 @@ class AbilityParser:
                 effects=[UnknownAction(raw_text=text, text=f"error_{str(e)[:40]}")],
                 raw_text=original_text
             )
-
-
-if __name__ == "__main__":
-    parser = AbilityParser()
-    test_texts = [
-        "{{toujyou.png|登場}}自分のステージにコスト13以上のメンバーがいる場合、カードを1枚引く。",
-    ]
-    for text in test_texts:
-        print(f"\nParsing: {text}")
-        result = parser.parse_ability(text, debug=False)
-        print(result.model_dump_json(indent=2, ensure_ascii=False))

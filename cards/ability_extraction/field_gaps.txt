@@ -156,8 +156,6 @@
     target: 6/15
     temporal: 14/15
 
-
-
 ============================================================
   COSTS
 ============================================================
@@ -189,8 +187,6 @@
     target: 3/209
     text: 208/209
     zone: 155/209
-
-
 
 ============================================================
   EFFECTS
@@ -695,41 +691,13 @@
   ALL fields present: ['action', 'condition', 'self_target', 'text', 'value']
 
 
-######################################################################
-  CROSS-REFERENCE: DATA FIELDS vs ENGINE CODE (TRIAGED)
-  =======================================================
-  
-  REAL BUGS FIXED:
-    1. position in appearance_condition → FIXED (condition.rs: evaluate_appearance_condition)
-    2. cost_limit_operator in movement_condition → FIXED (condition.rs: evaluate_movement_condition adds cost_limit check)
-  
-  FALSE POSITIVES (fields consumed indirectly):
-    - scope: dead field — engine uses `target=both` instead. No bug.
-    - heart_color: alias'd to heart_type via serde. Consumed as fallback.
-    - group_names in move_cards: consumed via group_name() accessor.
-    - activation_condition_parsed/*_position/trigger_*: consumed by trigger system, not effect handler.
-    - parenthetical: consumed by parenthetical extraction in parser (not engine handler).
-    - original_value: consumed by comparison system.
-    - blade_limit/blade_limit_operator: consumed by change_state effect handler (filter check).
-    - energy in pay_energy: consumed via `effect.count` which maps to energy count.
-    - any_number: consumed via `effect.any_number` in move_cards handler.
-    - characters/group_reference/state: consumed via filter infrastructure.
-    - cost_limit_operator (Condition): struct doesn't have field. Parser artifact. Use default ">=".
-  
-  NOW FIXED:
-    3. cost_limit_operator in movement_condition → FIXED (added to Condition struct + condition.rs reads it)
-  
-  =======================================================
-######################################################################
-
-
 ############################################################
   ENGINE COVERAGE CHECK
 ############################################################
 
   --- Condition: appearance_condition ---
   Data fields: ['all_areas', 'appearance', 'baton_touch_trigger', 'characters', 'location', 'position', 'target', 'text', 'type']
-  ** MISSING from engine (condition.rs): ['position']
+  OK - All fields accounted for
 
   --- Condition: card_count_condition ---
   Data fields: ['aggregate', 'card_property', 'card_type', 'count', 'exclude_self', 'group_names', 'location', 'operator', 'scope', 'target', 'text', 'type', 'unit']
@@ -753,7 +721,7 @@
 
   --- Condition: movement_condition ---
   Data fields: ['ability_negation', 'baton_touch_source', 'baton_touch_trigger', 'comparison_type', 'cost_limit', 'cost_limit_operator', 'exclude_self', 'group_names', 'location', 'movement', 'movement_state', 'operator', 'target', 'text', 'type']
-  ** MISSING from engine (condition.rs): ['cost_limit_operator']
+  OK - All fields accounted for
 
   --- Condition: state_condition ---
   Data fields: ['state', 'text', 'type']
@@ -802,6 +770,3 @@
   --- Effect: sequential ---
   Data fields: ['action', 'actions', 'activation_condition_parsed', 'activation_position', 'all', 'character_effects', 'condition', 'conditional', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_colors', 'location', 'original_value', 'parenthetical', 'per_unit', 'per_unit_count', 'per_unit_type', 'target', 'text', 'trigger_condition', 'trigger_type']
   ** MISSING from engine (compound.rs): ['activation_condition_parsed', 'activation_position', 'all', 'character_effects', 'distinct', 'duration', 'exclude_self', 'group_names', 'group_reference', 'heart_colors', 'location', 'original_value', 'parenthetical', 'trigger_condition', 'trigger_type']
-
-
-Done.
