@@ -67,11 +67,7 @@ fn baton_touch_does_not_lock_all_full_lanes() {
         .iter()
         .find(|action| {
             action.action_type == ActionType::PlayMemberToStage
-                && action
-                    .parameters
-                    .as_ref()
-                    .and_then(|p| p.card_id)
-                    == Some(second_arriver)
+                && action.parameters.as_ref().and_then(|p| p.card_id) == Some(second_arriver)
         })
         .expect("Second baton-touch play action should still be available");
 
@@ -82,7 +78,9 @@ fn baton_touch_does_not_lock_all_full_lanes() {
         .expect("Play action should include area information");
 
     assert!(
-        available_areas.iter().any(|area| area.available && area.is_baton_touch),
+        available_areas
+            .iter()
+            .any(|area| area.available && area.is_baton_touch),
         "At least one occupied lane should still offer baton touch after the first replacement"
     );
 }

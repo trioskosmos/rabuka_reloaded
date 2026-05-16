@@ -541,116 +541,46 @@ async fn exec_code(
 
 
 
-    // Simple parsing for cheat commands
+    let mut params: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for segment in code.split(';') {
+        let seg = segment.trim();
+        if let Some(eq_pos) = seg.find('=') {
+            let key = seg[..eq_pos].trim().to_lowercase();
+            let value = seg[eq_pos + 1..].trim().trim_matches('"').to_string();
+            params.insert(key, value);
+        }
+    }
 
-    // Format: player_idx = N; operations...
+    let player_idx: usize = params.get("player_idx")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
     if code.contains("draw_energy") {
-
-        // Extract player_idx
-
-        let player_idx = code.lines()
-
-            .find(|l| l.contains("player_idx"))
-
-            .and_then(|l| l.split('=').nth(1))
-
-            .and_then(|v| v.trim().split(';').next())
-
-            .and_then(|v| v.parse::<usize>().ok())
-
-            .unwrap_or(0);
-
-
-
-        // Extract amount
-
-        let amount = code.lines()
-
-            .find(|l| l.contains("amount"))
-
-            .and_then(|l| l.split('=').nth(1))
-
-            .and_then(|v| v.trim().split(';').next())
-
-            .and_then(|v| v.parse::<usize>().ok())
-
+        let amount: usize = params.get("amount")
+            .and_then(|v| v.parse().ok())
             .unwrap_or(1);
 
-
-
-        // Execute draw_energy amount times
-
         let player = if player_idx == 0 {
-
             &mut game_state.player1
-
         } else {
-
             &mut game_state.player2
-
         };
 
-
-
         for _ in 0..amount {
-
             let _ = player.draw_energy();
-
         }
+    }
 
-    } else if code.contains("add_card") && code.contains("card_no") {
-
-        // Extract player_idx
-
-        let player_idx = code.lines()
-
-            .find(|l| l.contains("player_idx"))
-
-            .and_then(|l| l.split('=').nth(1))
-
-            .and_then(|v| v.trim().split(';').next())
-
-            .and_then(|v| v.parse::<usize>().ok())
-
-            .unwrap_or(0);
-
-
-
-        // Extract card_no
-
-        let card_no = code.lines()
-
-            .find(|l| l.contains("card_no"))
-
-            .and_then(|l| l.split('=').nth(1))
-
-            .and_then(|v| v.trim().split(';').next())
-
-            .map(|v| v.trim().trim_matches('"'))
-
-            .unwrap_or("");
-
-
-
-        // Look up card and add to hand
-
-        if let Some(card_id) = game_state.card_database.get_card_id(card_no) {
-
+    if code.contains("add_card") && code.contains("card_no") {
+        let card_no = params.get("card_no").cloned().unwrap_or_default();
+        if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
             let player = if player_idx == 0 {
-
                 &mut game_state.player1
-
             } else {
-
                 &mut game_state.player2
-
             };
-
             player.hand.add_card(card_id);
-
         }
-
     }
 
 

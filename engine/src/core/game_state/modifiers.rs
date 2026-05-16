@@ -43,6 +43,7 @@ impl GameState {
         let mut exp_score: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
         let mut exp_heart: std::collections::HashMap<i16, std::collections::HashMap<String, i32>> =
             std::collections::HashMap::new();
+        let mut exp_prohibition: Vec<String> = Vec::new();
 
         // Compute stage positions for all entries before creating resolver
         let mut entry_positions: std::collections::HashMap<i16, Option<usize>> =
@@ -67,67 +68,81 @@ impl GameState {
             entry_positions.insert(cid, pos);
         }
 
-        {
-            let resolver = crate::ability::resolver::AbilityResolver::new(self);
-            for e in &entries {
-                // Check effect-level position requirement against pre-computed positions
-                if let Some(ref pos) = e.effect.position {
+        for e in &entries {
+            // Set activating_card so condition evaluators (e.g. exclude_self in
+            // location_condition) know which card is "self" for this entry.
+            let prev_activating = self.activating_card;
+            self.activating_card = Some(e.card_id);
+
+            {
+                let resolver = crate::ability::resolver::AbilityResolver::new(self);
+
+                // Check effect-level position requirement
+                let pos_ok = if let Some(ref pos) = e.effect.position {
                     let pos_str = pos.get_position();
                     let card_pos = entry_positions.get(&e.card_id).copied().flatten();
-                    let pos_ok = match (pos_str, card_pos) {
-                        (Some("center"), Some(1)) => true,
-                        (Some("left") | Some("left_side"), Some(0)) => true,
-                        (Some("right") | Some("right_side"), Some(2)) => true,
-                        (None, _) => true,
-                        _ => false,
-                    };
-                    if !pos_ok {
-                        continue;
-                    }
-                }
+                    matches!(
+                        (pos_str, card_pos),
+                        (Some("center"), Some(1))
+                            | (Some("left") | Some("left_side"), Some(0))
+                            | (Some("right") | Some("right_side"), Some(2))
+                            | (None, _)
+                    )
+                } else {
+                    true
+                };
 
-                let cond_met = e
-                    .effect
-                    .condition
-                    .as_ref()
-                    .map_or(true, |c| resolver.evaluate_condition(c));
-                if !cond_met {
-                    continue;
-                }
+                if pos_ok {
+                    let cond_met = e
+                        .effect
+                        .condition
+                        .as_ref()
+                        .map_or(true, |c| resolver.evaluate_condition(c));
 
-                match e.effect.action.as_str() {
-                    "gain_resource" => match e.effect.resource.as_deref().unwrap_or("") {
-                        "blade" | "ブレード" => {
-                            let n = e
-                                .effect
-                                .resource_icon_count
-                                .unwrap_or(e.effect.count.unwrap_or(1))
-                                as i32;
-                            *exp_blade.entry(e.card_id).or_insert(0) += n;
-                        }
-                        "heart" | "ハート" => {
-                            let n = e.effect.count.unwrap_or(1);
-                            for hc in &e.effect.heart_colors {
-                                *exp_heart
-                                    .entry(e.card_id)
-                                    .or_default()
-                                    .entry(hc.clone())
-                                    .or_insert(0) += n as i32;
+                    if cond_met {
+                        match e.effect.action.as_str() {
+                            "gain_resource" => match e.effect.resource.as_deref().unwrap_or("") {
+                                "blade" | "ブレード" => {
+                                    let n = e
+                                        .effect
+                                        .resource_icon_count
+                                        .unwrap_or(e.effect.count.unwrap_or(1))
+                                        as i32;
+                                    *exp_blade.entry(e.card_id).or_insert(0) += n;
+                                }
+                                "heart" | "ハート" => {
+                                    let n = e.effect.count.unwrap_or(1);
+                                    for hc in &e.effect.heart_colors {
+                                        *exp_heart
+                                            .entry(e.card_id)
+                                            .or_default()
+                                            .entry(hc.clone())
+                                            .or_insert(0) += n as i32;
+                                    }
+                                }
+                                _ => {}
+                            },
+                            "modify_score" => {
+                                *exp_score.entry(e.card_id).or_insert(0) +=
+                                    e.effect.value.unwrap_or(0) as i32;
                             }
+                            "modify_cost" => {
+                                *exp_cost.entry(e.card_id).or_insert(0) +=
+                                    e.effect.value.unwrap_or(0) as i32;
+                            }
+                            "restriction" => {
+                                if let Some(ref rt) = e.effect.restriction_type {
+                                    exp_prohibition.push(format!("const_restriction:{}:", rt));
+                                }
+                            }
+                            _ => {}
                         }
-                        _ => {}
-                    },
-                    "modify_score" => {
-                        *exp_score.entry(e.card_id).or_insert(0) +=
-                            e.effect.value.unwrap_or(0) as i32;
                     }
-                    "modify_cost" => {
-                        *exp_cost.entry(e.card_id).or_insert(0) +=
-                            e.effect.value.unwrap_or(0) as i32;
-                    }
-                    _ => {}
                 }
             }
+
+            // Restore the previous activating_card
+            self.activating_card = prev_activating;
         }
 
         // Blade
@@ -176,6 +191,15 @@ impl GameState {
             }
         }
         self.mods.constant_heart_bonuses = exp_heart;
+
+        // Apply restriction effects from constant abilities.
+        // Use "const_restriction:" prefix to distinguish from debut/live ability restrictions
+        // so we can safely clear and re-add constant restrictions on each recalculate call.
+        self.prohibition_effects
+            .retain(|p| !p.starts_with("const_restriction:"));
+        for p in &exp_prohibition {
+            self.prohibition_effects.push(p.clone());
+        }
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {

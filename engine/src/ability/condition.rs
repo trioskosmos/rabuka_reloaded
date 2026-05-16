@@ -160,7 +160,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         } else {
             0
         });
-        compare_counts(operator, location_value, count_threshold)
+        // When no operator is specified but we have a positive threshold (derived from
+        // card_type / group / etc.), default to ">=" semantics — "at least N cards match".
+        // A plain None operator with threshold=0 still returns true (unconditional match).
+        let effective_op = match operator {
+            None if count_threshold > 0 => Some(">="),
+            other => other,
+        };
+        compare_counts(effective_op, location_value, count_threshold)
     }
 
     fn check_location_heart_type(&self, condition: &Condition) -> bool {
@@ -466,15 +473,40 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 {
                     return self.get_count_for_target(condition, target);
                 }
-                let c = util::count_matching_with_blade(
-                    cards,
-                    card_db,
-                    card_type_filter,
-                    group,
-                    cost_limit,
-                    operator,
-                    &|cid| self.check_original_blade_filter(condition, cid),
-                );
+                let exclude_self_id = if condition.exclude_self.unwrap_or(false) {
+                    self.activating_card_id
+                } else {
+                    None
+                };
+                let c = if let Some(ex_id) = exclude_self_id {
+                    // Count matching but exclude the activating card itself
+                    cards
+                        .iter()
+                        .filter(|&&id| {
+                            id != -1
+                                && id != ex_id
+                                && util::card_matches_type(card_db, id, card_type_filter)
+                                && util::card_matches_group_str(card_db, id, group)
+                                && util::card_matches_cost_limit_op(
+                                    card_db,
+                                    id,
+                                    cost_limit,
+                                    operator,
+                                )
+                                && self.check_original_blade_filter(condition, id)
+                        })
+                        .count() as u32
+                } else {
+                    util::count_matching_with_blade(
+                        cards,
+                        card_db,
+                        card_type_filter,
+                        group,
+                        cost_limit,
+                        operator,
+                        &|cid| self.check_original_blade_filter(condition, cid),
+                    )
+                };
                 if all_areas {
                     if player.stage.stage.iter().filter(|&&c| c != -1).count() != 3 {
                         return 0;
@@ -843,7 +875,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "deck" => count_filtered(&player.main_deck.cards, card_type),
-            "energy_zone" => count_filtered(&player.energy_zone.cards, card_type),
+            "energy_zone" => {
+                if target == "both" || target == "either" {
+                    let p1 = count_filtered(&self.game_state.player1.energy_zone.cards, card_type);
+                    let p2 = count_filtered(&self.game_state.player2.energy_zone.cards, card_type);
+                    if target == "either" {
+                        p1.max(p2)
+                    } else {
+                        p1 + p2
+                    }
+                } else {
+                    count_filtered(&player.energy_zone.cards, card_type)
+                }
+            }
             "live_card_zone" => count_filtered(&player.live_card_zone.cards, card_type),
             "success_live_zone" | "success_live_card_zone" => {
                 if target == "either" || target == "both" {

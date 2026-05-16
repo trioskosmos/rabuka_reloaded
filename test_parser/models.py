@@ -1,160 +1,166 @@
+from typing import List, Optional, Union, Any, Literal
 from pydantic import BaseModel, Field
-from typing import Literal, List, Optional, Union, Any
 
-class Action(BaseModel):
+# --- Sub-models ---
+class AnyAction(BaseModel):
     action: str
-    text: Optional[str] = None
+    text: str
+    duration: Optional[str] = None
+    per_unit: Optional[bool] = None
+    per_unit_type: Optional[str] = None
 
-class MoveCardsAction(Action):
-    action: Literal["move_cards"]
-    source: Optional[str] = None
-    destination: Optional[str] = None
+class DrawCardAction(AnyAction):
+    action: Literal["draw_card"] = "draw_card"
+    count: int
+
+class MoveCardsAction(AnyAction):
+    action: Literal["move_cards"] = "move_cards"
+    source: str
+    destination: str
     count: Optional[int] = None
-    card_type: Optional[str] = None
-    target: Optional[str] = None
-    placement_order: Optional[str] = None
-    any_number: Optional[bool] = None
+    any_number: Optional[bool] = False
 
-class DrawCardAction(Action):
-    action: Literal["draw_card"]
-    source: Literal["deck"] = "deck"
-    destination: Literal["hand"] = "hand"
-    count: int = 1
-
-class LookAtAction(Action):
-    action: Literal["look_at"]
+class LookAtAction(AnyAction):
+    action: Literal["look_at"] = "look_at"
     source: str
     count: int
 
-class SelectAction(Action):
-    action: Literal["select_cards", "select"]
-    discard_remaining: Optional[bool] = None
+class LookAndSelectAction(AnyAction):
+    action: Literal["look_and_select"] = "look_and_select"
+    source: str
+    destination: str
+    look_count: int
+    select_count: int
+
+class SelectAction(AnyAction):
+    action: Literal["select", "select_cards"] = "select"
+    count: Optional[Union[int, str]] = None
+    target: Optional[str] = None
     destination: Optional[str] = None
-    count: Optional[int] = None
 
-class LookAndSelectAction(Action):
-    action: Literal["look_and_select"]
-    look_action: LookAtAction
-    select_action: Union[SelectAction, MoveCardsAction]
-
-class GainResourceAction(Action):
-    action: Literal["gain_resource"]
-    resource: Literal["blade", "heart", "generic"]
+class GainResourceAction(AnyAction):
+    action: Literal["gain_resource"] = "gain_resource"
+    resource: str
     count: int
-    target: Optional[str] = None
-    heart_color: Optional[str] = None
-    per_unit: Optional[bool] = None
-    per_unit_count: Optional[int] = None
-    per_unit_type: Optional[str] = None
-    location: Optional[str] = None
-    duration: Optional[str] = None
 
-class ChangeStateAction(Action):
-    action: Literal["change_state"]
-    state_change: Literal["wait", "active"]
-    card_type: str
-    count: Optional[int] = None
-    target: Optional[str] = None
-    optional: Optional[bool] = None
-
-class ModifyScoreAction(Action):
-    action: Literal["modify_score"]
-    operation: Literal["add", "remove"]
+class ModifyScoreAction(AnyAction):
+    action: Literal["modify_score"] = "modify_score"
+    operation: str
     value: int
+    target: str
 
-class ModifyRequiredHeartsAction(Action):
-    action: Literal["modify_required_hearts"]
-    operation: Literal["decrease", "increase"]
+class ChangeStateAction(AnyAction):
+    action: Literal["change_state"] = "change_state"
+    state_change: str
+    card_type: str
+    target: str
+    count: Optional[int] = 1
+
+class AppearAction(AnyAction):
+    action: Literal["appear"] = "appear"
+    source: str
+
+class RevealAction(AnyAction):
+    action: Literal["reveal"] = "reveal"
+    source: str
+    count: int
+
+class ModifyRequiredHeartsAction(AnyAction):
+    action: Literal["modify_required_hearts"] = "modify_required_hearts"
+    operation: str
     heart_color: str
     count: int
 
-class RevealAction(Action):
-    action: Literal["reveal"]
-    source: str
-    count: int
+class PositionChangeAction(AnyAction):
+    action: Literal["position_change"] = "position_change"
 
-class AppearAction(Action):
-    action: Literal["appear"]
-    source: str
-    destination: Literal["stage"] = "stage"
+class FormationChangeAction(AnyAction):
+    action: Literal["formation_change"] = "formation_change"
 
-class PositionChangeAction(Action):
-    action: Literal["position_change"]
+class TreatAsAction(AnyAction):
+    action: Literal["treat_as"] = "treat_as"
+    groups: List[str]
+
+class AbilityDisableAction(AnyAction):
+    action: Literal["ability_disable"] = "ability_disable"
     target: Optional[str] = None
+    ability_type: Optional[str] = None
 
-class FormationChangeAction(Action):
-    action: Literal["formation_change"]
+class AbilityTriggerAction(AnyAction):
+    action: Literal["ability_trigger"] = "ability_trigger"
+    trigger_condition: Optional[str] = None
+    ability_type: Optional[str] = None
 
-class DoNothingAction(Action):
-    action: Literal["do_nothing"]
+class DoNothingAction(AnyAction):
+    action: Literal["do_nothing"] = "do_nothing"
 
-class UnknownAction(Action):
-    action: Literal["unknown"]
-    text: str
+class UnknownAction(AnyAction):
+    action: Literal["unknown"] = "unknown"
 
-class SequentialAction(Action):
-    action: Literal["sequential"]
-    actions: List['AnyAction']
+class SequentialAction(AnyAction):
+    action: Literal["sequential"] = "sequential"
+    actions: List[Union[DrawCardAction, MoveCardsAction, LookAtAction, SelectAction, 
+                        GainResourceAction, ModifyScoreAction, ChangeStateAction, 
+                        AppearAction, RevealAction, ModifyRequiredHeartsAction,
+                        PositionChangeAction, FormationChangeAction, DoNothingAction,
+                        TreatAsAction, AbilityDisableAction, AbilityTriggerAction, UnknownAction, 'SequentialAction']]
 
-# And so on for all action types
-AnyAction = Union[
-    MoveCardsAction, 
-    DrawCardAction, 
-    LookAtAction, 
-    SelectAction, 
-    LookAndSelectAction, 
-    GainResourceAction, 
-    ChangeStateAction,
-    ModifyScoreAction,
-    ModifyRequiredHeartsAction,
-    RevealAction,
-    AppearAction,
-    PositionChangeAction,
-    FormationChangeAction,
-    DoNothingAction,
-    UnknownAction,
-    SequentialAction
-]
-
-class Cost(BaseModel):
+# --- Costs ---
+class AnyCost(BaseModel):
     type: str
     text: str
-    optional: Optional[bool] = None
 
-class MoveCardsCost(Cost):
-    type: Literal["move_cards"]
-    source: Optional[str] = None
-    destination: Optional[str] = None
-    count: Optional[int] = None
-    card_type: Optional[str] = None
-    self_cost: Optional[bool] = None
-
-class PayEnergyCost(Cost):
-    type: Literal["pay_energy"]
+class PayEnergyCost(AnyCost):
+    type: Literal["pay_energy"] = "pay_energy"
     energy: int
     count: int
 
-class UnknownCost(Cost):
-    type: Literal["unknown_cost"]
+class MoveCardsCost(AnyCost):
+    type: Literal["move_cards"] = "move_cards"
+    source: str
+    destination: str
+    count: int
+    optional: bool = False
 
-class ChangeStateCost(Cost):
-    type: Literal["change_state"]
-    state_change: Literal["wait", "active"]
+class ChangeStateCost(AnyCost):
+    type: Literal["change_state"] = "change_state"
+    state_change: str
     card_type: str
+    optional: bool = False
+    self_cost: bool = False
+
+class RevealCost(AnyCost):
+    type: Literal["reveal_cost"] = "reveal_cost"
     count: Optional[int] = None
-    target: Optional[str] = None
-    optional: Optional[bool] = None
 
-class SequentialCost(Cost):
-    type: Literal["sequential_cost"]
-    costs: List['AnyCost']
+class ChoiceCost(AnyCost):
+    type: Literal["choice_cost"] = "choice_cost"
+    costs: List[AnyCost]
 
-AnyCost = Union[MoveCardsCost, PayEnergyCost, UnknownCost, ChangeStateCost, SequentialCost]
+class UnknownCost(AnyCost):
+    type: Literal["unknown_cost"] = "unknown_cost"
+
+class SequentialCost(AnyCost):
+    type: Literal["sequential_cost"] = "sequential_cost"
+    costs: List[Union[PayEnergyCost, MoveCardsCost, ChangeStateCost, RevealCost, ChoiceCost, UnknownCost]]
+
+# --- Top Level ---
+class AbilityBlock(BaseModel):
+    cost: Optional[Union[PayEnergyCost, MoveCardsCost, ChangeStateCost, RevealCost, ChoiceCost, UnknownCost, SequentialCost]] = None
+    condition: Optional[str] = None
+    effect: Union[DrawCardAction, MoveCardsAction, LookAtAction, SelectAction, 
+                  GainResourceAction, ModifyScoreAction, ChangeStateAction, 
+                  AppearAction, RevealAction, ModifyRequiredHeartsAction,
+                  PositionChangeAction, FormationChangeAction, DoNothingAction,
+                  TreatAsAction, AbilityDisableAction, AbilityTriggerAction, UnknownAction, SequentialAction]
 
 class Ability(BaseModel):
     triggerless_text: str
-    cost: Optional[AnyCost] = None
-    effect: Optional[AnyAction] = None
-
-SequentialAction.model_rebuild()
-SequentialCost.model_rebuild()
+    blocks: List[AbilityBlock] = []
+    # Legacy fields
+    cost: Optional[Union[PayEnergyCost, MoveCardsCost, ChangeStateCost, RevealCost, ChoiceCost, UnknownCost, SequentialCost]] = None
+    effect: Optional[Union[DrawCardAction, MoveCardsAction, LookAtAction, SelectAction, 
+                          GainResourceAction, ModifyScoreAction, ChangeStateAction, 
+                          AppearAction, RevealAction, ModifyRequiredHeartsAction,
+                          PositionChangeAction, FormationChangeAction, DoNothingAction,
+                          TreatAsAction, AbilityDisableAction, AbilityTriggerAction, UnknownAction, SequentialAction]] = None
