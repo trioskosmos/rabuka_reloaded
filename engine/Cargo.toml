@@ -7,13 +7,13 @@ edition = "2021"
 opt-level = 1
 debug = 0
 incremental = true
-codegen-units = 256
+codegen-units = 16
 
 [profile.test]
 opt-level = 1
 debug = 0
 incremental = true
-codegen-units = 256
+codegen-units = 16
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }

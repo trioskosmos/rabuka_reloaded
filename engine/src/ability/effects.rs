@@ -327,7 +327,9 @@ impl<'a> AbilityResolver<'a> {
             if self.pending_choice.is_some() && !had_choice_before {
                 let mut for_opponent = effect.clone();
                 for_opponent.target = Some("opponent".to_string());
-                self.game_state.pending_sequential_actions = Some(vec![for_opponent]);
+                self.game_state.ability_queue.set_pending_commands(vec![
+                    crate::ability::types::Command::Effect(for_opponent),
+                ]);
                 return Ok(());
             }
             let mut for_opponent = effect.clone();
@@ -1050,6 +1052,53 @@ impl<'a> AbilityResolver<'a> {
         });
     }
 
+    /// Resolve heart color for gain_resource. Returns Ok(Some(color)) if fixed, Ok(None) if choice was set or not a heart resource.
+    fn resolve_gain_heart_color(
+        &mut self,
+        effect: &AbilityEffect,
+        resource: &str,
+        count: u32,
+        heart_colors: &[String],
+        heart_selection: bool,
+    ) -> Result<Option<String>, String> {
+        if resource != "heart" && resource != "ハート" {
+            return Ok(None);
+        }
+        if heart_colors.is_empty() && !heart_selection && effect.heart_type.is_none() {
+            return Ok(None);
+        }
+        let colors: Vec<String> = if !heart_colors.is_empty() {
+            heart_colors.to_vec()
+        } else if let Some(ref ht) = effect.heart_type {
+            vec![ht.clone()]
+        } else {
+            vec![
+                "heart01".into(),
+                "heart02".into(),
+                "heart03".into(),
+                "heart04".into(),
+                "heart05".into(),
+                "heart06".into(),
+            ]
+        };
+        let mut unique_colors: Vec<String> = Vec::new();
+        for c in colors {
+            if !unique_colors.contains(&c) {
+                unique_colors.push(c);
+            }
+        }
+        if unique_colors.len() == 1 && !heart_selection {
+            Ok(Some(unique_colors[0].clone()))
+        } else {
+            self.pending_choice = Some(Choice::SelectHeartColor {
+                count: count as usize,
+                options: unique_colors,
+                description: "Choose a heart color".to_string(),
+            });
+            Ok(None)
+        }
+    }
+
     fn execute_gain_resource(
         &mut self,
         effect: &AbilityEffect,
@@ -1085,44 +1134,16 @@ impl<'a> AbilityResolver<'a> {
                 && target == "self"
                 && !is_self_target);
 
-        let single_fixed_heart: Option<String> = if (resource == "heart" || resource == "ハート")
-            && (!heart_colors.is_empty() || heart_selection || effect.heart_type.is_some())
-        {
-            let colors = if heart_colors.is_empty() {
-                if let Some(ref ht) = effect.heart_type {
-                    vec![ht.clone()]
-                } else {
-                    vec![
-                        "heart01".into(),
-                        "heart02".into(),
-                        "heart03".into(),
-                        "heart04".into(),
-                        "heart05".into(),
-                        "heart06".into(),
-                    ]
-                }
-            } else {
-                heart_colors.to_vec()
-            };
-            let mut unique_colors: Vec<String> = Vec::new();
-            for c in colors {
-                if !unique_colors.contains(&c) {
-                    unique_colors.push(c);
-                }
-            }
-            if unique_colors.len() == 1 && !heart_selection {
-                Some(unique_colors[0].clone())
-            } else {
-                self.pending_choice = Some(Choice::SelectHeartColor {
-                    count: count as usize,
-                    options: unique_colors,
-                    description: "Choose a heart color".to_string(),
-                });
-                return Ok(());
-            }
-        } else {
-            None
-        };
+        let single_fixed_heart = self.resolve_gain_heart_color(
+            effect,
+            resource.as_str(),
+            count,
+            heart_colors,
+            heart_selection,
+        )?;
+        if self.pending_choice.is_some() {
+            return Ok(());
+        }
 
         let single_fixed_heart = single_fixed_heart.or_else(|| {
             if resource == "heart" || resource == "ハート" {
@@ -1149,9 +1170,13 @@ impl<'a> AbilityResolver<'a> {
             );
 
             let final_count = if per_unit {
+                // If the effect has an explicit location, use that as the count zone
+                // instead of the generic per_unit_type → zone mapping.
+                let effective_per_unit_type =
+                    effect.location.as_deref().or(per_unit_type_str.as_deref());
                 let mut matching_count = util::resolve_per_unit_count(
                     true,
-                    per_unit_type_str.as_deref(),
+                    effective_per_unit_type,
                     player,
                     &card_db,
                     &filter,
@@ -1532,8 +1557,8 @@ impl<'a> AbilityResolver<'a> {
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store a re-apply effect so finalize_choice applies the state
                 // change to the selected target after the choice is resolved.
-                self.game_state.pending_sequential_actions =
-                    Some(vec![crate::card::AbilityEffect {
+                self.game_state.ability_queue.set_pending_commands(vec![
+                    crate::ability::types::Command::Effect(crate::card::AbilityEffect {
                         action: "change_state".to_string(),
                         state_change: Some(state_change.clone()),
                         target: Some(target.clone()),
@@ -1544,7 +1569,8 @@ impl<'a> AbilityResolver<'a> {
                         self_cost: Some(self_cost),
                         cost_limit_operator,
                         ..Default::default()
-                    }]);
+                    }),
+                ]);
                 return Ok(());
             }
 
@@ -1601,6 +1627,10 @@ impl<'a> AbilityResolver<'a> {
                     player.energy_zone.active_energy_count += 1;
                 }
             }
+        }
+        // Track that energy was placed by a card effect (not energy phase draw)
+        if count > 0 {
+            self.game_state.last_energy_placed_by_effect = true;
         }
     }
 
@@ -2185,6 +2215,14 @@ impl<'a> AbilityResolver<'a> {
             "DEBUG: execute_place_energy_under_member - source: {:?}",
             source
         );
+        let activating_pos = self.game_state.activating_card.and_then(|c| {
+            self.game_state
+                .resolve_target_player(target)
+                .stage
+                .stage
+                .iter()
+                .position(|&id| id == c)
+        });
         if source == Some("under_member") {
             // Handle moving from under_member to energy_deck
             let player = self.game_state.resolve_target_player_mut(target);
@@ -2193,7 +2231,14 @@ impl<'a> AbilityResolver<'a> {
                 Some("left") | Some("左側") => 0,
                 Some("right") | Some("右側") => 2,
                 None => {
-                    if player.stage.stage[1] != -1 {
+                    // Default to activating card's position
+                    if let Some(idx) = activating_pos {
+                        if player.stage.stage[idx] != -1 {
+                            idx
+                        } else {
+                            return;
+                        }
+                    } else if player.stage.stage[1] != -1 {
                         1
                     } else if player.stage.stage[0] != -1 {
                         0
@@ -2278,7 +2323,17 @@ impl<'a> AbilityResolver<'a> {
             Some("left") | Some("左側") => 0,
             Some("right") | Some("右側") => 2,
             None => {
-                if player.stage.stage[1] != -1 {
+                // Default to activating card's position
+                if let Some(idx) = activating_pos {
+                    if player.stage.stage[idx] != -1 {
+                        idx
+                    } else {
+                        for card in energy_cards {
+                            player.energy_deck.cards.push(card);
+                        }
+                        return;
+                    }
+                } else if player.stage.stage[1] != -1 {
                     1
                 } else if player.stage.stage[0] != -1 {
                     0
@@ -2357,7 +2412,9 @@ impl<'a> AbilityResolver<'a> {
             if self.pending_choice.is_some() {
                 let mut self_effect = effect.clone();
                 self_effect.target = Some("self".to_string());
-                self.game_state.pending_sequential_actions = Some(vec![self_effect]);
+                self.game_state.ability_queue.set_pending_commands(vec![
+                    crate::ability::types::Command::Effect(self_effect),
+                ]);
             } else {
                 let mut self_effect = effect.clone();
                 self_effect.target = Some("self".to_string());
@@ -2445,7 +2502,12 @@ impl<'a> AbilityResolver<'a> {
                         sub.optional = effect.optional;
                         remaining.push(sub);
                     }
-                    self.game_state.pending_sequential_actions = Some(remaining);
+                    self.game_state.ability_queue.set_pending_commands(
+                        remaining
+                            .into_iter()
+                            .map(crate::ability::types::Command::Effect)
+                            .collect(),
+                    );
                 }
                 return Ok(());
             }
@@ -2884,7 +2946,12 @@ impl<'a> AbilityResolver<'a> {
                     sub.optional = effect.optional;
                     remaining.push(sub);
                 }
-                self.game_state.pending_sequential_actions = Some(remaining);
+                self.game_state.ability_queue.set_pending_commands(
+                    remaining
+                        .into_iter()
+                        .map(crate::ability::types::Command::Effect)
+                        .collect(),
+                );
             }
             self.game_state.formation_change_occurred_this_turn = true;
             self.execute_effect(&first_sub)?;

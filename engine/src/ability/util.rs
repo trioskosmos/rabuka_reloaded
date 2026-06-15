@@ -688,7 +688,8 @@ pub fn place_card_in_zone(
         }
         "under_member" => {
             // Rule 4.5.5: Place card under a member
-            // Find first non-empty stage slot as fallback
+            // Fallback: prefer center, then left, then right
+            // (callers that know the activating card's position should specify it)
             let target_idx = if player.stage.stage[1] != -1 {
                 1
             } else if player.stage.stage[0] != -1 {
@@ -784,6 +785,7 @@ pub fn resolve_per_unit_count(
         }
         Some("discard") => "waitroom",
         Some("live_card_zone") => "live_card_zone",
+        Some("success_live_zone") | Some("success_live_card_zone") => "success_live_zone",
         _ => return 1,
     };
     if zone == "under_member" {

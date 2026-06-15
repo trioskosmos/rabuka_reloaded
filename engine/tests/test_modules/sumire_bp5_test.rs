@@ -1,60 +1,197 @@
-/// Tests for PL!SP-bp5-004-R+ (平安名すみれ) ab#0 — Q220
-///
-/// Ability (自動[ターン1]):
-///   このカードの効果によって、このメンバーがエリアを移動するか
-///   自分のエネルギー置き場にエネルギーが置かれた時、
-///   カードを1枚引き、ライブ終了時まで、heart02を得る。
-///
-/// Q220: ポジションチェンジによりこのメンバーが移動する場合、
-///        自動能力は発動するか？
-/// Answer: はい、発動する。
 use crate::helpers::*;
+use rabuka_engine::card::HeartColor;
+use rabuka_engine::zones::MemberArea;
 
-/// Sumire at P1's Center. Wien in hand. Play Wien → Wien's debut triggers
-/// position_change for both players' center members.
-/// P1 chooses RightSide for Sumire → Sumire moves from Center to RightSide.
-/// Q220: After position change, verify Sumire moved (the auto ability
-/// trigger depends on engine's movement_condition evaluation).
-#[test]
-fn sumire_bp5_q220_position_change_moves_sumire() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
+fn heart02_mod(game: &TestGame, card_id: i16) -> i32 {
+    game.state
+        .mods
+        .get_heart_modifier(card_id, HeartColor::Heart02)
+}
 
-    let sumire = game.id("PL!SP-bp5-004-R\u{ff0b}");
-    let wien = game.id("PL!SP-bp5-010-R");
+/// Fill P1's main deck with enough filler cards for draws.
+fn fill_deck(game: &mut TestGame) {
     let filler = game.id("PL!-sd1-010-SD");
-    let p2_center = game.id("PL!-sd1-013-SD");
-
-    // Sumire at P1 Center, P2 also has a center member
-    game.state.player1.stage.stage = [-1, sumire, -1];
-    game.state.player2.stage.stage = [-1, p2_center, -1];
-
-    game.state.player1.hand.cards.push(wien);
-    game.state.player1.hand.cards.push(filler);
-    game.give_energy(13);
-
-    // Play Wien — debut triggers position_change for both
-    game.play_to_stage(wien, rabuka_engine::zones::MemberArea::LeftSide);
-
-    // Opponent's choice first
-    if game.has_pending_choice() {
-        game.select_option(0); // move P2 center to LeftSide
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
     }
+}
 
-    // P1's choice: Sumire at Center → choose destination
-    assert!(
-        game.has_pending_choice(),
-        "P1 should get choice for Sumire's destination"
-    );
-    game.select_option(2); // RightSide
+#[test]
+fn test_sumire_play_triggers_draw_and_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    game.state.player1.hand.cards.push(sumire);
+    // Playing Sumire triggers the "moves" condition (area move by self's card effect).
+    // This consumes the 1/turn use_limit and draws a card + grants heart02.
+    // play_to_stage internally calls trigger_auto_abilities + process_pending_auto_abilities,
+    // so the ability fires immediately.
+    game.play_to_stage(sumire, MemberArea::Center);
 
-    // Verify Sumire moved
+    // After play_to_stage, the ability already fired: 1 card drawn, heart02 granted.
+    let hand_size = game.state.player1.hand.cards.len();
+    assert_eq!(hand_size, 1, "One card drawn during play");
     assert_eq!(
-        game.state.player1.stage.stage[2], sumire,
-        "Q220: Sumire should be at RightSide after position change"
+        heart02_mod(&game, sumire),
+        1,
+        "Gained 1 heart02 during play"
+    );
+}
+
+#[test]
+fn test_sumire_energy_effect_triggers() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    // Place Sumire on stage WITHOUT triggering auto-abilities (add_to_stage bypasses triggers).
+    // This leaves the 1/turn available for the energy trigger test.
+    game.add_to_stage(MemberArea::Center, sumire);
+    // Simulate energy placed by card effect
+    game.state.last_energy_placed_by_effect = true;
+    game.state.last_area_move_card_id = None;
+    game.state.last_area_move_by_player = None;
+
+    let before_hand = game.state.player1.hand.cards.len();
+    let player_id = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        before_hand + 1,
+        "energy placement by effect should trigger draw"
     );
     assert_eq!(
-        game.state.player1.stage.stage[1], -1,
-        "P1 Center empty after Sumire moved"
+        heart02_mod(&game, sumire),
+        1,
+        "should get +1 heart02 from energy effect"
+    );
+}
+
+#[test]
+fn test_sumire_energy_phase_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    // Place Sumire directly (no auto-trigger on placement)
+    game.add_to_stage(MemberArea::Center, sumire);
+    // Energy phase places energy (NOT by card effect)
+    game.state.player1.draw_energy();
+    game.state.last_energy_placed_by_effect = false;
+    game.state.last_area_move_card_id = None;
+    game.state.last_area_move_by_player = None;
+
+    let before_hand = game.state.player1.hand.cards.len();
+    let player_id = game.state.player1.id.clone();
+    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+        &mut game.state,
+        &player_id,
+    );
+    assert_eq!(
+        heart02_mod(&game, sumire),
+        0,
+        "energy phase should NOT trigger"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        before_hand,
+        "no draw from energy phase"
+    );
+}
+
+#[test]
+fn test_sumire_opponent_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    // Place Sumire directly (no auto-trigger on placement)
+    game.add_to_stage(MemberArea::Center, sumire);
+    // Simulate opponent's card effect moving Sumire
+    game.state.last_area_move_card_id = Some(sumire);
+    game.state.last_area_move_by_player = Some(game.state.player2.id.clone());
+    game.state.last_energy_placed_by_effect = false;
+
+    let before_hand = game.state.player1.hand.cards.len();
+    let player_id = game.state.player1.id.clone();
+    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+        &mut game.state,
+        &player_id,
+    );
+    // Condition: "moves" with self_effect_only=true AND mover=opponent → area_ok fails
+    // energy_placed=false → energy_ok fails → condition fails
+    assert_eq!(
+        heart02_mod(&game, sumire),
+        0,
+        "opponent effect should NOT trigger"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        before_hand,
+        "no draw from opponent"
+    );
+}
+
+#[test]
+fn test_sumire_use_limit_blocks_second() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    game.state.player1.hand.cards.push(sumire);
+    // Play triggers the ability once (1/turn)
+    game.play_to_stage(sumire, MemberArea::Center);
+
+    let player_id = game.state.player1.id.clone();
+    // First trigger consumed use_limit during play_to_stage.
+    // Set up energy trigger and try again → should be blocked by use_limit.
+    game.state.last_energy_placed_by_effect = true;
+    game.state.last_area_move_card_id = None;
+    game.state.last_area_move_by_player = None;
+    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+        &mut game.state,
+        &player_id,
+    );
+    // The first trigger from play_to_stage already granted heart02.
+    // Second trigger is blocked by use_limit.
+    assert_eq!(
+        heart02_mod(&game, sumire),
+        1,
+        "heart02 from first trigger persists, second blocked"
+    );
+}
+
+#[test]
+fn test_sumire_no_event_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    // Place Sumire directly, no play trigger
+    game.add_to_stage(MemberArea::Center, sumire);
+    // Clear all event tracking
+    game.state.last_area_move_card_id = None;
+    game.state.last_area_move_by_player = None;
+    game.state.last_energy_placed_by_effect = false;
+
+    let before_hand = game.state.player1.hand.cards.len();
+    let player_id = game.state.player1.id.clone();
+    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+        &mut game.state,
+        &player_id,
+    );
+    assert_eq!(heart02_mod(&game, sumire), 0, "no event = no trigger");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        before_hand,
+        "no event = no draw"
     );
 }

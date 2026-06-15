@@ -378,9 +378,7 @@ impl Player {
 
             self.stage.stage[index] = card_id;
 
-            if !baton_touch_used {
-                self.areas_locked_this_turn.insert(stage_area);
-            }
+            self.areas_locked_this_turn.insert(stage_area);
 
             // Send replaced member to waitroom if baton touch was used
 

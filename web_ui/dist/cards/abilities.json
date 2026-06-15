@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-15T17:59:37.447177",
+  "generated_at": "2026-05-16T08:48:11.966264",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2290,6 +2290,9 @@
               "Aqours"
             ],
             "action": "move_cards",
+            "cost_reference": "previous_moved_card",
+            "cost_offset": 2,
+            "cost_limit_operator": "=",
             "exclude_self": true,
             "activation_position": "center"
           }
@@ -8851,7 +8854,9 @@
           "location": "stage",
           "group_names": [
             "みらくらぱーく！"
-          ]
+          ],
+          "comparison_type": "cost",
+          "operator": "<"
         },
         "action": "gain_resource",
         "resource": "heart",

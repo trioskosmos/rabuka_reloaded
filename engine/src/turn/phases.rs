@@ -361,6 +361,11 @@ impl super::TurnEngine {
             game_state.baton_touch_arriving_card_id = Some(card_id);
         }
 
+        // Track area move for movement_condition "moves"
+        eprintln!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
+        game_state.last_area_move_card_id = Some(card_id);
+        game_state.last_area_move_by_player = Some(player_id.clone());
+
         Self::trigger_debut_abilities(
             game_state,
             &player_id,

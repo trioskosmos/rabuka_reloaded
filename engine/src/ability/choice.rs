@@ -1,5 +1,6 @@
 use super::types::{Choice, ChoiceResult, ExecutionContext, LookAndSelectStep};
 use super::util;
+use crate::ability::types::Command;
 use crate::card::AbilityEffect;
 
 impl<'a> super::resolver::AbilityResolver<'a> {
@@ -10,6 +11,54 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             && self.pending_choice.is_none()
         {
             self.execution_context = ExecutionContext::None;
+        }
+        Ok(())
+    }
+
+    /// Resumes executing sequential commands parked on the current queue entry.
+    /// If another choice interrupts execution, the remaining actions are safely parked back.
+    pub fn resume_pending_commands(&mut self) -> Result<(), String> {
+        let pending = self.game_state.ability_queue.take_pending_commands();
+        for (i, command) in pending.iter().enumerate() {
+            match command {
+                Command::Effect(effect) => {
+                    self.execute_effect(effect)?;
+                }
+                Command::MoveCard {
+                    card_id,
+                    destination,
+                    target,
+                    state_change,
+                } => {
+                    let card_id = *card_id;
+                    let target = target.clone();
+                    let destination = destination.clone();
+                    let state_change = state_change.clone();
+
+                    let player = self.game_state.resolve_target_player_mut(&target);
+                    super::util::place_card_in_zone(player, card_id, &destination, None, false, 1);
+
+                    self.game_state.mods.clear_all_for_card(card_id);
+                    self.game_state.record_card_movement(card_id);
+                    if state_change.as_deref() == Some("wait") {
+                        self.game_state
+                            .mods
+                            .add_orientation_modifier(card_id, "wait");
+                    }
+                }
+                Command::Choice(choice) => {
+                    self.pending_choice = Some(choice.clone());
+                }
+            }
+
+            if self.pending_choice.is_some() {
+                if i + 1 < pending.len() {
+                    let mut existing = self.game_state.ability_queue.take_pending_commands();
+                    existing.extend(pending[i + 1..].to_vec());
+                    self.game_state.ability_queue.set_pending_commands(existing);
+                }
+                return Ok(());
+            }
         }
         Ok(())
     }
@@ -32,7 +81,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             .map(|choice| matches!(choice, Choice::SelectCard { zone, .. } if zone == "looked_at"))
             .unwrap_or(false);
 
-        let has_pending_sequential = self.game_state.pending_sequential_actions.is_some();
+        let has_pending_sequential = self.game_state.ability_queue.has_pending_commands();
 
         // Only preserve if this is the initial looked_at selection (not a sub-action choice).
         // Sub-choices created by pending_sequential_actions should NOT be preserved,
@@ -52,38 +101,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         self.resume_execution(context.clone())?;
         eprintln!(
-            "[FINALIZE_CHOICE] pending={:?} selected={:?} context={:?}",
-            self.game_state
-                .pending_sequential_actions
-                .as_ref()
-                .map(|p| p.len()),
-            self.selected_cards,
-            context
+            "[FINALIZE_CHOICE] pending={} selected={:?} context={:?}",
+            has_pending_sequential, self.selected_cards, context
         );
-        if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-            for (i, action) in pending.iter().enumerate() {
-                eprintln!(
-                    "[FINALIZE_EXEC] i={} action={:?} selected={:?}",
-                    i, action.action, self.selected_cards
-                );
-                self.execute_effect(action)?;
-                if self.pending_choice.is_some() {
-                    // Only store outer remaining if non-empty and nested didn't store.
-                    if i + 1 < pending.len()
-                        && self
-                            .game_state
-                            .pending_sequential_actions
-                            .as_ref()
-                            .map_or(true, |p| p.is_empty())
-                    {
-                        self.game_state.pending_sequential_actions =
-                            Some(pending[i + 1..].to_vec());
-                    }
-                    return Ok(());
-                }
-            }
-            self.game_state.pending_sequential_actions = None;
-        }
+        self.resume_pending_commands()?;
         Ok(())
     }
 
@@ -298,74 +319,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             original_blade_limit: None,
             original_blade_operator: None,
         };
-        let validate_card = |cid: i16| -> bool { validate_filter.matches(&card_db, cid, false) };
+        let mut validate_card =
+            |cid: i16| -> bool { validate_filter.matches(&card_db, cid, false) };
 
         if allow_skip && !indices.is_empty() {
             match zone {
                 "hand" => {
-                    let player = self.game_state.active_player_mut();
-                    let mut discard_count = 0u32;
-                    for &idx in indices.iter().rev() {
-                        if idx < player.hand.cards.len() {
-                            if validate_card(player.hand.cards[idx]) {
-                                player.waitroom.add_card(player.hand.cards[idx]);
-                                player.hand.remove_card(idx);
-                                discard_count += 1;
-                            }
-                        }
-                    }
-                    if discard_count > 0 {
-                        self.game_state.mods.last_cost_discard_count = discard_count;
-                    }
+                    self.discard_from_hand(indices, &mut validate_card);
                 }
                 "stage" => {
-                    let mut last_vacated = None;
-                    let mut moved_ids = Vec::new();
-                    {
-                        let player = self.game_state.active_player_mut();
-                        for &idx in indices.iter().rev() {
-                            if idx < 3
-                                && player.stage.stage[idx] != -1
-                                && validate_card(player.stage.stage[idx])
-                            {
-                                if let Some(card_id) =
-                                    player.remove_member_from_stage_with_recycling(idx, &card_db)
-                                {
-                                    player.waitroom.add_card(card_id);
-                                    last_vacated = Some(idx);
-                                    moved_ids.push(card_id);
-                                }
-                            }
-                        }
-                    }
-                    if let Some(pos) = last_vacated {
-                        self.game_state.last_vacated_stage_area = Some(pos);
-                    }
-                    if !moved_ids.is_empty() {
-                        self.moved_cards = moved_ids.clone();
-                        self.game_state.recently_moved_cards = Some(moved_ids);
-                    }
+                    self.remove_from_stage(indices, &mut validate_card, &card_db);
                 }
                 "energy_zone" => {
-                    let to_mark: Vec<i16> = {
-                        let player = self.game_state.active_player_mut();
-                        indices
-                            .iter()
-                            .filter_map(|&idx| {
-                                if idx < player.energy_zone.cards.len()
-                                    && validate_card(player.energy_zone.cards[idx])
-                                {
-                                    Some(player.energy_zone.cards[idx])
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect()
-                    };
-                    for cid in to_mark {
-                        self.game_state.mods.clear_all_for_card(cid);
-                        self.game_state.mods.add_orientation_modifier(cid, "wait");
-                    }
+                    self.mark_energy_as_wait(indices, &mut validate_card);
                 }
                 "discard" => {
                     if is_select_action {
@@ -485,71 +451,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     return self.finalize_choice(&context);
                 }
                 "revealed_cards" => {
-                    let cards: Vec<i16> = {
-                        let revealed = &mut self.game_state.revealed_cards;
-                        let mut result = Vec::new();
-                        let mut removed: Vec<usize> = indices.to_vec();
-                        removed.sort_by(|a, b| b.cmp(a));
-                        for &i in &removed {
-                            if i < revealed.len() {
-                                let cid = revealed.remove(i);
-                                if validate_card(cid) {
-                                    result.push(cid);
-                                }
-                            }
-                        }
-                        result
-                    };
-                    self.selected_cards = cards;
-                    // Move selected cards to destination
                     let dst = self.game_state.entry_destination().map(|s| s.to_string());
                     let dst_str = dst.as_deref().unwrap_or("hand");
-                    let player = self.game_state.active_player_mut();
-                    for &cid in &self.selected_cards.clone() {
-                        crate::ability::util::place_card_in_zone(
-                            player, cid, dst_str, None, false, 1,
-                        );
-                    }
+                    self.move_from_revealed(indices, &mut validate_card, &dst_str);
                     return self.finalize_choice(&context);
                 }
                 "under_member" => {
                     let dst = self.game_state.entry_destination().map(|s| s.to_string());
-                    // Default to energy_deck for under_member operations (place_energy_under_member)
                     let dst_str = dst.as_deref().unwrap_or("energy_deck").to_string();
-                    let player = self.game_state.active_player_mut();
-                    let mut cards_to_move: Vec<(usize, i16)> = Vec::new();
-                    for &idx in indices.iter() {
-                        let mut global_idx = 0;
-                        let mut found = false;
-                        for si in 0..3 {
-                            if idx < global_idx + player.stage.under_cards[si].len() {
-                                cards_to_move
-                                    .push((si, player.stage.under_cards[si][idx - global_idx]));
-                                found = true;
-                                break;
-                            }
-                            global_idx += player.stage.under_cards[si].len();
-                        }
-                        if !found {
-                            return Err(format!("Card at index {} not found in under_member", idx));
-                        }
-                    }
-                    let selected_ids: Vec<i16> =
-                        cards_to_move.iter().map(|&(_, cid)| cid).collect();
-                    let _ = player;
-                    let player = self.game_state.active_player_mut();
-                    for (si, card_id) in &cards_to_move {
-                        if let Some(pos) = player.stage.under_cards[*si]
-                            .iter()
-                            .position(|&c| c == *card_id)
-                        {
-                            player.stage.under_cards[*si].remove(pos);
-                            crate::ability::util::place_card_in_zone(
-                                player, *card_id, &dst_str, None, false, 1,
-                            );
-                        }
-                    }
-                    self.selected_cards = selected_ids;
+                    self.move_from_under_member(indices, &mut validate_card, &dst_str)?;
                     return self.finalize_choice(&context);
                 }
                 _ => {}
@@ -768,13 +678,15 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 if let Ok(options) = serde_json::from_str::<Vec<AbilityEffect>>(options_json) {
                     let idx: usize = selected.parse().unwrap_or(0);
                     if idx < options.len() {
-                        self.execute_effect(&options[idx]).map_err(|e| e)?;
+                        self.game_state
+                            .ability_queue
+                            .set_pending_commands(vec![Command::Effect(options[idx].clone())]);
                     }
                 }
             }
             self.pending_choice = None;
             self.clear_choice_meta();
-            return Ok(());
+            return self.resume_pending_commands();
         }
 
         if choice_card_no.as_deref() == Some("choice_string") {
@@ -905,32 +817,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         Ok(())
     }
 
-    fn handle_choice_string_selection(
-        &mut self,
-        selected: &str,
-        conditional_choice: Option<String>,
-    ) -> Result<(), String> {
-        if let Some(ref options_json) = conditional_choice {
-            if let Ok(options) = serde_json::from_str::<Vec<String>>(options_json) {
-                if let Ok(idx) = selected.parse::<usize>() {
-                    if idx > 0 && idx <= options.len() {
-                        let val = &options[idx - 1];
-                        if val.starts_with("heart")
-                            || ["赤", "桃", "緑", "青", "黄", "紫"].contains(&val.as_str())
-                        {
-                            self.game_state
-                                .prohibition_effects
-                                .push(format!("selected_heart_color:{}", val));
-                        }
-                    }
-                }
-            }
-        }
-        self.pending_choice = None;
-        self.clear_choice_meta();
-        Ok(())
-    }
-
     fn handle_position_change_choice(
         &mut self,
         choice_card_no: Option<String>,
@@ -939,26 +825,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         if selected == "skip" {
             self.pending_choice = None;
             self.clear_choice_meta();
-            if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-                for (i, action) in pending.iter().enumerate() {
-                    if let Err(e) = self.execute_effect(action) {
-                        eprintln!(
-                            "Failed to execute pending action after position change skip: {}",
-                            e
-                        );
-                    }
-                    if self.pending_choice.is_some() {
-                        let remaining = pending[i + 1..].to_vec();
-                        self.game_state.pending_sequential_actions = if remaining.is_empty() {
-                            None
-                        } else {
-                            Some(remaining)
-                        };
-                        return Ok(());
-                    }
-                }
-                self.game_state.pending_sequential_actions = None;
-            }
+            self.resume_pending_commands()?;
             self.execution_context = ExecutionContext::None;
             if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                 entry.execution_context = None;
@@ -991,238 +858,55 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         }
         self.pending_choice = None;
         self.clear_choice_meta();
-        if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-            for (i, action) in pending.iter().enumerate() {
-                if let Err(e) = self.execute_effect(action) {
-                    eprintln!(
-                        "Failed to execute pending action after position change: {}",
-                        e
-                    );
-                }
-                if self.pending_choice.is_some() {
-                    let remaining = pending[i + 1..].to_vec();
-                    self.game_state.pending_sequential_actions = if remaining.is_empty() {
-                        None
-                    } else {
-                        Some(remaining)
-                    };
-                    return Ok(());
-                }
-            }
-            self.game_state.pending_sequential_actions = None;
-        }
-        Ok(())
-    }
-
-    fn handle_choice_string_store(
-        &mut self,
-        selected: &str,
-        conditional_choice: Option<String>,
-    ) -> Result<(), String> {
-        let chosen = conditional_choice.and_then(|json| {
-            serde_json::from_str::<Vec<String>>(&json)
-                .ok()
-                .and_then(|opts| {
-                    selected
-                        .parse::<usize>()
-                        .ok()
-                        .and_then(|idx| opts.get(idx).cloned())
-                })
-        });
-        if let Some(s) = chosen {
-            self.game_state
-                .ability_queue
-                .current_entry_mut()
-                .map(|e| e.conditional_choice = Some(s));
-        }
-        self.pending_choice = None;
-        if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-            for (i, action) in pending.iter().enumerate() {
-                self.execute_effect(action)?;
-                if self.pending_choice.is_some() {
-                    let remaining = pending[i + 1..].to_vec();
-                    self.game_state.pending_sequential_actions = if remaining.is_empty() {
-                        None
-                    } else {
-                        Some(remaining)
-                    };
-                    return Ok(());
-                }
-            }
-            self.game_state.pending_sequential_actions = None;
-        }
-        Ok(())
-    }
-
-    fn handle_optional_cost_payment(&mut self, selected: &str) -> Result<(), String> {
-        if selected == "skip_optional_cost" || selected == "0" {
-            self.pending_choice = None;
-            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
-                entry.cost_paid = true;
-                entry.effect_started = true;
-                entry.optional_cost_was_paid = false;
-            }
-            return Ok(());
-        }
-        // "pay_optional_cost" or "1" from select_option(1)
-        self.pending_choice = None; // Clear the stale choice before processing sub-costs
-        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
-            entry.optional_cost_was_paid = true;
-        }
-        let is_pay = true;
-        if is_pay {
-            if let Some(cost) = self.game_state.entry_cost().cloned() {
-                if let Some(energy) = cost.energy {
-                    if energy > 0 {
-                        let tgt = cost.target.as_deref().unwrap_or("self");
-                        self.game_state
-                            .resolve_target_player_mut(tgt)
-                            .energy_zone
-                            .pay_energy(energy as usize)
-                            .map_err(|e| e)?;
-                    }
-                }
-                if cost.state_change.as_deref() == Some("wait") && cost.self_cost == Some(true) {
-                    if let Some(id) = self.game_state.activating_card {
-                        self.game_state.mods.add_orientation_modifier(id, "wait");
-                    }
-                }
-                // Handle sequential_cost sub-costs — pay each after user confirmed
-                if let Some(ref costs) = cost.costs {
-                    for sub_cost in costs {
-                        if sub_cost.state_change.as_deref() == Some("wait")
-                            && sub_cost.self_cost == Some(true)
-                        {
-                            if let Some(id) = self.game_state.activating_card {
-                                self.game_state.mods.add_orientation_modifier(id, "wait");
-                            }
-                        } else if let Err(e) = self.pay_cost(sub_cost) {
-                            eprintln!("Warning: sub-cost payment error: {}", e);
-                        }
-                        if self.pending_choice.is_some() {
-                            return Ok(());
-                        }
-                    }
-                }
-                eprintln!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
-                    cost.cost_type, self.game_state.entry_cost().is_some(), 
-                    self.game_state.entry_effect().map(|e| e.action.clone()));
-                if cost.cost_type.as_deref() == Some("place_energy_under_member") {
-                    self.execute_place_energy_under_member(
-                        cost.count.unwrap_or(1),
-                        cost.target.as_deref().unwrap_or("self"),
-                        cost.position.as_ref(),
-                        false,
-                        cost.source.as_deref(),
-                    );
-                }
-            }
-            self.pending_choice = None;
-            let is_effect_optional =
-                self.game_state.entry_choice_card_no().as_deref() == Some("optional_cost");
-            if self.game_state.entry_cost().is_some() {
-                if let Some(effect) = self.game_state.entry_effect().cloned() {
-                    if let Err(e) = self.execute_effect(&effect) {
-                        eprintln!("Failed to execute effect after optional cost: {}", e);
-                    }
-                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
-                        entry.effect_started = true;
-                    }
-                }
-            } else if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-                if !pending.is_empty() {
-                    for action in pending {
-                        if let Err(e) = self.execute_effect(action) {
-                            eprintln!("Failed to execute action after optional: {}", e);
-                        }
-                    }
-                    self.game_state.pending_sequential_actions = None;
-                }
-            } else if is_effect_optional {
-                if let Some(effect) = self.game_state.entry_effect().cloned() {
-                    let new_count = effect.energy_count.unwrap_or(effect.count_or(1));
-                    self.execute_place_energy_under_member(
-                        new_count,
-                        effect.target_name(),
-                        effect.position.as_ref(),
-                        false,
-                        effect.source.as_deref(),
-                    );
-                }
-            }
-        }
+        self.resume_pending_commands()?;
         Ok(())
     }
 
     fn handle_primary_alternative(&mut self, selected: &str) -> Result<(), String> {
-        if let Some(ref ability) = self.current_ability.clone() {
-            if let Some(ref effect) = ability.effect {
-                if effect.action == "conditional_alternative" {
-                    match selected {
-                        "primary" => {
-                            if let Some(ref p) = effect.compound.primary_effect {
-                                if let Err(e) = self.execute_effect(p) {
-                                    eprintln!("Failed to execute primary: {}", e);
-                                }
-                            }
-                        }
-                        "alternative" => {
-                            if let Some(ref a) = effect.compound.alternative_effect {
-                                if let Err(e) = self.execute_effect(a) {
-                                    eprintln!("Failed to execute alternative: {}", e);
-                                }
-                            }
-                        }
-                        _ => {}
-                    }
-                }
+        self.pending_choice = None;
+        if let Some(effect) = self.game_state.entry_effect().cloned() {
+            let chosen = if selected == "1" || selected == "alternative" || selected == "secondary"
+            {
+                effect
+                    .compound
+                    .alternative_effect
+                    .or(effect.compound.primary_effect)
+            } else {
+                effect.compound.primary_effect
+            };
+            if let Some(sub_effect) = chosen {
+                self.game_state
+                    .ability_queue
+                    .set_pending_commands(vec![Command::Effect(*sub_effect)]);
             }
         }
-        self.pending_choice = None;
+        self.resume_pending_commands()?;
         Ok(())
     }
 
     fn handle_position_destination(&mut self, selected: &str) -> Result<(), String> {
-        if selected == "skip" {
-            self.pending_choice = None;
-            return Ok(());
-        }
-        let dest = match selected {
-            "0" | "left" => "left_side",
-            "1" | "center" => "center",
-            "2" | "right" => "right_side",
-            _ => "center",
-        };
-        if let Some(ref ability) = self.current_ability.clone() {
-            if let Some(ref effect) = ability.effect {
-                if effect.action == "position_change" {
-                    if let Err(e) = self.execute_position_change_with_destination(effect, dest) {
-                        eprintln!("Failed position change: {}", e);
-                    }
-                }
-            }
-        }
         self.pending_choice = None;
-        if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-            for (i, action) in pending.iter().enumerate() {
-                if let Err(e) = self.execute_effect(action) {
-                    eprintln!(
-                        "Failed to execute pending action after position change: {}",
-                        e
-                    );
-                }
-                if self.pending_choice.is_some() {
-                    let remaining = pending[i + 1..].to_vec();
-                    self.game_state.pending_sequential_actions = if remaining.is_empty() {
-                        None
-                    } else {
-                        Some(remaining)
-                    };
-                    return Ok(());
-                }
-            }
-            self.game_state.pending_sequential_actions = None;
+        if let Some(effect) = self.game_state.entry_effect().cloned() {
+            let mut modified = effect.clone();
+            modified.destination = Some(selected.to_string());
+            self.game_state
+                .ability_queue
+                .set_pending_commands(vec![Command::Effect(modified)]);
         }
+        self.resume_pending_commands()?;
+        Ok(())
+    }
+
+    fn handle_conditional_optional(&mut self, selected: &str) -> Result<(), String> {
+        self.pending_choice = None;
+        if selected == "1" || selected == "yes" {
+            if let Some(effect) = self.game_state.entry_effect().cloned() {
+                self.game_state
+                    .ability_queue
+                    .set_pending_commands(vec![Command::Effect(effect)]);
+            }
+        }
+        self.resume_pending_commands()?;
         Ok(())
     }
 
@@ -1253,145 +937,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         Ok(())
     }
 
-    fn handle_conditional_optional(&mut self, selected: &str) -> Result<(), String> {
-        let effect = self.game_state.entry_effect().cloned();
-        self.pending_choice = None;
-        let is_negation = effect
-            .as_ref()
-            .map(|e| e.compound.conditional_negation.unwrap_or(false))
-            .unwrap_or(false);
-        if selected == "1" || selected == "yes" {
-            if let Some(ref e) = effect {
-                if let Some(ref o) = e.compound.optional_action {
-                    if let Err(err) = self.execute_effect(o) {
-                        eprintln!("Failed optional action: {}", err);
-                    }
-                }
-                if !is_negation {
-                    if let Some(ref c) = e.compound.conditional_action {
-                        if let Err(err) = self.execute_effect(c) {
-                            eprintln!("Failed conditional action: {}", err);
-                        }
-                    }
-                }
-            }
-        } else if is_negation {
-            if let Some(ref e) = effect {
-                if let Some(ref c) = e.compound.conditional_action {
-                    if let Err(err) = self.execute_effect(c) {
-                        eprintln!("Failed conditional action: {}", err);
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn handle_select_position(
-        &mut self,
-        position: &str,
-        context: ExecutionContext,
-    ) -> Result<(), String> {
-        match &context {
-            ExecutionContext::LookAndSelect { step } => {
-                if let LookAndSelectStep::Finalize { destination } = step {
-                    if destination == "stage" {
-                        if let Some(&card_id) = self.looked_at_cards.last() {
-                            let player = &mut self.game_state.player1;
-                            match position {
-                                "center" => {
-                                    player.stage.stage[1] = card_id;
-                                    player
-                                        .areas_locked_this_turn
-                                        .insert(crate::zones::MemberArea::Center);
-                                }
-                                "left_side" => {
-                                    player.stage.stage[0] = card_id;
-                                    player
-                                        .areas_locked_this_turn
-                                        .insert(crate::zones::MemberArea::LeftSide);
-                                }
-                                "right_side" => {
-                                    player.stage.stage[2] = card_id;
-                                    player
-                                        .areas_locked_this_turn
-                                        .insert(crate::zones::MemberArea::RightSide);
-                                }
-                                _ => {
-                                    player.hand.add_card(card_id);
-                                }
-                            }
-                            self.looked_at_cards.clear();
-                        }
-                    }
-                }
-            }
-            ExecutionContext::MoveCardsPosition {
-                card_id,
-                state_change,
-                target,
-            } => {
-                let player = match target.as_str() {
-                    "opponent" => &mut self.game_state.player2,
-                    _ => &mut self.game_state.player1,
-                };
-                let pos = match position {
-                    "center" => 1,
-                    "left_side" => 0,
-                    "right_side" => 2,
-                    _ => {
-                        player.hand.add_card(*card_id);
-                        return Ok(());
-                    }
-                };
-                if pos < 3 && player.stage.stage[pos] == -1 {
-                    player.stage.stage[pos] = *card_id;
-                    let area = match pos {
-                        0 => crate::zones::MemberArea::LeftSide,
-                        1 => crate::zones::MemberArea::Center,
-                        2 => crate::zones::MemberArea::RightSide,
-                        _ => crate::zones::MemberArea::Center,
-                    };
-                    player.areas_locked_this_turn.insert(area);
-                } else {
-                    player.hand.add_card(*card_id);
-                }
-                // Apply state_change and record movement (same as move_cards executor)
-                self.game_state.mods.clear_all_for_card(*card_id);
-                self.game_state.record_card_movement(*card_id);
-                if let Some(ref sc) = state_change {
-                    if sc == "wait" {
-                        self.game_state
-                            .mods
-                            .add_orientation_modifier(*card_id, "wait");
-                    }
-                }
-            }
-            _ => {}
-        }
-        self.pending_choice = None;
-        self.execution_context = ExecutionContext::None;
-
-        // Process any pending sequential actions (e.g., target="both" deferred opponent)
-        if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
-            for (i, action) in pending.iter().enumerate() {
-                self.execute_effect(action)?;
-                if self.pending_choice.is_some() {
-                    let remaining = pending[i + 1..].to_vec();
-                    self.game_state.pending_sequential_actions = if remaining.is_empty() {
-                        None
-                    } else {
-                        Some(remaining)
-                    };
-                    return Ok(());
-                }
-            }
-            self.game_state.pending_sequential_actions = None;
-        }
-
-        Ok(())
-    }
-
     fn handle_heart_selection(&mut self, count: u32, colors: &[String]) -> Result<(), String> {
         if let Some(chosen) = colors.first() {
             let color = crate::zones::parse_heart_color(chosen);
@@ -1407,523 +952,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         self.finalize_choice(&self.execution_context.clone())
     }
 
-    fn clear_choice_meta(&mut self) {
+    pub fn clear_choice_meta(&mut self) {
         if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
             entry.choice_card_no = None;
             entry.conditional_choice = None;
         }
-    }
-
-    fn execute_selected_cards_from_zone(
-        &mut self,
-        zone: &str,
-        indices: &[usize],
-        _count: usize,
-        card_type_filter: Option<&str>,
-        cost_limit: Option<u32>,
-        cost_limit_operator: Option<&str>,
-        group: Option<&str>,
-        characters: Option<&Vec<String>>,
-    ) -> Result<(), String> {
-        eprintln!("[EXEC_ZONE] enter zone={} indices={:?}", zone, indices);
-        let destination = self.game_state.entry_destination().map(|s| s.to_string());
-        let target = self
-            .game_state
-            .entry_effect()
-            .and_then(|e| e.target.clone())
-            .unwrap_or_else(|| "self".to_string());
-        let card_db = self.game_state.card_database.clone();
-        let vacated_area = self.game_state.last_vacated_stage_area;
-        let player = self.game_state.resolve_target_player_mut(&target);
-
-        let mut moved: Vec<i16> = Vec::new();
-
-        let passes = |cid: i16| -> bool {
-            util::card_matches_type(&card_db, cid, card_type_filter)
-                && util::card_matches_cost_limit_op(&card_db, cid, cost_limit, cost_limit_operator)
-                && util::card_matches_group_str(&card_db, cid, group)
-                && match characters {
-                    Some(chars) if !chars.is_empty() => {
-                        util::card_matches_characters(&card_db, cid, Some(chars))
-                    }
-                    _ => true,
-                }
-        };
-
-        match zone {
-            "hand" => {
-                for &i in indices {
-                    if i < player.hand.cards.len() && !passes(player.hand.cards[i]) {
-                        return Err(
-                            "Selected hand card does not match required filters".to_string()
-                        );
-                    }
-                }
-                let dest = destination.as_deref().unwrap_or("discard");
-                let mut idxs: Vec<usize> = indices.iter().copied().collect();
-                idxs.sort_by(|a, b| b.cmp(a));
-                let mut moved_cards: Vec<i16> = Vec::new();
-                for i in idxs {
-                    if i < player.hand.cards.len() {
-                        let card_id = player.hand.cards.remove(i);
-                        if passes(card_id) {
-                            match dest {
-                                "stage" => {
-                                    if player.stage.stage[1] == -1 {
-                                        player.stage.stage[1] = card_id;
-                                        player
-                                            .areas_locked_this_turn
-                                            .insert(crate::zones::MemberArea::Center);
-                                    } else if player.stage.stage[0] == -1 {
-                                        player.stage.stage[0] = card_id;
-                                        player
-                                            .areas_locked_this_turn
-                                            .insert(crate::zones::MemberArea::LeftSide);
-                                    } else if player.stage.stage[2] == -1 {
-                                        player.stage.stage[2] = card_id;
-                                        player
-                                            .areas_locked_this_turn
-                                            .insert(crate::zones::MemberArea::RightSide);
-                                    } else {
-                                        player.hand.add_card(card_id);
-                                    }
-                                }
-                                "same_area" => {
-                                    super::util::place_card_in_zone(
-                                        player,
-                                        card_id,
-                                        "same_area",
-                                        vacated_area,
-                                        false,
-                                        1,
-                                    );
-                                }
-                                _ => player.waitroom.add_card(card_id),
-                            }
-                            moved_cards.push(card_id);
-                        } else {
-                            player.hand.cards.insert(i, card_id);
-                        }
-                    }
-                }
-                if dest == "discard" || dest == "waitroom" {
-                    let count = moved_cards.len() as u32;
-                    eprintln!("[DISCARD_TRACK] setting last_cost_discard_count={}", count);
-                    self.game_state.mods.last_cost_discard_count = count;
-                }
-                if !moved_cards.is_empty() {
-                    self.game_state.recently_moved_cards = Some(moved_cards.clone());
-                }
-            }
-            "deck" => {
-                // Pre-validate: reject if any selected card fails the filter
-                for &i in indices {
-                    if i < player.main_deck.cards.len() && !passes(player.main_deck.cards[i]) {
-                        return Err(
-                            "Selected deck card does not match required filters".to_string()
-                        );
-                    }
-                }
-                let mut idxs: Vec<usize> = indices.iter().copied().collect();
-                idxs.sort_by(|a, b| b.cmp(a));
-                for i in idxs {
-                    if i < player.main_deck.cards.len() {
-                        let card_id = player.main_deck.cards.remove(i);
-                        if passes(card_id) {
-                            player.hand.add_card(card_id);
-                            moved.push(card_id);
-                        } else {
-                            player.main_deck.cards.insert(i, card_id);
-                        }
-                    }
-                }
-            }
-            "discard" => {
-                let dest = destination.as_deref().unwrap_or("hand");
-                // Pre-flight: if destination is stage and no room, silently reject
-                if dest == "stage" && player.stage.stage.iter().all(|&id| id != -1) {
-                    eprintln!("[DISCARD_ZONE] stage is full, cannot place cards from discard");
-                    return Ok(());
-                }
-                // Pre-validate: reject if any selected card fails the filter
-                for &i in indices {
-                    if i < player.waitroom.cards.len() && !passes(player.waitroom.cards[i]) {
-                        return Err(
-                            "Selected discard card does not match required filters".to_string()
-                        );
-                    }
-                }
-                let mut idxs: Vec<usize> = indices.iter().copied().collect();
-                idxs.sort_by(|a, b| b.cmp(a));
-                eprintln!(
-                    "[DISCARD_ZONE] indices={:?}, dest={}, discard_before_len={}",
-                    indices,
-                    dest,
-                    player.waitroom.cards.len()
-                );
-                // Validate total cost limit before moving cards
-                if let Some(limit) = cost_limit {
-                    let total_cost: u32 = idxs
-                        .iter()
-                        .filter_map(|&i| {
-                            if i < player.waitroom.cards.len() {
-                                card_db
-                                    .get_card(player.waitroom.cards[i])
-                                    .and_then(|c| c.cost)
-                            } else {
-                                None
-                            }
-                        })
-                        .sum();
-                    let op = cost_limit_operator.unwrap_or("<=");
-                    let ok = match op {
-                        ">=" => total_cost >= limit,
-                        ">" => total_cost > limit,
-                        "<" => total_cost < limit,
-                        "exact" | "=" => total_cost == limit,
-                        _ => total_cost <= limit,
-                    };
-                    eprintln!(
-                        "[DISCARD_ZONE] total_cost={}, limit={}, op={}, ok={}",
-                        total_cost, limit, op, ok
-                    );
-                    if !ok {
-                        eprintln!(
-                            "[TOTAL_COST] Selection rejected: total={} limit={} op={}",
-                            total_cost, limit, op
-                        );
-                        return Ok(());
-                    }
-                }
-                let mut card_ids_moved: Vec<i16> = Vec::new();
-                for i in idxs {
-                    if i < player.waitroom.cards.len() {
-                        let card_id = player.waitroom.cards.remove(i);
-                        eprintln!("[DISCARD_ZONE] removing idx={} card_id={}", i, card_id);
-                        if passes(card_id) {
-                            match dest {
-                                "stage" => {
-                                    if player.stage.stage[1] == -1 {
-                                        player.stage.stage[1] = card_id;
-                                    } else if player.stage.stage[0] == -1 {
-                                        player.stage.stage[0] = card_id;
-                                    } else if player.stage.stage[2] == -1 {
-                                        player.stage.stage[2] = card_id;
-                                    } else {
-                                        // Stage full — return card to discard
-                                        player.waitroom.cards.insert(i, card_id);
-                                        eprintln!("[DISCARD_ZONE] no stage room, returning card to discard");
-                                        continue;
-                                    }
-                                }
-                                "same_area" => {
-                                    super::util::place_card_in_zone(
-                                        player,
-                                        card_id,
-                                        "same_area",
-                                        vacated_area,
-                                        false,
-                                        1,
-                                    );
-                                }
-                                _ => player.hand.add_card(card_id),
-                            }
-                            card_ids_moved.push(card_id);
-                            moved.push(card_id);
-                        } else {
-                            player.waitroom.cards.insert(i, card_id);
-                        }
-                    }
-                }
-                // Apply state_change to moved cards (e.g. "wait" state)
-                let state_change = self
-                    .game_state
-                    .ability_queue
-                    .current_entry()
-                    .and_then(|e| e.ability.effect.as_ref())
-                    .and_then(|ef| ef.state_change.clone());
-                if let Some(sc) = state_change {
-                    if sc == "wait" {
-                        for &cid in &card_ids_moved {
-                            self.game_state.mods.add_orientation_modifier(cid, "wait");
-                        }
-                    }
-                }
-                if !card_ids_moved.is_empty() {
-                    self.game_state.recently_moved_cards = Some(card_ids_moved.clone());
-                }
-            }
-            "stage" => {
-                // Pre-validate: reject if any selected card fails the filter
-                for &idx in indices {
-                    if idx < 3 && player.stage.stage[idx] != -1 && !passes(player.stage.stage[idx])
-                    {
-                        return Err(
-                            "Selected stage card does not match required filters".to_string()
-                        );
-                    }
-                    if idx < 3 && player.stage.stage[idx] != -1 {
-                        self.selected_cards.push(player.stage.stage[idx]);
-                    }
-                }
-            }
-            "revealed_cards" => {
-                // Pre-validate: reject if any selected card fails the filter
-                for &idx in indices {
-                    if idx < self.game_state.revealed_cards.len()
-                        && !passes(self.game_state.revealed_cards[idx])
-                    {
-                        return Err(
-                            "Selected revealed card does not match required filters".to_string()
-                        );
-                    }
-                }
-                for &idx in indices.iter().rev() {
-                    if idx < self.game_state.revealed_cards.len() {
-                        let card_id = self.game_state.revealed_cards.remove(idx);
-                        if passes(card_id) {
-                            self.selected_cards.push(card_id);
-                        }
-                    }
-                }
-            }
-            _ => return Err(format!("Unknown zone: {}", zone)),
-        }
-        for cid in moved {
-            self.game_state.mods.clear_all_for_card(cid);
-        }
-        Ok(())
-    }
-
-    fn handle_select_cards_looked_at(&mut self, indices: &[usize]) -> Result<(), String> {
-        let select_action = self
-            .game_state
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.ability.effect.as_ref())
-            .and_then(|ef| ef.compound.select_action.clone());
-        let (destination, discard_remaining, placement_order) = (
-            select_action
-                .as_ref()
-                .and_then(|sa| sa.destination.clone())
-                .unwrap_or_else(|| "hand".to_string()),
-            select_action
-                .as_ref()
-                .and_then(|sa| sa.discard_remaining)
-                .unwrap_or(true),
-            select_action
-                .as_ref()
-                .and_then(|sa| sa.placement_order.clone()),
-        );
-        println!("DEBUG: handle_select_cards_looked_at - destination: {}, discard_remaining: {}, placement_order: {:?}", destination, discard_remaining, placement_order);
-
-        // If game_state.looked_at_cards was reset (resolver recreation), restore from selected_cards
-        if self.game_state.looked_at_cards.is_empty() && !self.selected_cards.is_empty() {
-            self.game_state.looked_at_cards = self.selected_cards.clone();
-        }
-
-        // Use game_state.looked_at_cards directly
-        let looked_at = &mut self.game_state.looked_at_cards;
-        let mut indices_sorted: Vec<usize> = indices.iter().copied().collect();
-        indices_sorted.sort_by(|a, b| b.cmp(a));
-
-        // Extract selected cards first
-        let mut selected_cards: Vec<i16> = Vec::new();
-        for i in indices_sorted {
-            if i < looked_at.len() {
-                selected_cards.insert(0, looked_at.remove(i));
-            }
-        }
-        let selected_count = selected_cards.len();
-        println!(
-            "DEBUG: Selected {} cards: {:?}",
-            selected_count, selected_cards
-        );
-
-        // Validate selected cards against cost_limit from the select_action
-        {
-            let card_db = &self.game_state.card_database;
-            let cost_limit = select_action.as_ref().and_then(|sa| sa.cost_limit);
-            let cost_limit_operator = select_action
-                .as_ref()
-                .and_then(|sa| sa.cost_limit_operator.as_deref());
-            selected_cards.retain(|&cid| {
-                super::util::card_matches_cost_limit_op(
-                    card_db,
-                    cid,
-                    cost_limit,
-                    cost_limit_operator,
-                )
-            });
-            if selected_cards.len() != selected_count {
-                println!(
-                    "DEBUG: Post-filter removed {} cards that don't match cost_limit",
-                    selected_count - selected_cards.len()
-                );
-            }
-        }
-
-        // Extract remaining cards
-        let remaining_cards: Vec<i16> = looked_at.drain(..).collect();
-        println!(
-            "DEBUG: Remaining {} cards: {:?}",
-            remaining_cards.len(),
-            remaining_cards
-        );
-
-        // Handle any_order: if placing 2+ cards on deck, prompt for order
-        let is_deck_dest = destination == "deck_top" || destination == "deck";
-        let needs_order = is_deck_dest
-            && placement_order.as_deref() == Some("any_order")
-            && selected_cards.len() > 1;
-
-        if needs_order {
-            self.looked_at_cards = selected_cards;
-            let player = self.game_state.active_player_mut();
-            if discard_remaining {
-                for card_id in remaining_cards {
-                    player.waitroom.add_card(card_id);
-                }
-            } else {
-                for card_id in remaining_cards {
-                    player.main_deck.cards.push(card_id);
-                }
-            }
-            let card_count = self.looked_at_cards.len();
-            self.pending_choice = Some(Choice::SelectTarget {
-                target: "order".to_string(),
-                description: format!("Choose order for cards on deck ({} cards)", card_count),
-                allow_skip: false,
-                options: None,
-            });
-            self.execution_context = ExecutionContext::LookAndSelect {
-                step: LookAndSelectStep::Finalize {
-                    destination: "deck".to_string(),
-                },
-            };
-            return Ok(());
-        }
-
-        // Move selected cards to destination
-        let player = self.game_state.active_player_mut();
-        for card_id in selected_cards {
-            match destination.as_str() {
-                "hand" => {
-                    println!("DEBUG: Adding card {} to hand", card_id);
-                    player.hand.add_card(card_id)
-                }
-                "deck_top" | "deck" => player.main_deck.cards.insert(0, card_id),
-                "discard" => player.waitroom.add_card(card_id),
-                _ => player.hand.add_card(card_id),
-            }
-        }
-        let _ = player;
-        println!(
-            "DEBUG: Hand now has {} cards: {:?}",
-            self.game_state.active_player().hand.cards.len(),
-            self.game_state.active_player().hand.cards
-        );
-
-        // Check for multi-selection: if user selected at least 1 but fewer than total,
-        // keep remaining for another pick. If they selected 0, treat as "done".
-        let any_number = select_action
-            .as_ref()
-            .and_then(|sa| sa.any_number)
-            .unwrap_or(false);
-        let json_count = select_action.as_ref().and_then(|sa| sa.count).unwrap_or(1) as usize;
-        let total_available = selected_count + remaining_cards.len();
-        // For any_number, max is all cards. Otherwise use json_count (with max/optional).
-        let max_select = if any_number {
-            total_available
-        } else {
-            json_count
-        };
-        let can_select_more = select_action
-            .as_ref()
-            .map(|sa| sa.max.unwrap_or(false) || sa.optional.unwrap_or(false) || any_number)
-            .unwrap_or(false);
-
-        if selected_count > 0
-            && can_select_more
-            && max_select > selected_count
-            && !remaining_cards.is_empty()
-        {
-            // Sync self.looked_at_cards BEFORE early return so resolver.take_looked_at()
-            // returns the updated state, not the pre-selection original.
-            self.looked_at_cards = remaining_cards.clone();
-            self.game_state.looked_at_cards = remaining_cards.clone();
-            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
-                entry.selected_card_ids = remaining_cards;
-            }
-            let remaining_available = self.game_state.looked_at_cards.len();
-            let remaining_selections = (max_select - selected_count).min(remaining_available);
-            let description = format!(
-                "Select up to {} more card(s) from the {} remaining looked-at cards",
-                remaining_selections, remaining_available
-            );
-            self.pending_choice = Some(
-                Choice::select_cards("looked_at", remaining_selections, description, true)
-                    .card_type(select_action.as_ref().and_then(|sa| sa.card_type.clone()))
-                    .cost_limit(
-                        select_action.as_ref().and_then(|sa| sa.cost_limit),
-                        select_action
-                            .as_ref()
-                            .and_then(|sa| sa.cost_limit_operator.clone()),
-                    )
-                    .group(
-                        select_action
-                            .as_ref()
-                            .and_then(|sa| sa.group_names.as_ref())
-                            .and_then(|v| v.first().cloned()),
-                    )
-                    .characters(select_action.as_ref().and_then(|sa| sa.characters.clone()))
-                    .build(),
-            );
-            return Ok(());
-        }
-
-        // Handle remaining cards — discard or return to deck
-        if discard_remaining {
-            for card_id in remaining_cards {
-                self.game_state
-                    .active_player_mut()
-                    .waitroom
-                    .add_card(card_id);
-            }
-        } else {
-            for card_id in remaining_cards {
-                self.game_state
-                    .active_player_mut()
-                    .main_deck
-                    .cards
-                    .push(card_id);
-            }
-        }
-
-        self.looked_at_cards = self.game_state.looked_at_cards.clone();
-        Ok(())
-    }
-    fn execute_selected_energy_zone_cards(
-        &mut self,
-        indices: &[usize],
-        _count: usize,
-    ) -> Result<(), String> {
-        let player = self.game_state.resolve_target_player_mut("self");
-        let mut to_mark: Vec<i16> = Vec::new();
-        for &i in indices {
-            if i < player.energy_zone.cards.len() {
-                to_mark.push(player.energy_zone.cards[i]);
-            }
-        }
-        let deactivated_count = indices.len();
-        if player.energy_zone.active_energy_count >= deactivated_count {
-            player.energy_zone.active_energy_count -= deactivated_count;
-        }
-        let _ = player;
-        for cid in to_mark {
-            self.game_state.mods.clear_all_for_card(cid);
-            self.game_state.mods.add_orientation_modifier(cid, "wait");
-        }
-        Ok(())
     }
 }

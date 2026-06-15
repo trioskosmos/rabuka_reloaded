@@ -578,3 +578,153 @@ fn rurino_bp1_discard_3_draw_3() {
         game.state.player1.hand.cards.len()
     );
 }
+
+// ====================================================================
+// 小泉花陽 (PL!-bp3-008-R+) ab#1 — ライブ開始時 optional change_state wait
+// ====================================================================
+// ライブ開始時: 『μ's』のメンバー1人をウェイトにしてもよい：
+//   ライブ終了時まで、heart03+heart03を得る。
+//
+// Cost: optional change_state (wait) with group_names=["μ's"], count=1
+// Effect: gain_resource heart ×2 (heart03), duration=live_end
+// ====================================================================
+
+/// Advance helpers for live start
+fn h_advance_to_live_card_set_p1(game: &mut TestGame) {
+    game.pass(); // Main -> Active
+    game.pass(); // Active -> Energy
+    game.pass(); // Energy -> Draw
+    game.pass(); // Draw -> Main
+    game.pass(); // Main -> LiveCardSetP1Turn
+}
+
+fn h_advance_to_live_start(game: &mut TestGame) {
+    game.pass(); // LiveCardSetP1 -> LiveCardSetP2
+    game.pass(); // LiveCardSetP2 -> FirstAttackerPerformance
+}
+
+/// Pay optional cost: a μ's member should be waited, hearts gained.
+#[test]
+fn hanayo_pay_optional_cost_waits_member_and_gains_hearts() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hanayo = game.id("PL!-bp3-008-R+");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Place Hanayo on stage (she's a μ's member via series check)
+    game.state.player1.stage.stage = [hanayo, -1, -1];
+
+    // Advance to live start
+    h_advance_to_live_card_set_p1(&mut game);
+    game.state.player1.live_card_zone.cards.push(filler);
+    h_advance_to_live_start(&mut game);
+
+    // Should have pending choice: "Pay optional cost? (pay or skip)"
+    assert!(
+        game.has_pending_choice(),
+        "Optional cost prompt should appear"
+    );
+
+    // Pay the cost (select_option(1) = "Yes")
+    game.select_option(1);
+
+    // After paying, the wait should have been applied
+    let hanayo_orientation = game.state.mods.get_orientation_modifier(hanayo);
+    assert_eq!(
+        hanayo_orientation.map(|s| s.as_str()),
+        Some("wait"),
+        "Hanayo should be waited after paying optional cost"
+    );
+
+    // Heart modifier should be applied (gain_resource heart03 x2, duration=live_end)
+    let heart03 = game
+        .state
+        .mods
+        .get_heart_modifier(hanayo, rabuka_engine::card::HeartColor::Heart03);
+    assert_eq!(
+        heart03, 2,
+        "Hanayo should have heart03 x2 modifier after paying cost"
+    );
+}
+
+/// Skip optional cost: no member waited, no hearts gained.
+#[test]
+fn hanayo_skip_optional_cost_no_effect() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hanayo = game.id("PL!-bp3-008-R+");
+
+    game.state.player1.stage.stage = [hanayo, -1, -1];
+
+    h_advance_to_live_card_set_p1(&mut game);
+    game.state
+        .player1
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    h_advance_to_live_start(&mut game);
+
+    assert!(
+        game.has_pending_choice(),
+        "Optional cost prompt should appear"
+    );
+
+    // Skip the cost (select_option(0) = "No")
+    game.select_option(0);
+
+    // Hanayo should NOT be waited
+    let hanayo_orientation = game.state.mods.get_orientation_modifier(hanayo);
+    assert_ne!(
+        hanayo_orientation.map(|s| s.as_str()),
+        Some("wait"),
+        "Hanayo should NOT be waited when cost is skipped"
+    );
+
+    // No heart modifier should be present
+    let heart03 = game
+        .state
+        .mods
+        .get_heart_modifier(hanayo, rabuka_engine::card::HeartColor::Heart03);
+    assert_eq!(heart03, 0, "No heart modifier when cost is skipped");
+}
+
+/// No μ's member on stage → optional cost prompt should NOT appear.
+#[test]
+fn hanayo_no_mus_member_skips_cost_prompt() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let hanayo = game.id("PL!-bp3-008-R+");
+    let non_mus = game.id("PL!-sd1-010-SD"); // no μ's affiliation
+
+    // Only non-μ's members on stage (Hanayo is in hand, not on stage)
+    game.state.player1.stage.stage = [non_mus, -1, -1];
+    game.state.player1.hand.cards.push(hanayo);
+    game.give_energy(15);
+    game.play_to_stage(hanayo, rabuka_engine::zones::MemberArea::Center);
+
+    // Now stage has [non_mus, hanayo, -1]
+    // Hanayo has the live-start ability, but since she's the only μ's member,
+    // the ability will trigger but...
+    // Actually, the cost can target any μ's member including hanayo herself.
+    // Let's use a different approach: put NO μ's members on stage.
+
+    // Reset: only non-μ's members
+    game.state.player1.stage.stage = [non_mus, non_mus, non_mus];
+
+    h_advance_to_live_card_set_p1(&mut game);
+    game.state
+        .player1
+        .live_card_zone
+        .cards
+        .push(game.id("PL!-sd1-010-SD"));
+    h_advance_to_live_start(&mut game);
+
+    // No optional cost prompt since there are no μ's members to wait
+    assert!(
+        !game.has_pending_choice(),
+        "No optional cost prompt when no μ's members on stage"
+    );
+}

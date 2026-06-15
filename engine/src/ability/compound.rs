@@ -1,5 +1,6 @@
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext};
+use crate::ability::types::Command;
 use crate::card::AbilityEffect;
 
 impl<'a> AbilityResolver<'a> {
@@ -87,9 +88,6 @@ impl<'a> AbilityResolver<'a> {
                     match self.execute_effect(&action_to_execute) {
                         Ok(_) => {
                             if self.pending_choice.is_some() {
-                                // A nested sequential may have already stored its remaining
-                                // actions in pending_sequential_actions. Don't overwrite
-                                // if the current action had no remaining.
                                 let current_was_optional = action.optional.unwrap_or(false);
                                 let remaining = if current_was_optional {
                                     let mut actions: Vec<AbilityEffect> =
@@ -102,7 +100,10 @@ impl<'a> AbilityResolver<'a> {
                                     repeat_actions[i + 1..].to_vec()
                                 };
                                 if !remaining.is_empty() {
-                                    self.game_state.pending_sequential_actions = Some(remaining);
+                                    let mut existing =
+                                        self.game_state.ability_queue.take_pending_commands();
+                                    existing.extend(remaining.into_iter().map(Command::Effect));
+                                    self.game_state.ability_queue.set_pending_commands(existing);
                                 }
                                 return Ok(());
                             }
@@ -119,7 +120,10 @@ impl<'a> AbilityResolver<'a> {
                                 repeat_actions[i + 1..].to_vec()
                             };
                             if !remaining.is_empty() {
-                                self.game_state.pending_sequential_actions = Some(remaining);
+                                let mut existing =
+                                    self.game_state.ability_queue.take_pending_commands();
+                                existing.extend(remaining.into_iter().map(Command::Effect));
+                                self.game_state.ability_queue.set_pending_commands(existing);
                             }
                             return Ok(());
                         }
@@ -271,6 +275,59 @@ impl<'a> AbilityResolver<'a> {
                 self.execute_effect(conditional)?;
             }
         }
+        Ok(())
+    }
+
+    pub fn handle_choice_string_selection(
+        &mut self,
+        selected: &str,
+        conditional_choice: Option<String>,
+    ) -> Result<(), String> {
+        if let Some(ref options_json) = conditional_choice {
+            if let Ok(options) = serde_json::from_str::<Vec<String>>(options_json) {
+                if let Ok(idx) = selected.parse::<usize>() {
+                    if idx > 0 && idx <= options.len() {
+                        let val = &options[idx - 1];
+                        if val.starts_with("heart")
+                            || ["赤", "桃", "緑", "青", "黄", "紫"].contains(&val.as_str())
+                        {
+                            self.game_state
+                                .prohibition_effects
+                                .push(format!("selected_heart_color:{}", val));
+                        }
+                    }
+                }
+            }
+        }
+        self.pending_choice = None;
+        self.clear_choice_meta();
+        self.resume_pending_commands()?;
+        Ok(())
+    }
+
+    pub fn handle_choice_string_store(
+        &mut self,
+        selected: &str,
+        conditional_choice: Option<String>,
+    ) -> Result<(), String> {
+        let chosen = conditional_choice.and_then(|json| {
+            serde_json::from_str::<Vec<String>>(&json)
+                .ok()
+                .and_then(|opts| {
+                    selected
+                        .parse::<usize>()
+                        .ok()
+                        .and_then(|idx| opts.get(idx).cloned())
+                })
+        });
+        if let Some(s) = chosen {
+            self.game_state
+                .ability_queue
+                .current_entry_mut()
+                .map(|e| e.conditional_choice = Some(s));
+        }
+        self.pending_choice = None;
+        self.resume_pending_commands()?;
         Ok(())
     }
 }

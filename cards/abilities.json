@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-05-16T08:48:11.966264",
+  "generated_at": "2026-05-17T06:22:20.172103",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1822,7 +1822,9 @@
           "location": "stage",
           "group_names": [
             "スリーズブーケ"
-          ]
+          ],
+          "comparison_type": "cost",
+          "operator": "<"
         },
         "source": "discard",
         "destination": "hand",
@@ -4247,7 +4249,9 @@
         "condition": {
           "type": "movement_condition",
           "text": "自分のカードの効果によって、このメンバーがエリアを移動するか自分のエネルギー置き場にエネルギーが置かれたとき",
-          "movement": "moves"
+          "movement": "moves",
+          "self_effect_only": true,
+          "energy_placed": true
         },
         "action": "sequential",
         "actions": [
@@ -5272,7 +5276,9 @@
               "target": "self",
               "baton_touch_trigger": true,
               "text": "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合",
-              "location": "stage"
+              "location": "stage",
+              "comparison_type": "cost",
+              "operator": "<"
             },
             "source": "hand",
             "destination": "discard",
@@ -6695,7 +6701,9 @@
           "target": "self",
           "baton_touch_trigger": true,
           "text": "このメンバーよりコストが低いメンバーからバトンタッチして登場した場合",
-          "location": "stage"
+          "location": "stage",
+          "comparison_type": "cost",
+          "operator": "<"
         },
         "source": "hand",
         "cost_limit": 4,
@@ -8816,7 +8824,9 @@
           "location": "stage",
           "group_names": [
             "DOLLCHESTRA"
-          ]
+          ],
+          "comparison_type": "cost",
+          "operator": "<"
         },
         "action": "gain_resource",
         "resource": "blade",
@@ -8854,7 +8864,9 @@
           "location": "stage",
           "group_names": [
             "みらくらぱーく！"
-          ]
+          ],
+          "comparison_type": "cost",
+          "operator": "<"
         },
         "action": "gain_resource",
         "resource": "heart",

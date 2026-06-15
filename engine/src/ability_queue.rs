@@ -1,6 +1,6 @@
-use crate::ability::types::Choice;
+use crate::ability::types::{Choice, Command};
 use crate::ability::types::ExecutionContext;
-use crate::card::Ability;
+use crate::card::{Ability, AbilityEffect};
 use crate::game_state::AbilityTrigger;
 
 /// Unique identifier for an ability instance in the queue
@@ -59,6 +59,12 @@ pub struct AbilityQueueEntry {
     pub optional_cost_was_paid: bool,
     /// Player who must make the pending choice (if different from activating player)
     pub choice_player_id: Option<String>,
+    /// Deferred sequential sub-effects interrupted by a player choice.
+    /// Replaces the global `GameState::pending_sequential_actions` side-channel.
+    /// When a sequential ability is processing actions [A, B, C] and B pauses for a
+    /// choice, the remaining actions [C, ...] are stored here and resumed in
+    /// `finalize_choice` after the player responds.
+    pub pending_commands: Vec<Command>,
 }
 
 /// Unified ability queue with proper state management
@@ -223,6 +229,35 @@ impl AbilityQueue {
     /// Get all pending entries
     pub fn pending_entries(&self) -> Vec<&AbilityQueueEntry> {
         self.entries.iter().filter(|e| !e.completed).collect()
+    }
+
+    /// Store deferred sequential commands on the current entry.
+    /// Called by `compound.rs` when a sequential ability is interrupted by a player choice.
+    /// Only stores if there are remaining actions to run.
+    pub fn set_pending_commands(&mut self, commands: Vec<Command>) {
+        if commands.is_empty() {
+            return;
+        }
+        if let Some(entry) = self.current_entry_mut() {
+            entry.pending_commands = commands;
+        }
+    }
+
+    /// Drain and return deferred sequential commands from the current entry.
+    /// Returns empty vec if no entry or no pending commands.
+    /// Called by `finalize_choice` to resume execution after a player responds.
+    pub fn take_pending_commands(&mut self) -> Vec<Command> {
+        if let Some(entry) = self.current_entry_mut() {
+            std::mem::take(&mut entry.pending_commands)
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Check if the current entry has any pending commands waiting to run.
+    pub fn has_pending_commands(&self) -> bool {
+        self.current_entry()
+            .map_or(false, |e| !e.pending_commands.is_empty())
     }
 }
 

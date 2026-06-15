@@ -393,7 +393,7 @@ impl<'de> Deserialize<'de> for SpecialHeart {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct Ability {
     #[serde(default = "default_empty_string")]
     pub full_text: String,
@@ -412,7 +412,7 @@ fn default_empty_string() -> String {
     String::new()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AbilityCost {
     #[serde(default = "default_empty_string")]
     pub text: String,
@@ -456,7 +456,7 @@ pub struct AbilityCost {
 /// Grouped sub-effect fields used by compound action handlers
 /// (Sequential, ConditionalAlternative, ConditionalOnResult, ConditionalOnOptional, LookAndSelect).
 /// Flattened into AbilityEffect via `#[serde(flatten)]` for JSON backward compat.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct CompoundBranch {
     #[serde(default)]
     pub look_action: Option<Box<AbilityEffect>>,
@@ -482,7 +482,7 @@ pub struct CompoundBranch {
     pub conditional_negation: Option<bool>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
     pub text: String,
@@ -704,7 +704,7 @@ impl AbilityEffect {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum PositionInfo {
     String(String),
@@ -723,7 +723,7 @@ impl PositionInfo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DynamicCount {
     #[serde(rename = "type")]
     pub count_type: String,
@@ -734,13 +734,13 @@ pub struct DynamicCount {
     pub calculation_value: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct QuotedText {
     pub text: String,
     pub quoted_type: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct Condition {
     #[serde(default = "default_empty_string")]
     pub text: String,
@@ -762,6 +762,8 @@ pub struct Condition {
     pub exclude_self: Option<bool>,
     pub any_of: Option<Vec<String>>,
     pub cost_limit: Option<u32>,
+    #[serde(default)]
+    pub cost_limit_operator: Option<String>,
     pub negation: Option<bool>,
     pub baton_touch_trigger: Option<bool>,
     pub baton_touch_source: Option<String>,
@@ -818,6 +820,12 @@ pub struct Condition {
     /// "preceding_moved" — check against the most recently moved cards from a prior action.
     #[serde(default)]
     pub source: Option<String>,
+    /// "自分のカードの効果" — only trigger if the event was caused by the player's own card effect.
+    #[serde(default)]
+    pub self_effect_only: Option<bool>,
+    /// "エネルギーが置かれた" — trigger is specifically about energy being placed in the energy zone.
+    #[serde(default)]
+    pub energy_placed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -871,7 +879,6 @@ impl Card {
                 .unwrap_or(&0) as i32;
             let total_all: i32 = provided_hearts.hearts.values().sum::<u32>() as i32;
 
-
             for (color, &needed_amount) in &need_heart.hearts {
                 if *color == HeartColor::Heart00 {
                     // heart0: total hearts of any color (Rule 8.2.8) — specific color hearts also count
@@ -885,7 +892,6 @@ impl Card {
                     }
                     let shortfall = (needed_amount as i32 - provided).max(0);
                     wildcard_remaining -= shortfall;
-
                 }
             }
             true

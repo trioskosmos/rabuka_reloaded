@@ -153,11 +153,13 @@ export const Rendering = {
         if (viewState.isMulligan) {
             // Unselected cards in Hand - Rust backend: hand is { cards: [...] }
             Rendering.renderCards('my-hand', p0.hand.cards, true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection, viewState.handFilter);
+            Rendering.renderCards('opp-hand', p1.hand.cards, false, false);
             
             // Selected cards shown at bottom of deck during mulligan (visual representation)
             // Do not show in "Confirmed Cards" panel during mulligan
         } else {
             Rendering.renderCards('my-hand', p0.hand.cards, true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection);
+            Rendering.renderCards('opp-hand', p1.hand.cards, false, false);
             Rendering.renderLookedCards(validTargets.selection);
         }
         Rendering.renderSelectionModal(viewState.selectionModal);

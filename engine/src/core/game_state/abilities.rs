@@ -41,6 +41,7 @@ impl GameState {
                             effect_started: false,
                             optional_cost_was_paid: false,
                             choice_player_id: None,
+                            pending_commands: Vec::new(),
                         };
 
                         self.ability_queue.enqueue(entry);

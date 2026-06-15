@@ -23,7 +23,6 @@ pub struct GameState {
     pub mods: GameModifiers,
     pub resolution_zone: ResolutionZone,
     pub pending_choice: Option<serde_json::Value>,
-    pub pending_sequential_actions: Option<Vec<crate::card::AbilityEffect>>,
     pub heart_color_decision_phase: String,
     pub game_state_history: Vec<String>,
     pub max_state_history_size: usize,
@@ -68,6 +67,12 @@ pub struct GameState {
     pub baton_touch_replaced_member_cost: Option<u32>,
     pub baton_touch_replaced_member_id: Option<i16>,
     pub baton_touch_arriving_card_id: Option<i16>,
+    /// Tracking for movement_condition "moves": the card that last moved areas.
+    pub last_area_move_card_id: Option<i16>,
+    /// Which player's effect caused the last area move (player_id string).
+    pub last_area_move_by_player: Option<String>,
+    /// Whether energy was placed by a card effect (vs energy phase draw).
+    pub last_energy_placed_by_effect: bool,
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
     // --- 1-byte aligned (bool, enum) ---
@@ -134,7 +139,6 @@ impl GameState {
             mods: GameModifiers::new(),
             resolution_zone: ResolutionZone::new(),
             pending_choice: None,
-            pending_sequential_actions: None,
             heart_color_decision_phase: "none".to_string(),
             game_state_history: Vec::new(),
             max_state_history_size: DEFAULT_HISTORY_SIZE,
@@ -179,6 +183,9 @@ impl GameState {
             baton_touch_replaced_member_cost: None,
             baton_touch_replaced_member_id: None,
             baton_touch_arriving_card_id: None,
+            last_area_move_card_id: None,
+            last_area_move_by_player: None,
+            last_energy_placed_by_effect: false,
             // 2-byte aligned
             activating_card: None,
             // 1-byte aligned

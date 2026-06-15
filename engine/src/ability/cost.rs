@@ -89,7 +89,7 @@ impl<'a> AbilityResolver<'a> {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
                     allow_skip: false,
-                options: None,
+                    options: None,
                 });
                 if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some("choice_cost".to_string());
@@ -303,6 +303,49 @@ impl<'a> AbilityResolver<'a> {
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
                 if optional && !is_activation {
+                    // For non-self_cost change_state, verify candidates exist before prompting
+                    if state_change == "wait" && cost.self_cost != Some(true) {
+                        let count = cost.count.unwrap_or(1) as usize;
+                        let exclude_self = cost.exclude_self.unwrap_or(false);
+                        let activating_id = self.game_state.activating_card;
+                        let card_db = &self.game_state.card_database;
+                        let group_names = cost.group_names.as_ref();
+
+                        let stage_cards: Vec<i16> = self
+                            .game_state
+                            .resolve_target_player(target)
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| id != -1)
+                            .copied()
+                            .collect();
+                        let candidates: Vec<i16> = stage_cards
+                            .into_iter()
+                            .filter(|id| !(exclude_self && activating_id == Some(*id)))
+                            .filter(|id| {
+                                super::util::card_matches_type(
+                                    card_db,
+                                    *id,
+                                    cost.card_type.as_deref(),
+                                )
+                            })
+                            .filter(|id| {
+                                group_names.as_ref().map_or(true, |gn| {
+                                    gn.iter().any(|g| {
+                                        super::util::card_matches_group_str(
+                                            card_db,
+                                            *id,
+                                            Some(g.as_str()),
+                                        )
+                                    })
+                                })
+                            })
+                            .collect();
+                        if candidates.is_empty() {
+                            return Ok(());
+                        }
+                    }
                     let cost_description = if state_change == "wait" {
                         "Put this member to wait state"
                     } else {
@@ -315,7 +358,7 @@ impl<'a> AbilityResolver<'a> {
                             cost_description
                         ),
                         allow_skip: true,
-                    options: None,
+                        options: None,
                     });
                     if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());
@@ -424,7 +467,7 @@ impl<'a> AbilityResolver<'a> {
                         target: "pay_optional_cost:skip_optional_cost".to_string(),
                         description: format!("Pay {} energy (or skip)?", energy),
                         allow_skip: true,
-                    options: None,
+                        options: None,
                     });
                     if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());
@@ -554,5 +597,161 @@ impl<'a> AbilityResolver<'a> {
 
     pub fn pay_cost(&mut self, cost: &AbilityCost) -> Result<(), String> {
         self.pay_cost_inner(cost)
+    }
+
+    pub fn handle_optional_cost_payment(&mut self, selected: &str) -> Result<(), String> {
+        if selected == "skip_optional_cost" || selected == "0" {
+            self.pending_choice = None;
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.cost_paid = true;
+                entry.effect_started = true;
+                entry.optional_cost_was_paid = false;
+            }
+            return Ok(());
+        }
+        // "pay_optional_cost" or "1" from select_option(1)
+        self.pending_choice = None;
+        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+            entry.optional_cost_was_paid = true;
+        }
+        let is_pay = true;
+        if is_pay {
+            if let Some(cost) = self.game_state.entry_cost().cloned() {
+                if let Some(energy) = cost.energy {
+                    if energy > 0 {
+                        let tgt = cost.target.as_deref().unwrap_or("self");
+                        self.game_state
+                            .resolve_target_player_mut(tgt)
+                            .energy_zone
+                            .pay_energy(energy as usize)
+                            .map_err(|e| e)?;
+                    }
+                }
+                if cost.state_change.as_deref() == Some("wait") {
+                    if cost.self_cost == Some(true) {
+                        if let Some(id) = self.game_state.activating_card {
+                            self.game_state.mods.add_orientation_modifier(id, "wait");
+                        }
+                    } else {
+                        let target = cost.target.as_deref().unwrap_or("self");
+                        let count = cost.count.unwrap_or(1) as usize;
+                        let card_db = &self.game_state.card_database;
+                        let group_names = cost.group_names.as_ref();
+                        let exclude_self = cost.exclude_self.unwrap_or(false);
+                        let activating_id = self.game_state.activating_card;
+                        let state_change = cost.state_change.as_deref().unwrap_or("");
+
+                        let stage_cards: Vec<i16> = self
+                            .game_state
+                            .resolve_target_player(target)
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| id != -1)
+                            .copied()
+                            .collect();
+                        let candidates: Vec<i16> = stage_cards
+                            .into_iter()
+                            .filter(|id| !(exclude_self && activating_id == Some(*id)))
+                            .filter(|id| {
+                                super::util::card_matches_type(
+                                    card_db,
+                                    *id,
+                                    cost.card_type.as_deref(),
+                                )
+                            })
+                            .filter(|id| {
+                                let group_ok = match group_names {
+                                    Some(gn) => gn.iter().any(|g| {
+                                        super::util::card_matches_group_str(
+                                            card_db,
+                                            *id,
+                                            Some(g.as_str()),
+                                        )
+                                    }),
+                                    None => true,
+                                };
+                                group_ok
+                            })
+                            .collect();
+
+                        if candidates.is_empty() {
+                            return Err("No matching members on stage to change state".to_string());
+                        }
+
+                        let to_wait: Vec<i16> = candidates.into_iter().take(count).collect();
+                        for &card_id in &to_wait {
+                            if state_change == "wait" {
+                                self.game_state
+                                    .mods
+                                    .add_orientation_modifier(card_id, "wait");
+                            } else if state_change == "rest" || state_change == "rested" {
+                                self.game_state
+                                    .mods
+                                    .add_orientation_modifier(card_id, "rest");
+                            }
+                        }
+                    }
+                }
+                // Handle sequential_cost sub-costs — pay each after user confirmed
+                if let Some(ref costs) = cost.costs {
+                    for sub_cost in costs {
+                        if sub_cost.state_change.as_deref() == Some("wait")
+                            && sub_cost.self_cost == Some(true)
+                        {
+                            if let Some(id) = self.game_state.activating_card {
+                                self.game_state.mods.add_orientation_modifier(id, "wait");
+                            }
+                        } else if let Err(e) = self.pay_cost(sub_cost) {
+                            eprintln!("Warning: sub-cost payment error: {}", e);
+                        }
+                        if self.pending_choice.is_some() {
+                            return Ok(());
+                        }
+                    }
+                }
+                eprintln!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
+                    cost.cost_type, self.game_state.entry_cost().is_some(), 
+                    self.game_state.entry_effect().map(|e| e.action.clone()));
+                if cost.cost_type.as_deref() == Some("place_energy_under_member") {
+                    self.execute_place_energy_under_member(
+                        cost.count.unwrap_or(1),
+                        cost.target.as_deref().unwrap_or("self"),
+                        cost.position.as_ref(),
+                        false,
+                        cost.source.as_deref(),
+                    );
+                }
+            }
+            self.pending_choice = None;
+            let is_effect_optional =
+                self.game_state.entry_choice_card_no().as_deref() == Some("optional_cost");
+            if self.game_state.entry_cost().is_some() {
+                if let Some(effect) = self.game_state.entry_effect().cloned() {
+                    if let Err(e) = self.execute_effect(&effect) {
+                        eprintln!("Failed to execute effect after optional cost: {}", e);
+                    }
+                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        entry.effect_started = true;
+                    }
+                }
+            } else if self.game_state.ability_queue.has_pending_commands() {
+                if let Err(e) = self.resume_pending_commands() {
+                    eprintln!("Failed to execute action after optional: {}", e);
+                }
+            } else if is_effect_optional {
+                if let Some(effect) = self.game_state.entry_effect().cloned() {
+                    let new_count = effect.energy_count.unwrap_or(effect.count_or(1));
+                    self.execute_place_energy_under_member(
+                        new_count,
+                        effect.target_name(),
+                        effect.position.as_ref(),
+                        false,
+                        effect.source.as_deref(),
+                    );
+                }
+            }
+        }
+        Ok(())
     }
 }

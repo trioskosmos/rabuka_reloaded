@@ -307,11 +307,7 @@ impl super::TurnEngine {
         // Capture whether pending sequential actions exist BEFORE choice resolution.
         // True  = effect execution was paused mid-way (pending sequential actions saved).
         // False = cost payment created the choice (effect hasn't started), or no sequential effect.
-        let had_pending_sequential = game_state
-            .pending_sequential_actions
-            .as_ref()
-            .map(|v| !v.is_empty())
-            .unwrap_or(false);
+        let had_pending_sequential = game_state.ability_queue.has_pending_commands();
         let (new_choice, looked_at, ctx, rev, res) = {
             let mut resolver = crate::ability::resolver::AbilityResolver::new(game_state);
             resolver.execution_context = saved_ctx.clone();

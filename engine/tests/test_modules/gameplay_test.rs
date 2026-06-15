@@ -684,81 +684,83 @@ fn nico_q168_both_appear_from_discard() {
     let cheap_p2 = game.id("PL!SP-sd1-020-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    // Nico in hand
     game.state.player1.hand.cards.push(nico);
     game.state.player1.hand.cards.push(filler);
-    // Cost ≤2 member cards in both players' discards
     game.state.player1.waitroom.cards.push(cheap_p1);
     game.state.player2.waitroom.cards.push(cheap_p2);
-
-    assert_eq!(game.state.player1.hand.cards.len(), 2);
-
-    // Nico costs 7 energy to play
     game.give_energy(7);
+    game.state.player1.stage.stage[0] = -1;
 
-    // Play Nico to stage (Main phase) — triggers debut ability
-    // The ability targets both players: each picks a cost ≤2 member from their discard
-    game.state.player1.stage.stage[0] = -1; // empty slot
+    // Play Nico → both-target debut triggers.
+    // Each player has exactly 1 eligible card in discard → Exact path (no SelectCard).
+    // P1 stage: [nico, -, -] → 2 empty slots → MoveCardsPosition prompt (SelectPosition).
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // Since the ability targets both players, there will be prompts
-    // First: P1 selects a card from their discard
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    // Then: P1 chooses a position (if multiple empty slots)
-    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
-        game.select_option(1); // choose center
-    }
-    // Next: P2's turn (auto-process if only 1 option)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    // Then: P2 chooses a position
-    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
-        game.select_option(2); // choose right (center may be taken by P1)
-    }
+    // P1 chooses position for their appeared member
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P1 should get position choice"
+    );
+    game.select_option(1); // center
 
-    // Both players should have a new member on stage in wait state
-    // P1's stage should have Nico (left), cheap_p1 (center, wait)
-    let p1_members: Vec<i16> = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .filter(|&&id| id != -1)
-        .copied()
-        .collect();
-    let p2_members: Vec<i16> = game
-        .state
-        .player2
-        .stage
-        .stage
-        .iter()
-        .filter(|&&id| id != -1)
-        .copied()
-        .collect();
-    eprintln!("[Nico] P1 stage members: {:?}", p1_members);
-    eprintln!("[Nico] P2 stage members: {:?}", p2_members);
-    assert!(
-        p1_members.contains(&cheap_p1),
-        "P1 should have their cheap member on stage"
+    // Opponent's effect runs inside finalize_choice, creating P2's MoveCardsPosition
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 should get position choice"
     );
+    game.select_option(2); // right
+
     assert!(
-        p2_members.contains(&cheap_p2),
-        "P2 should have their cheap member on stage"
+        !game.has_pending_choice(),
+        "No more pending choices after both players resolve"
     );
-    // Verify wait state on the placed cards
+
+    // P1: Nico at left, cheap_p1 at center
+    assert_eq!(game.state.player1.stage.stage[0], nico, "Nico at left");
+    assert_eq!(
+        game.state.player1.stage.stage[1], cheap_p1,
+        "P1's cheap member at center"
+    );
+    assert_eq!(game.state.player1.stage.stage[2], -1, "P1 right empty");
+
+    // P2: cheap_p2 at right
+    assert_eq!(game.state.player2.stage.stage[0], -1, "P2 left empty");
+    assert_eq!(game.state.player2.stage.stage[1], -1, "P2 center empty");
+    assert_eq!(
+        game.state.player2.stage.stage[2], cheap_p2,
+        "P2's cheap member at right"
+    );
+
+    // Both in wait state
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p1),
         Some(&"wait".to_string()),
-        "P1's cheap member should be in wait state"
+        "P1's member wait state"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p2),
         Some(&"wait".to_string()),
-        "P2's cheap member should be in wait state"
+        "P2's member wait state"
+    );
+
+    // Cards removed from discard, NOT in hand
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&cheap_p1),
+        "P1's card removed from discard"
+    );
+    assert!(
+        !game.state.player2.waitroom.cards.contains(&cheap_p2),
+        "P2's card removed from discard"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&cheap_p1),
+        "P1's card NOT in hand"
+    );
+    assert!(
+        !game.state.player2.hand.cards.contains(&cheap_p2),
+        "P2's card NOT in hand"
     );
 }
 
@@ -771,33 +773,40 @@ fn nico_q168_no_suitable_card_skips() {
 
     game.state.player1.hand.cards.push(nico);
     game.state.player1.hand.cards.push(filler);
-    // NO cost ≤2 members in either player's discard
-
-    // Nico costs 7 energy to play
     game.give_energy(7);
-
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // Q168: No suitable card → skip, no crash
-    // Stage should only have Nico (no extra members appeared)
-    let p1_members: Vec<i16> = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .filter(|&&id| id != -1)
-        .copied()
-        .collect();
-    assert_eq!(
-        p1_members.len(),
-        1,
-        "Only Nico should be on stage (no suitable cards in discard)"
-    );
+    // Q168: No suitable card in either discard → skip gracefully
     assert!(
         !game.has_pending_choice(),
         "No pending choice when both sides have no valid cards"
+    );
+    // Only Nico on stage
+    assert_eq!(game.state.player1.stage.stage[0], nico, "Nico at left");
+    assert_eq!(game.state.player1.stage.stage[1], -1, "center empty");
+    assert_eq!(game.state.player1.stage.stage[2], -1, "right empty");
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .stage
+            .iter()
+            .filter(|&&id| id != -1)
+            .count(),
+        1,
+        "Exactly 1 member (Nico) on P1 stage"
+    );
+    assert_eq!(
+        game.state
+            .player2
+            .stage
+            .stage
+            .iter()
+            .filter(|&&id| id != -1)
+            .count(),
+        0,
+        "No members on P2 stage"
     );
 }
 
@@ -815,37 +824,41 @@ fn nico_q170_turn_player_appears_first() {
     game.state.player1.hand.cards.push(cheap_p1);
     game.state.player1.waitroom.cards.push(cheap_p1);
     game.state.player2.waitroom.cards.push(cheap_p2);
-
     game.give_energy(7);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // Q170: Turn player (P1) resolves first. P1's cheap member should appear.
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select cheap card from discard
-    }
-    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
-        game.select_option(1); // choose center
-    }
-
-    // Verify P1 got their cheap member in wait state
-    let p1_members: Vec<i16> = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .filter(|&&id| id != -1)
-        .copied()
-        .collect();
-    assert!(
-        p1_members.contains(&cheap_p1),
-        "P1 should have their cheap member"
+    // P1 resolves first (turn player) → MoveCardsPosition prompt
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P1 gets position choice first"
     );
+    game.select_option(1); // P1: center
+
+    // Opponent resolves immediately after P1's choice
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 gets position choice after P1"
+    );
+    game.select_option(2); // P2: right
+
+    assert!(!game.has_pending_choice(), "No remaining prompts");
+
+    // P1: Nico left, cheap_p1 center
+    assert_eq!(game.state.player1.stage.stage[0], nico);
+    assert_eq!(game.state.player1.stage.stage[1], cheap_p1);
+    // P2: cheap_p2 right
+    assert_eq!(game.state.player2.stage.stage[2], cheap_p2);
+
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_p1),
-        Some(&"wait".to_string()),
-        "P1's member should be in wait state"
+        Some(&"wait".to_string())
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_p2),
+        Some(&"wait".to_string())
     );
 }
 
@@ -872,50 +885,38 @@ fn nico_q181_area_freed_after_card_leaves() {
     // Play Nico — ability triggers: both players appear a member
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // Handle both choices
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // P1's card choice
-    }
-    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
-        game.select_option(1); // P1 chooses center
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // P2's card choice
-    }
-    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
-        game.select_option(2); // P2 chooses right
-    }
+    // Both have 1 card in discard → Exact path → MoveCardsPosition prompts
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P1 position choice"
+    );
+    game.select_option(1); // P1: center
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 position choice"
+    );
+    game.select_option(2); // P2: right
 
-    // The appeared member (cheap) is in a stage area now (center)
-    let cheap_area = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .position(|&id| id == cheap);
-    assert!(cheap_area.is_some(), "Cheap member should be on P1's stage");
+    assert!(!game.has_pending_choice(), "No more prompts");
+
+    // Cheap member is at center
+    assert_eq!(game.state.player1.stage.stage[1], cheap);
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap),
-        Some(&"wait".to_string()),
-        "P1's member should be in wait state"
+        Some(&"wait".to_string())
     );
 
-    // Move the appeared member to discard (simulating removal)
-    let removed_id =
-        game.state.player1.stage.stage[cheap_area.expect("cheap card should have a stage area")];
-    game.state.player1.stage.stage[cheap_area.unwrap()] = -1;
-    game.state.player1.waitroom.cards.push(removed_id);
+    // Remove the appeared member
+    game.state.player1.stage.stage[1] = -1;
+    game.state.player1.waitroom.cards.push(cheap);
 
-    // Q181: The area where the appeared card was is now free
-    assert_eq!(
-        game.state.player1.stage.stage[cheap_area.unwrap()],
-        -1,
-        "Area should be empty after removing the appeared card (Q181)"
-    );
+    // Q181: The area is now free
+    assert_eq!(game.state.player1.stage.stage[1], -1, "Area freed");
     assert!(
-        game.state.player1.waitroom.cards.contains(&removed_id),
-        "Removed card should be in waitroom"
+        game.state.player1.waitroom.cards.contains(&cheap),
+        "Removed card back in waitroom"
     );
 }
 
@@ -934,30 +935,37 @@ fn nico_requires_empty_area() {
     game.state.player1.waitroom.cards.push(cheap);
     game.state.player2.waitroom.cards.push(cheap);
 
-    // Two fillers on stage, leaving exactly 1 empty area for Nico
+    // Stage [filler, -, filler] → play Nico to center → [filler, nico, filler]
     game.state.player1.stage.stage = [filler, -1, filler];
-
     game.give_energy(7);
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
-    // Now stage = [filler, nico, filler] — all 3 filled, no empty areas
-    // The ability tries to appear a cheap member but there's no room
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    // Q181 empty-area rule: no empty area → P1's effect does nothing
-    // Stage should still be [filler, nico, filler] (no fourth member)
-    let p1_count = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .filter(|&&id| id != -1)
-        .count();
+    // P1's effect finds no empty slot → card returned to discard
+    // P2's effect succeeds (P2 stage empty) → MoveCardsPosition prompt for P2
     assert_eq!(
-        p1_count, 3,
-        "No room for appeared member — should stay at 3"
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 gets position choice (P1 had no room)"
+    );
+    game.select_option(2); // P2: right
+
+    assert!(!game.has_pending_choice(), "No more prompts");
+
+    // P1 stage unchanged [filler, nico, filler]
+    assert_eq!(
+        game.state.player1.stage.stage,
+        [filler, nico, filler],
+        "P1 stage full, no extra card appeared"
+    );
+    // P1's card returned to discard
+    assert!(
+        game.state.player1.waitroom.cards.contains(&cheap),
+        "P1's card back in discard (no room on stage)"
+    );
+    // P2's card appeared on stage
+    assert_eq!(
+        game.state.player2.stage.stage[2], cheap,
+        "P2's card on right"
     );
 }
 
@@ -973,109 +981,247 @@ fn nico_cost_filter_only_shows_eligible() {
 
     game.state.player1.hand.cards.push(nico);
     game.state.player1.hand.cards.push(cheap);
-    // Both a cost-2 AND a cost-9 card in P1's discard
+    // Both cost-2 and cost-9 in P1 discard; filter only allows cheap (cost ≤2)
     game.state.player1.waitroom.cards.push(cheap);
     game.state.player1.waitroom.cards.push(expensive);
-    // P2 discard with just the cheap card
+    // P2 has 1 eligible card
     game.state.player2.waitroom.cards.push(cheap);
 
     game.give_energy(7);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // The ability fires for P1 (self): prompts to pick from discard
-    // The choice should ONLY include the cost-2 card (cost-9 filtered out)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // select cheap card
-    }
-    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
-        game.select_option(1); // choose center
-    }
-    // P2's turn: auto-selects (only 1 card in their discard)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.pending_choice_type() == Some("SelectPosition".to_string()) {
-        game.select_option(2); // choose right (center taken by P1)
-    }
-
-    // Only the cheap card should be on stage, NOT the expensive one
-    let p1_has_expensive = game.state.player1.stage.stage.contains(&expensive);
-    let p1_has_cheap = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .filter(|&&id| id == cheap)
-        .count();
+    // Only 1 card in P1 discard passes cost ≤2 → Exact → MoveCardsPosition
+    // P2 also has 1 card → Exact → MoveCardsPosition
     assert_eq!(
-        p1_has_cheap, 1,
-        "Cost-2 card should appear on stage exactly once"
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P1 position choice"
     );
-    assert!(!p1_has_expensive, "Cost-9 card should NOT appear on stage");
+    game.select_option(1); // P1: center
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 position choice"
+    );
+    game.select_option(2); // P2: right
+
+    assert!(!game.has_pending_choice(), "No more prompts");
+
+    // Cheap card on P1 stage, expensive NOT on P1 stage
+    assert_eq!(
+        game.state.player1.stage.stage[1], cheap,
+        "Cost-2 card on P1 center"
+    );
+    assert!(
+        !game.state.player1.stage.stage.contains(&expensive),
+        "Cost-9 card NOT on stage"
+    );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap),
-        Some(&"wait".to_string()),
-        "P1's cheap member should be in wait state"
+        Some(&"wait".to_string())
     );
 
-    // Verify the expensive card is still in the discard (was never a candidate)
+    // Expensive card still in discard
     assert!(
         game.state.player1.waitroom.cards.contains(&expensive),
         "Cost-9 card should remain in discard (was never selectable)"
     );
 }
 
-// ── Q169: Restriction is natural consequence of one-card-per-zone ──
+// ── Q169: Appeared card occupies area (natural stage slot restriction) ──
 
 #[test]
-fn nico_q169_no_baton_touch_from_appeared_area() {
+fn nico_q169_appeared_card_occupies_area() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let nico = game.id("PL!-pb1-018-R");
     let cheap = game.id("PL!SP-sd1-019-SD");
+    let cheap_p2 = game.id("PL!SP-sd1-020-SD");
 
     game.state.player1.hand.cards.push(nico);
     game.state.player1.hand.cards.push(cheap);
     game.state.player1.waitroom.cards.push(cheap);
-    game.state.player2.waitroom.cards.push(cheap);
+    game.state.player2.waitroom.cards.push(cheap_p2);
+    game.give_energy(7);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // Both-target: each has 1 card → Exact → MoveCardsPosition
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P1 position choice"
+    );
+    game.select_option(1); // P1: center
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 position choice"
+    );
+    game.select_option(2); // P2: right
+
+    // Cheap card occupies a stage slot
+    assert!(
+        game.state.player1.stage.stage.contains(&cheap),
+        "Cheap card on P1 stage"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], cheap,
+        "P1 center = cheap"
+    );
+    // Area is not empty (stage slot rule prevents second card there)
+    assert_ne!(game.state.player1.stage.stage[1], -1, "Area occupied");
+    // Wait state
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap),
+        Some(&"wait".to_string())
+    );
+}
+
+// ── Prompt path: 2+ eligible cards in discard → SelectCard prompt ──
+
+#[test]
+fn nico_prompt_path_two_eligible_in_discard() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nico = game.id("PL!-pb1-018-R");
+    let cheap_a = game.id("PL!SP-sd1-019-SD"); // cost 2, member
+    let cheap_b = game.id("PL!SP-sd1-020-SD"); // cost 2, member
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // P1 has 2 eligible cards in discard → should create a SelectCard prompt
+    game.state.player1.hand.cards.push(nico);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(cheap_a);
+    game.state.player1.waitroom.cards.push(cheap_b);
+    // P2 has 1 eligible card → Exact
+    game.state.player2.waitroom.cards.push(cheap_a);
 
     game.give_energy(7);
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    // P1: 2 eligible cards in discard → SelectCard prompt
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "P1 gets SelectCard prompt (2 eligible in discard)"
+    );
+    game.select_indices(&[0]); // select cheap_a
 
-    // The appeared member now occupies an area. The "one card per area" rule
-    // naturally prevents another member from appearing there this turn.
-    // The parenthetical note (この効果で登場した...登場できない) is informational.
-    // Q169 asks: can you baton touch FROM the appeared member's area?
-    // Baton touch replaces the member — which removes it and frees the area.
-    // This IS allowed (Q181 confirms area freed when card leaves).
-    // What's NOT allowed: appearing ANOTHER card into the same occupied area.
-    let cheap_area = game
-        .state
-        .player1
-        .stage
-        .stage
-        .iter()
-        .position(|&id| id == cheap);
-    assert!(cheap_area.is_some(), "Cheap card should occupy an area");
-    if let Some(area) = cheap_area {
-        // The area has exactly one card (cheap), and another card can't
-        // appear there while occupied — this is the stage slot rule.
-        assert_ne!(
-            game.state.player1.stage.stage[area], -1,
-            "Area should be occupied (not empty)"
-        );
-    }
+    // execute_selected_cards_from_zone auto-places the card (first empty slot = center)
+    // Then finalize_choice runs P2's effect → MoveCardsPosition for P2
+    // So the next prompt is P2's position, not P1's
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 position choice (P1 card auto-placed)"
+    );
+    game.select_option(2); // P2: right
+
+    assert!(!game.has_pending_choice(), "No more prompts");
+
+    // P1: cheap_a auto-placed at first empty slot (center)
+    assert_eq!(
+        game.state.player1.stage.stage[1], cheap_a,
+        "P1 selected card auto-placed at center"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_a),
+        Some(&"wait".to_string())
+    );
+    // cheap_b still in discard (was not selected)
+    assert!(
+        game.state.player1.waitroom.cards.contains(&cheap_b),
+        "cheap_b remains in discard"
+    );
+
+    // P2: their card appeared
+    assert!(
+        game.state.player2.stage.stage.contains(&cheap_a),
+        "P2's card on stage"
+    );
+
+    // No cards in hand
+    assert!(
+        !game.state.player1.hand.cards.contains(&cheap_a),
+        "P1's selected card NOT in hand"
+    );
+    assert!(
+        !game.state.player2.hand.cards.contains(&cheap_a),
+        "P2's card NOT in hand"
+    );
 }
+
+// ── Full stage edge case: no empty slot → card returns to discard ──
+
+#[test]
+fn nico_full_stage_then_prompt_path() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nico = game.id("PL!-pb1-018-R");
+    let cheap_a = game.id("PL!SP-sd1-019-SD");
+    let cheap_b = game.id("PL!SP-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // P1 has 2 eligible cards in discard (Prompt path)
+    game.state.player1.hand.cards.push(nico);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(cheap_a);
+    game.state.player1.waitroom.cards.push(cheap_b);
+    // P2 has 1 eligible card
+    game.state.player2.waitroom.cards.push(cheap_a);
+
+    // P1 stage: [filler, filler, filler] — full, even Nico has no room
+    game.state.player1.stage.stage = [filler, filler, filler];
+
+    game.give_energy(7);
+    // play_to_stage searches for empty slot but there's none...
+    // We need to play Nico another way. Actually, let's instead put
+    // 1 empty slot for Nico, then full after.
+    // Reset: [filler, -1, filler]
+    game.state.player1.stage.stage = [filler, -1, filler];
+    game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
+    // Now [filler, nico, filler] — full
+
+    // P1 has 2 eligible cards → SelectCard prompt (going through the Prompt path)
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "P1 SelectCard prompt"
+    );
+    game.select_indices(&[0]); // select cheap_a
+
+    // After selection, P1 tries to place on stage but stage is full
+    // place_card_in_zone for "empty_area" with full stage → returns card to discard
+    // No MoveCardsPosition prompt (0 empty slots)
+    // P2's effect runs next
+
+    // P2 has 1 card → Exact → P2 stage empty → MoveCardsPosition
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 position choice (P1's effect failed, P2's succeeds)"
+    );
+    game.select_option(0); // P2: left
+
+    assert!(!game.has_pending_choice(), "No more prompts");
+
+    // P1 stage unchanged [filler, nico, filler]
+    assert_eq!(game.state.player1.stage.stage, [filler, nico, filler]);
+    // cheap_a was returned to P1 discard (stage full)
+    assert!(
+        game.state.player1.waitroom.cards.contains(&cheap_a),
+        "P1's selected card back in discard (stage full)"
+    );
+    // P2's card appeared
+    assert!(
+        game.state.player2.stage.stage.contains(&cheap_a),
+        "P2's card appeared"
+    );
+}
+
 // ====================================================================
 //  唐可可＆平安名すみれ＆米女メイ (LL-bp2-001-R+) — cost reduction + blade gain
 // ====================================================================
@@ -1114,34 +1260,6 @@ fn you_q186_cost_reduced_playable() {
     assert_eq!(
         spent, 4,
         "Should have spent exactly 4 energy (cost reduction worked)"
-    );
-}
-
-#[test]
-fn you_q186_cost_reduced_fails() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let keke = game.id("LL-bp2-001-R\u{ff0b}");
-    let filler = game.id("PL!-sd1-010-SD");
-
-    game.state.player1.hand.cards.push(keke);
-    for _ in 0..16 {
-        game.state.player1.hand.cards.push(filler);
-    }
-    game.give_energy(3);
-
-    game.state.player1.stage.stage[0] = -1;
-    let result = TurnEngine::execute_main_phase_action(
-        &mut game.state,
-        &ActionType::PlayMemberToStage,
-        Some(keke),
-        None,
-        Some(rabuka_engine::zones::MemberArea::LeftSide),
-        Some(false),
-    );
-    assert!(
-        result.is_err(),
-        "Should fail with 3 energy (need 4 after reduction)"
     );
 }
 

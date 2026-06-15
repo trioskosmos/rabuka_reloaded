@@ -80,6 +80,18 @@ pub enum LookAndSelectStep {
     Finalize { destination: String },
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Command {
+    Effect(crate::card::AbilityEffect),
+    MoveCard {
+        card_id: i16,
+        destination: String,
+        target: String,
+        state_change: Option<String>,
+    },
+    Choice(Choice),
+}
+
 pub struct ChoiceBuilder {
     zone: String,
     card_type: Option<String>,
