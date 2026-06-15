@@ -114,14 +114,14 @@ impl AbilityResolver {
                     .sum();
                 self_score.abs_diff(opp_score)
             }
-            Some(ref reference) if reference.contains("これにより控え室に置いた数") => {
+            Some(reference) if reference.contains("これにより控え室に置いた数") => {
                 if let Some(ref moved) = gs.recently_moved_cards {
                     moved.len() as u32
                 } else {
                     self.moved_cards.len() as u32
                 }
             }
-            Some(ref reference) if reference.contains("合計スコア") => {
+            Some(reference) if reference.contains("合計スコア") => {
                 let player = gs.resolve_target_player("self");
                 player
                     .success_live_card_zone
@@ -164,7 +164,7 @@ impl AbilityResolver {
             let count = effect.count_or(1);
             self.pending_choice = Some(crate::ability::types::Choice::select_target(
                 "pay_optional_cost:skip_optional_cost",
-                &format!("Draw {} card(s)?", count),
+                format!("Draw {} card(s)?", count),
                 false,
             ));
             return Ok(());
@@ -172,12 +172,12 @@ impl AbilityResolver {
         let draw_count = if let Some(ref dc) = effect.dynamic_count {
             self.resolve_dynamic_count(gs, dc)
         } else if effect.count == Some(0) {
-            eprintln!("[DRAW_ZERO] self.moved_cards={:?}", self.moved_cards);
-            eprintln!(
+            log::debug!("[DRAW_ZERO] self.moved_cards={:?}", self.moved_cards);
+            log::debug!(
                 "[DRAW_ZERO] gs.recently_moved_cards={:?}",
                 gs.recently_moved_cards
             );
-            eprintln!(
+            log::debug!(
                 "[DRAW_ZERO] last_cost_discard_count={}",
                 gs.mods.last_cost_discard_count
             );
@@ -212,7 +212,7 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let has_heart_colors = !effect.heart_colors.is_empty();
         let has_heart_icons = effect.text.contains("heart_");
-        eprintln!(
+        log::debug!(
             "[SELECT_EFFECT] heart_colors={:?} has_icons={} source={:?} card_type={:?}",
             effect.heart_colors, has_heart_icons, effect.source, effect.card_type
         );
@@ -220,7 +220,7 @@ impl AbilityResolver {
             && effect.heart_colors.is_empty()
             && !has_heart_icons
             && effect.or_card_types.is_none()
-            && effect.characters.as_ref().map_or(true, |v| v.is_empty())
+            && effect.characters.as_ref().is_none_or(|v| v.is_empty())
             && effect.group_names.is_none()
         {
             return self.execute_area_select(gs, effect);
@@ -235,7 +235,7 @@ impl AbilityResolver {
                 crate::ability::util::extract_heart_colors_from_text(&effect.text)
             };
             if !heart_colors.is_empty() {
-                eprintln!(
+                log::debug!(
                     "[SELECT_EFFECT] calling execute_select_heart_color with colors={:?}",
                     heart_colors
                 );
@@ -245,7 +245,7 @@ impl AbilityResolver {
                     &heart_colors,
                     effect.target_name(),
                 );
-                eprintln!(
+                log::debug!(
                     "[SELECT_EFFECT] pending_choice={:?}",
                     self.pending_choice.is_some()
                 );
@@ -415,7 +415,7 @@ impl AbilityResolver {
                 }
             }
             _ => {
-                eprintln!("Draw from source '{}' not yet implemented", source);
+                log::debug!("Draw from source '{}' not yet implemented", source);
             }
         }
         Ok(())

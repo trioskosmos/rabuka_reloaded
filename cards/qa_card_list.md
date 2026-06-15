@@ -167,3 +167,4 @@ Write tests in engine\tests\gameplay_test_process.md
 | 157 | 1 | PL!SP-sd1-002-SD (唐 可可 (ab#0)) | Q63 | ✓ (phase tests)
 | 158 | 1 | PL!SP-sd1-004-SD (平安名すみれ (ab#0)) | Q171 | ✓ (shared QA)
 | 159 | 1 | PL!SP-sd1-026-SD (私のSymphony 〜澁谷かのんVer.〜 (ab#0)) | Q90 | ✓ (shared QA)
+| 160 | 1 | PL!HS-bp6-008-R (桂城 泉 (ab#0)) | Q257 | | ✓ izumi_bp6_test

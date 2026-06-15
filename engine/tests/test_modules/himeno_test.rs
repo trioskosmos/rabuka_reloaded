@@ -194,7 +194,7 @@ fn himeno_bp6_delayed_cannot_active_blocks_activation() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let himeno = game.id("PL!HS-bp6-006-R＋");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.stage.stage[0] = himeno;
     game.state.mods.add_orientation_modifier(himeno, "wait");

@@ -25,6 +25,12 @@ pub struct AbDebug {
     indent: usize,
 }
 
+impl Default for AbDebug {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AbDebug {
     pub fn new() -> Self {
         AbDebug { indent: 0 }
@@ -57,7 +63,7 @@ impl AbDebug {
         }
         let pad = "  ".repeat(self.indent);
         let log_entry = format!("[AB]{pad}{tag} {msg}");
-        eprintln!("{}", log_entry);
+        log::debug!("{}", log_entry);
         if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
             buffer.push(log_entry);
         }
@@ -124,7 +130,7 @@ impl AbDebug {
                 parts.join(" ")
             }),
             Some(ConditionType::LocationCondition) => ("location_condition", {
-                let extras = if cond.distinct.as_ref().map_or(false, |d| d.is_distinct()) {
+                let extras = if cond.distinct.as_ref().is_some_and(|d| d.is_distinct()) {
                     " distinct=names"
                 } else {
                     ""
@@ -239,11 +245,9 @@ impl AbDebug {
             "draw_card" => format!(
                 "draw {} card(s){}",
                 effect.count.unwrap_or(1),
-                effect
+                if effect
                     .optional
-                    .unwrap_or(false)
-                    .then(|| " (optional)")
-                    .unwrap_or("")
+                    .unwrap_or(false) { " (optional)" } else { "" }
             ),
             "move_cards" => format!(
                 "move {} from {} → {} (type: {})",
@@ -276,25 +280,21 @@ impl AbDebug {
                 effect.count.unwrap_or(1),
                 effect.card_type.as_deref().unwrap_or("card"),
                 effect.source.as_deref().unwrap_or("?"),
-                effect
+                if effect
                     .optional
-                    .unwrap_or(false)
-                    .then(|| " (optional)")
-                    .unwrap_or("")
+                    .unwrap_or(false) { " (optional)" } else { "" }
             ),
-            "look_and_select" => format!("look + select from deck"),
+            "look_and_select" => "look + select from deck".to_string(),
             "pay_energy" => format!(
                 "pay {} E{}",
                 effect.count.unwrap_or(1),
-                effect
+                if effect
                     .optional
-                    .unwrap_or(false)
-                    .then(|| " (optional)")
-                    .unwrap_or("")
+                    .unwrap_or(false) { " (optional)" } else { "" }
             ),
             "reveal" => format!("reveal {}", effect.source.as_deref().unwrap_or("?")),
-            "position_change" => format!("position change"),
-            "gain_ability" => format!("gain ability"),
+            "position_change" => "position change".to_string(),
+            "gain_ability" => "gain ability".to_string(),
             "do_nothing" => String::new(),
             _ => format!("{}: {}", a, trunc(&effect.text, 50)),
         };
@@ -338,8 +338,8 @@ impl AbDebug {
                 "compound ({} sub-costs)",
                 cost.costs.as_ref().map(|c| c.len()).unwrap_or(0)
             ),
-            "choice_condition" => format!("choice between costs"),
-            _ => format!("{}", ct),
+            "choice_condition" => "choice between costs".to_string(),
+            _ => ct.to_string(),
         };
         self.p("COST", format_args!("{}{}", prefix, msg));
     }
@@ -376,7 +376,7 @@ pub fn write_coverage_json(path: &str) -> Result<(), std::io::Error> {
     let file = std::fs::File::create(path)?;
     let writer = std::io::BufWriter::new(file);
     serde_json::to_writer_pretty(writer, &output)?;
-    eprintln!(
+    log::debug!(
         "Coverage data written to {} ({} unique abilities)",
         path,
         entries.len()

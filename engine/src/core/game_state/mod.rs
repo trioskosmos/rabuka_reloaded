@@ -111,6 +111,10 @@ pub struct GameState {
     pub performance_snapshots: Vec<PerformanceSnapshot>,
     /// Trace from the last ability resolution (for debugging).
     pub last_ability_trace: Option<crate::ability::types::AbilityTraceNode>,
+    /// Card ID being replaced by a success zone replacement effect (e.g. 錯覚CROSSROADS).
+    pub pending_success_replacement_card_id: Option<i16>,
+    /// Player ID of the player making the success zone replacement choice.
+    pub pending_success_replacement_player_id: Option<String>,
 }
 
 impl GameState {
@@ -234,6 +238,8 @@ impl GameState {
             live_surplus_ready_this_turn: false,
             performance_snapshots: Vec::new(),
             last_ability_trace: None,
+            pending_success_replacement_card_id: None,
+            pending_success_replacement_player_id: None,
         };
         debug_assert!(
             state.phase_invariant(),
@@ -372,6 +378,7 @@ impl GameState {
         self.recently_moved_cards = None;
         self.recently_moved_from_zone = None;
         self.mods.last_cost_discard_count = 0;
+        self.mods.last_cost_energy_count = 0;
     }
 
     /// Resolve which player's cheer_revealed_cards to use based on ability master.

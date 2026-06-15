@@ -130,6 +130,12 @@ pub struct Stage {
     pub under_cards: [SmallVec<[i16; 4]>; STAGE_SIZE],
 }
 
+impl Default for Stage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Stage {
     pub fn new() -> Self {
         Stage {
@@ -218,7 +224,7 @@ impl Stage {
         let mut waitroom = SmallVec::new();
         let mut energy_deck = SmallVec::new();
         for card_id in cards {
-            if card_db.get_card(card_id).map_or(false, |c| c.is_energy()) {
+            if card_db.get_card(card_id).is_some_and(|c| c.is_energy()) {
                 energy_deck.push(card_id);
             } else {
                 waitroom.push(card_id);
@@ -379,6 +385,7 @@ impl Stage {
         card_db: &CardDatabase,
         heart_override: &HashMap<i16, (HeartColor, u32)>,
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
+        heart_color_multiplier: &HashMap<i16, HeartColor>,
     ) -> BaseHeart {
         let mut hearts = HashMap::new();
 
@@ -392,12 +399,24 @@ impl Stage {
                 continue;
             }
 
+            let mut card_hearts: HashMap<HeartColor, u32> = HashMap::new();
             if let Some(card) = card_db.get_card(card_id) {
                 if let Some(ref base_heart) = card.base_heart {
                     for (color, count) in &base_heart.hearts {
-                        *hearts.entry(*color).or_insert(0) += count;
+                        *card_hearts.entry(*color).or_insert(0) += count;
                     }
                 }
+            }
+
+            // Apply heart_color_multiplier: transform all this card's hearts to one color
+            if let Some(override_color) = heart_color_multiplier.get(&card_id) {
+                let total: u32 = card_hearts.values().sum();
+                card_hearts.clear();
+                card_hearts.insert(*override_color, total);
+            }
+
+            for (color, count) in &card_hearts {
+                *hearts.entry(*color).or_insert(0) += count;
             }
 
             if let Some(mods) = heart_modifiers.get(&card_id) {
@@ -424,6 +443,12 @@ pub fn parse_heart_color(s: &str) -> HeartColor {
 pub struct LiveCardZone {
     // Rule 5.2: Live Card Zone - Where member and live cards are placed during Live Card Set Phase
     pub cards: SmallVec<[i16; MAX_LIVE_CARDS]>, // Card IDs - stack-allocated for up to MAX_LIVE_CARDS cards
+}
+
+impl Default for LiveCardZone {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LiveCardZone {
@@ -526,7 +551,7 @@ impl LiveCardZone {
                             None
                         };
                         let ref_need = effective_need.as_ref().unwrap_or(need_heart);
-                        stage_hearts.map_or(false, |sh| {
+                        stage_hearts.is_some_and(|sh| {
                             crate::card::Card::need_heart_satisfied(ref_need, sh)
                         })
                     } else {
@@ -567,6 +592,12 @@ pub struct EnergyZone {
     // Rule 5.1: Energy Zone - Where energy cards are placed and activated
     pub cards: SmallVec<[i16; MAX_ENERGY_CARDS]>, // Card IDs - stack-allocated for up to MAX_ENERGY_CARDS energy cards
     pub active_energy_count: usize, // Simple count of active energy cards (simpler than HashSet)
+}
+
+impl Default for EnergyZone {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl EnergyZone {
@@ -622,14 +653,14 @@ impl EnergyZone {
 
     pub fn pay_energy(&mut self, amount: usize) -> Result<(), String> {
         // Rule 5.9: Pay energy by decrementing active count
-        // eprintln!("pay_energy called: amount={}, active_energy_count={}", amount, self.active_energy_count);
+        // log::debug!("pay_energy called: amount={}, active_energy_count={}", amount, self.active_energy_count);
 
         if self.active_energy_count >= amount {
             self.active_energy_count -= amount;
-            // eprintln!("pay_energy result: success, remaining active_energy_count={}", self.active_energy_count);
+            // log::debug!("pay_energy result: success, remaining active_energy_count={}", self.active_energy_count);
             Ok(())
         } else {
-            // eprintln!("pay_energy result: failed, active_energy_count={}", self.active_energy_count);
+            // log::debug!("pay_energy result: failed, active_energy_count={}", self.active_energy_count);
             Err(format!(
                 "Could not pay {} energy (only {} active energy available, {} total energy cards)",
                 amount,
@@ -642,7 +673,7 @@ impl EnergyZone {
     pub fn activate_all(&mut self) {
         // Set all energy cards to active state
         self.active_energy_count = self.cards.len();
-        // eprintln!("Activated {} energy cards (active_energy_count={})", self.cards.len(), self.active_energy_count);
+        // log::debug!("Activated {} energy cards (active_energy_count={})", self.cards.len(), self.active_energy_count);
     }
 }
 
@@ -652,6 +683,12 @@ pub struct MainDeck {
     /// Pushing to the end (`cards.push()`) adds to the bottom.
     /// To put a card on top, use `cards.insert(0, id)`.
     pub cards: SmallVec<[i16; 60]>,
+}
+
+impl Default for MainDeck {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl MainDeck {
@@ -698,6 +735,12 @@ pub struct EnergyDeck {
     pub cards: SmallVec<[i16; 20]>, // Card IDs - stack-allocated for up to 20 energy cards
 }
 
+impl Default for EnergyDeck {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnergyDeck {
     pub fn new() -> Self {
         EnergyDeck {
@@ -722,6 +765,12 @@ impl EnergyDeck {
 pub struct Hand {
     // Rule 5.4: Hand - Where cards drawn from main deck are held
     pub cards: SmallVec<[i16; 7]>, // Card IDs - stack-allocated for up to 7 cards
+}
+
+impl Default for Hand {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Hand {
@@ -757,6 +806,12 @@ pub struct Waitroom {
     // Rule 5.5: Waitroom - Where used cards are placed
     // Used for refresh when main deck is empty
     pub cards: SmallVec<[i16; 30]>, // Card IDs - stack-allocated for typical sizes
+}
+
+impl Default for Waitroom {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Waitroom {
@@ -795,6 +850,12 @@ pub struct SuccessLiveCardZone {
     pub cards: SmallVec<[i16; 3]>, // Card IDs - stack-allocated for victory condition (max 3)
 }
 
+impl Default for SuccessLiveCardZone {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SuccessLiveCardZone {
     pub fn new() -> Self {
         SuccessLiveCardZone {
@@ -815,6 +876,12 @@ impl SuccessLiveCardZone {
 pub struct ExclusionZone {
     // Rule 5.7: Exclusion Zone - Where excluded cards are placed
     pub cards: SmallVec<[i16; 10]>, // Card IDs - stack-allocated for up to 10 cards
+}
+
+impl Default for ExclusionZone {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ExclusionZone {

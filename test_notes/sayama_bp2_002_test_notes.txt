@@ -1,0 +1,42 @@
+# Test Notes: PL!HS-bp2-002 村野さやか fixes
+
+## Parser fix (source=discard)
+File: cards/ability_extraction/parser.py
+
+When parsing "{{toujyou.png|登場}}自分の控え室からコスト2以下のメンバーカードを2枚まで手札に加える。", the action must include:
+
+{
+  "action": "move_cards",
+  "source": "discard",
+  "destination": "hand",
+  "card_type": "member_card",
+  "cost_limit": 2,
+  "cost_limit_operator": "<=",
+  "count": 2,
+  "max": true,
+  "target": "self"
+}
+
+Prior to the fix, source was null because extract_source() did not match the sub-clause 控え室から when it appeared after the trigger prefix rather than at the start of the action text.
+
+## Engine fix (comparison_target="self" with cost)
+File: engine/src/ability/condition/card.rs
+
+Condition type: comparison_condition
+Fields:
+- comparison_target: "self"
+- comparison_type: "cost"
+- location: "stage"
+- operator: ">"
+
+Prior to the fix, evaluate_comparison_condition used condition.count.unwrap_or(0) as the comparison threshold because it did not recognize "self" as a special target for cost/score comparisons. This made the condition always true when any stage member had non-zero cost.
+
+The fix looks up the activating card's effective cost (base cost minus any active cost modifier from GameState.mods) on the current stage and uses that as the comparison target.
+
+## How existing tests exercise this path
+
+- gameplay_test.rs lines 1189-1268: nico_prompt_path_two_eligible_in_discard already proves the SelectCard prompt path for move_cards from discard with a cost_limit filter. The new parser fix simply makes this path reachable for cards whose text is 控え室から rather than 控え室にある.
+- b7_constant_ability_test.rs lines 11-23: uses game.state.recalculate_constants() and then checks blade delta after placement. The 常時 ability in PL!HS-bp2-002 follows this exact pattern.
+- The Player struct does not expose a blade field directly in tests. Blade gains are observed through the game's state after recalculate_constants().
+
+Do NOT add new stub tests that call non-existent helpers like play_card, has_pending_select_cards_choice, or ability_triggers_constant on TestGame. Use the patterns above.

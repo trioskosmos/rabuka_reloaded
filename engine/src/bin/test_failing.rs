@@ -40,7 +40,7 @@ fn run_test(test_name: &str) -> (&str, bool) {
     println!("Running {}...", test_name);
     
     let output = process::Command::new("cargo")
-        .args(&["test", test_name, "--", "--nocapture"])
+        .args(["test", test_name, "--", "--nocapture"])
         .output();
     
     match output {

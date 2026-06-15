@@ -1,0 +1,102 @@
+HANAMARU (PL!S-bp5-016-N) TEST NOTES
+=====================================
+ab#0: ライブ開始時
+Condition: all_cost_comparison_condition
+- comparison_source: opponent
+- comparison_target: self
+- comparison_type: cost
+- operator: ">"
+- location: stage
+- card_type: member_card
+
+Action: gain_resource(blade, 2, duration=live_end, all=true)
+
+HALF-ENGINE SEMANTICS CHECK
+----------------------------
+"相手のステージにいるすべてのメンバーのそれぞれのコストよりコストが高い
+メンバーが自分のステージにいる場合"
+
+Eng: "If there exists a member on your stage whose cost is higher
+than every individual member on the opponent's stage"
+
+Key: universal quantification over OPPONENT individuals, existential over SELF.
+
+IS MET:
+- Opp stage: [cost 4, cost 3], Self stage: [cost 5]
+  → exists self member(cost 5) > max(opp costs=4) → TRUE
+
+IS NOT MET:
+- Opp stage: [cost 5], Self stage: [cost 4, cost 4]
+  → max(opp)=5, no self member > 5 → FALSE
+
+VACUOUS:
+- Opp stage empty → no opponent members to compare against → TRUE
+
+FULL ENGINE PLACEMENT CHECK
+----------------------------
+Trigger: ライブ開始時 = ON_LIVE_START
+Serialized in abilities.json: "triggers": "ライブ開始時"
+Compiler must map this to TriggerType::OnLiveStart (or equivalent).
+
+Condition bytecode: must encode comparison_source=opponent,
+comparison_target=self, comparison_type=cost, operator=>.
+
+Action: gain_resource with resource=blade, count=2, duration=live_end,
+all=true → all self stage members gain 2 blade tokens until live ends.
+
+PARSER BEHAVIOR
+---------------
+Handler: _try_cost_override_condition (parser.py)
+Pattern: 相手の...にいる(?:すべての|全ての)?(?:メンバー|カード)の
+        それぞれの(.+?)より\2が(高い|大きい|低い|小さい)...
+        メンバー|カード)が自分の...にいる
+
+Groups: 1=opp_location, 2=attribute(コスト/レベル/スコア),
+        3=operator, 4=self_location
+
+Output fields: type, comparison_source, comparison_target,
+               comparison_type, operator, location, card_type
+
+ENGINE CODE PATHS
+-----------------
+- Condition evaluation:
+  engine/src/ability/condition.rs evaluate_condition()
+  engine/src/ability/condition/card.rs evaluate_all_cost_comparison_condition()
+
+- Blade gain:
+  engine/src/ability/effects/misc.rs execute_gain_resource()
+  Pays attention to resource == "blade" and "all" flag.
+
+TEST STRATEGY (existing helper patterns from hasunosora_bp6_test)
+---------------------------------------------------------------
+1. hanamaru_condition_met_gains_blade
+   - Use known filler costs: PL!-sd1-010-SD (cost 4)
+   - P1: hanamaru + cost-3 filler on stage
+   - P2: cost-4 filler on stage
+   - Go to LiveStart, assert hanamaru gets blade modifier > 0
+
+2. hanamaru_condition_not_met_no_blade
+   - P1: hanamaru + cost-4 filler
+   - P2: cost-5 filler (no real cost-5 card available, skip or improvise)
+   - Assert blade modifier == 0
+
+3. hanamaru_vacuous_empty_opponent
+   - P1: hanamaru
+   - P2: empty stage
+   - Assert blade modifier > 0
+
+PITFALLS
+--------
+- "evaluate_all_cost_comparison_condition" warns as dead_code until a test
+  actually exercises it (or the real engine load path is tested).
+- abilities.json regenerated: any manual re-edits must be reapplied.
+- Forced into parser.py indentation fix: _try_kore_niyori_result had no body.
+- opponent cost mods included via game_state.mods.get_cost_modifier().
+- "stage" location is fixed in parser, no id="stage" needed.
+
+REMAINING WORK
+--------------
+1. Compiler: ensure cards_compiled.json / codegen maps
+   "all_cost_comparison_condition" → ConditionType::AllCostComparison.
+2. Write actual #[test]s using the pattern above.
+3. Verify trigger ライブ開始時 maps to ON_LIVE_START for this card.

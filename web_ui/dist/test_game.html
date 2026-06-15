@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Game Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .phase { font-size: 24px; font-weight: bold; margin: 20px 0; }
+        .actions { margin: 10px 0; }
+        .action { display: inline-block; margin: 5px; padding: 10px; background: #007bff; color: white; cursor: pointer; border: none; border-radius: 4px; }
+        .action:hover { background: #0056b3; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .log { margin: 10px 0; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>Game Test</h1>
+    <div id="phase" class="phase">Loading...</div>
+    <div id="status" class="status">Initializing...</div>
+    <div id="actions" class="actions"></div>
+    <div id="log" class="log"></div>
+    
+    <script>
+        let gameState = null;
+        let actions = [];
+        
+        async function updateState() {
+            try {
+                const [stateRes, actionsRes] = await Promise.all([
+                    fetch('/api/game-state'),
+                    fetch('/api/actions')
+                ]);
+                
+                gameState = await stateRes.json();
+                const actionsData = await actionsRes.json();
+                actions = actionsData.actions;
+                
+                document.getElementById('phase').textContent = `Phase: ${gameState.phase}`;
+                document.getElementById('actions').innerHTML = actions.map(a => 
+                    `<button class="action" onclick="executeAction(${a.index}, '${a.action_type}')">${a.description}</button>`
+                ).join('');
+                
+                log(`State updated: ${gameState.phase}, ${actions.length} actions`);
+            } catch (error) {
+                log(`Error updating state: ${error.message}`);
+            }
+        }
+        
+        async function executeAction(index, actionType) {
+            try {
+                log(`Executing action: ${actionType} (index ${index})`);
+                
+                const action = actions.find(a => a.index === index);
+                const res = await fetch('/api/execute-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action_index: index,
+                        action_type: actionType,
+                        card_id: action.parameters?.card_id,
+                        card_index: action.parameters?.card_index,
+                        card_indices: action.parameters?.card_indices,
+                        card_no: action.parameters?.card_no,
+                        stage_area: action.parameters?.stage_area,
+                        use_baton_touch: action.parameters?.use_baton_touch
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    gameState = data;
+                    log(`Action successful: ${data.phase}`);
+                    await updateState();
+                } else {
+                    log(`Action failed: ${res.status}`);
+                }
+            } catch (error) {
+                log(`Error executing action: ${error.message}`);
+            }
+        }
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${time}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        async function startGame() {
+            try {
+                log('Starting game...');
+                const res = await fetch('/api/rooms/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mode: 'pve',
+                        card_set: 'compiled',
+                        p0_deck: [],
+                        p0_energy: [],
+                        public: true
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    log(`Game started: ${data.success ? 'SUCCESS' : 'FAILED'}`);
+                    await updateState();
+                } else {
+                    log(`Failed to start game: ${res.status}`);
+                }
+            } catch (error) {
+                log(`Error starting game: ${error.message}`);
+            }
+        }
+        
+        // Auto-start game
+        window.addEventListener('load', () => {
+            setTimeout(startGame, 1000);
+        });
+    </script>
+</body>
+</html>

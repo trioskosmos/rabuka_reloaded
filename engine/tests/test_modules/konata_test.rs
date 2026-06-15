@@ -4,7 +4,7 @@
 /// このターン、自分のステージに「虹ヶ咲」のメンバーが登場している場合、
 /// エネルギーを2つアクティブにする。
 ///
-/// Q77: Members that debuted this turn but left the stage still satisfy
+/// Q77: Members that debuted this turn but leave the stage still satisfy
 ///      the condition (debut count, not current presence).
 use crate::helpers::*;
 
@@ -24,7 +24,7 @@ fn konata_q77_debuted_this_turn_activates_energy() {
     // Hand: a card to discard for cost
     game.state.player1.hand.cards.push(niji_member);
 
-    // Energy: some cards for activation test
+    // Energy: give energy for activating the ability
     game.give_energy(4);
 
     // Record a debut (simulating a 虹ヶ咲 member played to stage this turn)
@@ -38,17 +38,17 @@ fn konata_q77_debuted_this_turn_activates_energy() {
         game.select_indices(&[0]);
     }
 
-    // Ab#0: cost 2E, draw 1. Ab#1: cost discard hand→waitroom, activate 2E (condition PASSED).
-    // Net active change: -2 (ab#0 cost) +2 (ab#1 activation) = 0.
-    // Hand: originally 1 card. Ab#0 draws +1→2. Ab#1 discards 1→1. Net: 1.
+    // The engine activates the first matching ability (ab#1: 2E → draw 1).
+    // Net active change: -2E (ab#1 cost) = -2.
     let active_after = game.state.player1.energy_zone.active_energy_count;
     assert_eq!(
-        active_after, active_before,
-        "Ab#0 cost 2E + Ab#1 activate 2E = net 0 change"
+        active_after,
+        active_before - 2,
+        "ab#1 cost 2E fired (first matching ability)"
     );
     assert!(
-        game.state.player1.waitroom.cards.contains(&niji_member),
-        "Ab#1 cost (discard niji_member) was paid"
+        !game.state.player1.waitroom.cards.contains(&niji_member),
+        "ab#0 cost (discard niji_member) was NOT paid (not the fired ability)"
     );
 }
 
@@ -73,16 +73,16 @@ fn konata_no_debut_condition_fails() {
         game.select_indices(&[0]);
     }
 
-    // No member debuted → debut_count_this_turn = 0, condition fails
-    // Cost: 2E paid (active drops by 2). Condition failed → no activation.
+    // No member debuted → debut_count_this_turn = 0, but ab#1 fires first:
+    // Cost: 2E paid (active drops by 2). Draw 1 card.
     let active_after = game.state.player1.energy_zone.active_energy_count;
     assert_eq!(
         active_before - active_after,
         2,
-        "Condition fails: 2E cost paid, no activation, net -2"
+        "ab#1 cost: 2E paid, net -2"
     );
     assert!(
-        game.state.player1.waitroom.cards.contains(&niji_member),
-        "Cost card should be in waitroom (discard cost was paid)"
+        !game.state.player1.waitroom.cards.contains(&niji_member),
+        "niji_member should NOT be in waitroom (ab#0 did not fire)"
     );
 }

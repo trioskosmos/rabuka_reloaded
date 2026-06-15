@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Turn Choice Verification</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; margin-bottom: 30px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .test-step { display: flex; align-items: center; margin: 10px 0; }
+        .step-number { width: 30px; height: 30px; background: #007bff; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; margin-right: 15px; }
+        .step-text { flex: 1; }
+        .status { padding: 5px 10px; border-radius: 3px; margin-left: 10px; font-weight: bold; }
+        .pass { background: #d4edda; color: #155724; }
+        .fail { background: #f8d7da; color: #721c24; }
+        .pending { background: #fff3cd; color: #856404; }
+        .current-phase { font-size: 18px; font-weight: bold; text-align: center; margin: 20px 0; padding: 10px; background: #e9ecef; border-radius: 5px; }
+        .actions { text-align: center; margin: 20px 0; }
+        .action-btn { margin: 5px; padding: 10px 15px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        .action-btn:hover { background: #0056b3; }
+        .log { margin: 20px 0; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px; font-family: monospace; font-size: 12px; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Turn Choice Fix Verification</h1>
+        
+        <div class="current-phase" id="currentPhase">Loading...</div>
+        
+        <div class="test-section">
+            <h3>📋 Test Progress</h3>
+            <div class="test-step">
+                <div class="step-number">1</div>
+                <div class="step-text">Create room and check initial phase</div>
+                <div class="status pending" id="step1">Pending</div>
+            </div>
+            <div class="test-step">
+                <div class="step-number">2</div>
+                <div class="step-text">Execute RPS (Rock vs Paper)</div>
+                <div class="status pending" id="step2">Pending</div>
+            </div>
+            <div class="test-step">
+                <div class="step-number">3</div>
+                <div class="step-text">Check turn choice phase</div>
+                <div class="status pending" id="step3">Pending</div>
+            </div>
+            <div class="test-step">
+                <div class="step-number">4</div>
+                <div class="step-text">Execute turn choice (Go first)</div>
+                <div class="status pending" id="step4">Pending</div>
+            </div>
+            <div class="test-step">
+                <div class="step-number">5</div>
+                <div class="step-text">Verify mulligan phase</div>
+                <div class="status pending" id="step5">Pending</div>
+            </div>
+        </div>
+        
+        <div class="actions" id="actionsContainer">
+            <h3>🎯 Available Actions</h3>
+            <div id="actionButtons">Loading actions...</div>
+        </div>
+        
+        <div class="log" id="log">
+            <h3>📝 Test Log</h3>
+            <div id="logContent">Starting verification...</div>
+        </div>
+    </div>
+    
+    <script>
+        let gameState = null;
+        let actions = [];
+        let testStep = 1;
+        
+        function log(message) {
+            const logContent = document.getElementById('logContent');
+            const time = new Date().toLocaleTimeString();
+            logContent.innerHTML += `[${time}] ${message}\n`;
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+        
+        function updatePhase() {
+            const phaseElement = document.getElementById('currentPhase');
+            if (gameState) {
+                phaseElement.textContent = `Current Phase: ${gameState.phase}`;
+                phaseElement.style.background = getPhaseColor(gameState.phase);
+            }
+        }
+        
+        function getPhaseColor(phase) {
+            const colors = {
+                'RockPaperScissors': '#e3f2fd',
+                'ChooseFirstAttacker': '#fff3cd',
+                'MulliganP1Turn': '#d1ecf1',
+                'MulliganP2Turn': '#d1ecf1',
+                'Active': '#d4edda'
+            };
+            return colors[phase] || '#f8f9fa';
+        }
+        
+        function updateActions() {
+            const container = document.getElementById('actionButtons');
+            if (actions.length === 0) {
+                container.innerHTML = '<p>No actions available</p>';
+                return;
+            }
+            
+            const buttons = actions.map(action => 
+                `<button class="action-btn" onclick="executeAction(${action.index}, '${action.action_type}')">${action.description}</button>`
+            ).join(' ');
+            
+            container.innerHTML = buttons;
+        }
+        
+        function updateStep(stepNumber, status, message) {
+            const stepElement = document.getElementById(`step${stepNumber}`);
+            stepElement.className = `status ${status}`;
+            stepElement.textContent = status;
+            
+            if (message) {
+                log(`Step ${stepNumber}: ${message}`);
+            }
+        }
+        
+        async function executeAction(index, actionType) {
+            try {
+                log(`Executing: ${actionType}`);
+                
+                const action = actions.find(a => a.index === index);
+                const res = await fetch('/api/execute-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action_index: index,
+                        action_type: actionType,
+                        card_id: action.parameters?.card_id,
+                        card_index: action.parameters?.card_index,
+                        card_indices: action.parameters?.card_indices,
+                        card_no: action.parameters?.card_no,
+                        stage_area: action.parameters?.stage_area,
+                        use_baton_touch: action.parameters?.use_baton_touch
+                    })
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    gameState = data;
+                    actions = data.legal_actions || [];
+                    updatePhase();
+                    updateActions();
+                    checkTestProgress();
+                    log(`Action successful: ${data.phase}`);
+                } else {
+                    log(`Action failed: ${res.status}`);
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`);
+            }
+        }
+        
+        function checkTestProgress() {
+            if (!gameState) return;
+            
+            switch (testStep) {
+                case 1:
+                    if (gameState.phase === 'RockPaperScissors') {
+                        updateStep(1, 'pass', 'Initial phase correct');
+                        testStep = 2;
+                    }
+                    break;
+                case 2:
+                    if (gameState.phase === 'ChooseFirstAttacker') {
+                        updateStep(2, 'pass', 'RPS completed, turn choice available');
+                        testStep = 3;
+                    }
+                    break;
+                case 3:
+                    if (actions.some(a => a.action_type === 'choose_first_attacker')) {
+                        updateStep(3, 'pass', 'Turn choice actions available');
+                        testStep = 4;
+                    }
+                    break;
+                case 4:
+                    if (gameState.phase === 'MulliganP1Turn' || gameState.phase === 'MulliganP2Turn') {
+                        updateStep(4, 'pass', 'Turn choice executed correctly');
+                        testStep = 5;
+                    }
+                    break;
+                case 5:
+                    if (actions.some(a => a.action_type === 'skip_mulligan' || a.action_type === 'confirm_mulligan')) {
+                        updateStep(5, 'pass', 'Mulligan phase reached - TEST COMPLETE');
+                        log('🎉 TURN CHOICE FIX VERIFIED SUCCESSFULLY');
+                    }
+                    break;
+            }
+        }
+        
+        async function initializeTest() {
+            try {
+                log('Initializing verification test...');
+                
+                // Create room
+                const roomRes = await fetch('/api/rooms/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mode: 'pve',
+                        card_set: 'compiled',
+                        p0_deck: [],
+                        p0_energy: [],
+                        public: true
+                    })
+                });
+                
+                if (roomRes.ok) {
+                    const roomData = await roomRes.json();
+                    log(`Room created: ${roomData.success ? 'SUCCESS' : 'FAILED'}`);
+                    
+                    if (roomData.success) {
+                        // Get initial state and actions
+                        const [stateRes, actionsRes] = await Promise.all([
+                            fetch('/api/game-state'),
+                            fetch('/api/actions')
+                        ]);
+                        
+                        if (stateRes.ok && actionsRes.ok) {
+                            gameState = await stateRes.json();
+                            const actionsData = await actionsRes.json();
+                            actions = actionsData.actions || [];
+                            
+                            updatePhase();
+                            updateActions();
+                            checkTestProgress();
+                            log('Test initialized successfully');
+                        } else {
+                            log('Failed to get initial state/actions');
+                        }
+                    }
+                } else {
+                    log('Failed to create room');
+                }
+            } catch (error) {
+                log(`Initialization error: ${error.message}`);
+            }
+        }
+        
+        // Auto-start test
+        window.addEventListener('load', () => {
+            setTimeout(initializeTest, 1000);
+        });
+    </script>
+</body>
+</html>

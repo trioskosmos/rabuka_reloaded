@@ -22,14 +22,14 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
-        println!(
+        log::debug!(
             "DEBUG: execute_effect - action: {}, source: {}, destination: {}",
             effect.action,
             effect.source_or("none"),
             effect.destination.as_deref().unwrap_or("none")
         );
         if !self.can_activate_effect(gs, effect) {
-            println!("DEBUG: cannot activate effect");
+            log::debug!("DEBUG: cannot activate effect");
             return Ok(());
         }
 
@@ -37,7 +37,7 @@ impl AbilityResolver {
         if effect.non_stackable.unwrap_or(false) {
             let effect_key = format!("{}:{}", effect.action, effect.text);
             if gs.non_stackable_effects.contains(&effect_key) {
-                println!(
+                log::debug!(
                     "DEBUG: non-stackable effect already active, skipping: {}",
                     effect_key
                 );
@@ -58,21 +58,23 @@ impl AbilityResolver {
         }
 
         gs.reset_replacement_effect_flags();
-        let action_str = effect.action.clone();
+        let action_str = effect.action.as_str();
 
         // Empty action with opponent_action means it was entirely handled by opponent
         if action_str.is_empty() && effect.action_by.is_some() {
             return Ok(());
         }
 
-        let replacement_effects: Vec<crate::game_state::ReplacementEffect> = gs
-            .get_replacement_effects_for_event(&action_str)
+        let replacement_indices: Vec<usize> = gs.replacement_effects
             .iter()
-            .map(|r| (*r).clone())
+            .enumerate()
+            .filter(|(_, r)| r.original_event == action_str && !r.applied_this_event)
+            .map(|(i, _)| i)
             .collect();
-        if !replacement_effects.is_empty() {
-            for replacement in &replacement_effects {
-                if replacement.is_choice_based {
+            
+        if !replacement_indices.is_empty() {
+            for idx in replacement_indices {
+                if gs.replacement_effects[idx].is_choice_based {
                     let description =
                         format!("Apply replacement effect for action '{}'?", action_str);
                     self.pending_choice = Some(Choice::SelectTarget {
@@ -83,10 +85,12 @@ impl AbilityResolver {
                     });
                     return Err("Pending choice required: apply replacement effect".to_string());
                 } else {
-                    for replacement_effect in &replacement.replacement_effects {
+                    let effects_to_execute = gs.replacement_effects[idx].replacement_effects.clone();
+                    let card_id = gs.replacement_effects[idx].card_id;
+                    for replacement_effect in &effects_to_execute {
                         self.execute_effect(gs, replacement_effect)?;
                     }
-                    gs.mark_replacement_effect_applied(replacement.card_id);
+                    gs.mark_replacement_effect_applied(card_id);
                 }
             }
             return Ok(());
@@ -159,7 +163,7 @@ impl AbilityResolver {
                 let mut change_count = effect.count_or(0);
                 let mut change_group = effect.group_name();
                 if effect.per_unit.unwrap_or(false) {
-                    let player = gs.resolve_target_player(&effect.target_name());
+                    let player = gs.resolve_target_player(effect.target_name());
                     let location = effect.location.as_deref().unwrap_or(Zone::Stage.to_str());
                     let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
                     let per_unit_filter = util::filter_from_parts(
@@ -267,10 +271,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            ActionType::InvalidateAbility => {
-                self.execute_invalidate_ability(gs);
-                Ok(())
-            }
+            ActionType::InvalidateAbility => self.execute_invalidate_ability(gs, effect),
             ActionType::GainAbility => self.execute_gain_ability_effect(gs, effect),
             ActionType::GainAbilityFromSource => self.execute_gain_ability_from_source(gs, effect),
             ActionType::PlayBatonTouch => {
@@ -356,7 +357,7 @@ impl AbilityResolver {
                 effect
                     .restricted_destination
                     .as_deref()
-                    .or_else(|| effect.destination.as_deref()),
+                    .or(effect.destination.as_deref()),
                 effect.target_name(),
                 effect.delayed.unwrap_or(false),
             ),
@@ -445,19 +446,41 @@ impl AbilityResolver {
             ActionType::ConditionalOnResult => self.execute_conditional_on_result(gs, effect),
             ActionType::ConditionalOnOptional => self.execute_conditional_on_optional(gs, effect),
             ActionType::ModifyCost => {
+                let card_db = &gs.card_database;
                 let mut value = effect.value.unwrap_or(0);
                 if effect.per_unit.unwrap_or(false) {
-                    let player = gs.resolve_target_player(&effect.target_name());
-                    let zone = effect.location.as_deref().unwrap_or(Zone::Hand.to_str());
-                    let cards: Vec<i16> = crate::ability::util::zone_cards(player, zone).to_vec();
-                    let count = cards.len() as u32;
-                    let per_unit_count = effect.per_unit_count.unwrap_or(1);
-                    let final_count = if effect.exclude_self.unwrap_or(false) {
-                        count.saturating_sub(1)
-                    } else {
-                        count
+                    let per_unit_type_str = effect
+                        .per_unit_type
+                        .as_deref()
+                        .or(effect.location.as_deref())
+                        .unwrap_or("枚");
+                    let player = gs.resolve_target_player(effect.target_name());
+                    // Use resolve_per_unit_count which handles under_member,
+                    // discard, waitroom_card and other special zones that
+                    // zone_cards() cannot represent as a flat slice.
+                    let per_unit_filter = util::CardFilter {
+                        card_type: effect.card_type.as_deref(),
+                        ..util::CardFilter::default()
                     };
-                    value = (final_count / per_unit_count) * value;
+                    let matching_count = util::resolve_per_unit_count(
+                        true,
+                        Some(per_unit_type_str),
+                        player,
+                        card_db,
+                        &per_unit_filter,
+                        &[],
+                        effect.state.as_deref(),
+                        &gs.mods.orientation_modifiers,
+                    );
+                    let per_unit_count = effect.per_unit_count.unwrap_or(1);
+                    let mut units = matching_count / per_unit_count;
+                    // Apply max_repeats cap (aliased as repeat_limit).
+                    // The text side-constraint "N枚までしか数えない" is parsed as
+                    // max_repeats on the effect.
+                    if let Some(cap) = effect.repeat_limit {
+                        units = units.min(cap);
+                    }
+                    value *= units;
                 }
                 self.execute_modify_cost(
                     gs,
@@ -473,8 +496,17 @@ impl AbilityResolver {
                 self.execute_reveal_until_live_card(gs, effect.target_name())
             }
             ActionType::RevealUntilChosenCard => self.execute_reveal_until_chosen_card(gs, effect),
+            ActionType::PerformYell => {
+                let count = if let Some(ref dc) = effect.dynamic_count {
+                    self.resolve_dynamic_count(gs, dc)
+                } else {
+                    effect.count_or(1)
+                };
+                self.execute_perform_yell(gs, count, effect.target_name());
+                Ok(())
+            }
             _ => {
-                eprintln!("Unknown effect action: '{}'", action_str);
+                log::debug!("Unknown effect action: '{}'", action_str);
                 Ok(())
             }
         }

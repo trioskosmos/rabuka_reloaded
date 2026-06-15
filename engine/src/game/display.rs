@@ -651,11 +651,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     };
     let p1_mulligan = mulligan_player_id
         .as_ref()
-        .map_or(false, |id| *id == game_state.player1.id)
+        .is_some_and(|id| *id == game_state.player1.id)
         .then_some(game_state.mulligan_selected_indices.as_slice());
     let p2_mulligan = mulligan_player_id
         .as_ref()
-        .map_or(false, |id| *id == game_state.player2.id)
+        .is_some_and(|id| *id == game_state.player2.id)
         .then_some(game_state.mulligan_selected_indices.as_slice());
 
     let blade_flat: std::collections::HashMap<i16, i32> = game_state

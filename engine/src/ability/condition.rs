@@ -149,6 +149,17 @@ impl<'a> ConditionContext<'a> {
                 // At top level they are handled by evaluate_movement_condition's nested path.
                 false
             }
+            Some(ConditionType::ResourceCondition) => self.evaluate_resource_condition(condition),
+            Some(ConditionType::ActionSuccessCondition) => {
+                // Action success conditions are placed by the parser to gate followup
+                // actions on the success of a previous action. When reached here, the
+                // previous action already succeeded (otherwise this followup wouldn't
+                // be executing). Always passes.
+                true
+            }
+            Some(ConditionType::AllCostComparisonCondition) => {
+                self.evaluate_all_cost_comparison_condition(condition)
+            }
             Some(ConditionType::Custom) => {
                 // Custom conditions are parser-only markers; always true when reached.
                 true
@@ -156,7 +167,11 @@ impl<'a> ConditionContext<'a> {
             None => false,
         };
 
-        let final_result = if condition.negation.unwrap_or(false) {
+        let final_result = if condition.negation.unwrap_or(false)
+            && !(ct == Some(ConditionType::CardCountCondition) && condition.card_property.is_some())
+        {
+            // CardCountCondition with card_property handles negation internally
+            // (per-card filter already inverts via negate flag) — do NOT double-negate.
             !result
         } else {
             result

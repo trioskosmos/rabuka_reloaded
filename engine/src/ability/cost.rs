@@ -153,7 +153,7 @@ impl AbilityResolver {
                     .current_ability
                     .as_ref()
                     .and_then(|a| a.triggers.as_ref())
-                    .map_or(false, |t| t == crate::triggers::ACTIVATION);
+                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
 
                 let same_unit = cost.same_unit_name.unwrap_or(false);
                 let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
@@ -197,11 +197,11 @@ impl AbilityResolver {
                     } else {
                         count
                     };
-                    eprintln!(
+                    log::debug!(
                         "▶ cost(move_cards, {}=>discard, effective_count={}, any_number={}, optional={})",
                         source, effective_count, is_any_number, is_optional
                     );
-                    eprintln!(
+                    log::debug!(
                         "  ├─ hand[{}] → {} match{}: [{}]",
                         pl.hand.cards.len(),
                         matching_indices.len(),
@@ -214,7 +214,7 @@ impl AbilityResolver {
                     );
 
                     if is_optional && matching_indices.is_empty() {
-                        eprintln!("  └─ skip (optional/any_number, no eligible cards in hand)");
+                        log::debug!("  └─ skip (optional/any_number, no eligible cards in hand)");
                         return Ok(());
                     } else if !matching_indices.is_empty() {
                         let desc = if is_any_number {
@@ -229,7 +229,7 @@ impl AbilityResolver {
                                 if is_optional { " (or skip)" } else { "" }
                             )
                         };
-                        eprintln!("  └─ choice created (allow_skip={})", is_optional);
+                        log::debug!("  └─ choice created (allow_skip={})", is_optional);
                         if optional {
                             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                                 entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
@@ -261,7 +261,7 @@ impl AbilityResolver {
                     let cost_limit = cost.cost_limit;
                     let card_type_filter = card_type.as_deref();
 
-                    let player = &*gs.resolve_target_player(target);
+                    let player = gs.resolve_target_player(target);
                     let card_db = &gs.card_database;
                     let filter = util::filter_from_parts(
                         card_type_filter,
@@ -272,11 +272,11 @@ impl AbilityResolver {
                         None,
                         None,
                     );
-                    let zone_cards = util::zone_cards(player, &source);
+                    let _zone_cards = util::zone_cards(player, source);
 
                     if same_unit {
                         let is_optional = optional && !is_activation;
-                        let player_ref = &*gs.resolve_target_player(target);
+                        let player_ref = gs.resolve_target_player(target);
                         let hand_cards = &player_ref.hand.cards;
                         // Group hand cards by unit name
                         let mut unit_groups: std::collections::BTreeMap<String, Vec<i16>> =
@@ -297,7 +297,7 @@ impl AbilityResolver {
                             .filter(|(_, &cid)| {
                                 if let Some(card) = card_db.get_card(cid) {
                                     let unit = card.unit.as_deref().unwrap_or("");
-                                    unit_groups.get(unit).map_or(false, |g| g.len() >= count)
+                                    unit_groups.get(unit).is_some_and(|g| g.len() >= count)
                                 } else {
                                     false
                                 }
@@ -377,7 +377,7 @@ impl AbilityResolver {
                     .current_ability
                     .as_ref()
                     .and_then(|a| a.triggers.as_ref())
-                    .map_or(false, |t| t == crate::triggers::ACTIVATION);
+                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
 
                 if optional && !is_activation {
                     // For non-self_cost change_state, verify candidates exist before prompting
@@ -428,7 +428,7 @@ impl AbilityResolver {
                         cost.self_cost.unwrap_or(false),
                         true,
                     );
-                    eprintln!("[CHANGE_STATE] candidates={:?}", candidates);
+                    log::debug!("[CHANGE_STATE] candidates={:?}", candidates);
 
                     if candidates.is_empty() {
                         return Err("No matching members on stage to change state".to_string());
@@ -461,11 +461,45 @@ impl AbilityResolver {
                 let energy = cost.energy.unwrap_or(0);
                 let target = cost.target.as_deref().unwrap_or("self");
                 let optional = cost.optional.unwrap_or(false);
+                let any_number = cost.any_number.unwrap_or(false);
                 let is_activation = self
                     .current_ability
                     .as_ref()
                     .and_then(|a| a.triggers.as_ref())
-                    .map_or(false, |t| t == crate::triggers::ACTIVATION);
+                    .is_some_and(|t| t == crate::triggers::ACTIVATION);
+
+                if any_number && (optional || !is_activation) {
+                    let player = gs.resolve_target_player_mut(target);
+                    let active_count = player.energy_zone.active_energy_count;
+                    if active_count == 0 {
+                        // No energy to pay — treat as skip
+                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                            entry.cost_paid = true;
+                            entry.optional_cost_was_paid = false;
+                        }
+                        return Ok(());
+                    }
+                    // Show active energy cards for selection (one by one with skip)
+                    let filtered_indices: Vec<usize> = (0..active_count).collect();
+                    self.pending_choice = Some(
+                        Choice::select_cards(
+                            Zone::Energy.to_str().to_string(),
+                            0,
+                            format!(
+                                "Select energy card to pay (active: {}). Skip when done",
+                                active_count
+                            ),
+                            true,
+                        )
+                        .filtered_indices(Some(filtered_indices))
+                        .target_player_id(Some(target.to_string()))
+                        .build(),
+                    );
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+                    }
+                    return Ok(());
+                }
 
                 if optional && !is_activation {
                     self.pending_choice = Some(Choice::SelectTarget {
@@ -481,7 +515,7 @@ impl AbilityResolver {
                 }
 
                 if gs.baton_touch_zero_cost && energy > 0 {
-                    eprintln!(
+                    log::debug!(
                         "Skipping pay_energy cost of {} due to baton touch zero cost",
                         energy
                     );
@@ -491,9 +525,7 @@ impl AbilityResolver {
                 let player = gs.resolve_target_player_mut(target);
 
                 if energy > 0 {
-                    if let Err(e) = player.energy_zone.pay_energy(energy as usize) {
-                        return Err(e);
-                    }
+                    player.energy_zone.pay_energy(energy as usize)?
                 }
                 Ok(())
             }
@@ -523,7 +555,7 @@ impl AbilityResolver {
                 let card_type = cost.card_type.clone();
 
                 let mut card_ids: Vec<i16> = {
-                    let player = &*gs.resolve_target_player(target);
+                    let player = gs.resolve_target_player(target);
                     let card_db = &gs.card_database;
                     match Zone::from_str(source) {
                         Some(Zone::Hand) => player
@@ -552,7 +584,7 @@ impl AbilityResolver {
                 let explicit_count = cost.count.unwrap_or(1) as usize;
 
                 if has_explicit_count && card_ids.len() <= explicit_count {
-                    for card_id in card_ids {
+                    for &card_id in &card_ids {
                         gs.revealed_cards.push(card_id);
                         gs.revealed_cost_cards.push(card_id);
                     }
@@ -658,8 +690,7 @@ impl AbilityResolver {
                         let tgt = cost.target.as_deref().unwrap_or("self");
                         gs.resolve_target_player_mut(tgt)
                             .energy_zone
-                            .pay_energy(energy as usize)
-                            .map_err(|e| e)?;
+                            .pay_energy(energy as usize)?;
                     }
                 }
                 if cost.state_change.as_deref() == Some("wait") {
@@ -707,14 +738,14 @@ impl AbilityResolver {
                                 gs.mods.add_orientation_modifier(id, "wait");
                             }
                         } else if let Err(e) = self.pay_cost(gs, sub_cost) {
-                            eprintln!("Warning: sub-cost payment error: {}", e);
+                            log::debug!("Warning: sub-cost payment error: {}", e);
                         }
                         if self.pending_choice.is_some() {
                             return Ok(());
                         }
                     }
                 }
-                eprintln!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
+                log::debug!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
                     cost.cost_type, gs.entry_cost().is_some(), 
                     gs.entry_effect().map(|e| e.action.clone()));
                 if cost.cost_type.as_deref() == Some("place_energy_under_member") {
@@ -730,28 +761,28 @@ impl AbilityResolver {
             }
             self.pending_choice = None;
             let is_effect_optional = gs.entry_choice_card_no() == Some(ChoiceRoute::OptionalCost);
-            eprintln!(
+            log::debug!(
                 "[HANDLE_OPT_COST] entry_cost={:?} entry_effect={:?} effect_action={:?}",
                 gs.entry_cost().map(|c| c.state_change.as_deref()),
                 gs.entry_effect().map(|e| e.action.clone()),
                 gs.entry_effect().map(|e| e.action.clone())
             );
-            eprintln!(
+            log::debug!(
                 "[HANDLE_OPT_COST2] entering if: entry_cost.is_some={}",
                 gs.entry_cost().is_some()
             );
             if gs.entry_cost().is_some() {
-                eprintln!(
+                log::debug!(
                     "[HANDLE_OPT_COST2] inside if: entry_effect.is_some={}",
                     gs.entry_effect().is_some()
                 );
                 if let Some(effect) = gs.entry_effect().cloned() {
-                    eprintln!(
+                    log::debug!(
                         "[HANDLE_OPT_COST2] calling execute_effect with action={}",
                         effect.action
                     );
                     if let Err(e) = self.execute_effect(gs, &effect) {
-                        eprintln!("Failed to execute effect after optional cost: {}", e);
+                        log::debug!("Failed to execute effect after optional cost: {}", e);
                     }
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.effect_started = true;
@@ -759,7 +790,7 @@ impl AbilityResolver {
                 }
             } else if gs.ability_queue.has_pending_commands() {
                 if let Err(e) = self.resume_pending_commands(gs) {
-                    eprintln!("Failed to execute action after optional: {}", e);
+                    log::debug!("Failed to execute action after optional: {}", e);
                 }
             } else if is_effect_optional {
                 if let Some(effect) = gs.entry_effect().cloned() {

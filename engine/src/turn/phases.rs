@@ -102,7 +102,6 @@ impl super::TurnEngine {
             match game_state.current_phase {
                 Phase::LiveCardSetFirstAttacker => {
                     game_state.current_phase = Phase::LiveCardSetSecondAttacker;
-                    return;
                 }
                 Phase::LiveCardSetSecondAttacker => {
                     game_state.recalculate_constants();
@@ -111,7 +110,19 @@ impl super::TurnEngine {
                     let first_attacker_id = game_state.first_attacker().id.clone();
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
                     game_state.process_pending_auto_abilities(&first_attacker_id);
-                    return;
+                    if game_state.has_pending_choice() {
+                        return;
+                    }
+                    // After all LiveStart abilities resolve, trigger each_time abilities
+                    // on live cards (e.g. 繚乱！ビクトリーロード ab#0)
+                    Self::trigger_each_time_abilities(
+                        game_state,
+                        &first_attacker_id,
+                        crate::triggers::LIVE_START,
+                    );
+                    game_state.process_pending_auto_abilities(&first_attacker_id);
+                    if game_state.has_pending_choice() {
+                    }
                 }
                 Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance => {
                     let is_first =
@@ -164,17 +175,23 @@ impl super::TurnEngine {
         let om = game_state.mods.orientation_modifiers.clone();
         let nhm: std::collections::HashMap<
             i16,
-            std::collections::HashMap<crate::card::HeartColor, i32>,
+            std::collections::HashMap<
+                crate::card::HeartColor,
+                crate::core::game_modifiers::ModifierEntry,
+            >,
         > = game_state
             .mods
             .need_heart_modifiers
             .iter()
             .map(|(&k, colors)| {
-                let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
-                    colors.iter().map(|(&c, e)| (c, e.total())).collect();
+                let flat: std::collections::HashMap<
+                    crate::card::HeartColor,
+                    crate::core::game_modifiers::ModifierEntry,
+                > = colors.iter().map(|(&c, e)| (c, *e)).collect();
                 (k, flat)
             })
             .collect();
+        let hcm = game_state.mods.heart_color_multiplier.clone();
         let cannot_live = game_state.is_action_prohibited("cannot_live");
         let player = if is_first {
             game_state.first_attacker_mut()
@@ -193,6 +210,7 @@ impl super::TurnEngine {
             &btm,
             &om,
             &nhm,
+            &hcm,
             cannot_live,
         );
         drop(resolution_zone);
@@ -278,7 +296,7 @@ impl super::TurnEngine {
         _card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
         let idx = if let Some(indices) = _card_indices {
-            indices.get(0).copied().unwrap_or(0)
+            indices.first().copied().unwrap_or(0)
         } else if let Some(cid) = card_id {
             game_state
                 .active_player()
@@ -387,7 +405,7 @@ impl super::TurnEngine {
                 .hand
                 .cards
                 .iter()
-                .position(|c| card_db.get_card(*c).map_or(false, |card| card.is_member()))
+                .position(|c| card_db.get_card(*c).is_some_and(|card| card.is_member()))
                 .ok_or_else(|| "No member cards in hand".to_string())?
         };
 
@@ -436,9 +454,9 @@ impl super::TurnEngine {
 
         // Check if this card has play_baton_touch with count > 1 (double baton touch)
         let has_double_baton = double_baton_areas.is_some()
-            || card_db.get_card(card_id).map_or(false, |c| {
+            || card_db.get_card(card_id).is_some_and(|c| {
                 c.abilities.iter().any(|a| {
-                    a.effect.as_ref().map_or(false, |ef| {
+                    a.effect.as_ref().is_some_and(|ef| {
                         ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
                     })
                 })
@@ -510,7 +528,7 @@ impl super::TurnEngine {
                 }
             }
 
-            eprintln!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
+            log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
             game_state.last_area_move_card_id = Some(card_id);
             game_state.last_area_move_by_player = Some(player_id.clone());
             return Ok(());
@@ -580,9 +598,8 @@ impl super::TurnEngine {
             }
         }
 
-
         // Track area move for movement_condition "moves"
-        eprintln!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
+        log::debug!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
         game_state.last_area_move_card_id = Some(card_id);
         game_state.last_area_move_by_player = Some(player_id.clone());
 
@@ -613,7 +630,7 @@ impl super::TurnEngine {
                                 ability
                                     .triggers
                                     .as_ref()
-                                    .map_or(false, |t| t.contains(crate::triggers::BATON_TOUCH))
+                                    .is_some_and(|t| t.contains(crate::triggers::BATON_TOUCH))
                             })
                             .map(|ability| {
                                 (
@@ -669,7 +686,7 @@ impl super::TurnEngine {
                                 .effect
                                 .as_ref()
                                 .and_then(|e| e.condition.as_ref())
-                                .map_or(false, |c| {
+                                .is_some_and(|c| {
                                     matches!(
                                         Zone::from_str(c.location.as_deref().unwrap_or("")),
                                         Some(Zone::Discard | Zone::Waitroom)

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Automated Frontend Test</title>
+</head>
+<body>
+    <h1>Automated Frontend Test</h1>
+    <div id="log"></div>
+    <script>
+        async function testFrontend() {
+            const log = document.getElementById('log');
+            
+            function addLog(msg) {
+                const div = document.createElement('div');
+                div.textContent = msg;
+                log.appendChild(div);
+                console.log(msg);
+            }
+            
+            try {
+                addLog('=== AUTOMATED FRONTEND TEST ===');
+                
+                // Wait for page to load
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Open game setup modal
+                addLog('1. Opening game setup...');
+                const setupButton = document.querySelector('[data-action="open-setup-modal"]');
+                if (!setupButton) {
+                    addLog('❌ Setup button not found');
+                    return;
+                }
+                setupButton.click();
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Select decks
+                addLog('2. Selecting decks...');
+                const p0Select = document.getElementById('p0-deck-select');
+                const p1Select = document.getElementById('p1-deck-select');
+                if (p0Select && p1Select) {
+                    p0Select.value = 'Aqours Cup';
+                    p1Select.value = 'Aqours Cup';
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                // Start game
+                addLog('3. Starting game...');
+                const submitButton = document.querySelector('[data-action="submit-game-setup"]');
+                if (!submitButton) {
+                    addLog('❌ Submit button not found');
+                    return;
+                }
+                submitButton.click();
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                // Check initial phase
+                addLog('4. Checking initial phase...');
+                const initialPhase = window.State?.data?.phase;
+                addLog('Initial phase: ' + initialPhase);
+                
+                if (initialPhase !== 'RockPaperScissors') {
+                    addLog('❌ Wrong initial phase, expected RockPaperScissors');
+                    return;
+                }
+                
+                // Get RPS actions
+                addLog('5. Getting RPS actions...');
+                const rpsActions = window.State?.data?.legal_actions?.filter(a => 
+                    a.action_type === 'rock_choice' || 
+                    a.action_type === 'paper_choice' || 
+                    a.action_type === 'scissors_choice'
+                ) || [];
+                addLog('RPS actions: ' + rpsActions.length);
+                
+                if (rpsActions.length !== 3) {
+                    addLog('❌ Wrong number of RPS actions');
+                    return;
+                }
+                
+                // Click Rock
+                addLog('6. Clicking Rock...');
+                const rockAction = rpsActions.find(a => a.action_type === 'rock_choice');
+                const rockButton = document.querySelector(`[data-action-id="${rockAction?.index}"]`);
+                if (rockButton) {
+                    rockButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
+                // Click Paper
+                addLog('7. Clicking Paper...');
+                const paperAction = window.State?.data?.legal_actions?.find(a => a.action_type === 'paper_choice');
+                const paperButton = document.querySelector(`[data-action-id="${paperAction?.index}"]`);
+                if (paperButton) {
+                    paperButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
+                // Check phase after RPS
+                addLog('8. Checking phase after RPS...');
+                const phaseAfterRPS = window.State?.data?.phase;
+                addLog('Phase after RPS: ' + phaseAfterRPS);
+                
+                if (phaseAfterRPS !== 'ChooseFirstAttacker') {
+                    addLog('❌ Wrong phase after RPS, expected ChooseFirstAttacker');
+                    return;
+                }
+                
+                // Get turn choice actions
+                addLog('9. Getting turn choice actions...');
+                const turnActions = window.State?.data?.legal_actions?.filter(a => 
+                    a.action_type === 'choose_first_attacker' || 
+                    a.action_type === 'choose_second_attacker'
+                ) || [];
+                addLog('Turn choice actions: ' + turnActions.length);
+                
+                if (turnActions.length !== 2) {
+                    addLog('❌ Wrong number of turn choice actions');
+                    return;
+                }
+                
+                // Click "Go first"
+                addLog('10. Clicking Go first...');
+                const goFirstAction = turnActions.find(a => a.action_type === 'choose_first_attacker');
+                const goFirstButton = document.querySelector(`[data-action-id="${goFirstAction?.index}"]`);
+                if (goFirstButton) {
+                    goFirstButton.click();
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                }
+                
+                // Check phase after turn choice
+                addLog('11. Checking phase after turn choice...');
+                const phaseAfterTurn = window.State?.data?.phase;
+                addLog('Phase after turn choice: ' + phaseAfterTurn);
+                
+                if (phaseAfterTurn !== 'MulliganP1Turn' && phaseAfterTurn !== 'MulliganP2Turn') {
+                    addLog('❌ Wrong phase after turn choice, expected Mulligan phase');
+                    addLog('Got: ' + phaseAfterTurn);
+                    return;
+                }
+                
+                // Get mulligan actions
+                addLog('12. Getting mulligan actions...');
+                const mulliganActions = window.State?.data?.legal_actions?.filter(a => 
+                    a.action_type === 'confirm_mulligan' || 
+                    a.action_type === 'skip_mulligan'
+                ) || [];
+                addLog('Mulligan actions: ' + mulliganActions.length);
+                
+                if (mulliganActions.length < 1) {
+                    addLog('❌ No mulligan actions available');
+                    return;
+                }
+                
+                addLog('=== TEST PASSED ===');
+                addLog('Turn choice phase correctly advances to mulligan');
+                
+            } catch (error) {
+                addLog('=== TEST FAILED ===');
+                addLog('Error: ' + error.message);
+                console.error(error);
+            }
+        }
+        
+        // Auto-start test after page loads
+        window.addEventListener('load', () => {
+            setTimeout(testFrontend, 1000);
+        });
+    </script>
+</body>
+</html>

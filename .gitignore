@@ -8,3 +8,10 @@ node_modules/
 nul
 *.log
 *.json
+!cards/*.json
+!web_ui/package.json
+!web_ui/package-lock.json
+!web_ui/vite.config.js
+.kilo/
+.opencode/
+.ruff_cache/

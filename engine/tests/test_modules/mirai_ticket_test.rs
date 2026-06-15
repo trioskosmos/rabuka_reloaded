@@ -1,5 +1,4 @@
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 /// PL!S-bp6-021-L | MIRAI TICKET (ab#0)
 ///
@@ -18,8 +17,8 @@ fn mirai_ticket_custom_condition_loads_and_fires() {
     let mut game = TestGame::new(db);
 
     let mirai = game.id("PL!S-bp6-021-L");
-    let live = game.id("PL!-bp3-026-L"); // Oh,Love&Peace!
-    let center = game.id("PL!-pb1-014-R"); // stage member with blade
+    let _live = game.id("PL!-bp3-026-L"); // Oh,Love&Peace!
+    let _center = game.id("PL!-pb1-014-R"); // stage member with blade
     let filler = game.id("PL!-sd1-010-SD");
 
     // Fill decks

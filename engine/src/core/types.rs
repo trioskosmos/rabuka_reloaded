@@ -167,6 +167,7 @@ pub struct MemberContribution {
     pub ability_heart_bonuses: Vec<AbilityBonus>,
     pub ability_blade_bonuses: Vec<AbilityBonus>,
     pub card_no: String,
+    pub is_wait: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -13,7 +13,7 @@ impl AbilityResolver {
             .ability_gain
             .as_deref()
             .filter(|s| !s.is_empty())
-            .or_else(|| {
+            .or({
                 if effect.text.is_empty() {
                     None
                 } else {
@@ -104,13 +104,41 @@ impl AbilityResolver {
         }
     }
 
-    pub(crate) fn execute_invalidate_ability(&mut self, gs: &mut GameState) {
+    pub(crate) fn execute_invalidate_ability(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
+        // Check if there are valid targets on stage matching the effect's filters,
+        // excluding the activating card itself (you can't invalidate your own abilities
+        // as part of playing yourself).
+        let db = &gs.card_database;
+        let player = gs.resolve_target_player(effect.target.as_deref().unwrap_or("self"));
+        let stage_ids: Vec<i16> = player
+            .stage
+            .stage
+            .iter()
+            .copied()
+            .filter(|&id| id != -1)
+            .collect();
+
+        let mut filter = super::util::CardFilter::from_effect(effect);
+        if let Some(activating) = gs.activating_card {
+            filter.exclude_self = Some(activating);
+        }
+        let valid = super::util::matching_ids(&stage_ids, db, &filter, true);
+
+        if valid.is_empty() {
+            return Err("no valid targets for invalidation".to_string());
+        }
+
         if let Some(card_id) = gs.activating_card {
             let pp = self.player_prefix(gs);
             let cn = self.card_name(card_id);
             gs.rule_log.push(format!("{} {}: 能力無効化", pp, cn));
             gs.negated_abilities.insert(card_id);
         }
+        Ok(())
     }
 
     pub(crate) fn execute_gain_ability(
@@ -135,7 +163,7 @@ impl AbilityResolver {
             .as_ref()
             .and_then(|e| e.gained_effect.clone())
         {
-            eprintln!(
+            log::debug!(
                 "[GAINED_ABILITY] Executing gained effect: {:?}",
                 gained.action
             );
@@ -151,7 +179,7 @@ impl AbilityResolver {
             }) {
                 if let Some(card_id) = gs.activating_card {
                     gs.mods.add_score_modifier(card_id, val);
-                    eprintln!(
+                    log::debug!(
                         "[GAINED_ABILITY] Applied +{} score modifier to card {}",
                         val, card_id
                     );
@@ -237,7 +265,7 @@ impl AbilityResolver {
                 }
 
                 if let Some(cl) = effect.cost_limit {
-                    let card_cost = c.cost.unwrap_or(0) as u32;
+                    let card_cost = c.cost.unwrap_or(0);
                     let passes = match effect.cost_limit_operator.as_deref() {
                         Some("<=") | None => card_cost <= cl,
                         Some(">=") => card_cost >= cl,
@@ -272,7 +300,7 @@ impl AbilityResolver {
                             ability
                                 .triggers
                                 .as_ref()
-                                .map_or(false, |t| t.contains(f) || f.contains(t.as_str()))
+                                .is_some_and(|t| t.contains(f) || f.contains(t.as_str()))
                         }),
                         None => true,
                     };

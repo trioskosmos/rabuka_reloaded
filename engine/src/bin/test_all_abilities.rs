@@ -167,7 +167,7 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
                     .find(|(id, other)| {
                         **id != card_id
                             && other.is_member()
-                            && other.cost.map_or(false, |c| c <= 2)
+                            && other.cost.is_some_and(|c| c <= 2)
                             && other.unit.as_deref() == Some("Printemps")
                     })
                     .map(|(id, _)| *id)
@@ -175,7 +175,7 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
             .or_else(|| {
                 db.cards
                     .iter()
-                    .find(|(_, c)| c.is_member() && c.cost.map_or(false, |cost| cost <= 2))
+                    .find(|(_, c)| c.is_member() && c.cost.is_some_and(|cost| cost <= 2))
                     .map(|(id, _)| *id)
             })
             .unwrap_or(filler)
@@ -318,7 +318,7 @@ fn main() {
         serde_json::from_str(&data).expect("Failed to parse scenarios.json");
 
     let db = load_db();
-    eprintln!(
+    log::debug!(
         "Loaded {} cards, testing {} scenarios",
         db.cards.len(),
         scenarios.len()
@@ -338,6 +338,6 @@ fn main() {
     });
     let output_str = serde_json::to_string_pretty(&output).unwrap();
     std::fs::write("test_results.json", &output_str).expect("Failed to write results");
-    eprintln!("Results written to test_results.json");
+    log::debug!("Results written to test_results.json");
     println!("{}", output_str);
 }

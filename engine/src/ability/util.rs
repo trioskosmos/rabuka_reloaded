@@ -11,8 +11,8 @@ pub fn find_modify_cost<'a>(
     loc: Option<&str>,
 ) -> Option<&'a crate::card::AbilityEffect> {
     if effect.action == "modify_cost"
-        && op.map_or(true, |o| effect.operation.as_deref() == Some(o))
-        && loc.map_or(true, |l| effect.location.as_deref() == Some(l))
+        && op.is_none_or(|o| effect.operation.as_deref() == Some(o))
+        && loc.is_none_or(|l| effect.location.as_deref() == Some(l))
     {
         return Some(effect);
     }
@@ -43,9 +43,14 @@ pub fn calculate_play_cost_reduction(
     let mut cost_reduction: u32 = 0;
     for ability in &card.abilities {
         if let Some(ref effect) = ability.effect {
-            if let Some(_mod) = find_modify_cost(effect, Some("subtract"), Some("hand")) {
-                let per_unit = _mod.per_unit_count.unwrap_or(1) as usize;
-                cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
+            if let Some(mod_cost) = find_modify_cost(effect, Some("subtract"), Some("hand")) {
+                if mod_cost.per_unit.unwrap_or(false) {
+                    let per_unit = mod_cost.per_unit_count.unwrap_or(1) as usize;
+                    cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
+                } else {
+                    let reduction = mod_cost.value.unwrap_or(1);
+                    cost_reduction = cost_reduction.max(reduction);
+                }
                 break;
             }
         }
@@ -76,11 +81,11 @@ pub fn calculate_play_cost_reduction(
                                 continue;
                             }
                             if let Some(limit) = effect.cost_limit {
-                                if card.cost.map_or(true, |c| c != limit) {
+                                if card.cost != Some(limit) {
                                     continue;
                                 }
                             }
-                            if !cost_threshold_met(&card, effect) {
+                            if !cost_threshold_met(card, effect) {
                                 continue;
                             }
                             if let Some(ref ct) = effect.card_type {
@@ -122,7 +127,7 @@ pub fn calculate_play_cost_reduction(
                             if !group_matches {
                                 continue;
                             }
-                            if !cost_threshold_met(&card, effect) {
+                            if !cost_threshold_met(card, effect) {
                                 continue;
                             }
                             if let Some(ref ct) = effect.card_type {
@@ -163,11 +168,10 @@ fn cost_threshold_met(card: &crate::card::Card, effect: &crate::card::AbilityEff
                 return false;
             }
         }
-        (Some(threshold), None) => {
-            if card.cost.map_or(true, |c| c != threshold) {
+        (Some(threshold), None)
+            if card.cost != Some(threshold) => {
                 return false;
             }
-        }
         _ => {}
     }
     true
@@ -226,11 +230,8 @@ pub fn card_matches_group(
 /// for each check so callers can log detailed diagnostics. Disabled by default;
 /// enable via `RABUKA_DEBUG_GROUP=1`.
 fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&str>, result: bool) {
-    if std::env::var("RABUKA_DEBUG_GROUP").is_err() {
-        return;
-    }
-    let running = std::env::var("RABUKA_DEBUG_GROUP").unwrap_or_default();
-    if running.is_empty() || running != "1" {
+    static DEBUG_GROUP: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    if !*DEBUG_GROUP.get_or_init(|| std::env::var("RABUKA_DEBUG_GROUP").as_deref() == Ok("1")) {
         return;
     }
     let card = card_db.get_card(card_id);
@@ -263,7 +264,7 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
         }
         None => String::new(),
     };
-    eprintln!(
+    log::debug!(
         "[GROUP_MATCH] card={}[{}] group={:?} result={} {}",
         card_name, card_id, group_name, result, checks
     );
@@ -279,30 +280,34 @@ pub fn card_matches_group_str(
             // Normalize full-width/half-width exclamation marks so that
             // group names like "みらくらぱーく！" match unit fields using
             // either ！(U+FF01) or !(U+0021).
+            // Also normalize µ (micro sign U+00B5) to μ (mu U+03BC) for
+            // μ's group matching.
             fn norm(s: &str) -> String {
-                s.replace('\u{FF01}', "!")
+                s.replace('\u{FF01}', "!").replace('\u{00B5}', "\u{03BC}")
             }
             let gn = norm(g);
             card_db
                 .get_card(card_id)
                 .map(|c| {
-                    norm(c.unit.as_deref().unwrap_or("")) == gn
+                    let unit = c.unit.as_deref().unwrap_or("");
+                    let unit_match = unit == gn || ((unit.contains('\u{FF01}') || unit.contains('\u{00B5}')) && norm(unit) == gn);
+                    unit_match
                 || c.group == g
                 // Check name fragments for multi-name cards (e.g. "にこ" in "矢澤にこ")
-                || card_db.get_card_names(card_id).iter().any(|n| norm(n).contains(&gn))
+                || card_db.get_card_names(card_id).iter().any(|n| n.contains(&gn) || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm(n).contains(&gn)))
                 // For multi-series cards (containing \n), don't match individual series
                 // Multi-name cards' individuals each have their own series but the card
                 // as a whole should not match group conditions (Q212)
-                || (!c.series.contains('\n') && card_series_matches_group(&c.series, g))
+                || (!c.series.contains('\n') && card_series_matches_group(&c.series, &gn))
                 // Constant `set_card_identity` ("treated as") abilities give the
                 // card additional group memberships in all zones. Examples:
                 //   AURORA FLOWER (PL!HS-bp5-018-L) is "スリーズブーケ" /
                 //   "DOLLCHESTRA" / "みらくらぱーく！" everywhere.
                 || c.abilities.iter().any(|ab| {
-                    ab.effect.as_ref().map_or(false, |eff| {
+                    ab.effect.as_ref().is_some_and(|eff| {
                         eff.action == "set_card_identity"
-                            && eff.identities.as_ref().map_or(false, |ids| {
-                                ids.iter().any(|id| norm(id) == gn)
+                            && eff.identities.as_ref().is_some_and(|ids| {
+                                ids.iter().any(|id| id == &gn || ((id.contains('\u{FF01}') || id.contains('\u{00B5}')) && norm(id) == gn))
                             })
                     })
                 })
@@ -341,10 +346,17 @@ pub fn card_matches_characters(
         Some(names) if !names.is_empty() => {
             let card_names = card_db.get_card_names(card_id);
             names.iter().any(|name| {
-                let clean_name = name.replace(' ', "").replace('　', "");
+                let clean_name = name.replace([' ', '　'], "");
                 card_names.iter().any(|cn| {
-                    let clean_cn = cn.replace(' ', "").replace('　', "");
-                    clean_cn.contains(&clean_name)
+                    if cn.contains(&clean_name) {
+                        return true;
+                    }
+                    if cn.contains(' ') || cn.contains('　') {
+                        let clean_cn = cn.replace([' ', '　'], "");
+                        clean_cn.contains(&clean_name)
+                    } else {
+                        false
+                    }
                 })
             })
         }
@@ -369,13 +381,17 @@ pub fn card_matches_cost_limit_op(
     match cost_limit {
         Some(limit) => card_db
             .get_card(card_id)
-            .and_then(|c| c.cost)
-            .map(|cost| match comparison {
-                Some("min") | Some(">=") => cost >= limit,
-                Some("exact") | Some("=") => cost == limit,
-                Some(">") => cost > limit,
-                Some("<") => cost < limit,
-                _ => cost <= limit,
+            .map(|c| {
+                // Use score for live cards, cost for members
+                c.cost.or(c.score)
+            })
+            .flatten()
+            .map(|value| match comparison {
+                Some("min") | Some(">=") => value >= limit,
+                Some("exact") | Some("=") => value == limit,
+                Some(">") => value > limit,
+                Some("<") => value < limit,
+                _ => value <= limit,
             })
             .unwrap_or(false),
         None => true,
@@ -390,13 +406,13 @@ pub fn card_matches_heart_colors(
     if heart_colors.is_empty() {
         return true;
     }
-    let result = card_db.get_card(card_id).map_or(true, |card| {
+    let result = card_db.get_card(card_id).is_none_or(|card| {
         heart_colors.iter().any(|color| {
             let hc = parse_heart_color(color);
             card.base_heart.as_ref().map_or(
                 card.need_heart
                     .as_ref()
-                    .map_or(false, |need| need.hearts.contains_key(&hc)),
+                    .is_some_and(|need| need.hearts.contains_key(&hc)),
                 |base| base.hearts.contains_key(&hc),
             )
         })
@@ -428,6 +444,8 @@ pub struct CardFilter<'a> {
     pub groups: Option<&'a Vec<String>>,
     pub cost_limit: Option<u32>,
     pub cost_operator: Option<&'a str>,
+    /// Minimum cost bound for range filters (e.g. cost >= 4)
+    pub cost_limit_min: Option<u32>,
     /// Sum-total cost constraint — checked post-selection, not in per-card matches()
     pub cost_total: Option<u32>,
     pub cost_total_operator: Option<&'a str>,
@@ -498,6 +516,12 @@ impl<'a> CardFilter<'a> {
         if skip_empty && id == -1 {
             return false;
         }
+        if let Some(exclude_id) = self.exclude_self {
+            if id == exclude_id {
+                log::debug!("[DBG matches] exclude_self id={} matched, excluding", id);
+                return false;
+            }
+        }
         if let Some(ex) = self.exclude_cards {
             if ex.contains(&id) {
                 return false;
@@ -523,44 +547,13 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
-        if let Some(ex) = self.exclude_cards {
-            if ex.contains(&id) {
-                return false;
-            }
-        }
-        if let Some(ct) = self.card_type {
-            if !card_matches_type(db, id, Some(ct)) {
-                return false;
-            }
-        }
-        eprintln!(
-            "[DBG matches] id={} group={:?} groups={:?}",
-            id, self.group, self.groups
-        );
-        if let Some(g) = self.group {
-            let gmatch = card_matches_group_str(db, id, Some(g));
-            eprintln!(
-                "[DBG matches]   card_matches_group_str({}, {:?}) = {}",
-                id, g, gmatch
-            );
-            if !gmatch {
-                if let Some(gs) = self.groups {
-                    if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) {
-                        eprintln!("[DBG matches]   -> false (no group match)");
-                        return false;
-                    }
-                } else {
-                    eprintln!("[DBG matches]   -> false (no self.groups fallback)");
-                    return false;
-                }
-            }
-        } else if let Some(gs) = self.groups {
-            if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) {
-                return false;
-            }
-        }
         if let Some(lim) = self.cost_limit {
             if !card_matches_cost_limit_op(db, id, Some(lim), self.cost_operator) {
+                return false;
+            }
+        }
+        if let Some(min) = self.cost_limit_min {
+            if !card_matches_cost_limit_op(db, id, Some(min), Some(">=")) {
                 return false;
             }
         }
@@ -574,11 +567,10 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
-        if !self.heart_colors.is_empty() {
-            if !card_matches_heart_colors(db, id, self.heart_colors) {
+        if !self.heart_colors.is_empty()
+            && !card_matches_heart_colors(db, id, self.heart_colors) {
                 return false;
             }
-        }
         if let Some(need_total) = self.need_heart_total {
             if let Some(color_str) = self.need_heart_color {
                 // Per-color check (e.g. heart06 >= 3)
@@ -658,9 +650,10 @@ impl<'a> CardFilter<'a> {
                 .as_ref()
                 .and_then(|v| v.first())
                 .map(|s| s.as_str()),
-            groups: effect.group_names.as_ref().map(|v| v.as_ref()),
+            groups: effect.group_names.as_ref().map(|v| v),
             cost_limit: effect.cost_limit,
             cost_operator: effect.cost_limit_operator.as_deref(),
+            cost_limit_min: effect.cost_limit_min,
             cost_total: effect.cost_total,
             cost_total_operator: effect.cost_total_operator.as_deref(),
             characters: effect.characters.as_ref(),
@@ -700,6 +693,7 @@ impl<'a> CardFilter<'a> {
                 groups: None,
                 cost_limit: *cost_limit,
                 cost_operator: cost_limit_operator.as_deref(),
+                cost_limit_min: None,
                 cost_total: None,
                 cost_total_operator: None,
                 need_heart_total: None,
@@ -721,7 +715,7 @@ impl<'a> CardFilter<'a> {
 }
 
 fn card_matches_name_fragments(db: &CardDatabase, id: i16, fragments: &[String]) -> bool {
-    db.get_card(id).map_or(false, |card| {
+    db.get_card(id).is_some_and(|card| {
         fragments.iter().all(|f| card.name.contains(f.as_str()))
     })
 }
@@ -906,11 +900,13 @@ pub fn zone_cards<'a>(player: &'a crate::player::Player, zone: &str) -> &'a [i16
         Some(Zone::EnergyZone) | Some(Zone::Energy) => &player.energy_zone.cards,
         Some(Zone::LiveCardZone) => &player.live_card_zone.cards,
         Some(Zone::SuccessLiveZone) => &player.success_live_card_zone.cards,
+        // UnderMember is a 2D structure (Vec<Vec<i16>>) and cannot be
+        // returned as a flat slice. Callers must use resolve_per_unit_count
+        // or direct iteration instead.
+        // SuccessLiveZone cards are already handled above.
+        Some(Zone::UnderMember) => &[], // Use resolve_per_unit_count instead
         // Legacy string matches for strings that don't parse to Zone enum
-        None => match zone {
-            "under_member" => &[], // Return empty; caller must handle separately
-            _ => &[],
-        },
+        None => &[],
         // All other Zone variants not explicitly listed above
         _ => &[],
     }
@@ -1222,7 +1218,7 @@ pub fn place_card_in_zone(
             true
         }
         _ => {
-            if destination == "" {
+            if destination.is_empty() {
                 player.waitroom.add_card(card_id);
             } else {
                 player.hand.add_card(card_id);
@@ -1311,6 +1307,8 @@ pub fn resolve_per_unit_count(
     card_db: &CardDatabase,
     filter: &CardFilter,
     heart_colors: &[String],
+    state_filter: Option<&str>,
+    orientation_modifiers: &std::collections::HashMap<i16, String>,
 ) -> u32 {
     if !per_unit {
         return 1;
@@ -1320,7 +1318,7 @@ pub fn resolve_per_unit_count(
         Some("hand") | Some("card") => Zone::Hand.to_str(),
         Some("under_member") => Zone::UnderMember.to_str(),
         Some("枚") => {
-            let has_member_ct = filter.card_type.map_or(false, |ct| ct == "member_card");
+            let has_member_ct = filter.card_type == Some("member_card");
             if has_member_ct {
                 Zone::UnderMember.to_str()
             } else {
@@ -1354,19 +1352,25 @@ pub fn resolve_per_unit_count(
                 .count() as u32
         }
     } else {
-        let cards = zone_cards(player, zone);
+        let mut cards: Vec<i16> = zone_cards(player, zone).to_vec();
+        // Apply state filter (wait/active) for stage cards
+        let is_stage = Zone::from_str(zone) == Some(Zone::Stage);
+        if is_stage {
+            if let Some(state) = state_filter {
+                cards.retain(|&cid| {
+                    orientation_modifiers
+                        .get(&cid)
+                        .map_or(state == "active", |o| o.as_str() == state)
+                });
+            }
+        }
         if heart_colors.is_empty() {
-            count_matching(
-                cards,
-                card_db,
-                filter,
-                Zone::from_str(zone) == Some(Zone::Stage),
-            )
+            count_matching(&cards, card_db, filter, is_stage)
         } else {
             cards
                 .iter()
                 .filter(|&&id| {
-                    filter.matches(card_db, id, Zone::from_str(zone) == Some(Zone::Stage))
+                    filter.matches(card_db, id, is_stage)
                         && card_matches_heart_colors(card_db, id, heart_colors)
                 })
                 .count() as u32
@@ -1526,7 +1530,7 @@ pub fn get_selection_indices(
     self_target_only: bool,
     skip_empty: bool,
 ) -> Vec<usize> {
-    eprintln!(
+    log::debug!(
         "[GET_SEL] cards.len={} filter.nh_color={:?} filter.nh_total={:?}",
         cards.len(),
         filter.need_heart_color,

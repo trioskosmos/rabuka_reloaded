@@ -558,6 +558,12 @@ pub struct AbilityEffect {
     pub cost_limit: Option<u32>,
     #[serde(default)]
     pub cost_limit_operator: Option<String>,
+    /// Minimum cost bound for range filters (e.g. "コスト4以上9以下" → min=4)
+    #[serde(default)]
+    pub cost_limit_min: Option<u32>,
+    /// Maximum cost bound for range filters (e.g. "コスト4以上9以下" → max=9)
+    #[serde(default)]
+    pub cost_limit_max: Option<u32>,
     /// Sum-total cost constraint (e.g. "total cost ≤ 4")
     #[serde(default)]
     pub cost_total: Option<u32>,
@@ -663,6 +669,8 @@ pub struct AbilityEffect {
     pub character_effects: Option<Vec<serde_json::Value>>,
     #[serde(default)]
     pub group_names: Option<Vec<String>>,
+    #[serde(default)]
+    pub exclude_group_names: Option<Vec<String>>,
     #[serde(default)]
     pub heart_selection: Option<bool>,
     #[serde(default)]
@@ -849,6 +857,8 @@ pub struct Condition {
     pub card_type: Option<String>,
     pub target: Option<String>,
     pub group_names: Option<Vec<String>>,
+    #[serde(default)]
+    pub exclude_group_names: Option<Vec<String>>,
     pub characters: Option<Vec<String>>,
     pub exclude_characters: Option<Vec<String>>,
     pub state: Option<String>,
@@ -871,6 +881,8 @@ pub struct Condition {
     pub movement_state: Option<String>,
     pub energy_state: Option<String>,
     pub comparison_target: Option<String>,
+    #[serde(default)]
+    pub comparison_source: Option<String>,
     pub movement: Option<String>,
     pub temporal: Option<String>,
     pub phase: Option<String>,
@@ -949,6 +961,10 @@ pub struct Condition {
     pub cost_reference_operator: Option<String>,
     #[serde(default)]
     pub cost_reference_type: Option<String>,
+    /// delta: true — check the change (difference) caused by preceding action,
+    /// not the absolute current value. Used for surplus heart loss tracking.
+    #[serde(default)]
+    pub delta: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -28,7 +28,7 @@ impl super::resolver::AbilityResolver {
         for (i, command) in pending.iter().enumerate() {
             match command {
                 Command::Effect(effect) => {
-                    self.last_effect_target = effect.target.clone();
+                    self.spawn_context.target = effect.target.clone();
                     self.execute_effect(gs, effect)?;
                 }
                 Command::MoveCard {
@@ -72,7 +72,7 @@ impl super::resolver::AbilityResolver {
             .retain(|(_, duration)| duration != "live_end");
         let expired_count = initial_count - self.duration_effects.len();
         if expired_count > 0 {
-            eprintln!("Expired {} effects with duration 'live_end'", expired_count);
+            log::debug!("Expired {} effects with duration 'live_end'", expired_count);
         }
     }
 
@@ -111,7 +111,7 @@ impl super::resolver::AbilityResolver {
         if !sub_choice {
             self.resume_pending_commands(gs)?;
         }
-        eprintln!(
+        log::debug!(
             "[FINALIZE_CHOICE] pending={} selected={:?} context={:?}",
             has_pending_sequential, self.selected_cards, context
         );
@@ -196,7 +196,7 @@ impl super::resolver::AbilityResolver {
                 *is_select_action,
                 target_player_id.clone(),
                 *blind,
-                choice.as_ref().map_or(false, |c| {
+                choice.as_ref().is_some_and(|c| {
                     matches!(
                         c,
                         Choice::SelectCard {
@@ -272,8 +272,8 @@ impl super::resolver::AbilityResolver {
         is_reveal: bool,
     ) -> Result<(), String> {
         println!(
-            "DEBUG: handle_select_card - zone: '{}', indices: {:?}, context: {:?}, is_reveal: {}",
-            zone, indices, context, is_reveal
+            "DEBUG: handle_select_card - zone: '{}', indices: {:?}, count: {}, allow_skip: {}, context: {:?}, is_reveal: {}",
+            zone, indices, count, allow_skip, context, is_reveal
         );
 
         // Distinguish cost vs effect: cost handler only fires when effect NOT yet started.
@@ -281,7 +281,7 @@ impl super::resolver::AbilityResolver {
         let effect_started = gs
             .ability_queue
             .current_entry()
-            .map_or(false, |e| e.effect_started);
+            .is_some_and(|e| e.effect_started);
 
         // Handle reveal action: push selected cards to revealed_cards, don't discard.
         // Supports sequential multi-pick via re-prompt when indices.len() < count.
@@ -455,14 +455,14 @@ impl super::resolver::AbilityResolver {
         let mut skip_discard_cleanup = false;
         // Enter cost-phase when: ability has a cost, and we're handling a hand choice
         // (either with picks, or with skip when allow_skip is true).
-        eprintln!(
+        log::debug!(
             "[COST_GATE] entry_cost={:?} allow_skip={} indices={:?} effect_started={}",
             gs.entry_cost().is_some(),
             allow_skip,
             indices,
             gs.ability_queue
                 .current_entry()
-                .map_or(false, |e| e.effect_started)
+                .is_some_and(|e| e.effect_started)
         );
         if gs.entry_cost().is_some() && (!effect_started || allow_skip || !indices.is_empty()) {
             // Cost-phase zone handler — only for hand choices where effect hasn't started,
@@ -473,7 +473,7 @@ impl super::resolver::AbilityResolver {
                     entry.optional_cost_was_paid = true;
                 }
             }
-            eprintln!("[ZONE_MATCH] zone={} about to match effect-phase", zone);
+            log::debug!("[ZONE_MATCH] zone={} about to match effect-phase", zone);
             match Zone::from_str(zone) {
                 Some(Zone::Hand) if gs.entry_cost().is_some() && !effect_started => {
                     let target = target_player_id
@@ -512,10 +512,10 @@ impl super::resolver::AbilityResolver {
                             }
                         }
                     }
-                    eprintln!("[COST_HAND] indices={:?} count={} allow_skip={} new_cards={:?} moved_so_far={:?}", indices, count, allow_skip, new_card_ids, self.moved_cards);
+                    log::debug!("[COST_HAND] indices={:?} count={} allow_skip={} new_cards={:?} moved_so_far={:?}", indices, count, allow_skip, new_card_ids, self.moved_cards);
                     // Empty indices: user is Done (or skipping entirely).
                     if new_card_ids.is_empty() {
-                        eprintln!("[COST_HAND] empty indices branch");
+                        log::debug!("[COST_HAND] empty indices branch");
                         if !self.moved_cards.is_empty() {
                             gs.mods.last_cost_discard_count = self.moved_cards.len() as u32;
                             gs.recently_moved_cards = Some(self.moved_cards.clone());
@@ -534,7 +534,7 @@ impl super::resolver::AbilityResolver {
                     // Sequential count-based: re-prompt if more picks allowed, else finalize.
                     if count > 0 && new_card_ids.len() < count {
                         let remaining = count - new_card_ids.len();
-                        eprintln!(
+                        log::debug!(
                             "[COST_HAND] re-prompt branch: count={} this_pick={} remaining={}",
                             count,
                             new_card_ids.len(),
@@ -605,7 +605,7 @@ impl super::resolver::AbilityResolver {
                         return Ok(());
                     }
                     // Cap met or only one card left (any_number): finalize.
-                    eprintln!(
+                    log::debug!(
                         "[COST_HAND] finalize branch: moved_so_far={:?}",
                         self.moved_cards
                     );
@@ -619,36 +619,48 @@ impl super::resolver::AbilityResolver {
                     self.pending_choice = None;
                     return Ok(());
                 }
-                Some(Zone::Stage) if !effect_started => {
-                    // Cost phase: move selected stage cards to discard.
-                    let player = gs.active_player_mut();
-                    let card_ids =
-                        util::resolve_indices_to_ids(player, Zone::Stage.to_str(), indices);
-                    let valid_ids: Vec<i16> = card_ids
-                        .into_iter()
-                        .filter(|&cid| validate_card(cid))
-                        .collect();
-                    let mut last_vacated = None;
-                    for &cid in &valid_ids {
-                        if let Some(pos) = player.stage.stage.iter().position(|&x| x == cid) {
-                            last_vacated = Some(pos);
+                Some(Zone::Energy) if !effect_started => {
+                    // Cost phase: pay energy (any-number selection).
+                    let count_paid = indices.len();
+                    if count_paid > 0 {
+                        let player = gs.resolve_target_player_mut(
+                            target_player_id.as_deref().unwrap_or("self"),
+                        );
+                        player.energy_zone.pay_energy(count_paid)?;
+                        gs.mods.last_cost_energy_count += count_paid as u32;
+                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                            entry.cost_paid = true;
+                            entry.optional_cost_was_paid = true;
                         }
                     }
-                    let moved_count = util::move_cards(
-                        player,
-                        &valid_ids,
-                        Zone::Stage.to_str(),
-                        Zone::Discard.to_str(),
-                        None,
-                        &card_db,
-                    );
-                    if moved_count > 0 {
-                        if let Some(pos) = last_vacated {
-                            gs.last_vacated_stage_area = Some(pos);
-                        }
-                        self.moved_cards = valid_ids.clone();
-                        gs.recently_moved_cards = Some(valid_ids);
-                        gs.recently_moved_from_zone = Some("stage".to_string());
+                    // Re-prompt for more, or skip to finish (any_number with count=0)
+                    let energy_left = {
+                        let player =
+                            gs.resolve_target_player(target_player_id.as_deref().unwrap_or("self"));
+                        player.energy_zone.active_energy_count
+                    };
+                    if count_paid > 0 && energy_left > 0 {
+                        let filtered_indices: Vec<usize> = (0..energy_left).collect();
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                Zone::Energy.to_str().to_string(),
+                                0,
+                                format!(
+                                    "Select energy card to pay (active: {}). Skip when done",
+                                    energy_left
+                                ),
+                                true,
+                            )
+                            .filtered_indices(Some(filtered_indices))
+                            .target_player_id(Some(
+                                target_player_id
+                                    .clone()
+                                    .unwrap_or_else(|| "self".to_string()),
+                            ))
+                            .build(),
+                        );
+                        self.store_pending_choice(gs);
+                        return Ok(());
                     }
                     self.clear_choice_state(gs);
                     return self.resume_pending_commands(gs);
@@ -778,12 +790,12 @@ impl super::resolver::AbilityResolver {
                     target_player_id.as_deref(),
                 )?,
                 Some(Zone::LookedAt) => {
-                    eprintln!("[HSC1_LOOKED_AT] START: looked_cards.len()={}, indices={:?}, filtered_indices={:?}, is_select_cards={}",
+                    log::debug!("[HSC1_LOOKED_AT] START: looked_cards.len()={}, indices={:?}, filtered_indices={:?}, is_select_cards={}",
                         gs.looked_at_cards.len(), indices, filtered_indices, gs.ability_queue.current_entry()
                             .and_then(|e| e.ability.effect.as_ref())
                             .and_then(|ef| ef.compound.select_action.as_ref())
                             .map(|sa| {
-                                eprintln!("[HSC1_SA] sa.action={:?}, compound.actions.len={:?}", sa.action, sa.compound.actions.as_ref().map(|a| a.len()));
+                                log::debug!("[HSC1_SA] sa.action={:?}, compound.actions.len={:?}", sa.action, sa.compound.actions.as_ref().map(|a| a.len()));
                                 sa.action == "select_cards"
                             })
                             .unwrap_or(false));
@@ -821,7 +833,7 @@ impl super::resolver::AbilityResolver {
                             return Ok(());
                         }
                     } else if let ExecutionContext::LookAndSelect { .. } = self.execution_context {
-                        if let Some(_) = select_action_entry {}
+                        select_action_entry.is_some();
                         self.handle_select_cards_looked_at(gs, &mapped_indices)?;
                     } else {
                         self.handle_select_cards_looked_at(gs, &mapped_indices)?;
@@ -865,7 +877,7 @@ impl super::resolver::AbilityResolver {
                 Some(Zone::RevealedCards) => {
                     let dst = gs.entry_destination().map(|s| s.to_string());
                     let dst_str = dst.as_deref().unwrap_or(Zone::Hand.to_str());
-                    self.move_from_revealed(gs, indices, &mut validate_card, &dst_str);
+                    self.move_from_revealed(gs, indices, &mut validate_card, dst_str);
                     return self.finalize_choice(gs, &context);
                 }
                 Some(Zone::UnderMember) => {
@@ -908,13 +920,13 @@ impl super::resolver::AbilityResolver {
             }
         }
 
-        eprintln!(
+        log::debug!(
             "[OUTER_MATCH] zone={} effect_started={}",
             zone, effect_started
         );
         match Zone::from_str(zone) {
             Some(Zone::Hand) => {
-                eprintln!("[HAND_START] entering effect-phase Hand handler");
+                log::debug!("[HAND_START] entering effect-phase Hand handler");
                 let mapped_indices: Vec<usize> = if let Some(ref fidx) = filtered_indices {
                     indices
                         .iter()
@@ -928,9 +940,13 @@ impl super::resolver::AbilityResolver {
                 } else {
                     &mapped_indices
                 };
+                log::debug!(
+                    "[HAND_HANDLER] hand_idx={:?} count={} allow_skip={}",
+                    hand_idx, count, allow_skip
+                );
                 if !hand_idx.is_empty() || allow_skip {
                     if !hand_idx.is_empty() && count > 0 && hand_idx.len() < count {
-                        eprintln!("[COUNT_PROMPT] count={} len={}", count, hand_idx.len());
+                        log::debug!("[COUNT_PROMPT] count={} len={}", count, hand_idx.len());
                         // Sequential selection: store selected HAND INDICES and re-prompt
                         // Read target player's hand and build index list (no gs borrow after this)
                         let target = target_player_id.as_deref().unwrap_or("self").to_string();
@@ -995,13 +1011,13 @@ impl super::resolver::AbilityResolver {
                     // any_number re-prompt: after each non-empty selection, user can pick more or skip.
                     // Move current selection to destination immediately, then re-prompt.
                     if !hand_idx.is_empty() && count == 0 && allow_skip {
-                        eprintln!("[ANY_ENTERED] count={} hand_idx={:?}", count, hand_idx);
+                        log::debug!("[ANY_ENTERED] count={} hand_idx={:?}", count, hand_idx);
                         let target = target_player_id.as_deref().unwrap_or("self").to_string();
                         // Move current selection to destination immediately
                         self.execute_selected_cards_from_zone(
                             gs,
                             Zone::Hand.to_str(),
-                            &hand_idx,
+                            hand_idx,
                             count,
                             card_type.as_deref(),
                             cost_limit,
@@ -1390,7 +1406,7 @@ impl super::resolver::AbilityResolver {
                 self.execute_selected_energy_zone_cards(gs, &filtered, count)?;
             }
             Some(Zone::SelectedCards) => {
-                eprintln!(
+                log::debug!(
                     "[SELECTED_CARDS_BEFORE] self.selected_cards={:?} indices={:?}",
                     self.selected_cards, indices
                 );
@@ -1401,7 +1417,7 @@ impl super::resolver::AbilityResolver {
                     }
                 }
                 self.selected_cards = cards;
-                eprintln!(
+                log::debug!(
                     "[SELECTED_CARDS_AFTER] self.selected_cards={:?}",
                     self.selected_cards
                 );
@@ -1415,7 +1431,7 @@ impl super::resolver::AbilityResolver {
                     if indices.is_empty() && allow_skip {
                         gs.ability_queue.take_pending_commands();
                         self.selected_cards = vec![];
-                        eprintln!("[SELECT_STAGE] skip: cleared pending commands");
+                        log::debug!("[SELECT_STAGE] skip: cleared pending commands");
                     }
                     let stage_indices: Vec<usize> = if let Some(ref fidx) = filtered_indices {
                         indices
@@ -1436,7 +1452,7 @@ impl super::resolver::AbilityResolver {
                             }
                         }
                     }
-                    eprintln!(
+                    log::debug!(
                         "[SELECT_STAGE] is_select_action=true cards={:?} filtered_idx={:?}",
                         cards, filtered_indices
                     );
@@ -1490,13 +1506,13 @@ impl super::resolver::AbilityResolver {
                     .to_string();
                 self.move_from_under_member(gs, indices, &mut validate_card, &dst_str)?;
             }
-            _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
+            _ => log::debug!("Card selection from zone '{}' not yet implemented", zone),
         }
-        eprintln!(
+        log::debug!(
             "▶ Select: {} card(s) selected from zone={:?} → [{}]",
             self.selected_cards.len(),
             zone,
-            self.pipeline.fmt_ids(&self.selected_cards)
+            self.fmt_ids(&self.selected_cards)
         );
         self.finalize_choice(gs, &context)
     }
@@ -1622,7 +1638,7 @@ impl super::resolver::AbilityResolver {
     fn handle_order_selection(&mut self, gs: &mut GameState, selected: &str) -> Result<(), String> {
         let ctx = self.execution_context.clone();
         if let ExecutionContext::LookAndSelect { step } = ctx {
-            if let LookAndSelectStep::Finalize { destination } = step {
+            if let LookAndSelectStep::Finalize { destination, .. } = step {
                 if Zone::from_str(&destination) == Some(Zone::Deck) {
                     if let Ok(idx) = selected.parse::<usize>() {
                         if idx < gs.looked_at_cards.len() {
@@ -1670,7 +1686,7 @@ impl super::resolver::AbilityResolver {
                         if let Err(e) =
                             self.execute_position_change_with_destination(gs, &modified, "front")
                         {
-                            eprintln!("Failed to execute position change: {}", e);
+                            log::debug!("Failed to execute position change: {}", e);
                         }
                         self.clear_choice_state_and_resume(gs)?;
                         return Ok(());
@@ -1689,7 +1705,7 @@ impl super::resolver::AbilityResolver {
                     }
                 }
             }
-            let was_select = choice_card_no.as_ref().map_or(false, |ccn| match ccn {
+            let was_select = choice_card_no.as_ref().is_some_and(|ccn| match ccn {
                 ChoiceRoute::Raw(s) => s.contains(":select"),
                 _ => false,
             });
@@ -1709,7 +1725,7 @@ impl super::resolver::AbilityResolver {
                 if let Err(e) =
                     self.execute_position_change(gs, &modified, None, &target_str, "this_member")
                 {
-                    eprintln!(
+                    log::debug!(
                         "Failed to create destination choice for position change: {}",
                         e
                     );
@@ -1726,7 +1742,7 @@ impl super::resolver::AbilityResolver {
             }
             modified.destination = Some(dest.to_string());
             if let Err(e) = self.execute_position_change_with_destination(gs, &modified, dest) {
-                eprintln!("Failed to execute position change: {}", e);
+                log::debug!("Failed to execute position change: {}", e);
             }
         }
         self.clear_choice_state_and_resume(gs)?;
@@ -1900,7 +1916,7 @@ impl super::resolver::AbilityResolver {
         if let Some(options) = gs.entry_cost().and_then(|c| c.options.clone()) {
             if idx < options.len() {
                 if let Err(e) = self.pay_cost(gs, &options[idx]) {
-                    eprintln!("Failed to pay cost option: {}", e);
+                    log::debug!("Failed to pay cost option: {}", e);
                 }
             }
         }

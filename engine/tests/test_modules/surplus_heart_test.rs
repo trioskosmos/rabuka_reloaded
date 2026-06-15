@@ -1,41 +1,6 @@
 /// Tests for 余剰ハート (surplus heart) mechanics.
 use crate::helpers::*;
 
-fn set_p2_live(game: &mut TestGame, card_id: i16) {
-    game.state.player2.hand.cards.push(card_id);
-    game.state.player2.live_card_zone.cards.push(card_id);
-    game.state.player2.hand.cards.retain(|c| *c != card_id);
-}
-
-fn advance_through_live(game: &mut TestGame) {
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    assert_eq!(
-        game.state.player1.energy_zone.cards.len(),
-        0,
-        "No energy: no heart04 pool (Q174)"
-    );
-    assert!(!game.has_pending_choice());
-}
-
-fn fill_deck_and_energy(game: &mut TestGame, blade_all_count: u32) {
-    let f = game.id("PL!-sd1-010-SD");
-    for _ in 0..15 {
-        game.state.player1.main_deck.cards.push(f);
-    }
-    for _ in 0..15 {
-        game.state.player2.main_deck.cards.push(f);
-    }
-    game.give_energy(blade_all_count as usize);
-}
-
 #[test]
 fn bella_q173_two_lives_succeed_both_trigger() {
     let db = load_real_database();

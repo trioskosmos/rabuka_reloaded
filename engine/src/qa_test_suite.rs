@@ -35,7 +35,7 @@ fn get_card_id(card: &Card, card_db: &CardDatabase) -> i16 {
     *card_db
         .card_no_to_id
         .get(&card.card_no)
-        .expect(&format!("Card not in database: {}", card.card_no))
+        .unwrap_or_else(|| panic!("Card not in database: {}", card.card_no))
 }
 
 fn test_q23_member_card_to_stage_procedure() {
@@ -91,6 +91,8 @@ fn test_q23_member_card_to_stage_procedure() {
 
     let initial_hand_count = game_state.player1.hand.cards.len();
     let initial_energy_active = game_state.player1.energy_zone.active_count();
+
+    let _stage_member_id = game_state.player1.stage.stage.iter().find(|&&id| id != -1).unwrap();
 
     let actions = game_setup::generate_possible_actions(&game_state);
     println!(
@@ -203,6 +205,7 @@ fn test_q24_baton_touch_procedure() {
     let initial_waitroom_count = game_state.player1.waitroom.cards.len();
     let initial_hand_count = game_state.player1.hand.cards.len();
     let initial_energy_active = game_state.player1.energy_zone.active_count();
+    let _touched_member = game_state.player1.stage.stage.iter().find(|&&id| id != -1).copied();
 
     println!(
         "After turn 1 - hand: {:?}, energy: {}",
@@ -658,7 +661,7 @@ fn test_q27_baton_touch_only_one_member() {
     }
 
     // Verify we can only select one area at a time
-    if baton_areas.len() > 0 {
+    if !baton_areas.is_empty() {
         let selected_area = baton_areas[0];
         println!(
             "Selecting one baton touch option: area={:?}",
@@ -2053,7 +2056,7 @@ fn test_ability_live_success_draw_then_discard() {
     let live_success_ability = member_card
         .abilities
         .iter()
-        .find(|a| a.triggers.as_ref().map_or(false, |t| t == "ライブ成功時"))
+        .find(|a| a.triggers.as_ref().is_some_and(|t| t == "ライブ成功時"))
         .expect("Should have live_success ability");
     println!(
         "Live success ability: {:?}",
@@ -2192,5 +2195,463 @@ pub fn run_all() {
     test_ability_activation_cost_targeting();
     test_ability_live_success_draw_then_discard();
 
+    // Constant ability tests
+    test_constant_success_replacement_ability();
+    test_constant_success_replacement_ability_skip();
+
+    // Baton touch auto ability tests
+    test_baton_touch_discard_ability_triggers();
+    test_baton_touch_discard_ability_skipped_low_cost();
+
+    // Gain ability (常時) tests
+    test_constant_gain_ability_score();
+
     println!("\nAll QA tests completed successfully!");
+}
+
+fn test_baton_touch_discard_ability_triggers() {
+    println!("\nRunning Ability Test: Baton touch discard auto ability triggers");
+
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+
+    // Card with baton_touch discard auto ability: PL!HS-sd1-001-SD (日野下花帆, cost 9, 蓮ノ空)
+    let target_card = cards
+        .iter()
+        .find(|c| c.card_no == "PL!HS-sd1-001-SD")
+        .expect("Card PL!HS-sd1-001-SD not found");
+    let target_id = get_card_id(target_card, &card_database);
+    println!(
+        "Target card: {} ({}) cost={:?}",
+        target_card.name, target_card.card_no, target_card.cost
+    );
+
+    // Arriving card (cost >= 10, 蓮ノ空): PL!HS-PR-001-PR (also 日野下花帆, cost 10, 蓮ノ空)
+    let arriving_card = cards
+        .iter()
+        .find(|c| c.card_no == "PL!HS-PR-001-PR")
+        .expect("Card PL!HS-PR-001-PR not found");
+    let arriving_id = get_card_id(arriving_card, &card_database);
+    println!(
+        "Arriving card: {} ({}) cost={:?}",
+        arriving_card.name, arriving_card.card_no, arriving_card.cost
+    );
+
+    // Put the target card in waitroom (simulating it was replaced via baton touch)
+    player1.waitroom.cards.push(target_id);
+
+    // Set up inactive energy cards (so we can detect activation)
+    let energy_ids: Vec<i16> = cards
+        .iter()
+        .filter(|c| c.is_energy())
+        .take(5)
+        .map(|c| get_card_id(c, &card_database))
+        .collect();
+    for &eid in &energy_ids {
+        player1.energy_zone.cards.push(eid);
+    }
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    game_state.current_phase = Phase::Main;
+    game_state.turn_number = 2;
+
+    game_state.baton_touch_count = 1;
+    game_state.baton_touch_replaced_member_id = Some(target_id);
+    game_state.baton_touch_arriving_card_id = Some(arriving_id);
+    game_state.recently_moved_cards = Some(vec![target_id]);
+    game_state.recently_moved_from_zone = Some("stage".to_string());
+
+    let initial_energy_active = game_state.player1.energy_zone.active_count();
+    println!("Initial active energy count: {}", initial_energy_active);
+
+    // Trigger discard auto abilities for the replaced card
+    crate::turn::TurnEngine::trigger_discard_auto_abilities(&mut game_state, "player1", target_id);
+    game_state.process_pending_auto_abilities("player1");
+
+    let final_energy_active = game_state.player1.energy_zone.active_count();
+    println!("Final active energy count: {}", final_energy_active);
+
+    assert!(
+        final_energy_active > initial_energy_active,
+        "Energy should have been activated by baton touch ability (was {}, now {})",
+        initial_energy_active,
+        final_energy_active
+    );
+
+    println!("Baton touch discard auto ability test PASSED");
+}
+
+fn test_baton_touch_discard_ability_skipped_low_cost() {
+    println!(
+        "\nRunning Ability Test: Baton touch discard auto ability SKIPPED (low cost arriving)"
+    );
+
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+
+    // Same target card
+    let target_card = cards
+        .iter()
+        .find(|c| c.card_no == "PL!HS-sd1-001-SD")
+        .expect("Card PL!HS-sd1-001-SD not found");
+    let target_id = get_card_id(target_card, &card_database);
+
+    // Use a low-cost (cost < 10) arriving card that does NOT meet the condition
+    let low_cost_card = cards
+        .iter()
+        .find(|c| {
+            c.is_member()
+                && c.card_no != "PL!HS-sd1-001-SD"
+                && c.cost.is_some_and(|c| c < 10)
+                && {
+                    let cid = get_card_id(c, &card_database);
+                    crate::ability::util::card_matches_group_str(
+                        &card_database,
+                        cid,
+                        Some("蓮ノ空"),
+                    )
+                }
+        })
+        .expect("Should find a low-cost 蓮ノ空 member");
+    let low_cost_id = get_card_id(low_cost_card, &card_database);
+    println!(
+        "Low-cost arriving card: {} ({}) cost={:?}",
+        low_cost_card.name, low_cost_card.card_no, low_cost_card.cost
+    );
+
+    player1.waitroom.cards.push(target_id);
+
+    let energy_ids: Vec<i16> = cards
+        .iter()
+        .filter(|c| c.is_energy())
+        .take(5)
+        .map(|c| get_card_id(c, &card_database))
+        .collect();
+    for &eid in &energy_ids {
+        player1.energy_zone.cards.push(eid);
+    }
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    game_state.current_phase = Phase::Main;
+    game_state.turn_number = 2;
+
+    game_state.baton_touch_count = 1;
+    game_state.baton_touch_replaced_member_id = Some(target_id);
+    game_state.baton_touch_arriving_card_id = Some(low_cost_id);
+    game_state.recently_moved_cards = Some(vec![target_id]);
+    game_state.recently_moved_from_zone = Some("stage".to_string());
+
+    let initial_energy_active = game_state.player1.energy_zone.active_count();
+
+    crate::turn::TurnEngine::trigger_discard_auto_abilities(&mut game_state, "player1", target_id);
+    game_state.process_pending_auto_abilities("player1");
+
+    let final_energy_active = game_state.player1.energy_zone.active_count();
+    println!(
+        "Initial active: {}, Final active: {}",
+        initial_energy_active, final_energy_active
+    );
+
+    assert_eq!(
+        final_energy_active, initial_energy_active,
+        "Energy should NOT have been activated (arriving card cost < 10)"
+    );
+
+    println!("Baton touch discard auto ability SKIPPED test PASSED");
+}
+
+fn test_constant_success_replacement_ability() {
+    println!("\nRunning Ability Test: Constant success replacement - select μ's card");
+
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+
+    // Find PL!-bp6-024-L (錯覚CROSSROADS) — the card with the replacement ability
+    let target_card = cards
+        .iter()
+        .find(|c| c.card_no == "PL!-bp6-024-L")
+        .expect("Card PL!-bp6-024-L not found");
+    let target_id = get_card_id(target_card, &card_database);
+    println!(
+        "Target card: {} ({})",
+        target_card.name, target_card.card_no
+    );
+    for (i, a) in target_card.abilities.iter().enumerate() {
+        println!(
+            "  Ability[{}]: triggers={:?}, action={:?}",
+            i,
+            a.triggers,
+            a.effect.as_ref().map(|e| &e.action)
+        );
+    }
+
+    // Find a μ's live card to put in waitroom
+    let muse_live = cards
+        .iter()
+        .find(|c| {
+            c.is_live() && c.card_no != "PL!-bp6-024-L" && {
+                let cid = get_card_id(c, &card_database);
+                crate::ability::util::card_matches_group_str(&card_database, cid, Some("μ's"))
+            }
+        })
+        .expect("Should find a μ's live card for replacement");
+    let muse_live_id = get_card_id(muse_live, &card_database);
+    println!("μ's live card: {} ({})", muse_live.name, muse_live.card_no);
+
+    // Put the target card in live_card_zone
+    player1.live_card_zone.cards.push(target_id);
+
+    // Put the μ's live card in waitroom (discard)
+    player1.waitroom.cards.push(muse_live_id);
+
+    // Put some filler energy cards in waitroom for variety
+    for c in cards.iter().filter(|c| c.is_energy()).take(3) {
+        player1.waitroom.cards.push(get_card_id(c, &card_database));
+    }
+
+    println!("Initial state:");
+    println!(
+        "  live_card_zone: {:?} ({} cards)",
+        player1.live_card_zone.cards,
+        player1.live_card_zone.cards.len()
+    );
+    println!(
+        "  waitroom: {:?} ({} cards)",
+        player1.waitroom.cards,
+        player1.waitroom.cards.len()
+    );
+    println!(
+        "  success_live_zone: {:?} ({} cards)",
+        player1.success_live_card_zone.cards,
+        player1.success_live_card_zone.cards.len()
+    );
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    game_state.current_phase = Phase::LiveVictoryDetermination;
+    game_state.live_success_triggered_this_turn = true;
+
+    // Run victory determination — should detect replacement and create a choice
+    crate::turn::TurnEngine::execute_live_victory_determination(&mut game_state);
+
+    assert!(
+        game_state.has_pending_choice(),
+        "A pending choice should exist for success zone replacement"
+    );
+
+    // Verify the choice parameters
+    if let Some(ref choice_val) = game_state.get_pending_choice_json() {
+        if let Ok(choice) =
+            serde_json::from_value::<crate::ability::types::Choice>(choice_val.clone())
+        {
+            match &choice {
+                crate::ability::types::Choice::SelectCard {
+                    zone,
+                    count,
+                    allow_skip,
+                    card_type,
+                    group,
+                    ..
+                } => {
+                    println!("SelectCard choice: zone={}, count={}, allow_skip={}, card_type={:?}, group={:?}",
+                        zone, count, allow_skip, card_type, group);
+                    assert_eq!(zone, "discard", "Zone should be 'discard'");
+                    assert_eq!(*count, 1, "Count should be 1");
+                    assert!(*allow_skip, "Should allow skip");
+                    assert_eq!(
+                        card_type.as_deref(),
+                        Some("live_card"),
+                        "Card type should be live_card"
+                    );
+                    assert_eq!(group.as_deref(), Some("μ's"), "Group should be μ's");
+                }
+                _ => panic!("Expected SelectCard choice, got {:?}", choice),
+            }
+        } else {
+            println!("Pending choice could not be parsed as Choice enum (may be frontend format)");
+        }
+    }
+
+    // Now simulate selecting the μ's card (index 0 into the waitroom — the μ's card was added first)
+    let waitroom_len_before = game_state.player1.waitroom.cards.len();
+    let success_zone_before = game_state.player1.success_live_card_zone.cards.len();
+
+    crate::turn::TurnEngine::resume_with_choice(&mut game_state, None, Some(vec![0]))
+        .expect("resume_with_choice should succeed");
+
+    // Verify the replacement was applied:
+    // - The original card should be in waitroom
+    // - The μ's card should be in success zone
+    // - The μ's card should no longer be in waitroom
+    assert!(
+        game_state
+            .player1
+            .success_live_card_zone
+            .cards
+            .contains(&muse_live_id),
+        "The μ's live card should be in the success zone"
+    );
+    assert!(
+        !game_state.player1.waitroom.cards.contains(&muse_live_id),
+        "The μ's live card should have been removed from waitroom"
+    );
+    // Waitroom count stays the same: one removed (μ's card) + one added (original card)
+    assert_eq!(
+        game_state.player1.waitroom.cards.len(),
+        waitroom_len_before,
+        "Waitroom should have the same count (removed μ's, added original)"
+    );
+    assert_eq!(
+        game_state.player1.success_live_card_zone.cards.len(),
+        success_zone_before + 1,
+        "Success zone should have one more card"
+    );
+
+    // live_card_zone should be empty
+    assert!(
+        game_state.player1.live_card_zone.cards.is_empty(),
+        "Live card zone should be empty after processing"
+    );
+
+    // The original card should now be in waitroom
+    assert!(
+        game_state.player1.waitroom.cards.contains(&target_id),
+        "The original card should be in waitroom after replacement"
+    );
+
+    println!("Success zone replacement test (chosen) PASSED");
+}
+
+fn test_constant_success_replacement_ability_skip() {
+    println!("\nRunning Ability Test: Constant success replacement - skip");
+
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+
+    let target_card = cards
+        .iter()
+        .find(|c| c.card_no == "PL!-bp6-024-L")
+        .expect("Card PL!-bp6-024-L not found");
+    let target_id = get_card_id(target_card, &card_database);
+
+    let muse_live = cards
+        .iter()
+        .find(|c| {
+            c.is_live() && c.card_no != "PL!-bp6-024-L" && {
+                let cid = get_card_id(c, &card_database);
+                crate::ability::util::card_matches_group_str(&card_database, cid, Some("μ's"))
+            }
+        })
+        .expect("Should find a μ's live card for replacement");
+    let muse_live_id = get_card_id(muse_live, &card_database);
+
+    player1.live_card_zone.cards.push(target_id);
+    player1.waitroom.cards.push(muse_live_id);
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+    game_state.current_phase = Phase::LiveVictoryDetermination;
+    game_state.live_success_triggered_this_turn = true;
+
+    // Run victory determination
+    crate::turn::TurnEngine::execute_live_victory_determination(&mut game_state);
+    assert!(
+        game_state.has_pending_choice(),
+        "A pending choice should exist for success zone replacement"
+    );
+
+    // Now skip (pass None for both card_id and card_indices → empty indices → treated as skip)
+    crate::turn::TurnEngine::resume_with_choice(&mut game_state, None, None)
+        .expect("resume_with_choice should succeed for skip");
+
+    // Verify the original card went to success zone
+    assert!(
+        game_state
+            .player1
+            .success_live_card_zone
+            .cards
+            .contains(&target_id),
+        "The original card should be in the success zone when replacement is skipped"
+    );
+    assert!(
+        game_state.player1.waitroom.cards.contains(&muse_live_id),
+        "The μ's card should still be in waitroom when replacement is skipped"
+    );
+
+    // live_card_zone should be empty
+    assert!(
+        game_state.player1.live_card_zone.cards.is_empty(),
+        "Live card zone should be empty after processing"
+    );
+
+    println!("Success zone replacement test (skipped) PASSED");
+}
+
+fn test_constant_gain_ability_score() {
+    println!("\nRunning Ability Test: Constant gain_ability score bonus");
+
+    let cards = load_all_cards();
+    let card_database = create_card_database(cards.clone());
+
+    let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
+    let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
+
+    // Target: PL!HS-bp1-003-P (乙宗梢, cost 13, 蓮ノ空) — has 常時 gain_ability
+    let target_card = cards
+        .iter()
+        .find(|c| c.card_no == "PL!HS-bp1-003-P")
+        .expect("Card PL!HS-bp1-003-P not found");
+    let target_id = get_card_id(target_card, &card_database);
+    println!("Target: {} ({})", target_card.name, target_card.card_no);
+
+    // Two other 蓮ノ空 members with different names
+    let other1_id = cards
+        .iter()
+        .find(|c| c.card_no == "PL!HS-PR-001-PR")
+        .map(|c| get_card_id(c, &card_database))
+        .expect("Card PL!HS-PR-001-PR not found");
+    let other2_id = cards
+        .iter()
+        .find(|c| c.card_no == "PL!HS-bp1-016-PR")
+        .map(|c| get_card_id(c, &card_database))
+        .expect("Card PL!HS-bp1-016-PR not found");
+
+    // Place all 3 on stage (left, center, right) — condition requires all areas filled
+    player1.stage.stage = [target_id, other1_id, other2_id];
+
+    let mut game_state = GameState::new(player1, player2, card_database.clone());
+
+    // Verify initial score modifier is 0
+    assert_eq!(
+        game_state.mods.get_score_modifier(target_id),
+        0,
+        "Initial score modifier should be 0"
+    );
+
+    // Run recalculate_constants — should evaluate 常時 ability and apply score bonus
+    game_state.recalculate_constants();
+
+    let score_mod = game_state.mods.get_score_modifier(target_id);
+    println!("Score modifier after recalculate_constants: {}", score_mod);
+
+    assert!(
+        score_mod > 0,
+        "Score modifier should be positive (got {})",
+        score_mod
+    );
+
+    println!(
+        "Constant gain_ability score test PASSED (+{} score)",
+        score_mod
+    );
 }

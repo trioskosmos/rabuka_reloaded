@@ -26,17 +26,19 @@ impl AbilityResolver {
             .and_then(|cid| gs.card_database.get_card(cid))
             .map(|c| c.name.clone());
 
-        let before = ZoneSnapshot::from_game_state(gs);
-        let mut seq_node = AbilityTraceNode::new(seq_label)
-            .with_card(card_name)
-            .with_before(before);
+         let seq_node = self.debug_trace.then(|| {
+             
+            AbilityTraceNode::new(seq_label)
+                .with_card(card_name.clone())
+                .with_before(ZoneSnapshot::from_game_state(gs))
+        });
 
         let cond_met = if conditional {
             let ctx = super::condition::ConditionContext::new(gs);
             effect
                 .condition
                 .as_ref()
-                .map_or(true, |c| ctx.evaluate_condition(c))
+                .is_none_or(|c| ctx.evaluate_condition(c))
         } else {
             true
         };
@@ -45,13 +47,13 @@ impl AbilityResolver {
         }
 
         if is_further {
-            eprintln!("Further conditional effect (さらに) - executing additional actions");
+            log::debug!("Further conditional effect (さらに) - executing additional actions");
         }
 
         if let Some(ref actions) = effect.compound.actions {
             let has_repeat = actions
                 .last()
-                .map_or(false, |a| a.action == "repeat_procedure");
+                .is_some_and(|a| a.action == "repeat_procedure");
             let repeat_max = if has_repeat {
                 actions.last().and_then(|a| a.repeat_limit).unwrap_or(1)
             } else {
@@ -63,7 +65,7 @@ impl AbilityResolver {
                 actions.as_slice()
             };
 
-            eprintln!(
+            log::debug!(
                 "[ABILITY] sequential: {} actions, repeat_max={} card_id={:?}",
                 repeat_actions.len(),
                 repeat_max,
@@ -71,7 +73,7 @@ impl AbilityResolver {
             );
             for _repeat in 0..repeat_max {
                 for (i, action) in repeat_actions.iter().enumerate() {
-                    eprintln!(
+                    log::debug!(
                         "[ABILITY]  >> sub-action[{}]: action={} has_condition={} card_id={:?}",
                         i,
                         action.action,
@@ -107,7 +109,7 @@ impl AbilityResolver {
                         }
                     }
 
-                    eprintln!(
+                    log::debug!(
                         "[SEQ_LOOP] executing action[{}] action={} pending_before={:?}",
                         i,
                         action.action,
@@ -126,22 +128,23 @@ impl AbilityResolver {
 
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
-                            eprintln!(
+                            log::debug!(
                                 "[SEQ_LOOP] after execute: pending={:?}",
                                 self.pending_choice.is_some()
                             );
                             if self.pending_choice.is_some() {
                                 let current_was_optional = action.optional.unwrap_or(false);
-                                let remaining = if current_was_optional && i + 1 < repeat_actions.len() {
-                                    let mut actions: Vec<AbilityEffect> =
-                                        repeat_actions[i..].to_vec();
-                                    if !actions.is_empty() {
-                                        actions[0].optional = None;
-                                    }
-                                    actions
-                                } else {
-                                    repeat_actions[i + 1..].to_vec()
-                                };
+                                let remaining =
+                                    if current_was_optional && i + 1 < repeat_actions.len() {
+                                        let mut actions: Vec<AbilityEffect> =
+                                            repeat_actions[i..].to_vec();
+                                        if !actions.is_empty() {
+                                            actions[0].optional = None;
+                                        }
+                                        actions
+                                    } else {
+                                        repeat_actions[i + 1..].to_vec()
+                                    };
                                 save_remaining(gs, remaining);
                                 return Ok(());
                             } else if action.optional.unwrap_or(false)
@@ -154,7 +157,8 @@ impl AbilityResolver {
                         }
                         Err(e) if e.contains("Pending choice required") => {
                             let current_was_optional = action.optional.unwrap_or(false);
-                            let remaining = if current_was_optional && i + 1 < repeat_actions.len() {
+                            let remaining = if current_was_optional && i + 1 < repeat_actions.len()
+                            {
                                 let mut actions: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
                                 if !actions.is_empty() {
                                     actions[0].optional = None;
@@ -174,9 +178,11 @@ impl AbilityResolver {
         // Clear context so resume_with_choice doesn't re-process the ability.
         self.execution_context = ExecutionContext::None;
 
-        // Finalize sequential trace node
-        seq_node.after = Some(ZoneSnapshot::from_game_state(gs));
-        self.pipeline.trace.children.push(seq_node);
+        // Finalize sequential trace node (only allocated when debug_trace is enabled)
+        if let Some(mut node) = seq_node {
+            node.after = Some(ZoneSnapshot::from_game_state(gs));
+            self.pipeline.trace.children.push(node);
+        }
 
         Ok(())
     }
@@ -246,6 +252,25 @@ impl AbilityResolver {
             }
         }
 
+        // Handle the case where we have alternative_effect + top-level condition
+        // but no primary_effect and no alternative_condition (e.g. replacement effects
+        // like 錯覚CROSSROADS: "when this card would be placed in success zone, instead...")
+        if effect.compound.alternative_effect.is_some()
+            && effect.compound.primary_effect.is_none()
+            && effect.compound.alternative_condition.is_none()
+        {
+            if let Some(ref cond) = effect.condition {
+                let ctx =
+                    super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                if ctx.evaluate_condition(cond) {
+                    if let Some(ref alt_effect) = effect.compound.alternative_effect {
+                        return self.execute_effect(gs, alt_effect);
+                    }
+                }
+            }
+            return Ok(());
+        }
+
         if let Some(ref primary_effect) = effect.compound.primary_effect {
             self.execute_effect(gs, primary_effect)
         } else {
@@ -278,7 +303,7 @@ impl AbilityResolver {
         // If the ability has an optional cost and it was NOT paid (skipped),
         // the primary effect should not run. This fixes "may pay" patterns
         // where the effect is gated behind the optional cost.
-        let cost_was_paid = gs.ability_queue.current_entry().map_or(true, |e| {
+        let cost_was_paid = gs.ability_queue.current_entry().is_none_or(|e| {
             e.optional_cost_was_paid || !e.cost_paid || e.ability.cost.is_none()
         });
         if !cost_was_paid {
@@ -289,9 +314,9 @@ impl AbilityResolver {
         let result_condition = effect.compound.result_condition.as_ref();
         let followup_action = effect.compound.followup_action.as_ref();
 
-        if let Some(ref primary) = primary_action {
+        if let Some(primary) = primary_action {
             if let Err(e) = self.execute_effect(gs, primary) {
-                eprintln!("Primary action failed in conditional_on_result: {}", e);
+                log::debug!("Primary action failed in conditional_on_result: {}", e);
                 return Err(e);
             }
             // If primary created a choice (e.g. "select 3 cards to reveal"),
@@ -315,11 +340,11 @@ impl AbilityResolver {
             .unwrap_or(true);
 
         if condition_met {
-            if let Some(ref followup) = followup_action {
+            if let Some(followup) = followup_action {
                 self.execute_effect(gs, followup)?;
             }
         } else {
-            eprintln!("Result condition not met, skipping followup action");
+            log::debug!("Result condition not met, skipping followup action");
         }
         Ok(())
     }
@@ -347,10 +372,10 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        if let Some(ref optional) = optional_action {
+        if let Some(optional) = optional_action {
             self.execute_effect(gs, optional)?;
         }
-        if let Some(ref conditional) = conditional_action {
+        if let Some(conditional) = conditional_action {
             if !is_negation {
                 self.execute_effect(gs, conditional)?;
             }

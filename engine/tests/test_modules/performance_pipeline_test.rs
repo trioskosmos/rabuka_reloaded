@@ -19,11 +19,6 @@ fn advance_to_live_card_set_p1(game: &mut TestGame) {
     assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
 }
 
-fn advance_to_live_start(game: &mut TestGame) {
-    game.pass();
-    game.pass();
-}
-
 #[test]
 fn performance_pipeline_blade_yell_heart_score() {
     let db = load_real_database();

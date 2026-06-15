@@ -6,7 +6,7 @@
 /// This test verifies the fix for card_count_condition checking discard pile for live cards
 /// instead of incorrectly checking live_card_zone
 use crate::helpers::*;
-use rabuka_engine::turn::TurnEngine;
+
 use rabuka_engine::zones::MemberArea;
 
 /// Test case 1: Live card among 5 drawn cards should trigger draw
@@ -45,12 +45,6 @@ fn test_live_card_among_five_drawn_triggers_draw() {
     // Play the card to stage and activate its debut ability
     game.add_to_hand(nagi_card);
     game.play_to_stage(nagi_card, MemberArea::Center);
-    game.activate_ability(nagi_card);
-
-    // Manually trigger auto abilities for the player
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
 
     // Verify: 5 cards moved to discard, and since one was a live card, should draw 1
     let final_hand_size = game.player().hand.cards.len();
@@ -109,12 +103,6 @@ fn test_no_live_cards_among_five_drawn_no_draw() {
     // Play the card to stage and activate its debut ability
     game.add_to_hand(nagi_card);
     game.play_to_stage(nagi_card, MemberArea::Center);
-    game.activate_ability(nagi_card);
-
-    // Manually trigger auto abilities for the player
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
 
     // Verify: 5 cards moved to discard, but no draw since no live cards
     let final_hand_size = game.player().hand.cards.len();
@@ -172,12 +160,6 @@ fn test_live_card_in_existing_discard_but_not_in_five_drawn_no_draw() {
     // Play the card to stage and activate its debut ability
     game.add_to_hand(nagi_card);
     game.play_to_stage(nagi_card, MemberArea::Center);
-    game.activate_ability(nagi_card);
-
-    // Manually trigger auto abilities for the player
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
 
     // Verify: 5 cards moved to discard, but no draw since none of the 5 were live cards
     let final_hand_size = game.player().hand.cards.len();
@@ -236,12 +218,6 @@ fn test_multiple_live_cards_among_five_drawn_still_only_draw_one() {
     // Play the card to stage and activate its debut ability
     game.add_to_hand(nagi_card);
     game.play_to_stage(nagi_card, MemberArea::Center);
-    game.activate_ability(nagi_card);
-
-    // Manually trigger auto abilities for the player
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
 
     // Verify: 5 cards moved to discard, and should draw exactly 1 card (not 2)
     let final_hand_size = game.player().hand.cards.len();

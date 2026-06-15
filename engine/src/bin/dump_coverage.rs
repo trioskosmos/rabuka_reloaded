@@ -8,9 +8,9 @@ fn main() {
         .nth(1)
         .unwrap_or_else(|| "coverage_data.json".to_string());
     match debug::write_coverage_json(&path) {
-        Ok(()) => eprintln!("Done."),
+        Ok(()) => log::debug!("Done."),
         Err(e) => {
-            eprintln!("Error writing coverage data: {}", e);
+            log::debug!("Error writing coverage data: {}", e);
             std::process::exit(1);
         }
     }

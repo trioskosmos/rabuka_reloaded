@@ -30,7 +30,7 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn any_of_matches(&self, condition_type: &str) -> bool {
-        let master = &*self.game_state.resolve_target_player("self");
+        let master = self.game_state.resolve_target_player("self");
         match condition_type {
             "has_member" => stage_has_any_member(master),
             "has_energy" => !master.energy_zone.cards.is_empty(),
@@ -54,7 +54,7 @@ impl<'a> ConditionContext<'a> {
                 crate::game_state::Phase::Main
             ),
             _ => {
-                eprintln!("Unknown any_of condition type: {}", condition_type);
+                log::debug!("Unknown any_of condition type: {}", condition_type);
                 false
             }
         }
@@ -84,7 +84,7 @@ impl<'a> ConditionContext<'a> {
             );
             all_pass
         } else {
-            eprintln!("[COMPOUND] no conditions array!");
+            log::debug!("[COMPOUND] no conditions array!");
             true
         }
     }

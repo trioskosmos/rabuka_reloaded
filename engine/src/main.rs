@@ -24,6 +24,7 @@ pub fn game_state_to_display(game_state: &game_state::GameState) -> display::Gam
 static GAME_STATE: Mutex<Option<game_state::GameState>> = Mutex::new(None);
 
 fn main() {
+    env_logger::init();
     let args: Vec<String> = std::env::args().collect();
 
     if args.len() > 1 {
@@ -48,7 +49,7 @@ fn main() {
                 run_web_server();
             }
             _ => {
-                eprintln!("Unknown command: {}", args[1]);
+                log::debug!("Unknown command: {}", args[1]);
             }
         }
     } else {
@@ -62,7 +63,7 @@ fn output_game_state() {
         let display = game_state_to_display(state);
         println!("{}", serde_json::to_string(&display).unwrap());
     } else {
-        eprintln!("Game not initialized. Run 'init' command first.");
+        log::debug!("Game not initialized. Run 'init' command first.");
     }
 }
 
@@ -72,7 +73,7 @@ fn initialize_game() {
     let cards = match card_loader::CardLoader::load_cards_from_file(cards_path) {
         Ok(cards) => cards,
         Err(e) => {
-            eprintln!("Failed to load cards: {}", e);
+            log::debug!("Failed to load cards: {}", e);
             return;
         }
     };
@@ -84,7 +85,7 @@ fn initialize_game() {
     let deck_lists = match deck_parser::DeckParser::parse_all_decks() {
         Ok(decks) => decks,
         Err(e) => {
-            eprintln!("Failed to load decks: {}", e);
+            log::debug!("Failed to load decks: {}", e);
             return;
         }
     };
@@ -107,7 +108,7 @@ fn initialize_game() {
             deck
         }
         Err(e) => {
-            eprintln!("Failed to build deck for Player 1: {}", e);
+            log::debug!("Failed to build deck for Player 1: {}", e);
             return;
         }
     };
@@ -122,7 +123,7 @@ fn initialize_game() {
             deck
         }
         Err(e) => {
-            eprintln!("Failed to build deck for Player 2: {}", e);
+            log::debug!("Failed to build deck for Player 2: {}", e);
             return;
         }
     };
@@ -205,7 +206,7 @@ fn output_actions() {
         let response = ActionsResponse { actions };
         println!("{}", serde_json::to_string(&response).unwrap());
     } else {
-        eprintln!("Game not initialized. Run 'init' command first.");
+        log::debug!("Game not initialized. Run 'init' command first.");
     }
 }
 
@@ -215,7 +216,7 @@ fn execute_action(index: usize) {
         let actions = game_setup::generate_possible_actions(state);
 
         if index >= actions.len() {
-            eprintln!("Invalid action index");
+            log::debug!("Invalid action index");
             return;
         }
 
@@ -232,7 +233,7 @@ fn execute_action(index: usize) {
             }
             _ => {
                 // Handle unknown action types gracefully
-                eprintln!(
+                log::debug!(
                     "Warning: Unknown action type '{}' - no specific handler implemented",
                     action.action_type
                 );
@@ -241,7 +242,7 @@ fn execute_action(index: usize) {
 
         println!("Action executed successfully");
     } else {
-        eprintln!("Game not initialized. Run 'init' command first.");
+        log::debug!("Game not initialized. Run 'init' command first.");
     }
 }
 
@@ -257,8 +258,8 @@ fn run_web_server() {
     match tokio::runtime::Runtime::new() {
         Ok(runtime) => match runtime.block_on(web_server::run_web_server()) {
             Ok(_) => println!("Server shutdown gracefully"),
-            Err(e) => eprintln!("Server error: {}", e),
+            Err(e) => log::debug!("Server error: {}", e),
         },
-        Err(e) => eprintln!("Failed to create runtime: {}", e),
+        Err(e) => log::debug!("Failed to create runtime: {}", e),
     }
 }

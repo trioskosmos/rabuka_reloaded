@@ -137,6 +137,7 @@ impl Player {
             _ => crate::zones::MemberArea::RightSide,
         };
         let (member_under, energy_under) = self.stage.recycle_under_cards(area, card_db);
+        self.areas_locked_this_turn.remove(&area);
         for cid in member_under {
             self.waitroom.add_card(cid);
         }
@@ -162,7 +163,7 @@ impl Player {
         let card_id = self.hand.cards.remove(hand_index);
 
         if let Some(card) = card_db.get_card(card_id) {
-            // eprintln!("Retrieved card: {} (card_no: {})", card.name, card.card_no);
+            // log::debug!("Retrieved card: {} (card_no: {})", card.name, card.card_no);
 
             if !card.is_member() {
                 self.hand.cards.insert(hand_index, card_id);
@@ -197,7 +198,7 @@ impl Player {
                     {
                         let per_unit_count = effect.per_unit_count.unwrap_or(1) as usize;
                         let success_count = self.success_live_card_zone.cards.len();
-                        let multiplier = effect.count.unwrap_or(1) as u32;
+                        let multiplier = effect.count.unwrap_or(1);
                         cost_increase = ((success_count / per_unit_count) as u32) * multiplier;
                     }
                 }
@@ -244,13 +245,7 @@ impl Player {
                         let active_energy_count = self.energy_zone.active_count();
 
                         // Allow baton touch if cost_to_pay is 0 (equal/lower cost) OR if there's sufficient energy to pay the reduced cost
-                        if cost_to_pay == 0
-                            || (cost_to_pay > 0 && active_energy_count >= cost_to_pay as usize)
-                        {
-                            true
-                        } else {
-                            false
-                        }
+                        cost_to_pay == 0 || (cost_to_pay > 0 && active_energy_count >= cost_to_pay as usize)
                     }
                 } else {
                     // No member in target area, can't baton touch
@@ -267,9 +262,9 @@ impl Player {
             if baton_touch_used {
                 if let Some(member_id) = self.stage.get_area(stage_area) {
                     let has_protection =
-                        card_db.get_card(member_id).map_or(false, |existing_card| {
+                        card_db.get_card(member_id).is_some_and(|existing_card| {
                             existing_card.abilities.iter().any(|a| {
-                                a.effect.as_ref().map_or(false, |ef| {
+                                a.effect.as_ref().is_some_and(|ef| {
                                     ef.restriction_type.as_deref() == Some("cannot_baton_touch")
                                 })
                             })
@@ -441,20 +436,16 @@ impl Player {
             !self.main_deck.is_empty(),
             "draw_card called with empty deck — tests must fill player.main_deck.cards"
         );
-        self.main_deck.draw().map(|card_id| {
+        self.main_deck.draw().inspect(|&card_id| {
             self.add_card_to_hand(card_id);
-
-            card_id
         })
     }
 
     pub fn draw_energy(&mut self) -> Option<i16> {
-        self.energy_deck.draw().map(|card_id| {
+        self.energy_deck.draw().inspect(|&card_id| {
             self.energy_zone.cards.push(card_id);
 
             self.energy_zone.active_energy_count += 1;
-
-            card_id
         })
     }
 

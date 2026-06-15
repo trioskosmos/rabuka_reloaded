@@ -8,7 +8,6 @@
 /// Both cases tested on a clean board with no-ability fillers only.
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
-use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_card_set(game: &mut TestGame) {
     game.pass(); // → Active

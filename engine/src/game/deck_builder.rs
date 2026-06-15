@@ -69,40 +69,40 @@ impl DeckBuilder {
 
         // Log missing cards for debugging
         if !missing_cards.is_empty() {
-            eprintln!(
+            log::debug!(
                 "Warning: {} cards not found in database:",
                 missing_cards.len()
             );
             for card_no in &missing_cards {
-                eprintln!("  - {}", card_no);
+                log::debug!("  - {}", card_no);
             }
         }
 
         // Validate deck composition with priority on 12 live + 48 member
         let total_main = member_count + live_count;
         if total_main < 60 {
-            eprintln!(
+            log::debug!(
                 "Warning: Main deck has {} cards (expected 60): {} member + {} live",
                 total_main, member_count, live_count
             );
         }
 
         if live_count < 12 {
-            eprintln!(
+            log::debug!(
                 "Warning: Main deck has {} live cards (expected 12)",
                 live_count
             );
         }
 
         if member_count < 48 {
-            eprintln!(
+            log::debug!(
                 "Warning: Main deck has {} member cards (expected 48)",
                 member_count
             );
         }
 
         if energy_count != 12 {
-            eprintln!(
+            log::debug!(
                 "Warning: Energy deck has {} energy cards (expected 12)",
                 energy_count
             );
@@ -119,11 +119,7 @@ impl DeckBuilder {
         card_db: &mut Arc<CardDatabase>,
     ) -> Result<(), String> {
         let current_count = deck.energy_deck.len();
-        let needed = if current_count < 12 {
-            12 - current_count
-        } else {
-            0
-        };
+        let needed = 12_usize.saturating_sub(current_count);
 
         if needed > 0 {
             // Find a template energy card

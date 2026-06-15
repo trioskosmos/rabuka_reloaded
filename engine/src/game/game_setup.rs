@@ -240,7 +240,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 let mut actions: Vec<Action> = positions
                     .iter()
                     .map(|pos| {
-                        let idx = crate::ability::util::stage_position_index(&pos);
+                        let idx = crate::ability::util::stage_position_index(pos);
                         let (label, stage_area, card_id) = match idx {
                             Some(0) => (
                                 if is_source {
@@ -299,7 +299,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             if target == "draw_any_number" {
                 let max_count = description
                     .matches(char::is_numeric)
-                    .last()
+                    .next_back()
                     .and_then(|s| s.parse::<i16>().ok())
                     .unwrap_or(5);
                 return (0..=max_count)
@@ -313,7 +313,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             ActionType::ChoiceDecision,
                             &label,
                             ActionParameters {
-                                card_id: Some(n as i16),
+                                card_id: Some(n),
                                 card_no: Some(n.to_string()),
                                 ..make_params()
                             },
@@ -324,7 +324,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             if target == "order" {
                 let count = description
                     .matches(char::is_numeric)
-                    .last()
+                    .next_back()
                     .and_then(|s| s.parse::<usize>().ok())
                     .unwrap_or(3);
                 return (0..count)
@@ -499,7 +499,6 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .iter()
                         .copied()
                         .enumerate()
-                        .map(|(i, id)| (i, id))
                         .collect(),
                     Some(Zone::Discard) | Some(Zone::Waitroom) => player
                         .waitroom
@@ -507,7 +506,6 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .iter()
                         .copied()
                         .enumerate()
-                        .map(|(i, id)| (i, id))
                         .collect(),
                     Some(Zone::Stage) => player
                         .stage
@@ -516,7 +514,6 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .copied()
                         .enumerate()
                         .filter(|&(_, id)| id != -1)
-                        .map(|(i, id)| (i, id))
                         .collect(),
                     Some(Zone::Energy) => player
                         .energy_zone
@@ -524,14 +521,12 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .iter()
                         .copied()
                         .enumerate()
-                        .map(|(i, id)| (i, id))
                         .collect(),
                     Some(Zone::LookedAt) => game_state
                         .looked_at_cards
                         .iter()
                         .copied()
                         .enumerate()
-                        .map(|(i, id)| (i, id))
                         .collect(),
                     Some(Zone::RevealedCards) => {
                         let cheer = game_state.cheer_revealed_cards();
@@ -540,7 +535,6 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 .iter()
                                 .copied()
                                 .enumerate()
-                                .map(|(i, id)| (i, id))
                                 .collect()
                         } else {
                             game_state
@@ -548,7 +542,6 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                                 .iter()
                                 .copied()
                                 .enumerate()
-                                .map(|(i, id)| (i, id))
                                 .collect()
                         }
                     }
@@ -888,9 +881,9 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 let has_baton_touch_protection = game_state
                                     .card_database
                                     .get_card(existing_member_id)
-                                    .map_or(false, |existing_card| {
+                                    .is_some_and(|existing_card| {
                                         existing_card.abilities.iter().any(|a| {
-                                            a.effect.as_ref().map_or(false, |ef| {
+                                            a.effect.as_ref().is_some_and(|ef| {
                                                 ef.restriction_type.as_deref()
                                                     == Some("cannot_baton_touch")
                                             })
@@ -955,7 +948,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
 
                         // Check if this card has play_baton_touch with count > 1 (double baton)
                         let has_double_baton = card.abilities.iter().any(|a| {
-                            a.effect.as_ref().map_or(false, |ef| {
+                            a.effect.as_ref().is_some_and(|ef| {
                                 ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
                             })
                         });
@@ -1051,7 +1044,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
         if let Some(card) = game_state.card_database.get_card(card_id) {
             let card_position: MemberArea = area_name.parse().unwrap_or(MemberArea::Center);
             for (ability_index, ability) in card.abilities.iter().enumerate() {
-                let can_activate = ability.triggers.as_ref().map_or(false, |t| {
+                let can_activate = ability.triggers.as_ref().is_some_and(|t| {
                     t.contains("main")
                         || t.contains(crate::triggers::MAIN)
                         || t.contains(crate::triggers::ACTIVATION)
@@ -1129,13 +1122,13 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     .effect
                     .as_ref()
                     .and_then(|e| e.activation_condition_parsed.as_ref())
-                    .map_or(false, |c| {
+                    .is_some_and(|c| {
                         Zone::from_str(c.location.as_deref().unwrap_or("")) == Some(Zone::Discard)
                     });
                 if !is_discard_activation {
                     continue;
                 }
-                let can_activate = ability.triggers.as_ref().map_or(false, |t| {
+                let can_activate = ability.triggers.as_ref().is_some_and(|t| {
                     t.contains("main")
                         || t.contains(crate::triggers::MAIN)
                         || t.contains(crate::triggers::ACTIVATION)

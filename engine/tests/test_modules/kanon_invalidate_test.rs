@@ -18,12 +18,14 @@ fn kanon_q106_debut_recover_from_discard() {
     let liella = game.id("PL!SP-sd1-001-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
+    let other_liella = game.id("PL!SP-sd1-002-SD");
     game.state.player1.hand.cards.push(kanon);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.waitroom.cards.push(liella);
     game.give_energy(13);
 
     game.state.player1.stage.stage[1] = -1;
+    game.state.player1.stage.stage[0] = other_liella;
     game.play_to_stage(kanon, rabuka_engine::zones::MemberArea::Center);
 
     let recovered = game.state.player1.hand.cards.contains(&liella);

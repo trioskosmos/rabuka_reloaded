@@ -48,7 +48,28 @@ impl<'a> ConditionContext<'a> {
                                 }
                             }
                             Some(ConditionType::HasMoved) => {
-                                if let Some(activating_card_id) = self.activating_card_id {
+                                let check_card = condition.position.as_ref().and_then(|pos| {
+                                    pos.get_position().and_then(|pos_str| {
+                                        let target = condition.target.as_deref().unwrap_or("self");
+                                        let player = self.resolve_condition_player(target);
+                                        util::stage_position_index(pos_str).and_then(|idx| {
+                                            if idx < 3 && player.stage.stage[idx] != -1 {
+                                                Some(player.stage.stage[idx])
+                                            } else {
+                                                None
+                                            }
+                                        })
+                                    })
+                                });
+                                if let Some(card_id) = check_card {
+                                    self.game_state.has_card_moved_this_turn(card_id)
+                                } else if self.game_state.position_change_occurred_this_turn {
+                                    let target = condition.target.as_deref().unwrap_or("self");
+                                    let player = self.resolve_condition_player(target);
+                                    player.stage.stage.iter().any(|&cid| {
+                                        cid != -1 && self.game_state.has_card_moved_this_turn(cid)
+                                    })
+                                } else if let Some(activating_card_id) = self.activating_card_id {
                                     self.game_state.has_card_moved_this_turn(activating_card_id)
                                 } else {
                                     false
@@ -194,7 +215,7 @@ impl<'a> ConditionContext<'a> {
                         || condition
                             .characters
                             .as_ref()
-                            .map_or(false, |c| !c.is_empty());
+                            .is_some_and(|c| !c.is_empty());
                     let check_orientation = |cid: i16| -> bool {
                         self.game_state
                             .mods
@@ -207,7 +228,7 @@ impl<'a> ConditionContext<'a> {
                                 && self.card_matches_count_filters(
                                     cid,
                                     condition.card_type.as_deref(),
-                                    condition.group_names.as_ref().map(|v| v.as_slice()),
+                                    condition.group_names.as_deref(),
                                     &[],
                                     condition.cost_limit,
                                     condition.cost_limit_operator.as_deref(),
@@ -216,7 +237,7 @@ impl<'a> ConditionContext<'a> {
                                 )
                         })
                     } else {
-                        self.activating_card_id.map_or(false, |cid| {
+                        self.activating_card_id.is_some_and(|cid| {
                             stage_cards.contains(&cid) && check_orientation(cid)
                         })
                     }
@@ -247,7 +268,7 @@ impl<'a> ConditionContext<'a> {
             "moved" => {
                 let card_moved = self
                     .activating_card_id
-                    .map_or(false, |cid| self.game_state.has_card_moved_this_turn(cid));
+                    .is_some_and(|cid| self.game_state.has_card_moved_this_turn(cid));
                 let base_check = if let Some(state) = movement_state {
                     match state {
                         "to_stage" => {
@@ -264,7 +285,7 @@ impl<'a> ConditionContext<'a> {
                             let is_position_change =
                                 self.game_state.position_change_occurred_this_turn;
                             if condition.text.contains("登場") {
-                                let on_stage = self.activating_card_id.map_or(false, |cid| {
+                                let on_stage = self.activating_card_id.is_some_and(|cid| {
                                     let p = self.resolve_condition_player(
                                         condition.target.as_deref().unwrap_or("self"),
                                     );
@@ -283,7 +304,7 @@ impl<'a> ConditionContext<'a> {
                     }
                     let is_position_change = self.game_state.position_change_occurred_this_turn;
                     if condition.text.contains("登場") {
-                        let on_stage = self.activating_card_id.map_or(false, |cid| {
+                        let on_stage = self.activating_card_id.is_some_and(|cid| {
                             let p = self.resolve_condition_player(
                                 condition.target.as_deref().unwrap_or("self"),
                             );
@@ -304,8 +325,8 @@ impl<'a> ConditionContext<'a> {
                             self.game_state
                                 .card_database
                                 .get_card(cid)
-                                .map_or(false, |c| {
-                                    c.cost.map_or(false, |cost| {
+                                .is_some_and(|c| {
+                                    c.cost.is_some_and(|cost| {
                                         compare_counts(Some(op), cost, cost_limit)
                                     })
                                 })
@@ -357,17 +378,19 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                 }
-                if condition.exclude_self.unwrap_or(false) {
-                    if self.game_state.activating_card == Some(replaced_id) {
+                if condition.exclude_self.unwrap_or(false)
+                    && self.game_state.activating_card == Some(replaced_id) {
                         return false;
                     }
-                }
+                // group_names and cost_limit may describe the arriving member
+                // ("とバトンタッチ" pattern: "baton touch WITH a X member")
+                let check_id = replaced_id;
                 if let Some(ref groups) = condition.group_names {
                     if !groups.is_empty() {
                         let group_ok = groups.iter().any(|g| {
                             crate::ability::util::card_matches_group_str(
                                 &self.game_state.card_database,
-                                replaced_id,
+                                check_id,
                                 Some(g),
                             )
                         });
@@ -386,11 +409,11 @@ impl<'a> ConditionContext<'a> {
                     }
                 }
                 if let Some(cost_limit) = condition.cost_limit {
-                    if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
+                    if let Some(card) = self.game_state.card_database.get_card(check_id) {
                         let op = condition.cost_limit_operator.as_deref().unwrap_or(">=");
                         if !card
                             .cost
-                            .map_or(false, |cost| compare_counts(Some(op), cost, cost_limit))
+                            .is_some_and(|cost| compare_counts(Some(op), cost, cost_limit))
                         {
                             return false;
                         }
@@ -420,17 +443,16 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "moves" => {
-                let area_ok = condition.self_effect_only.map_or(true, |_| {
+                let area_ok = condition.self_effect_only.is_none_or(|_| {
                     self.game_state.last_area_move_card_id.is_some()
-                        && self
+                        && (self
                             .game_state
                             .last_area_move_by_player
-                            .as_ref()
-                            .map_or(false, |mover| mover == &player.id)
+                            .as_ref() == Some(&player.id))
                 });
                 let energy_ok = condition
                     .energy_placed
-                    .map_or(true, |_| self.game_state.last_energy_placed_by_effect);
+                    .is_none_or(|_| self.game_state.last_energy_placed_by_effect);
                 let has_area_check = condition.self_effect_only.is_some();
                 let has_energy_check = condition.energy_placed.is_some();
                 if !has_area_check && !has_energy_check {
@@ -516,11 +538,11 @@ impl<'a> ConditionContext<'a> {
                 }
                 let ori = self.game_state.mods.get_orientation_modifier(card_id);
                 let orientation_ok = match (from, to) {
-                    ("active", "wait") => ori.map_or(false, |s| s == "wait"),
-                    ("wait", "active") => ori.map_or(true, |s| s == "active"),
+                    ("active", "wait") => ori.is_some_and(|s| s == "wait"),
+                    ("wait", "active") => ori.is_none_or(|s| s == "active"),
                     _ => false,
                 };
-                eprintln!(
+                log::debug!(
                     "[STATE_CHANGE_COND] card_id={} from={:?} to={:?} ori={:?} orientation_ok={}",
                     card_id, from, to, ori, orientation_ok
                 );
@@ -529,10 +551,10 @@ impl<'a> ConditionContext<'a> {
                 }
                 if let Some(cl) = condition.cost_limit {
                     let card_db = &self.game_state.card_database;
-                    let cost_ok = card_db.get_card(card_id).map_or(false, |c| {
+                    let cost_ok = card_db.get_card(card_id).is_some_and(|c| {
                         let card_cost = c.cost.unwrap_or(0);
                         let op = condition.cost_limit_operator.as_deref().unwrap_or("<=");
-                        eprintln!(
+                        log::debug!(
                             "[STATE_CHANGE_COND] cost_limit={} card_cost={} op={:?}",
                             cl, card_cost, op
                         );
@@ -546,14 +568,14 @@ impl<'a> ConditionContext<'a> {
                         }
                     });
                     if !cost_ok {
-                        eprintln!("[STATE_CHANGE_COND] cost check failed");
+                        log::debug!("[STATE_CHANGE_COND] cost check failed");
                         continue;
                     }
                 }
-                eprintln!("[STATE_CHANGE_COND] ALL CHECKS PASSED, returning true");
+                log::debug!("[STATE_CHANGE_COND] ALL CHECKS PASSED, returning true");
                 return true;
             }
-            eprintln!("[STATE_CHANGE_COND] no matching card found, returning false");
+            log::debug!("[STATE_CHANGE_COND] no matching card found, returning false");
             return false;
         }
         true

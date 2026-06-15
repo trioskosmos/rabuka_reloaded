@@ -1,6 +1,6 @@
 use super::debug::AbDebug;
 use super::enums::Zone;
-use super::types::{AbilityTraceNode, Choice, EffectPipeline, ExecutionContext, ZoneSnapshot};
+use super::types::{AbilityTraceNode, Choice, EffectPipeline, ExecutionContext, EffectSpawnContext, ZoneSnapshot};
 use super::util;
 use crate::card::{Ability, AbilityCost, AbilityEffect, CardDatabase, Keyword};
 use crate::game_state::{GameState, Phase};
@@ -22,21 +22,10 @@ pub struct AbilityResolver {
     pub selected_cards: Vec<i16>,
     pub selected_area: Option<String>,
     pub moved_cards: Vec<i16>,
-    /// Effect target to use in child resolution (set by resume_pending_commands
-    /// for pending-command effects from "both" splits).
-    pub last_effect_target: Option<String>,
-    /// Effect destination to use in child resolution (set by execute_move_cards
-    /// for sub-actions with non-default destination, read by execute_selected_cards_from_zone).
-    pub last_effect_destination: Option<String>,
-    /// Effect deck position to use in child resolution (set by execute_move_cards
-    /// for sub-actions with position, read by execute_selected_cards_from_zone).
-    pub last_effect_position: Option<usize>,
-    /// Set by zone selection functions when they create a sub-choice (e.g. SelectPosition
-    /// for empty_area). Read by finalize_choice to decide whether to resume pending commands.
+    pub spawn_context: EffectSpawnContext,
     pub sub_choice_created: bool,
-    /// Cards pending stage placement after position choice for first card.
     pub pending_stage_cards: Vec<(i16, String)>,
-    /// Pipeline carries effect sequencing state explicitly.
+    pub debug_trace: bool,
     pub pipeline: EffectPipeline,
 }
 
@@ -56,15 +45,12 @@ impl AbilityResolver {
             selected_cards: Vec::new(),
             selected_area: None,
             moved_cards: Vec::new(),
-            last_effect_target: None,
-            last_effect_destination: None,
-            last_effect_position: None,
+            spawn_context: EffectSpawnContext::default(),
             sub_choice_created: false,
             pending_stage_cards: Vec::new(),
+            debug_trace: false,
             pipeline: {
-                let mut p = EffectPipeline::new(card_database);
-                p.activating_card_id = activating_card_id;
-                p
+                EffectPipeline::new()
             },
         }
     }
@@ -122,7 +108,7 @@ impl AbilityResolver {
         let cost_already_paid = gs
             .ability_queue
             .current_entry()
-            .map_or(false, |e| e.cost_paid);
+            .is_some_and(|e| e.cost_paid);
 
         if !cost_already_paid {
             if let Some(ref activation_condition) = effect.activation_condition_parsed {
@@ -155,7 +141,7 @@ impl AbilityResolver {
                     }
                 }
                 if !ctx.evaluate_condition(&cond) {
-                    eprintln!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
+                    log::debug!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
                         effect.action, condition.condition_type, condition.location, condition.group_names, condition.exclude_characters);
                     return false;
                 }
@@ -273,7 +259,7 @@ impl AbilityResolver {
                     let target = target_player_id.as_deref().unwrap_or("self");
                     let card_ids: Vec<i16> = {
                         let player = gs.resolve_target_player_mut(target);
-                        match Zone::from_str(&zone) {
+                        match Zone::from_str(zone) {
                             Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
                             Some(Zone::Discard) | Some(Zone::Waitroom) => {
                                 player.waitroom.cards.iter().copied().collect()
@@ -291,9 +277,9 @@ impl AbilityResolver {
                             Some(Zone::RevealedCards) => {
                                 let cheer = gs.cheer_revealed_cards().clone();
                                 if !cheer.is_empty() {
-                                    cheer.iter().copied().collect()
+                                    cheer.to_vec()
                                 } else {
-                                    gs.revealed_cards.iter().copied().collect()
+                                    gs.revealed_cards.to_vec()
                                 }
                             }
                             _ => Vec::new(),
@@ -383,13 +369,15 @@ impl AbilityResolver {
         let card_id_str = activating_card.map(|id| id.to_string()).unwrap_or_default();
 
         // Initialize root trace node with ability information
-        self.pipeline.trace.label = format!(
-            "ability[{}]: {}",
-            ability_index,
-            ability.full_text.chars().take(60).collect::<String>()
-        );
-        self.pipeline.trace.card = Some(card_name.to_string());
-        self.pipeline.trace.before = Some(ZoneSnapshot::from_game_state(gs));
+        if self.debug_trace {
+            self.pipeline.trace.label = format!(
+                "ability[{}]: {}",
+                ability_index,
+                ability.full_text.chars().take(60).collect::<String>()
+            );
+            self.pipeline.trace.card = Some(card_name.to_string());
+            self.pipeline.trace.before = Some(ZoneSnapshot::from_game_state(gs));
+        }
 
         dbg.ability(card_name, card_no, &card_id_str, ability);
 
@@ -423,7 +411,7 @@ impl AbilityResolver {
         let cost_already_paid = gs
             .ability_queue
             .current_entry()
-            .map_or(false, |e| e.cost_paid);
+            .is_some_and(|e| e.cost_paid);
 
         if !cost_already_paid {
             if let Some(ref cost) = ability.cost {
@@ -445,9 +433,9 @@ impl AbilityResolver {
                     let can_activate = ability
                         .effect
                         .as_ref()
-                        .map_or(true, |e| self.can_activate_effect(gs, e));
+                        .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        eprintln!("[USE_LIMIT] inserting key={}", key);
+                        log::debug!("[USE_LIMIT] inserting key={}", key);
                         gs.turn_limited_abilities_used.insert(key.clone());
                     }
                 }
@@ -506,17 +494,16 @@ impl AbilityResolver {
             // Check the effect's condition BEFORE executing. The condition must
             // be met in the current game state (after cost payment). This prevents
             // effects like "choice" from being shown when the condition fails.
-            if effect.condition.is_some() || effect.activation_condition_parsed.is_some() {
-                if !self.can_activate_effect(gs, effect) {
+            if (effect.condition.is_some() || effect.activation_condition_parsed.is_some())
+                && !self.can_activate_effect(gs, effect) {
                     dbg.p("RESULT", "effect condition not met — skipped");
                     return Ok(());
                 }
-            }
             if let Err(e) = self.execute_effect(gs, effect) {
                 dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
                 return Err(e);
             }
-            eprintln!(
+            log::debug!(
                 "[AFTER_EXEC] pending={:?} action={:?}",
                 self.pending_choice.is_some(),
                 &effect.action[..20.min(effect.action.len())]
@@ -528,7 +515,7 @@ impl AbilityResolver {
                     }
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() {
-                            eprintln!("[USE_LIMIT] inserting key={}", key);
+                            log::debug!("[USE_LIMIT] inserting key={}", key);
                             gs.turn_limited_abilities_used.insert(key.clone());
                         }
                     }
@@ -540,7 +527,7 @@ impl AbilityResolver {
                     || gs
                         .ability_queue
                         .current_entry()
-                        .map_or(false, |e| e.cost_paid);
+                        .is_some_and(|e| e.cost_paid);
                 if is_paid {
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.effect_started = true;
@@ -558,9 +545,9 @@ impl AbilityResolver {
                     let can_activate = ability
                         .effect
                         .as_ref()
-                        .map_or(true, |e| self.can_activate_effect(gs, e));
+                        .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        eprintln!("[USE_LIMIT] inserting key={}", key);
+                        log::debug!("[USE_LIMIT] inserting key={}", key);
                         gs.turn_limited_abilities_used.insert(key.clone());
                     }
                 }
@@ -571,7 +558,7 @@ impl AbilityResolver {
                 let can_activate = ability
                     .effect
                     .as_ref()
-                    .map_or(true, |e| self.can_activate_effect(gs, e));
+                    .is_none_or(|e| self.can_activate_effect(gs, e));
                 if can_activate {
                     gs.turn_limited_abilities_used.insert(key);
                 }
@@ -581,8 +568,9 @@ impl AbilityResolver {
         gs.activating_card = None;
         self.current_ability = None;
 
-        // Finalize root trace with final state
-        self.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));
+        if self.debug_trace {
+            self.pipeline.trace.after = Some(ZoneSnapshot::from_game_state(gs));
+        }
 
         Ok(())
     }
@@ -594,6 +582,9 @@ impl AbilityResolver {
         effect_name: &str,
         card_name: Option<String>,
     ) {
+        if !self.debug_trace {
+            return;
+        }
         let before = ZoneSnapshot::from_game_state(gs);
         let node = AbilityTraceNode::new(effect_name)
             .with_card(card_name)
@@ -603,6 +594,9 @@ impl AbilityResolver {
 
     /// Record the end of an effect execution (update after state in the last trace node).
     pub fn trace_effect_end(&mut self, gs: &GameState) {
+        if !self.debug_trace {
+            return;
+        }
         let after = ZoneSnapshot::from_game_state(gs);
         if let Some(last_child) = self.pipeline.trace.children.last_mut() {
             last_child.after = Some(after);
@@ -652,9 +646,9 @@ impl AbilityResolver {
         let mut cost = cost.clone();
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
-                if mod_cost.operation.as_deref() == Some("subtract") {
-                    if mod_cost.per_unit.unwrap_or(false) {
-                        if mod_cost.per_unit_type.as_deref() == Some("group_name") {
+                if mod_cost.operation.as_deref() == Some("subtract")
+                    && mod_cost.per_unit.unwrap_or(false)
+                        && mod_cost.per_unit_type.as_deref() == Some("group_name") {
                             // Count distinct group names on self's stage
                             let player = gs.resolve_target_player("self");
                             let card_db = &gs.card_database;
@@ -669,7 +663,7 @@ impl AbilityResolver {
                                     }
                                 }
                             }
-                            let per_unit_count = mod_cost.per_unit_count.unwrap_or(1) as u32;
+                            let per_unit_count = mod_cost.per_unit_count.unwrap_or(1);
                             let reduction = (groups.len() as u32 / per_unit_count)
                                 * mod_cost.count.unwrap_or(1);
                             if cost.cost_type.as_deref() == Some("pay_energy") {
@@ -677,8 +671,6 @@ impl AbilityResolver {
                                 cost.energy = Some(new_energy);
                             }
                         }
-                    }
-                }
             }
         }
         cost
@@ -686,5 +678,24 @@ impl AbilityResolver {
 
     pub fn card_db(&self) -> Arc<CardDatabase> {
         self.card_database.clone()
+    }
+
+    pub fn fmt_card(&self, cid: i16) -> String {
+        self.card_database
+            .get_card(cid)
+            .map(|c| c.name.as_str())
+            .unwrap_or("?")
+            .to_string()
+    }
+
+    pub fn fmt_ids(&self, ids: &[i16]) -> String {
+        if ids.is_empty() {
+            "[]".into()
+        } else {
+            ids.iter()
+                .map(|&id| self.fmt_card(id))
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
     }
 }

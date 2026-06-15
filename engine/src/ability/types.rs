@@ -1,6 +1,4 @@
-use crate::card::CardDatabase;
 use std::fmt;
-use std::sync::Arc;
 
 use serde_json::Value;
 
@@ -134,6 +132,7 @@ pub enum ExecutionContext {
         card_id: i16,
         state_change: Option<String>,
         target: String,
+        source_zone: String,
     },
 }
 
@@ -149,6 +148,7 @@ pub enum LookAndSelectStep {
     },
     Finalize {
         destination: String,
+        source_zone: String,
     },
 }
 
@@ -455,6 +455,18 @@ impl Choice {
 }
 
 // ====================================================================
+// EffectSpawnContext — carry spawn-time effect parameters explicitly
+// ====================================================================
+
+#[derive(Clone, Debug, Default)]
+pub struct EffectSpawnContext {
+    pub target: Option<String>,
+    pub destination: Option<String>,
+    pub source: Option<String>,
+    pub position: Option<usize>,
+}
+
+// ====================================================================
 // Execution trace nodes
 // ====================================================================
 
@@ -526,45 +538,22 @@ impl AbilityTraceNode {
 // EffectPipeline — the data that flows between sequential effects.
 // ====================================================================
 
-/// Carries state between sequential effect steps explicitly.
-/// Instead of hiding `selected_cards`, `moved_cards` etc. on the
-/// resolver or queue entry, the pipeline makes the handoff traceable.
+/// Carries execution trace state explicitly.
 #[derive(Clone, Debug)]
 pub struct EffectPipeline {
-    pub selected_card_ids: Vec<i16>,
-    pub moved_cards: Vec<i16>,
-    pub activating_card_id: Option<i16>,
-    pub card_database: Arc<CardDatabase>,
     pub trace: AbilityTraceNode,
 }
 
+impl Default for EffectPipeline {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EffectPipeline {
-    pub fn new(db: Arc<CardDatabase>) -> Self {
+    pub fn new() -> Self {
         EffectPipeline {
-            selected_card_ids: Vec::new(),
-            moved_cards: Vec::new(),
-            activating_card_id: None,
-            card_database: db,
             trace: AbilityTraceNode::new("root"),
-        }
-    }
-
-    pub fn fmt_card(&self, cid: i16) -> String {
-        self.card_database
-            .get_card(cid)
-            .map(|c| c.name.as_str())
-            .unwrap_or("?")
-            .to_string()
-    }
-
-    pub fn fmt_ids(&self, ids: &[i16]) -> String {
-        if ids.is_empty() {
-            "[]".into()
-        } else {
-            ids.iter()
-                .map(|&id| self.fmt_card(id))
-                .collect::<Vec<_>>()
-                .join(", ")
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::ability::resolver::AbilityResolver;
-use crate::ability::types::{Choice, ChoiceRoute, Command};
+use crate::ability::types::{Choice, Command};
 use crate::card::Ability;
 use crate::game_state::AbilityTrigger;
 
@@ -181,7 +181,45 @@ impl AbilityQueue {
                     choice: choice_clone,
                 };
             }
-            _ => {}
+            QueueState::Idle | QueueState::Completed { .. } => {
+                // Store the choice directly without an entry
+                let dummy_entry = AbilityQueueEntry {
+                    id: AbilityId::new("", 0, "choice"),
+                    card_no: String::new(),
+                    player_id: String::new(),
+                    ability: Ability {
+                        full_text: String::new(),
+                        triggerless_text: String::new(),
+                        triggers: None,
+                        use_limit: None,
+                        is_null: false,
+                        cost: None,
+                        effect: None,
+                        keywords: None,
+                    },
+                    ability_index: 0,
+                    card_id: None,
+                    trigger_type: AbilityTrigger::Auto,
+                    completed: false,
+                    cost_paid: false,
+                    cost_paid_index: 0,
+                    pending_choice_result: None,
+                    choice_card_no: None,
+                    conditional_choice: None,
+                    effect_started: false,
+                    optional_cost_was_paid: false,
+                    choice_player_id: None,
+                    pending_commands: Vec::new(),
+                    resolver: None,
+                };
+                self.entries.push(dummy_entry);
+                self.state = QueueState::WaitingForChoice {
+                    entry_index: self.entries.len() - 1,
+                    choice: choice_clone,
+                };
+            }
+            QueueState::WaitingForChoice { .. }
+            | QueueState::WaitingForAutoAbilityChoice { .. } => {}
         }
     }
 
@@ -282,7 +320,7 @@ impl AbilityQueue {
     /// Check if the current entry has any pending commands waiting to run.
     pub fn has_pending_commands(&self) -> bool {
         self.current_entry()
-            .map_or(false, |e| !e.pending_commands.is_empty())
+            .is_some_and(|e| !e.pending_commands.is_empty())
     }
 
     /// Move the entry at `from_index` to the front of the queue (position 0).

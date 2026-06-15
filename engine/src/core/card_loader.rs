@@ -91,7 +91,7 @@ impl CardLoader {
                                 if let Some(card_no) = card_str.split(" | ").next() {
                                     ability_map
                                         .entry(card_no.to_string())
-                                        .or_insert_with(Vec::new)
+                                        .or_default()
                                         .push(ability.clone());
                                     _total_abilities_mapped += 1;
                                 }
@@ -100,12 +100,12 @@ impl CardLoader {
                     }
                 } else {
                     // Log deserialization error for debugging
-                    eprintln!(
+                    log::debug!(
                         "Failed to deserialize ability entry: {}",
                         serde_json::to_string_pretty(ability_entry).unwrap_or_default()
                     );
                     if let Err(e) = serde_json::from_value::<Ability>(ability_entry.clone()) {
-                        eprintln!("Deserialization error: {}", e);
+                        log::debug!("Deserialization error: {}", e);
                     }
                 }
             }

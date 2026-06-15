@@ -47,7 +47,7 @@ impl AbilityResolver {
                     let is_wait = gs
                         .mods
                         .get_orientation_modifier(cid)
-                        .map_or(false, |o| o == "wait");
+                        .is_some_and(|o| o == "wait");
                     if !is_wait {
                         return false;
                     }
@@ -63,11 +63,43 @@ impl AbilityResolver {
                     }
                     true
                 })
+            } else if state_change == "wait"
+                && effect.state.as_deref() == Some("active")
+            {
+                // wait effect targeting only active members:
+                // check if there is at least one active (non-wait) member
+                let p = gs.resolve_target_player(&target);
+                let ct = card_type_filter.as_deref();
+                let gf = group_filter.as_deref();
+                p.stage.stage.iter().any(|&cid| {
+                    if cid == -1 {
+                        return false;
+                    }
+                    // member is active when there is no "wait" orientation modifier
+                    let is_active = gs
+                        .mods
+                        .get_orientation_modifier(cid)
+                        .is_none_or(|o| o != "wait");
+                    if !is_active {
+                        return false;
+                    }
+                    if let Some(t) = ct {
+                        if !util::card_matches_type(&gs.card_database, cid, Some(t)) {
+                            return false;
+                        }
+                    }
+                    if let Some(g) = gf {
+                        if !util::card_matches_group_str(&gs.card_database, cid, Some(g)) {
+                            return false;
+                        }
+                    }
+                    true
+                })
             } else {
-                true // non-active state changes always have targets
+                true // no state filter: any member is a valid target
             };
             if !can_target {
-                eprintln!(
+                log::debug!(
                     "[EXEC_CHANGE_STATE] optional {} but no valid targets — skipping",
                     state_change
                 );
@@ -97,7 +129,7 @@ impl AbilityResolver {
         let is_member_op = card_type_filter.as_deref() == Some("member_card") || self_cost;
 
         if is_member_op {
-            eprintln!(
+            log::debug!(
                 "[EXEC_CHANGE_STATE] member_op: target={} count={} max={} state_change={}",
                 target, count, max, state_change
             );
@@ -147,11 +179,18 @@ impl AbilityResolver {
                 let _ = card_db;
                 let _ = player;
                 for (i, card_id) in &stage_snapshot {
-                    // For activation (wait→active): only members currently in "wait"
-                    // state are valid targets. Other state changes accept any member.
+                    // State-based candidate filtering:
+                    //   wait→active (state_change=="active"): only "wait" members.
+                    //   active→wait with state=="active" filter: only active members.
+                    //   Everything else: accept any member.
                     let matches_state = if state_change == "active" {
                         let ori = gs.mods.get_orientation_modifier(*card_id);
-                        ori.map_or(false, |o| o == "wait")
+                        ori.is_some_and(|o| o == "wait")
+                    } else if effect.state.as_deref() == Some("active") {
+                        // e.g. "アクティブ状態のメンバーをウェイトにする"
+                        // Only members currently in active state (no wait modifier).
+                        let ori = gs.mods.get_orientation_modifier(*card_id);
+                        ori.is_none_or(|o| o != "wait")
                     } else {
                         true
                     };
@@ -203,6 +242,11 @@ impl AbilityResolver {
                     crate::ability::types::Command::Effect(crate::card::AbilityEffect {
                         action: "change_state".to_string(),
                         state_change: Some(state_change.clone()),
+                        // Preserve the state filter (e.g. "active" for
+                        // "アクティブ状態のメンバーをウェイトにする") so the
+                        // re-run after the player's choice keeps the same
+                        // candidate filter and doesn't accept already-waited members.
+                        state: effect.state.clone(),
                         target: Some(target.clone()),
                         count: Some(count),
                         card_type: card_type_filter.clone(),
@@ -224,7 +268,7 @@ impl AbilityResolver {
 
             let actual_targets = candidates.iter().take(change_count).collect::<Vec<_>>();
 
-            eprintln!(
+            log::debug!(
                 "[EXEC_CHANGE_STATE] targets={:?} state_change={}",
                 actual_targets
                     .iter()
@@ -239,26 +283,26 @@ impl AbilityResolver {
                 .filter(|(_, card_id)| {
                     let o = gs.mods.get_orientation_modifier(*card_id);
                     // None = active (no modifier), Some("wait") = wait
-                    o.map_or(false, |o| o == "wait")
+                    o.is_some_and(|o| o == "wait")
                 })
                 .count();
 
             for (_, card_id) in &actual_targets {
                 if is_cannot_activate_by_effect {
-                    eprintln!(
+                    log::debug!(
                         "[EXEC_CHANGE_STATE] blocked by cannot_activate_by_effect: card_id={}",
                         card_id
                     );
                     continue;
                 }
-                eprintln!(
+                log::debug!(
                     "[EXEC_CHANGE_STATE] applying: card_id={} state={} before_ori={:?}",
                     card_id,
                     state_change,
                     gs.mods.get_orientation_modifier(*card_id)
                 );
                 gs.mods.add_orientation_modifier(*card_id, &state_change);
-                eprintln!(
+                log::debug!(
                     "[EXEC_CHANGE_STATE] after: card_id={} ori={:?}",
                     card_id,
                     gs.mods.get_orientation_modifier(*card_id)
@@ -279,7 +323,7 @@ impl AbilityResolver {
             // Re-trigger auto abilities for both players — a member's state
             // change may satisfy state_change_condition on an auto ability
             // (e.g. "when opponent cost ≤4 member is waited → draw").
-            eprintln!(
+            log::debug!(
                 "[STATE_CHANGE] modifier applied, re-triggering auto abilities (state={})",
                 state_change
             );
@@ -292,7 +336,7 @@ impl AbilityResolver {
         }
 
         // Energy card state change (original behavior) — delegated
-        return self.execute_energy_state_change(
+        self.execute_energy_state_change(
             gs,
             effect,
             &state_change,
@@ -301,7 +345,7 @@ impl AbilityResolver {
             max,
             card_type_filter.as_deref(),
             group_filter.as_deref(),
-        );
+        )
     }
 
     /// Place energy from deck to energy zone with specific state (wait/active).
@@ -370,13 +414,13 @@ impl AbilityResolver {
                     _ => player.energy_zone.active_energy_count,
                 };
                 let capped = (count as usize).min(available) as u32;
-                eprintln!(
+                log::debug!(
                     "[ENERGY] max=true: count={} available={} effective={}",
                     count, available, capped
                 );
                 capped
             } else {
-                eprintln!("[ENERGY] max=false: count={} effectve={}", count, count);
+                log::debug!("[ENERGY] max=false: count={} effectve={}", count, count);
                 count
             };
 
@@ -388,8 +432,8 @@ impl AbilityResolver {
                 ));
             }
 
-            if !max && valid_indices.len() > effective_count as usize {
-                if state_change != "active" && state_change != "アクティブ" {
+            if !max && valid_indices.len() > effective_count as usize
+                && state_change != "active" && state_change != "アクティブ" {
                     self.pending_choice = Some(
                         Choice::select_cards(
                             Zone::Energy.to_str(),
@@ -408,7 +452,6 @@ impl AbilityResolver {
                     self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                     return Ok(());
                 }
-            }
 
             let wait_cards: Vec<i16> = valid_indices
                 .iter()
@@ -435,10 +478,10 @@ impl AbilityResolver {
                     break;
                 }
                 if let Some(&card_id) = player.energy_zone.cards.get(i) {
-                    let matches_type = card_type_filter.map_or(true, |ct| {
+                    let matches_type = card_type_filter.is_none_or(|ct| {
                         util::card_matches_type(&card_db, card_id, Some(ct))
                     });
-                    let matches_grp = group_filter.map_or(true, |gf| {
+                    let matches_grp = group_filter.is_none_or(|gf| {
                         util::card_matches_group_str(&card_db, card_id, Some(gf))
                     });
                     if matches_type && matches_grp {
@@ -526,7 +569,7 @@ impl AbilityResolver {
             "yellow" | "黄ブレード" => Some(crate::card::BladeColor::Yellow),
             "purple" | "紫ブレード" => Some(crate::card::BladeColor::Purple),
             _ => {
-                eprintln!("[set_blade_type] Unknown blade type: {:?}", bt);
+                log::debug!("[set_blade_type] Unknown blade type: {:?}", bt);
                 None
             }
         });
@@ -569,7 +612,7 @@ impl AbilityResolver {
         &mut self,
         gs: &mut GameState,
         heart_type: Option<&str>,
-        target: &str,
+        _target: &str,
         _count: i32,
     ) {
         let pp = self.player_prefix(gs);
@@ -581,28 +624,21 @@ impl AbilityResolver {
         gs.rule_log
             .push(format!("{} {}: ハート種類を{}に設定", pp, act_name, ht));
         let heart_type = heart_type.unwrap_or("heart00");
-        let card_ids: Vec<i16> = {
-            let player = gs.resolve_target_player_mut(target);
-            player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .copied()
-                .collect()
-        };
-        let color = crate::zones::parse_heart_color(heart_type);
-        for card_id in card_ids {
-            gs.mods.heart_color_multiplier.insert(card_id, color);
-            gs.record_ability_application(
-                gs.activating_card.unwrap_or(-1),
-                format!("Transform hearts to {}", heart_type),
-                "transform",
-                card_id,
-                Some(color.index()),
-                0,
-            );
+        // Target only the activating card (このメンバー = this member)
+        let card_id = gs.activating_card.unwrap_or(-1);
+        if card_id == -1 {
+            return;
         }
+        let color = crate::zones::parse_heart_color(heart_type);
+        gs.mods.heart_color_multiplier.insert(card_id, color);
+        gs.record_ability_application(
+            card_id,
+            format!("Transform hearts to {}", heart_type),
+            "transform",
+            card_id,
+            Some(color.index()),
+            0,
+        );
     }
 
     pub(crate) fn execute_activation_cost(
@@ -680,7 +716,7 @@ impl AbilityResolver {
         choice: bool,
         target: &str,
     ) {
-        eprintln!("specify_heart_color: choice={}, target={}", choice, target);
+        log::debug!("specify_heart_color: choice={}, target={}", choice, target);
         if choice {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "heart_color".to_string(),
@@ -698,7 +734,7 @@ impl AbilityResolver {
         target: &str,
     ) {
         let _target = target;
-        let card_id = self.activating_card_id.or_else(|| gs.activating_card);
+        let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             if let Some(identities) = identities {
                 for identity in identities {
@@ -714,7 +750,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         value: u32,
     ) -> Result<(), String> {
-        let card_id = self.activating_card_id.or_else(|| gs.activating_card);
+        let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.mods.set_cost_modifier(card_id, value as i32);
         }
@@ -727,7 +763,7 @@ impl AbilityResolver {
         timing: &str,
         treat_as: &str,
     ) {
-        let card_id = self.activating_card_id.or_else(|| gs.activating_card);
+        let card_id = self.activating_card_id.or(gs.activating_card);
         if let Some(card_id) = card_id {
             gs.prohibition_effects.push(format!(
                 "all_blade_timing:{}:{}:{}",
@@ -775,7 +811,7 @@ impl AbilityResolver {
             "subtract" => -(value as i32),
             "set" => value as i32,
             _ => {
-                eprintln!("Unknown operation: {}", operation);
+                log::debug!("Unknown operation: {}", operation);
                 return;
             }
         };

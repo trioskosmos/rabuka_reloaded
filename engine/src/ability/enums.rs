@@ -210,6 +210,7 @@ pub enum ActionType {
     ModifyRequiredHeartsGlobal,
     ModifyYellCount,
     ActivationCost,
+    PerformYell,
 }
 
 impl ActionType {
@@ -276,6 +277,7 @@ impl ActionType {
             "modify_required_hearts_global" => Some(ActionType::ModifyRequiredHeartsGlobal),
             "modify_yell_count" => Some(ActionType::ModifyYellCount),
             "activation_cost" => Some(ActionType::ActivationCost),
+            "perform_yell" => Some(ActionType::PerformYell),
             _ => None,
         }
     }
@@ -340,6 +342,7 @@ impl ActionType {
             ActionType::ModifyRequiredHeartsGlobal => "modify_required_hearts_global",
             ActionType::ModifyYellCount => "modify_yell_count",
             ActionType::ActivationCost => "activation_cost",
+            ActionType::PerformYell => "perform_yell",
         }
     }
 
@@ -403,6 +406,7 @@ impl ActionType {
             ActionType::ModifyRequiredHeartsGlobal => "Modify Required Hearts (Global)",
             ActionType::ModifyYellCount => "Modify Yell Count",
             ActionType::ActivationCost => "Activation Cost",
+            ActionType::PerformYell => "Perform Yell",
         }
     }
 }
@@ -444,6 +448,9 @@ pub enum ConditionType {
     OtherwiseCondition,
     NotMoved,
     HasMoved,
+    ResourceCondition,
+    ActionSuccessCondition,
+    AllCostComparisonCondition,
     Custom,
 }
 
@@ -476,6 +483,9 @@ impl ConditionType {
             "otherwise_condition" => Some(Self::OtherwiseCondition),
             "not_moved" => Some(Self::NotMoved),
             "has_moved" => Some(Self::HasMoved),
+            "resource_condition" => Some(Self::ResourceCondition),
+            "action_success_condition" => Some(Self::ActionSuccessCondition),
+            "all_cost_comparison_condition" => Some(Self::AllCostComparisonCondition),
             "custom" => Some(Self::Custom),
             _ => None,
         }
@@ -509,6 +519,9 @@ impl ConditionType {
             Self::OtherwiseCondition => "otherwise_condition",
             Self::NotMoved => "not_moved",
             Self::HasMoved => "has_moved",
+            Self::ResourceCondition => "resource_condition",
+            Self::ActionSuccessCondition => "action_success_condition",
+            Self::AllCostComparisonCondition => "all_cost_comparison_condition",
             Self::Custom => "custom",
         }
     }

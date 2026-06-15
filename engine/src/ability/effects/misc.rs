@@ -92,7 +92,7 @@ impl AbilityResolver {
             );
         }
 
-        eprintln!("Unhandled custom action: {}", action_str);
+        log::debug!("Unhandled custom action: {}", action_str);
         Ok(())
     }
 
@@ -203,7 +203,7 @@ impl AbilityResolver {
         // Execute for self first
         let mut for_self = effect.clone();
         for_self.target = Some("self".to_string());
-        self.last_effect_target = Some("self".to_string());
+        self.spawn_context.target = Some("self".to_string());
 
         let had_choice_before = self.pending_choice.is_some();
         let _ = self.execute_effect(gs, &for_self);
@@ -279,7 +279,7 @@ impl AbilityResolver {
                 }
             }
 
-            eprintln!(
+            log::debug!(
                 "[BP6_HEART] distinct colors from {} discarded cards: {:?}",
                 recently_moved.as_ref().map(|v| v.len()).unwrap_or(0),
                 distinct_colors
@@ -341,7 +341,8 @@ impl AbilityResolver {
             || (effect.source.is_none()
                 && effect.card_type.as_deref() == Some("member_card")
                 && target == "self"
-                && !is_self_target);
+                && !is_self_target
+                && effect.exclude_self.is_none());
 
         // For per_unit gain_resource, skip heart_colors selection and use
         // the previously selected heart from conditional_choice (set by a
@@ -379,11 +380,12 @@ impl AbilityResolver {
 
         let recently_moved = gs.recently_moved_cards.clone();
 
-        let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
-            gs.activating_card
-        } else {
-            None
-        };
+        let exclude_self_id =
+            if effect.exclude_self.unwrap_or(false) && effect.target.as_deref() != Some("self") {
+                gs.activating_card
+            } else {
+                None
+            };
 
         if effect.target_count.is_some()
             && !is_all
@@ -413,11 +415,10 @@ impl AbilityResolver {
                 None,
                 exclude_self_id,
             );
-            if effect.filter_targets_by_heart_colors.unwrap_or(false) {
-                if !effect.heart_colors.is_empty() {
+            if effect.filter_targets_by_heart_colors.unwrap_or(false)
+                && !effect.heart_colors.is_empty() {
                     prelim_filter.heart_colors = &effect.heart_colors;
                 }
-            }
             let mut candidates = util::matching_ids_filtered(
                 &stage_ids,
                 &card_db,
@@ -480,6 +481,8 @@ impl AbilityResolver {
             }
         }
 
+        let orientation_modifiers = gs.mods.orientation_modifiers.clone();
+        let last_energy = gs.mods.last_cost_energy_count;
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = gs.resolve_target_player_mut(&target);
 
@@ -498,14 +501,20 @@ impl AbilityResolver {
                 // instead of the generic per_unit_type → zone mapping.
                 let effective_per_unit_type =
                     effect.location.as_deref().or(per_unit_type_str.as_deref());
-                let mut matching_count = util::resolve_per_unit_count(
-                    true,
-                    effective_per_unit_type,
-                    player,
-                    &card_db,
-                    &filter,
-                    &[],
-                );
+                let mut matching_count = if effective_per_unit_type == Some("つ") {
+                    last_energy
+                } else {
+                    util::resolve_per_unit_count(
+                        true,
+                        effective_per_unit_type,
+                        player,
+                        &card_db,
+                        &filter,
+                        &[],
+                        effect.state.as_deref(),
+                        &orientation_modifiers,
+                    )
+                };
                 // For per_unit_type="discard": always use the cost-tracked discard count.
                 // This gives exact discard count for abilities like LL-bp2-001
                 // (cost: discard named characters → gain 1 blade per discarded card).
@@ -546,6 +555,12 @@ impl AbilityResolver {
                         units = units.min(cap);
                     }
                 }
+                // Also cap by max_repeats (aliased as repeat_limit), used
+                // when the parser sets it as the sole cap on per_unit effects
+                // (e.g. "N枚までしか数えない" text constraints).
+                if let Some(cap) = effect.repeat_limit {
+                    units = units.min(cap);
+                }
                 units * effect.resource_icon_count.unwrap_or(1)
             } else {
                 count
@@ -562,7 +577,9 @@ impl AbilityResolver {
             let tc = effect.target_count;
             let dn = effect.distinct.as_deref();
 
-            let has_blade_filter = card_type_filter.is_some() || group_filter.is_some();
+            let has_characters = effect.characters.as_ref().is_some_and(|c| !c.is_empty());
+            let has_blade_filter =
+                card_type_filter.is_some() || group_filter.is_some() || has_characters;
             // When has_selection_filter is set (target_count/distinct), don't blindly
             // use all_selected — apply the filter with exclusion to find the right targets.
             // Only use all_selected directly for pure sequential select→gain_resource.
@@ -632,13 +649,12 @@ impl AbilityResolver {
 
             // Apply heart_colors as a target filter when the effect
             // specifies that targets must already possess the heart color.
-            if effect.filter_targets_by_heart_colors.unwrap_or(false) {
-                if !effect.heart_colors.is_empty() {
+            if effect.filter_targets_by_heart_colors.unwrap_or(false)
+                && !effect.heart_colors.is_empty() {
                     heart_targets.retain(|&id| {
                         util::card_matches_heart_colors(&card_db, id, &effect.heart_colors)
                     });
                 }
-            }
 
             (blade_targets, heart_targets, heart_color_inner, final_count)
         };
@@ -763,7 +779,9 @@ impl AbilityResolver {
                         );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
-                } else if effect.target_count.is_none() && effect.exclude_self.is_none() {
+                } else if effect.target_count.is_none()
+                    && (effect.exclude_self.is_none() || effect.target.as_deref() == Some("self"))
+                {
                     if let Some(card_id) = activating_card_id {
                         gs.mods.add_blade_modifier_with_trace(
                             card_id,
@@ -812,7 +830,9 @@ impl AbilityResolver {
 
         if resource == "heart" || resource == "ハート" {
             if heart_targets.is_empty() {
-                if effect.target_count.is_none() && effect.exclude_self.is_none() {
+                if effect.target_count.is_none()
+                    && (effect.exclude_self.is_none() || effect.target.as_deref() == Some("self"))
+                {
                     if let Some(card_id) = activating_card_id {
                         gs.mods.add_heart_modifier_with_trace(
                             card_id,
@@ -879,15 +899,14 @@ impl AbilityResolver {
         }
 
         // Store effect_data for blade cleanup.
-        if is_temporary && effect_data.is_none() {
-            if resource == "blade" || resource == "ブレード" {
+        if is_temporary && effect_data.is_none()
+            && (resource == "blade" || resource == "ブレード") {
                 let cards_json: Vec<serde_json::Value> = blade_targets_save
                     .iter()
                     .map(|&cid| serde_json::json!({"card_id": cid, "amount": final_count}))
                     .collect();
                 effect_data = Some(serde_json::Value::Array(cards_json.clone()));
             }
-        }
 
         let pp = self.player_prefix(gs);
         let act_name = gs
@@ -964,7 +983,7 @@ impl AbilityResolver {
         count: u32,
         target: &str,
     ) -> Result<(), String> {
-        eprintln!("play_baton_touch: count={}, target={}", count, target);
+        log::debug!("play_baton_touch: count={}, target={}", count, target);
         if gs.baton_touch_count > 0 {
             // Already performed baton touch during play action — no-op now.
             return Ok(());
@@ -1106,7 +1125,7 @@ impl AbilityResolver {
                 .current_ability
                 .as_ref()
                 .and_then(|a| a.triggers.as_ref())
-                .map_or(false, |t| t == crate::triggers::ACTIVATION);
+                .is_some_and(|t| t == crate::triggers::ACTIVATION);
             if !is_activation {
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "pay_optional_cost:skip_optional_cost".to_string(),
@@ -1403,7 +1422,7 @@ impl AbilityResolver {
                 // Position is SOURCE ("member AT center"). Find that member on
                 // the target's stage and create choice to pick destination.
                 let player = gs.resolve_target_player_mut(target);
-                let pos_idx = util::stage_position_index(&position_str)
+                let pos_idx = util::stage_position_index(position_str)
                     .ok_or_else(|| format!("Unknown position: {}", position_str))?;
                 if player.stage.stage[pos_idx] == -1 {
                     return Ok(()); // no member at source → skip this side
@@ -1517,7 +1536,7 @@ impl AbilityResolver {
 
         let card_db = self.card_db();
         let player = gs.resolve_target_player_mut(target);
-        let target_index = util::stage_position_index(&position_str)
+        let target_index = util::stage_position_index(position_str)
             .ok_or_else(|| format!("Unknown position: {}", position_str))?;
 
         let current_index = player.stage.stage.iter().position(|&card_id| {
@@ -1546,7 +1565,7 @@ impl AbilityResolver {
                 player.stage.stage[target_index],
                 player.stage.stage[current_idx],
             );
-            if let Ok(_) = player.stage.position_change(from_area, to_area) {
+            if player.stage.position_change(from_area, to_area).is_ok() {
                 let _ = player;
                 gs.record_card_movement(target_id);
                 if source_id != -1 {
@@ -1674,7 +1693,7 @@ impl AbilityResolver {
         if let Some(source) = source_position {
             // Source position specified: move member AT source TO destination.
             let player = gs.resolve_target_player_mut(target);
-            let source_idx = util::stage_position_index(&source)
+            let source_idx = util::stage_position_index(source)
                 .ok_or_else(|| format!("Unknown source position: {}", source))?;
             if player.stage.stage[source_idx] == -1 {
                 return Ok(()); // no member at source, skip
@@ -1943,7 +1962,7 @@ impl AbilityResolver {
         let player = gs.resolve_target_player_mut(target);
         if count > 0 {
             if let Err(e) = player.energy_zone.pay_energy(count as usize) {
-                eprintln!("{}", e);
+                log::debug!("{}", e);
             }
         }
     }
@@ -2031,7 +2050,7 @@ impl AbilityResolver {
         lose_blade_hearts: bool,
         target: &str,
     ) {
-        eprintln!("re_yell: lose_blade_hearts={}", lose_blade_hearts);
+        log::debug!("re_yell: lose_blade_hearts={}", lose_blade_hearts);
         let card_db = self.card_db();
         let mut cards_to_clear_modifiers: Vec<i16> = Vec::new();
         {
@@ -2089,7 +2108,7 @@ impl AbilityResolver {
                 player.energy_deck.cards.shuffle(&mut rand::thread_rng());
             }
             _ => {
-                eprintln!("Unknown shuffle zone: {}", source);
+                log::debug!("Unknown shuffle zone: {}", source);
             }
         }
     }
@@ -2122,5 +2141,15 @@ impl AbilityResolver {
             .get_card(card_id)
             .map(|c| c.name.clone())
             .unwrap_or_else(|| format!("Card#{}", card_id))
+    }
+
+    /// Perform N additional yells.
+    /// A yell reveals cards from deck top until a live card is found.
+    pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u32, target: &str) {
+        for _ in 0..count {
+            // Reuse existing reveal-until-live-card logic
+            self.execute_reveal_until_live_card(gs, target)
+                .unwrap_or_else(|e| log::debug!("[YELL] Error during yell: {}", e));
+        }
     }
 }

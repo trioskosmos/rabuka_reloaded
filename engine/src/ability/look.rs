@@ -1,8 +1,7 @@
 use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
-use super::util;
-use crate::card::{AbilityEffect, CardDatabase};
+use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
 impl AbilityResolver {
@@ -148,7 +147,7 @@ impl AbilityResolver {
         let any_number = self
             .current_effect
             .as_ref()
-            .map_or(false, |e| e.any_number.unwrap_or(false));
+            .is_some_and(|e| e.any_number.unwrap_or(false));
         let looked_at_len = gs.looked_at_cards.len();
         let player = gs.resolve_target_player_mut(target);
 
@@ -169,8 +168,8 @@ impl AbilityResolver {
             && available > 0
         {
             let current_effect = self.current_effect.as_ref();
-            let is_max = current_effect.map_or(false, |e| e.max.unwrap_or(false));
-            let is_optional = current_effect.map_or(false, |e| e.optional.unwrap_or(false));
+            let is_max = current_effect.is_some_and(|e| e.max.unwrap_or(false));
+            let is_optional = current_effect.is_some_and(|e| e.optional.unwrap_or(false));
 
             println!("DEBUG: is_max: {}, is_optional: {}", is_max, is_optional);
 
@@ -301,7 +300,7 @@ impl AbilityResolver {
                     .ability_queue
                     .current_entry()
                     .and_then(|e| e.conditional_choice.as_ref())
-                    .map_or(false, |cc| or_types.contains(cc));
+                    .is_some_and(|cc| or_types.contains(cc));
                 if already_chosen {
                     return Ok(());
                 }
@@ -335,9 +334,7 @@ impl AbilityResolver {
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store the options as JSON array in conditional_choice so the reveal can read the player's pick
-                gs.ability_queue.current_entry_mut().map(|e| {
-                    e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
-                });
+                if let Some(e) = gs.ability_queue.current_entry_mut() { e.conditional_choice = Some(serde_json::to_string(or_types).unwrap()); }
                 return Ok(());
             }
         }
@@ -419,7 +416,7 @@ impl AbilityResolver {
             .retain(|&id| filter.matches(&card_db, id, false));
 
         // Exclude previously selected cards if exclude_selected is true
-        eprintln!(
+        log::debug!(
             "[EXCLUDE_SEL] selected={:?} looked_at_before={:?}",
             self.selected_cards, gs.looked_at_cards
         );
@@ -432,12 +429,12 @@ impl AbilityResolver {
                 gs.looked_at_cards.retain(|&id| id != activating_id);
             }
         }
-        eprintln!("[EXCLUDE_SEL] looked_at_after={:?}", gs.looked_at_cards);
+        log::debug!("[EXCLUDE_SEL] looked_at_after={:?}", gs.looked_at_cards);
 
         let optional = self
             .current_effect
             .as_ref()
-            .map_or(false, |e| e.optional.unwrap_or(false));
+            .is_some_and(|e| e.optional.unwrap_or(false));
         if gs.looked_at_cards.len() < count as usize {
             return Ok(()); // Not enough distinct cards — skip silently
         }
@@ -530,17 +527,15 @@ impl AbilityResolver {
         let player = gs.resolve_target_player_mut(target);
 
         // If deck has fewer cards than requested, the effect cannot execute.
-        if Zone::from_str(source) == Some(Zone::Deck)
-            || Zone::from_str(source) == Some(Zone::DeckTop)
-        {
-            if player.main_deck.cards.len() < count as usize {
+        if (Zone::from_str(source) == Some(Zone::Deck)
+            || Zone::from_str(source) == Some(Zone::DeckTop))
+            && player.main_deck.cards.len() < count as usize {
                 return Err(format!(
                     "Not enough cards in deck: need {}, have {}",
                     count,
                     player.main_deck.cards.len()
                 ));
             }
-        }
 
         let cards = match Zone::from_str(source) {
             Some(Zone::Deck) | Some(Zone::DeckTop) => {
@@ -618,7 +613,7 @@ impl AbilityResolver {
             by_group.entry(group_name).or_default().push(card_id);
         }
 
-        for (_group, members) in &by_group {
+        for members in by_group.values() {
             for &card_id in members {
                 gs.revealed_cards.push(card_id);
             }

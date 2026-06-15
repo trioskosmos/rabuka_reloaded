@@ -1,6 +1,5 @@
 use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
-use super::super::types::{Choice, ChoiceRoute};
 use super::super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
@@ -38,6 +37,8 @@ impl AbilityResolver {
             None
         };
 
+        let orientation_modifiers = gs.mods.orientation_modifiers.clone();
+        let last_energy = gs.mods.last_cost_energy_count;
         let (live_card_ids, final_value) = {
             let player = gs.resolve_target_player_mut(&target);
 
@@ -52,15 +53,26 @@ impl AbilityResolver {
             );
 
             let final_value = if per_unit {
-                let matching_count = util::resolve_per_unit_count(
-                    true,
-                    per_unit_type_str.as_deref(),
-                    player,
-                    &card_db,
-                    &filter,
-                    heart_colors,
-                );
-                value * matching_count * per_unit_count_val
+                let matching_count = if per_unit_type_str.as_deref() == Some("つ") {
+                    // "つ" = counter for units; for energy costs this is the
+                    // number of energy paid in the current cost step.
+                    log::debug!("[PER_UNIT_つ] last_cost_energy_count={}", last_energy);
+                    last_energy
+                } else {
+                    util::resolve_per_unit_count(
+                        true,
+                        per_unit_type_str.as_deref(),
+                        player,
+                        &card_db,
+                        &filter,
+                        heart_colors,
+                        effect.state.as_deref(),
+                        &orientation_modifiers,
+                    )
+                };
+                // per_unit_count: apply value once per N units (e.g. 4 energy = +1)
+                let effective_units = matching_count / per_unit_count_val.max(1);
+                value * effective_units
             } else {
                 value
             };
@@ -100,7 +112,7 @@ impl AbilityResolver {
                 })
                 .collect();
 
-            eprintln!(
+            log::debug!(
                 "▶ Score {} {} {} {}: {} applied to [{}]",
                 operation,
                 final_value,
@@ -109,7 +121,7 @@ impl AbilityResolver {
                 final_value,
                 target_card_ids
                     .iter()
-                    .map(|(id, _)| self.pipeline.fmt_card(*id))
+                    .map(|(id, _)| self.fmt_card(*id))
                     .collect::<Vec<_>>()
                     .join(", ")
             );
@@ -120,14 +132,10 @@ impl AbilityResolver {
         for (card_id, delta) in &live_card_ids {
             if let Some(constraint) = &effect_constraint {
                 let current_mod = gs.mods.get_score_modifier(*card_id);
-                match constraint.as_str() {
-                    "min:0" => {
-                        if current_mod + delta < 0 {
-                            continue;
-                        }
+                if constraint.as_str() == "min:0"
+                    && current_mod + delta < 0 {
+                        continue;
                     }
-                    _ => {}
-                }
             }
             if operation == "set" {
                 gs.mods.set_score_modifier(*card_id, *delta);
@@ -207,15 +215,12 @@ impl AbilityResolver {
                     }
                 }
                 if let Some(tc) = timing_condition {
-                    match tc {
-                        "appeared_or_moved_this_turn" => {
-                            let moved = gs.has_card_moved_this_turn(card_id);
-                            let appeared = gs.has_card_appeared_this_turn(card_id);
-                            if !moved && !appeared {
-                                continue;
-                            }
+                    if tc == "appeared_or_moved_this_turn" {
+                        let moved = gs.has_card_moved_this_turn(card_id);
+                        let appeared = gs.has_card_appeared_this_turn(card_id);
+                        if !moved && !appeared {
+                            continue;
                         }
-                        _ => {}
                     }
                 }
                 count += 1;
@@ -242,11 +247,24 @@ impl AbilityResolver {
         } else {
             heart_colors.to_vec()
         };
+        // For "set" with multiple colors, the parser sometimes emits total count (issue7:
+        // 12 hearts ÷ 4 colors = 3 each) and sometimes per-color count (hareruya_q64:
+        // 2 each for 3 colors). Heuristic: if value is a multiple of colors.len() AND
+        // exceeds the color count, it's total budget to distribute; otherwise per-color.
+        let per_color_value = if operation == "set"
+            && colors.len() > 1
+            && value > colors.len() as u32
+            && value.is_multiple_of(colors.len() as u32)
+        {
+            value / colors.len() as u32
+        } else {
+            value
+        };
         for hc in &colors {
             let color = crate::zones::parse_heart_color(hc);
             gs.rule_log.push(format!(
                 "{} {}: 要求ハート{} {} {}",
-                pp, act_name, op_jp, value, hc
+                pp, act_name, op_jp, per_color_value, hc
             ));
             for card_id in &card_ids {
                 match operation {
@@ -259,11 +277,8 @@ impl AbilityResolver {
                             .add_need_heart_modifier(*card_id, color, value as i32);
                     }
                     "set" => {
-                        // The parser splits multiple heart colors into separate
-                        // sub-actions, each with its own color and value/count.
-                        // Use value as the per-color modifier directly.
                         gs.mods
-                            .set_need_heart_modifier(*card_id, color, value as i32);
+                            .set_need_heart_modifier(*card_id, color, per_color_value as i32);
                     }
                     _ => return Err(format!("Unknown operation: {}", operation)),
                 }
@@ -335,7 +350,7 @@ impl AbilityResolver {
             "set" => {
                 gs.cheer_checks_required = count;
             }
-            _ => eprintln!("Unknown operation: {}", operation),
+            _ => log::debug!("Unknown operation: {}", operation),
         }
     }
 
@@ -401,7 +416,7 @@ impl AbilityResolver {
             "increase" => value as i32,
             "decrease" => -(value as i32),
             _ => {
-                eprintln!("Unknown operation: {}", operation);
+                log::debug!("Unknown operation: {}", operation);
                 return;
             }
         };

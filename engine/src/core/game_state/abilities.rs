@@ -35,7 +35,7 @@ impl GameState {
         ability: &crate::card::Ability,
         trigger: &crate::game_state::AbilityTrigger,
     ) -> bool {
-        ability.triggers.as_ref().map_or(false, |t| match trigger {
+        ability.triggers.as_ref().is_some_and(|t| match trigger {
             crate::game_state::AbilityTrigger::Activation => {
                 t.contains(crate::triggers::ACTIVATION)
             }
@@ -143,6 +143,7 @@ impl GameState {
             } else {
                 &self.player2
             };
+            // Scan stage cards for AUTO abilities
             for &card_id in &player.stage.stage {
                 if card_id == -1 {
                     continue;
@@ -152,7 +153,7 @@ impl GameState {
                         if ability
                             .triggers
                             .as_ref()
-                            .map_or(false, |t| t == crate::triggers::AUTO)
+                            .is_some_and(|t| t == crate::triggers::AUTO)
                         {
                             // Guard: skip discard-location abilities when the card
                             // is on stage (prevents premature triggering).
@@ -172,6 +173,37 @@ impl GameState {
                                 }
                                 // Evaluate trigger_condition (e.g. "このメンバーがエリアを移動する"
                                 // for each-time triggers). If not met, skip.
+                                if let Some(ref trigger_cond) = effect.trigger_condition {
+                                    let ctx =
+                                        crate::ability::condition::ConditionContext::new(self);
+                                    if !ctx.evaluate_condition(trigger_cond) {
+                                        continue;
+                                    }
+                                }
+                            }
+                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
+                        }
+                    }
+                }
+            }
+            // Also scan live cards for AUTO abilities
+            for &card_id in &player.live_card_zone.cards {
+                if let Some(card) = self.card_database.get_card(card_id) {
+                    for ability in &card.abilities {
+                        if ability
+                            .triggers
+                            .as_ref()
+                            .is_some_and(|t| t == crate::triggers::AUTO)
+                        {
+                            if let Some(ref effect) = ability.effect {
+                                // For each_time abilities, skip the trigger_condition
+                                // pre-filter here — they are handled by dedicated
+                                // trigger functions (trigger_live_start_abilities etc.)
+                                // that fire them per matching member.
+                                if effect.trigger_type.as_deref() == Some("each_time") {
+                                    continue;
+                                }
                                 if let Some(ref trigger_cond) = effect.trigger_condition {
                                     let ctx =
                                         crate::ability::condition::ConditionContext::new(self);
@@ -454,13 +486,12 @@ impl GameState {
         // Check if a resolver already exists (e.g., cost phase completed, effect needs to run).
         // If so, reuse it — it carries state (revealed_cost_cards, etc.) needed by the effect.
         let mut resolver = if self.ability_queue.has_resolver() {
-            eprintln!("[PCA] Reusing existing resolver for effect execution");
+            log::debug!("[PCA] Reusing existing resolver for effect execution");
             let mut r = self.ability_queue.take_resolver().unwrap();
             // Don't reset moved_cards/selected_cards — the effect may need
             // them for cost_reference (e.g. previous_moved_card) or conditions.
             r.selected_cards.clear();
-            r.last_effect_target = None;
-            r.last_effect_position = None;
+            r.spawn_context = crate::ability::types::EffectSpawnContext::default();
             r.pending_stage_cards = Vec::new();
             r.execution_context = crate::ability::types::ExecutionContext::None;
             r
@@ -471,7 +502,7 @@ impl GameState {
         match resolver.resolve_ability(self, &ability, card_id, ability_index) {
             Ok(()) => {}
             Err(e) => {
-                eprintln!("Failed to resolve ability: {}", e);
+                log::debug!("Failed to resolve ability: {}", e);
                 self.ability_queue.complete_current();
                 self.clear_effect_tracking();
                 return;
@@ -480,7 +511,9 @@ impl GameState {
 
         // Sync resolver state to GameState before the resolver may be dropped.
         // The condition system and other subsystems read GameState directly.
-        self.last_ability_trace = Some(resolver.pipeline.trace.clone());
+        if resolver.debug_trace {
+            self.last_ability_trace = Some(resolver.pipeline.trace.clone());
+        }
 
         if let Some(ref c) = resolver.pending_choice {
             let is_choice_type = self
@@ -613,12 +646,13 @@ impl GameState {
                         cost_limit,
                         ref cost_limit_operator,
                         ref target_player_id,
+                        ref group,
                         ..
                     } = choice
                     {
                         let target = target_player_id.as_deref().unwrap_or("self");
                         let player = self.resolve_target_player(target);
-                        let card_ids: Vec<i16> = match Zone::from_str(&zone) {
+                        let card_ids: Vec<i16> = match Zone::from_str(zone) {
                             Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
                             Some(Zone::Discard) => player.waitroom.cards.iter().copied().collect(),
                             Some(Zone::Stage) => player
@@ -660,7 +694,16 @@ impl GameState {
                                     None => true,
                                     _ => true,
                                 };
+                                let group_ok = match group.as_ref() {
+                                    Some(g) => crate::ability::util::card_matches_group_str(
+                                        &self.card_database,
+                                        cid,
+                                        Some(g),
+                                    ),
+                                    None => true,
+                                };
                                 type_ok
+                                    && group_ok
                                     && if let Some(lim) = cost_limit {
                                         crate::ability::util::card_matches_cost_limit_op(
                                             &self.card_database,
@@ -700,7 +743,7 @@ impl GameState {
             ("opponent", Some("player2") | Some("p2")) => &mut self.player1,
             ("opponent", _) => &mut self.player2,
             ("both", _) => {
-                eprintln!("WARN: resolve_target_player_mut called with 'both'  Ereturning player1, use execute_for_targets instead");
+                log::debug!("WARN: resolve_target_player_mut called with 'both'  Ereturning player1, use execute_for_targets instead");
                 &mut self.player1
             }
             _ => &mut self.player1,
@@ -904,7 +947,7 @@ impl GameState {
                         let restricted_to = effect
                             .restricted_destination
                             .as_deref()
-                            .or_else(|| effect.destination.as_deref());
+                            .or(effect.destination.as_deref());
                         if effect.action == "restriction"
                             && effect.restriction_type.as_deref() == Some("cannot_place")
                             && {
@@ -917,7 +960,7 @@ impl GameState {
                                         && cz == Some(Zone::LiveCardZone)
                             }
                         {
-                            eprintln!("Card {} cannot be placed in {} due to constant ability restriction", card.card_no, zone);
+                            log::debug!("Card {} cannot be placed in {} due to constant ability restriction", card.card_no, zone);
                             return false;
                         }
                     }
@@ -929,7 +972,7 @@ impl GameState {
         if self.prohibition_effects.iter().any(|p| {
             p.starts_with("restriction:cannot_place:") && _prohibition_destination_blocks(p, zone)
         }) {
-            eprintln!(
+            log::debug!(
                 "Card {} cannot be placed in {} due to dynamic prohibition",
                 card_id, zone
             );
@@ -987,7 +1030,7 @@ impl GameState {
             let card = player.live_card_zone.cards.remove(index);
             player.waitroom.cards.push(card);
             if let Some(card_data) = self.card_database.get_card(card) {
-                eprintln!(
+                log::debug!(
                     "Removed card {} from live_card_zone due to constant ability restriction",
                     card_data.card_no
                 );
@@ -1035,7 +1078,7 @@ impl GameState {
             let is_expired = match effect.duration {
                 Duration::LiveEnd => {
                     let expired = self.current_turn_phase != TurnPhase::Live;
-                    eprintln!(
+                    log::debug!(
                         "[EXPIRY] LiveEnd check: phase={:?} turn_phase={:?} expired={}",
                         self.current_phase, self.current_turn_phase, expired
                     );
@@ -1095,7 +1138,7 @@ impl GameState {
                                     {
                                         self.mods
                                             .remove_blade_modifier(card_id as i16, amount as i32);
-                                        eprintln!(
+                                        log::debug!(
                                             "Reverted {} blades from card {}",
                                             amount, card_id
                                         );
@@ -1110,7 +1153,7 @@ impl GameState {
                                 {
                                     self.mods
                                         .remove_blade_modifier(card_id as i16, amount as i32);
-                                    eprintln!("Reverted {} blades from card {}", amount, card_id);
+                                    log::debug!("Reverted {} blades from card {}", amount, card_id);
                                 }
                             }
                         }
@@ -1136,7 +1179,7 @@ impl GameState {
                                             color,
                                             amount as i32,
                                         );
-                                        eprintln!(
+                                        log::debug!(
                                             "Reverted {} hearts from card {} (color {:?})",
                                             amount, card_id, color
                                         );
@@ -1159,7 +1202,7 @@ impl GameState {
                                         color,
                                         amount as i32,
                                     );
-                                    eprintln!(
+                                    log::debug!(
                                         "Reverted {} hearts from card {} (color {:?})",
                                         amount, card_id, color
                                     );
@@ -1172,7 +1215,7 @@ impl GameState {
                     if let Some(ref data) = effect.effect_data {
                         if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
                             self.mods.remove_heart_override(card_id as i16);
-                            eprintln!("Removed heart override for card {}", card_id);
+                            log::debug!("Removed heart override for card {}", card_id);
                         }
                     }
                 }
@@ -1188,7 +1231,7 @@ impl GameState {
                                     {
                                         self.mods
                                             .remove_cost_modifier(card_id as i16, amount as i32);
-                                        eprintln!(
+                                        log::debug!(
                                             "Reverted cost modifier {} from card {}",
                                             amount, card_id
                                         );
@@ -1203,7 +1246,7 @@ impl GameState {
                                 {
                                     self.mods
                                         .remove_cost_modifier(card_id as i16, amount as i32);
-                                    eprintln!(
+                                    log::debug!(
                                         "Reverted cost modifier {} from card {}",
                                         amount, card_id
                                     );
@@ -1213,7 +1256,7 @@ impl GameState {
                     }
                 }
                 _ => {
-                    eprintln!("Expired effect: {}", effect.description);
+                    log::debug!("Expired effect: {}", effect.description);
                 }
             }
         }
@@ -1242,12 +1285,7 @@ impl GameState {
         });
     }
 
-    pub fn get_replacement_effects_for_event(&self, event: &str) -> Vec<&ReplacementEffect> {
-        self.replacement_effects
-            .iter()
-            .filter(|e| e.original_event == event && !e.applied_this_event)
-            .collect()
-    }
+
 
     pub fn reset_replacement_effect_flags(&mut self) {
         for effect in &mut self.replacement_effects {
@@ -1301,8 +1339,8 @@ impl GameState {
         format!(
             "t{}_p{}_tp{}_p1h{}_p1e{}_p1w{}_p1l{}_p1su{}_p1st{:?}_p2h{}_p2e{}_p2w{}_p2l{}_p2su{}_p2st{:?}_oe{}_pro{}_tmp{}_rps{:?}",
             self.turn_number,
-            self.current_phase.to_string(),
-            self.current_turn_phase.to_string(),
+            self.current_phase,
+            self.current_turn_phase,
             self.player1.hand.cards.len(),
             self.player1.energy_zone.cards.len(),
             self.player1.waitroom.cards.len(),
