@@ -15,7 +15,11 @@ pub struct GameModifiers {
     pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, i32>>,
     pub constant_blade_bonuses: HashMap<i16, i32>,
     pub constant_cost_bonuses: HashMap<i16, i32>,
+    pub constant_score_bonuses: HashMap<i16, i32>,
+    pub constant_heart_bonuses: HashMap<i16, HashMap<String, i32>>,
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
+    /// Number of cards moved from hand to discard by the most recent cost payment.
+    pub last_cost_discard_count: u32,
 }
 
 impl GameModifiers {
@@ -31,7 +35,10 @@ impl GameModifiers {
             need_heart_modifiers: HashMap::new(),
             constant_blade_bonuses: HashMap::new(),
             constant_cost_bonuses: HashMap::new(),
+            constant_score_bonuses: HashMap::new(),
+            constant_heart_bonuses: HashMap::new(),
             heart_color_multiplier: HashMap::new(),
+            last_cost_discard_count: 0,
         }
     }
 
@@ -109,6 +116,14 @@ impl GameModifiers {
         *self.score_modifiers.entry(card_id).or_insert(0) += delta;
     }
 
+    pub fn remove_score_modifier(&mut self, card_id: i16, delta: i32) {
+        let val = self.score_modifiers.entry(card_id).or_insert(0);
+        *val -= delta;
+        if *val == 0 {
+            self.score_modifiers.remove(&card_id);
+        }
+    }
+
     pub fn get_score_modifier(&self, card_id: i16) -> i32 {
         self.score_modifiers.get(&card_id).copied().unwrap_or(0)
     }
@@ -179,6 +194,8 @@ impl GameModifiers {
         self.cost_modifiers.remove(&card_id);
         self.constant_blade_bonuses.remove(&card_id);
         self.constant_cost_bonuses.remove(&card_id);
+        self.constant_score_bonuses.remove(&card_id);
+        self.constant_heart_bonuses.remove(&card_id);
         self.heart_color_multiplier.remove(&card_id);
     }
 }

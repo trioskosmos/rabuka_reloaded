@@ -140,6 +140,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     characters,
                     filtered_indices,
                     is_select_action,
+                    ref target_player_id,
                     ..
                 }),
                 ChoiceResult::CardSelected { indices },
@@ -158,6 +159,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     characters.clone(),
                     filtered_indices.clone(),
                     *is_select_action,
+                    target_player_id.clone(),
                 )
             }
             (Some(Choice::SelectCard { .. }), ChoiceResult::Skip) => {
@@ -197,6 +199,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         characters: Option<Vec<String>>,
         filtered_indices: Option<Vec<usize>>,
         is_select_action: bool,
+        target_player_id: Option<String>,
     ) -> Result<(), String> {
         println!(
             "DEBUG: handle_select_card - zone: '{}', indices: {:?}, context: {:?}",
@@ -301,17 +304,23 @@ impl<'a> super::resolver::AbilityResolver<'a> {
             match zone {
                 "hand" => {
                     let player = self.game_state.active_player_mut();
+                    let mut discard_count = 0u32;
                     for &idx in indices.iter().rev() {
                         if idx < player.hand.cards.len() {
                             if validate_card(player.hand.cards[idx]) {
                                 player.waitroom.add_card(player.hand.cards[idx]);
                                 player.hand.remove_card(idx);
+                                discard_count += 1;
                             }
                         }
+                    }
+                    if discard_count > 0 {
+                        self.game_state.mods.last_cost_discard_count = discard_count;
                     }
                 }
                 "stage" => {
                     let mut last_vacated = None;
+                    let mut moved_ids = Vec::new();
                     {
                         let player = self.game_state.active_player_mut();
                         for &idx in indices.iter().rev() {
@@ -324,12 +333,17 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 {
                                     player.waitroom.add_card(card_id);
                                     last_vacated = Some(idx);
+                                    moved_ids.push(card_id);
                                 }
                             }
                         }
                     }
                     if let Some(pos) = last_vacated {
                         self.game_state.last_vacated_stage_area = Some(pos);
+                    }
+                    if !moved_ids.is_empty() {
+                        self.moved_cards = moved_ids.clone();
+                        self.game_state.recently_moved_cards = Some(moved_ids);
                     }
                 }
                 "energy_zone" => {
@@ -673,8 +687,67 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     self.selected_cards
                 );
             }
+            "stage" => {
+                if is_select_action {
+                    // Select card(s) for a state change or similar effect
+                    // without moving them off stage.
+                    let player = self
+                        .game_state
+                        .resolve_target_player_mut(target_player_id.as_deref().unwrap_or("self"));
+                    let mut cards: Vec<i16> = Vec::new();
+                    for &idx in indices.iter() {
+                        if idx < 3 && player.stage.stage[idx] != -1 {
+                            let cid = player.stage.stage[idx];
+                            if validate_card(cid) {
+                                cards.push(cid);
+                            }
+                        }
+                    }
+                    self.selected_cards = cards;
+                } else {
+                    // Move selected stage card(s) to the destination zone.
+                    // Used by effects like Yoshiko (move chosen Aqours member off stage).
+                    let dst = self.game_state.entry_destination().map(|s| s.to_string());
+                    let dst_str = dst.as_deref().unwrap_or("discard").to_string();
+                    let mut moved_ids: Vec<i16> = Vec::new();
+                    let mut last_vacated: Option<usize> = None;
+                    {
+                        let player = self.game_state.active_player_mut();
+                        for &idx in indices.iter().rev() {
+                            if idx < 3
+                                && player.stage.stage[idx] != -1
+                                && validate_card(player.stage.stage[idx])
+                            {
+                                if let Some(card_id) =
+                                    player.remove_member_from_stage_with_recycling(idx, &card_db)
+                                {
+                                    crate::ability::util::place_card_in_zone(
+                                        player, card_id, &dst_str, None, false, 1,
+                                    );
+                                    moved_ids.push(card_id);
+                                    last_vacated = Some(idx);
+                                }
+                            }
+                        }
+                    }
+                    if let Some(pos) = last_vacated {
+                        self.game_state.last_vacated_stage_area = Some(pos);
+                    }
+                    self.selected_cards = moved_ids.clone();
+                    if !moved_ids.is_empty() {
+                        self.moved_cards = moved_ids.clone();
+                        self.game_state.recently_moved_cards = Some(moved_ids);
+                    }
+                }
+            }
             _ => eprintln!("Card selection from zone '{}' not yet implemented", zone),
         }
+        eprintln!(
+            "[ARN] handle_select_card: selected_cards.len()={}, zone={:?} allow_skip={}",
+            self.selected_cards.len(),
+            zone,
+            allow_skip
+        );
         if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
             entry.selected_card_ids = self.selected_cards.clone();
         }
@@ -863,6 +936,35 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         choice_card_no: Option<String>,
         selected: &str,
     ) -> Result<(), String> {
+        if selected == "skip" {
+            self.pending_choice = None;
+            self.clear_choice_meta();
+            if let Some(ref pending) = self.game_state.pending_sequential_actions.clone() {
+                for (i, action) in pending.iter().enumerate() {
+                    if let Err(e) = self.execute_effect(action) {
+                        eprintln!(
+                            "Failed to execute pending action after position change skip: {}",
+                            e
+                        );
+                    }
+                    if self.pending_choice.is_some() {
+                        let remaining = pending[i + 1..].to_vec();
+                        self.game_state.pending_sequential_actions = if remaining.is_empty() {
+                            None
+                        } else {
+                            Some(remaining)
+                        };
+                        return Ok(());
+                    }
+                }
+                self.game_state.pending_sequential_actions = None;
+            }
+            self.execution_context = ExecutionContext::None;
+            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                entry.execution_context = None;
+            }
+            return Ok(());
+        }
         if let Some(effect) = self.game_state.entry_effect().cloned() {
             let mut modified = effect.clone();
             let dest = match selected {
@@ -1081,6 +1183,10 @@ impl<'a> super::resolver::AbilityResolver<'a> {
     }
 
     fn handle_position_destination(&mut self, selected: &str) -> Result<(), String> {
+        if selected == "skip" {
+            self.pending_choice = None;
+            return Ok(());
+        }
         let dest = match selected {
             "0" | "left" => "left_side",
             "1" | "center" => "center",
@@ -1346,7 +1452,6 @@ impl<'a> super::resolver::AbilityResolver<'a> {
 
         match zone {
             "hand" => {
-                // Pre-validate: reject if any selected card fails the filter
                 for &i in indices {
                     if i < player.hand.cards.len() && !passes(player.hand.cards[i]) {
                         return Err(
@@ -1357,6 +1462,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 let dest = destination.as_deref().unwrap_or("discard");
                 let mut idxs: Vec<usize> = indices.iter().copied().collect();
                 idxs.sort_by(|a, b| b.cmp(a));
+                let mut moved_cards: Vec<i16> = Vec::new();
                 for i in idxs {
                     if i < player.hand.cards.len() {
                         let card_id = player.hand.cards.remove(i);
@@ -1394,11 +1500,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                                 }
                                 _ => player.waitroom.add_card(card_id),
                             }
-                            moved.push(card_id);
+                            moved_cards.push(card_id);
                         } else {
                             player.hand.cards.insert(i, card_id);
                         }
                     }
+                }
+                if dest == "discard" || dest == "waitroom" {
+                    let count = moved_cards.len() as u32;
+                    eprintln!("[DISCARD_TRACK] setting last_cost_discard_count={}", count);
+                    self.game_state.mods.last_cost_discard_count = count;
+                }
+                if !moved_cards.is_empty() {
+                    self.game_state.recently_moved_cards = Some(moved_cards.clone());
                 }
             }
             "deck" => {
@@ -1534,6 +1648,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                             self.game_state.mods.add_orientation_modifier(cid, "wait");
                         }
                     }
+                }
+                if !card_ids_moved.is_empty() {
+                    self.game_state.recently_moved_cards = Some(card_ids_moved.clone());
                 }
             }
             "stage" => {
@@ -1677,6 +1794,7 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", card_count),
                 allow_skip: false,
+                options: None,
             });
             self.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Finalize {

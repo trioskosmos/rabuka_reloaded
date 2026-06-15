@@ -284,6 +284,7 @@ impl<'a> AbilityResolver<'a> {
                     target: "choice_string".to_string(),
                     description: format!("Pick card type: {:?}", or_types),
                     allow_skip: false,
+                options: None,
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store the options as JSON array in conditional_choice so the reveal can read the player's pick

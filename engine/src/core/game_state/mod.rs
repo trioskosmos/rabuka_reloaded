@@ -66,6 +66,7 @@ pub struct GameState {
     pub player1_rps_choice: Option<i32>,
     pub player2_rps_choice: Option<i32>,
     pub baton_touch_replaced_member_cost: Option<u32>,
+    pub baton_touch_replaced_member_id: Option<i16>,
     pub baton_touch_arriving_card_id: Option<i16>,
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
@@ -176,6 +177,7 @@ impl GameState {
             player1_rps_choice: None,
             player2_rps_choice: None,
             baton_touch_replaced_member_cost: None,
+            baton_touch_replaced_member_id: None,
             baton_touch_arriving_card_id: None,
             // 2-byte aligned
             activating_card: None,

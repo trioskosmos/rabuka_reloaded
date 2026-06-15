@@ -472,6 +472,8 @@ export const LogRenderer = {
             div.classList.add('effect');
         } else if (entryUpper.includes('SCORE') || entryUpper.includes('SUCCESS LIVE')) {
             div.classList.add('score');
+        } else if (entryUpper.includes('PERFORMANCE')) {
+            div.classList.add('performance');
         } else if (group.entry.includes('===')) {
             div.classList.add('turn');
         }

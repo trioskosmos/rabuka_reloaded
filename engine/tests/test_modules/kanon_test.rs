@@ -40,13 +40,10 @@ fn kanon_ab1_live_success_fires_but_live_fails_no_hearts() {
     let kanon = game.id("PL!SP-pb1-001-R");
 
     game.state.player1.stage.stage[1] = kanon;
-    game.state
-        .player1
-        .hand
-        .cards
-        .push(game.id("PL!-sd1-020-SD"));
+    let live = game.id("PL!-sd1-020-SD");
+    game.state.player1.hand.cards.push(live);
     advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(game.id("PL!-sd1-020-SD"));
+    game.set_live_card(live);
     advance_to_live_start(&mut game);
 
     // Skip LiveStart "unless pay" optional cost
@@ -92,11 +89,8 @@ fn kanon_q93_partial_resolution_one_card() {
 
     game.state.player1.stage.stage[1] = kanon;
     // Put 1 card in hand (besides the live card) + the live card
-    game.state
-        .player1
-        .hand
-        .cards
-        .push(game.id("PL!-sd1-019-SD")); // live card
+    let live = game.id("PL!-sd1-019-SD");
+    game.state.player1.hand.cards.push(live); // live card
     game.state
         .player1
         .hand
@@ -105,7 +99,7 @@ fn kanon_q93_partial_resolution_one_card() {
 
     let hand_before = game.state.player1.hand.cards.len();
     advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(game.id("PL!-sd1-019-SD"));
+    game.set_live_card(live);
     advance_to_live_start(&mut game);
 
     // Skip the optional 2E cost → discard effect fires
@@ -131,14 +125,11 @@ fn kanon_q93_partial_resolution_zero_cards() {
     let kanon = game.id("PL!SP-pb1-001-R");
 
     game.state.player1.stage.stage[1] = kanon;
-    game.state
-        .player1
-        .hand
-        .cards
-        .push(game.id("PL!-sd1-019-SD")); // live card only
+    let live = game.id("PL!-sd1-019-SD");
+    game.state.player1.hand.cards.push(live); // live card only
 
     advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(game.id("PL!-sd1-019-SD"));
+    game.set_live_card(live);
     advance_to_live_start(&mut game);
 
     // Skip optional cost → discard 2 fires, but 0 cards to discard → no-op

@@ -1984,6 +1984,10 @@ def _fill_defaults(action, text):
             ):
                 if a == "change_state" and action.get("group_names"):
                     pass
+                elif a == "draw_card" and (
+                    "置いた枚数分" in text or "置いた枚数" in text
+                ):
+                    action["count"] = 0
                 else:
                     action["count"] = 1
     # Fix remaining custom actions that have enough parsed info
@@ -2938,10 +2942,22 @@ def _extract_basic_cost_fields(cost, text):
     ):
         if re.search(r"このメンバー[をが]", text):
             cost["self_cost"] = True
-    # Card names from 「」
+    # Card names from 「」 — detect exclusion patterns (「name」以外)
     name_matches = re.findall(r"「([^」]+)」", text)
-    if name_matches:
-        cost["characters"] = name_matches
+    include_chars = []
+    exclude_chars = []
+    for name in name_matches:
+        idx = text.find(f"「{name}」")
+        if idx >= 0:
+            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
+            if after.startswith("以外"):
+                exclude_chars.append(name)
+            else:
+                include_chars.append(name)
+    if include_chars:
+        cost["characters"] = include_chars
+    if exclude_chars:
+        cost["exclude_characters"] = exclude_chars
 
 
 def parse_cost(text: str) -> Dict[str, Any]:
@@ -3052,8 +3068,20 @@ def parse_cost(text: str) -> Dict[str, Any]:
     if "シャッフルする" in text or "シャッフルして" in text or "シャッフルし" in text:
         cost["shuffle"] = True
     names = re.findall(r"「([^」]+)」", text)
-    if names:
-        cost["characters"] = names
+    include_chars = []
+    exclude_chars = []
+    for name in names:
+        idx = text.find(f"「{name}」")
+        if idx >= 0:
+            after = text[idx + len(f"「{name}」") : idx + len(f"「{name}」") + 3]
+            if after.startswith("以外"):
+                exclude_chars.append(name)
+            else:
+                include_chars.append(name)
+    if include_chars:
+        cost["characters"] = include_chars
+    if exclude_chars:
+        cost["exclude_characters"] = exclude_chars
     if "もよい" in text or "てもよい" in text:
         cost["optional"] = True
     gns = extract_group_names(text)

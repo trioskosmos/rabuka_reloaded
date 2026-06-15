@@ -410,3 +410,171 @@ fn rurino_ozora_different_stage_positions() {
         "Should have 1 other member when Rurino is right"
     );
 }
+
+#[test]
+fn mirakura_discard_then_draws_count_plus_one() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ability_card = game.new_id("PL!HS-pb1-003-R");
+    let discard_card = game.new_id("PL!HS-pb1-003-R"); // same template as ability → matches same filter
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(ability_card);
+    game.add_to_hand(discard_card);
+    game.give_energy(15);
+
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.main_deck.cards.push(filler);
+
+    game.play_to_stage(ability_card, rabuka_engine::zones::MemberArea::Center);
+
+    // Cost may auto-pay (Exact match: 1 eligible = count=1) or create a Prompt choice.
+    // Handle both cases:
+    if game.has_pending_choice() {
+        // Choice created — select the one eligible card
+        let ct = game.pending_choice_type();
+        assert_eq!(ct, Some("SelectCard".to_string()));
+        game.select_indices(&[0]);
+    }
+
+    // Effect: draw 2 (1 discarded + 1 bonus)
+    assert!(
+        game.state.player1.waitroom.cards.contains(&discard_card),
+        "Discard pile should contain the discarded card"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        2,
+        "Should draw 2 cards after discarding 1"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        1,
+        "Deck should have 1 remaining card after drawing 2"
+    );
+}
+
+#[test]
+fn q244_mirakura_no_discard_draws_one() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let ability_card = game.new_id("PL!HS-pb1-003-R");
+    let other_card = game.new_id("PL!HS-pb1-003-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(ability_card);
+    game.add_to_hand(other_card);
+    game.give_energy(15);
+    game.state.player1.main_deck.cards.push(filler);
+
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    game.play_to_stage(ability_card, rabuka_engine::zones::MemberArea::Center);
+
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        0,
+        "No cards should be discarded when player chooses 0"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        2,
+        "If 0 cards are discarded, the ability should still draw 1 card"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 1,
+        "Deck should lose exactly one card when drawing for 0 discarded cards"
+    );
+}
+
+// ====================================================================
+//  大沢瑠璃乃 (PL!HS-bp1-005-R) — 登場:  discard up to 3 → draw equal to discarded
+// ====================================================================
+// 登場: 手札を3枚まで控え室に置いてもよい：これにより置いた枚数分カードを引く。
+//
+// Cost: optional, discard up to 3 from hand
+// Effect: draw cards equal to number actually discarded
+// ====================================================================
+fn setup_rurino_bp1(game: &mut TestGame) -> (usize, usize) {
+    let rurino = game.id("PL!HS-bp1-005-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(rurino);
+    game.give_energy(9);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+    game.play_to_stage(rurino, rabuka_engine::zones::MemberArea::Center);
+
+    (deck_before, 3)
+}
+
+#[test]
+fn rurino_bp1_discard_2_draw_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
+
+    if game.has_pending_choice() {
+        game.select_indices(&[0, 1]);
+    }
+
+    // count=0 → draw = last_cost_discard_count = 2
+    assert_eq!(game.state.player1.waitroom.cards.len(), 2);
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 2);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "3 - 2 discarded + 2 drawn = 3, got {}",
+        game.state.player1.hand.cards.len()
+    );
+}
+
+#[test]
+fn rurino_bp1_discard_0_draw_0() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
+
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // skipped cost → 0 discarded → draw 0
+    assert_eq!(game.state.player1.hand.cards.len(), hand_before);
+    assert_eq!(game.state.player1.waitroom.cards.len(), 0);
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before);
+}
+
+#[test]
+fn rurino_bp1_discard_3_draw_3() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
+
+    if game.has_pending_choice() {
+        game.select_indices(&[0, 1, 2]);
+    }
+
+    // count=0 → draw = last_cost_discard_count = 3
+    assert_eq!(game.state.player1.waitroom.cards.len(), 3);
+    assert_eq!(game.state.player1.main_deck.cards.len(), deck_before - 3);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "3 - 3 discarded + 3 drawn = 3, got {}",
+        game.state.player1.hand.cards.len()
+    );
+}

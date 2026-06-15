@@ -1,5 +1,5 @@
 use crate::card::CardDatabase;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -28,7 +28,7 @@ pub struct DeckBuilder;
 
 impl DeckBuilder {
     pub fn build_deck_from_database(
-        card_db: &Arc<CardDatabase>,
+        card_db: &mut Arc<CardDatabase>,
         card_numbers: Vec<String>,
     ) -> Result<Deck, String> {
         let mut main_deck: VecDeque<i16> = VecDeque::new();
@@ -39,16 +39,13 @@ impl DeckBuilder {
         let mut energy_count = 0;
         let mut missing_cards: Vec<String> = Vec::new();
 
-        let mut card_number_counts: HashMap<String, u32> = HashMap::new();
-
         for card_no in card_numbers {
-            let count = card_number_counts.entry(card_no.clone()).or_insert(0);
-            *count += 1;
+            // Try to find card template ID
+            let template_id = card_db.get_card_id(&card_no);
 
-            // Try to find card with flexible matching (case-insensitive, fullwidth normalization)
-            let card_id = card_db.get_card_id(&card_no);
-
-            if let Some(card_id) = card_id {
+            if let Some(template_id) = template_id {
+                // Create a unique instance ID for this card copy
+                let card_id = Arc::make_mut(card_db).create_copy(template_id);
                 if let Some(card) = card_db.get_card(card_id) {
                     match card.card_type {
                         crate::card::CardType::Member => {
@@ -119,7 +116,7 @@ impl DeckBuilder {
 
     pub fn add_default_energy_cards_from_database(
         deck: &mut Deck,
-        card_db: &Arc<CardDatabase>,
+        card_db: &mut Arc<CardDatabase>,
     ) -> Result<(), String> {
         let current_count = deck.energy_deck.len();
         let needed = if current_count < 12 {
@@ -129,33 +126,19 @@ impl DeckBuilder {
         };
 
         if needed > 0 {
-            let mut energy_card_ids: Vec<i16> = Vec::new();
-            for (card_id, card) in card_db.cards.iter() {
-                if card.is_energy() {
-                    energy_card_ids.push(*card_id);
-                    if energy_card_ids.len() >= needed {
-                        break;
-                    }
+            // Find a template energy card
+            let template_energy_id = card_db.cards.iter()
+                .find(|(_, card)| card.is_energy())
+                .map(|(id, _)| *id);
+
+            if let Some(template_id) = template_energy_id {
+                for _ in 0..needed {
+                    let card_id = Arc::make_mut(card_db).create_copy(template_id);
+                    deck.energy_deck.push_back(card_id);
                 }
+            } else {
+                return Err("No energy cards found in database".to_string());
             }
-
-            if energy_card_ids.len() < needed {
-                // If not enough unique energy cards, reuse the ones we found
-                eprintln!(
-                    "Warning: Only found {} energy cards, need {}",
-                    energy_card_ids.len(),
-                    needed
-                );
-            }
-
-            for card_id in energy_card_ids {
-                deck.energy_deck.push_back(card_id);
-            }
-        } else {
-            eprintln!(
-                "Energy deck already has {} cards (12 required)",
-                deck.energy_deck.len()
-            );
         }
         Ok(())
     }

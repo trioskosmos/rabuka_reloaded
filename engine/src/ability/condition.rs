@@ -160,7 +160,14 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         } else {
             0
         });
-        compare_counts(operator, location_value, count_threshold)
+        // When no operator is specified but we have a positive threshold (derived from
+        // card_type / group / etc.), default to ">=" semantics — "at least N cards match".
+        // A plain None operator with threshold=0 still returns true (unconditional match).
+        let effective_op = match operator {
+            None if count_threshold > 0 => Some(">="),
+            other => other,
+        };
+        compare_counts(effective_op, location_value, count_threshold)
     }
 
     fn check_location_heart_type(&self, condition: &Condition) -> bool {
@@ -425,7 +432,31 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 self_count
             }
             _ => {
-                let player = self.game_state.resolve_target_player(target);
+                let player = if target == "self" {
+                    self.activating_card_id
+                        .and_then(|cid| {
+                            let p1 = &self.game_state.player1;
+                            let p2 = &self.game_state.player2;
+                            if p1.stage.stage.contains(&cid)
+                                || p1.hand.cards.contains(&cid)
+                                || p1.live_card_zone.cards.contains(&cid)
+                                || p1.energy_zone.cards.contains(&cid)
+                            {
+                                Some(p1)
+                            } else if p2.stage.stage.contains(&cid)
+                                || p2.hand.cards.contains(&cid)
+                                || p2.live_card_zone.cards.contains(&cid)
+                                || p2.energy_zone.cards.contains(&cid)
+                            {
+                                Some(p2)
+                            } else {
+                                None
+                            }
+                        })
+                        .unwrap_or_else(|| self.game_state.resolve_target_player(target))
+                } else {
+                    self.game_state.resolve_target_player(target)
+                };
                 let revealed_vec: Vec<i16> = if location == "revealed_cards" {
                     self.game_state.revealed_cards.iter().copied().collect()
                 } else {
@@ -442,15 +473,40 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 {
                     return self.get_count_for_target(condition, target);
                 }
-                let c = util::count_matching_with_blade(
-                    cards,
-                    card_db,
-                    card_type_filter,
-                    group,
-                    cost_limit,
-                    operator,
-                    &|cid| self.check_original_blade_filter(condition, cid),
-                );
+                let exclude_self_id = if condition.exclude_self.unwrap_or(false) {
+                    self.activating_card_id
+                } else {
+                    None
+                };
+                let c = if let Some(ex_id) = exclude_self_id {
+                    // Count matching but exclude the activating card itself
+                    cards
+                        .iter()
+                        .filter(|&&id| {
+                            id != -1
+                                && id != ex_id
+                                && util::card_matches_type(card_db, id, card_type_filter)
+                                && util::card_matches_group_str(card_db, id, group)
+                                && util::card_matches_cost_limit_op(
+                                    card_db,
+                                    id,
+                                    cost_limit,
+                                    operator,
+                                )
+                                && self.check_original_blade_filter(condition, id)
+                        })
+                        .count() as u32
+                } else {
+                    util::count_matching_with_blade(
+                        cards,
+                        card_db,
+                        card_type_filter,
+                        group,
+                        cost_limit,
+                        operator,
+                        &|cid| self.check_original_blade_filter(condition, cid),
+                    )
+                };
                 if all_areas {
                     if player.stage.stage.iter().filter(|&&c| c != -1).count() != 3 {
                         return 0;
@@ -473,9 +529,32 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         eprintln!(
             "[DISTINCT] check: target={target} location={location} group_names={group_names:?}"
         );
-        let player = self
-            .game_state
-            .resolve_target_player(if target == "either" { "self" } else { target });
+        let distinct_target = if target == "either" { "self" } else { target };
+        let player = if distinct_target == "self" {
+            self.activating_card_id
+                .and_then(|cid| {
+                    let p1 = &self.game_state.player1;
+                    let p2 = &self.game_state.player2;
+                    if p1.stage.stage.contains(&cid)
+                        || p1.hand.cards.contains(&cid)
+                        || p1.live_card_zone.cards.contains(&cid)
+                        || p1.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p1)
+                    } else if p2.stage.stage.contains(&cid)
+                        || p2.hand.cards.contains(&cid)
+                        || p2.live_card_zone.cards.contains(&cid)
+                        || p2.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p2)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| self.game_state.resolve_target_player(distinct_target))
+        } else {
+            self.game_state.resolve_target_player(distinct_target)
+        };
         let mut card_ids: Vec<i16> = match location {
             "stage" => player.stage.stage.to_vec(),
             "hand" => player.hand.cards.to_vec(),
@@ -612,7 +691,9 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 group_names.and_then(|g| g.first().map(|s| s.as_str())),
                 condition.cost_limit,
                 operator,
-                None, None, None,
+                None,
+                None,
+                None,
             );
             let matching_count = util::count_matching(&combined, card_db, &filter, false);
             compare_counts(operator, matching_count, count_threshold)
@@ -668,7 +749,31 @@ impl<'a> super::resolver::AbilityResolver<'a> {
         let card_type = condition.card_type.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let count = condition.count.unwrap_or(1);
-        let player = self.game_state.resolve_target_player(target);
+        let player = if target == "self" {
+            self.activating_card_id
+                .and_then(|cid| {
+                    let p1 = &self.game_state.player1;
+                    let p2 = &self.game_state.player2;
+                    if p1.stage.stage.contains(&cid)
+                        || p1.hand.cards.contains(&cid)
+                        || p1.live_card_zone.cards.contains(&cid)
+                        || p1.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p1)
+                    } else if p2.stage.stage.contains(&cid)
+                        || p2.hand.cards.contains(&cid)
+                        || p2.live_card_zone.cards.contains(&cid)
+                        || p2.energy_zone.cards.contains(&cid)
+                    {
+                        Some(p2)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_else(|| self.game_state.resolve_target_player(target))
+        } else {
+            self.game_state.resolve_target_player(target)
+        };
         let exclude_self = condition.exclude_self.unwrap_or(false);
         let activating_id = self.activating_card_id;
         let card_db = &self.game_state.card_database;
@@ -770,7 +875,19 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "deck" => count_filtered(&player.main_deck.cards, card_type),
-            "energy_zone" => count_filtered(&player.energy_zone.cards, card_type),
+            "energy_zone" => {
+                if target == "both" || target == "either" {
+                    let p1 = count_filtered(&self.game_state.player1.energy_zone.cards, card_type);
+                    let p2 = count_filtered(&self.game_state.player2.energy_zone.cards, card_type);
+                    if target == "either" {
+                        p1.max(p2)
+                    } else {
+                        p1 + p2
+                    }
+                } else {
+                    count_filtered(&player.energy_zone.cards, card_type)
+                }
+            }
             "live_card_zone" => count_filtered(&player.live_card_zone.cards, card_type),
             "success_live_zone" | "success_live_card_zone" => {
                 if target == "either" || target == "both" {
@@ -796,52 +913,48 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                     count
                 }
             }
-            // No explicit location: use recently_moved if available, otherwise infer from card_type
-            "" => {
-                if let Some(ref moved) = self.game_state.recently_moved_cards {
-                    count_filtered(moved, card_type)
-                } else {
-                    match card_type {
-                        "live_card" => count_filtered(&player.waitroom.cards, card_type),
-                        "member_card" => {
-                            if condition.aggregate.as_deref() == Some("total") {
-                                player.stage.total_blades(
-                                    card_db,
-                                    &self.game_state.mods.blade_modifiers,
-                                    &self.game_state.mods.orientation_modifiers,
-                                ) as usize
-                            } else {
-                                let mut stage_count = player
-                                    .stage
-                                    .stage
-                                    .iter()
-                                    .filter(|&&id| {
-                                        id != -1 && {
-                                            if hc.is_empty() {
-                                                true
-                                            } else {
-                                                crate::ability::util::card_matches_heart_colors(
-                                                    card_db, id, hc,
-                                                )
-                                            }
-                                        }
-                                    })
-                                    .count();
-                                if exclude_self {
-                                    if let Some(cid) = activating_id {
-                                        if player.stage.stage.iter().any(|&id| id == cid) {
-                                            stage_count = stage_count.saturating_sub(1);
-                                        }
+            // No explicit location: infer from card_type (don't use recently_moved_cards
+            // as fallback — that breaks sequential conditions where an earlier action moved
+            // cards but the later condition still refers to the stage)
+            "" => match card_type {
+                "live_card" => count_filtered(&player.waitroom.cards, card_type),
+                "member_card" => {
+                    if condition.aggregate.as_deref() == Some("total") {
+                        player.stage.total_blades(
+                            card_db,
+                            &self.game_state.mods.blade_modifiers,
+                            &self.game_state.mods.orientation_modifiers,
+                        ) as usize
+                    } else {
+                        let mut stage_count = player
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| {
+                                id != -1 && {
+                                    if hc.is_empty() {
+                                        true
+                                    } else {
+                                        crate::ability::util::card_matches_heart_colors(
+                                            card_db, id, hc,
+                                        )
                                     }
                                 }
-                                stage_count
+                            })
+                            .count();
+                        if exclude_self {
+                            if let Some(cid) = activating_id {
+                                if player.stage.stage.iter().any(|&id| id == cid) {
+                                    stage_count = stage_count.saturating_sub(1);
+                                }
                             }
                         }
-                        "energy_card" => player.energy_zone.cards.len(),
-                        _ => 0,
+                        stage_count
                     }
                 }
-            }
+                "energy_card" => player.energy_zone.cards.len(),
+                _ => 0,
+            },
             _ => 0,
         } as u32;
         let passed = compare_counts(condition.operator.as_deref(), actual, count);
@@ -1116,7 +1229,21 @@ impl<'a> super::resolver::AbilityResolver<'a> {
                 }
             }
             "notmoved" => true,
-            "baton_touch" => condition.baton_touch_trigger.unwrap_or(false),
+            "baton_touch" => {
+                let triggered = condition.baton_touch_trigger.unwrap_or(false);
+                if !triggered {
+                    return false;
+                }
+                if let Some(source_name) = condition.baton_touch_source.as_deref() {
+                    if let Some(replaced_id) = self.game_state.baton_touch_replaced_member_id {
+                        if let Some(card) = self.game_state.card_database.get_card(replaced_id) {
+                            return card.name.contains(source_name);
+                        }
+                    }
+                    return false;
+                }
+                true
+            }
             _ => match location {
                 "stage" => {
                     player.stage.stage[0] != -1

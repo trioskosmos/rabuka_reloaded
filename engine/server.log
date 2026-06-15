@@ -1,0 +1,53 @@
+warning: unused import: `HashMap`
+ --> src\game\deck_builder.rs:2:24
+  |
+2 | use std::collections::{HashMap, VecDeque};
+  |                        ^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable `consumed_by_color` is assigned to, but never used
+   --> src\core\card.rs:873:17
+    |
+873 |             let mut consumed_by_color: i32 = 0;
+    |                 ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: consider using `_consumed_by_color` instead
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `consumed_by_color` is never read
+   --> src\core\card.rs:888:21
+    |
+888 |                     consumed_by_color += provided.min(needed_amount as i32);
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `rabuka_engine` (lib) generated 3 warnings (run `cargo fix --lib -p rabuka_engine` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 0.57s
+     Running `C:/rust_targets\release\rabuka_engine.exe web-server`
+Web server starting on http://127.0.0.1:8080
+Game UI: http://127.0.0.1:8080
+DEBUG: init_game complete, phase: RockPaperScissors
+DEBUG: ChooseFirstAttacker phase, rps_winner: Some(2)
+DEBUG: Auto-advanced from Active to Energy
+DEBUG: Auto-advanced from Energy to Draw
+DEBUG: Auto-advanced from Draw to Main
+[AUTO_TRIGGER] checking stage for player player1 stage=[-1, 1952, -1]
+[AUTO_TRIGGER] checking stage for player player1 stage=[1957, 1952, -1]
+[AB]ABILITY "高海千歌" (1952)
+[AB]  TRIGGER 起動 
+[AB]  TEXT {{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。
+[AB]  COST stage → discard (1 member_card)
+[AB]COST move 1 from stage to discard (src: このメンバーをステージから控え室に置く) → OK
+[STATE_CHANGE] effect.state_change=None, moved_cards.len=1, moved_cards=[1952]
+[AB]  RESULT cost paid ✓
+[AB]EFFECT move 1 from discard → hand (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: hand
+[AB]EFFECT move 1 from discard → hand (type: member_card)
+[STATE_CHANGE] effect.state_change=None, moved_cards.len=1, moved_cards=[1952]
+[AB]  RESULT effect applied ✓
+DEBUG: Auto-advanced from Active to Energy
+DEBUG: Auto-advanced from Energy to Draw
+DEBUG: Auto-advanced from Draw to Main

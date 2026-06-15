@@ -165,8 +165,6 @@ pub struct Card {
     // Parsed abilities from abilities.json
     #[serde(skip)]
     pub abilities: Vec<Ability>,
-    #[serde(skip)]
-    pub card_id: i16, // Database ID for optimization
 }
 
 #[derive(Debug, Clone)]
@@ -199,18 +197,12 @@ impl CardDatabase {
         copy_id
     }
 
-    pub fn load_or_create(cards: Vec<Card>) -> Self {
+    pub fn load_or_create(mut cards: Vec<Card>) -> Self {
         let mut db = Self::new();
 
-        // Try to load existing mapping
-        if let Ok(mapping) = std::fs::read_to_string("card_id_mapping.json") {
-            if let Ok(loaded_mapping) = serde_json::from_str::<HashMap<String, i16>>(&mapping) {
-                db.card_no_to_id = loaded_mapping;
-                db.next_id = db.card_no_to_id.values().max().copied().unwrap_or(0) + 1;
-            }
-        }
+        // Sort by card_no for deterministic ID assignment across runs
+        cards.sort_by(|a, b| a.card_no.cmp(&b.card_no));
 
-        // Add cards, assigning IDs if not already mapped
         for card in cards {
             if !db.card_no_to_id.contains_key(&card.card_no) {
                 db.card_no_to_id.insert(card.card_no.clone(), db.next_id);
@@ -220,16 +212,7 @@ impl CardDatabase {
             db.cards.insert(card_id, card);
         }
 
-        // Save mapping
-
         db
-    }
-
-    pub fn save_mapping(&self) {
-        if let Ok(mapping) = serde_json::to_string_pretty(&self.card_no_to_id) {
-            std::fs::write("card_id_mapping.json", mapping)
-                .expect("Failed to save card ID mapping");
-        }
     }
 
     pub fn get_card(&self, card_id: i16) -> Option<&Card> {
@@ -362,7 +345,6 @@ impl<'de> Deserialize<'de> for Card {
             need_heart: helper.need_heart,
             special_heart: helper.special_heart,
             abilities: Vec::new(),
-            card_id: 0,
         })
     }
 }
@@ -615,6 +597,11 @@ pub struct AbilityEffect {
     #[serde(default)]
     #[serde(alias = "heart_color")]
     pub heart_type: Option<String>,
+    /// Cost lookup reference for relative cost filters (e.g. previous moved card + 2).
+    #[serde(default)]
+    pub cost_reference: Option<String>,
+    #[serde(default)]
+    pub cost_offset: Option<i32>,
     /// parenthetical annotations (e.g. rule clarifications in parentheses)
     #[serde(default)]
     pub parenthetical: Option<Vec<String>>,
@@ -883,7 +870,7 @@ impl Card {
                 .get(&HeartColor::Heart00)
                 .unwrap_or(&0) as i32;
             let total_all: i32 = provided_hearts.hearts.values().sum::<u32>() as i32;
-            let mut consumed_by_color: i32 = 0;
+
 
             for (color, &needed_amount) in &need_heart.hearts {
                 if *color == HeartColor::Heart00 {
@@ -898,7 +885,7 @@ impl Card {
                     }
                     let shortfall = (needed_amount as i32 - provided).max(0);
                     wildcard_remaining -= shortfall;
-                    consumed_by_color += provided.min(needed_amount as i32);
+
                 }
             }
             true

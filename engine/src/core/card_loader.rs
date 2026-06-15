@@ -109,6 +109,7 @@ impl CardLoader {
                                     if (fixed_action.action == "draw"
                                         || fixed_action.action == "draw_card")
                                         && fixed_action.count.is_none()
+                                        && fixed_action.dynamic_count.is_none()
                                     {
                                         fixed_action.count = Some(1);
                                     }

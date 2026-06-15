@@ -102,20 +102,20 @@ impl TestGame {
     }
 
     /// Look up a card's numeric ID by card_no in the database.
-    /// Returns the same unique copy_id for each card_no (not the base template_id).
-    /// Each template gets 5 pre-created copies; `id()` returns the same copy_id
-    /// for repeated calls with the same card_no so test patterns like
-    /// `game.state.hand.cards.push(game.id("x"))` + `game.set_live_card(game.id("x"))`
-    /// both refer to the same in-zone card. Use `game.new_id("...")` for distinct copies.
+    /// Returns a new unique copy_id each call (popped from the pre-created pool).
+    /// Each call returns a distinct ID so multiple copies of the same card on stage
+    /// get per-card modifier tracking instead of sharing modifiers.
+    /// Store the result in a variable if you need to reference the same card later.
     pub fn id(&self, card_no: &str) -> i16 {
         let template_id = card_id(&self.db, card_no);
-        let pool = self.copy_pool.borrow();
-        pool.get(&template_id)
-            .and_then(|v| v.last().copied())
+        self.copy_pool
+            .borrow_mut()
+            .get_mut(&template_id)
+            .and_then(|v| v.pop())
             .unwrap_or(template_id)
     }
 
-    /// Get a NEW unique copy_id (different from `id()`).
+    /// Get a NEW unique copy_id (different from `id_ref()`).
     /// Each call returns a distinct ID, used when multiple copies of the same card
     /// are needed in the same zone.
     pub fn new_id(&self, card_no: &str) -> i16 {
@@ -124,6 +124,18 @@ impl TestGame {
             .borrow_mut()
             .get_mut(&template_id)
             .and_then(|v| v.pop())
+            .unwrap_or(template_id)
+    }
+
+    /// Get a stable reference ID for a card_no (always returns the same copy).
+    /// Unlike `id()`, this peeks without consuming the pool entry.
+    /// Use this when you need a known ID for assertions or lookups
+    /// after the card has been placed in a zone via `id()`.
+    pub fn id_ref(&self, card_no: &str) -> i16 {
+        let template_id = card_id(&self.db, card_no);
+        let pool = self.copy_pool.borrow();
+        pool.get(&template_id)
+            .and_then(|v| v.last().copied())
             .unwrap_or(template_id)
     }
 
@@ -162,6 +174,12 @@ impl TestGame {
 
     /// Play a member card from hand onto the stage.
     pub fn play_to_stage(&mut self, card_id: i16, area: MemberArea) {
+        self.try_play_to_stage(card_id, area)
+            .expect("play_to_stage failed");
+    }
+
+    /// Attempt to play a member card from hand onto the stage. Returns Result.
+    pub fn try_play_to_stage(&mut self, card_id: i16, area: MemberArea) -> Result<(), String> {
         TurnEngine::execute_main_phase_action(
             &mut self.state,
             &ActionType::PlayMemberToStage,
@@ -170,7 +188,6 @@ impl TestGame {
             Some(area),
             Some(false),
         )
-        .expect("play_to_stage failed");
     }
 
     /// Activate the first 起動 (activation) ability on a stage card.

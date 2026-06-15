@@ -57,6 +57,8 @@ pub struct AbilityQueueEntry {
     pub effect_started: bool,
     /// Whether the optional cost was actually paid (not skipped)
     pub optional_cost_was_paid: bool,
+    /// Player who must make the pending choice (if different from activating player)
+    pub choice_player_id: Option<String>,
 }
 
 /// Unified ability queue with proper state management
