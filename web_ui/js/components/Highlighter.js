@@ -1,5 +1,4 @@
 import { State } from '../state.js';
-import { Tooltips } from '../ui_tooltips.js';
 
 export const Highlighter = {
     addHighlight: (idOrEl, className) => {

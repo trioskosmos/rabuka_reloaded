@@ -19,6 +19,16 @@ pub struct CardDisplay {
     pub total_blade: u32,
     pub id: i16,
     pub ability_text: Option<String>,
+    #[serde(default)]
+    pub bonus_blade: i32,
+    #[serde(default)]
+    pub bonus_hearts: Vec<i32>,
+    #[serde(default)]
+    pub bonus_score: i32,
+    #[serde(default)]
+    pub bonus_cost: i32,
+    #[serde(default)]
+    pub heart_transform: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -82,6 +92,8 @@ pub struct StageDisplay {
 pub struct GameStateDisplay {
     pub turn: u32,
     pub phase: String,
+    #[serde(default)]
+    pub active_player: String,
     pub player1: PlayerDisplay,
     pub player2: PlayerDisplay,
     pub pending_choice: Option<serde_json::Value>,
@@ -89,6 +101,8 @@ pub struct GameStateDisplay {
     pub looked_cards: ZoneDisplay,
     #[serde(default)]
     pub rule_log: Vec<String>,
+    #[serde(default)]
+    pub structured_log: Vec<crate::types::LogEntry>,
     #[serde(default)]
     pub performance_results: Option<std::collections::HashMap<String, PerformanceSnapshot>>,
     #[serde(default)]
@@ -136,6 +150,92 @@ pub fn card_to_display(
             },
             id: card_id,
             ability_text: Some(card.ability.clone()),
+            bonus_blade: blade_modifier,
+            bonus_hearts: Vec::new(),
+            bonus_score: 0,
+            bonus_cost: 0,
+            heart_transform: None,
+        }
+    })
+}
+
+pub fn card_to_display_full(
+    card_id: i16,
+    card_db: &CardDatabase,
+    orientation: Option<Orientation>,
+    blade_modifier: i32,
+    score_modifier: i32,
+    heart_modifiers: &std::collections::HashMap<crate::card::HeartColor, i32>,
+    heart_transform: Option<crate::card::HeartColor>,
+    cost_modifier: i32,
+) -> Option<CardDisplay> {
+    card_db.get_card(card_id).map(|card| {
+        let base_heart = card.base_heart.as_ref().map(|bh| {
+            bh.hearts
+                .iter()
+                .map(|(color, count)| {
+                    let color_str = match color {
+                        crate::card::HeartColor::Heart00 => "heart00",
+                        crate::card::HeartColor::Heart01 => "heart01",
+                        crate::card::HeartColor::Heart02 => "heart02",
+                        crate::card::HeartColor::Heart03 => "heart03",
+                        crate::card::HeartColor::Heart04 => "heart04",
+                        crate::card::HeartColor::Heart05 => "heart05",
+                        crate::card::HeartColor::Heart06 => "heart06",
+                        crate::card::HeartColor::BAll => "b_all",
+                        crate::card::HeartColor::Draw => "draw",
+                        crate::card::HeartColor::Score => "score",
+                    };
+                    (color_str.to_string(), *count)
+                })
+                .collect()
+        });
+        let mut bonus_hearts = vec![0i32; 7];
+        for (color, &val) in heart_modifiers {
+            let idx = match color {
+                crate::card::HeartColor::Heart00 => 0,
+                crate::card::HeartColor::Heart01 => 1,
+                crate::card::HeartColor::Heart02 => 2,
+                crate::card::HeartColor::Heart03 => 3,
+                crate::card::HeartColor::Heart04 => 4,
+                crate::card::HeartColor::Heart05 => 5,
+                crate::card::HeartColor::Heart06 => 6,
+                _ => continue,
+            };
+            bonus_hearts[idx] = val;
+        }
+        let transform_str = heart_transform.map(|hc| {
+            let s = match hc {
+                crate::card::HeartColor::Heart00 => "heart00",
+                crate::card::HeartColor::Heart01 => "heart01",
+                crate::card::HeartColor::Heart02 => "heart02",
+                crate::card::HeartColor::Heart03 => "heart03",
+                crate::card::HeartColor::Heart04 => "heart04",
+                crate::card::HeartColor::Heart05 => "heart05",
+                crate::card::HeartColor::Heart06 => "heart06",
+                _ => "heart00",
+            };
+            s.to_string()
+        });
+        CardDisplay {
+            card_no: card.card_no.clone(),
+            name: card.name.clone(),
+            card_type: format!("{:?}", card.card_type),
+            orientation: orientation.map(|o| format!("{:?}", o)),
+            base_heart,
+            blade: card.blade,
+            total_blade: if orientation == Some(Orientation::Wait) {
+                0
+            } else {
+                ((card.blade as i32) + blade_modifier).max(0) as u32
+            },
+            id: card_id,
+            ability_text: Some(card.ability.clone()),
+            bonus_blade: blade_modifier,
+            bonus_hearts,
+            bonus_score: score_modifier,
+            bonus_cost: cost_modifier,
+            heart_transform: transform_str,
         }
     })
 }
@@ -154,8 +254,19 @@ pub fn stage_to_display(
     card_db: &CardDatabase,
     blade_modifiers: &std::collections::HashMap<i16, i32>,
     orientation_modifiers: &std::collections::HashMap<i16, String>,
+    heart_modifiers: &std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    >,
+    score_modifiers: &std::collections::HashMap<i16, i32>,
+    heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
+    cost_modifiers: &std::collections::HashMap<i16, i32>,
 ) -> StageDisplay {
     let blade_mod = |cid: i16| blade_modifiers.get(&cid).copied().unwrap_or(0);
+    let score_mod = |cid: i16| score_modifiers.get(&cid).copied().unwrap_or(0);
+    let heart_mod = |cid: i16| heart_modifiers.get(&cid).cloned().unwrap_or_default();
+    let heart_xform = |cid: i16| heart_color_multiplier.get(&cid).copied();
+    let cost_mod = |cid: i16| cost_modifiers.get(&cid).copied().unwrap_or(0);
     let orientation = |cid: i16| {
         orientation_modifiers.get(&cid).map(|o| match o.as_str() {
             "wait" => Orientation::Wait,
@@ -164,31 +275,43 @@ pub fn stage_to_display(
     };
     StageDisplay {
         left_side: if stage.stage[0] != -1 {
-            card_to_display(
+            card_to_display_full(
                 stage.stage[0],
                 card_db,
                 orientation(stage.stage[0]),
                 blade_mod(stage.stage[0]),
+                score_mod(stage.stage[0]),
+                &heart_mod(stage.stage[0]),
+                heart_xform(stage.stage[0]),
+                cost_mod(stage.stage[0]),
             )
         } else {
             None
         },
         center: if stage.stage[1] != -1 {
-            card_to_display(
+            card_to_display_full(
                 stage.stage[1],
                 card_db,
                 orientation(stage.stage[1]),
                 blade_mod(stage.stage[1]),
+                score_mod(stage.stage[1]),
+                &heart_mod(stage.stage[1]),
+                heart_xform(stage.stage[1]),
+                cost_mod(stage.stage[1]),
             )
         } else {
             None
         },
         right_side: if stage.stage[2] != -1 {
-            card_to_display(
+            card_to_display_full(
                 stage.stage[2],
                 card_db,
                 orientation(stage.stage[2]),
                 blade_mod(stage.stage[2]),
+                score_mod(stage.stage[2]),
+                &heart_mod(stage.stage[2]),
+                heart_xform(stage.stage[2]),
+                cost_mod(stage.stage[2]),
             )
         } else {
             None
@@ -226,6 +349,8 @@ pub fn player_to_display(
     prohibition_effects: &[String],
     cannot_activate_members: &[String],
     mulligan_selection: Option<&[usize]>,
+    heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
+    cost_modifiers: &std::collections::HashMap<i16, i32>,
 ) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player
         .energy_zone
@@ -383,6 +508,10 @@ pub fn player_to_display(
             card_db,
             blade_modifiers,
             orientation_modifiers,
+            heart_modifiers,
+            score_modifiers,
+            heart_color_multiplier,
+            cost_modifiers,
         ),
         live_zone: zone_to_display(&player.live_card_zone.cards, card_db),
         success_live_card_zone: zone_to_display(&player.success_live_card_zone.cards, card_db),
@@ -489,6 +618,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         rule_log.drain(0..rule_log.len() - 500);
     }
 
+    // Structured log for rich UI rendering
+    let mut structured_log = game_state.structured_log.clone();
+    AbDebug::flush_to_structured_log(&mut structured_log, game_state.turn_number);
+    if structured_log.len() > 500 {
+        structured_log.drain(0..structured_log.len() - 500);
+    }
+
     // Build performance results (grouped by player_id)
     let perf_history = game_state.performance_snapshots.clone();
     let mut perf_results: Option<std::collections::HashMap<String, PerformanceSnapshot>> = None;
@@ -522,38 +658,95 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         .map_or(false, |id| *id == game_state.player2.id)
         .then_some(game_state.mulligan_selected_indices.as_slice());
 
+    let blade_flat: std::collections::HashMap<i16, i32> = game_state
+        .mods
+        .blade_modifiers
+        .iter()
+        .map(|(&k, v)| (k, v.total()))
+        .collect();
+    let score_flat: std::collections::HashMap<i16, i32> = game_state
+        .mods
+        .score_modifiers
+        .iter()
+        .map(|(&k, v)| (k, v.total()))
+        .collect();
+    let heart_flat: std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    > = game_state
+        .mods
+        .heart_modifiers
+        .iter()
+        .map(|(&k, colors)| {
+            let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
+                colors.iter().map(|(&c, e)| (c, e.total())).collect();
+            (k, flat)
+        })
+        .collect();
+    let need_heart_flat: std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    > = game_state
+        .mods
+        .need_heart_modifiers
+        .iter()
+        .map(|(&k, colors)| {
+            let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
+                colors.iter().map(|(&c, e)| (c, e.total())).collect();
+            (k, flat)
+        })
+        .collect();
+
+    let blade_flat2 = blade_flat.clone();
+    let score_flat2 = score_flat.clone();
+    let cost_flat: std::collections::HashMap<i16, i32> = game_state
+        .mods
+        .cost_modifiers
+        .iter()
+        .map(|(&k, v)| (k, v.total()))
+        .collect();
+    let cost_flat2 = cost_flat.clone();
+    let heart_flat2 = heart_flat.clone();
+    let need_heart_flat2 = need_heart_flat.clone();
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
+        active_player: game_state.active_player().id.clone(),
         player1: player_to_display(
             &game_state.player1,
             &game_state.card_database,
-            &game_state.mods.blade_modifiers,
-            &game_state.mods.score_modifiers,
-            &game_state.mods.heart_modifiers,
+            &blade_flat,
+            &score_flat,
+            &heart_flat,
             &game_state.mods.orientation_modifiers,
             &game_state.gained_abilities,
-            &game_state.mods.need_heart_modifiers,
+            &need_heart_flat,
             &game_state.prohibition_effects,
             &game_state.cannot_activate_members,
             p1_mulligan,
+            &game_state.mods.heart_color_multiplier,
+            &cost_flat,
         ),
         player2: player_to_display(
             &game_state.player2,
             &game_state.card_database,
-            &game_state.mods.blade_modifiers,
-            &game_state.mods.score_modifiers,
-            &game_state.mods.heart_modifiers,
+            &blade_flat2,
+            &score_flat2,
+            &heart_flat2,
             &game_state.mods.orientation_modifiers,
             &game_state.gained_abilities,
-            &game_state.mods.need_heart_modifiers,
+            &need_heart_flat2,
             &game_state.prohibition_effects,
             &game_state.cannot_activate_members,
             p2_mulligan,
+            &game_state.mods.heart_color_multiplier,
+            &cost_flat2,
         ),
         pending_choice: game_state.get_pending_choice_json(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
         rule_log,
+        structured_log,
         performance_results: perf_results,
         performance_history: perf_history,
     }

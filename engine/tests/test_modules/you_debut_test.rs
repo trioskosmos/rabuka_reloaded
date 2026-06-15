@@ -132,7 +132,13 @@ fn you_ability_select_multiple_cards() {
         game.select_indices(&[0]);
     }
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
     resolve_all_up_to(&mut game, 30);
     assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
@@ -235,7 +241,10 @@ fn you_select_2_then_ends() {
         game.select_indices(&[0]);
     }
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
     resolve_all_up_to(&mut game, 30);
     assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");
@@ -268,7 +277,13 @@ fn you_select_3_then_ends() {
         game.select_indices(&[0]);
     }
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
     resolve_all_up_to(&mut game, 30);
     assert!(game.state.player1.hand.cards.contains(&q1), "Q1 in hand");

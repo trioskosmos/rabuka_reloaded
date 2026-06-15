@@ -39,8 +39,7 @@ fn hazuki_activate_two_liella_discarded_gain_2_blade() {
         .mods
         .blade_modifiers
         .get(&hazuki)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(
         blade_val, 2,
         "2 Liella! members discarded → 2 blade on activating card"
@@ -79,8 +78,7 @@ fn hazuki_activate_no_liella_discarded_gain_0_blade() {
         .mods
         .blade_modifiers
         .get(&hazuki)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(blade_val, 0, "0 Liella! members discarded → 0 blade");
 }
 
@@ -110,7 +108,6 @@ fn hazuki_activate_not_enough_deck_no_blade() {
         .mods
         .blade_modifiers
         .get(&hazuki)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(blade_val, 0, "Cost failed → no blade applied");
 }

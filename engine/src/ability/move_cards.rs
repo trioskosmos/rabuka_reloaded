@@ -1,3 +1,4 @@
+use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ExecutionContext, LookAndSelectStep};
 use super::util;
@@ -98,22 +99,25 @@ impl AbilityResolver {
         effect: &AbilityEffect,
         filter: &util::CardFilter,
     ) {
-        self.pending_choice = Some(
-            Choice::select_cards(
-                zone,
-                count,
-                format!("Select {} card(s) from {}", count, zone.replace("_", " ")),
-                can_skip,
+        let description = if effect.any_number.unwrap_or(false) {
+            format!(
+                "Select any number of card(s) from {}",
+                zone.replace("_", " ")
             )
-            .card_type(filter.card_type.map(|s| s.to_string()))
-            .cost_limit(filter.cost_limit, effect.cost_limit_operator.clone())
-            .cost_total(filter.cost_total, effect.cost_total_operator.clone())
-            .group(filter.group.map(|s| s.to_string()))
-            .characters(filter.characters.cloned())
-            .target_player_id(Some(
-                effect.target.clone().unwrap_or_else(|| "self".to_string()),
-            ))
-            .build(),
+        } else {
+            format!("Select {} card(s) from {}", count, zone.replace("_", " "))
+        };
+        self.pending_choice = Some(
+            Choice::select_cards(zone, count, description, can_skip)
+                .card_type(filter.card_type.map(|s| s.to_string()))
+                .cost_limit(filter.cost_limit, effect.cost_limit_operator.clone())
+                .cost_total(filter.cost_total, effect.cost_total_operator.clone())
+                .group(filter.group.map(|s| s.to_string()))
+                .characters(filter.characters.cloned())
+                .target_player_id(Some(
+                    effect.target.clone().unwrap_or_else(|| "self".to_string()),
+                ))
+                .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
     }
@@ -133,7 +137,9 @@ impl AbilityResolver {
     ) -> Result<bool, String> {
         let activating_card = gs.activating_card;
         let player = gs.resolve_target_player_mut(player_target);
-        if destination == "empty_area" || destination == "stage" {
+        if Zone::from_str(destination) == Some(Zone::EmptyArea)
+            || Zone::from_str(destination) == Some(Zone::Stage)
+        {
             let empty_slots: Vec<usize> = (0..3).filter(|&i| player.stage.stage[i] == -1).collect();
             if empty_slots.len() > 1 {
                 // Prefer the vacated area (other baton-passed position) if still empty
@@ -181,11 +187,13 @@ impl AbilityResolver {
                 return Err("Stage is full".to_string());
             }
         }
-        let pos_to_use = if destination == "under_member" {
+        let pos_to_use = if Zone::from_str(destination) == Some(Zone::UnderMember) {
             activating_card
                 .and_then(|cid| player.stage.stage.iter().position(|&id| id == cid))
                 .or(vacated_area)
-        } else if destination == "deck" || destination == "deck_top" {
+        } else if Zone::from_str(destination) == Some(Zone::Deck)
+            || Zone::from_str(destination) == Some(Zone::DeckTop)
+        {
             deck_position.or(vacated_area)
         } else {
             vacated_area
@@ -219,6 +227,11 @@ impl AbilityResolver {
             behavior,
             false,
         )? {
+            util::SelectionOutcome::Exact(indices) if can_skip && !indices.is_empty() => {
+                // Optional + exact match: still prompt so the user can choose to skip.
+                self.prompt_card_selection(zone_name, indices.len(), can_skip, effect, filter);
+                Ok(None)
+            }
             util::SelectionOutcome::Exact(indices) => {
                 let taken = util::zone_remove_at_indices(player, zone_name, &indices);
                 Ok(Some(taken))
@@ -268,7 +281,9 @@ impl AbilityResolver {
 
         // Get cards from source
         let source_str = if source.is_empty() { "" } else { source };
-        if !self.selected_cards.is_empty() && source_str == "selected_cards" {
+        if !self.selected_cards.is_empty()
+            && Zone::from_str(source_str) == Some(Zone::SelectedCards)
+        {
             let selected = self.selected_cards.clone();
             for &card_id in &selected {
                 remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
@@ -276,8 +291,27 @@ impl AbilityResolver {
             return Ok(selected);
         }
 
-        match source_str {
-            "deck" | "deck_top" => {
+        // Handle special source identifiers before the Zone match
+        if source_str == "looked_at_remaining" {
+            // All remaining looked_at cards go to the destination.
+            // The matched card was already removed from looked_at_cards
+            // by the preceding move_cards (source=looked_at), so drain ALL.
+            let cards: Vec<i16> = gs.looked_at_cards.drain(..).collect();
+            for &card in &cards {
+                player.waitroom.add_card(card);
+            }
+            return Ok(cards);
+        }
+
+        // Handle "those_cards" alias for discard/waitroom
+        let effective_source = if source_str == "those_cards" {
+            Zone::Discard.to_str()
+        } else {
+            source_str
+        };
+
+        match Zone::from_str(effective_source) {
+            Some(Zone::Deck) | Some(Zone::DeckTop) => {
                 let mut drawn = Vec::new();
                 let mut attempts = 0u32;
                 while drawn.len() < count
@@ -300,7 +334,7 @@ impl AbilityResolver {
                 }
                 Ok(drawn)
             }
-            "energy_deck" => {
+            Some(Zone::EnergyDeck) => {
                 let mut drawn = Vec::new();
                 for _i in 0..count {
                     if let Some(card) = player.energy_deck.draw() {
@@ -311,7 +345,7 @@ impl AbilityResolver {
                 }
                 Ok(drawn)
             }
-            "stage" => {
+            Some(Zone::Stage) => {
                 if is_self_cost {
                     let idx = activating_card_id
                         .and_then(|act_id| player.stage.stage.iter().position(|&id| id == act_id))
@@ -392,85 +426,90 @@ impl AbilityResolver {
                                 cost_total,
                                 cost_total_operator,
                             );
-                            self.prompt_card_selection("stage", count, false, effect, &filter);
+                            self.prompt_card_selection(
+                                Zone::Stage.to_str(),
+                                count,
+                                false,
+                                effect,
+                                &filter,
+                            );
                             Ok(vec![])
                         }
                         util::SelectionOutcome::Skip => Ok(vec![]),
                     }
                 }
             }
-            "hand" | "discard" | "energy_zone" | "live_card_zone" | "success_live_zone"
-            | "those_cards" => {
-                let actual_zone = if source_str == "those_cards" {
-                    "discard"
-                } else {
-                    source_str
-                };
+            Some(Zone::Hand)
+            | Some(Zone::Discard)
+            | Some(Zone::Energy)
+            | Some(Zone::LiveCardZone)
+            | Some(Zone::SuccessLiveZone) => {
+                let src_zone = Zone::from_str(effective_source);
+                let actual_zone = effective_source;
 
-                let insufficient_behavior = match source_str {
-                    "energy_zone" => util::InsufficientBehavior::Error(
+                let insufficient_behavior = match src_zone {
+                    Some(Zone::Energy) => util::InsufficientBehavior::Error(
                         "Not enough cards in energy zone".to_string(),
                     ),
-                    "live_card_zone" => util::InsufficientBehavior::Error(
+                    Some(Zone::LiveCardZone) => util::InsufficientBehavior::Error(
                         "Not enough cards in live card zone".to_string(),
                     ),
-                    "success_live_zone" => util::InsufficientBehavior::Error(
+                    Some(Zone::SuccessLiveZone) => util::InsufficientBehavior::Error(
                         "Not enough cards in success live zone".to_string(),
                     ),
                     _ => util::InsufficientBehavior::Silent,
                 };
 
-                let can_skip = match source_str {
-                    "discard" => is_max || effect.optional.unwrap_or(false),
-                    "hand" => effect.optional.unwrap_or(false),
+                let can_skip = match src_zone {
+                    Some(Zone::Discard) => is_max || effect.optional.unwrap_or(false),
+                    Some(Zone::Hand) => {
+                        effect.optional.unwrap_or(false) || effect.any_number.unwrap_or(false)
+                    }
                     _ => false,
                 };
 
-                let pass_is_all = match source_str {
-                    "hand" | "discard" | "energy_zone" => is_all,
+                let pass_is_all = match src_zone {
+                    Some(Zone::Hand) | Some(Zone::Discard) | Some(Zone::Energy) => is_all,
                     _ => false,
                 };
 
                 let mut filter = util::filter_from_parts_full(
-                    if source_str == "live_card_zone" {
+                    if src_zone == Some(Zone::LiveCardZone) {
                         Some("live_card")
-                    } else if source_str == "success_live_zone" {
+                    } else if src_zone == Some(Zone::SuccessLiveZone) {
                         None
                     } else {
                         card_type_filter
                     },
-                    if matches!(source_str, "energy_zone" | "success_live_zone") {
+                    if matches!(src_zone, Some(Zone::Energy) | Some(Zone::SuccessLiveZone)) {
                         None
                     } else {
                         group_name
                     },
-                    if matches!(
-                        source_str,
-                        "energy_zone" | "success_live_zone" | "those_cards"
-                    ) {
+                    if matches!(src_zone, Some(Zone::Energy) | Some(Zone::SuccessLiveZone)) {
                         None
                     } else {
                         cost_limit
                     },
-                    if source_str == "discard" {
+                    if src_zone == Some(Zone::Discard) {
                         effect.cost_limit_operator.as_deref()
                     } else {
                         None
                     },
                     character_filter,
-                    if matches!(source_str, "hand" | "discard") {
+                    if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
                         name_fragments
                     } else {
                         None
                     },
                     None,
                     None,
-                    if matches!(source_str, "hand" | "discard") {
+                    if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
                         cost_total
                     } else {
                         None
                     },
-                    if matches!(source_str, "hand" | "discard") {
+                    if matches!(src_zone, Some(Zone::Hand) | Some(Zone::Discard)) {
                         cost_total_operator
                     } else {
                         None
@@ -504,10 +543,10 @@ impl AbilityResolver {
                     None => Ok(vec![]),
                 }
             }
-            "looked_at" => {
-                let matching: Vec<usize> = (0..self.looked_at_cards.len())
+            Some(Zone::LookedAt) => {
+                let matching: Vec<usize> = (0..gs.looked_at_cards.len())
                     .filter(|&i| {
-                        let cid = self.looked_at_cards[i];
+                        let cid = gs.looked_at_cards[i];
                         util::card_matches_type(card_db, cid, card_type_filter)
                             && util::card_matches_group_str(card_db, cid, group_name)
                             && util::card_matches_cost_limit(card_db, cid, cost_limit)
@@ -516,42 +555,25 @@ impl AbilityResolver {
 
                 if matching.is_empty() {
                     Ok(vec![])
-                } else if matching.len() > count && !is_all {
-                    let filter = util::filter_from_parts_full(
-                        card_type_filter,
-                        group_name,
-                        cost_limit,
-                        None,
-                        character_filter,
-                        None,
-                        None,
-                        None,
-                        None,
-                        None,
-                    );
-                    self.prompt_card_selection("looked_at", count, false, effect, &filter);
-                    Ok(vec![])
                 } else {
-                    let mut sorted = matching;
-                    sorted.sort_unstable_by(|a, b| b.cmp(a));
-                    Ok(sorted
+                    // For LookedAt, cards are ordered: [0] = matched target,
+                    // remaining = revealed but non-matching. Take first `count`
+                    // without prompting, since the order is meaningful.
+                    let take = if is_all {
+                        matching.len()
+                    } else {
+                        count.min(matching.len())
+                    };
+                    let mut taken: Vec<i16> = matching[..take]
                         .iter()
-                        .map(|&i| self.looked_at_cards.remove(i))
-                        .collect())
+                        .rev()
+                        .map(|&i| gs.looked_at_cards.remove(i))
+                        .collect();
+                    taken.reverse();
+                    Ok(taken)
                 }
             }
-            "looked_at_remaining" => {
-                let cards: Vec<i16> = if self.looked_at_cards.len() > 1 {
-                    self.looked_at_cards.drain(1..).collect()
-                } else {
-                    self.looked_at_cards.drain(..).collect()
-                };
-                for &card in &cards {
-                    player.waitroom.add_card(card);
-                }
-                Ok(cards)
-            }
-            "selected_cards" => {
+            Some(Zone::SelectedCards) => {
                 let selected = self.selected_cards.clone();
                 let idxs: Vec<usize> = (0..selected.len()).collect();
                 match util::classify_selection(
@@ -573,21 +595,32 @@ impl AbilityResolver {
                     }
                     util::SelectionOutcome::Prompt => {
                         let filter = util::CardFilter::from_effect(effect);
-                        self.prompt_card_selection("selected_cards", count, false, effect, &filter);
+                        self.prompt_card_selection(
+                            Zone::SelectedCards.to_str(),
+                            count,
+                            false,
+                            effect,
+                            &filter,
+                        );
                         Ok(vec![])
                     }
                     util::SelectionOutcome::Skip => Ok(vec![]),
                 }
             }
-            "revealed_cards" => {
-                let cheer_cards = cheer_buf.clone();
-                let cards = if !cheer_cards.is_empty() {
-                    cheer_cards
+            Some(Zone::RevealedCards) => {
+                // Drain from source to prevent card duplication.
+                // (line 619 cloned before, leaving originals in cheer_buf/revealed_cards,
+                //  causing the returned cards to still exist in the source after move.)
+                // Use gs.revealed_cards as the primary source; drain cheer_buf in sync.
+                let cards: Vec<i16> = if !cheer_buf.is_empty() {
+                    let c = cheer_buf.drain(..).collect::<Vec<_>>();
+                    gs.revealed_cards.retain(|id| !c.contains(id));
+                    c
                 } else {
                     gs.revealed_cards.drain(..).collect()
                 };
                 if cards.len() > count {
-                    cheer_buf.extend(cards.iter().copied());
+                    // Put cards back so prompt_card_selection can find them.
                     gs.revealed_cards.extend(cards.iter().copied());
                     let filter = util::filter_from_parts_full(
                         card_type_filter,
@@ -601,13 +634,21 @@ impl AbilityResolver {
                         None,
                         None,
                     );
-                    self.prompt_card_selection("revealed_cards", count, false, effect, &filter);
+                    self.prompt_card_selection(
+                        Zone::RevealedCards.to_str(),
+                        count,
+                        false,
+                        effect,
+                        &filter,
+                    );
                     Ok(vec![])
                 } else {
+                    // Cards were drained from source — just return them.
+                    // No duplication: the source no longer has them.
                     Ok(cards)
                 }
             }
-            "under_member" => {
+            Some(Zone::UnderMember) => {
                 // Move from under_member to destination needs a choice.
                 // Delegate to place_energy_under_member for choice creation.
                 self.execute_place_energy_under_member(
@@ -616,7 +657,7 @@ impl AbilityResolver {
                     effect.target_name(),
                     effect.position.as_ref(),
                     effect.optional.unwrap_or(false),
-                    Some("under_member"),
+                    Some(Zone::UnderMember.to_str()),
                 );
                 Ok(vec![])
             }
@@ -733,6 +774,19 @@ impl AbilityResolver {
             _ => false,
         };
 
+        // Store destination for execute_selected_cards_from_zone to read later
+        // (needed when the resolve creates a card selection choice and the destination
+        // is not accessible via entry_destination, e.g. for sequential sub-actions).
+        self.last_effect_destination = effect.destination.clone();
+        // Store position for execute_selected_cards_from_zone to read later
+        // (needed for deck placement from sub-action effects).
+        self.last_effect_position = effect.position.as_ref().and_then(|p| match p {
+            crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
+            crate::card::PositionInfo::Struct { position, .. } => {
+                position.as_ref().and_then(|s| s.parse::<usize>().ok())
+            }
+        });
+
         let mut taken = self.resolve_cards_from_source(
             gs,
             effect,
@@ -756,14 +810,14 @@ impl AbilityResolver {
         )?;
 
         // --- STEP 2: Any-order deck placement (before consuming taken) ---
-        if source == "discard"
-            && destination == "deck"
+        if Zone::from_str(&source) == Some(Zone::Discard)
+            && Zone::from_str(&destination) == Some(Zone::Deck)
             && effect.placement_order.as_deref() == Some("any_order")
             && taken.len() > 1
         {
             let taken_count = taken.len();
             moved_cards.extend(taken.iter().copied());
-            self.looked_at_cards = taken.clone();
+            gs.looked_at_cards = taken.clone();
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", taken_count),
@@ -772,7 +826,7 @@ impl AbilityResolver {
             });
             self.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Finalize {
-                    destination: "deck".to_string(),
+                    destination: Zone::Deck.to_str().to_string(),
                 },
             };
             return Ok(());
@@ -808,7 +862,8 @@ impl AbilityResolver {
 
         let stage_full = {
             let player = if use_p2 { &gs.player2 } else { &gs.player1 };
-            destination == "stage" && player.stage.stage.iter().all(|&id| id != -1)
+            Zone::from_str(&destination) == Some(Zone::Stage)
+                && player.stage.stage.iter().all(|&id| id != -1)
         };
 
         if stage_full {
@@ -827,7 +882,8 @@ impl AbilityResolver {
             moved_cards.extend(taken);
         } else {
             for &card_id in &taken {
-                if destination == "deck" && deck_pos.is_some() && !is_max {
+                if Zone::from_str(&destination) == Some(Zone::Deck) && deck_pos.is_some() && !is_max
+                {
                     let pos = deck_pos.unwrap();
                     let player = if use_p2 {
                         &mut gs.player2
@@ -841,7 +897,10 @@ impl AbilityResolver {
                         target: "position|destination".to_string(),
                         description: "Choose deck top or bottom".to_string(),
                         allow_skip: false,
-                        options: Some(vec!["deck_top".to_string(), "deck_bottom".to_string()]),
+                        options: Some(vec![
+                            Zone::DeckTop.to_str().to_string(),
+                            Zone::DeckBottom.to_str().to_string(),
+                        ]),
                     });
                     self.execution_context = ExecutionContext::MoveCardsPosition {
                         card_id,
@@ -874,7 +933,7 @@ impl AbilityResolver {
                                 &mut gs.player1
                             };
                             let src_zone = if source.as_str() == "those_cards" {
-                                "discard"
+                                Zone::Discard.to_str()
                             } else {
                                 source.as_str()
                             };
@@ -889,6 +948,7 @@ impl AbilityResolver {
             gs,
             &moved_cards,
             &destination,
+            &source,
             &effect.state_change,
             tgt.as_deref(),
         );
@@ -904,8 +964,8 @@ impl AbilityResolver {
         match &context {
             ExecutionContext::LookAndSelect { step } => {
                 if let LookAndSelectStep::Finalize { destination } = step {
-                    if destination == "stage" {
-                        if let Some(&card_id) = self.looked_at_cards.last() {
+                    if Zone::from_str(destination) == Some(Zone::Stage) {
+                        if let Some(&card_id) = gs.looked_at_cards.last() {
                             let player = &mut gs.player1;
                             let pos_idx = super::util::stage_position_index(position);
                             match pos_idx {
@@ -931,7 +991,7 @@ impl AbilityResolver {
                                     player.hand.add_card(card_id);
                                 }
                             }
-                            self.looked_at_cards.clear();
+                            gs.looked_at_cards.clear();
                         }
                     }
                 }
@@ -1007,6 +1067,8 @@ impl AbilityResolver {
                 if !card_no.is_empty() {
                     if player_id == gs.player1.id {
                         gs.player1.debut_count_this_turn += 1;
+                    } else if player_id == gs.player2.id {
+                        gs.player2.debut_count_this_turn += 1;
                     }
                     gs.trigger_auto_ability(
                         format!("{}_debut_{}", card_no, card_id),
@@ -1022,31 +1084,62 @@ impl AbilityResolver {
         self.pending_choice = None;
         self.execution_context = ExecutionContext::None;
         self.resume_pending_commands(gs)?;
-        // Auto-place remaining cards deferred by multi-card stage selection
+        // Place remaining cards deferred by multi-card stage selection.
+        // Each remaining card gets its own position choice.
         if !self.pending_stage_cards.is_empty() {
             let remaining = std::mem::take(&mut self.pending_stage_cards);
-            for (cid, tgt) in &remaining {
-                let p = gs.resolve_target_player_mut(tgt);
-                if let Some(pos) = p.waitroom.cards.iter().position(|&id| id == *cid) {
+            for (cid, tgt) in remaining.clone() {
+                let p = gs.resolve_target_player_mut(&tgt);
+                if let Some(pos) = p.waitroom.cards.iter().position(|&id| id == cid) {
                     p.waitroom.cards.remove(pos);
                 }
-                let slot = if p.stage.stage[1] == -1 {
-                    1
-                } else if p.stage.stage[0] == -1 {
-                    0
-                } else if p.stage.stage[2] == -1 {
-                    2
+                let empty_slots: Vec<usize> = (0..3).filter(|&i| p.stage.stage[i] == -1).collect();
+                if empty_slots.len() > 1 {
+                    // More than 1 empty slot → prompt for position.
+                    // Defer remaining cards and return pending.
+                    let pos_target = tgt.clone();
+                    let remaining = remaining.into_iter().skip(1).collect::<Vec<_>>();
+                    if !remaining.is_empty() {
+                        self.pending_stage_cards = remaining;
+                    }
+                    let pos_str = empty_slots
+                        .iter()
+                        .map(|&i| match i {
+                            0 => "left_side",
+                            1 => "center",
+                            _ => "right_side",
+                        })
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    self.pending_choice = Some(Choice::SelectPosition {
+                        position: pos_str,
+                        description: format!(
+                            "Choose position for {}",
+                            gs.card_database
+                                .get_card(cid)
+                                .map_or("card", |c| c.name.as_str())
+                        ),
+                        allow_skip: false,
+                    });
+                    self.execution_context = ExecutionContext::MoveCardsPosition {
+                        card_id: cid,
+                        state_change: None,
+                        target: pos_target,
+                    };
+                    return Ok(());
+                } else if empty_slots.len() == 1 {
+                    let slot = empty_slots[0];
+                    p.stage.stage[slot] = cid;
+                    p.areas_locked_this_turn.insert(match slot {
+                        0 => crate::zones::MemberArea::LeftSide,
+                        1 => crate::zones::MemberArea::Center,
+                        _ => crate::zones::MemberArea::RightSide,
+                    });
                 } else {
                     continue;
-                };
-                p.stage.stage[slot] = *cid;
-                p.areas_locked_this_turn.insert(match slot {
-                    0 => crate::zones::MemberArea::LeftSide,
-                    1 => crate::zones::MemberArea::Center,
-                    _ => crate::zones::MemberArea::RightSide,
-                });
-                gs.mods.clear_all_for_card(*cid);
-                gs.record_card_movement(*cid);
+                }
+                gs.mods.clear_all_for_card(cid);
+                gs.record_card_movement(cid);
             }
         }
         Ok(())
@@ -1058,6 +1151,7 @@ impl AbilityResolver {
         gs: &mut GameState,
         moved_cards: &[i16],
         destination: &str,
+        source: &str,
         state_change: &Option<String>,
         target: Option<&str>,
     ) {
@@ -1074,7 +1168,7 @@ impl AbilityResolver {
                 for card_id in moved_cards {
                     gs.mods.add_orientation_modifier(*card_id, "active");
                 }
-                if destination == "energy_zone" {
+                if Zone::from_str(destination) == Some(Zone::Energy) {
                     let p = match target.unwrap_or("self") {
                         "self" => &mut gs.player1,
                         "opponent" => &mut gs.player2,
@@ -1089,9 +1183,12 @@ impl AbilityResolver {
             gs.record_card_movement(*card_id);
         }
 
-        if destination == "discard" {
+        if Zone::from_str(destination) == Some(Zone::Discard)
+            || Zone::from_str(destination) == Some(Zone::Waitroom)
+        {
             self.moved_cards = moved_cards.to_vec();
             gs.recently_moved_cards = Some(moved_cards.to_vec());
+            gs.recently_moved_from_zone = Some(source.to_string());
         }
         eprintln!(
             "[FINALIZE_MOVE] dest={} cards={:?} -> self.moved_cards={:?}",
@@ -1285,7 +1382,10 @@ impl AbilityResolver {
         characters: Option<&Vec<String>>,
         target_player_id: Option<&str>,
     ) -> Result<(), String> {
-        let destination = gs.entry_destination().map(|s| s.to_string());
+        let destination = gs
+            .entry_destination()
+            .map(|s| s.to_string())
+            .or_else(|| self.last_effect_destination.clone());
         let target = target_player_id
             .map(|s| s.to_string())
             .or_else(|| self.last_effect_target.clone())
@@ -1306,27 +1406,30 @@ impl AbilityResolver {
                 }
         };
 
-        {
+        // Filter indices to only include cards that match required filters.
+        // Non-matching cards are silently skipped (consistent with cost-phase handler).
+        let filtered_indices: Vec<usize> = {
             let player = gs.resolve_target_player(&target);
             let cards = util::zone_cards(player, zone);
-            for &idx in indices {
-                if idx < cards.len() && !passes(cards[idx]) {
-                    return Err(format!(
-                        "Selected card from {} does not match required filters",
-                        zone
-                    ));
-                }
-            }
-        }
+            indices
+                .iter()
+                .filter(|&&idx| idx < cards.len() && passes(cards[idx]))
+                .copied()
+                .collect()
+        };
 
-        let dest =
-            destination
-                .as_deref()
-                .unwrap_or(if zone == "discard" { "hand" } else { "discard" });
+        let zone_enum = Zone::from_str(zone);
+        let dest = destination
+            .as_deref()
+            .unwrap_or(if zone_enum == Some(Zone::Discard) {
+                Zone::Hand.to_str()
+            } else {
+                Zone::Discard.to_str()
+            });
         let mut moved = Vec::new();
-        match zone {
-            "hand" | "discard" | "deck" => {
-                if dest == "stage" {
+        match zone_enum {
+            Some(Zone::Hand) | Some(Zone::Discard) | Some(Zone::Deck) => {
+                if Zone::from_str(dest) == Some(Zone::Stage) {
                     let player = gs.resolve_target_player(&target);
                     if player.stage.stage.iter().all(|&id| id != -1) {
                         eprintln!("[STAGE_PLACEMENT] stage is full, cannot place cards");
@@ -1336,11 +1439,11 @@ impl AbilityResolver {
 
                 let sum_limit = cost_total.or(cost_limit);
                 let sum_operator = cost_total_operator.or(cost_limit_operator);
-                if zone == "discard" && sum_limit.is_some() {
+                if zone_enum == Some(Zone::Discard) && sum_limit.is_some() {
                     let player = gs.resolve_target_player(&target);
                     let limit = sum_limit.unwrap();
                     let op = sum_operator.unwrap_or("<=");
-                    let card_ids = util::resolve_indices_to_ids(player, zone, indices);
+                    let card_ids = util::resolve_indices_to_ids(player, zone, &filtered_indices);
                     let total_cost: u32 = card_ids
                         .iter()
                         .filter_map(|&cid| card_db.get_card(cid).and_then(|c| c.cost))
@@ -1363,11 +1466,13 @@ impl AbilityResolver {
 
                 let card_ids = {
                     let player = gs.resolve_target_player(&target);
-                    util::resolve_indices_to_ids(player, zone, indices)
+                    util::resolve_indices_to_ids(player, zone, &filtered_indices)
                 };
 
-                match dest {
-                    "stage" | "empty_area" | "same_area" if zone != "deck" => {
+                match Zone::from_str(dest) {
+                    Some(Zone::Stage) | Some(Zone::EmptyArea) | Some(Zone::SameArea)
+                        if zone_enum != Some(Zone::Deck) =>
+                    {
                         moved = self.execute_stage_placement_choices(
                             gs,
                             &card_ids,
@@ -1377,27 +1482,60 @@ impl AbilityResolver {
                             &target,
                         )?;
                     }
+                    Some(Zone::Deck) => {
+                        // Resolve deck position from the entry effect,
+                        // falling back to last_effect_position for sub-action effects.
+                        let deck_pos = gs
+                            .entry_effect()
+                            .and_then(|ef| {
+                                ef.position.as_ref().and_then(|p| match p {
+                                    crate::card::PositionInfo::String(s) => s.parse::<usize>().ok(),
+                                    crate::card::PositionInfo::Struct { position, .. } => {
+                                        position.as_ref().and_then(|s| s.parse::<usize>().ok())
+                                    }
+                                })
+                            })
+                            .or(self.last_effect_position)
+                            .map(|p| if p > 0 { p - 1 } else { 0 });
+                        let player = gs.resolve_target_player_mut(&target);
+                        for &cid in &card_ids {
+                            if let Some(pos) = deck_pos {
+                                let clamped = pos.min(player.main_deck.cards.len());
+                                player.main_deck.cards.insert(clamped, cid);
+                            } else {
+                                util::place_card_in_zone(player, cid, dest, None, false, 1);
+                            }
+                        }
+                        moved = card_ids;
+                    }
                     _ => {
+                        eprintln!(
+                            "[MOVE_CARDS] zone={} dest={} card_ids={:?} moved={:?} target={}",
+                            zone, dest, card_ids, moved, target
+                        );
                         let player = gs.resolve_target_player_mut(&target);
                         util::move_cards(player, &card_ids, zone, dest, None, &card_db);
                         moved = card_ids;
                     }
                 }
 
-                if zone == "hand" && (dest == "discard" || dest == "waitroom") {
+                if zone_enum == Some(Zone::Hand)
+                    && (Zone::from_str(dest) == Some(Zone::Discard)
+                        || Zone::from_str(dest) == Some(Zone::Waitroom))
+                {
                     gs.mods.last_cost_discard_count = moved.len() as u32;
                 }
             }
-            "stage" => {
+            Some(Zone::Stage) => {
                 let player = gs.resolve_target_player_mut(&target);
-                for &idx in indices {
+                for &idx in &filtered_indices {
                     if idx < 3 && player.stage.stage[idx] != -1 {
                         self.selected_cards.push(player.stage.stage[idx]);
                     }
                 }
             }
-            "revealed_cards" => {
-                for &idx in indices.iter().rev() {
+            Some(Zone::RevealedCards) => {
+                for &idx in filtered_indices.iter().rev() {
                     if idx < gs.revealed_cards.len() {
                         let card_id = gs.revealed_cards.remove(idx);
                         self.selected_cards.push(card_id);
@@ -1428,7 +1566,8 @@ impl AbilityResolver {
         }
 
         if !moved.is_empty() {
-            gs.recently_moved_cards = Some(moved);
+            gs.recently_moved_cards = Some(moved.clone());
+            gs.recently_moved_from_zone = Some(zone.to_string());
         }
         Ok(())
     }
@@ -1448,7 +1587,7 @@ impl AbilityResolver {
             select_action
                 .as_ref()
                 .and_then(|sa| sa.destination.clone())
-                .unwrap_or_else(|| "hand".to_string()),
+                .unwrap_or_else(|| Zone::Hand.to_str().to_string()),
             select_action
                 .as_ref()
                 .and_then(|sa| sa.discard_remaining)
@@ -1468,7 +1607,40 @@ impl AbilityResolver {
             indices
         );
 
+        // Extract per-group constraint from execution context
+        let max_per_group = match &self.execution_context {
+            ExecutionContext::LookAndSelect {
+                step: LookAndSelectStep::Select { max_per_group, .. },
+            } => *max_per_group,
+            _ => None,
+        };
+
         let looked_at = &mut gs.looked_at_cards;
+
+        // Validate per-group constraint before removing cards
+        if let Some(mpg) = max_per_group {
+            let card_db = &gs.card_database;
+            let mut group_counts: std::collections::HashMap<String, u32> =
+                std::collections::HashMap::new();
+            for &idx in indices {
+                if idx < looked_at.len() {
+                    let cid = looked_at[idx];
+                    if let Some(card) = card_db.get_card(cid) {
+                        if !card.series.is_empty() {
+                            let count = group_counts.entry(card.series.clone()).or_insert(0);
+                            *count += 1;
+                            if *count > mpg {
+                                return Err(format!(
+                                    "Cannot select more than {} card(s) from the same series ({})",
+                                    mpg, card.series
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let mut indices_sorted: Vec<usize> = indices.iter().copied().collect();
         indices_sorted.sort_by(|a, b| b.cmp(a));
 
@@ -1493,23 +1665,24 @@ impl AbilityResolver {
 
         let remaining_cards: Vec<i16> = looked_at.drain(..).collect();
 
-        let is_deck_dest = destination == "deck_top" || destination == "deck";
+        let is_deck_dest = Zone::from_str(&destination) == Some(Zone::DeckTop)
+            || Zone::from_str(&destination) == Some(Zone::Deck);
         let needs_order = is_deck_dest
             && placement_order.as_deref() == Some("any_order")
             && selected_cards.len() > 1;
 
         if needs_order {
-            self.looked_at_cards = selected_cards;
+            gs.looked_at_cards = selected_cards;
             let player = gs.active_player_mut();
             let dest_zone = if discard_remaining {
-                "discard"
+                Zone::Discard.to_str()
             } else {
-                "deck_bottom"
+                Zone::DeckBottom.to_str()
             };
             for card_id in remaining_cards {
                 util::place_card_in_zone(player, card_id, dest_zone, None, false, 1);
             }
-            let card_count = self.looked_at_cards.len();
+            let card_count = gs.looked_at_cards.len();
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "order".to_string(),
                 description: format!("Choose order for cards on deck ({} cards)", card_count),
@@ -1518,7 +1691,7 @@ impl AbilityResolver {
             });
             self.execution_context = ExecutionContext::LookAndSelect {
                 step: LookAndSelectStep::Finalize {
-                    destination: "deck".to_string(),
+                    destination: Zone::Deck.to_str().to_string(),
                 },
             };
             return Ok(());
@@ -1551,7 +1724,7 @@ impl AbilityResolver {
             && max_select > selected_count
             && !remaining_cards.is_empty()
         {
-            self.looked_at_cards = remaining_cards.clone();
+            gs.looked_at_cards = remaining_cards.clone();
             gs.looked_at_cards = remaining_cards.clone();
             let remaining_available = gs.looked_at_cards.len();
             let remaining_selections = (max_select - selected_count).min(remaining_available);
@@ -1560,37 +1733,41 @@ impl AbilityResolver {
                 remaining_selections, remaining_available
             );
             self.pending_choice = Some(
-                Choice::select_cards("looked_at", remaining_selections, description, true)
-                    .card_type(select_action.as_ref().and_then(|sa| sa.card_type.clone()))
-                    .cost_limit(
-                        select_action.as_ref().and_then(|sa| sa.cost_limit),
-                        select_action
-                            .as_ref()
-                            .and_then(|sa| sa.cost_limit_operator.clone()),
-                    )
-                    .group(
-                        select_action
-                            .as_ref()
-                            .and_then(|sa| sa.group_names.as_ref())
-                            .and_then(|v| v.first().cloned()),
-                    )
-                    .characters(select_action.as_ref().and_then(|sa| sa.characters.clone()))
-                    .build(),
+                Choice::select_cards(
+                    Zone::LookedAt.to_str(),
+                    remaining_selections,
+                    description,
+                    true,
+                )
+                .card_type(select_action.as_ref().and_then(|sa| sa.card_type.clone()))
+                .cost_limit(
+                    select_action.as_ref().and_then(|sa| sa.cost_limit),
+                    select_action
+                        .as_ref()
+                        .and_then(|sa| sa.cost_limit_operator.clone()),
+                )
+                .group(
+                    select_action
+                        .as_ref()
+                        .and_then(|sa| sa.group_names.as_ref())
+                        .and_then(|v| v.first().cloned()),
+                )
+                .characters(select_action.as_ref().and_then(|sa| sa.characters.clone()))
+                .build(),
             );
             return Ok(());
         }
 
         let player = gs.active_player_mut();
         let dest_zone = if discard_remaining {
-            "discard"
+            Zone::Discard.to_str()
         } else {
-            "deck_bottom"
+            Zone::DeckBottom.to_str()
         };
         for card_id in remaining_cards {
             util::place_card_in_zone(player, card_id, dest_zone, None, false, 1);
         }
 
-        self.looked_at_cards = gs.looked_at_cards.clone();
         Ok(())
     }
 

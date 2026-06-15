@@ -10,11 +10,16 @@ let tooltipTimeout = null;
 let tooltipHideTimeout = null;
 let currentTooltipTarget = null;
 
-// Cached DOM nodes — these panels are static and never destroyed,
-// so we grab them once at module load instead of on every hover.
-const descPanel = document.getElementById('card-desc-panel');
-const descContent = document.getElementById('card-desc-content');
-const descTitle = document.getElementById('card-desc-title');
+// Lazily-cached DOM nodes — re-queried if cache is stale.
+let _panel, _content, _title;
+function dom() {
+    if (!_panel || !_panel.isConnected) {
+        _panel = document.getElementById('card-desc-panel');
+        _content = document.getElementById('card-desc-content');
+        _title = document.getElementById('card-desc-title');
+    }
+    return { panel: _panel, content: _content, title: _title };
+}
 
 export const Tooltips = {
     findCardById: (cardId) => State.resolveCardData(cardId),
@@ -135,8 +140,17 @@ export const Tooltips = {
             const rawActionRichText = actionRichText.replace(/<[^>]+>/g, "").trim();
 
             if (rawActionRichText && !TextEnricher.isGenericInstruction(rawActionRichText)) {
-                // If the action text is non-generic (like a translated sub-ability), prioritize it
-                finalAbilityText = actionRichText;
+                // Only let action text replace card text if the action's source card
+                // matches the hovered card (e.g. use_ability on the same card).
+                // Otherwise the action text may come from a different card
+                // (e.g. play_member_to_stage hovering a stage slot shows the hand card's ability).
+                const actionSrcId = actionObj.source_card_id ?? actionObj._source_card_id;
+                const sameCard = cardObj && cardObj.id !== undefined && actionSrcId === cardObj.id;
+                if (sameCard || !cardObj || !cardText) {
+                    finalAbilityText = actionRichText;
+                } else {
+                    actionLabel = actionRichText;
+                }
             } else if (rawActionRichText && !finalAbilityText.includes(rawActionRichText)) {
                 // If it's a generic mechanical instruction (like "Play X to Slot 0"),
                 // and it's not already in the text, we might want to keep it as a label.
@@ -156,17 +170,20 @@ export const Tooltips = {
 
         // Only hide the panel if we have absolutely nothing to show (no card and no text)
         if (!combinedText && !cardObj) {
-            descPanel.classList.remove('active');
+            dom().panel.classList.remove('active');
             return;
         }
 
         // Product/series prefix from card_no (e.g. "PL!-pb1" from "PL!-pb1-014-R")
         let productLabel = "";
+        let fullCardNo = "";
         if (cardObj && cardObj.card_no) {
             const parts = cardObj.card_no.match(/^(PL!-[A-Za-z0-9]+)/);
             if (parts) productLabel = parts[1];
+            fullCardNo = cardObj.card_no;
         }
         const cardIdLabel = (cardObj && cardObj.id !== undefined && cardObj.id >= 0) ? ` <span style="opacity:0.6; font-size:0.8em;">(ID: ${cardObj.id})</span>` : "";
+        const cardNoLabel = fullCardNo ? ` <span style="opacity:0.5; font-size:0.75em; font-family:monospace;">${fullCardNo}</span>` : "";
         
         let titleText = (dataSource.dataset.cardName || "Card Detail");
         let metadataHtml = "";
@@ -174,6 +191,7 @@ export const Tooltips = {
         if (cardObj) {
             const translated = window.translateCard ? window.translateCard(cardObj) : { name: cardObj.name, groups: cardObj.groups, units: cardObj.units };
             titleText = productLabel ? `${productLabel} — ${translated.name}` : translated.name;
+            titleText += cardNoLabel + cardIdLabel;
         }
 
         // Show raw ability JSON when Shift is held
@@ -186,15 +204,15 @@ export const Tooltips = {
             }
         }
 
-        if (descTitle) {
-            descTitle.innerHTML = titleText + cardIdLabel;
-            descTitle.style.display = titleText ? 'block' : 'none';
+        if (dom().title) {
+            dom().title.innerHTML = titleText;
+            dom().title.style.display = titleText ? 'block' : 'none';
         }
 
         const enrichedText = combinedText ? TextEnricher.enrichAbilityText(combinedText) : "";
-        descContent.innerHTML = metadataHtml + enrichedText + rawJsonHtml;
-        descContent.dataset.rawText = enrichedText;
-        descPanel.classList.add('active');
+        dom().content.innerHTML = metadataHtml + enrichedText + rawJsonHtml;
+        dom().content.dataset.rawText = enrichedText;
+        dom().panel.classList.add('active');
 
         if (tooltipHideTimeout) {
             clearTimeout(tooltipHideTimeout);

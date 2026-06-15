@@ -91,23 +91,19 @@ impl TestGame {
         state.turn_number = 1;
         rabuka_engine::ability::debug::set_debug(true);
 
-        // Pre-create copy IDs for every card template
+        // Pre-create 1 copy per template (down from 5). Most tests reference
+        // each card once. Arc::make_mut is called ONCE (not 25000×) to give us
+        // a mutable database we can populate copies into.
         let mut copy_pool: HashMap<i16, Vec<i16>> = HashMap::new();
-        let template_ids: Vec<i16> = state.card_database.cards.keys().copied().collect();
+        let db_mut = Arc::make_mut(&mut state.card_database);
+        let template_ids: Vec<i16> = db_mut.cards.keys().copied().collect();
         for &tid in &template_ids {
-            let mut copies = Vec::new();
-            for _ in 0..5 {
-                let cid = Arc::make_mut(&mut state.card_database).create_copy(tid);
-                copies.push(cid);
-            }
-            copy_pool.insert(tid, copies);
+            let cid = db_mut.create_copy(tid);
+            copy_pool.insert(tid, vec![cid]);
         }
 
-        // Use the mutated database (with copies) as the test's db reference
-        let db_with_copies = state.card_database.clone();
-
         TestGame {
-            db: db_with_copies,
+            db: state.card_database.clone(),
             state,
             copy_pool: RefCell::new(copy_pool),
             debug_enabled: true,
@@ -175,9 +171,10 @@ impl TestGame {
     }
 
     /// Give player1 active energy (uses real card LL-E-001-SD).
+    /// Each energy card gets its own unique copy ID.
     pub fn give_energy(&mut self, count: usize) {
-        let energy_card = self.id("LL-E-001-SD");
         for _ in 0..count {
+            let energy_card = self.id("LL-E-001-SD");
             self.state.player1.energy_zone.cards.push(energy_card);
         }
         self.state.player1.energy_zone.active_energy_count += count;
@@ -252,10 +249,27 @@ impl TestGame {
             .expect("select_indices failed");
     }
 
+    /// Try to select indices, returning the error instead of panicking.
+    pub fn try_select_indices(&mut self, indices: &[usize]) -> Result<(), String> {
+        TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
+    }
+
     /// Select a choice option by index (for SelectTarget choices like answers, alternatives).
     pub fn select_option(&mut self, option_index: i16) {
         TurnEngine::resume_with_choice(&mut self.state, Some(option_index), None)
             .expect("select_option failed");
+    }
+
+    /// Drain all auto-ability choice prompts, selecting the first option each time.
+    pub fn drain_auto_ability_choices(&mut self) {
+        while let Some(choice) = self.state.get_pending_choice() {
+            match choice {
+                Choice::SelectAutoAbility { .. } => {
+                    self.select_indices(&[]);
+                }
+                _ => break,
+            }
+        }
     }
 
     /// Advance to the next phase (Pass action).

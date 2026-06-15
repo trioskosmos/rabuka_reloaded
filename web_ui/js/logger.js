@@ -3,8 +3,8 @@
  * Handles application logs and the game feed UI.
  */
 
-export const logs = [];
-export const feedItems = [];
+const logs = [];
+const feedItems = [];
 
 export function log(msg, type = 'normal') {
     const timestamp = new Date().toLocaleTimeString();

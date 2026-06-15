@@ -2,8 +2,6 @@
  * Interaction Adapter
  * Handles mapping of Rust backend actions to UI targets and validating legal actions.
  */
-import { State } from './state.js';
-
 export const InteractionAdapter = {
     /**
      * Calculates which UI elements are valid targets for the current list of legal actions.

@@ -797,7 +797,7 @@ fn kanon_unless_pay_skip_triggers_discard() {
     }
     // Card selection prompt for which 2 to discard
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]); // discard first 2 cards
+        game.try_select_indices(&[0, 1]).unwrap(); // discard first 2 cards
     }
 
     let hand_after = game.state.player1.hand.cards.len();

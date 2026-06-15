@@ -51,12 +51,15 @@ impl super::TurnEngine {
             for area in areas {
                 if let Some(card_id) = player.stage.get_area(area) {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
+                        eprintln!("[DEBUT_TRIG_DBG] stage card_id={} card_no={} card_no_clone={}", card_id, card.card_no, card_no_clone);
                         if card.card_no == card_no_clone {
                             for ability in &card.abilities {
-                                if ability.triggers.as_ref().map_or(false, |t| {
+                                let trigger_match = ability.triggers.as_ref().map_or(false, |t| {
                                     t.contains(crate::triggers::DEBUT)
                                         || t.contains(crate::triggers::DEBUT_EN)
-                                }) {
+                                });
+                                eprintln!("[DEBUT_TRIG_DBG]   ability={} triggers={:?} match={}", ability.full_text, ability.triggers, trigger_match);
+                                if trigger_match {
                                     // Skip abilities that require baton touch if baton touch wasn't used
                                     if !baton_touch_used
                                         && ability

@@ -1,5 +1,5 @@
 use crate::ability::resolver::AbilityResolver;
-use crate::ability::types::{Choice, Command};
+use crate::ability::types::{Choice, ChoiceRoute, Command};
 use crate::card::Ability;
 use crate::game_state::AbilityTrigger;
 
@@ -18,6 +18,8 @@ impl AbilityId {
 pub enum QueueState {
     /// Queue is idle, ready to process next ability
     Idle,
+    /// Waiting for player to choose which auto ability resolves first (Rule 9.5.3)
+    WaitingForAutoAbilityChoice { choice: Choice },
     /// Currently paying cost for an ability
     PayingCost { entry_index: usize },
     /// Waiting for user choice (cost payment, target selection, etc.)
@@ -45,8 +47,8 @@ pub struct AbilityQueueEntry {
     /// Stored choice result for resumption
     pub cost_paid_index: usize,
     pub pending_choice_result: Option<crate::ability::types::ChoiceResult>,
-    /// Discriminator for choice handlers ("choice", "choice_string", "optional_cost", "position_change")
-    pub choice_card_no: Option<String>,
+    /// Discriminator for routing choice results to the correct handler.
+    pub choice_card_no: Option<crate::ability::types::ChoiceRoute>,
     /// JSON-serialized options for choice/choice_string discriminators
     pub conditional_choice: Option<String>,
     /// Whether the effect has started executing (prevents re-processing)
@@ -90,6 +92,7 @@ impl AbilityQueue {
     /// Check if queue is waiting for user choice
     pub fn is_waiting_for_choice(&self) -> Option<&Choice> {
         match &self.state {
+            QueueState::WaitingForAutoAbilityChoice { choice } => Some(choice),
             QueueState::WaitingForChoice { choice, .. } => Some(choice),
             _ => None,
         }
@@ -102,7 +105,7 @@ impl AbilityQueue {
             | QueueState::WaitingForChoice { entry_index, .. }
             | QueueState::ExecutingEffect { entry_index }
             | QueueState::Completed { entry_index } => self.entries.get(*entry_index),
-            QueueState::Idle => None,
+            QueueState::Idle | QueueState::WaitingForAutoAbilityChoice { .. } => None,
         }
     }
 
@@ -112,9 +115,13 @@ impl AbilityQueue {
             | QueueState::WaitingForChoice { entry_index, .. }
             | QueueState::ExecutingEffect { entry_index }
             | QueueState::Completed { entry_index } => *entry_index,
-            QueueState::Idle => return None,
+            QueueState::Idle | QueueState::WaitingForAutoAbilityChoice { .. } => return None,
         };
         self.entries.get_mut(idx)
+    }
+
+    pub fn get_entry(&self, index: usize) -> Option<&AbilityQueueEntry> {
+        self.entries.get(index)
     }
 
     /// Number of entries pending or completed
@@ -178,9 +185,16 @@ impl AbilityQueue {
         }
     }
 
+    pub fn pause_for_auto_ability_choice(&mut self, choice: Choice) {
+        self.state = QueueState::WaitingForAutoAbilityChoice { choice };
+    }
+
     /// Resume after user provides choice result
     pub fn resume_with_choice(&mut self, result: crate::ability::types::ChoiceResult) {
         match &self.state {
+            QueueState::WaitingForAutoAbilityChoice { .. } => {
+                self.state = QueueState::Idle;
+            }
             QueueState::WaitingForChoice { entry_index, .. } => {
                 if let Some(entry) = self.entries.get_mut(*entry_index) {
                     entry.pending_choice_result = Some(result);
@@ -238,6 +252,19 @@ impl AbilityQueue {
         }
         if let Some(entry) = self.current_entry_mut() {
             entry.pending_commands = commands;
+        }
+    }
+
+    /// Append commands to the existing pending commands on the current entry.
+    /// Unlike `set_pending_commands` which replaces, this preserves existing commands.
+    /// Used when a sequential conditional effect needs to park followup actions
+    /// alongside already-pending commands.
+    pub fn save_pending_sequential_actions(&mut self, commands: Vec<Command>) {
+        if commands.is_empty() {
+            return;
+        }
+        if let Some(entry) = self.current_entry_mut() {
+            entry.pending_commands.extend(commands);
         }
     }
 

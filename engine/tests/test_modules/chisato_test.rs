@@ -52,7 +52,7 @@ fn chisato_cost_hits_threshold_condition_passes() {
 
     game.activate_ability(chisato);
     assert!(game.has_pending_choice(), "Should have reveal choice");
-    game.select_indices(&[0, 1, 2, 3, 4]);
+    game.try_select_indices(&[0, 1, 2, 3, 4]).unwrap();
 
     // After the ability resolves, verify cards were revealed (in hand, revealed)
     // and the condition passed (ability ran to completion)
@@ -90,7 +90,7 @@ fn chisato_cost_misses_threshold_condition_fails() {
 
     game.activate_ability(chisato);
     assert!(game.has_pending_choice(), "Should have reveal choice");
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     // Cards should still be in hand (reveal doesn't discard)
     assert_eq!(
@@ -157,7 +157,7 @@ fn chisato_q78_ability_lost_on_leave() {
 
     game.activate_ability(chisato);
     assert!(game.has_pending_choice(), "Should have reveal choice");
-    game.select_indices(&[0, 1, 2, 3, 4]);
+    game.try_select_indices(&[0, 1, 2, 3, 4]).unwrap();
 
     // Now move Chisato to waitroom (simulating leaving stage)
     game.state.player1.stage.stage[1] = -1;

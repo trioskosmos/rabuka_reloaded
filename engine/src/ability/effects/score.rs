@@ -1,4 +1,6 @@
+use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
+use super::super::types::{Choice, ChoiceRoute};
 use super::super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
@@ -30,10 +32,11 @@ impl AbilityResolver {
         let per_unit_type_str = per_unit_type.map(|s| s.to_string());
         let effect_constraint = effect_constraint.map(|s| s.to_string());
         let card_db = self.card_db();
-        let exclude_self_id = effect.exclude_self.and_then(|_| {
-            let gs_ref = &*gs;
-            gs_ref.activating_card
-        });
+        let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
+            gs.activating_card
+        } else {
+            None
+        };
 
         let (live_card_ids, final_value) = {
             let player = gs.resolve_target_player_mut(&target);
@@ -63,9 +66,12 @@ impl AbilityResolver {
             };
 
             let candidate_ids: Vec<i16> = match card_type_filter.as_deref() {
-                Some("member_card") => {
-                    util::matching_ids(util::zone_cards(player, "stage"), &card_db, &filter, true)
-                }
+                Some("member_card") => util::matching_ids(
+                    util::zone_cards(player, Zone::Stage.to_str()),
+                    &card_db,
+                    &filter,
+                    true,
+                ),
                 _ => player.live_card_zone.cards.iter().copied().collect(),
             };
             let target_card_ids: Vec<(i16, i32)> = candidate_ids
@@ -125,8 +131,24 @@ impl AbilityResolver {
             }
             if operation == "set" {
                 gs.mods.set_score_modifier(*card_id, *delta);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.clone(),
+                    "score_set",
+                    *card_id,
+                    None,
+                    *delta,
+                );
             } else {
                 gs.mods.add_score_modifier(*card_id, *delta);
+                gs.record_ability_application(
+                    gs.activating_card.unwrap_or(-1),
+                    effect.text.clone(),
+                    "score_bonus",
+                    *card_id,
+                    None,
+                    *delta,
+                );
             }
             count_applied += 1;
         }
@@ -150,26 +172,35 @@ impl AbilityResolver {
         gs: &mut GameState,
         operation: &str,
         mut value: u32,
-        heart_color: &str,
+        heart_colors: &[String],
         target: &str,
         per_unit: bool,
         per_unit_count: u32,
         group_name: Option<&str>,
         timing_condition: Option<&str>,
-        _location: Option<&str>,
+        location: Option<&str>,
     ) -> Result<(), String> {
         if per_unit {
             let card_db = &gs.card_database;
             let player = gs.resolve_target_player(target);
-            let stage_cards: Vec<i16> = player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .copied()
-                .collect();
+
+            let cards: Vec<i16> = match location {
+                Some("success_live_zone") | Some("success_live_card_zone") => {
+                    player.success_live_card_zone.cards.to_vec()
+                }
+                _ => {
+                    // Default: count stage members
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .filter(|&&id| id != -1)
+                        .copied()
+                        .collect()
+                }
+            };
             let mut count = 0u32;
-            for &card_id in &stage_cards {
+            for &card_id in &cards {
                 if let Some(g) = group_name {
                     if !util::card_matches_group_str(card_db, card_id, Some(g)) {
                         continue;
@@ -191,7 +222,6 @@ impl AbilityResolver {
             }
             value = count * per_unit_count;
         }
-        let color = crate::zones::parse_heart_color(heart_color);
         let card_ids: Vec<i16> = {
             let player = gs.resolve_target_player_mut(target);
             player.live_card_zone.cards.to_vec()
@@ -207,25 +237,36 @@ impl AbilityResolver {
             "set" => "設定",
             _ => operation,
         };
-        gs.rule_log.push(format!(
-            "{} {}: 要求ハート{} {} {}",
-            pp, act_name, op_jp, value, heart_color
-        ));
-        for card_id in card_ids {
-            match operation {
-                "decrease" => {
-                    gs.mods
-                        .add_need_heart_modifier(card_id, color, -(value as i32));
+        let colors = if heart_colors.is_empty() {
+            vec!["heart00".to_string()]
+        } else {
+            heart_colors.to_vec()
+        };
+        for hc in &colors {
+            let color = crate::zones::parse_heart_color(hc);
+            gs.rule_log.push(format!(
+                "{} {}: 要求ハート{} {} {}",
+                pp, act_name, op_jp, value, hc
+            ));
+            for card_id in &card_ids {
+                match operation {
+                    "decrease" => {
+                        gs.mods
+                            .add_need_heart_modifier(*card_id, color, -(value as i32));
+                    }
+                    "increase" => {
+                        gs.mods
+                            .add_need_heart_modifier(*card_id, color, value as i32);
+                    }
+                    "set" => {
+                        // The parser splits multiple heart colors into separate
+                        // sub-actions, each with its own color and value/count.
+                        // Use value as the per-color modifier directly.
+                        gs.mods
+                            .set_need_heart_modifier(*card_id, color, value as i32);
+                    }
+                    _ => return Err(format!("Unknown operation: {}", operation)),
                 }
-                "increase" => {
-                    gs.mods
-                        .add_need_heart_modifier(card_id, color, value as i32);
-                }
-                "set" => {
-                    gs.mods
-                        .set_need_heart_modifier(card_id, color, value as i32);
-                }
-                _ => return Err(format!("Unknown operation: {}", operation)),
             }
         }
         Ok(())
@@ -236,27 +277,39 @@ impl AbilityResolver {
         gs: &mut GameState,
         operation: &str,
         value: u32,
-        heart_color: &str,
+        heart_colors: &[String],
         target: &str,
     ) -> Result<(), String> {
-        let color = crate::zones::parse_heart_color(heart_color);
+        let colors = if heart_colors.is_empty() {
+            vec!["heart00".to_string()]
+        } else {
+            heart_colors.to_vec()
+        };
         let card_ids: Vec<i16> = {
             let player = gs.resolve_target_player_mut(target);
             player.live_card_zone.cards.to_vec()
         };
-        for card_id in card_ids {
-            let modifier_value = match operation {
-                "increase" => value as i32,
-                "decrease" => -(value as i32),
-                _ => return Err(format!("Unknown operation: {}", operation)),
-            };
-            gs.mods
-                .add_need_heart_modifier(card_id, color, modifier_value);
+        for hc in &colors {
+            let color = crate::zones::parse_heart_color(hc);
+            for card_id in &card_ids {
+                let modifier_value = match operation {
+                    "increase" => value as i32,
+                    "decrease" => -(value as i32),
+                    _ => return Err(format!("Unknown operation: {}", operation)),
+                };
+                gs.mods
+                    .add_need_heart_modifier(*card_id, color, modifier_value);
+            }
         }
         Ok(())
     }
 
-    pub(crate) fn execute_modify_yell_count(&mut self, gs: &mut GameState, operation: &str, count: u32) {
+    pub(crate) fn execute_modify_yell_count(
+        &mut self,
+        gs: &mut GameState,
+        operation: &str,
+        count: u32,
+    ) {
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card

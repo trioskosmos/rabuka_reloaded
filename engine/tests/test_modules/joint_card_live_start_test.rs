@@ -53,26 +53,25 @@ fn finish_live_setup(game: &mut TestGame) {
 
 /// The multi-name card itself counts as all three names for the cost filter.
 /// One copy in hand + 2 fillers whose names match should satisfy count=3.
+/// Selecting all 3 should pay cost and grant score+3.
 #[test]
-fn test_bp1_live_start_self_counts_as_all_three_names() {
+fn test_bp1_live_start_pay_cost_gains_score_three() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let joint = game.id("LL-bp1-001-R\u{ff0b}"); // 上原歩夢&澁谷かのん&日野下花帆
     let ayumu = game.id("PL!N-sd1-001-SD"); // 上原歩夢
-    let kanon = game.id("PL!S-sd1-001-SD"); // 澁谷かのん
+    let kanon = game.id("PL!SP-sd1-001-SD"); // 澁谷かのん
     let live = game.id("PL!-sd1-010-SD");
     let filler = game.new_id("PL!-sd1-010-SD");
 
     // Stage: joint in center
     game.state.player1.stage.stage[1] = joint;
-    // Hand: one copy of each sub-character (will be used to pay cost)
-    game.state.player1.hand.cards.push(joint); // self in hand — also eligible
+    // Hand: 3 matching names (joint self + ayumu + kanon) to pay cost
+    game.state.player1.hand.cards.push(joint);
     game.state.player1.hand.cards.push(ayumu);
     game.state.player1.hand.cards.push(kanon);
-    // Add live card to hand so it can be set
     game.add_to_hand(live);
-    // Decks for phase advances
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(filler);
         game.state.player2.main_deck.cards.push(filler);
@@ -84,10 +83,27 @@ fn test_bp1_live_start_self_counts_as_all_three_names() {
     game.set_live_card(live);
     finish_live_setup(&mut game);
 
-    // bp1 should trigger live_start and ask player to pay cost (optional)
     assert!(
         game.has_pending_choice(),
-        "bp1 live_start should produce a pending choice to pay the cost"
+        "bp1 live_start should prompt to select 3 cards for optional cost"
+    );
+
+    // Select all 3 matching cards (indices in the choice list)
+    while game.has_pending_choice() {
+        game.try_select_indices(&[0, 1, 2]).unwrap();
+    }
+
+    assert!(
+        !game.has_pending_choice(),
+        "bp1 should resolve after cost payment"
+    );
+
+    // Effect: score+3 modifier applied to joint
+    let score_mod = game.state.mods.get_score_modifier(joint);
+    assert_eq!(
+        score_mod, 3,
+        "bp1: paying cost should grant score+3 (got {})",
+        score_mod
     );
 }
 
@@ -166,7 +182,7 @@ fn test_bp2_live_start_discard_any_number_gains_blade_per_card() {
     );
 
     // Select both matching cards (indices 0 and 1)
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     assert!(
         !game.has_pending_choice(),
@@ -377,20 +393,232 @@ fn test_bp4_debut_trigger_fires_independently() {
     );
 }
 
+/// bp4 debut trigger completes look_and_select: select member → hand, rest → waitroom.
+#[test]
+fn test_bp4_debut_look_select_puts_card_in_hand() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let joint = game.id("LL-bp4-001-R\u{ff0b}"); // 絢瀬絵里&朝香果林&葉月恋
+    let ayumu = game.id("PL!-pb1-011-R"); // 絢瀬絵里 cost=2 — matches select filter
+    let filler1 = game.new_id("PL!-sd1-010-SD"); // cost=4 blade=1
+    let filler2 = game.new_id("PL!-sd1-010-SD");
+    let filler3 = game.new_id("PL!-sd1-010-SD");
+    let filler4 = game.new_id("PL!-sd1-010-SD");
+
+    game.add_to_hand(joint);
+    // Deck top: [ayumu(matching), filler1, filler2, filler3, filler4, ...]
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(ayumu);
+    game.state.player1.main_deck.cards.push(filler1);
+    game.state.player1.main_deck.cards.push(filler2);
+    game.state.player1.main_deck.cards.push(filler3);
+    game.state.player1.main_deck.cards.push(filler4);
+    for _ in 0..10 {
+        game.state
+            .player1
+            .main_deck
+            .cards
+            .push(game.new_id("PL!-sd1-010-SD"));
+    }
+    game.give_energy(20);
+
+    let hand_before = game.state.player1.hand.cards.len();
+
+    // Play joint to stage — this triggers 登場 ability (look top 5, select 1)
+    game.play_to_stage(joint, MemberArea::Center);
+
+    // After playing joint to stage, hand decreased by 1
+    let hand_after_play = game.state.player1.hand.cards.len();
+    assert_eq!(
+        hand_after_play,
+        hand_before - 1,
+        "Joint should leave hand when played"
+    );
+
+    assert!(
+        game.has_pending_choice(),
+        "bp4 debut should prompt for card selection from looked-at cards"
+    );
+
+    // Select the first card (ayumu — matches name filter)
+    game.select_indices(&[0]);
+
+    // After selection: ayumu should be in hand
+    let hand_after = game.state.player1.hand.cards.len();
+    assert_eq!(
+        hand_after,
+        hand_after_play + 1,
+        "Selected card should go to hand ({} -> {})",
+        hand_after_play,
+        hand_after
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&ayumu),
+        "Ayumu should be in hand after selection"
+    );
+
+    let waitroom_count = game.state.player1.waitroom.cards.len();
+    assert!(
+        waitroom_count >= 4,
+        "Remaining looked-at cards should go to waitroom (got {})",
+        waitroom_count
+    );
+
+    // No pending choices should remain
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    assert!(
+        !game.has_pending_choice(),
+        "All choices should be resolved after look-and-select completes"
+    );
+}
+
+/// bp4 debut: skip selection → no card to hand, all cards to waitroom.
+#[test]
+fn test_bp4_debut_skip_select_discards_all() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let joint = game.id("LL-bp4-001-R\u{ff0b}");
+    let ayumu = game.id("PL!-pb1-011-R"); // 絢瀬絵里
+    let filler1 = game.new_id("PL!-sd1-010-SD");
+    let filler2 = game.new_id("PL!-sd1-010-SD");
+    let filler3 = game.new_id("PL!-sd1-010-SD");
+    let filler4 = game.new_id("PL!-sd1-010-SD");
+
+    game.add_to_hand(joint);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(ayumu);
+    game.state.player1.main_deck.cards.push(filler1);
+    game.state.player1.main_deck.cards.push(filler2);
+    game.state.player1.main_deck.cards.push(filler3);
+    game.state.player1.main_deck.cards.push(filler4);
+    for _ in 0..10 {
+        game.state
+            .player1
+            .main_deck
+            .cards
+            .push(game.new_id("PL!-sd1-010-SD"));
+        game.state
+            .player2
+            .main_deck
+            .cards
+            .push(game.new_id("PL!-sd1-010-SD"));
+    }
+    game.state
+        .player2
+        .hand
+        .cards
+        .push(game.new_id("PL!-sd1-010-SD"));
+    game.give_energy(20);
+
+    game.play_to_stage(joint, MemberArea::Center);
+    let hand_after_play = game.state.player1.hand.cards.len();
+
+    assert!(game.has_pending_choice(), "bp4 debut should prompt");
+
+    // Skip — select empty
+    game.select_indices(&[]);
+
+    let hand_after = game.state.player1.hand.cards.len();
+    assert_eq!(
+        hand_after, hand_after_play,
+        "Skipping selection should not add any card to hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.len() >= 5,
+        "All looked-at cards should go to waitroom when skipped (got {})",
+        game.state.player1.waitroom.cards.len()
+    );
+}
+
+/// bp4 debut: select matching member → wait opponent members with
+/// cost ≤ revealed card's cost AND original blade ≤ 3.
+#[test]
+fn test_bp4_debut_wait_opponent_members_after_selection() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let joint = game.id("LL-bp4-001-R\u{ff0b}");
+    let ayumu = game.id("PL!-pb1-011-R"); // 絢瀬絵里 cost=2, blade=1
+    let filler = game.new_id("PL!-sd1-010-SD");
+
+    let p2_low = game.id("PL!-sd1-002-SD"); // cost=2, blade=1 → should wait
+    let p2_high_cost = game.id("PL!-sd1-001-SD"); // cost=11, blade=3 → should NOT wait
+    let p2_filler = game.id("PL!-sd1-010-SD"); // cost=4, blade=1 → should NOT wait
+    game.state.player2.stage.stage = [p2_high_cost, p2_low, p2_filler];
+
+    game.add_to_hand(joint);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(ayumu);
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.main_deck.cards.push(filler);
+    for _ in 0..10 {
+        game.state
+            .player1
+            .main_deck
+            .cards
+            .push(game.new_id("PL!-sd1-010-SD"));
+        game.state
+            .player2
+            .main_deck
+            .cards
+            .push(game.new_id("PL!-sd1-010-SD"));
+    }
+    game.state
+        .player2
+        .hand
+        .cards
+        .push(game.new_id("PL!-sd1-010-SD"));
+    game.give_energy(20);
+
+    game.play_to_stage(joint, MemberArea::Center);
+    assert!(game.has_pending_choice(), "bp4 debut should prompt");
+
+    game.select_indices(&[0]);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // ayumu cost=2 → filter: cost≤2 AND original blade≤3
+    // p2_low (cost=2, blade=1) should be waited (orientation = "wait")
+    let ori = |cid| game.state.mods.get_orientation_modifier(cid);
+    assert_eq!(
+        ori(p2_low),
+        Some(&"wait".to_string()),
+        "p2_low should be waited"
+    );
+    assert_ne!(
+        ori(p2_high_cost),
+        Some(&"wait".to_string()),
+        "p2_high_cost should NOT be waited"
+    );
+    assert_ne!(
+        ori(p2_filler),
+        Some(&"wait".to_string()),
+        "p2_filler should NOT be waited"
+    );
+}
+
 // ─────────────────────────────────────────────────────────────
 // bp6 — 南ことり＆黒澤ダイヤ＆徒町小鈴
 // ライブ開始時: discard ANY NUMBER → gain 1 heart per distinct COLOR of discarded
 // ─────────────────────────────────────────────────────────────
 
-/// Discarding 2 cards of 2 different colors → gain 1 of each color (2 distinct).
+/// Discarding 2 cards of 2 different colors → gain 1 of each distinct color.
 #[test]
 fn test_bp6_live_start_two_distinct_colors_gain_two_hearts() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let joint = game.id("LL-bp6-001-R\u{ff0b}"); // 南ことり&黒澤ダイヤ&徒町小鈴
-    let kotori = game.id("PL!-bp3-003-R"); // 南ことり
-    let dia = game.id("PL!S-sd1-004-SD"); // 黒澤ダイヤ
+    let kotori = game.id("PL!-bp3-003-R"); // 南ことり — hearts: 01,03,06
+    let dia = game.id("PL!S-sd1-004-SD"); // 黒澤ダイヤ — hearts: 02,04,05
     let live = game.id("PL!-sd1-010-SD");
     let filler = game.new_id("PL!-sd1-010-SD");
 
@@ -415,32 +643,57 @@ fn test_bp6_live_start_two_distinct_colors_gain_two_hearts() {
     );
 
     // Discard both cards
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     assert!(
         !game.has_pending_choice(),
         "bp6 should resolve after selection"
     );
 
-    // The exact heart colors depend on what those cards have in need_heart.
-    // What we can assert: at least 1 heart was gained (since we discarded 2 cards
-    // that should each have some need_heart colors).
-    let total_hearts: i32 = [
-        HeartColor::Heart01,
-        HeartColor::Heart02,
-        HeartColor::Heart03,
-        HeartColor::Heart04,
-        HeartColor::Heart05,
-        HeartColor::Heart06,
-    ]
-    .iter()
-    .map(|&c| game.state.mods.get_heart_modifier(joint, c))
-    .sum();
-
-    assert!(
-        total_hearts >= 1,
-        "bp6: discarding 2 named cards should gain at least 1 heart from distinct colors (got {})",
-        total_hearts
+    // kotori: heart01, heart03, heart06
+    // dia: heart02, heart04, heart05
+    // Combined distinct colors: 01+02+03+04+05+06 = 6
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart01),
+        1,
+        "Heart01 from kotori"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart02),
+        1,
+        "Heart02 from dia"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart03),
+        1,
+        "Heart03 from kotori"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart04),
+        1,
+        "Heart04 from dia"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart05),
+        1,
+        "Heart05 from dia"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart06),
+        1,
+        "Heart06 from kotori"
     );
 }
 
@@ -476,7 +729,7 @@ fn test_bp6_live_start_same_color_deduplicates() {
     assert!(game.has_pending_choice(), "bp6 should prompt for discard");
 
     // Discard both copies
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     // Determine the exact colors from the card.
     // Member cards store their heart colors in base_heart; need_heart is only on live cards.

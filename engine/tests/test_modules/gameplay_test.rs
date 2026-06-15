@@ -615,6 +615,7 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
     game.set_live_card(distortion);
     game.set_live_card(distortion);
     advance_to_live_start(&mut game);
+    game.drain_auto_ability_choices();
     assert!(!game.has_pending_choice());
     assert_eq!(game.state.player1.energy_zone.active_energy_count, 7);
     let total_score: i32 = game
@@ -753,8 +754,10 @@ fn ayumu_live_start_triggers() {
         "LiveStart optional cost should prompt for named character discard"
     );
 
-    // Pay the cost: discard the named copy
-    game.select_indices(&[0]);
+    // Pay the cost: discard the named copy (handling sequential prompts)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
 
     // Verify gain_ability effect: Ayumu should have gained the score +3 constant ability
     assert!(
@@ -1482,8 +1485,11 @@ fn you_abilityless_card_not_in_choice() {
         "LiveStart optional cost prompt should appear"
     );
 
-    // Select only the named copy (index 0 = the first selectable, which should be the named copy)
+    // Select only the named copy
     game.select_indices(&[0]);
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     // Filler should still be in hand (it was not eligible for selection)
     assert!(
@@ -2083,7 +2089,13 @@ fn umi_pr014_appear_reveal_and_draw_when_no_live_card() {
 
     // 登場 trigger: reveal 3 from opponent's hand → no live cards → draw 1
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
 
     // Umi cost is 2, we had 3 energy
@@ -2151,7 +2163,13 @@ fn umi_pr014_appear_reveal_no_draw_when_live_card_present() {
     game.play_to_stage(umi, rabuka_engine::zones::MemberArea::LeftSide);
 
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
 
     // P1 should NOT draw because a live card was among the revealed cards
@@ -2219,8 +2237,57 @@ fn umi_pr014_appear_reveal_with_choice_when_more_cards_than_count() {
         _ => panic!("Expected SelectCard choice, got {:?}", choice),
     }
 
-    // Select 3 cards
-    game.select_indices(&[0, 1, 2]);
+    // Select 3 cards sequentially to test re-prompt preserves blind, is_reveal, target
+    // Pick card at index 0
+    game.select_indices(&[0]);
+
+    // Re-prompt should preserve blind/is_reveal/target
+    assert!(
+        game.has_pending_choice(),
+        "Sequential re-prompt should appear"
+    );
+    let re_prompt_choice = game.state.get_pending_choice().unwrap();
+    match &re_prompt_choice {
+        rabuka_engine::ability::types::Choice::SelectCard {
+            count: c,
+            blind: b,
+            is_reveal: r,
+            zone: z,
+            target_player_id: t,
+            ..
+        } => {
+            assert_eq!(*c, 2, "Re-prompt should ask for 2 more cards");
+            assert!(*b, "Re-prompt should preserve blind=true");
+            assert!(*r, "Re-prompt should preserve is_reveal=true");
+            assert_eq!(z, "hand", "Re-prompt should still target hand");
+            assert_eq!(
+                t.as_deref(),
+                Some("opponent"),
+                "Re-prompt should target opponent, got {:?}",
+                t
+            );
+        }
+        _ => panic!("Expected SelectCard re-prompt, got {:?}", re_prompt_choice),
+    }
+
+    // Pick another card
+    game.select_indices(&[1]);
+
+    // Another re-prompt for the last card
+    assert!(game.has_pending_choice(), "Second re-prompt should appear");
+    let re_prompt2 = game.state.get_pending_choice().unwrap();
+    match &re_prompt2 {
+        rabuka_engine::ability::types::Choice::SelectCard {
+            count: c, blind: b, ..
+        } => {
+            assert_eq!(*c, 1, "Second re-prompt should ask for 1 more");
+            assert!(*b, "Second re-prompt should preserve blind");
+        }
+        _ => panic!("Expected SelectCard re-prompt, got {:?}", re_prompt2),
+    }
+
+    // Pick the third card
+    game.select_indices(&[2]);
 
     // No live cards among the 3 selected → should draw 1
     assert_eq!(
@@ -2234,4 +2301,102 @@ fn umi_pr014_appear_reveal_with_choice_when_more_cards_than_count() {
         "Exactly 3 cards should be revealed"
     );
     assert!(!game.has_pending_choice(), "No pending choices expected");
+}
+
+// ====================================================================
+//  黒澤ダイヤ (PL!S-sd1-004-SD) — LiveStart: optional draw, conditional deck_top
+// ====================================================================
+// ライブ開始時: カードを1枚引いてもよい。そうした場合、手札2枚を好きな順番で
+//   デッキの上に置く。(conditional sequential: draw optional, move_cards hand→deck_top)
+// ====================================================================
+
+#[test]
+fn dia_sd1_optional_draw_skip_skips_movement() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let dia = game.id("PL!S-sd1-004-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.add_to_hand(dia);
+    // Two extra fillers in hand for deck_top placement test
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler); // one more filler as live card
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(13);
+    game.play_to_stage(dia, rabuka_engine::zones::MemberArea::Center);
+    // Deck: 10 fillers, Hand after play_to_stage: [filler, filler, filler] (3)
+
+    // Advance to LiveCardSet (passes through Draw phase which draws 1 card → deck=9, hand=4)
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
+
+    game.set_live_card(filler); // removes 1 filler from hand → hand=3
+    game.pass();
+    game.pass();
+
+    assert!(
+        game.has_pending_choice(),
+        "Dia's optional draw should appear"
+    );
+    game.select_option(0); // skip draw
+
+    assert!(!game.has_pending_choice());
+    // Deck: 10 - 1 (Draw phase) = 9 (no draw from skipped ability)
+    assert_eq!(game.state.player1.main_deck.len(), 9, "Deck should be 9");
+    // Hand: 3 (after play_to_stage) + 1 (Draw) - 1 (set_live_card) = 3
+    assert_eq!(game.state.player1.hand.len(), 3, "Hand unchanged");
+}
+
+#[test]
+fn dia_sd1_optional_draw_pay_then_deck_top() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let dia = game.id("PL!S-sd1-004-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.add_to_hand(dia);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler); // one more as live card
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(13);
+    game.play_to_stage(dia, rabuka_engine::zones::MemberArea::Center);
+    // Hand: [filler,filler,filler] (3), Deck: 10
+
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
+    game.pass();
+    // Draw phase draws 1 → Deck=9, Hand=4
+    game.set_live_card(filler); // Hand=3
+    game.pass();
+    game.pass();
+
+    assert_eq!(game.pending_choice_type(), Some("SelectTarget".to_string()));
+    game.select_option(1); // pay (draw) → Deck=8, Hand=4
+
+    assert_eq!(game.pending_choice_type(), Some("SelectCard".to_string()));
+    assert!(!game.state.player1.hand.cards.is_empty());
+
+    game.try_select_indices(&[0, 1]).unwrap(); // place 2 on deck → Deck=10, Hand=2
+
+    assert!(!game.has_pending_choice());
+
+    // Final: 10 - 1 - 1 + 2 = 10
+    assert_eq!(game.state.player1.main_deck.len(), 10);
+    // Hand: 3 + 1 - 1 + 1 - 2 = 2
+    assert_eq!(game.state.player1.hand.len(), 2);
 }

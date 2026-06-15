@@ -1,5 +1,5 @@
 import { State } from '../state.js';
-import { Phase, fixImg as fixImgPath, isMulliganPhase } from '../constants.js';
+import { fixImg as fixImgPath, isMulliganPhase } from '../constants.js';
 import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
@@ -527,6 +527,7 @@ export const CardRenderer = {
                     area.removeAttribute('data-action-id');
                     slotDiv.removeAttribute('data-action-id');
                 }
+                CardRenderer.renderCardBonuses(slotDiv, slot);
             } else {
                 slotDiv.innerHTML = '';
                 // Clear under-cards display when no member in slot
@@ -725,7 +726,21 @@ export const CardRenderer = {
         // Selection cards are handled by ChoiceView in the action area — skip them here
         const hasChoice = state.pending_choice?.zone || state.pending_choice?.selection_cards?.length > 0;
         const pendingSelectionCards = hasChoice ? [] : (state.pending_choice?.selection_cards || []);
-        const cards = overrideCards || (pendingSelectionCards.length > 0 ? pendingSelectionCards : (state.looked_cards || []));
+        let cards = overrideCards || (pendingSelectionCards.length > 0 ? pendingSelectionCards : (state.looked_cards || []));
+
+        // When a choice is active, filter to only cards with a matching legal action
+        // (backend may send all zone cards; legal_actions define which are valid picks)
+        if (state.pending_choice && state.legal_actions && state.legal_actions.length > 0 && cards.length > 0) {
+            cards = cards.filter(c => {
+                if (!c) return false;
+                const cardId = c.id !== undefined ? c.id : c.card_id;
+                return state.legal_actions.some(a => {
+                    const params = a.parameters || {};
+                    return params.card_id === cardId || params.card_id === c.card_id;
+                });
+            });
+        }
+
         if (cards.length === 0) {
             DOMUtils.setVisible(DOM_IDS.LOOKED_CARDS_PANEL, false);
             return;
@@ -795,5 +810,68 @@ export const CardRenderer = {
             
             content.appendChild(cardEl);
         });
+    },
+
+    renderCardBonuses: (slotEl, card) => {
+        if (!card) return;
+        let existing = slotEl.querySelector('.card-bonuses');
+        if (existing) existing.remove();
+
+        const bonuses = [];
+
+        if (card.bonus_blade && card.bonus_blade !== 0) {
+            bonuses.push({ type: 'bonus-blade', value: card.bonus_blade, icon: 'icon_blade.png' });
+        }
+
+        const heartIcons = ['heart_00.png','heart_01.png','heart_02.png','heart_03.png','heart_04.png','heart_05.png','heart_06.png'];
+        if (card.bonus_hearts && Array.isArray(card.bonus_hearts)) {
+            card.bonus_hearts.forEach((val, idx) => {
+                if (val && val !== 0 && idx < heartIcons.length) {
+                    bonuses.push({ type: 'bonus-heart', value: val, icon: heartIcons[idx] });
+                }
+            });
+        }
+
+        if (card.heart_transform) {
+            bonuses.push({ type: 'bonus-transform', value: null, icon: card.heart_transform.replace('heart', 'heart_') + '.png' });
+        }
+
+        if (card.bonus_score && card.bonus_score !== 0) {
+            bonuses.push({ type: 'bonus-score', value: card.bonus_score, icon: 'icon_score.png' });
+        }
+
+        if (card.bonus_cost && card.bonus_cost !== 0) {
+            bonuses.push({ type: 'bonus-cost', value: card.bonus_cost, icon: 'icon_energy.png' });
+        }
+
+        if (bonuses.length === 0) return;
+
+        const container = document.createElement('div');
+        container.className = 'card-bonuses';
+
+        bonuses.forEach(b => {
+            const badge = document.createElement('div');
+            badge.className = `bonus-badge ${b.type}`;
+            if (b.value !== null) {
+                const valSpan = document.createElement('span');
+                valSpan.className = 'bonus-value';
+                valSpan.textContent = b.value > 0 ? `+${b.value}` : `${b.value}`;
+                badge.appendChild(valSpan);
+            }
+            if (b.icon) {
+                const img = document.createElement('img');
+                img.src = fixImgPath('img/texticon/' + b.icon);
+                img.alt = '';
+                badge.appendChild(img);
+            }
+            if (b.type === 'bonus-transform') {
+                badge.title = `Heart transform → ${card.heart_transform}`;
+            } else if (b.value !== null) {
+                badge.title = `${b.type.replace('bonus-', '')} ${b.value > 0 ? '+' : ''}${b.value}`;
+            }
+            container.appendChild(badge);
+        });
+
+        slotEl.appendChild(container);
     }
 };

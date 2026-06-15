@@ -7,7 +7,7 @@ import { CardRenderer, ImageLoader, resolveCardImagePath } from './components/Ca
 import { BoardRenderer } from './components/BoardRenderer.js';
 import { ActionMenu } from './components/ActionMenu.js';
 
-import { Phase, fixImg, isMulliganPhase } from './constants.js';
+import { Phase, isMulliganPhase } from './constants.js';
 import * as i18n from './i18n/index.js';
 import { Tooltips } from './ui_tooltips.js';
 import { InteractionAdapter } from './interaction_adapter.js';
@@ -68,17 +68,9 @@ function initDomCache() {
 }
 
 export const Rendering = {
-    _lastStateId: null,
-
     render: () => {
         if (State.renderRequested) return;
 
-        // Dirty-check: skip full re-render if state_id hasn't changed (unless forced)
-        const stateId = State.data?.state_id ?? State.data?.turn_number ?? null;
-        if (stateId !== null && stateId === Rendering._lastStateId && !State._forceRender) {
-            return;
-        }
-        Rendering._lastStateId = stateId;
         State._forceRender = false;
 
         State.renderRequested = true;
@@ -109,7 +101,8 @@ export const Rendering = {
 
         const assetsToLoad = [];
         [state.player1, state.player2].forEach(p => {
-            const handCards = p.hand.cards;
+            const handCards = p?.hand?.cards;
+            if (!handCards) return;
             handCards.forEach(c => {
                 if (c?.card_no) {
                     const path = resolveCardImagePath(c.card_no);
@@ -252,7 +245,16 @@ export const Rendering = {
         const content = document.getElementById(DOM_IDS.SELECTION_CONTENT);
         if (!panel || !content) return;
 
-        const useSidebarCards = modalState.cards.length > 0 && window.innerWidth > 768;
+        // Filter to only cards that have a valid action
+        const validPairs = [];
+        modalState.cards.forEach((c, idx) => {
+            const action = modalState.actions[idx];
+            if (action) validPairs.push({ card: c, action });
+        });
+        const filteredCards = validPairs.map(p => p.card);
+        const filteredActions = validPairs.map(p => p.action);
+
+        const useSidebarCards = filteredCards.length > 0 && window.innerWidth > 768;
         if (!modalState.isVisible || useSidebarCards) {
             panel.style.display = DISPLAY_VALUES.NONE;
             return;
@@ -261,8 +263,8 @@ export const Rendering = {
         panel.style.display = DISPLAY_VALUES.FLEX;
 
         content.innerHTML = '';
-        modalState.cards.forEach((c, idx) => {
-            const action = modalState.actions[idx];
+        filteredCards.forEach((c, idx) => {
+            const action = filteredActions[idx];
             const viewModel = CardRenderer.getCardViewModel(c, {
                 containerId: DOM_IDS.SELECTION_CONTENT,
                 actionId: action?.index,
@@ -302,12 +304,7 @@ export const Rendering = {
     renderHeartProgress: (filled, required) => PerformanceRenderer.renderHeartProgress(filled, required),
 
     renderHeartsCompact: (hearts) => PerformanceRenderer.renderHeartsCompact(hearts),
-    renderBladeHeartsCompact: (hearts) => PerformanceRenderer.renderHeartsCompact(hearts),
     renderBladesCompact: (blades) => PerformanceRenderer.renderBladesCompact(blades),
-    renderTotalHeartsBreakdown: (hearts) => PerformanceRenderer.renderHeartsCompact(hearts),
-
-    renderModifiers: () => { /* Placeholder for future implementation */ },
-    renderGameData: () => { /* Placeholder for future implementation */ },
 
     updateSettingsButtons: (perspectivePlayer = State.perspectivePlayer) => {
         const liveWatchBtn = document.getElementById('live-watch-btn');

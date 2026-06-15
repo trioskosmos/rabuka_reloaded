@@ -1,3 +1,25 @@
+/// Check whether a prohibition_effects entry of the form
+/// "restriction:cannot_place:<destination>" blocks placing in the given zone.
+/// LiveCardZone and SuccessLiveZone are interchangeable for placement purposes.
+fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
+    let parts: Vec<&str> = prohibition.split(':').collect();
+    if parts.len() < 3 {
+        return false;
+    }
+    let dest = parts[2];
+    if dest.is_empty() {
+        // No destination specified — assume the restriction targets the
+        // success live card zone (the most common use case for dynamic
+        // cannot_place restrictions like メビウスループ).
+        return zone == Zone::SuccessLiveZone.to_str();
+    }
+    let dest_zone = Zone::from_str(dest);
+    let target_zone = Zone::from_str(zone);
+    dest_zone == target_zone
+        || (dest_zone == Some(Zone::LiveCardZone) && target_zone == Some(Zone::SuccessLiveZone))
+        || (dest_zone == Some(Zone::SuccessLiveZone) && target_zone == Some(Zone::LiveCardZone))
+}
+
 impl GameState {
     fn stage_card_ids(&self) -> impl Iterator<Item = i16> + '_ {
         self.player1
@@ -136,7 +158,8 @@ impl GameState {
                             // is on stage (prevents premature triggering).
                             if let Some(ref effect) = ability.effect {
                                 if let Some(ref condition) = effect.condition {
-                                    if condition.location.as_deref() == Some("discard")
+                                    if Zone::from_str(condition.location.as_deref().unwrap_or(""))
+                                        == Some(Zone::Discard)
                                         && condition.card_type.as_deref() == Some("member_card")
                                     {
                                         let in_discard =
@@ -285,18 +308,56 @@ impl GameState {
             if !self.ability_queue.is_idle() {
                 break;
             }
-            let idx = (0..self.ability_queue.len()).find(|&i| {
-                self.ability_queue.is_entry_available(i)
-                    && self.ability_queue.entry_player_id(i) == Some(player_id)
-            });
-            let idx = match idx {
-                Some(i) => i,
-                None => break,
-            };
+
+            let available_indices: Vec<usize> = (0..self.ability_queue.len())
+                .filter(|&i| {
+                    self.ability_queue.is_entry_available(i)
+                        && self.ability_queue.entry_player_id(i) == Some(player_id)
+                })
+                .collect();
+
+            if available_indices.is_empty() {
+                break;
+            }
+
+            if available_indices.len() > 1 {
+                let options = available_indices
+                    .iter()
+                    .filter_map(|&idx| {
+                        let entry = self.ability_queue.get_entry(idx)?;
+                        let cid = entry.card_id.unwrap_or(0);
+                        let card_name = self
+                            .card_database
+                            .get_card(cid)
+                            .map(|c| c.name.clone())
+                            .unwrap_or_else(|| entry.card_no.clone());
+                        Some(crate::ability::types::AutoAbilityOption {
+                            card_name,
+                            ability_text: entry.ability.full_text.clone(),
+                            queue_index: idx,
+                        })
+                    })
+                    .collect();
+
+                let choice = crate::ability::types::Choice::SelectAutoAbility {
+                    player_id: player_id.to_string(),
+                    options,
+                    description:
+                        "複数の自動能力が同時に発動しました。使用する順番を選択してください。"
+                            .to_string(),
+                };
+
+                self.ability_queue.pause_for_auto_ability_choice(choice);
+                break;
+            }
+
+            let idx = available_indices[0];
             self.ability_queue.promote_entry_by_abs(idx);
             if !self.ability_queue.start_next() {
                 break;
             }
+            self.recently_moved_cards = None;
+            self.recently_moved_from_zone = None;
             self.process_current_ability();
             if self.has_pending_choice() {
                 break;
@@ -342,8 +403,10 @@ impl GameState {
                             .as_ref()
                             .and_then(|e| e.condition.as_ref())
                             .map(|c| {
-                                c.location.as_deref() == Some("discard")
-                                    || c.location.as_deref() == Some("waitroom")
+                                matches!(
+                                    Zone::from_str(c.location.as_deref().unwrap_or("")),
+                                    Some(Zone::Discard | Zone::Waitroom)
+                                )
                             })
                             .unwrap_or(false);
                         if is_auto && has_discard_condition {
@@ -393,21 +456,11 @@ impl GameState {
         let mut resolver = if self.ability_queue.has_resolver() {
             eprintln!("[PCA] Reusing existing resolver for effect execution");
             let mut r = self.ability_queue.take_resolver().unwrap();
-            // Sync resolver state to GameState before effect execution, since the
-            // condition system reads GameState fields directly (e.g., revealed_cost_cards).
-            if !r.revealed_cost_cards.is_empty() {
-                self.revealed_cost_cards = r.revealed_cost_cards.clone();
-            }
-            if !r.looked_at_cards.is_empty() {
-                self.looked_at_cards = r.looked_at_cards.clone();
-            }
-            // Reset cost-phase state so the fresh effect execution doesn't see stale data
-            // (moved_cards, selected_cards, etc. were set during cost payment).
-            r.moved_cards = Vec::new();
-            r.selected_cards = Vec::new();
-            r.revealed_cost_cards = Vec::new();
-            r.looked_at_cards = Vec::new();
+            // Don't reset moved_cards/selected_cards — the effect may need
+            // them for cost_reference (e.g. previous_moved_card) or conditions.
+            r.selected_cards.clear();
             r.last_effect_target = None;
+            r.last_effect_position = None;
             r.pending_stage_cards = Vec::new();
             r.execution_context = crate::ability::types::ExecutionContext::None;
             r
@@ -428,18 +481,13 @@ impl GameState {
         // Sync resolver state to GameState before the resolver may be dropped.
         // The condition system and other subsystems read GameState directly.
         self.last_ability_trace = Some(resolver.pipeline.trace.clone());
-        if !resolver.revealed_cost_cards.is_empty() {
-            self.revealed_cost_cards = resolver.revealed_cost_cards.clone();
-        }
-        self.looked_at_cards = resolver.looked_at_cards.clone();
 
         if let Some(ref c) = resolver.pending_choice {
             let is_choice_type = self
                 .ability_queue
                 .current_entry()
-                .and_then(|e| e.choice_card_no.clone())
-                .as_deref()
-                == Some("choice");
+                .and_then(|e| e.choice_card_no.as_ref())
+                == Some(&crate::ability::types::ChoiceRoute::Choice);
 
             if !cost_already_paid {
                 if let Some(e) = self.ability_queue.current_entry_mut() {
@@ -500,7 +548,7 @@ impl GameState {
         self.entry_effect().and_then(|e| e.destination.as_deref())
     }
 
-    pub fn entry_choice_card_no(&self) -> Option<String> {
+    pub fn entry_choice_card_no(&self) -> Option<crate::ability::types::ChoiceRoute> {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.choice_card_no.clone())
@@ -570,18 +618,20 @@ impl GameState {
                     {
                         let target = target_player_id.as_deref().unwrap_or("self");
                         let player = self.resolve_target_player(target);
-                        let card_ids: Vec<i16> = match zone.as_str() {
-                            "hand" => player.hand.cards.iter().copied().collect(),
-                            "discard" => player.waitroom.cards.iter().copied().collect(),
-                            "stage" => player
+                        let card_ids: Vec<i16> = match Zone::from_str(&zone) {
+                            Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
+                            Some(Zone::Discard) => player.waitroom.cards.iter().copied().collect(),
+                            Some(Zone::Stage) => player
                                 .stage
                                 .stage
                                 .iter()
                                 .copied()
                                 .filter(|&id| id != -1)
                                 .collect(),
-                            "energy_zone" => player.energy_zone.cards.iter().copied().collect(),
-                            "selected_cards" => entry
+                            Some(Zone::Energy) => {
+                                player.energy_zone.cards.iter().copied().collect()
+                            }
+                            Some(Zone::SelectedCards) => entry
                                 .resolver
                                 .as_ref()
                                 .map(|r| r.selected_cards.clone())
@@ -793,6 +843,28 @@ impl GameState {
             || self.current_phase == Phase::SecondAttackerPerformance
     }
 
+    /// Check whether a prohibition_effects entry of the form
+    /// "restriction:cannot_place:<destination>" blocks placing in the given zone.
+    /// LiveCardZone and SuccessLiveZone are interchangeable for placement purposes.
+    fn _prohibition_destination_blocks(prohibition: &str, zone: &str) -> bool {
+        let parts: Vec<&str> = prohibition.split(':').collect();
+        if parts.len() < 3 {
+            return false;
+        }
+        let dest = parts[2];
+        if dest.is_empty() {
+            // No destination specified — assume the restriction targets the
+            // success live card zone (the most common use case for dynamic
+            // cannot_place restrictions like メビウスループ).
+            return zone == Zone::SuccessLiveZone.to_str();
+        }
+        let dest_zone = Zone::from_str(dest);
+        let target_zone = Zone::from_str(zone);
+        dest_zone == target_zone
+            || (dest_zone == Some(Zone::LiveCardZone) && target_zone == Some(Zone::SuccessLiveZone))
+            || (dest_zone == Some(Zone::SuccessLiveZone) && target_zone == Some(Zone::LiveCardZone))
+    }
+
     pub fn should_trigger_live_success(&self, player: &Player) -> bool {
         // Rule 8.3.15-8.3.16: Heart requirements gate whether the live succeeds.
         // If the live card's need_heart isn't satisfied by stage hearts, the live fails
@@ -807,11 +879,10 @@ impl GameState {
         }
         // stage_hearts is set in execute_live_victory_determination to include
         // yell blade hearts, matching the total the performance heart check used.
-        let empty_mult = std::collections::HashMap::new();
-        let stage_hearts = player
-            .stage_hearts
-            .clone()
-            .unwrap_or_else(|| player.calculate_stage_hearts(&self.card_database, &empty_mult));
+        // Fallback uses heart_color_multiplier from mods to include blade cheering.
+        let stage_hearts = player.stage_hearts.clone().unwrap_or_else(|| {
+            player.calculate_stage_hearts(&self.card_database, &self.mods.heart_color_multiplier)
+        });
         for card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*card_id) {
                 if card.satisfies_heart_requirement(&stage_hearts) {
@@ -836,11 +907,15 @@ impl GameState {
                             .or_else(|| effect.destination.as_deref());
                         if effect.action == "restriction"
                             && effect.restriction_type.as_deref() == Some("cannot_place")
-                            && (restricted_to == Some(zone)
-                                || restricted_to == Some("live_card_zone")
-                                    && zone == "success_live_zone"
-                                || restricted_to == Some("success_live_zone")
-                                    && zone == "live_card_zone")
+                            && {
+                                let rz = restricted_to.and_then(Zone::from_str);
+                                let cz = Zone::from_str(zone);
+                                rz == cz
+                                    || rz == Some(Zone::LiveCardZone)
+                                        && cz == Some(Zone::SuccessLiveZone)
+                                    || rz == Some(Zone::SuccessLiveZone)
+                                        && cz == Some(Zone::LiveCardZone)
+                            }
                         {
                             eprintln!("Card {} cannot be placed in {} due to constant ability restriction", card.card_no, zone);
                             return false;
@@ -848,6 +923,17 @@ impl GameState {
                     }
                 }
             }
+        }
+        // Also consult dynamic prohibition_effects for `cannot_place` restrictions
+        // added at runtime (e.g. ライブ成功時 triggers like メビウスループ).
+        if self.prohibition_effects.iter().any(|p| {
+            p.starts_with("restriction:cannot_place:") && _prohibition_destination_blocks(p, zone)
+        }) {
+            eprintln!(
+                "Card {} cannot be placed in {} due to dynamic prohibition",
+                card_id, zone
+            );
+            return false;
         }
         true
     }
@@ -874,12 +960,20 @@ impl GameState {
 
         let mut cards_to_remove: Vec<(&str, usize)> = Vec::new();
         for (index, card_id) in p1_cards {
-            if !self.can_place_card_in_zone(card_id, "live_card_zone", &p1_id) {
+            if !self.can_place_card_in_zone(
+                card_id,
+                crate::ability::enums::Zone::LiveCardZone.to_str(),
+                &p1_id,
+            ) {
                 cards_to_remove.push((&p1_id, index));
             }
         }
         for (index, card_id) in p2_cards {
-            if !self.can_place_card_in_zone(card_id, "live_card_zone", &p2_id) {
+            if !self.can_place_card_in_zone(
+                card_id,
+                crate::ability::enums::Zone::LiveCardZone.to_str(),
+                &p2_id,
+            ) {
                 cards_to_remove.push((&p2_id, index));
             }
         }
@@ -1079,6 +1173,42 @@ impl GameState {
                         if let Some(card_id) = data.get("card_id").and_then(|v| v.as_i64()) {
                             self.mods.remove_heart_override(card_id as i16);
                             eprintln!("Removed heart override for card {}", card_id);
+                        }
+                    }
+                }
+                "modify_cost" => {
+                    if let Some(ref data) = effect.effect_data {
+                        if let Some(cards) = data.as_array() {
+                            for card_data in cards {
+                                if let Some(card_id) =
+                                    card_data.get("card_id").and_then(|v| v.as_i64())
+                                {
+                                    if let Some(amount) =
+                                        card_data.get("amount").and_then(|v| v.as_i64())
+                                    {
+                                        self.mods
+                                            .remove_cost_modifier(card_id as i16, amount as i32);
+                                        eprintln!(
+                                            "Reverted cost modifier {} from card {}",
+                                            amount, card_id
+                                        );
+                                    }
+                                }
+                            }
+                        } else if let Some(card_data) = data.as_object() {
+                            if let Some(card_id) = card_data.get("card_id").and_then(|v| v.as_i64())
+                            {
+                                if let Some(amount) =
+                                    card_data.get("amount").and_then(|v| v.as_i64())
+                                {
+                                    self.mods
+                                        .remove_cost_modifier(card_id as i16, amount as i32);
+                                    eprintln!(
+                                        "Reverted cost modifier {} from card {}",
+                                        amount, card_id
+                                    );
+                                }
+                            }
                         }
                     }
                 }

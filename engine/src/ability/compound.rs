@@ -82,14 +82,14 @@ impl AbilityResolver {
                     // Only inherit per_unit properties for actions that support them
                     // Discard/move_cards actions should not inherit per_unit multipliers
                     let supports_per_unit = matches!(
-                        action.action.as_str(),
-                        "draw"
-                            | "draw_card"
-                            | "gain_resource"
-                            | "modify_score"
-                            | "modify_required_hearts"
-                            | "gain_ability"
-                            | "set_blade_count"
+                        crate::ability::enums::ActionType::from_str(&action.action),
+                        Some(crate::ability::enums::ActionType::Draw)
+                            | Some(crate::ability::enums::ActionType::DrawCard)
+                            | Some(crate::ability::enums::ActionType::GainResource)
+                            | Some(crate::ability::enums::ActionType::ModifyScore)
+                            | Some(crate::ability::enums::ActionType::ModifyRequiredHearts)
+                            | Some(crate::ability::enums::ActionType::GainAbility)
+                            | Some(crate::ability::enums::ActionType::SetBladeCount)
                     );
                     if supports_per_unit {
                         if action_to_execute.per_unit.is_none() && effect.per_unit.is_some() {
@@ -113,6 +113,17 @@ impl AbilityResolver {
                         action.action,
                         self.pending_choice.is_some()
                     );
+                    fn save_remaining(
+                        gs: &mut crate::game_state::GameState,
+                        remaining: Vec<AbilityEffect>,
+                    ) {
+                        if !remaining.is_empty() {
+                            let mut existing = gs.ability_queue.take_pending_commands();
+                            existing.extend(remaining.into_iter().map(Command::Effect));
+                            gs.ability_queue.set_pending_commands(existing);
+                        }
+                    }
+
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
                             eprintln!(
@@ -121,7 +132,7 @@ impl AbilityResolver {
                             );
                             if self.pending_choice.is_some() {
                                 let current_was_optional = action.optional.unwrap_or(false);
-                                let remaining = if current_was_optional {
+                                let remaining = if current_was_optional && i + 1 < repeat_actions.len() {
                                     let mut actions: Vec<AbilityEffect> =
                                         repeat_actions[i..].to_vec();
                                     if !actions.is_empty() {
@@ -131,17 +142,19 @@ impl AbilityResolver {
                                 } else {
                                     repeat_actions[i + 1..].to_vec()
                                 };
-                                if !remaining.is_empty() {
-                                    let mut existing = gs.ability_queue.take_pending_commands();
-                                    existing.extend(remaining.into_iter().map(Command::Effect));
-                                    gs.ability_queue.set_pending_commands(existing);
-                                }
+                                save_remaining(gs, remaining);
+                                return Ok(());
+                            } else if action.optional.unwrap_or(false)
+                                && action.action == "change_state"
+                            {
+                                // Optional change_state completed without creating a choice
+                                // (no valid targets). Skip remaining actions (そうした場合).
                                 return Ok(());
                             }
                         }
                         Err(e) if e.contains("Pending choice required") => {
                             let current_was_optional = action.optional.unwrap_or(false);
-                            let remaining = if current_was_optional {
+                            let remaining = if current_was_optional && i + 1 < repeat_actions.len() {
                                 let mut actions: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
                                 if !actions.is_empty() {
                                     actions[0].optional = None;
@@ -150,11 +163,7 @@ impl AbilityResolver {
                             } else {
                                 repeat_actions[i + 1..].to_vec()
                             };
-                            if !remaining.is_empty() {
-                                let mut existing = gs.ability_queue.take_pending_commands();
-                                existing.extend(remaining.into_iter().map(Command::Effect));
-                                gs.ability_queue.set_pending_commands(existing);
-                            }
+                            save_remaining(gs, remaining);
                             return Ok(());
                         }
                         Err(e) => return Err(e),
@@ -221,7 +230,7 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "primary|alternative".to_string(),
                 description,
-                allow_skip: false,
+                allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
             self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
@@ -284,6 +293,16 @@ impl AbilityResolver {
             if let Err(e) = self.execute_effect(gs, primary) {
                 eprintln!("Primary action failed in conditional_on_result: {}", e);
                 return Err(e);
+            }
+            // If primary created a choice (e.g. "select 3 cards to reveal"),
+            // save the condition check + followup as a pending sequential action
+            // so it resumes after the choice is resolved.
+            if self.pending_choice.is_some() {
+                let mut finish = effect.clone();
+                finish.compound.primary_effect = None;
+                gs.ability_queue
+                    .save_pending_sequential_actions(vec![Command::Effect(finish)]);
+                return Ok(());
             }
         }
 

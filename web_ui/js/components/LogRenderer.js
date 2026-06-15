@@ -316,12 +316,19 @@ export const LogRenderer = {
 
     renderRuleLogSection: (state, currentLang, showFriendlyAbilities, selectedTurn) => {
         let logData = state.rule_log || [];
+        let structData = state.structured_log || [];
         if (logData.length > 200) logData = logData.slice(-200);
+        if (structData.length > 200) structData = structData.slice(-200);
 
         if (selectedTurn !== -1) {
             const turnStr = `[Turn ${selectedTurn}]`;
             logData = logData.filter(entry => entry.includes(turnStr));
+            structData = structData.filter(e => e.turn === selectedTurn);
         }
+
+        // Build lookup from log text to structured entry
+        const structLookup = new Map();
+        structData.forEach(s => structLookup.set(s.text, s));
 
         const section = document.createElement('div');
         section.className = 'log-section rule-log-section';
@@ -358,7 +365,9 @@ export const LogRenderer = {
             }
         };
 
-        [...logData].reverse().forEach((entry) => {
+        const logArray = [...logData];
+        logArray.reverse();
+        logArray.forEach((entry, revIdx) => {
             const idMatch = entry.match(/\[Turn \d+\] \[ID: (\d+)\] (.*)/);
             const executionId = idMatch ? idMatch[1] : null;
             const body = idMatch ? idMatch[2] : entry.replace(/^\[Turn \d+\]\s*/, '');
@@ -400,13 +409,13 @@ export const LogRenderer = {
                 } else if (currentSnapshot) {
                     currentSnapshot.entries.push(body);
                 } else {
-                    groupedLogs.push({ entry, body, turnPrefix });
+                    groupedLogs.push({ entry, body, turnPrefix, structEntry: structLookup.get(entry) || null });
                 }
             } else {
                 flushAbGroup();
                 flushSnapshot();
                 currentGroup = null;
-                groupedLogs.push({ entry, body, turnPrefix });
+                groupedLogs.push({ entry, body, turnPrefix, structEntry: structLookup.get(entry) || null });
             }
         });
         flushAbGroup();
@@ -529,6 +538,9 @@ export const LogRenderer = {
         } else if (entryUpper.includes('能力') || entryUpper.includes('ability') || entryUpper.includes('スコア') || entryUpper.includes('コスト')) {
             div.classList.add('effect');
             entryType = 'ability_effect';
+        } else if (entryUpper.includes('[ACTIVATED]') || entryUpper.includes('[TRIGGERED]')) {
+            div.classList.add('activated');
+            entryType = 'activated';
         }
 
         div.setAttribute('data-log-type', entryType);
@@ -547,6 +559,14 @@ export const LogRenderer = {
         const cardData = LogRenderer.resolveCardFromBody(group.body);
         if (cardData && !group.entry.includes('Mulligan') && !group.entry.includes('PLAYS')) {
             LogRenderer.appendFullAbility(div, cardData);
+        }
+
+        // Use structured log entry for richer card lookup
+        if (!cardData && group.structEntry && group.structEntry.source_card_id != null) {
+            const structuredCard = Tooltips.findCardById(group.structEntry.source_card_id);
+            if (structuredCard) {
+                LogRenderer.appendFullAbility(div, structuredCard);
+            }
         }
 
         return div;

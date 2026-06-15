@@ -38,7 +38,7 @@ fn fuyumari_q118_opponent_picks_first_card() {
 
     // Step 1: Player selects 2 distinct live cards from discard (indices 0 and 1)
     assert!(game.has_pending_choice(), "Should have select choice");
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     // Step 2: Opponent picks a card from the selected ones
     // The opponent select choice has source "selected_cards" with the 2 cards.
@@ -89,7 +89,7 @@ fn fuyumari_q118_opponent_picks_second_card() {
     game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Step 1: Player selects both
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     // Step 2: Opponent picks the SECOND card (index 1 = live_b)
     assert!(
@@ -164,7 +164,10 @@ fn fuyumari_q118_card_count_integrity() {
     game.state.player1.stage.stage[0] = -1;
     game.play_to_stage(fuyumari, rabuka_engine::zones::MemberArea::LeftSide);
 
-    game.select_indices(&[0, 1]);
+    game.select_indices(&[0]);
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
     if game.has_pending_choice() {
         game.select_indices(&[0]); // opponent selects first of the two
     }

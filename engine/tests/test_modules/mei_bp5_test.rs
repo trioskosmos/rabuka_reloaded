@@ -1,18 +1,154 @@
-/// Tests for PL!SP-bp5-007-R (米女メイ) ab#0 — Q235
+/// Tests for PL!SP-bp5-007-R (米女メイ) ab#0
 ///
 /// Ability (登場):
 ///   手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。
-///   その中から各グループにつき1枚まで公開し、3枚まで手札に加えてもよい。
+///   その中から各グループ名につき1枚ずつ公開し、3枚まで手札に加えてもよい。
 ///   残りを控え室に置く。
 ///
-/// Q235: LL-bp1-001-R+ (上原歩夢&澁谷かのん&日野下花帆) を
-///        個別名として手札に加えられるか？
-/// Answer: はい、マルチネームカードは個別名でも検索可能。
+/// Parser outputs: look_and_select, count=3, max=true, optional=true,
+///   reveal=true, per_group=true, per_group_count=1
 use crate::helpers::*;
 
-/// Debut ability triggers look_and_select from deck top 5.
-/// With multi-name cards in deck, verify engine processes the
-/// look → reveal → add sequence without crashing.
+fn discard_cost_if_pending(game: &mut TestGame) {
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+}
+
+fn discard_before(game: &TestGame) -> usize {
+    game.state.player1.waitroom.cards.len()
+}
+
+fn select_and_finish(game: &mut TestGame, count: usize) {
+    for _ in 0..count {
+        if game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
+    }
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+}
+
+/// Setup: Mei + 1 filler in hand, 5 deck cards from 3 different series
+fn setup_max_three() -> TestGame {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let mei = game.id("PL!SP-bp5-007-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.hand.cards.push(mei);
+    game.state.player1.hand.cards.push(filler);
+
+    // Deck: 5 cards from different series to allow selecting 3 (max 1 per series)
+    // Index 0: Love Live! Superstar!! (Mei itself)
+    // Index 1: Love Live! (sd1 filler)
+    // Index 2-4: same as above, but won't be picked together due to per-group
+    let sup = game.new_id("PL!SP-bp5-007-R");
+    let ll1 = game.new_id("PL!-sd1-010-SD");
+    let ll2 = game.new_id("PL!-sd1-010-SD");
+    let ll3 = game.new_id("PL!-sd1-010-SD");
+    let ll4 = game.new_id("PL!-sd1-010-SD");
+    game.state.player1.main_deck.cards.push(sup); // [0] Superstar!!
+    game.state.player1.main_deck.cards.push(ll1); // [1] Love Live!
+    game.state.player1.main_deck.cards.push(ll2); // [2] Love Live! (same series as [1])
+    game.state.player1.main_deck.cards.push(ll3); // [3] Love Live!
+    game.state.player1.main_deck.cards.push(ll4); // [4] Love Live!
+
+    game.give_energy(15);
+    game.play_to_stage(mei, rabuka_engine::zones::MemberArea::LeftSide);
+    game
+}
+
+/// Select 2 cards from different series (max per-group = 1 each series)
+#[test]
+fn mei_bp5_select_two_from_different_series() {
+    let mut game = setup_max_three();
+    let disc_start = discard_before(&game);
+
+    discard_cost_if_pending(&mut game);
+
+    // Pick [0] = Superstar!! and then next remaining [0] = Love Live! (different series → allowed)
+    select_and_finish(&mut game, 2);
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        disc_start + 4, // 1 cost + 3 unselected = 4
+        "Discard: 1 cost + 3 remaining"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        2, // 2 start - 1 stage - 1 cost + 2 selected = 2
+        "2 cards in hand from different series"
+    );
+}
+
+/// Select 0 cards (skip), verify 0 added, all 5 + 1 cost go to discard
+#[test]
+fn mei_bp5_select_zero_cards() {
+    let mut game = setup_max_three();
+    let disc_start = discard_before(&game);
+
+    discard_cost_if_pending(&mut game);
+    select_and_finish(&mut game, 0);
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        disc_start + 6, // 1 cost + 5 all = 6
+        "All 5 + 1 cost discarded when skipping"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        0, // 2 start - 1 stage - 1 cost = 0
+        "No cards in hand when skipping"
+    );
+}
+
+/// Select 1 card, verify 1 in hand, 4 + 1 cost go to discard
+#[test]
+fn mei_bp5_select_one_card() {
+    let mut game = setup_max_three();
+    let disc_start = discard_before(&game);
+
+    discard_cost_if_pending(&mut game);
+    select_and_finish(&mut game, 1);
+
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        disc_start + 5, // 1 cost + 4 remaining = 5
+        "Discard: 1 cost + 4 unselected"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1, // 2 - 1 stage - 1 cost + 1 selected = 1
+        "1 card in hand"
+    );
+}
+
+/// Per-group constraint: selecting 2 cards from the same series is rejected
+#[test]
+fn mei_bp5_per_group_rejects_two_from_same_group() {
+    let mut game = setup_max_three();
+
+    discard_cost_if_pending(&mut game);
+
+    // Try to pick 2 cards from Love Live! series (indices [1, 2])
+    if game.has_pending_choice() {
+        let result = game.try_select_indices(&[1, 2]);
+        assert!(
+            result.is_err(),
+            "Per-group should reject 2 cards from same series"
+        );
+    }
+    // After rejection, no further choices (ability terminated).
+    assert!(
+        !game.has_pending_choice(),
+        "No pending choice after rejection"
+    );
+}
+
+/// Q235: Multi-name card should be selectable
 #[test]
 fn mei_bp5_q235_debut_look_and_select_with_multiname() {
     let db = load_real_database();
@@ -20,57 +156,33 @@ fn mei_bp5_q235_debut_look_and_select_with_multiname() {
 
     let mei = game.id("PL!SP-bp5-007-R");
     let filler = game.id("PL!-sd1-010-SD");
-    let filler2 = game.id("PL!-sd1-013-SD");
-    // Multi-name card: 上原歩夢&澁谷かのん&日野下花帆
     let multiname = game.id("LL-bp1-001-R\u{ff0b}");
 
-    // Mei in hand + filler
     game.state.player1.hand.cards.push(mei);
     game.state.player1.hand.cards.push(filler);
-    game.state.player1.hand.cards.push(filler2);
 
-    // Deck top: put multiname card + filler
-    game.state.player1.main_deck.cards.push(multiname);
+    // Deck: multiname (LL-bp1 series) + 1 love live filler + 3 more fillers
+    game.state.player1.main_deck.cards.push(multiname); // [0] LL-bp1 series
+    game.state.player1.main_deck.cards.push(filler); // [1] sd1 series
+    game.state.player1.main_deck.cards.push(filler); // [2-4] same series as [1]
     game.state.player1.main_deck.cards.push(filler);
-    game.state.player1.main_deck.cards.push(filler2);
-    game.state.player1.main_deck.cards.push(filler2);
-    game.state.player1.main_deck.cards.push(filler2);
+    game.state.player1.main_deck.cards.push(filler);
 
-    game.give_energy(15); // Mei cost=15
-
-    // Play Mei to stage — debut triggers look_and_select
+    game.give_energy(15);
     game.play_to_stage(mei, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // Debut fires with optional cost (discard 1 from hand) + look_and_select
-    // Handle optional cost choice
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // accept the optional discard
-    }
+    discard_cost_if_pending(&mut game);
 
-    // Look_and_select: look at top 5 → reveal → add up to 3 → discard rest
-    // The choice flow depends on engine implementation.
-    // For now, verify no crash and the ability framework fires.
-    let on_stage = game.state.player1.stage.stage[0];
-    assert_eq!(on_stage, mei, "Mei should be on stage");
+    // Pick at most 1 per series: [0] (LL-bp1) + remaining [0] (sd1) = 2 from different series
+    select_and_finish(&mut game, 2);
 
-    // Resolve the look_and_select choice: accept all cards to hand
-    if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2, 3, 4]); // select all 5 looked-at cards
-    }
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    // Q235: Multi-name card should either be in hand (added) or in waitroom (discarded)
     let multiname_in_hand = game.state.player1.hand.cards.contains(&multiname);
-    let _multiname_in_waitroom = game.state.player1.waitroom.cards.contains(&multiname);
     assert!(
         multiname_in_hand,
-        "Multi-name card should have been added to hand (was first card selected for add)"
+        "Multi-name card should be selectable and added to hand"
     );
-    // Deck should have fewer cards (look_and_select removes from deck top)
     assert!(
         !game.state.player1.main_deck.cards.contains(&multiname),
-        "Multi-name card should no longer be in the deck (removed by look_and_select)"
+        "Multi-name card should no longer be in the deck"
     );
 }

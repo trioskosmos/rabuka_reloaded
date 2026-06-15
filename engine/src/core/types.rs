@@ -228,6 +228,21 @@ pub struct ScoreLine {
     pub value: u32,
 }
 
+/// Records that a specific ability applied a modifier during execution,
+/// so the source can be traced back to the originating card + ability text.
+/// Populated in effect handlers (execute_gain_resource etc.) and consumed
+/// by build_snapshot to fill ability_heart_bonuses, ability_blade_bonuses,
+/// Breakdown.scores, Breakdown.transforms, and TriggeredAbility.
+#[derive(Debug, Clone)]
+pub struct AbilityApplication {
+    pub source_card_id: i16,
+    pub ability_text: String,
+    pub effect_type: String, // "heart_bonus", "blade_bonus", "score_bonus", "transform", "need_heart_mod"
+    pub target_card_id: i16,
+    pub heart_color: Option<usize>,
+    pub amount: i32,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct TriggeredAbility {
     pub source_card_id: i16,
@@ -240,6 +255,7 @@ pub struct TriggeredAbility {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Adjustment {
+    #[serde(rename = "type")]
     pub adjustment_type: String,
     pub desc: String,
     pub value: i32,
@@ -253,4 +269,14 @@ pub struct AbilityBonus {
     pub amount: u32,
     pub color: Option<usize>,
     pub ability_text: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LogEntry {
+    pub text: String,
+    pub turn: u32,
+    pub player_label: String,
+    pub source_card_id: Option<i16>,
+    pub source_card_name: Option<String>,
+    pub category: String,
 }

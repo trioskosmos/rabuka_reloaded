@@ -11,6 +11,7 @@ impl GameState {
         let mut exp_heart: std::collections::HashMap<i16, std::collections::HashMap<String, i32>> =
             std::collections::HashMap::new();
         let mut exp_prohibition: Vec<String> = Vec::new();
+        let mut exp_global_need_heart: Vec<(i16, String, i32)> = Vec::new();
 
         // Compute stage positions for all entries before creating resolver
         let mut entry_positions: std::collections::HashMap<i16, Option<usize>> =
@@ -66,110 +67,114 @@ impl GameState {
                         .map_or(true, |c| ctx.evaluate_condition(c));
 
                     if cond_met {
-                        match effect.action.as_str() {
-                            "gain_resource" => match effect.resource.as_deref().unwrap_or("") {
-                                "blade" | "ブレード" => {
-                                    let n = if effect.per_unit.unwrap_or(false) {
-                                        let player = if self.player1.stage.stage.contains(card_id) {
-                                            &self.player1
-                                        } else {
-                                            &self.player2
-                                        };
-                                        let zone = effect
-                                            .location
-                                            .as_deref()
-                                            .or(effect.per_unit_type.as_deref())
-                                            .unwrap_or("hand");
-                                        let filter = crate::ability::util::CardFilter {
-                                            card_type: effect.card_type.as_deref(),
-                                            ..Default::default()
-                                        };
-                                        let per_count =
-                                            crate::ability::util::resolve_per_unit_count(
-                                                true,
-                                                Some(zone),
-                                                player,
-                                                &self.card_database,
-                                                &filter,
-                                                &[],
-                                            );
-                                        let base = effect.resource_icon_count.unwrap_or(1);
-                                        let mut units = per_count as i32
-                                            / effect.per_unit_count.unwrap_or(1).max(1) as i32;
-                                        if effect.max.unwrap_or(false) {
-                                            if let Some(cap) = effect.count {
-                                                units = units.min(cap as i32);
+                        match crate::ability::enums::ActionType::from_str(&effect.action) {
+                            Some(crate::ability::enums::ActionType::GainResource) => {
+                                match effect.resource.as_deref().unwrap_or("") {
+                                    "blade" | "ブレード" => {
+                                        let n = if effect.per_unit.unwrap_or(false) {
+                                            let player =
+                                                if self.player1.stage.stage.contains(card_id) {
+                                                    &self.player1
+                                                } else {
+                                                    &self.player2
+                                                };
+                                            let zone = effect
+                                                .location
+                                                .as_deref()
+                                                .or(effect.per_unit_type.as_deref())
+                                                .unwrap_or(Zone::Hand.to_str());
+                                            let filter = crate::ability::util::CardFilter {
+                                                card_type: effect.card_type.as_deref(),
+                                                ..Default::default()
+                                            };
+                                            let per_count =
+                                                crate::ability::util::resolve_per_unit_count(
+                                                    true,
+                                                    Some(zone),
+                                                    player,
+                                                    &self.card_database,
+                                                    &filter,
+                                                    &[],
+                                                );
+                                            let base = effect.resource_icon_count.unwrap_or(1);
+                                            let mut units = per_count as i32
+                                                / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                                            if effect.max.unwrap_or(false) {
+                                                if let Some(cap) = effect.count {
+                                                    units = units.min(cap as i32);
+                                                }
                                             }
-                                        }
-                                        units * base as i32
-                                    } else {
-                                        effect
-                                            .resource_icon_count
-                                            .unwrap_or(effect.count.unwrap_or(1))
-                                            as i32
-                                    };
-                                    *exp_blade.entry(*card_id).or_insert(0) += n;
-                                }
-                                "heart" | "ハート" => {
-                                    let n = if effect.per_unit.unwrap_or(false) {
-                                        let player = if self.player1.stage.stage.contains(card_id) {
-                                            &self.player1
+                                            units * base as i32
                                         } else {
-                                            &self.player2
+                                            effect
+                                                .resource_icon_count
+                                                .unwrap_or(effect.count.unwrap_or(1))
+                                                as i32
                                         };
-                                        let zone = effect
-                                            .location
-                                            .as_deref()
-                                            .or(effect.per_unit_type.as_deref())
-                                            .unwrap_or("hand");
-                                        let filter = crate::ability::util::CardFilter {
-                                            card_type: effect.card_type.as_deref(),
-                                            ..Default::default()
-                                        };
-                                        let per_count =
-                                            crate::ability::util::resolve_per_unit_count(
-                                                true,
-                                                Some(zone),
-                                                player,
-                                                &self.card_database,
-                                                &filter,
-                                                &effect.heart_colors,
-                                            );
-                                        let mut units = per_count as i32
-                                            / effect.per_unit_count.unwrap_or(1).max(1) as i32;
-                                        if effect.max.unwrap_or(false) {
-                                            if let Some(cap) = effect.count {
-                                                units = units.min(cap as i32);
-                                            }
-                                        }
-                                        units
-                                    } else {
-                                        effect.count.unwrap_or(1) as i32
-                                    };
-                                    for hc in &effect.heart_colors {
-                                        *exp_heart
-                                            .entry(*card_id)
-                                            .or_default()
-                                            .entry(hc.clone())
-                                            .or_insert(0) += n;
+                                        *exp_blade.entry(*card_id).or_insert(0) += n;
                                     }
+                                    "heart" | "ハート" => {
+                                        let n = if effect.per_unit.unwrap_or(false) {
+                                            let player =
+                                                if self.player1.stage.stage.contains(card_id) {
+                                                    &self.player1
+                                                } else {
+                                                    &self.player2
+                                                };
+                                            let zone = effect
+                                                .location
+                                                .as_deref()
+                                                .or(effect.per_unit_type.as_deref())
+                                                .unwrap_or(Zone::Hand.to_str());
+                                            let filter = crate::ability::util::CardFilter {
+                                                card_type: effect.card_type.as_deref(),
+                                                ..Default::default()
+                                            };
+                                            let per_count =
+                                                crate::ability::util::resolve_per_unit_count(
+                                                    true,
+                                                    Some(zone),
+                                                    player,
+                                                    &self.card_database,
+                                                    &filter,
+                                                    &effect.heart_colors,
+                                                );
+                                            let mut units = per_count as i32
+                                                / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                                            if effect.max.unwrap_or(false) {
+                                                if let Some(cap) = effect.count {
+                                                    units = units.min(cap as i32);
+                                                }
+                                            }
+                                            units
+                                        } else {
+                                            effect.count.unwrap_or(1) as i32
+                                        };
+                                        for hc in &effect.heart_colors {
+                                            *exp_heart
+                                                .entry(*card_id)
+                                                .or_default()
+                                                .entry(hc.clone())
+                                                .or_insert(0) += n;
+                                        }
+                                    }
+                                    _ => {}
                                 }
-                                _ => {}
-                            },
-                            "modify_score" => {
+                            }
+                            Some(crate::ability::enums::ActionType::ModifyScore) => {
                                 *exp_score.entry(*card_id).or_insert(0) +=
                                     effect.value.unwrap_or(0) as i32;
                             }
-                            "modify_cost" => {
+                            Some(crate::ability::enums::ActionType::ModifyCost) => {
                                 *exp_cost.entry(*card_id).or_insert(0) +=
                                     effect.value.unwrap_or(0) as i32;
                             }
-                            "restriction" => {
+                            Some(crate::ability::enums::ActionType::Restriction) => {
                                 if let Some(ref rt) = effect.restriction_type {
                                     exp_prohibition.push(format!("const_restriction:{}:", rt));
                                 }
                             }
-                            "gain_ability" => {
+                            Some(crate::ability::enums::ActionType::GainAbility) => {
                                 if effect.ability_gain.as_deref() == Some("{{icon_all.png|ハート}}")
                                     || effect
                                         .ability_gain
@@ -189,12 +194,72 @@ impl GameState {
                                     }
                                 }
                             }
-                            "gain_ability_from_source" => {
+                            Some(crate::ability::enums::ActionType::GainAbilityFromSource) => {
                                 let mut resolver = crate::ability::resolver::AbilityResolver::new(
                                     self.card_database.clone(),
                                     self.activating_card,
                                 );
                                 let _ = resolver.execute_gain_ability_from_source(self, &effect);
+                            }
+                            Some(crate::ability::enums::ActionType::ModifyRequiredHeartsGlobal) => {
+                                let target_name = effect.target_name();
+                                let target_player = self.resolve_target_player(&target_name);
+                                let target_cards: Vec<i16> =
+                                    target_player.live_card_zone.cards.to_vec();
+                                let value = effect.value_or_count(1) as i32;
+                                let op = effect.operation.as_deref().unwrap_or("increase");
+                                let delta = match op {
+                                    "increase" => value,
+                                    "decrease" => -value,
+                                    _ => value,
+                                };
+                                let colors: Vec<String> = if effect.heart_colors.is_empty() {
+                                    vec!["heart00".to_string()]
+                                } else {
+                                    effect.heart_colors.clone()
+                                };
+                                for card_id in &target_cards {
+                                    for color in &colors {
+                                        exp_global_need_heart.push((
+                                            *card_id,
+                                            color.clone(),
+                                            delta,
+                                        ));
+                                    }
+                                }
+                            }
+                            Some(crate::ability::enums::ActionType::Sequential) => {
+                                if let Some(ref actions) = effect.compound.actions {
+                                    for sub in actions {
+                                        match crate::ability::enums::ActionType::from_str(
+                                            &sub.action,
+                                        ) {
+                                            Some(
+                                                crate::ability::enums::ActionType::GainResource,
+                                            ) => match sub.resource.as_deref().unwrap_or("") {
+                                                "blade" | "ブレード" => {
+                                                    let n = sub
+                                                        .resource_icon_count
+                                                        .unwrap_or(sub.count.unwrap_or(1))
+                                                        as i32;
+                                                    *exp_blade.entry(*card_id).or_insert(0) += n;
+                                                }
+                                                "heart" | "ハート" => {
+                                                    let n = sub.count.unwrap_or(1) as i32;
+                                                    for hc in &sub.heart_colors {
+                                                        *exp_heart
+                                                            .entry(*card_id)
+                                                            .or_default()
+                                                            .entry(hc.clone())
+                                                            .or_insert(0) += n;
+                                                    }
+                                                }
+                                                _ => {}
+                                            },
+                                            _ => {}
+                                        }
+                                    }
+                                }
                             }
                             _ => {}
                         }
@@ -262,6 +327,18 @@ impl GameState {
             self.prohibition_effects.push(p.clone());
         }
 
+        // Clear old constant global need_heart modifiers, then re-apply new ones.
+        let old_global_nh = std::mem::take(&mut self.mods.constant_global_need_heart);
+        for (card_id, color_str, delta) in &old_global_nh {
+            let hc = crate::card::parse_heart_color(color_str);
+            self.mods.add_need_heart_modifier(*card_id, hc, -*delta);
+        }
+        for (card_id, color_str, delta) in &exp_global_need_heart {
+            let hc = crate::card::parse_heart_color(color_str);
+            self.mods.add_need_heart_modifier(*card_id, hc, *delta);
+        }
+        self.mods.constant_global_need_heart = exp_global_need_heart;
+
         // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
         self.recalculate_constant_cost_modifiers();
     }
@@ -271,7 +348,8 @@ impl GameState {
             .collect_constant_stage_effects()
             .into_iter()
             .filter(|(_, effect)| {
-                effect.action == "gain_resource"
+                crate::ability::enums::ActionType::from_str(&effect.action)
+                    == Some(crate::ability::enums::ActionType::GainResource)
                     && matches!(effect.resource.as_deref(), Some("blade") | Some("ブレード"))
             })
             .collect();
@@ -295,7 +373,7 @@ impl GameState {
                             .location
                             .as_deref()
                             .or(effect.per_unit_type.as_deref())
-                            .unwrap_or("hand");
+                            .unwrap_or(crate::ability::enums::Zone::Hand.to_str());
                         let filter = crate::ability::util::CardFilter {
                             card_type: effect.card_type.as_deref(),
                             ..Default::default()
@@ -342,12 +420,18 @@ impl GameState {
         let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = self
             .collect_constant_stage_effects()
             .into_iter()
-            .filter(|(_, effect)| effect.action == "modify_cost")
+            .filter(|(_, effect)| {
+                crate::ability::enums::ActionType::from_str(&effect.action)
+                    == Some(crate::ability::enums::ActionType::ModifyCost)
+            })
             .collect();
-        let hand_cost_abilities = self
-            .collect_constant_hand_effects()
-            .into_iter()
-            .filter(|(_, effect)| effect.action == "modify_cost");
+        let hand_cost_abilities =
+            self.collect_constant_hand_effects()
+                .into_iter()
+                .filter(|(_, effect)| {
+                    crate::ability::enums::ActionType::from_str(&effect.action)
+                        == Some(crate::ability::enums::ActionType::ModifyCost)
+                });
         cost_abilities.extend(hand_cost_abilities);
 
         let mut expected: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
@@ -364,10 +448,48 @@ impl GameState {
                     // Handle per_unit cost reduction (e.g. "1 per other card in hand")
                     if effect.per_unit.unwrap_or(false) {
                         let player = self.resolve_target_player(&effect.target_name());
-                        let zone = effect.location.as_deref().unwrap_or("hand");
-                        let cards: Vec<i16> =
-                            crate::ability::util::zone_cards(player, zone).to_vec();
-                        let count = cards.len() as u32;
+                        // per_unit_location overrides the counting zone when the
+                        // parser determines the per-unit count targets a different
+                        // zone than the effect's location (e.g. count stage members
+                        // while the cost modifier itself applies to hand cards).
+                        let count_zone = effect
+                            .per_unit_location
+                            .as_deref()
+                            .or(effect.location.as_deref())
+                            .unwrap_or(Zone::Hand.to_str());
+                        let count = if count_zone == "stage" && effect.group_names.is_some() {
+                            let group_name = effect.group_name();
+                            let card_db = &self.card_database;
+                            let stage_ids: Vec<i16> = player
+                                .stage
+                                .stage
+                                .iter()
+                                .copied()
+                                .filter(|&id| id != -1)
+                                .collect();
+                            eprintln!(
+                                "[COST_MOD_PER_UNIT_DEBUG] stage_ids={:?} group_name={:?}",
+                                stage_ids, group_name
+                            );
+                            let matches = stage_ids
+                                .iter()
+                                .filter(|&&id| {
+                                    crate::ability::util::card_matches_group_str(
+                                        card_db, id, group_name,
+                                    )
+                                })
+                                .count();
+                            eprintln!("[COST_MOD_PER_UNIT_DEBUG] group_matches={}", matches);
+                            matches as u32
+                        } else {
+                            let cards: Vec<i16> =
+                                crate::ability::util::zone_cards(player, count_zone).to_vec();
+                            cards.len() as u32
+                        };
+                        eprintln!(
+                            "[COST_MOD_PER_UNIT] cid={} count_zone={} count={}",
+                            cid, count_zone, count
+                        );
                         let per_unit_count = effect.per_unit_count.unwrap_or(1);
                         let exclude_self = effect.exclude_self.unwrap_or(false);
                         let effective = if exclude_self {
@@ -377,7 +499,7 @@ impl GameState {
                         };
                         value = ((effective / per_unit_count) * (value as u32)) as i32;
                         eprintln!("[COST_MOD] cid={} zone={} count={} eff={} per_unit_cnt={} val={} exclude={}",
-                            cid, zone, count, effective, per_unit_count, value, exclude_self);
+                            cid, count_zone, count, effective, per_unit_count, value, exclude_self);
                     }
                     eprintln!(
                         "[COST_MOD] cid={} op={:?} val={}",

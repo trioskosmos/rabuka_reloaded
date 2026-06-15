@@ -1,3 +1,4 @@
+use crate::ability::enums::Zone;
 use crate::zones::{
     EnergyDeck, EnergyZone, ExclusionZone, Hand, LiveCardZone, MainDeck, Stage,
     SuccessLiveCardZone, Waitroom,
@@ -179,6 +180,7 @@ impl Player {
             let hand_count = self.hand.cards.len() + 1;
             let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
                 &self.stage,
+                &self.success_live_card_zone.cards,
                 hand_count,
                 card_id,
                 card_db,
@@ -187,9 +189,11 @@ impl Player {
             let mut cost_increase: u32 = 0;
             for ability in &card.abilities {
                 if let Some(ref effect) = ability.effect {
-                    if effect.action == "modify_cost"
+                    if crate::ability::enums::ActionType::from_str(&effect.action)
+                        == Some(crate::ability::enums::ActionType::ModifyCost)
                         && matches!(effect.operation.as_deref(), Some("increase") | Some("add"))
-                        && effect.location.as_deref() == Some("success_live_zone")
+                        && Zone::from_str(effect.location.as_deref().unwrap_or(""))
+                            == Some(Zone::SuccessLiveZone)
                     {
                         let per_unit_count = effect.per_unit_count.unwrap_or(1) as usize;
                         let success_count = self.success_live_card_zone.cards.len();

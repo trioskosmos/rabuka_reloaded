@@ -67,7 +67,10 @@ fn eli_bp4_all_at_once_discard() {
     game.play_to_stage(eli, MemberArea::Center);
     game.activate_ability(eli);
     assert!(game.has_pending_choice(), "Should prompt for hand discard");
-    game.select_indices(&[0, 1]);
+    game.select_indices(&[0]);
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
     assert!(
         game.has_pending_choice(),
         "Should prompt for live card selection from discard"

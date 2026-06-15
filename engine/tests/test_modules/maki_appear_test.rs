@@ -37,6 +37,16 @@ fn maki_baton_touch_places_cheap_member_on_stage() {
         game.state.player1.stage.stage.contains(&maki),
         "Maki on stage after baton touch"
     );
+
+    // Now move_cards (formerly appear) may need a card selection choice
+    if game.has_pending_choice() {
+        game.select_indices(&[0]); // select cheap from hand
+    }
+    // Resolve any remaining choices (positioning sub-choice, etc.)
+    while game.has_pending_choice() {
+        game.select_option(0);
+    }
+
     assert!(
         game.state.player1.stage.stage.contains(&cheap),
         "cheap member appeared on stage"

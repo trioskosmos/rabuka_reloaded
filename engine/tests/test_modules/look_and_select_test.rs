@@ -74,7 +74,10 @@ fn look_and_select_any_number_full_selection() {
     );
 
     // Select both looked-at cards
-    game.select_indices(&[0, 1]);
+    game.select_indices(&[0]);
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
 
     // Resolve order prompt (any_order)
     while game.has_pending_choice() {
@@ -132,5 +135,36 @@ fn look_and_select_any_number_skip_all() {
         game.state.player1.waitroom.cards.contains(&card_a)
             || game.state.player1.waitroom.cards.contains(&card_b),
         "At least one unmatched card should be in discard"
+    );
+}
+
+#[test]
+fn look_and_select_dynamic_count_look_at_counts_stage_members_plus_two() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let card = game.id("PL!HS-bp6-001-R＋");
+    let filler = game.id("PL!-sd1-010-SD");
+    let top_a = game.id("PL!-sd1-014-SD");
+    let top_b = game.id("PL!-sd1-015-SD");
+
+    game.state.player1.hand.cards.push(card);
+    game.give_energy(4);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(top_a);
+    game.state.player1.main_deck.cards.push(top_b);
+    game.state.player1.main_deck.cards.push(filler);
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(card, MemberArea::Center);
+
+    assert!(
+        game.has_pending_choice(),
+        "Should have look_and_select choice"
+    );
+    assert_eq!(
+        game.state.looked_at_cards.len(),
+        3,
+        "Should look at 3 cards when the entering member is on stage"
     );
 }

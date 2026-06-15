@@ -59,6 +59,7 @@ export const GameService = {
 
             updateStateData(data);
             State.gameHasStarted = true;
+            State.fetchFrameCounter();
 
         } catch (e) {
             console.error("Game state fetch error:", e);
@@ -99,6 +100,7 @@ export const GameService = {
             console.log('DEBUG: Frontend received new state after action:', data.phase, data.legal_actions?.length || 0, 'actions');
             console.log('DEBUG: Full response data:', JSON.stringify(data, null, 2));
             updateStateData(data);
+            State.fetchFrameCounter();
             log('Action completed');
 
         } catch (e) {
@@ -144,6 +146,7 @@ export const GameService = {
 
             updateStateData(data);
             window.lastShownPerformanceHash = "";
+            State.fetchFrameCounter();
             log('New game started');
             if (networkFacade?.fetchState) await networkFacade.fetchState();
         } catch (e) {

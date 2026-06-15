@@ -212,7 +212,7 @@ fn select_both_cards_stay_on_deck() {
         game.has_pending_choice(),
         "Should have look_and_select choice"
     );
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     // Order choice: pick first card (index 0) to be on top
     if game.has_pending_choice() {
@@ -270,7 +270,7 @@ fn select_both_cards_any_order_card_b_on_top() {
         game.has_pending_choice(),
         "Should have look_and_select choice"
     );
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     // Order choice: pick card_b (index 1) to be on top
     if game.has_pending_choice() {

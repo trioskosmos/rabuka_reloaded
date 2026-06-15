@@ -85,14 +85,21 @@ export const ChoiceView = {
             const optItems = [];
 
             // Check for SelectAutoAbility choice (Rule 9.5.3)
-            if (choice.title && choice.title.includes('auto ability resolves first')) {
-                state.legal_actions && state.legal_actions.forEach(a => {
-                    const cardName = a.parameters?.card_no || a.parameters?.card_name || a.description || 'Ability';
-                    const abilityText = a.parameters?.card_name ? '' : '';
+            // The choice's options array has ability_text fields, distinguishing
+            // it from WASM-style card options.
+            if (choice.options && choice.options.length > 0 && choice.options[0].ability_text) {
+                choice.options.forEach((opt, idx) => {
+                    const cardName = opt.card_name || `Ability ${idx + 1}`;
+                    const abilityText = opt.ability_text || '';
+                    // Find matching legal_action
+                    const action = state.legal_actions?.find(a => {
+                        return a.parameters?.card_id === idx || a.description?.startsWith(cardName);
+                    });
                     optItems.push({
                         card: null,
                         name: cardName,
-                        action: a,
+                        desc: abilityText,
+                        action: action || { index: idx },
                     });
                 });
             } else if (choice.options && choice.options.length > 0) {
@@ -105,7 +112,7 @@ export const ChoiceView = {
                         const name = cardNo && cardNo.startsWith('heart') 
                             ? cardNo.replace('heart0', '♥').replace('heart', '♥') 
                             : (a.parameters?.card_name || a.description || '');
-                        optItems.push({ card: null, name, action: a });
+                        optItems.push({ card: null, name, action: a, isText: true });
                     });
                 } else {
                     // WASM-style options with action IDs
@@ -165,8 +172,30 @@ export const ChoiceView = {
                 cardEl.className = 'compact-choice-card';
                 cardEl.title = item.name;
 
-                // Text-only action: render as clickable button, not empty card
-                if (item.isText) {
+                // Auto-ability option: show card name + ability text
+                if (item.desc) {
+                    cardEl.className += ' text-option auto-ability';
+                    cardEl.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: flex-start;
+                        justify-content: center;
+                        padding: 12px 18px;
+                        min-width: 280px;
+                        min-height: 72px;
+                        cursor: pointer;
+                        font-size: 1rem;
+                        background: var(--input-bg, #2a2a3a);
+                        border: 2px solid var(--accent-purple, #9966ff);
+                        border-radius: 8px;
+                        color: var(--text, #eee);
+                        text-align: left;
+                    `;
+                    cardEl.innerHTML = `
+                        <div style="font-weight:bold;color:#cc88ff;margin-bottom:4px;">${Tooltips.enrichAbilityText(item.name)}</div>
+                        <div style="opacity:0.8;font-size:0.85rem;line-height:1.4;">${Tooltips.enrichAbilityText(item.desc)}</div>
+                    `;
+                } else if (item.isText) {
                     cardEl.className += ' text-option';
                     cardEl.style.cssText = `
                         display: flex;
@@ -205,10 +234,37 @@ export const ChoiceView = {
                     cardEl.innerHTML = '';
                     cardEl.appendChild(heartImg);
                 } else if (cardData && cardData.card_no) {
-                    const imgSrc = resolveCardImagePath(cardData.card_no);
-                    if (imgSrc) {
-                        cardEl.style.backgroundImage = `url(${imgSrc})`;
-                        cardEl.className += ' has-image';
+                    if (choice.blind) {
+                        // Blind pick: show card back, not the actual card face
+                        cardEl.style.cssText = `
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            width: 60px;
+                            height: 84px;
+                            border-radius: 4px;
+                            border: 2px solid var(--accent-gold, #d4a843);
+                            background: linear-gradient(135deg, #2a2a3a 0%, #1a1a2e 50%, #2a2a3a 100%);
+                            cursor: pointer;
+                            font-size: 1.6rem;
+                            color: var(--accent-gold, #d4a843);
+                            flex-shrink: 0;
+                        `;
+                        cardEl.textContent = '?';
+                        cardEl.className += ' has-image blind-card';
+                        cardEl.title = '??? (blind pick)';
+                    } else {
+                        const imgSrc = resolveCardImagePath(cardData.card_no);
+                        if (imgSrc) {
+                            cardEl.style.backgroundImage = `url(${imgSrc})`;
+                            cardEl.className += ' has-image';
+                            // Live cards use landscape aspect ratio (720/512)
+                            if (cardData.type === 'ライブ') {
+                                cardEl.style.aspectRatio = '720 / 512';
+                                cardEl.style.width = '84px';
+                                cardEl.style.height = 'auto';
+                            }
+                        }
                     }
                 }
 

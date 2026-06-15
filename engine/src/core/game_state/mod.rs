@@ -1,3 +1,4 @@
+use crate::ability::enums::Zone;
 use crate::ability_queue::AbilityQueue;
 use crate::card::CardDatabase;
 use crate::constants::DEFAULT_HISTORY_SIZE;
@@ -7,10 +8,10 @@ use crate::zones::{MemberArea, ResolutionZone};
 use std::sync::Arc;
 
 pub use crate::types::{
-    AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource, Breakdown, Duration,
-    EffectEntry, GameResult, HeartSource, LiveCardResult, LivePerformanceData, MemberContribution,
-    PerformanceSnapshot, Phase, ReplacementEffect, ScoreLine, TemporaryEffect, TriggeredAbility,
-    TurnPhase, YellCardResult,
+    AbilityApplication, AbilityBonus, AbilityTrigger, Adjustment, Allocation, BladeSource,
+    Breakdown, Duration, EffectEntry, GameResult, HeartSource, LiveCardResult, LivePerformanceData,
+    LogEntry, MemberContribution, PerformanceSnapshot, Phase, ReplacementEffect, ScoreLine,
+    TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
 };
 
 #[derive(Debug, Clone)]
@@ -26,6 +27,7 @@ pub struct GameState {
     pub game_state_history: Vec<String>,
     pub max_state_history_size: usize,
     pub rule_log: Vec<String>,
+    pub structured_log: Vec<LogEntry>,
     pub turn1_abilities_played: std::collections::HashSet<String>,
     pub turn2_abilities_played: std::collections::HashMap<String, u32>,
     pub live_owned_hearts: std::collections::HashMap<String, Vec<(String, u32)>>,
@@ -51,7 +53,11 @@ pub struct GameState {
     pub player1_cheer_revealed_cards: Vec<i16>,
     pub player2_cheer_revealed_cards: Vec<i16>,
     pub looked_at_cards: Vec<i16>,
+    pub ability_applications: Vec<crate::types::AbilityApplication>,
     pub recently_moved_cards: Option<Vec<i16>>,
+    /// The zone the cards in `recently_moved_cards` were moved FROM.
+    /// Used to distinguish e.g. hand-to-waitroom from stage-to-waitroom (baton touch).
+    pub recently_moved_from_zone: Option<String>,
     pub debut_ability_triggers: Vec<(String, i16)>,
     pub last_vacated_stage_area: Option<usize>,
     // --- 4-byte aligned (u32, Option<i32>) ---
@@ -91,6 +97,9 @@ pub struct GameState {
     pub position_change_occurred_this_turn: bool,
     pub opponent_live_success_this_turn: bool,
     pub opponent_live_no_excess_heart_this_turn: bool,
+    pub self_no_excess_heart_this_turn: bool,
+    pub opponent_live_surplus_count: u32,
+    pub self_live_surplus_count: u32,
     pub formation_change_occurred_this_turn: bool,
     pub opponent_choice_declined: bool,
     pub live_being_performed: bool,
@@ -98,7 +107,7 @@ pub struct GameState {
     pub draw_state: bool,
     pub loop_detected: bool,
     pub live_success_triggered_this_turn: bool,
-    pub self_no_excess_heart_this_turn: bool,
+    pub live_surplus_ready_this_turn: bool,
     pub performance_snapshots: Vec<PerformanceSnapshot>,
     /// Trace from the last ability resolution (for debugging).
     pub last_ability_trace: Option<crate::ability::types::AbilityTraceNode>,
@@ -147,6 +156,7 @@ impl GameState {
             game_state_history: Vec::new(),
             max_state_history_size: DEFAULT_HISTORY_SIZE,
             rule_log: Vec::new(),
+            structured_log: Vec::new(),
             turn1_abilities_played: std::collections::HashSet::new(),
             turn2_abilities_played: std::collections::HashMap::new(),
             live_owned_hearts: std::collections::HashMap::new(),
@@ -172,7 +182,9 @@ impl GameState {
             player1_cheer_revealed_cards: Vec::new(),
             player2_cheer_revealed_cards: Vec::new(),
             looked_at_cards: Vec::new(),
+            ability_applications: Vec::new(),
             recently_moved_cards: None,
+            recently_moved_from_zone: None,
             debut_ability_triggers: Vec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned
@@ -209,6 +221,9 @@ impl GameState {
             position_change_occurred_this_turn: false,
             opponent_live_success_this_turn: false,
             opponent_live_no_excess_heart_this_turn: false,
+            self_no_excess_heart_this_turn: false,
+            opponent_live_surplus_count: 0,
+            self_live_surplus_count: 0,
             formation_change_occurred_this_turn: false,
             opponent_choice_declined: false,
             live_being_performed: false,
@@ -216,7 +231,7 @@ impl GameState {
             draw_state: false,
             loop_detected: false,
             live_success_triggered_this_turn: false,
-            self_no_excess_heart_this_turn: false,
+            live_surplus_ready_this_turn: false,
             performance_snapshots: Vec::new(),
             last_ability_trace: None,
         };
@@ -355,6 +370,7 @@ impl GameState {
         self.last_area_move_by_player = None;
         self.last_energy_placed_by_effect = false;
         self.recently_moved_cards = None;
+        self.recently_moved_from_zone = None;
         self.mods.last_cost_discard_count = 0;
     }
 
@@ -389,6 +405,134 @@ impl GameState {
         } else {
             &mut self.player2_cheer_revealed_cards
         }
+    }
+
+    /// Push a log entry to both rule_log and structured_log.
+    pub fn log_entry(
+        &mut self,
+        text: String,
+        player_label: &str,
+        source_card_id: Option<i16>,
+        source_card_name: Option<String>,
+        category: &str,
+    ) {
+        self.rule_log.push(text.clone());
+        self.structured_log.push(LogEntry {
+            text,
+            turn: self.turn_number,
+            player_label: player_label.to_string(),
+            source_card_id,
+            source_card_name,
+            category: category.to_string(),
+        });
+    }
+
+    /// Push a log entry using the currently activating card's info.
+    pub fn log_ability(&mut self, text: String, category: &str) {
+        let pp = self.player_prefix();
+        let act_name = self
+            .activating_card
+            .and_then(|id| self.card_database.get_card(id))
+            .map(|c| c.name.clone());
+        self.log_entry(text, &pp, self.activating_card, act_name, category);
+    }
+
+    /// Determine the player label (P1/P2) for the activating card.
+    pub fn player_prefix(&self) -> String {
+        if let Some(card_id) = self.activating_card {
+            if self.player1.stage.stage.contains(&card_id)
+                || self
+                    .player1
+                    .stage
+                    .under_cards
+                    .iter()
+                    .any(|uc| uc.contains(&card_id))
+            {
+                return self.player1.id.clone();
+            }
+            if self.player2.stage.stage.contains(&card_id)
+                || self
+                    .player2
+                    .stage
+                    .under_cards
+                    .iter()
+                    .any(|uc| uc.contains(&card_id))
+            {
+                return self.player2.id.clone();
+            }
+        }
+        self.active_player().id.clone()
+    }
+
+    /// Snapshot current zone sizes for delta tracking.
+    pub fn zone_snapshot(&self) -> std::collections::HashMap<String, usize> {
+        let mut m = std::collections::HashMap::new();
+        for (prefix, p) in [("P1", &self.player1), ("P2", &self.player2)] {
+            m.insert(format!("{}.hand", prefix), p.hand.len());
+            m.insert(format!("{}.deck", prefix), p.main_deck.len());
+            m.insert(format!("{}.energy_deck", prefix), p.energy_deck.cards.len());
+            m.insert(format!("{}.energy_zone", prefix), p.energy_zone.cards.len());
+            m.insert(format!("{}.waitroom", prefix), p.waitroom.len());
+            m.insert(format!("{}.live_zone", prefix), p.live_card_zone.len());
+            m.insert(
+                format!("{}.success_live", prefix),
+                p.success_live_card_zone.len(),
+            );
+        }
+        m
+    }
+
+    /// Log zone deltas from before/after snapshots.
+    pub fn log_zone_delta(
+        &mut self,
+        before: &std::collections::HashMap<String, usize>,
+        category: &str,
+    ) {
+        let after = self.zone_snapshot();
+        let mut parts: Vec<String> = Vec::new();
+        let all_keys: std::collections::HashSet<String> =
+            before.keys().chain(after.keys()).cloned().collect();
+        let mut sorted: Vec<&String> = all_keys.iter().collect();
+        sorted.sort();
+        for key in sorted {
+            let b = before.get(key).copied().unwrap_or(0);
+            let a = after.get(key).copied().unwrap_or(0);
+            if a != b {
+                let delta = a as i64 - b as i64;
+                let zone_short = key.split('.').nth(1).unwrap_or(key);
+                parts.push(format!(
+                    "{} {}{}",
+                    zone_short,
+                    if delta >= 0 { "+" } else { "" },
+                    delta
+                ));
+            }
+        }
+        if !parts.is_empty() {
+            self.log_ability(parts.join(", "), category);
+        }
+    }
+
+    /// Record an ability application for source-tracking in the performance snapshot.
+    /// Called from effect handlers after applying a modifier.
+    pub fn record_ability_application(
+        &mut self,
+        source_card_id: i16,
+        ability_text: String,
+        effect_type: &str,
+        target_card_id: i16,
+        heart_color: Option<usize>,
+        amount: i32,
+    ) {
+        self.ability_applications
+            .push(crate::types::AbilityApplication {
+                source_card_id,
+                ability_text,
+                effect_type: effect_type.to_string(),
+                target_card_id,
+                heart_color,
+                amount,
+            });
     }
 }
 

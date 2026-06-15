@@ -67,6 +67,23 @@ const stateInternal = {
     lastMulliganCards: [],
     showMulliganReturn: false,
 
+    _frameCounter: 0,
+
+    fetchFrameCounter: async () => {
+        try {
+            const res = await fetch('api/debug/frames');
+            if (!res.ok) return;
+            const data = await res.json();
+            if (data.success) {
+                State._frameCounter = data.current_frame ?? 0;
+                if (State.data) {
+                    State.data._frameCounter = State._frameCounter;
+                }
+                State.emit('frame-counter-updated');
+            }
+        } catch (e) { /* silent */ }
+    },
+
     updateUiConfig: async (changes) => {
         if (!State.data) State.data = {};
         if (!State.data.ui_config) State.data.ui_config = {};
@@ -182,11 +199,11 @@ const stateInternal = {
 
     rebuildCardIndex: () => {
         const state = State.data;
-        const playersList = [state.player1, state.player2];
         if (!state || (!state.player1 && !state.player2)) {
             State.cardIndex = null;
             return;
         }
+        const playersList = [state.player1, state.player2];
 
         const index = {};
 
@@ -246,8 +263,20 @@ const stateInternal = {
                 });
             }
 
+            const indexStage = (stage) => {
+                if (!stage) return;
+                ['left_side', 'center', 'right_side', 'left_under', 'center_under', 'right_under'].forEach(slot => {
+                    const card = stage[slot];
+                    if (Array.isArray(card)) {
+                        card.forEach(c => addCard(c, 'stage'));
+                    } else if (card && typeof card === 'object') {
+                        addCard(card, 'stage');
+                    }
+                });
+            }
+
             indexZone(p.hand);
-            indexZone(p.stage);
+            indexStage(p.stage);
             indexZone(p.live_zone);
             indexZone(p.looked_cards);
             if (p.energy) {
@@ -351,6 +380,7 @@ const stateInternal = {
         State.plannerData = null;
         State.lastPlannerFetchKey = null;
         window.lastShownPerformanceHash = "";
+        State._frameCounter = 0;
     },
 
     resolveCardData: (cid) => {

@@ -32,11 +32,29 @@ export const ActionButtons = {
         if (!name) name = a.action_type || "";
         const isBaton = params.use_baton_touch || (name && (name.includes('Baton') || name.includes('バトン')));
 
+        if (a.action_type === 'select_mulligan') {
+            const ci = params.card_index;
+            let isSelected = false;
+            if (state && ci !== undefined) {
+                const p = State.perspectivePlayer;
+                const player = p === 0 ? state.player1 : state.player2;
+                if (player) {
+                    const sel = player.mulligan_selection;
+                    if (typeof sel === 'number') {
+                        isSelected = ((sel >> ci) & 1) === 1;
+                    } else if (Array.isArray(sel)) {
+                        isSelected = sel.includes(ci);
+                    }
+                }
+            }
+            const prefix = isSelected ? '✓ ' : '';
+            const displayName = prefix + (name || '?');
+            if (isMini) return `<span class="truncate-name">${displayName}</span>`;
+            return `<div class="action-title">${Tooltips.enrichAbilityText(displayName)}</div>`;
+        }
+
         if (isMini) {
             if (a.action_type === 'play_member_to_stage') return `<span>${cost !== null ? cost : 0}</span>${isBaton ? ' [B]' : ''}`;
-            if (a.action_type === 'select_mulligan') {
-                return `<span class="truncate-name">${name || '?'}</span>`;
-            }
             let label = `${energyIcon}${cost !== null ? cost : 0}`;
             if (isBaton) label += ' [B]';
             return Tooltips.enrichAbilityText(label);

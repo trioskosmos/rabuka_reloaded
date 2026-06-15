@@ -44,8 +44,11 @@ fn miracle_wave_q182_excess_heart_score_4() {
     advance_to_live_start(&mut game);
 
     game.pass(); // → SecondAttackerPerformance
+    game.drain_auto_ability_choices();
     game.pass(); // → LiveVictoryDetermination (set)
+    game.drain_auto_ability_choices();
     game.pass(); // → Active (processes LiveVictoryDetermination)
+    game.drain_auto_ability_choices();
 
     let mod_val = game.state.mods.get_score_modifier(wave);
     assert_eq!(

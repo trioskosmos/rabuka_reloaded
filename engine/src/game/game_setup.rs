@@ -1,10 +1,10 @@
 // Game setup and initialization functions
 // This module contains shared game setup logic used by both the web server and bot modules
 
+use crate::ability::enums::Zone;
+use crate::ability::types::Choice;
 use crate::game_state::GameState;
 use crate::zones::MemberArea;
-
-use crate::ability::types::Choice;
 use serde::{Deserialize, Serialize};
 use std::vec::Vec;
 
@@ -234,6 +234,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 ];
             }
             if target == "position|destination" {
+                let is_source = description == "Choose which member to move";
                 let default_positions = vec!["left".into(), "center".into(), "right".into()];
                 let positions = options.as_deref().unwrap_or(&default_positions);
                 let mut actions: Vec<Action> = positions
@@ -241,9 +242,33 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     .map(|pos| {
                         let idx = crate::ability::util::stage_position_index(&pos);
                         let (label, stage_area, card_id) = match idx {
-                            Some(0) => ("Move to Left", "left".to_string(), 0),
-                            Some(1) => ("Move to Center", "center".to_string(), 1),
-                            Some(2) => ("Move to Right", "right".to_string(), 2),
+                            Some(0) => (
+                                if is_source {
+                                    "Select Left"
+                                } else {
+                                    "Move to Left"
+                                },
+                                "left".to_string(),
+                                0,
+                            ),
+                            Some(1) => (
+                                if is_source {
+                                    "Select Center"
+                                } else {
+                                    "Move to Center"
+                                },
+                                "center".to_string(),
+                                1,
+                            ),
+                            Some(2) => (
+                                if is_source {
+                                    "Select Right"
+                                } else {
+                                    "Move to Right"
+                                },
+                                "right".to_string(),
+                                2,
+                            ),
                             _ => ("Move", pos.clone(), -1),
                         };
                         make_action_params(
@@ -379,10 +404,31 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 ];
             }
             if target == "choice_string" || target == "conditional_optional" {
+                if let Some(ref opts) = options {
+                    if opts.len() > 2 {
+                        // Multi-option choice_string: enumerate options
+                        return opts
+                            .iter()
+                            .enumerate()
+                            .map(|(i, opt)| {
+                                make_action_params(
+                                    ActionType::ChoiceOption,
+                                    opt,
+                                    ActionParameters {
+                                        card_id: Some(i as i16),
+                                        card_no: Some(i.to_string()),
+                                        ..make_params()
+                                    },
+                                )
+                            })
+                            .collect();
+                    }
+                }
+                // Fallback: Yes/No (1 option or empty)
                 return vec![
                     make_action_params(
                         ActionType::ChoiceOption,
-                        &format!("Yes  E{}", description),
+                        &format!("Yes E{}", description),
                         ActionParameters {
                             card_id: Some(1),
                             card_no: Some("yes".to_string()),
@@ -391,7 +437,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     ),
                     make_action_params(
                         ActionType::ChoiceOption,
-                        &format!("No  E{}", description),
+                        &format!("No E{}", description),
                         ActionParameters {
                             card_id: Some(0),
                             card_no: Some("no".to_string()),
@@ -429,6 +475,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             allow_skip,
             cost_limit,
             cost_limit_operator,
+            group,
             characters,
             ref filtered_indices,
             ref target_player_id,
@@ -445,8 +492,8 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     ("opponent", _) => &game_state.player2,
                     _ => &game_state.player1,
                 };
-                match zone.as_str() {
-                    "hand" => player
+                match Zone::from_str(zone.as_str()) {
+                    Some(Zone::Hand) => player
                         .hand
                         .cards
                         .iter()
@@ -454,7 +501,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .enumerate()
                         .map(|(i, id)| (i, id))
                         .collect(),
-                    "discard" => player
+                    Some(Zone::Discard) | Some(Zone::Waitroom) => player
                         .waitroom
                         .cards
                         .iter()
@@ -462,7 +509,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .enumerate()
                         .map(|(i, id)| (i, id))
                         .collect(),
-                    "stage" => player
+                    Some(Zone::Stage) => player
                         .stage
                         .stage
                         .iter()
@@ -471,7 +518,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .filter(|&(_, id)| id != -1)
                         .map(|(i, id)| (i, id))
                         .collect(),
-                    "energy_zone" => player
+                    Some(Zone::Energy) => player
                         .energy_zone
                         .cards
                         .iter()
@@ -479,24 +526,36 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .enumerate()
                         .map(|(i, id)| (i, id))
                         .collect(),
-                    "looked_at" => game_state
+                    Some(Zone::LookedAt) => game_state
                         .looked_at_cards
                         .iter()
                         .copied()
                         .enumerate()
                         .map(|(i, id)| (i, id))
                         .collect(),
-                    "revealed_cards" => game_state
-                        .revealed_cards
-                        .iter()
-                        .copied()
-                        .enumerate()
-                        .map(|(i, id)| (i, id))
-                        .collect(),
+                    Some(Zone::RevealedCards) => {
+                        let cheer = game_state.cheer_revealed_cards();
+                        if !cheer.is_empty() {
+                            cheer
+                                .iter()
+                                .copied()
+                                .enumerate()
+                                .map(|(i, id)| (i, id))
+                                .collect()
+                        } else {
+                            game_state
+                                .revealed_cards
+                                .iter()
+                                .copied()
+                                .enumerate()
+                                .map(|(i, id)| (i, id))
+                                .collect()
+                        }
+                    }
                     _ => Vec::new(),
                 }
             };
-            // Apply filtered_indices: exclude already-selected cards (used for sequential hand selection)
+            // Apply filtered_indices: exclude already-selected or ineligible cards
             let card_ids: Vec<(usize, i16)> = match filtered_indices {
                 Some(fi) if !fi.is_empty() => card_ids
                     .into_iter()
@@ -546,6 +605,16 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         characters.as_ref(),
                     ) {
                         continue;
+                    }
+                    // Apply group filter
+                    if let Some(ref grp) = group {
+                        if !crate::ability::util::card_matches_group_str(
+                            &game_state.card_database,
+                            *card_id,
+                            Some(grp.as_str()),
+                        ) {
+                            continue;
+                        }
                     }
                     let card_name = game_state
                         .card_database
@@ -1040,6 +1109,71 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                     ActionParameters {
                         card_id: Some(card_id),
                         stage_area: Some(area_name.to_string()),
+                        card_name: Some(card.name.clone()),
+                        card_no: Some(card.card_no.clone()),
+                        base_cost: Some(ability_cost),
+                        final_cost: Some(ability_cost),
+                        ..make_params()
+                    },
+                ));
+            }
+        }
+    }
+
+    // Also check discard pile for cards that activate from discard
+    // (activation_condition_parsed with location = discard)
+    for &card_id in &active_player.waitroom.cards {
+        if let Some(card) = game_state.card_database.get_card(card_id) {
+            for (ability_index, ability) in card.abilities.iter().enumerate() {
+                let is_discard_activation = ability
+                    .effect
+                    .as_ref()
+                    .and_then(|e| e.activation_condition_parsed.as_ref())
+                    .map_or(false, |c| {
+                        Zone::from_str(c.location.as_deref().unwrap_or("")) == Some(Zone::Discard)
+                    });
+                if !is_discard_activation {
+                    continue;
+                }
+                let can_activate = ability.triggers.as_ref().map_or(false, |t| {
+                    t.contains("main")
+                        || t.contains(crate::triggers::MAIN)
+                        || t.contains(crate::triggers::ACTIVATION)
+                        || (t.contains(crate::triggers::AUTO) && ability.cost.is_some())
+                        || t.contains(crate::triggers::BATON_TOUCH)
+                });
+                if !can_activate {
+                    continue;
+                }
+
+                let ability_key =
+                    format!("{}_{}_{}", card_id, ability_index, game_state.turn_number);
+                if ability.use_limit.is_some()
+                    && game_state
+                        .turn_limited_abilities_used
+                        .contains(&ability_key)
+                {
+                    continue;
+                }
+
+                let ability_name = if ability.full_text.chars().count() > 30 {
+                    format!(
+                        "{}...",
+                        ability.full_text.chars().take(30).collect::<String>()
+                    )
+                } else {
+                    ability.full_text.clone()
+                };
+                let ability_cost = ability.cost.as_ref().and_then(|c| c.energy).unwrap_or(0);
+
+                actions.push(make_action_params(
+                    ActionType::UseAbility,
+                    &format!(
+                        "Use ability on {} (discard): {} (起動) - Cost: {}",
+                        card.name, ability_name, ability_cost
+                    ),
+                    ActionParameters {
+                        card_id: Some(card_id),
                         card_name: Some(card.name.clone()),
                         card_no: Some(card.card_no.clone()),
                         base_cost: Some(ability_cost),

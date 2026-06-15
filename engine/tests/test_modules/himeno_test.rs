@@ -135,3 +135,95 @@ fn himeno_edge_no_mirakura_skips() {
         "No cards in hand: himeno played, filler paid"
     );
 }
+
+// ====================================================================
+//  安養寺 姫芽 (PL!HS-bp6-006) — Cost reduction & delayed cannot_active
+// ====================================================================
+// ab#0 (常時): Cost reduced by 2 per みらくらぱーく！ member on stage
+// ab#1 (常時): Cannot be baton-touched by non-みらくらぱーく！ cards
+// ab#2 (ライブ成功時): Wait this member + delayed cannot_active (1 turn)
+// ====================================================================
+
+#[test]
+fn himeno_bp6_cost_reduced_by_mirakura_on_stage() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let himeno = game.id("PL!HS-bp6-006-R＋");
+    let mk = game.id("PL!HS-bp1-005-R"); // unit=みらくらぱーく！ member
+
+    game.state.player1.hand.cards.push(himeno);
+    game.state.player1.stage.stage = [mk, -1, -1];
+
+    game.state.recalculate_constant_cost_modifiers();
+    let cost_mod = game.state.mods.get_cost_modifier(himeno);
+    assert_eq!(cost_mod, -2, "1 Mirakura member on stage → cost -2");
+}
+
+#[test]
+fn himeno_bp6_cost_no_reduction_without_mirakura() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let himeno = game.id("PL!HS-bp6-006-R＋");
+
+    game.state.player1.hand.cards.push(himeno);
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.state.recalculate_constant_cost_modifiers();
+    let cost_mod = game.state.mods.get_cost_modifier(himeno);
+    assert_eq!(cost_mod, 0, "0 Mirakura members on stage → cost unchanged");
+}
+
+#[test]
+fn himeno_bp6_cost_reduced_by_two_mirakura() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let himeno = game.id("PL!HS-bp6-006-R＋");
+    let mk1 = game.id("PL!HS-bp1-005-R"); // unit=みらくらぱーく！
+    let mk2 = game.id("PL!HS-PR-005-PR"); // unit=みらくらぱーく！
+
+    game.state.player1.hand.cards.push(himeno);
+    game.state.player1.stage.stage = [mk1, mk2, -1];
+
+    game.state.recalculate_constant_cost_modifiers();
+    let cost_mod = game.state.mods.get_cost_modifier(himeno);
+    assert_eq!(cost_mod, -4, "2 Mirakura members → cost -4");
+}
+
+#[test]
+fn himeno_bp6_delayed_cannot_active_blocks_activation() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let himeno = game.id("PL!HS-bp6-006-R＋");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = himeno;
+    game.state.mods.add_orientation_modifier(himeno, "wait");
+
+    game.state.mods.add_delayed_cannot_active(himeno, 1);
+
+    // Check that is_delayed_cannot_active returns true
+    assert!(game.state.mods.is_delayed_cannot_active(himeno));
+
+    // Tick (simulate next Active phase processing)
+    game.state.mods.tick_delayed_cannot_active();
+
+    // After one tick, flag should be 0 → is_delayed_cannot_active returns false
+    assert!(!game.state.mods.is_delayed_cannot_active(himeno));
+}
+
+#[test]
+fn himeno_bp6_delayed_cannot_active_stack_resets_on_second_set() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let himeno = game.id("PL!HS-bp6-006-R＋");
+
+    game.state.player1.stage.stage[0] = himeno;
+    game.state.mods.add_orientation_modifier(himeno, "wait");
+
+    // Set delayed flag twice — should keep max (not increase beyond 1)
+    game.state.mods.add_delayed_cannot_active(himeno, 1);
+    game.state.mods.add_delayed_cannot_active(himeno, 1);
+
+    game.state.mods.tick_delayed_cannot_active(); // 1 → 0
+    assert!(!game.state.mods.is_delayed_cannot_active(himeno));
+}

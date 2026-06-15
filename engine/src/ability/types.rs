@@ -1,7 +1,34 @@
 use crate::card::CardDatabase;
+use std::fmt;
 use std::sync::Arc;
 
 use serde_json::Value;
+
+/// Discriminator for routing choice results to the correct handler.
+/// Statically known routes are enum variants; dynamic routes (e.g. position_change
+/// with card_no) use `Raw`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ChoiceRoute {
+    Choice,
+    ChoiceString,
+    ChoiceCost,
+    OptionalCost,
+    ChangeState,
+    Raw(String),
+}
+
+impl fmt::Display for ChoiceRoute {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ChoiceRoute::Choice => write!(f, "choice"),
+            ChoiceRoute::ChoiceString => write!(f, "choice_string"),
+            ChoiceRoute::ChoiceCost => write!(f, "choice_cost"),
+            ChoiceRoute::OptionalCost => write!(f, "optional_cost"),
+            ChoiceRoute::ChangeState => write!(f, "change_state"),
+            ChoiceRoute::Raw(s) => write!(f, "{}", s),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Choice {
@@ -112,9 +139,17 @@ pub enum ExecutionContext {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum LookAndSelectStep {
-    LookAt { count: usize, source: String },
-    Select { count: usize },
-    Finalize { destination: String },
+    LookAt {
+        count: usize,
+        source: String,
+    },
+    Select {
+        count: usize,
+        max_per_group: Option<u32>,
+    },
+    Finalize {
+        destination: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]

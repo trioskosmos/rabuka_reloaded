@@ -1,6 +1,8 @@
+use super::enums::Zone;
 use super::resolver::AbilityResolver;
-use super::types::{Choice, ExecutionContext, LookAndSelectStep};
-use crate::card::AbilityEffect;
+use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
+use super::util;
+use crate::card::{AbilityEffect, CardDatabase};
 use crate::game_state::GameState;
 
 impl AbilityResolver {
@@ -16,7 +18,7 @@ impl AbilityResolver {
             self.execute_effect(gs, look_action)?;
             println!(
                 "DEBUG: After look_action - looked_at_cards.len(): {}",
-                self.looked_at_cards.len()
+                gs.looked_at_cards.len()
             );
         }
 
@@ -32,25 +34,23 @@ impl AbilityResolver {
                 || !filter.heart_colors.is_empty()
                 || filter.cost_limit.is_some();
             if has_filter {
-                let (matching, non_matching): (Vec<_>, Vec<_>) = self
+                let (matching, non_matching): (Vec<_>, Vec<_>) = gs
                     .looked_at_cards
                     .iter()
                     .partition(|&&card_id| filter.matches(card_db, card_id, false));
-                self.looked_at_cards = matching;
+                gs.looked_at_cards = matching;
                 let player = gs.resolve_target_player_mut("self");
                 for &card_id in &non_matching {
                     player.waitroom.add_card(card_id);
                 }
             }
 
-            // Always sync to game_state so handle_select_cards_looked_at can access them
-            gs.looked_at_cards = self.looked_at_cards.clone();
             println!(
                 "DEBUG: Synced to game_state.looked_at_cards.len(): {}",
                 gs.looked_at_cards.len()
             );
 
-            let available_count = self.looked_at_cards.len();
+            let available_count = gs.looked_at_cards.len();
             let is_max = select_action.max.unwrap_or(false);
             let max_select = if any_number {
                 available_count
@@ -80,7 +80,7 @@ impl AbilityResolver {
             };
 
             let choice = Choice::select_cards(
-                "looked_at",
+                Zone::LookedAt.to_str(),
                 max_select,
                 description.clone(),
                 optional || is_max || any_number || available_count == 0,
@@ -104,8 +104,22 @@ impl AbilityResolver {
             );
             self.pending_choice = Some(choice);
             self.execution_context = ExecutionContext::LookAndSelect {
-                step: LookAndSelectStep::Select { count: max_select },
+                step: LookAndSelectStep::Select {
+                    count: max_select,
+                    max_per_group: select_action.per_group_count,
+                },
             };
+
+            // Save followup_action as pending command — it executes after the selection completes.
+            // This enables the "その後" (afterwards) pattern where a separate effect runs
+            // after the look_and_select finishes (e.g. wait opponent members based on revealed card).
+            if let Some(ref followup) = effect.compound.followup_action {
+                let mut existing = gs.ability_queue.take_pending_commands();
+                existing.push(crate::ability::types::Command::Effect(
+                    followup.as_ref().clone(),
+                ));
+                gs.ability_queue.set_pending_commands(existing);
+            }
             println!(
                 "DEBUG: Choice created and stored - pending_choice.is_some(): {}",
                 self.pending_choice.is_some()
@@ -135,12 +149,13 @@ impl AbilityResolver {
             .current_effect
             .as_ref()
             .map_or(false, |e| e.any_number.unwrap_or(false));
+        let looked_at_len = gs.looked_at_cards.len();
         let player = gs.resolve_target_player_mut(target);
 
         // Support player selection for reveal: when count allows choice, prompt instead of auto-revealing all
-        let available = match source {
-            "hand" => player.hand.cards.len(),
-            "looked_at" => self.looked_at_cards.len(),
+        let available = match Zone::from_str(source) {
+            Some(Zone::Hand) => player.hand.cards.len(),
+            Some(Zone::LookedAt) => looked_at_len,
             _ => 0,
         };
 
@@ -149,7 +164,10 @@ impl AbilityResolver {
             source, available, count, any_number
         );
 
-        if (source == "hand" || source == "looked_at") && available > 0 {
+        if (Zone::from_str(source) == Some(Zone::Hand)
+            || Zone::from_str(source) == Some(Zone::LookedAt))
+            && available > 0
+        {
             let current_effect = self.current_effect.as_ref();
             let is_max = current_effect.map_or(false, |e| e.max.unwrap_or(false));
             let is_optional = current_effect.map_or(false, |e| e.optional.unwrap_or(false));
@@ -210,16 +228,16 @@ impl AbilityResolver {
         }
 
         let card_ids: Vec<i16> = {
-            match source {
-                "hand" => player.hand.cards.iter().copied().collect(),
-                "deck" => player
+            match Zone::from_str(source) {
+                Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
+                Some(Zone::Deck) => player
                     .main_deck
                     .cards
                     .iter()
                     .take(count as usize)
                     .copied()
                     .collect(),
-                "looked_at" => self
+                Some(Zone::LookedAt) => gs
                     .looked_at_cards
                     .iter()
                     .filter(|&&card_id| {
@@ -328,25 +346,27 @@ impl AbilityResolver {
         let card_db = gs.card_database.clone();
         let player = gs.resolve_target_player_mut(&target);
 
-        let card_ids: Vec<i16> = match source {
-            "hand" => player.hand.cards.iter().copied().collect(),
-            "deck" => player
+        let card_ids: Vec<i16> = match Zone::from_str(source) {
+            Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
+            Some(Zone::Deck) => player
                 .main_deck
                 .cards
                 .iter()
                 .take(count as usize)
                 .copied()
                 .collect(),
-            "discard" => player.waitroom.cards.iter().copied().collect(),
-            "stage" => player
+            Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                player.waitroom.cards.iter().copied().collect()
+            }
+            Some(Zone::Stage) => player
                 .stage
                 .stage
                 .iter()
                 .filter(|&&id| id != -1)
                 .copied()
                 .collect(),
-            "looked_at" => self.looked_at_cards.clone(),
-            "selected_cards" => self.selected_cards.clone(),
+            Some(Zone::LookedAt) => gs.looked_at_cards.clone(),
+            Some(Zone::SelectedCards) => self.selected_cards.clone(),
             _ => vec![],
         };
 
@@ -365,7 +385,7 @@ impl AbilityResolver {
         );
         let distinct_indices =
             super::util::filter_distinct(&filtered, &card_db, &distinct_filter, false);
-        self.looked_at_cards = distinct_indices.iter().map(|&i| filtered[i]).collect();
+        gs.looked_at_cards = distinct_indices.iter().map(|&i| filtered[i]).collect();
 
         // Apply additional filters (characters, group, cost_limit) that the choice will validate.
         // These come from parameters or fall back to current_effect.
@@ -395,38 +415,39 @@ impl AbilityResolver {
             characters: characters.as_ref().or(ce_chars),
             ..Default::default()
         };
-        self.looked_at_cards
+        gs.looked_at_cards
             .retain(|&id| filter.matches(&card_db, id, false));
 
         // Exclude previously selected cards if exclude_selected is true
         eprintln!(
             "[EXCLUDE_SEL] selected={:?} looked_at_before={:?}",
-            self.selected_cards, self.looked_at_cards
+            self.selected_cards, gs.looked_at_cards
         );
         if exclude_selected && !self.selected_cards.is_empty() {
-            self.looked_at_cards
+            gs.looked_at_cards
                 .retain(|id| !self.selected_cards.contains(id));
         }
         if exclude_self.unwrap_or(false) {
             if let Some(activating_id) = gs.activating_card {
-                self.looked_at_cards.retain(|&id| id != activating_id);
+                gs.looked_at_cards.retain(|&id| id != activating_id);
             }
         }
-        eprintln!("[EXCLUDE_SEL] looked_at_after={:?}", self.looked_at_cards);
+        eprintln!("[EXCLUDE_SEL] looked_at_after={:?}", gs.looked_at_cards);
 
         let optional = self
             .current_effect
             .as_ref()
             .map_or(false, |e| e.optional.unwrap_or(false));
-        if self.looked_at_cards.len() < count as usize {
+        if gs.looked_at_cards.len() < count as usize {
             return Ok(()); // Not enough distinct cards — skip silently
         }
         // Compute filtered stage indices: map looked_at_cards back to stage positions.
         // This ensures handle_select_card looks up the right card when exclude_selected
         // or other filters shift which cards are available.
-        let filtered_indices: Option<Vec<usize>> = if source == "stage" {
+        let filtered_indices: Option<Vec<usize>> = if Zone::from_str(source) == Some(Zone::Stage) {
+            let looked = gs.looked_at_cards.clone();
             Some(
-                self.looked_at_cards
+                looked
                     .iter()
                     .filter_map(|&id| {
                         gs.resolve_target_player_mut(&target)
@@ -489,14 +510,29 @@ impl AbilityResolver {
     pub fn execute_look_at(
         &mut self,
         gs: &mut GameState,
+        effect: &AbilityEffect,
         count: u32,
         target: &str,
         source: &str,
     ) -> Result<(), String> {
+        if effect.optional.unwrap_or(false) {
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "pay_optional_cost:skip_optional_cost".to_string(),
+                description: format!("Look at {} card(s) (optional cost)?", count),
+                allow_skip: true,
+                options: None,
+            });
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+            }
+            return Ok(());
+        }
         let player = gs.resolve_target_player_mut(target);
 
         // If deck has fewer cards than requested, the effect cannot execute.
-        if source == "deck" || source == "deck_top" {
+        if Zone::from_str(source) == Some(Zone::Deck)
+            || Zone::from_str(source) == Some(Zone::DeckTop)
+        {
             if player.main_deck.cards.len() < count as usize {
                 return Err(format!(
                     "Not enough cards in deck: need {}, have {}",
@@ -506,23 +542,25 @@ impl AbilityResolver {
             }
         }
 
-        let cards = match source {
-            "deck" | "deck_top" => player.main_deck.draw_multiple(count as usize),
-            "hand" => player
+        let cards = match Zone::from_str(source) {
+            Some(Zone::Deck) | Some(Zone::DeckTop) => {
+                player.main_deck.draw_multiple(count as usize)
+            }
+            Some(Zone::Hand) => player
                 .hand
                 .cards
                 .iter()
                 .take(count as usize)
                 .copied()
                 .collect(),
-            "discard" => player
+            Some(Zone::Discard) | Some(Zone::Waitroom) => player
                 .waitroom
                 .cards
                 .iter()
                 .take(count as usize)
                 .copied()
                 .collect(),
-            "stage" => player
+            Some(Zone::Stage) => player
                 .stage
                 .stage
                 .iter()
@@ -530,7 +568,7 @@ impl AbilityResolver {
                 .take(count as usize)
                 .copied()
                 .collect(),
-            "energy_zone" => player
+            Some(Zone::Energy) | Some(Zone::EnergyZone) => player
                 .energy_zone
                 .cards
                 .iter()
@@ -540,7 +578,7 @@ impl AbilityResolver {
             _ => vec![],
         };
 
-        self.looked_at_cards = cards;
+        gs.looked_at_cards = cards;
         Ok(())
     }
     pub fn execute_reveal_per_group(
@@ -553,17 +591,19 @@ impl AbilityResolver {
         let card_db = gs.card_database.clone();
         let card_ids: Vec<i16> = {
             let player = gs.resolve_target_player_mut(target);
-            match source {
-                "hand" => player.hand.cards.iter().copied().collect(),
-                "deck" => player
+            match Zone::from_str(source) {
+                Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
+                Some(Zone::Deck) => player
                     .main_deck
                     .cards
                     .iter()
                     .take(count as usize)
                     .copied()
                     .collect(),
-                "discard" => player.waitroom.cards.iter().copied().collect(),
-                "looked_at" => self.looked_at_cards.clone(),
+                Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                    player.waitroom.cards.iter().copied().collect()
+                }
+                Some(Zone::LookedAt) => gs.looked_at_cards.clone(),
                 _ => vec![],
             }
         };
@@ -683,7 +723,7 @@ impl AbilityResolver {
         let (all_revealed, _) = self.reveal_until(gs, target, |card_db, cid| {
             card_db.get_card(cid).map(|c| c.is_live()).unwrap_or(false)
         });
-        self.looked_at_cards = all_revealed;
+        gs.looked_at_cards = all_revealed;
         Ok(())
     }
 
@@ -692,20 +732,41 @@ impl AbilityResolver {
         gs: &mut GameState,
         target: &str,
         card_type: Option<&str>,
+        cost_limit: Option<u32>,
+        cost_limit_operator: Option<&str>,
     ) -> Result<(), String> {
         let card_type_owned = card_type.map(|s| s.to_string());
+        let cost_limit_owned = cost_limit;
+        let cost_op_owned = cost_limit_operator.map(|s| s.to_string());
+        // cost_limit only applies when the selected card_type is member_card
+        // (ability text: "live_card or member_card with cost >= 10")
+        let apply_cost =
+            cost_limit_owned.is_some() && card_type_owned.as_deref() == Some("member_card");
         let (mut all_revealed, matched_idx) = self.reveal_until(gs, target, move |card_db, cid| {
-            super::util::card_matches_type(card_db, cid, card_type_owned.as_deref())
+            if !super::util::card_matches_type(card_db, cid, card_type_owned.as_deref()) {
+                return false;
+            }
+            if apply_cost {
+                if let Some(lim) = cost_limit_owned {
+                    if !super::util::card_matches_cost_limit_op(
+                        card_db,
+                        cid,
+                        Some(lim),
+                        cost_op_owned.as_deref(),
+                    ) {
+                        return false;
+                    }
+                }
+            }
+            true
         });
 
         if let Some(idx) = matched_idx {
             let matched = all_revealed.remove(idx);
-            self.looked_at_cards = std::iter::once(matched).chain(all_revealed).collect();
+            gs.looked_at_cards = std::iter::once(matched).chain(all_revealed).collect();
         } else {
-            self.looked_at_cards.clear();
+            gs.looked_at_cards.clear();
         }
-        // Sync to game_state so subsequent move_cards("looked_at") can access them
-        gs.looked_at_cards = self.looked_at_cards.clone();
         Ok(())
     }
 }

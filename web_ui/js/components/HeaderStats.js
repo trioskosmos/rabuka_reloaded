@@ -2,6 +2,7 @@
  * HeaderStats Component
  * Handles rendering of the game header (Turn, Phase, Energy, Scores, Hearts Summary).
  */
+import { State } from '../state.js';
 import * as i18n from '../i18n/index.js';
 import { PerformanceRenderer } from './PerformanceRenderer.js';
 
@@ -9,6 +10,8 @@ export const HeaderStats = {
     cache: {
         turn: null,
         phase: null,
+        activePlayer: null,
+        frameCounter: null,
         player1Score: null,
         player2Score: null,
         energy: null,
@@ -27,6 +30,8 @@ export const HeaderStats = {
     init: () => {
         HeaderStats.cache.turn = document.getElementById('turn');
         HeaderStats.cache.phase = document.getElementById('phase');
+        HeaderStats.cache.activePlayer = document.getElementById('active-player');
+        HeaderStats.cache.frameCounter = document.getElementById('frame-counter');
         HeaderStats.cache.player1Score = document.getElementById('player1-score');
         HeaderStats.cache.player2Score = document.getElementById('player2-score');
         HeaderStats.cache.energy = document.getElementById('header-energy');
@@ -53,6 +58,12 @@ export const HeaderStats = {
         
         if (HeaderStats.cache.turn) HeaderStats.cache.turn.textContent = state.turn || 1;
         if (HeaderStats.cache.phase) HeaderStats.cache.phase.textContent = i18n.t(phaseKey);
+        if (HeaderStats.cache.activePlayer) {
+            HeaderStats.cache.activePlayer.textContent = state.active_player || 'P1';
+        }
+        if (HeaderStats.cache.frameCounter) {
+            HeaderStats.cache.frameCounter.textContent = state._frameCounter ?? 0;
+        }
 
         if (HeaderStats.cache.player1Score && HeaderStats.cache.player2Score) {
             const p0Success = (p0.success_live_card_zone?.cards || []).length;

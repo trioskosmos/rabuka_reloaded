@@ -51,8 +51,15 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
     )
     .expect("play with baton touch");
 
-    while game.has_pending_choice() {
+    // After baton touch + debut: draw 2 cards (auto).
+    // If multiple matching cards in discard, a card selection choice appears.
+    // If exactly 1 match, card auto-selected (no choice).
+    if game.has_pending_choice() {
         game.select_indices(&[0]);
+    }
+    // If multiple empty stage slots, choose deployment position.
+    if game.has_pending_choice() {
+        game.select_option(0);
     }
 
     // Q194: Double baton touch replaced 2 members

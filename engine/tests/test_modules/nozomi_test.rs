@@ -41,7 +41,7 @@ fn nozomi_q229_baton_touch_triggers_discard_then_draw() {
     game.play_to_stage(nozomi, rabuka_engine::zones::MemberArea::Center);
 
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.try_select_indices(&[0, 1]).unwrap();
     }
 
     assert_eq!(

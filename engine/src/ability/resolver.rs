@@ -1,4 +1,5 @@
 use super::debug::AbDebug;
+use super::enums::Zone;
 use super::types::{AbilityTraceNode, Choice, EffectPipeline, ExecutionContext, ZoneSnapshot};
 use super::util;
 use crate::card::{Ability, AbilityCost, AbilityEffect, CardDatabase, Keyword};
@@ -9,14 +10,12 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub struct AbilityResolver {
     pub pending_choice: Option<Choice>,
-    pub looked_at_cards: Vec<i16>,
     pub card_database: Arc<CardDatabase>,
     pub duration_effects: Vec<(String, String)>,
     pub current_ability: Option<crate::card::Ability>,
     pub activating_card_id: Option<i16>,
     pub execution_context: ExecutionContext,
     pub current_effect: Option<AbilityEffect>,
-    pub revealed_cost_cards: Vec<i16>,
     pub is_reveal_cost: bool,
     pub last_draw_count: u32,
     pub looked_at_total_count: usize,
@@ -26,6 +25,12 @@ pub struct AbilityResolver {
     /// Effect target to use in child resolution (set by resume_pending_commands
     /// for pending-command effects from "both" splits).
     pub last_effect_target: Option<String>,
+    /// Effect destination to use in child resolution (set by execute_move_cards
+    /// for sub-actions with non-default destination, read by execute_selected_cards_from_zone).
+    pub last_effect_destination: Option<String>,
+    /// Effect deck position to use in child resolution (set by execute_move_cards
+    /// for sub-actions with position, read by execute_selected_cards_from_zone).
+    pub last_effect_position: Option<usize>,
     /// Set by zone selection functions when they create a sub-choice (e.g. SelectPosition
     /// for empty_area). Read by finalize_choice to decide whether to resume pending commands.
     pub sub_choice_created: bool,
@@ -39,14 +44,12 @@ impl AbilityResolver {
     pub fn new(card_database: Arc<CardDatabase>, activating_card_id: Option<i16>) -> Self {
         AbilityResolver {
             pending_choice: None,
-            looked_at_cards: Vec::new(),
             card_database: card_database.clone(),
             duration_effects: Vec::new(),
             current_ability: None,
             activating_card_id,
             execution_context: ExecutionContext::None,
             current_effect: None,
-            revealed_cost_cards: Vec::new(),
             is_reveal_cost: false,
             last_draw_count: 0,
             looked_at_total_count: 0,
@@ -54,6 +57,8 @@ impl AbilityResolver {
             selected_area: None,
             moved_cards: Vec::new(),
             last_effect_target: None,
+            last_effect_destination: None,
+            last_effect_position: None,
             sub_choice_created: false,
             pending_stage_cards: Vec::new(),
             pipeline: {
@@ -62,10 +67,6 @@ impl AbilityResolver {
                 p
             },
         }
-    }
-
-    pub fn take_looked_at(&mut self) -> Vec<i16> {
-        std::mem::take(&mut self.looked_at_cards)
     }
 
     /// Find matching card indices in a zone, prompt if too many.
@@ -117,22 +118,32 @@ impl AbilityResolver {
         );
         let mut dbg = AbDebug::new();
         dbg.effect(effect);
-        if let Some(ref activation_condition) = effect.activation_condition_parsed {
-            let mut merged_cond = activation_condition.clone();
-            // Merge the effect's position info into the condition so it's checked.
-            if merged_cond.position.is_none() {
-                if let Some(ref pos) = effect.position {
-                    merged_cond.position = Some(pos.clone());
-                } else if let Some(ref act_pos) = effect.activation_position {
-                    merged_cond.activation_position = Some(act_pos.clone());
+
+        let cost_already_paid = gs
+            .ability_queue
+            .current_entry()
+            .map_or(false, |e| e.cost_paid);
+
+        if !cost_already_paid {
+            if let Some(ref activation_condition) = effect.activation_condition_parsed {
+                let mut merged_cond = activation_condition.clone();
+                // Merge the effect's position info into the condition so it's checked.
+                if merged_cond.position.is_none() {
+                    if let Some(ref pos) = effect.position {
+                        merged_cond.position = Some(pos.clone());
+                    } else if let Some(ref act_pos) = effect.activation_position {
+                        merged_cond.activation_position = Some(act_pos.clone());
+                    }
                 }
-            }
-            if !ctx.evaluate_condition(&merged_cond) {
-                return false;
+                if !ctx.evaluate_condition(&merged_cond) {
+                    return false;
+                }
             }
         }
         if let Some(ref condition) = effect.condition {
-            if effect.action == "conditional_alternative" {
+            if crate::ability::enums::ActionType::from_str(&effect.action)
+                == Some(crate::ability::enums::ActionType::ConditionalAlternative)
+            {
                 // skip — condition is a branch selector, not a gate
             } else {
                 let mut cond = condition.clone();
@@ -255,23 +266,36 @@ impl AbilityResolver {
                     cost_limit,
                     ref cost_limit_operator,
                     ref target_player_id,
+                    ref group,
                     ..
                 } = choice
                 {
                     let target = target_player_id.as_deref().unwrap_or("self");
                     let card_ids: Vec<i16> = {
                         let player = gs.resolve_target_player_mut(target);
-                        match zone.as_str() {
-                            "hand" => player.hand.cards.iter().copied().collect(),
-                            "discard" => player.waitroom.cards.iter().copied().collect(),
-                            "stage" => player
+                        match Zone::from_str(&zone) {
+                            Some(Zone::Hand) => player.hand.cards.iter().copied().collect(),
+                            Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                                player.waitroom.cards.iter().copied().collect()
+                            }
+                            Some(Zone::Stage) => player
                                 .stage
                                 .stage
                                 .iter()
                                 .copied()
                                 .filter(|&id| id != -1)
                                 .collect(),
-                            "energy_zone" => player.energy_zone.cards.iter().copied().collect(),
+                            Some(Zone::Energy) | Some(Zone::EnergyZone) => {
+                                player.energy_zone.cards.iter().copied().collect()
+                            }
+                            Some(Zone::RevealedCards) => {
+                                let cheer = gs.cheer_revealed_cards().clone();
+                                if !cheer.is_empty() {
+                                    cheer.iter().copied().collect()
+                                } else {
+                                    gs.revealed_cards.iter().copied().collect()
+                                }
+                            }
                             _ => Vec::new(),
                         }
                     };
@@ -300,6 +324,16 @@ impl AbilityResolver {
                             };
                             if !type_ok {
                                 return false;
+                            }
+                            // group filter
+                            if let Some(g) = group {
+                                if !crate::ability::util::card_matches_group_str(
+                                    &gs.card_database,
+                                    cid,
+                                    Some(g),
+                                ) {
+                                    return false;
+                                }
                             }
                             // per-card cost_limit filter (not sum cost_total)
                             if let Some(lim) = cost_limit {

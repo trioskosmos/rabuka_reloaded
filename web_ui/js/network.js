@@ -19,11 +19,6 @@ export const Network = {
         };
     },
 
-    setRenderCallback: () => {
-        // Legacy callback placeholder to prevent initialization errors in main.js
-        // The modern UI uses reactive state updates via state.js
-    },
-
     setOpenDeckModalCallback: () => {
         // Placeholder to prevent initialization error in main.js
     },

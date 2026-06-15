@@ -474,6 +474,7 @@
 .member-slot.filled {
     border-style: solid;
     background: var(--bg-tertiary);
+    overflow: visible;
 }
 
 .member-slot img {
@@ -485,6 +486,68 @@
 
 .member-slot.valid-target {
     cursor: pointer;
+}
+
+/* --- Card Bonuses (overlaid icons on right side of stage cards) --- */
+.card-bonuses {
+    position: absolute;
+    top: 2px;
+    left: calc(100% + 4px);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    z-index: 10;
+    pointer-events: none;
+}
+
+.bonus-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 1px;
+    padding: 1px 3px;
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 3px;
+    font-size: 0.6rem;
+    line-height: 1;
+    color: #fff;
+    white-space: nowrap;
+    pointer-events: auto;
+    cursor: default;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.bonus-badge .bonus-value {
+    font-weight: bold;
+    font-size: 0.6rem;
+}
+
+.bonus-badge img {
+    width: 12px;
+    height: 12px;
+    object-fit: contain;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.bonus-badge.bonus-blade {
+    border-color: rgba(74, 158, 255, 0.5);
+}
+
+.bonus-badge.bonus-heart {
+    border-color: rgba(255, 85, 170, 0.5);
+}
+
+.bonus-badge.bonus-score {
+    border-color: rgba(74, 222, 128, 0.5);
+}
+
+.bonus-badge.bonus-cost {
+    border-color: rgba(74, 158, 255, 0.7);
+}
+
+.bonus-badge.bonus-transform {
+    border-color: rgba(245, 158, 11, 0.6);
+    background: rgba(0, 0, 0, 0.85);
 }
 
 /* --- Under Cards (Stacked Behind Member) --- */

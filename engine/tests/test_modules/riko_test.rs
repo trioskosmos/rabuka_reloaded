@@ -58,7 +58,7 @@ fn riko_q130_opponent_discards_skips_conditional() {
     game.play_to_stage(riko, rabuka_engine::zones::MemberArea::LeftSide);
 
     if game.has_pending_choice() {
-        game.select_option(1);
+        game.select_indices(&[0]); // opponent selects the live card from hand
     }
 
     assert_eq!(

@@ -1,4 +1,3 @@
-import { Phase } from './constants.js';
 import { isMulliganPhase } from './constants.js';
 
 function getSelectedIndices(state, uiState, perspectivePlayer) {
@@ -70,14 +69,20 @@ export const ViewState = {
         const confirmedCards = isMulligan ? [] : selectedIndices.map(idx => handCards[idx]).filter(card => card !== null && card !== undefined);
 
         const pendingChoice = state.pending_choice;
-        const selectionCards = pendingChoice?.selection_cards || [];
-        const selectionActions = selectionCards.map(c => {
+        const rawSelectionCards = pendingChoice?.selection_cards || [];
+        // Only include cards that have a matching legal action
+        // (backend may send all zone cards; legal_actions define which are valid choices)
+        const selectionPairs = [];
+        rawSelectionCards.forEach(c => {
             const cardId = c.id !== undefined ? c.id : c.card_id;
-            return state.legal_actions?.find(a => {
+            const action = state.legal_actions?.find(a => {
                 const params = a.parameters || {};
                 return params.card_id === cardId || params.card_id === c.card_id;
             });
+            if (action) selectionPairs.push({ card: c, action });
         });
+        const selectionCards = selectionPairs.map(p => p.card);
+        const selectionActions = selectionPairs.map(p => p.action);
 
         return {
             perspectivePlayer,

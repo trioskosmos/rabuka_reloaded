@@ -102,10 +102,6 @@ export const COLORS = {
 };
 
 export const CSS_CLASSES = {
-  RESIZING: 'resizing',
-  ACTION_PENDING: 'action-pending',
   SIDEBAR_OPEN: 'sidebar-open',
   ACTIVE: 'active',
-  HIGHLIGHTED: 'highlighted',
-  COL_RESIZE: 'col-resize',
 };

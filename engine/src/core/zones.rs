@@ -1,4 +1,5 @@
 use crate::card::{BaseHeart, CardDatabase, HeartColor, HeartIcon, Keyword};
+use crate::core::game_modifiers::ModifierEntry;
 use serde::{Deserialize, Serialize};
 use smallvec::SmallVec;
 use std::collections::HashMap;
@@ -480,7 +481,7 @@ impl LiveCardZone {
         need_heart_modifiers: Option<
             &std::collections::HashMap<
                 i16,
-                std::collections::HashMap<crate::card::HeartColor, i32>,
+                std::collections::HashMap<crate::card::HeartColor, ModifierEntry>,
             >,
         >,
         score_modifiers: Option<&std::collections::HashMap<i16, i32>>,
@@ -494,17 +495,28 @@ impl LiveCardZone {
                     .and_then(|sm| sm.get(card_id))
                     .copied()
                     .unwrap_or(0);
-                total_score += (base_score + modifier).max(0) as u32;
+                let card_score = (base_score + modifier).max(0) as u32;
 
-                if let Some(ref need_heart) = card.need_heart {
+                let heart_needs_satisfied = if let Some(ref need_heart) = card.need_heart {
                     if !need_heart.hearts.is_empty() {
-                        // Compute effective need_heart by applying modifiers
                         let effective_need = if let Some(modifiers) = need_heart_modifiers {
                             if let Some(card_mods) = modifiers.get(card_id) {
-                                let mut adjusted = need_heart.clone();
-                                for (color, delta) in card_mods {
-                                    let entry = adjusted.hearts.entry(*color).or_insert(0);
-                                    *entry = (*entry as i32 + delta).max(0) as u32;
+                                let has_set = card_mods.values().any(|e| e.set != 0);
+                                let mut adjusted = if has_set {
+                                    BaseHeart {
+                                        hearts: HashMap::new(),
+                                    }
+                                } else {
+                                    need_heart.clone()
+                                };
+                                for (color, me) in card_mods {
+                                    if me.set != 0 {
+                                        adjusted.hearts.insert(*color, me.set as u32);
+                                    }
+                                    if me.additive != 0 {
+                                        let entry = adjusted.hearts.entry(*color).or_insert(0);
+                                        *entry = (*entry as i32 + me.additive).max(0) as u32;
+                                    }
                                 }
                                 Some(adjusted)
                             } else {
@@ -514,10 +526,18 @@ impl LiveCardZone {
                             None
                         };
                         let ref_need = effective_need.as_ref().unwrap_or(need_heart);
-                        let satisfied = stage_hearts.map_or(false, |sh| {
+                        stage_hearts.map_or(false, |sh| {
                             crate::card::Card::need_heart_satisfied(ref_need, sh)
-                        });
+                        })
+                    } else {
+                        true
                     }
+                } else {
+                    true
+                };
+
+                if heart_needs_satisfied {
+                    total_score += card_score;
                 }
             }
         }

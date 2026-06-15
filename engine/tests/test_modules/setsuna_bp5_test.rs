@@ -87,7 +87,7 @@ fn setsuna_unequal_success_cards_no_heart() {
     game.pass();
     game.pass();
 
-    // Engine gap: condition check evaluates combined total (3) instead of comparing both sides.
+    // Condition should fail: P1 has 2 success cards, P2 has 1 (not equal)
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
@@ -95,8 +95,10 @@ fn setsuna_unequal_success_cards_no_heart() {
         .state
         .mods
         .get_heart_modifier(setsuna, rabuka_engine::card::HeartColor::Heart02);
-    assert_eq!(mod_val, 2,
-        "Unequal success cards (P1=2, P2=1) → condition evaluates incorrectly → heart02 still applied");
+    assert_eq!(
+        mod_val, 0,
+        "Unequal success cards (P1=2, P2=1) → condition correctly fails → heart02 not applied"
+    );
 }
 
 // ========================

@@ -54,6 +54,7 @@ fn link_to_future_three_distinct_members_plus_6() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(link);
     advance_to_live_start(&mut game);
+    game.drain_auto_ability_choices();
 
     let live_card_id = game.state.player1.live_card_zone.cards[0];
     let score_mod = game.state.mods.get_score_modifier(live_card_id);

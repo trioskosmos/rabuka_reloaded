@@ -19,6 +19,64 @@ use crate::display;
 
 pub use crate::display::{CardDisplay, ZoneDisplay, PlayerDisplay, StageDisplay, GameStateDisplay};
 
+// ====================================================================
+// Frame snapshot — lightweight board state using card IDs only
+// (no full CardDisplay objects — the card database has all names/data)
+// ====================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrameSnapshot {
+    pub frame: u64,
+    pub turn: u32,
+    pub phase: String,
+    pub active_player: String,
+    pub label: String,
+    pub p1: FramePlayerState,
+    pub p2: FramePlayerState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FramePlayerState {
+    pub hand: Vec<i16>,
+    pub hand_count: usize,
+    pub energy_count: usize,
+    pub deck_count: usize,
+    pub discard: Vec<i16>,
+    pub stage: [i16; 3],
+    pub stage_under: [Vec<i16>; 3],
+    pub live_zone: Vec<i16>,
+    pub success_live_zone: Vec<i16>,
+}
+
+impl FrameSnapshot {
+    pub fn capture(game_state: &crate::game_state::GameState, frame: u64, label: String) -> Self {
+        let p = |player: &crate::player::Player| FramePlayerState {
+            hand: player.hand.cards.iter().copied().collect(),
+            hand_count: player.hand.cards.len(),
+            energy_count: player.energy_zone.active_energy_count,
+            deck_count: player.main_deck.cards.len(),
+            discard: player.waitroom.cards.iter().copied().collect(),
+            stage: player.stage.stage,
+            stage_under: [
+                player.stage.under_cards[0].iter().copied().collect(),
+                player.stage.under_cards[1].iter().copied().collect(),
+                player.stage.under_cards[2].iter().copied().collect(),
+            ],
+            live_zone: player.live_card_zone.cards.iter().copied().collect(),
+            success_live_zone: player.success_live_card_zone.cards.iter().copied().collect(),
+        };
+        FrameSnapshot {
+            frame,
+            turn: game_state.turn_number,
+            phase: format!("{:?}", game_state.current_phase),
+            active_player: game_state.active_player().id.clone(),
+            label,
+            p1: p(&game_state.player1),
+            p2: p(&game_state.player2),
+        }
+    }
+}
+
 
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -233,6 +291,10 @@ pub struct AppState {
 
     pub custom_energy_decks: Arc<Mutex<HashMap<i32, Vec<String>>>>,
 
+    pub frame_counter: Arc<Mutex<u64>>,
+
+    pub frame_history: Arc<Mutex<Vec<FrameSnapshot>>>,
+
 }
 
 
@@ -410,6 +472,19 @@ async fn execute_action(
 
             data.history.lock().unwrap().push(snapshot);
             data.future.lock().unwrap().clear();
+
+            // Capture frame snapshot (card IDs only, ~0.5 KB each)
+            let mut fc = data.frame_counter.lock().unwrap();
+            *fc += 1;
+            let frame = *fc;
+            let label = format!(
+                "{}{}",
+                req.action_type.as_deref().unwrap_or("?"),
+                req.card_no.as_deref().map(|n| format!(": {}", n)).unwrap_or_default(),
+            );
+            data.frame_history.lock().unwrap().push(
+                FrameSnapshot::capture(&game_state, frame, label)
+            );
 
             let display = crate::display::game_state_to_display(&game_state);
             let actions = actions_with_index(&game_state);
@@ -692,6 +767,42 @@ async fn debug_dump_state(data: web::Data<AppState>) -> impl Responder {
     let game_state = lock_state!(data.game_state, read);
     let display = crate::display::game_state_to_display(&game_state);
     HttpResponse::Ok().json(serde_json::json!({"success": true, "state": display}))
+}
+
+/// GET /api/debug/frames — lightweight frame index
+/// Returns frame metadata (no card IDs), suitable for UI counter display.
+async fn debug_frames(data: web::Data<AppState>) -> impl Responder {
+    let frames = data.frame_history.lock().unwrap();
+    let current = frames.len().saturating_sub(1);
+    let index: Vec<serde_json::Value> = frames
+        .iter()
+        .map(|f| {
+            serde_json::json!({
+                "frame": f.frame,
+                "turn": f.turn,
+                "phase": f.phase,
+                "active_player": f.active_player,
+                "label": f.label,
+                "current": f.frame == current as u64,
+            })
+        })
+        .collect();
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "current_frame": current,
+        "total_frames": frames.len(),
+        "frames": index,
+    }))
+}
+
+/// GET /api/debug/dump_frames — download all frame snapshots as JSON
+async fn debug_dump_frames(data: web::Data<AppState>) -> impl Responder {
+    let frames = data.frame_history.lock().unwrap();
+    HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "total_frames": frames.len(),
+        "frames": *frames,
+    }))
 }
 
 
@@ -1528,7 +1639,8 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
         let deck_refs = [(&mut player1_deck, &energy_nos1), (&mut player2_deck, &energy_nos2)];
         for (deck, energy_ids) in deck_refs {
             for eid in energy_ids {
-                if let Some(card_id) = card_database.get_card_id(eid) {
+                if let Some(template_id) = card_database.get_card_id(eid) {
+                    let card_id = Arc::make_mut(&mut card_database).create_copy(template_id);
                     deck.energy_deck.push_back(card_id);
                 }
             }
@@ -1578,6 +1690,10 @@ async fn init_game(data: web::Data<AppState>, req: Option<web::Json<InitGameRequ
     *state_guard = game_state;
     data.history.lock().unwrap().clear();
     data.future.lock().unwrap().clear();
+    *data.frame_counter.lock().unwrap() = 0;
+    data.frame_history.lock().unwrap().clear();
+    let frame0 = FrameSnapshot::capture(&state_guard, 0, "Game start".into());
+    data.frame_history.lock().unwrap().push(frame0);
 
     let display = crate::display::game_state_to_display(&state_guard);
     let actions = actions_with_index(&state_guard);
@@ -1655,6 +1771,8 @@ pub async fn run_web_server() -> std::io::Result<()> {
         future: Arc::new(Mutex::new(Vec::new())),
         custom_decks: Arc::new(Mutex::new(HashMap::new())),
         custom_energy_decks: Arc::new(Mutex::new(HashMap::new())),
+        frame_counter: Arc::new(Mutex::new(0)),
+        frame_history: Arc::new(Mutex::new(Vec::new())),
     });
 
     println!("Game UI: http://127.0.0.1:8080");
@@ -1682,6 +1800,8 @@ pub async fn run_web_server() -> std::io::Result<()> {
             .route("/api/debug/redo", web::post().to(debug_redo))
             .route("/api/debug/snapshot", web::get().to(debug_snapshot))
             .route("/api/debug/dump_state", web::get().to(debug_dump_state))
+            .route("/api/debug/frames", web::get().to(debug_frames))
+            .route("/api/debug/dump_frames", web::get().to(debug_dump_frames))
             .route("/api/debug/conditions", web::get().to(debug_conditions))
             .route("/api/export_game", web::get().to(export_game))
             .route("/api/get_decks", web::get().to(get_decks))

@@ -49,7 +49,52 @@ impl AbilityResolver {
         ability_text: &str,
         target_trigger: Option<&str>,
         _count: Option<u32>,
+        source_card: Option<&str>,
     ) {
+        if let Some(card_id) = source_card.and_then(|sc| match sc {
+            "cost_card" => gs
+                .recently_moved_cards
+                .as_ref()
+                .and_then(|cards| cards.last().copied()),
+            _ => None,
+        }) {
+            let trigger = target_trigger.map(|t| t.to_string());
+            let card_name = gs.card_database.get_card(card_id).map(|c| {
+                let ab = c.abilities.clone();
+                let name = c.name.clone();
+                (ab, name)
+            });
+            if let Some((abilities, cn)) = card_name {
+                if let Some(ref trig) = trigger {
+                    for ability in &abilities {
+                        let ability_trigger = ability
+                            .triggers
+                            .as_ref()
+                            .and_then(|t| t.split('/').next())
+                            .unwrap_or("");
+                        if ability_trigger == trig {
+                            if let Some(ref effect) = ability.effect {
+                                let _ = self.execute_effect(gs, effect);
+                            }
+                            let pp = self.player_prefix(gs);
+                            gs.rule_log.push(format!(
+                                "{} {}: activated {} ability from {}",
+                                pp,
+                                gs.activating_card
+                                    .map(|c| self.card_name(c))
+                                    .unwrap_or_default(),
+                                trig,
+                                cn
+                            ));
+                            return;
+                        }
+                    }
+                }
+            }
+            return;
+        }
+
+        // Fallback: store gained ability string
         if let Some(card_id) = gs.activating_card {
             let mut text = ability_text.to_string();
             if let Some(trigger) = target_trigger {

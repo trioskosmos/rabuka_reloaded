@@ -36,9 +36,17 @@ fn rina_q226_position_clamps_to_bottom() {
     if game.has_pending_choice() {
         game.select_option(0); // pay the optional cost
     }
-    // Select the live card from discard
+    // Select the live card from discard (find its position — deck auto-discard pushes cards ahead of it)
     if game.has_pending_choice() {
-        game.select_indices(&[0]);
+        let live_idx = game
+            .state
+            .player1
+            .waitroom
+            .cards
+            .iter()
+            .position(|&c| c == live)
+            .unwrap();
+        game.select_indices(&[live_idx]);
     }
 
     // Deck should have 3 cards: 1 (the live card placed at bottom) + 2 (remaining)

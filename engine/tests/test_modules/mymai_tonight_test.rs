@@ -49,8 +49,7 @@ fn mymai_tonight_with_aqours_live_gains_blade() {
             .mods
             .blade_modifiers
             .get(&member_a)
-            .copied()
-            .unwrap_or(0)
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total)
             > 0
     );
 }
@@ -67,8 +66,7 @@ fn mymai_tonight_alone_no_blade() {
             .mods
             .blade_modifiers
             .get(&member_a)
-            .copied()
-            .unwrap_or(0),
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total),
         0
     );
 }
@@ -88,8 +86,7 @@ fn mymai_tonight_with_aqours_member_no_blade() {
             .mods
             .blade_modifiers
             .get(&member_a)
-            .copied()
-            .unwrap_or(0),
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total),
         0
     );
 }
@@ -109,8 +106,7 @@ fn mymai_tonight_with_non_aqours_live_no_blade() {
             .mods
             .blade_modifiers
             .get(&member_a)
-            .copied()
-            .unwrap_or(0),
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total),
         0
     );
 }
@@ -130,8 +126,7 @@ fn mymai_tonight_blade_disappears_after_live_end() {
             .mods
             .blade_modifiers
             .get(&member_a)
-            .copied()
-            .unwrap_or(0)
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total)
             > 0
     );
     game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance
@@ -142,8 +137,7 @@ fn mymai_tonight_blade_disappears_after_live_end() {
             .mods
             .blade_modifiers
             .get(&member_a)
-            .copied()
-            .unwrap_or(0),
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total),
         0
     );
 }

@@ -2,7 +2,7 @@
  * Centralized Modal Manager
  * Handles all modal visibility, display logic, and event delegation
  */
-import { DOM_IDS, DISPLAY_VALUES } from '../constants_dom.js';
+import { DISPLAY_VALUES } from '../constants_dom.js';
 
 export const ModalManager = {
   /**

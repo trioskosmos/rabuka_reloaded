@@ -1,6 +1,7 @@
 /// Hierarchical debug output for ability evaluation.
 /// Every line shows WHAT is being checked, WHAT the expected value is,
 /// and WHAT the actual game state value is — all in one self-contained line.
+use crate::ability::enums::ConditionType;
 use crate::card::{Ability, AbilityCost, AbilityEffect, Condition};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -32,6 +33,21 @@ impl AbDebug {
     pub fn flush_to_rule_log(rule_log: &mut Vec<String>) {
         if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
             rule_log.extend(buffer.drain(..));
+        }
+    }
+
+    pub fn flush_to_structured_log(structured_log: &mut Vec<crate::types::LogEntry>, turn: u32) {
+        if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
+            for line in buffer.drain(..) {
+                structured_log.push(crate::types::LogEntry {
+                    text: line,
+                    turn,
+                    player_label: String::new(),
+                    source_card_id: None,
+                    source_card_name: None,
+                    category: "debug".to_string(),
+                });
+            }
         }
     }
 
@@ -71,7 +87,7 @@ impl AbDebug {
     }
 
     pub fn condition(&mut self, cond: &Condition, actual: u32, threshold: u32, passed: bool) {
-        let ct = cond.condition_type.as_deref().unwrap_or("?");
+        let ct = cond.condition_type;
         let loc = cond.location.as_deref().unwrap_or("");
         let tgt = cond.target.as_deref().unwrap_or("");
         let gn = cond
@@ -81,12 +97,15 @@ impl AbDebug {
             .unwrap_or_default();
         let op = cond.operator.as_deref().unwrap_or(">=");
         let pass = if passed { "PASS" } else { "FAIL" };
-        let detail = match ct {
-            "compound" => format!(
-                "{} sub-conditions",
-                cond.conditions.as_ref().map(|c| c.len()).unwrap_or(0)
+        let (ct_label, detail): (&str, String) = match ct {
+            Some(ConditionType::Compound) => (
+                "compound",
+                format!(
+                    "{} sub-conditions",
+                    cond.conditions.as_ref().map(|c| c.len()).unwrap_or(0)
+                ),
             ),
-            "card_count_condition" => {
+            Some(ConditionType::CardCountCondition) => ("card_count_condition", {
                 let mut parts = vec![format!(
                     "{}{} {}{}",
                     op,
@@ -103,9 +122,9 @@ impl AbDebug {
                 parts.push(format!("actual={}", actual));
                 parts.push(pass.to_string());
                 parts.join(" ")
-            }
-            "location_condition" => {
-                let extras = if cond.distinct.unwrap_or(false) {
+            }),
+            Some(ConditionType::LocationCondition) => ("location_condition", {
+                let extras = if cond.distinct.as_ref().map_or(false, |d| d.is_distinct()) {
                     " distinct=names"
                 } else {
                     ""
@@ -114,15 +133,15 @@ impl AbDebug {
                     "{}{} @{}.{}{} → actual={} {}",
                     op, threshold, loc, tgt, extras, actual, pass
                 )
-            }
-            "comparison_condition" => {
+            }),
+            Some(ConditionType::ComparisonCondition) => ("comparison_condition", {
                 let rt = cond.resource_type.as_deref().unwrap_or("?");
                 format!(
                     "{}{} {}{} → actual={} {}",
                     op, threshold, rt, loc, actual, pass
                 )
-            }
-            "appearance_condition" => {
+            }),
+            Some(ConditionType::AppearanceCondition) => ("appearance_condition", {
                 let areas = if cond.all_areas.unwrap_or(false) {
                     " all_areas"
                 } else {
@@ -138,21 +157,32 @@ impl AbDebug {
                     },
                     pass
                 )
+            }),
+            Some(ConditionType::MovementCondition) => (
+                "movement_condition",
+                format!(
+                    "movement={}{} → {}",
+                    cond.movement.as_deref().unwrap_or("?"),
+                    loc,
+                    pass
+                ),
+            ),
+            Some(ConditionType::OrCondition) => (
+                "or_condition",
+                format!(
+                    "{} sub-conditions (any)",
+                    cond.conditions.as_ref().map(|c| c.len()).unwrap_or(0)
+                ),
+            ),
+            Some(ConditionType::OtherwiseCondition) => {
+                ("otherwise_condition", format!("else branch → {}", pass))
             }
-            "movement_condition" => format!(
-                "movement={}{} → {}",
-                cond.movement.as_deref().unwrap_or("?"),
-                loc,
-                pass
-            ),
-            "or_condition" => format!(
-                "{} sub-conditions (any)",
-                cond.conditions.as_ref().map(|c| c.len()).unwrap_or(0)
-            ),
-            "otherwise_condition" => format!("else branch → {}", pass),
-            _ => format!("{} ... {}", ct, pass),
+            _ => {
+                let label = ct.map(|c| c.to_str()).unwrap_or("?");
+                (label, format!("... {}", pass))
+            }
         };
-        self.p("COND", format_args!("{:20} {}", ct, detail));
+        self.p("COND", format_args!("{:20} {}", ct_label, detail));
     }
 
     pub fn cost_pay(&mut self, cost: &AbilityCost, ok: bool) {

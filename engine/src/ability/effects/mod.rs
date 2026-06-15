@@ -7,6 +7,7 @@ pub mod state;
 pub(crate) use draw::draw_cards_for_player;
 
 use super::debug::AbDebug;
+use super::enums::{ActionType, Zone};
 use super::resolver::AbilityResolver;
 use super::types::Choice;
 use super::util;
@@ -45,13 +46,14 @@ impl AbilityResolver {
             gs.non_stackable_effects.insert(effect_key);
         }
 
-        if effect.action_by.as_deref() == Some("opponent") {
+        if effect.action_by.as_deref() == Some("opponent") || effect.action == "opponent_action" {
             if let Some(ref opponent_action) = effect.opponent_action {
                 let mut modified = opponent_action.clone();
                 if modified.target.is_none() || modified.target.as_deref() == Some("self") {
                     modified.target = Some("opponent".to_string());
                 }
                 self.execute_effect(gs, &modified)?;
+                return Ok(());
             }
         }
 
@@ -120,39 +122,50 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        match action_str.as_str() {
-            "sequential" => self.execute_sequential_effect(
+        // Convert string action to typed enum for stronger dispatch
+        let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
+
+        match action_type {
+            ActionType::Sequential => self.execute_sequential_effect(
                 gs,
                 effect,
                 effect.conditional.unwrap_or(false),
                 effect.is_further.unwrap_or(false),
             ),
-            "conditional_alternative" => self.execute_conditional_alternative(gs, effect),
-            "look_and_select" => self.execute_look_and_select(gs, effect),
-            "select_cards" => self.execute_select_cards(gs, effect),
-            "draw" | "draw_card" => self.execute_draw_wrapper(gs, effect),
-            "draw_until_count" => {
+            ActionType::ConditionalAlternative => self.execute_conditional_alternative(gs, effect),
+            ActionType::LookAndSelect => self.execute_look_and_select(gs, effect),
+            ActionType::SelectCards => self.execute_select_cards(gs, effect),
+            ActionType::Draw | ActionType::DrawCard => self.execute_draw_wrapper(gs, effect),
+            ActionType::DrawUntilCount => {
                 self.execute_draw_until_count(
                     gs,
                     effect.target_count.unwrap_or(0),
                     effect.target_name(),
-                    effect.destination.as_deref().unwrap_or("hand"),
+                    effect.destination.as_deref().unwrap_or(Zone::Hand.to_str()),
                 );
                 Ok(())
             }
-            "discard_card" | "move_cards" => self.execute_move_cards(gs, effect),
-            "gain_resource" => self.execute_gain_resource(gs, effect),
-            "change_state" => {
+            ActionType::DiscardCard | ActionType::MoveCards => self.execute_move_cards(gs, effect),
+            ActionType::GainResource => self.execute_gain_resource(gs, effect),
+            ActionType::ChangeState => {
+                let change_cost_limit = if effect.cost_from_revealed.unwrap_or(false) {
+                    gs.revealed_cards
+                        .first()
+                        .and_then(|&cid| gs.card_database.get_card(cid))
+                        .and_then(|c| c.cost)
+                } else {
+                    effect.cost_limit
+                };
                 let mut change_count = effect.count_or(0);
                 let mut change_group = effect.group_name();
                 if effect.per_unit.unwrap_or(false) {
                     let player = gs.resolve_target_player(&effect.target_name());
-                    let location = effect.location.as_deref().unwrap_or("stage");
+                    let location = effect.location.as_deref().unwrap_or(Zone::Stage.to_str());
                     let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
                     let per_unit_filter = util::filter_from_parts(
                         effect.card_type.as_deref(),
                         change_group,
-                        effect.cost_limit,
+                        change_cost_limit,
                         None,
                         effect.characters.as_ref(),
                         None,
@@ -174,7 +187,7 @@ impl AbilityResolver {
                     change_count,
                     effect.max.unwrap_or(false),
                     effect.card_type.as_deref(),
-                    effect.cost_limit,
+                    change_cost_limit,
                     effect.optional.unwrap_or(false),
                     change_group,
                     effect.self_cost.unwrap_or(false),
@@ -186,7 +199,7 @@ impl AbilityResolver {
                     effect.blade_limit_operator.as_deref(),
                 )
             }
-            "modify_score" => self.execute_modify_score(
+            ActionType::ModifyScore => self.execute_modify_score(
                 gs,
                 effect,
                 effect.operation.as_deref().unwrap_or("add"),
@@ -202,11 +215,11 @@ impl AbilityResolver {
                 effect.self_target.unwrap_or(false),
                 &effect.heart_colors,
             ),
-            "modify_required_hearts" => self.execute_modify_required_hearts(
+            ActionType::ModifyRequiredHearts => self.execute_modify_required_hearts(
                 gs,
                 effect.operation.as_deref().unwrap_or("decrease"),
-                effect.value.or(effect.count).unwrap_or(0),
-                effect.heart_color_or("heart00"),
+                effect.value_or_count(0),
+                &effect.heart_colors,
                 effect.target_name(),
                 effect.per_unit.unwrap_or(false),
                 effect.per_unit_count.unwrap_or(1),
@@ -214,7 +227,7 @@ impl AbilityResolver {
                 effect.timing_condition.as_deref(),
                 effect.location.as_deref(),
             ),
-            "set_cost" => {
+            ActionType::SetCost => {
                 self.execute_set_cost(
                     gs,
                     effect.value.unwrap_or(0),
@@ -223,7 +236,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "set_blade_type" => {
+            ActionType::SetBladeType => {
                 self.execute_set_blade_type(
                     gs,
                     effect.blade_type.as_deref(),
@@ -232,7 +245,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "set_heart_type" => {
+            ActionType::SetHeartType => {
                 self.execute_set_heart_type(
                     gs,
                     effect
@@ -244,40 +257,49 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "activate_ability" => {
+            ActionType::ActivateAbility => {
                 self.execute_activate_ability(
                     gs,
                     effect.ability_text.as_deref().unwrap_or(""),
                     effect.target_trigger.as_deref(),
                     effect.count,
+                    effect.source_card.as_deref(),
                 );
                 Ok(())
             }
-            "invalidate_ability" => {
+            ActionType::InvalidateAbility => {
                 self.execute_invalidate_ability(gs);
                 Ok(())
             }
-            "gain_ability" => self.execute_gain_ability_effect(gs, effect),
-            "gain_ability_from_source" => self.execute_gain_ability_from_source(gs, effect),
-            "play_baton_touch" => {
+            ActionType::GainAbility => self.execute_gain_ability_effect(gs, effect),
+            ActionType::GainAbilityFromSource => self.execute_gain_ability_from_source(gs, effect),
+            ActionType::PlayBatonTouch => {
                 self.execute_play_baton_touch(gs, effect.count_or(1), effect.target_name())
             }
-            "reveal" => self.execute_reveal_effect(gs, effect),
-            "select" => self.execute_select_effect(gs, effect),
-            "look_at" => self.execute_look_at(
-                gs,
-                effect.count_or(1),
-                effect.target_name(),
-                effect.source_or("deck"),
-            ),
-            "modify_required_hearts_global" => self.execute_modify_required_hearts_standard(
+            ActionType::Reveal => self.execute_reveal_effect(gs, effect),
+            ActionType::Select => self.execute_select_effect(gs, effect),
+            ActionType::LookAt => {
+                let count = if let Some(ref dc) = effect.dynamic_count {
+                    self.resolve_dynamic_count(gs, dc)
+                } else {
+                    effect.count_or(1)
+                };
+                self.execute_look_at(
+                    gs,
+                    effect,
+                    count,
+                    effect.target_name(),
+                    effect.source_or(Zone::Deck.to_str()),
+                )
+            }
+            ActionType::ModifyRequiredHeartsGlobal => self.execute_modify_required_hearts_standard(
                 gs,
                 effect.operation.as_deref().unwrap_or("increase"),
-                effect.value.or(effect.count).unwrap_or(1),
-                effect.heart_color_or("heart00"),
+                effect.value_or_count(1),
+                &effect.heart_colors,
                 effect.target_name(),
             ),
-            "modify_yell_count" => {
+            ActionType::ModifyYellCount => {
                 self.execute_modify_yell_count(
                     gs,
                     effect.operation.as_deref().unwrap_or("subtract"),
@@ -285,7 +307,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "place_energy_under_member" => {
+            ActionType::PlaceEnergyUnderMember => {
                 self.execute_place_energy_under_member(
                     gs,
                     effect.energy_count.unwrap_or(1),
@@ -296,7 +318,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "activation_cost" => {
+            ActionType::ActivationCost => {
                 self.execute_activation_cost(
                     gs,
                     effect.operation.as_deref().unwrap_or("increase"),
@@ -306,52 +328,39 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "position_change" => self.execute_position_change(
+            ActionType::PositionChange => self.execute_position_change(
                 gs,
                 effect,
                 effect.position.clone(),
                 effect.target_name(),
                 effect.target_member.as_deref().unwrap_or("this_member"),
             ),
-            "formation_change" => {
-                gs.formation_change_occurred_this_turn = true;
-                self.execute_position_change(
-                    gs,
-                    effect,
-                    effect.position.clone(),
-                    effect.target_name(),
-                    "this_member",
-                )
-            }
-            "appear" => self.execute_appear(gs, effect),
-            "choice" => self.execute_choice(
-                gs,
-                effect.choice_options.as_ref(),
-                effect.choice_type.as_deref(),
-                effect.options.as_ref(),
-                effect.choice_maker.as_deref(),
-            ),
-            "pay_energy" => {
+
+            ActionType::Choice => self.execute_choice(gs, effect),
+            ActionType::PayEnergy => {
                 self.execute_pay_energy(gs, effect.count_or(0), effect.target_name());
                 Ok(())
             }
-            "set_card_identity" => self.execute_set_card_identity_effect(gs, effect),
-            "repeat_procedure" => {
+            ActionType::SetCardIdentity => self.execute_set_card_identity_effect(gs, effect),
+            ActionType::RepeatProcedure => {
                 self.execute_repeat_procedure(gs, effect, effect.repeat_limit.unwrap_or(1))
             }
-            "discard_until_count" => self.execute_discard_until_count(
+            ActionType::DiscardUntilCount => self.execute_discard_until_count(
                 gs,
                 effect.target_count.unwrap_or(0),
                 effect.target_name(),
             ),
-            "restriction" => self.execute_restriction(
+            ActionType::Restriction => self.execute_restriction(
                 gs,
                 effect.restriction_type.as_deref(),
-                effect.restricted_destination.as_deref(),
+                effect
+                    .restricted_destination
+                    .as_deref()
+                    .or_else(|| effect.destination.as_deref()),
                 effect.target_name(),
                 effect.delayed.unwrap_or(false),
             ),
-            "re_yell" => {
+            ActionType::ReYell => {
                 self.execute_re_yell(
                     gs,
                     effect.lose_blade_hearts.unwrap_or(false),
@@ -359,20 +368,20 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "activation_restriction" => {
+            ActionType::ActivationRestriction => {
                 self.execute_activation_restriction(gs, effect.target_name());
                 Ok(())
             }
-            "choose_required_hearts" => {
+            ActionType::ChooseRequiredHearts => {
                 self.execute_choose_required_hearts(gs);
                 Ok(())
             }
-            "modify_limit" => self.execute_modify_limit(
+            ActionType::ModifyLimit => self.execute_modify_limit(
                 gs,
                 effect.operation.as_deref().unwrap_or("decrease"),
                 effect.count_or(0),
             ),
-            "set_blade_count" => {
+            ActionType::SetBladeCount => {
                 self.execute_set_blade_count(
                     gs,
                     effect.value.unwrap_or(effect.count_or(0)),
@@ -380,17 +389,10 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "custom" => self.execute_custom(gs, effect, &action_str),
-            "do_nothing" => Ok(()),
-            "set_required_hearts" => {
-                self.execute_set_required_hearts(gs, &effect.heart_colors, effect.target_name());
-                Ok(())
-            }
-            "set_score" => {
-                self.execute_set_score(gs, effect.value.unwrap_or(0), effect.target_name());
-                Ok(())
-            }
-            "specify_heart_color" => {
+            ActionType::Custom => self.execute_custom(gs, effect, &action_str),
+            ActionType::DoNothing => Ok(()),
+
+            ActionType::SpecifyHeartColor => {
                 self.execute_specify_heart_color(
                     gs,
                     effect.choice.unwrap_or(false),
@@ -398,7 +400,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "modify_required_hearts_success" => {
+            ActionType::ModifyRequiredHeartsSuccess => {
                 self.execute_modify_required_hearts_success(
                     gs,
                     effect.operation.as_deref().unwrap_or("increase"),
@@ -409,8 +411,8 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "set_cost_to_use" => self.execute_set_cost_to_use(gs, effect.value.unwrap_or(0)),
-            "all_blade_timing" => {
+            ActionType::SetCostToUse => self.execute_set_cost_to_use(gs, effect.value.unwrap_or(0)),
+            ActionType::AllBladeTiming => {
                 self.execute_all_blade_timing(
                     gs,
                     effect.timing.as_deref().unwrap_or("check_required_hearts"),
@@ -418,7 +420,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "set_card_identity_all_regions" => {
+            ActionType::SetCardIdentityAllRegions => {
                 self.execute_set_card_identity_all_regions(
                     gs,
                     effect.identities.as_ref(),
@@ -426,23 +428,27 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            "shuffle" => {
-                self.execute_shuffle(gs, effect.target_name(), effect.source_or("deck"));
+            ActionType::Shuffle => {
+                self.execute_shuffle(
+                    gs,
+                    effect.target_name(),
+                    effect.source_or(Zone::Deck.to_str()),
+                );
                 Ok(())
             }
-            "reveal_per_group" => self.execute_reveal_per_group(
+            ActionType::RevealPerGroup => self.execute_reveal_per_group(
                 gs,
-                effect.source_or("hand"),
+                effect.source_or(Zone::Hand.to_str()),
                 effect.count_or(1),
                 effect.target_name(),
             ),
-            "conditional_on_result" => self.execute_conditional_on_result(gs, effect),
-            "conditional_on_optional" => self.execute_conditional_on_optional(gs, effect),
-            "modify_cost" => {
+            ActionType::ConditionalOnResult => self.execute_conditional_on_result(gs, effect),
+            ActionType::ConditionalOnOptional => self.execute_conditional_on_optional(gs, effect),
+            ActionType::ModifyCost => {
                 let mut value = effect.value.unwrap_or(0);
                 if effect.per_unit.unwrap_or(false) {
                     let player = gs.resolve_target_player(&effect.target_name());
-                    let zone = effect.location.as_deref().unwrap_or("hand");
+                    let zone = effect.location.as_deref().unwrap_or(Zone::Hand.to_str());
                     let cards: Vec<i16> = crate::ability::util::zone_cards(player, zone).to_vec();
                     let count = cards.len() as u32;
                     let per_unit_count = effect.per_unit_count.unwrap_or(1);
@@ -459,13 +465,14 @@ impl AbilityResolver {
                     value,
                     effect.target_name(),
                     effect.card_type.as_deref(),
+                    effect.duration.as_deref(),
                 );
                 Ok(())
             }
-            "reveal_until_live_card" => {
+            ActionType::RevealUntilLiveCard => {
                 self.execute_reveal_until_live_card(gs, effect.target_name())
             }
-            "reveal_until_chosen_card" => self.execute_reveal_until_chosen_card(gs, effect),
+            ActionType::RevealUntilChosenCard => self.execute_reveal_until_chosen_card(gs, effect),
             _ => {
                 eprintln!("Unknown effect action: '{}'", action_str);
                 Ok(())

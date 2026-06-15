@@ -46,6 +46,7 @@ fn ladybug_q114_both_members_on_stage_reduces_hearts() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(ladybug);
     advance_to_live_start(&mut game);
+    game.drain_auto_ability_choices();
 
     // LiveStart abilities fire. Ladybug's condition checks for
     // 小鈴 and さやか on stage (both present).
@@ -53,11 +54,10 @@ fn ladybug_q114_both_members_on_stage_reduces_hearts() {
     // The exact reduction is visible in game state need_heart_modifiers.
     let heart_mods = &game.state.mods.need_heart_modifiers;
     eprintln!("[LADYBUG] need_heart_modifiers: {:?}", heart_mods);
-    let reduction = heart_mods
+    let reduction: i32 = heart_mods
         .get(&ladybug)
         .and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00))
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     let all_mods = heart_mods.get(&ladybug);
     eprintln!("[LADYBUG] all mods for ladybug: {:?}", all_mods);
     assert_eq!(
@@ -89,13 +89,12 @@ fn ladybug_q114_missing_sayaka_no_reduction() {
     game.set_live_card(ladybug);
     advance_to_live_start(&mut game);
 
-    let reduction = game
+    let reduction: i32 = game
         .state
         .mods
         .need_heart_modifiers
         .get(&ladybug)
         .and_then(|m| m.get(&rabuka_engine::card::HeartColor::Heart00))
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(reduction, 0, "Q114: Missing さやか → no heart reduction");
 }

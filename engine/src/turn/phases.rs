@@ -1,3 +1,4 @@
+use crate::ability::enums::Zone;
 use crate::constants::MAX_LIVE_CARDS;
 use crate::game_state::{GameState, Phase};
 
@@ -42,20 +43,27 @@ impl super::TurnEngine {
                             .stage
                             .iter()
                             .filter_map(|&cid| {
-                                if cid != -1
-                                    && game_state.mods.get_orientation_modifier(cid)
-                                        == Some(&"wait".to_string())
-                                {
-                                    Some(cid)
-                                } else {
-                                    None
+                                if cid == -1 {
+                                    return None;
                                 }
+                                if game_state.mods.get_orientation_modifier(cid)
+                                    != Some(&"wait".to_string())
+                                {
+                                    return None;
+                                }
+                                // Skip members with an active delayed_cannot_active flag
+                                if game_state.mods.is_delayed_cannot_active(cid) {
+                                    return None;
+                                }
+                                Some(cid)
                             })
                             .collect()
                     };
                     for &cid in &to_activate {
                         game_state.mods.add_orientation_modifier(cid, "active");
                     }
+                    // Tick down delayed_cannot_active counters after activation
+                    game_state.mods.tick_delayed_cannot_active();
                     game_state.active_player_mut().activate_all_energy();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Energy;
@@ -132,12 +140,41 @@ impl super::TurnEngine {
     fn execute_performance_phase(game_state: &mut GameState, is_first: bool) {
         let mut resolution_zone = std::mem::take(&mut game_state.resolution_zone);
         let card_db = game_state.card_database.clone();
-        let bm = game_state.mods.blade_modifiers.clone();
+        let bm: std::collections::HashMap<i16, i32> = game_state
+            .mods
+            .blade_modifiers
+            .iter()
+            .map(|(&k, e)| (k, e.total()))
+            .collect();
         let ho = game_state.mods.heart_override.clone();
-        let hm = game_state.mods.heart_modifiers.clone();
+        let hm: std::collections::HashMap<
+            i16,
+            std::collections::HashMap<crate::card::HeartColor, i32>,
+        > = game_state
+            .mods
+            .heart_modifiers
+            .iter()
+            .map(|(&k, colors)| {
+                let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
+                    colors.iter().map(|(&c, e)| (c, e.total())).collect();
+                (k, flat)
+            })
+            .collect();
         let btm = game_state.mods.blade_type_modifiers.clone();
         let om = game_state.mods.orientation_modifiers.clone();
-        let nhm = game_state.mods.need_heart_modifiers.clone();
+        let nhm: std::collections::HashMap<
+            i16,
+            std::collections::HashMap<crate::card::HeartColor, i32>,
+        > = game_state
+            .mods
+            .need_heart_modifiers
+            .iter()
+            .map(|(&k, colors)| {
+                let flat: std::collections::HashMap<crate::card::HeartColor, i32> =
+                    colors.iter().map(|(&c, e)| (c, e.total())).collect();
+                (k, flat)
+            })
+            .collect();
         let cannot_live = game_state.is_action_prohibited("cannot_live");
         let player = if is_first {
             game_state.first_attacker_mut()
@@ -170,21 +207,56 @@ impl super::TurnEngine {
             game_state.cheer_revealed_cards_first(is_first).push(*cid);
         }
         *game_state.cheer_blade_heart_count_mut(is_first) = note_icons;
-        let (perf_player_id, perf_player) = if is_first {
+        let (perf_player_id, _perf_player) = if is_first {
             let p = game_state.first_attacker();
             (p.id.clone(), p)
         } else {
             let p = game_state.second_attacker();
             (p.id.clone(), p)
         };
-        let snap = crate::turn::live::build_snapshot(
+        // Enrich member contributions from ability_applications before snapshot
+        let mut mc = perf_data.member_contributions.clone();
+        let mut bd = crate::types::Breakdown {
+            hearts: perf_data.heart_sources.clone(),
+            blades: perf_data.blade_sources.clone(),
+            allocations: perf_data.allocations.clone(),
+            requirements: Vec::new(),
+            transforms: Vec::new(),
+            scores: Vec::new(),
+        };
+        let mut tas = Vec::new();
+        let apps = std::mem::take(&mut game_state.ability_applications);
+        crate::turn::live::enrich_from_applications(
+            &mut mc,
+            &mut bd,
+            &mut tas,
+            &apps,
+            &game_state.card_database,
+        );
+
+        // Also collect draw effect triggered ability
+        if perf_data.draw_effects_occurred {
+            tas.push(crate::types::TriggeredAbility {
+                source_card_id: -1,
+                name: "Draw Effect".to_string(),
+                card_name: String::new(),
+                effect_text: "カードを引く効果が発動しました".to_string(),
+                condition_text: None,
+                is_public: true,
+            });
+        }
+
+        let mut snap = crate::turn::live::build_snapshot(
             turn,
             &perf_player_id,
             &perf_data,
             &game_state.card_database,
-            perf_player,
             note_icons,
         );
+        // Replace placeholder data with enriched versions from ability_applications
+        snap.member_contributions = mc;
+        snap.breakdown = bd;
+        snap.triggered_abilities = tas;
         game_state.performance_snapshots.push(snap);
         let pid = perf_player_id;
         Self::trigger_auto_abilities_for_player(game_state, &pid);
@@ -457,6 +529,12 @@ impl super::TurnEngine {
         if baton_touch_used {
             game_state.record_baton_touch();
             game_state.baton_touch_arriving_card_id = Some(card_id);
+            // The replaced member moved stage→waitroom; record it so that
+            // "手札から控え室に置かれるたび" auto-abilities do NOT fire.
+            if let Some(replaced_id) = replaced_member_id {
+                game_state.recently_moved_cards = Some(vec![replaced_id]);
+                game_state.recently_moved_from_zone = Some("stage".to_string());
+            }
             if has_double_baton {
                 let second_area = {
                     let player = game_state.active_player();
@@ -486,6 +564,13 @@ impl super::TurnEngine {
                         let _ = player
                             .remove_member_from_stage_with_recycling(area2 as usize, &card_db);
                         player.waitroom.cards.push(eid);
+                        // Also include second baton-touch replacement in recently_moved tracking
+                        if let Some(ref mut rmc) = game_state.recently_moved_cards {
+                            rmc.push(eid);
+                        } else {
+                            game_state.recently_moved_cards = Some(vec![eid]);
+                            game_state.recently_moved_from_zone = Some("stage".to_string());
+                        }
                     }
                     game_state.record_baton_touch();
                     game_state.baton_touch_replaced_member_id =
@@ -494,6 +579,7 @@ impl super::TurnEngine {
                 game_state.last_vacated_stage_area = other_vacated;
             }
         }
+
 
         // Track area move for movement_condition "moves"
         eprintln!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
@@ -584,8 +670,10 @@ impl super::TurnEngine {
                                 .as_ref()
                                 .and_then(|e| e.condition.as_ref())
                                 .map_or(false, |c| {
-                                    c.location.as_deref() == Some("discard")
-                                        || c.location.as_deref() == Some("waitroom")
+                                    matches!(
+                                        Zone::from_str(c.location.as_deref().unwrap_or("")),
+                                        Some(Zone::Discard | Zone::Waitroom)
+                                    )
                                 })
                     })
                     .map(|ability| {

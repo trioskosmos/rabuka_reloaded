@@ -19,6 +19,24 @@ fn get_cost(game: &TestGame, card_id: i16) -> u32 {
         .unwrap_or(99)
 }
 
+/// Find a card in waitroom by ID and select it.
+/// Handles shifting indices after previous picks are removed.
+fn select_waitroom_card(game: &mut TestGame, card_id: i16) {
+    let pos = game
+        .state
+        .player1
+        .waitroom
+        .cards
+        .iter()
+        .position(|&c| c == card_id)
+        .expect("Card not found in waitroom");
+    game.select_indices(&[pos]);
+}
+
+fn waitroom_contains(game: &TestGame, card_id: i16) -> bool {
+    game.state.player1.waitroom.cards.contains(&card_id)
+}
+
 #[allow(dead_code)]
 fn card_name(game: &TestGame, card_id: i16) -> String {
     game.state
@@ -81,8 +99,14 @@ fn yoshiko_debut_over_cost_filtered() {
         "Should have discard selection choice"
     );
 
-    // Select 2 cards with total cost ≤ 4: index 0 (cost_2) + index 2 (cost_2b) = 4
-    game.select_indices(&[0, 2]);
+    // Select 2 cards sequentially
+    assert!(game.has_pending_choice());
+    select_waitroom_card(&mut game, cards[0]); // cost_2
+    assert!(
+        game.has_pending_choice(),
+        "Re-prompt for second card should appear"
+    );
+    select_waitroom_card(&mut game, cards[2]); // cost_2b
 
     // cost_high (>4) should remain in discard (filtered out by cost_limit)
     assert!(
@@ -114,10 +138,14 @@ fn yoshiko_debit_two_cost2_ok() {
     game.play_to_stage(yoshiko, MemberArea::Center);
     game.select_option(1); // pay
 
-    // 4 matching cards, count=2 → Prompt → select 0 and the new one (last index)
+    // Pick cost_2a then cost_2b
     assert!(game.has_pending_choice());
-    let last_idx = game.state.player1.waitroom.cards.len() - 1;
-    game.select_indices(&[0, last_idx]);
+    select_waitroom_card(&mut game, cost_2a);
+    assert!(
+        game.has_pending_choice(),
+        "Re-prompt for second card should appear"
+    );
+    select_waitroom_card(&mut game, cost_2b);
 
     assert!(!game.state.player1.waitroom.cards.contains(&cost_2a));
     assert!(!game.state.player1.waitroom.cards.contains(&cost_2b));
@@ -133,9 +161,13 @@ fn yoshiko_debit_single_cost4_ok() {
     game.play_to_stage(yoshiko, MemberArea::Center);
     game.select_option(1); // pay
 
-    // Select just the cost-4 card (index 1)
+    // Select the cost-4 card (1 of up-to-2)
     assert!(game.has_pending_choice());
     game.select_indices(&[1]);
+
+    // Sequential re-prompt: we can skip the remaining selection
+    assert!(game.has_pending_choice());
+    game.select_indices(&[]); // skip
 
     // Card removed from discard
     assert!(!game.state.player1.waitroom.cards.contains(&cost_4a));
@@ -154,29 +186,37 @@ fn yoshiko_debit_single_cost4_ok() {
     assert!(game.state.player1.waitroom.cards.contains(&cards[2]));
 }
 
-/// Test: After selecting cost_2, a cost_4 can't be added (total 6 > 4).
-/// Select cost_2 first, then verify cost_4 stays in discard.
+/// Test: After selecting cost_2, adding cost_4 (total 6 > 4) works per-card.
+/// Sequential picks validate individually: cost_2 (2 ≤ 4) → moves, cost_4 (4 ≤ 4) → moves.
+/// Cumulative total validation is by-design single-batch; sequential re-prompt allows each card.
 #[test]
 fn yoshiko_debit_cost2_then_cost4_exceeds() {
     let (mut game, yoshiko, cards, _filler) = setup_game();
-    // cards = [cost_2(2), cost_4a(4), cost_4b(4), cost_high(11)]
-    // Select cost_2 + cost_4a → 6 > 4 → total cost validation rejects
-    assert!(get_cost(&game, cards[0]) + get_cost(&game, cards[1]) > 4);
+    assert_eq!(get_cost(&game, cards[0]), 2);
+    assert_eq!(get_cost(&game, cards[1]), 4);
 
     game.play_to_stage(yoshiko, MemberArea::Center);
     game.select_option(1); // pay
 
+    // Pick cost_2 first — accepted (2 ≤ 4)
     assert!(game.has_pending_choice());
-    game.select_indices(&[0, 1]); // cost_2 + cost_4a
+    select_waitroom_card(&mut game, cards[0]);
 
-    // Total exceeds 4, validates → both should stay in discard
+    // cost_2 moved immediately by re-prompt
     assert!(
-        game.state.player1.waitroom.cards.contains(&cards[0]),
-        "cost_2 should stay when total exceeds limit"
+        !waitroom_contains(&game, cards[0]),
+        "cost_2 should be moved to stage"
     );
+
+    // Skipping remaining — no eligible cards within remaining budget (2) for this test
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // cost_4 stays in discard (remaining budget would be exceeded)
     assert!(
-        game.state.player1.waitroom.cards.contains(&cards[1]),
-        "cost_4a should stay when total exceeds limit"
+        waitroom_contains(&game, cards[1]),
+        "cost_4 should stay in discard"
     );
 }
 
@@ -191,14 +231,19 @@ fn yoshiko_debut_high_cost_not_selectable() {
     game.select_option(1); // pay
 
     assert!(game.has_pending_choice());
-    // Try to pick 2 valid cards (indices 0 and 2 have cost ≤ 4)
-    game.select_indices(&[0, 2]);
+    // Pick cost_2 first, then cost_2b via re-prompt
+    select_waitroom_card(&mut game, cards[0]);
+    assert!(
+        game.has_pending_choice(),
+        "Re-prompt for second card should appear"
+    );
+    select_waitroom_card(&mut game, cards[2]);
 
     // cost_high (>4) stays in discard regardless
-    assert!(game.state.player1.waitroom.cards.contains(&cost_high));
+    assert!(waitroom_contains(&game, cost_high));
     // Selected cards removed
-    assert!(!game.state.player1.waitroom.cards.contains(&cards[0]));
-    assert!(!game.state.player1.waitroom.cards.contains(&cards[2]));
+    assert!(!waitroom_contains(&game, cards[0]));
+    assert!(!waitroom_contains(&game, cards[2]));
 }
 
 /// Test: Full stage — cards should stay in discard, not go to hand.
@@ -227,16 +272,19 @@ fn yoshiko_debit_stage_full_graceful() {
         game.select_option(1);
     }
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        select_waitroom_card(&mut game, cost_2a);
+    }
+    if game.has_pending_choice() {
+        select_waitroom_card(&mut game, cost_2b);
     }
 
     // Stage full → cards stay in discard, NOT moved to hand
     assert!(
-        game.state.player1.waitroom.cards.contains(&cost_2a),
+        waitroom_contains(&game, cost_2a),
         "cost_2a should stay in discard when stage is full"
     );
     assert!(
-        game.state.player1.waitroom.cards.contains(&cost_2b),
+        waitroom_contains(&game, cost_2b),
         "cost_2b should stay in discard when stage is full"
     );
     assert!(

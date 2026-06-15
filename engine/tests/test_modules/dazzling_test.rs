@@ -41,6 +41,7 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
     game.set_live_card(dazzling);
     game.pass();
     game.pass();
+    game.drain_auto_ability_choices();
 
     // LiveStart fires: 3 sequential actions
     // Action 0: select 1 from the 3 named members (stage, CardSelect choice)
@@ -58,8 +59,7 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
             .mods
             .blade_modifiers
             .get(&id)
-            .copied()
-            .unwrap_or(0)
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total)
             > 0
     };
     eprintln!(

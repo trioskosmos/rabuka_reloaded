@@ -396,6 +396,10 @@ fn mirakura_discard_then_draws_count_plus_one() {
         let ct = game.pending_choice_type();
         assert_eq!(ct, Some("SelectCard".to_string()));
         game.select_indices(&[0]);
+        // Sequential re-prompt: skip to proceed to draw action
+        if game.has_pending_choice() {
+            game.select_indices(&[]);
+        }
     }
 
     // Effect: draw 2 (1 discarded + 1 bonus)
@@ -487,7 +491,15 @@ fn rurino_bp1_discard_2_draw_2() {
     let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
 
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        // Sequential: pick 2 cards, then skip the remaining 1
+        game.select_indices(&[0]);
+        if game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
+        if game.has_pending_choice() {
+            // Skip the third — we want to discard exactly 2
+            game.select_indices(&[]);
+        }
     }
 
     // count=0 → draw = last_cost_discard_count = 2
@@ -524,7 +536,14 @@ fn rurino_bp1_discard_3_draw_3() {
     let (deck_before, hand_before) = setup_rurino_bp1(&mut game);
 
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1, 2]);
+        // Sequential: pick 3 cards, count=3 met, finalize
+        game.select_indices(&[0]);
+        if game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
+        if game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
     }
 
     // count=0 → draw = last_cost_discard_count = 3
@@ -759,8 +778,7 @@ fn suki_low_blade_no_score() {
         .mods
         .score_modifiers
         .get(&suki_id)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(score, 0, "No bonus for blade=1 (<6)");
 }
 
@@ -786,8 +804,7 @@ fn suki_high_blade_gains_score() {
         .mods
         .score_modifiers
         .get(&suki_id)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert!(score >= 1, "Bonus given for blade 1+6=7 (got {})", score);
 }
 
@@ -812,8 +829,7 @@ fn suki_choose_low_blade_no_bonus() {
         .mods
         .score_modifiers
         .get(&suki_id)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(score, 0, "No bonus for picking low-blade member");
 }
 
@@ -838,8 +854,7 @@ fn suki_choose_high_blade_gains_bonus() {
         .mods
         .score_modifiers
         .get(&suki_id)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert!(score >= 1, "Bonus for high-blade choice (got {})", score);
 }
 

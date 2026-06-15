@@ -1,3 +1,5 @@
+use crate::ability::enums::Zone;
+use crate::ability::types::ChoiceRoute;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::game_state::Phase;
@@ -128,12 +130,31 @@ impl super::TurnEngine {
                 && a.effect
                     .as_ref()
                     .and_then(|e| e.activation_condition_parsed.as_ref())
-                    .map_or(false, |c| c.location.as_deref() == Some("hand"))
+                    .map_or(false, |c| {
+                        Zone::from_str(c.location.as_deref().unwrap_or("")) == Some(Zone::Hand)
+                    })
+        });
+        // Check if card activates from discard (activation_condition has location=discard)
+        let is_discard_activation = card.abilities.iter().any(|a| {
+            a.triggers
+                .as_ref()
+                .map_or(false, |t| t == crate::triggers::ACTIVATION)
+                && a.effect
+                    .as_ref()
+                    .and_then(|e| e.activation_condition_parsed.as_ref())
+                    .map_or(false, |c| {
+                        Zone::from_str(c.location.as_deref().unwrap_or("")) == Some(Zone::Discard)
+                    })
         });
         if is_hand_activation {
             // Card activates from hand  Everify it's in hand, skip stage position checks
             if !player.hand.cards.contains(&card_id) {
                 return Err("Card not found in hand".to_string());
+            }
+        } else if is_discard_activation {
+            // Card activates from discard — verify it's in discard
+            if !player.waitroom.cards.contains(&card_id) {
+                return Err("Card not found in discard".to_string());
             }
         } else {
             let stage_position = player
@@ -177,6 +198,11 @@ impl super::TurnEngine {
             }
         }
         let player_id = game_state.active_player().id.clone();
+        let log_prefix = if player_id == "p1" || player_id == "player1" {
+            "P1"
+        } else {
+            "P2"
+        };
         for (idx, ability) in card.abilities.iter().enumerate() {
             if ability
                 .triggers
@@ -202,6 +228,10 @@ impl super::TurnEngine {
                     Some(card_id),
                 );
                 game_state.process_pending_auto_abilities(&player_id);
+                game_state.rule_log.push(format!(
+                    "{} [Activated] {}: {}",
+                    log_prefix, card.name, ability.full_text
+                ));
             }
         }
         Ok(())
@@ -244,7 +274,7 @@ impl super::TurnEngine {
             .current_entry()
             .and_then(|e| e.choice_card_no.clone());
         let result =
-            Self::build_choice_result(&choice, card_id, card_indices, choice_card_no.as_deref())?;
+            Self::build_choice_result(&choice, card_id, card_indices, choice_card_no.as_ref())?;
         Self::resume_queue_with_choice(game_state, choice, result)
     }
 
@@ -252,7 +282,7 @@ impl super::TurnEngine {
         choice: &crate::ability::types::Choice,
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
-        _choice_card_no: Option<&str>,
+        _choice_card_no: Option<&ChoiceRoute>,
     ) -> Result<crate::ability::types::ChoiceResult, String> {
         match choice {
             crate::ability::types::Choice::SelectCard { .. } => {
@@ -287,7 +317,11 @@ impl super::TurnEngine {
                     _ => {
                         // For position_change:opponent choices, use card_id as option index
                         // to look up the actual option string instead of the raw index.
-                        if _choice_card_no == Some("position_change:opponent:front") {
+                        if _choice_card_no
+                            == Some(&ChoiceRoute::Raw(
+                                "position_change:opponent:front".to_string(),
+                            ))
+                        {
                             if let Some(ref opts) = options {
                                 if let Some(id) = card_id {
                                     if id >= 0 && (id as usize) < opts.len() {
@@ -378,12 +412,50 @@ impl super::TurnEngine {
         choice: crate::ability::types::Choice,
         result: crate::ability::types::ChoiceResult,
     ) -> Result<(), String> {
+        match game_state.ability_queue.get_state() {
+            crate::ability_queue::QueueState::WaitingForAutoAbilityChoice { .. } => {
+                if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } =
+                    result
+                {
+                    let player_id = if let crate::ability::types::Choice::SelectAutoAbility {
+                        ref player_id,
+                        ..
+                    } = choice
+                    {
+                        player_id.clone()
+                    } else {
+                        String::new()
+                    };
+                    game_state.ability_queue.resume_with_choice(result.clone());
+                    game_state.ability_queue.promote_entry_by_abs(queue_index);
+                    if game_state.ability_queue.start_next() {
+                        game_state.recently_moved_cards = None;
+                        game_state.recently_moved_from_zone = None;
+                        game_state.process_current_ability();
+                    }
+                    if !game_state.has_pending_choice() && !player_id.is_empty() {
+                        game_state.process_pending_auto_abilities(&player_id);
+                    }
+                    return Ok(());
+                } else {
+                    return Err("Expected AutoAbilitySelected result".to_string());
+                }
+            }
+            _ => {}
+        }
+
         game_state.ability_queue.resume_with_choice(result.clone());
         let had_pending_sequential = game_state.ability_queue.has_pending_commands();
 
         // Take the persistent resolver from the queue entry
         let mut resolver = match game_state.ability_queue.take_resolver() {
-            Some(r) => r,
+            Some(r) => {
+                eprintln!(
+                    "[RWC] took resolver: moved_cards={:?} selected={:?}",
+                    r.moved_cards, r.selected_cards
+                );
+                r
+            }
             None => {
                 return Err("No resolver found on queue entry".to_string());
             }
@@ -392,15 +464,20 @@ impl super::TurnEngine {
         let res = resolver.provide_choice_result(game_state, result);
 
         if let Err(e) = res {
+            eprintln!("[RWC_ERROR] provide_choice_result failed: {}", e);
             game_state.ability_queue.complete_current();
             return Err(e);
         }
 
+        eprintln!(
+            "[RWC] after provide: pending_choice={:?} moved_cards={:?} selected={:?}",
+            resolver.pending_choice.is_some(),
+            resolver.moved_cards,
+            resolver.selected_cards
+        );
+
         if resolver.pending_choice.is_some() {
             // Sub-choice created — store resolver back on entry and pause queue
-            // Sync resolver state to GameState before storing (handle_order_selection
-            // reads gs.looked_at_cards, not resolver.looked_at_cards).
-            game_state.looked_at_cards = resolver.looked_at_cards.clone();
             let sub_choice = resolver.pending_choice.clone().unwrap();
             resolver.store_pending_choice(game_state);
             game_state.ability_queue.set_resolver(resolver);
@@ -424,11 +501,24 @@ impl super::TurnEngine {
             let optional_skipped = game_state.ability_queue.current_entry().map_or(false, |e| {
                 e.cost_paid
                     && !e.optional_cost_was_paid
-                    && e.choice_card_no.as_deref() == Some("optional_cost")
+                    && e.choice_card_no == Some(ChoiceRoute::OptionalCost)
             });
+            // Re-check pending commands — they may have been cleared by the choice
+            // handler (e.g. optional draw skip), leaving the sequential stranded.
+            // Only fire when effect hasn't started yet (the skip is between optional
+            // draw choice and the draw action itself). Normal sequential mid-execution
+            // has effect_started=true and must NOT be cancelled.
+            let pending_cleared = cost_was_paid
+                && !effect_started
+                && had_pending_sequential
+                && !game_state.ability_queue.has_pending_commands();
             let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
 
-            if optional_skipped {
+            if optional_skipped || pending_cleared {
+                eprintln!(
+                    "[RWC] optional_skipped={} pending_cleared={} completing ability",
+                    optional_skipped, pending_cleared
+                );
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = game_state.active_player().id.clone();

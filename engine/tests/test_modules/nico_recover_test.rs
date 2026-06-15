@@ -34,7 +34,10 @@ fn nico_recover_with_heart06_ge3() {
     )
     .expect("activate");
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
     while game.has_pending_choice() {
         game.select_indices(&[0]);
@@ -63,7 +66,7 @@ fn nico_heart06_too_low_not_recovered() {
     )
     .expect("activate");
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.try_select_indices(&[0, 1]).unwrap();
     }
     while game.has_pending_choice() {
         game.select_indices(&[0]);
@@ -97,7 +100,7 @@ fn nico_no_eligible_card_skips() {
     )
     .expect("activate");
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.try_select_indices(&[0, 1]).unwrap();
     }
     while game.has_pending_choice() {
         game.select_indices(&[0]);
@@ -126,7 +129,7 @@ fn nico_one_card_recovered_even_if_multiple_eligible() {
     .expect("activate");
     // Discard filler + eligible_a (indices 0, 1). Hand: 4 - 2 = 2.
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.try_select_indices(&[0, 1]).unwrap();
     }
     // Effect: 1 eligible in discard (eligible_b). Count=1, idxs.len()=1 → Exact → recover 1.
     // Wait — actually we discarded eligible_a + filler, so eligible_b is still in hand.

@@ -62,45 +62,8 @@ impl CardLoader {
             for ability_entry in unique_abilities {
                 // Try to deserialize the ability directly - #[serde(default)] will handle missing fields
                 if let Ok(mut ability) = serde_json::from_value::<Ability>(ability_entry.clone()) {
-                    // If effect action field is empty, try to infer it from the effect structure
+                    // Fix nested actions - rebuild the actions array with count set
                     if let Some(ref mut effect) = ability.effect {
-                        if effect.action.is_empty() {
-                            if let Some(effect_json) = ability_entry.get("effect") {
-                                let _text = effect_json
-                                    .get("text")
-                                    .and_then(|t| t.as_str())
-                                    .unwrap_or("");
-
-                                // Check if it has source/destination which indicates move_cards
-                                if effect_json.get("source").is_some()
-                                    && effect_json.get("destination").is_some()
-                                {
-                                    effect.action = "move_cards".to_string();
-                                }
-                                // Otherwise check if it has an actions array
-                                else if let Some(actions) =
-                                    effect_json.get("actions").and_then(|a| a.as_array())
-                                {
-                                    if !actions.is_empty() {
-                                        effect.action = "sequential".to_string();
-                                    }
-                                }
-                                // No text-based inference - abilities.json should have all fields populated
-                            }
-                        }
-                    }
-
-                    // Fix: If effect has per_unit: true and action is draw/draw_card but count is None, set count to 1
-                    // Also fix nested actions in sequential effects
-                    if let Some(ref mut effect) = ability.effect {
-                        if effect.per_unit == Some(true) {
-                            if (effect.action == "draw" || effect.action == "draw_card")
-                                && effect.count.is_none()
-                            {
-                                effect.count = Some(1);
-                            }
-                        }
-                        // Fix nested actions - rebuild the actions array with count set
                         if let Some(ref actions) = effect.compound.actions.clone() {
                             let fixed_actions: Vec<crate::card::AbilityEffect> = actions
                                 .iter()

@@ -12,6 +12,7 @@ export const Phase = {
     FIRST_ATTACKER_PERFORMANCE: "FirstAttackerPerformance",
     SECOND_ATTACKER_PERFORMANCE: "SecondAttackerPerformance",
     LIVE_VICTORY_DETERMINATION: "LiveVictoryDetermination",
+    RESPONSE: "Response",
 };
 
 export const isMulliganPhase = (phase) => {
@@ -20,7 +21,7 @@ export const isMulliganPhase = (phase) => {
     return lower === "mulligan" || lower === "mulliganp1turn" || lower === "mulliganp2turn";
 };
 
-export const isStaticHost = window.location.hostname.includes('github.io') ||
+const isStaticHost = window.location.hostname.includes('github.io') ||
     (window.location.protocol === 'file:') ||
     (window.location.hostname === '' && !window.location.port);
 

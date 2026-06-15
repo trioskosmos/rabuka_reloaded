@@ -1,3 +1,4 @@
+use crate::ability::enums::{ActionType, Zone};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -16,7 +17,7 @@ pub enum CardType {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum HeartColor {
-    #[serde(rename = "heart00")]
+    #[serde(rename = "heart00", alias = "heart0")]
     Heart00, // Index 0 - wildcard, can be treated as any heart01-heart06
     #[serde(rename = "heart01")]
     Heart01,
@@ -172,6 +173,12 @@ pub struct CardDatabase {
     pub cards: HashMap<i16, Card>,
     pub card_no_to_id: HashMap<String, i16>,
     pub next_id: i16,
+}
+
+impl Default for CardDatabase {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CardDatabase {
@@ -538,6 +545,9 @@ pub struct AbilityEffect {
     pub options: Option<Vec<AbilityEffect>>,
     pub per_unit_count: Option<u32>,
     pub per_unit_type: Option<String>,
+    /// Zone to count cards in for per_unit calculations. When absent, falls back
+    /// to the effect's `location` field (or "hand" as default).
+    pub per_unit_location: Option<String>,
     #[serde(alias = "max_repeats")]
     pub repeat_limit: Option<u32>,
     pub is_further: Option<bool>,
@@ -567,6 +577,10 @@ pub struct AbilityEffect {
     pub need_heart_color: Option<String>,
     #[serde(default)]
     pub reveal: Option<bool>,
+    #[serde(default)]
+    pub per_group: Option<bool>,
+    #[serde(default)]
+    pub per_group_count: Option<u32>,
     pub distinct: Option<String>,
     // Card name matching constraints
     #[serde(default)]
@@ -652,6 +666,8 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub heart_selection: Option<bool>,
     #[serde(default)]
+    pub filter_targets_by_heart_colors: Option<bool>,
+    #[serde(default)]
     pub location: Option<String>,
     #[serde(default)]
     pub source_location: Option<String>,
@@ -707,6 +723,16 @@ pub struct AbilityEffect {
     pub blade_limit: Option<u32>,
     #[serde(default)]
     pub blade_limit_operator: Option<String>,
+    /// Original cost threshold (e.g. "元々のコストが17以上" → original_count: 17)
+    #[serde(default)]
+    pub original_count: Option<u32>,
+    /// Operator for original cost threshold (e.g. ">=", "<=", "==")
+    #[serde(default)]
+    pub original_operator: Option<String>,
+    /// Resolve cost_limit from the first revealed card at runtime.
+    /// Used by followup actions that reference "これにより公開したカードのコスト以下".
+    #[serde(default)]
+    pub cost_from_revealed: Option<bool>,
 }
 
 impl AbilityEffect {
@@ -739,6 +765,22 @@ impl AbilityEffect {
             .first()
             .map(|s| s.as_str())
             .unwrap_or(default)
+    }
+
+    /// Parses the action string into a typed ActionType for type-safe matching.
+    pub fn action_type(&self) -> Option<ActionType> {
+        ActionType::from_str(&self.action)
+    }
+
+    /// Returns true if the action matches the given ActionType variant.
+    pub fn is_action(&self, at: ActionType) -> bool {
+        self.action_type() == Some(at)
+    }
+
+    /// Returns the numeric value from `value` or `count`, in that priority.
+    /// Consolidates the many `effect.value.or(effect.count)` patterns in dispatch.
+    pub fn value_or_count(&self, default: u32) -> u32 {
+        self.value.or(self.count).unwrap_or(default)
     }
 }
 
@@ -778,12 +820,28 @@ pub struct QuotedText {
     pub quoted_type: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum DistinctInfo {
+    Boolean(bool),
+    String(String),
+}
+
+impl DistinctInfo {
+    pub fn is_distinct(&self) -> bool {
+        match self {
+            DistinctInfo::Boolean(b) => *b,
+            DistinctInfo::String(s) => s != "false" && !s.is_empty(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct Condition {
     #[serde(default = "default_empty_string")]
     pub text: String,
     #[serde(rename = "type")]
-    pub condition_type: Option<String>,
+    pub condition_type: Option<crate::ability::enums::ConditionType>,
     pub location: Option<String>,
     pub locations: Option<Vec<String>>,
     pub count: Option<u32>,
@@ -795,8 +853,12 @@ pub struct Condition {
     pub exclude_characters: Option<Vec<String>>,
     pub state: Option<String>,
     pub position: Option<PositionInfo>,
+    /// Cross-position comparison target (e.g. "right_side" when position is "left_side")
+    #[serde(default)]
+    pub position_compare: Option<String>,
     pub temporal_scope: Option<String>,
-    pub distinct: Option<bool>,
+    #[serde(default)]
+    pub distinct: Option<DistinctInfo>,
     pub exclude_self: Option<bool>,
     pub any_of: Option<Vec<String>>,
     pub cost_limit: Option<u32>,
@@ -1021,21 +1083,94 @@ impl Card {
     }
 }
 
-pub fn parse_heart_color(s: &str) -> HeartColor {
-    match s {
-        "heart00" => HeartColor::Heart00,
-        "heart01" => HeartColor::Heart01,
-        "heart02" => HeartColor::Heart02,
-        "heart03" => HeartColor::Heart03,
-        "heart04" => HeartColor::Heart04,
-        "heart05" => HeartColor::Heart05,
-        "heart06" => HeartColor::Heart06,
-        "b_all" => HeartColor::BAll,
-        "draw" => HeartColor::Draw,
-        "score" => HeartColor::Score,
-        _ if s.starts_with("b_") => parse_heart_color(&s[2..]),
-        _ => HeartColor::Heart00,
+impl std::fmt::Display for HeartColor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeartColor::Heart00 => write!(f, "heart00"),
+            HeartColor::Heart01 => write!(f, "heart01"),
+            HeartColor::Heart02 => write!(f, "heart02"),
+            HeartColor::Heart03 => write!(f, "heart03"),
+            HeartColor::Heart04 => write!(f, "heart04"),
+            HeartColor::Heart05 => write!(f, "heart05"),
+            HeartColor::Heart06 => write!(f, "heart06"),
+            HeartColor::BAll => write!(f, "b_all"),
+            HeartColor::Draw => write!(f, "draw"),
+            HeartColor::Score => write!(f, "score"),
+        }
     }
+}
+
+impl HeartColor {
+    /// Returns the index of this heart color (0-6, 0=Heart00 wildcard, 1-6=Heart01-Heart06).
+    pub fn index(&self) -> usize {
+        match self {
+            HeartColor::Heart00 => 0,
+            HeartColor::Heart01 => 1,
+            HeartColor::Heart02 => 2,
+            HeartColor::Heart03 => 3,
+            HeartColor::Heart04 => 4,
+            HeartColor::Heart05 => 5,
+            HeartColor::Heart06 => 6,
+            _ => 0,
+        }
+    }
+
+    /// Reconstruct a HeartColor from an index (0-6). Panics for out-of-range.
+    pub fn from_index(i: usize) -> Self {
+        match i {
+            0 => HeartColor::Heart00,
+            1 => HeartColor::Heart01,
+            2 => HeartColor::Heart02,
+            3 => HeartColor::Heart03,
+            4 => HeartColor::Heart04,
+            5 => HeartColor::Heart05,
+            6 => HeartColor::Heart06,
+            _ => HeartColor::Heart00,
+        }
+    }
+
+    /// Returns the short label used in display output ("h00"-"h06").
+    pub fn short_label(&self) -> &'static str {
+        match self {
+            HeartColor::Heart00 => "h00",
+            HeartColor::Heart01 => "h01",
+            HeartColor::Heart02 => "h02",
+            HeartColor::Heart03 => "h03",
+            HeartColor::Heart04 => "h04",
+            HeartColor::Heart05 => "h05",
+            HeartColor::Heart06 => "h06",
+            HeartColor::BAll => "b_all",
+            HeartColor::Draw => "draw",
+            HeartColor::Score => "score",
+        }
+    }
+}
+
+impl std::str::FromStr for HeartColor {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "heart00" => HeartColor::Heart00,
+            "heart01" => HeartColor::Heart01,
+            "heart02" => HeartColor::Heart02,
+            "heart03" => HeartColor::Heart03,
+            "heart04" => HeartColor::Heart04,
+            "heart05" => HeartColor::Heart05,
+            "heart06" => HeartColor::Heart06,
+            "b_all" => HeartColor::BAll,
+            "draw" => HeartColor::Draw,
+            "score" => HeartColor::Score,
+            _ if s.starts_with("b_") => {
+                HeartColor::from_str(&s[2..]).unwrap_or(HeartColor::Heart00)
+            }
+            _ => HeartColor::Heart00,
+        })
+    }
+}
+
+/// Canonical string→HeartColor conversion. Use `s.parse::<HeartColor>()` instead.
+pub fn parse_heart_color(s: &str) -> HeartColor {
+    s.parse().unwrap_or(HeartColor::Heart00)
 }
 
 impl Card {
@@ -1133,9 +1268,10 @@ impl Card {
     pub fn get_hand_cost_reduction(&self, hand_size: usize) -> u32 {
         for ability in &self.abilities {
             if let Some(ref effect) = ability.effect {
-                if effect.action == "modify_cost"
+                if crate::ability::enums::ActionType::from_str(&effect.action)
+                    == Some(crate::ability::enums::ActionType::ModifyCost)
                     && effect.operation.as_deref() == Some("subtract")
-                    && effect.location.as_deref() == Some("hand")
+                    && Zone::from_str(effect.location.as_deref().unwrap_or("")) == Some(Zone::Hand)
                 {
                     let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
                     return (hand_size.saturating_sub(1) * per_unit) as u32;

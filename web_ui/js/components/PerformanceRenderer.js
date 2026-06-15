@@ -195,54 +195,55 @@ function renderHeartProgress(filled, required) {
     return html;
 }
 
-function renderSuccessEquation(have, need) {
-    const haveValues = [...have];
+function renderSuccessEquation(have, need, spare) {
     const needValues = need;
+    const haveValues = have;
+    const spareValues = spare || [0, 0, 0, 0, 0, 0, 0];
     const totalHave = sumHearts(haveValues);
     const totalNeed = sumHearts(needValues);
+    const totalSpare = sumHearts(spareValues);
 
-    let satisfied = 0;
-    let wildcards = haveValues[0] || 0;
-    let requiredTotal = 0;
+    const success = totalHave >= totalNeed;
 
+    // Build per-color deficit info
+    const deficitLines = [];
     for (let color = 1; color < 7; color += 1) {
-        const colorNeed = needValues[color] || 0;
-        const colorHave = haveValues[color] || 0;
-        requiredTotal += colorNeed;
-        const directMatch = Math.min(colorHave, colorNeed);
-        satisfied += directMatch;
-        const deficit = colorNeed - directMatch;
-        if (deficit > 0) {
-            const wildcardMatch = Math.min(wildcards, deficit);
-            satisfied += wildcardMatch;
-            wildcards -= wildcardMatch;
+        const needed = needValues[color] || 0;
+        const filled = haveValues[color] || 0;
+        if (needed > filled) {
+            deficitLines.push(`${needed - filled} more ${HEART_LABELS[color]}`);
         }
     }
 
-    const anyNeed = needValues[6] || 0;
-    requiredTotal += anyNeed;
-    const anyMatch = Math.min(wildcards, anyNeed);
-    satisfied += anyMatch;
-
-    const success = satisfied >= requiredTotal;
+    // Check if wildcards were used (filled has hearts but need has different totals per color)
+    let wildcardUsed = 0;
+    for (let color = 1; color < 7; color += 1) {
+        const needed = needValues[color] || 0;
+        const filled = haveValues[color] || 0;
+        // Wildcards fill the gap when filled > what colored hearts could provide
+        // We can't perfectly separate colored vs wildcard in the filled array,
+        // but if filled matches needed exactly, wildcards were likely used for deficits
+    }
 
     return `
         <div class="perf-match-summary ${success ? 'success' : 'failure'}">
             <div class="perf-math-sum">
                 <div class="perf-math-operand">
-                    <div class="perf-eyebrow">Goal</div>
+                    <div class="perf-eyebrow">Required</div>
                     <div class="perf-math-value">${totalNeed}</div>
                 </div>
                 <div class="perf-math-operator"> vs </div>
                 <div class="perf-math-operand">
-                    <div class="perf-eyebrow">Have</div>
+                    <div class="perf-eyebrow">Filled</div>
                     <div class="perf-math-value">${totalHave}</div>
                 </div>
                 <div class="perf-math-operator"> = </div>
                 <div class="perf-math-result">
-                    <div class="perf-math-value">${success ? '✓' : '✗'}</div>
+                    <div class="perf-math-value">${success ? '✓ PASS' : '✗ FAIL'}</div>
                 </div>
             </div>
+            ${deficitLines.length > 0 ? `<div class="perf-wildcard-info" style="color:var(--accent-pink);">Shortfall: ${deficitLines.join(', ')}</div>` : ''}
+            ${totalSpare > 0 ? `<div class="perf-wildcard-info">${totalSpare} hearts remaining in pool</div>` : ''}
         </div>
     `;
 }
@@ -480,48 +481,50 @@ function renderComparisonBanner(displayResults) {
     `;
 }
 
-function renderStoryCards(result) {
-    const lives = result?.lives || [];
-    const passedLives = countPassedLives(lives);
-    const totalLives = lives.length;
-    const totalHearts = sumHearts(result?.total_hearts || []);
-    const yellCards = result?.yell_cards?.length || 0;
-    const scoreLines = result?.breakdown?.scores?.length || 0;
-    const bonusLines = result?.triggered_abilities?.length || 0;
+function renderTotalSection(result) {
+    if (!result) return '';
+    const members = result.member_contributions || [];
+    const yellCards = result.yell_cards || [];
 
-    const cards = [
-        {
-            title: 'Board setup',
-            body: `${totalHearts} total hearts and ${result?.note_icons || 0} note icons were available when the engine judged this player.`
-        },
-        {
-            title: 'Yell window',
-            body: `${result?.yell_count || 0} blades produced ${yellCards} yelled cards after reductions, and those cards immediately became stage energy.`
-        },
-        {
-            title: 'Live check',
-            body: `${passedLives} of ${totalLives} live cards passed. Because the engine checks lives sequentially, spare hearts only matter if earlier lives succeeded.`
-        },
-        {
-            title: 'Score lock-in',
-            body: `${scoreLines} explicit score lines and ${bonusLines} triggered abilities are recorded on this result snapshot.`
-        }
-    ];
+    const stageHearts = [0,0,0,0,0,0,0];
+    members.forEach(m => {
+        const base = m.base_hearts || [0,0,0,0,0,0,0];
+        const bonus = m.bonus_hearts || [0,0,0,0,0,0,0];
+        for (let i = 0; i < 7; i++) stageHearts[i] += (base[i] || 0) + (bonus[i] || 0);
+    });
+
+    const yellHearts = [0,0,0,0,0,0,0];
+    yellCards.forEach(c => {
+        const bh = c.blade_hearts || [0,0,0,0,0,0,0];
+        for (let i = 0; i < 7; i++) yellHearts[i] += bh[i];
+    });
+
+    const totalHearts = stageHearts.map((v, i) => v + yellHearts[i]);
 
     return `
         <section class="perf-section-card">
             <div class="perf-section-heading-row compact">
                 <div>
-                    <div class="perf-eyebrow">Phase Story</div>
+                    <div class="perf-eyebrow">Total Hearts Available</div>
                 </div>
             </div>
-            <div class="perf-story-grid">
-                ${cards.map((card) => `
-                    <article class="perf-story-card">
-                        <h4>${escapeHtml(card.title)}</h4>
-                        <p>${escapeHtml(card.body)}</p>
-                    </article>
-                `).join('')}
+            <div class="perf-total-breakdown">
+                <div class="perf-breakdown-row">
+                    <span class="perf-mini-heading">Stage totals</span>
+                    ${renderHeartsCompact(stageHearts)}
+                    <span class="perf-breakdown-sum">${sumHearts(stageHearts)}</span>
+                </div>
+                <div class="perf-breakdown-row">
+                    <span class="perf-mini-heading">Yell totals</span>
+                    ${renderHeartsCompact(yellHearts)}
+                    <span class="perf-breakdown-sum">${sumHearts(yellHearts)}</span>
+                </div>
+                <div class="perf-breakdown-divider"></div>
+                <div class="perf-breakdown-row grand">
+                    <span class="perf-mini-heading">Grand total</span>
+                    ${renderHeartsCompact(totalHearts)}
+                    <span class="perf-breakdown-sum">${sumHearts(totalHearts)}</span>
+                </div>
             </div>
         </section>
     `;
@@ -535,7 +538,6 @@ function renderLiveCards(result) {
                 <div class="perf-section-heading-row compact">
                     <div>
                         <div class="perf-eyebrow">Live Checks</div>
-                        <h3>Target lives</h3>
                     </div>
                 </div>
                 <div class="perf-empty-state">No live cards were stored in this snapshot.</div>
@@ -552,9 +554,10 @@ function renderLiveCards(result) {
             </div>
             <div class="perf-live-grid">
                 ${lives.map((live, index) => {
-                    const spare = live?.spare || [0, 0, 0, 0, 0, 0, 0];
+                    const required = live?.required || [0,0,0,0,0,0,0];
+                    const filled = live?.filled || [0,0,0,0,0,0,0];
+                    const spare = live?.spare || [0,0,0,0,0,0,0];
                     const adjustments = live.adjustments;
-                    const spareTotal = sumHearts(spare);
                     return `
                         <article class="perf-live-card ${live?.passed ? 'success' : 'failure'}">
                             <div class="perf-live-card-head">
@@ -563,43 +566,48 @@ function renderLiveCards(result) {
                                     ${(() => { const cd = live.card_no ? State.resolveCardData(live.card_no) : null; return cd?.img ? `<img src="${fixImg(cd.img)}" class="perf-live-art" alt="${escapeHtml(live.name || 'Live')}">` : ''; })()}
                                     <div>
                                         <h4>${escapeHtml(live?.name || 'Live')}</h4>
-                                        <div class="perf-live-card-meta">Printed score ${live?.score || 0}</div>
+                                        <div class="perf-live-card-meta">Score ${live?.score || 0}</div>
                                     </div>
                                 </div>
                                 <div class="perf-status-pill ${live?.passed ? 'success' : 'failure'}">${live?.passed ? 'PASS' : 'FAIL'}</div>
                             </div>
-                            <div class="perf-live-grid-rows" style="gap: 4px;">
-                                <div style="display: flex; gap: 8px; align-items: center;">
-                                    <div class="perf-mini-heading" style="margin-bottom: 0;">Goal:</div>
-                                    <div class="perf-hearts-grid">${renderHeartsGrid(live?.required || [])}</div>
+                            <div class="perf-live-breakdown">
+                                <div class="perf-breakdown-row">
+                                    <span class="perf-mini-heading">Required</span>
+                                    ${renderHeartsCompact(required)}
+                                    <span class="perf-breakdown-sum">${sumHearts(required)}</span>
                                 </div>
-                                <div style="display: flex; gap: 8px; align-items: center;">
-                                    <div class="perf-mini-heading" style="margin-bottom: 0;">Hit:</div>
-                                    <div class="perf-hearts-grid">${renderHeartsGrid(live?.filled || [])}</div>
+                                <div class="perf-breakdown-row">
+                                    <span class="perf-mini-heading">Filled</span>
+                                    ${renderHeartsCompact(filled)}
+                                    <span class="perf-breakdown-sum">${sumHearts(filled)}</span>
+                                </div>
+                                <div class="perf-breakdown-row">
+                                    <span class="perf-mini-heading">Remaining</span>
+                                    ${renderHeartsCompact(spare)}
+                                    <span class="perf-breakdown-sum">${sumHearts(spare)}</span>
                                 </div>
                             </div>
-                            <div class="perf-heart-legend" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">
-                                <span class="heart-tag color-any" style="display:inline-flex;align-items:center;gap:2px;padding:0 4px;border-radius:3px;"><img src="img/texticon/heart_00.png" class="heart-mini-icon">Any</span> = wildcard fills any missing color
-                            </div>
-                            ${renderSuccessEquation(live?.filled || [], live?.required || [])}
+                            ${required[0] > 0 ? `<div class="perf-heart-legend" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;"><img src="img/texticon/heart_00.png" class="heart-mini-icon" style="width:12px;height:12px;"> Any hearts fill deficits of any color</div>` : ''}
+                            ${renderSuccessEquation(filled, required, spare)}
                             ${!live?.passed ? `
                                 <div class="perf-live-fail-reason">
                                     Not enough hearts: needed ${HEART_LABELS.map((l,i)=>{
-                                        const n = (live?.required||[])[i]||0;
+                                        const n = required[i]||0;
                                         return n ? `<b>${n} ${l}</b>` : '';
                                     }).filter(Boolean).join(', ')}
-                                    ${(live?.filled||[]).some(f=>f>0) ? `, had ${HEART_LABELS.map((l,i)=>{
-                                        const f = (live?.filled||[])[i]||0;
+                                    ${filled.some(f=>f>0) ? `, had ${HEART_LABELS.map((l,i)=>{
+                                        const f = filled[i]||0;
                                         return f ? `${f} ${l}` : '';
                                     }).filter(Boolean).join(', ')}` : ''}
                                 </div>
                             ` : ''}
-                            ${adjustments.length > 0 ? `
+                            ${adjustments && adjustments.length > 0 ? `
                                 <div class="perf-pill-list">
-                                    ${adjustments.map((adjustment) => {
-                                        const isTransform = adjustment?.type === 'transform' || adjustment?.type === 'override';
-                                        const value = adjustment?.desc || `${adjustment?.value > 0 ? '+' : ''}${adjustment?.value || 0} ${HEART_LABELS[adjustment?.color ?? 0] || 'heart'}`;
-                                        return `<div class="perf-adjustment-pill ${isTransform ? 'transform' : 'requirement'}">${escapeHtml(adjustment?.source || 'Effect')}: ${escapeHtml(value)}</div>`;
+                                    ${adjustments.map((adj) => {
+                                        const isTransform = adj?.type === 'transform' || adj?.type === 'override';
+                                        const value = adj?.desc || `${adj?.value > 0 ? '+' : ''}${adj?.value || 0} ${HEART_LABELS[adj?.color ?? 0] || 'heart'}`;
+                                        return `<div class="perf-adjustment-pill ${isTransform ? 'transform' : 'requirement'}">${escapeHtml(adj?.source || 'Effect')}: ${escapeHtml(value)}</div>`;
                                     }).join('')}
                                 </div>
                             ` : ''}
@@ -612,6 +620,7 @@ function renderLiveCards(result) {
 }
 
 function renderAllocationSection(result) {
+    if (!result?.breakdown?.allocations) return '';
     const allocations = result.breakdown.allocations;
     if (allocations.length === 0) {
         return `
@@ -675,20 +684,24 @@ function renderAllocationSection(result) {
 }
 
 function renderContributionSection(result) {
+    if (!result?.member_contributions) return '';
     const members = result.member_contributions;
-    if (members.length === 0) {
+    const triggered = result.triggered_abilities || [];
+
+    if (members.length === 0 && triggered.length === 0) {
         return `
             <section class="perf-section-card">
                 <div class="perf-section-heading-row compact">
                     <div>
                         <div class="perf-eyebrow">Stage Contributors</div>
-                        <h3>Members on stage</h3>
                     </div>
                 </div>
                 <div class="perf-empty-state">No stage member contribution breakdown is stored for this snapshot.</div>
             </section>
         `;
     }
+
+    const slotLabels = ['Left', 'Center', 'Right'];
 
     return `
         <section class="perf-section-card">
@@ -699,103 +712,157 @@ function renderContributionSection(result) {
             </div>
             <div class="perf-contrib-grid">
                 ${members.map((member) => {
-                    const heartBonuses = member.ability_heart_bonuses;
-                    const bladeBonuses = member.ability_blade_bonuses;
+                    const base = member.base_hearts || [0,0,0,0,0,0,0];
+                    const bonus = member.bonus_hearts || [0,0,0,0,0,0,0];
+                    const total = base.map((v, i) => v + (bonus[i] || 0));
+                    const totalBlade = (member.base_blades || 0) + (member.bonus_blades || 0);
+                    const heartBonuses = member.ability_heart_bonuses || [];
+                    const bladeBonuses = member.ability_blade_bonuses || [];
+                    const slot = member.slot !== undefined && member.slot >= 0 && member.slot < 3
+                        ? slotLabels[member.slot] : `Slot ${(member.slot ?? -1) + 1}`;
+                    const memberImg = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.img ? fixImg(cd.img) : ''; })() : '';
+                    const memberName = member.card_no ? (() => { const cd = State.resolveCardData(member.card_no); return cd?.name || member?.source || 'Member'; })() : (member?.source || 'Member');
                     return `
                         <article class="perf-contrib-card" data-member-id="${member?.source_id ?? ''}" data-member-slot="${member?.slot ?? ''}">
                             <div class="perf-contrib-header">
-                                ${member?.img ? `<img src="${fixImg(member.img)}" class="perf-contrib-art" alt="${escapeHtml(member?.source || 'Member')}">` : ''}
+                                ${memberImg ? `<img src="${memberImg}" class="perf-contrib-art" alt="${escapeHtml(memberName)}">` : ''}
                                 <div>
-                                    <h4>${escapeHtml(member?.source || 'Member')}</h4>
-                                    <div class="perf-live-card-meta">Stage slot ${Number(member?.slot ?? -1) + 1}</div>
+                                    <h4>${escapeHtml(memberName)}</h4>
+                                    <div class="perf-live-card-meta">${slot}</div>
                                 </div>
                             </div>
-                            <div class="perf-contrib-stats">
-                                <div>
-                                    <div class="perf-mini-heading">Printed hearts</div>
-                                    ${renderHeartsCompact(member?.base_hearts || [])}
+                            <div class="perf-stage-breakdown">
+                                <div class="perf-breakdown-row total">
+                                    <span class="perf-mini-heading">Total hearts</span>
+                                    ${renderHeartsCompact(total)}
+                                    <span class="perf-breakdown-sum">${sumHearts(total)}</span>
                                 </div>
-                                <div>
-                                    <div class="perf-mini-heading">Bonus hearts</div>
-                                    ${renderHeartsCompact(member?.bonus_hearts || [])}
+                                <div class="perf-breakdown-subrows">
+                                    <div class="perf-breakdown-row sub">
+                                        <span class="perf-mini-heading">Base hearts</span>
+                                        ${renderHeartsCompact(base)}
+                                    </div>
+                                    ${bonus.some(v => v > 0) ? `
+                                    <div class="perf-breakdown-row sub">
+                                        <span class="perf-mini-heading">Ability additions</span>
+                                        ${renderHeartsCompact(bonus)}
+                                    </div>
+                                    ` : ''}
                                 </div>
-                                <div>
-                                    <div class="perf-mini-heading">Printed blades</div>
-                                    ${renderBladesCompact(member?.base_blades || 0)}
-                                </div>
-                                <div>
-                                    <div class="perf-mini-heading">Bonus blades</div>
-                                    ${member?.bonus_blades > 0 ? renderBladesCompact(member.bonus_blades) : '<span class="perf-empty-inline">0</span>'}
-                                </div>
-                                <div>
-                                    <div class="perf-mini-heading">Notes</div>
-                                    <div class="perf-stat-pill">${member?.base_notes || 0}${member?.bonus_notes ? ` (+${member.bonus_notes})` : ''}</div>
-                                </div>
-                                <div>
-                                    <div class="perf-mini-heading">Draw icons</div>
-                                    <div class="perf-stat-pill">${member?.draw_icons || 0}</div>
-                                </div>
-                            </div>
-                            ${(heartBonuses.length > 0 || bladeBonuses.length > 0) ? `
-                                <div class="perf-bonus-block">
+                                ${heartBonuses.length > 0 ? `
+                                <div class="perf-breakdown-bonuses">
                                     ${heartBonuses.map((bonus) => `
-                                        <div class="perf-bonus-item">
+                                        <div class="perf-bonus-item compact">
                                             <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 0] || 'heart')}</div>
                                             ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
                                         </div>
                                     `).join('')}
-                                    ${bladeBonuses.map((bonus) => `
-                                        <div class="perf-bonus-item">
-                                            <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || bonus?.value || 0} blade</div>
-                                            ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
-                                        </div>
-                                    `).join('')}
                                 </div>
-                            ` : ''}
+                                ` : ''}
+                                <div class="perf-breakdown-row">
+                                    <span class="perf-mini-heading">Blades</span>
+                                    ${renderBladesCompact(totalBlade)}
+                                    ${(member.bonus_blades || 0) > 0 ? `<span class="perf-breakdown-detail">(+${member.bonus_blades} from abilities)</span>` : ''}
+                                    ${bladeBonuses.length > 0 ? `
+                                    <div class="perf-breakdown-bonuses">
+                                        ${bladeBonuses.map((bonus) => `
+                                            <div class="perf-bonus-item compact">
+                                                <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || bonus?.value || 0} blade</div>
+                                                ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    ` : ''}
+                                </div>
+                                <div class="perf-breakdown-row minor">
+                                    <span class="perf-mini-heading">Notes</span>
+                                    <span class="perf-breakdown-value">${member?.base_notes || 0}${member?.bonus_notes ? ` (+${member.bonus_notes})` : ''}</span>
+                                    <span style="margin-left:12px;" class="perf-mini-heading">Draw</span>
+                                    <span class="perf-breakdown-value">${member?.draw_icons || 0}</span>
+                                </div>
+                            </div>
                         </article>
                     `;
                 }).join('')}
+                ${triggered.length > 0 ? `
+                <article class="perf-contrib-card global-bonuses">
+                    <div class="perf-contrib-header">
+                        <div>
+                            <h4>Global Bonuses</h4>
+                            <div class="perf-live-card-meta">Effects not tied to a single member</div>
+                        </div>
+                    </div>
+                    <div class="perf-breakdown-bonuses">
+                        ${triggered.map((ability) => {
+                            let abilityText = '';
+                            try {
+                                const card = Tooltips.findCardById(ability?.source_card_id);
+                                if (card) {
+                                    const rawText = TextEnricher.getEffectiveRawText(card);
+                                    if (rawText) abilityText = enrichText(rawText);
+                                }
+                            } catch (e) {}
+                            return `
+                                <div class="perf-bonus-item compact">
+                                    <div class="perf-bonus-title">${escapeHtml(ability?.name || 'Triggered ability')}</div>
+                                    <div class="perf-bonus-meta">${escapeHtml(ability?.card_name || '')}</div>
+                                    ${abilityText ? `<div class="perf-bonus-text">${abilityText}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </article>
+                ` : ''}
             </div>
         </section>
     `;
 }
 
 function renderYellSection(result) {
-    const yellCards = result.yell_cards;
-    const heartSources = result.breakdown.hearts;
-    const bladeSources = result.breakdown.blades;
+    const yellCards = result.yell_cards || [];
+    const heartSources = result.breakdown?.hearts || [];
+
+    if (yellCards.length === 0 && heartSources.length === 0) {
+        return `
+            <section class="perf-section-card">
+                <div class="perf-section-heading-row compact">
+                    <div>
+                        <div class="perf-eyebrow">Yell & Source Pool</div>
+                    </div>
+                </div>
+                <div class="perf-empty-state">No yell cards or source data recorded.</div>
+            </section>
+        `;
+    }
+
+    // Aggregate per-color total across all yell cards
+    const totalYellHearts = [0,0,0,0,0,0,0];
+    yellCards.forEach(c => {
+        const bh = c.blade_hearts || [0,0,0,0,0,0,0];
+        for (let i = 0; i < 7; i++) totalYellHearts[i] += bh[i];
+    });
+
+    // Per-color source: count how many yell cards contribute to each color
+    const perColorCount = [0,0,0,0,0,0,0];
+    yellCards.forEach(c => {
+        const bh = c.blade_hearts || [0,0,0,0,0,0,0];
+        for (let i = 1; i < 7; i++) {
+            if (bh[i] > 0) perColorCount[i]++;
+        }
+    });
 
     return `
         <section class="perf-section-card">
             <div class="perf-section-heading-row compact">
                 <div>
-                    <div class="perf-eyebrow">Yell and Source Pool</div>
-                    <h3>Cards and values that fed this performance</h3>
+                    <div class="perf-eyebrow">Yell & Source Pool</div>
                 </div>
-                <p>Stage cards, yelled cards, and blade-note sources are shown separately because the engine records them separately.</p>
             </div>
-            <div class="perf-source-lists">
-                <div>
-                    <div class="perf-mini-heading">Heart sources</div>
-                    <div class="perf-chip-list">
-                        ${heartSources.length > 0 ? heartSources.map((item) => `
-                            <div class="perf-source-chip ${item?.type === 'yell' ? 'yell' : ''}">
-                                <span>${escapeHtml(item?.source || 'Source')}</span>
-                                ${renderHeartsCompact(item?.value || [])}
-                            </div>
-                        `).join('') : '<div class="perf-empty-state small">No heart source breakdown saved.</div>'}
-                    </div>
-                </div>
-                <div>
-                    <div class="perf-mini-heading">Blade and note sources</div>
-                    <div class="perf-chip-list">
-                        ${bladeSources.length > 0 ? bladeSources.map((item) => `
-                            <div class="perf-source-chip ${item?.type === 'yell' ? 'yell' : ''}">
-                                <span>${escapeHtml(item?.source || 'Source')}</span>
-                                <strong>+${item?.value || 0}</strong>
-                            </div>
-                        `).join('') : '<div class="perf-empty-state small">No blade breakdown saved.</div>'}
-                    </div>
+            <div class="perf-yell-summary">
+                <div class="perf-breakdown-row total">
+                    <span class="perf-mini-heading">Total yell hearts</span>
+                    ${renderHeartsCompact(totalYellHearts)}
+                    <span class="perf-breakdown-sum">${sumHearts(totalYellHearts)}</span>
                 </div>
             </div>
             <div class="perf-yell-gallery">
@@ -813,8 +880,40 @@ function renderYellSection(result) {
                             </div>
                         </article>
                     `;
-                }).join('') : '<div class="perf-empty-state">No yelled cards were recorded for this snapshot.</div>'}
+                }).join('') : ''}
             </div>
+            ${perColorCount.some(c => c > 0) ? `
+            <div class="perf-yell-source-breakdown">
+                <div class="perf-mini-heading" style="margin-bottom: 4px;">Per-color source</div>
+                <div class="perf-chip-list">
+                    ${HEART_LABELS.map((label, i) => {
+                        if (i === 0 || perColorCount[i] === 0) return '';
+                        const total = totalYellHearts[i] || 0;
+                        return `
+                            <div class="perf-source-chip yell">
+                                <img src="${HEART_ICONS[i]}" class="heart-mini-icon" alt="">
+                                <span>${total} (from ${perColorCount[i]} yell card${perColorCount[i] > 1 ? 's' : ''})</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            ` : ''}
+            ${heartSources.length > 0 ? `
+            <div class="perf-source-lists">
+                <div>
+                    <div class="perf-mini-heading">Heart sources</div>
+                    <div class="perf-chip-list">
+                        ${heartSources.map((item) => `
+                            <div class="perf-source-chip ${item?.source_type === 'yell' ? 'yell' : ''}">
+                                <span>${escapeHtml(item?.source || 'Source')}</span>
+                                ${renderHeartsCompact(item?.value || [])}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+            ` : ''}
         </section>
     `;
 }
@@ -929,16 +1028,12 @@ function renderPlayerPanel(playerId, result) {
             </section>
 
             <div class="perf-panel-body-grid">
-                <div class="perf-body-column-left">
-                    ${renderStoryCards(result)}
-                    ${renderLiveCards(result)}
-                </div>
-                <div class="perf-body-column-right">
-                    ${renderContributionSection(result)}
-                    ${renderYellSection(result)}
-                    ${renderAllocationSection(result)}
-                    ${renderEffectsSection(result)}
-                </div>
+                ${renderContributionSection(result)}
+                ${renderYellSection(result)}
+                ${renderTotalSection(result)}
+                ${renderLiveCards(result)}
+                ${renderAllocationSection(result)}
+                ${renderEffectsSection(result)}
             </div>
         </article>
     `;
@@ -951,6 +1046,7 @@ export const PerformanceRenderer = {
 
     renderPerformanceGuide: () => {
         const state = State.data;
+        if (!state) return;
         const perspectivePlayer = State.perspectivePlayer;
         const player = perspectivePlayer === 0 ? state.player1 : state.player2;
         const guide = player?.performance_guide;

@@ -9,10 +9,7 @@ import { fixImg } from './constants.js';
 import { DOM_IDS, DISPLAY_VALUES } from './constants_dom.js';
 import { ModalManager } from './utils/ModalManager.js';
 
-let onRender = () => { console.warn("Replay: No render callback set"); };
-
 export const Replay = {
-    setRenderCallback: (cb) => { onRender = cb; },
 
     toggleReplayMode: () => {
         State.updateUiConfig({ replay_mode: !State.replayMode });

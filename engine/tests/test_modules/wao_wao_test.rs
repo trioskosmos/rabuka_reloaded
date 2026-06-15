@@ -62,6 +62,7 @@ fn wao_wao_q178_activate_3_printemps_score_plus_1() {
 
     game.pass();
     game.pass();
+    game.drain_auto_ability_choices();
 
     // All 3 Printemps should now be active ("active" string modifier = active state)
     let o_a = game.state.mods.get_orientation_modifier(printemps_a);

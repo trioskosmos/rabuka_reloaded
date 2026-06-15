@@ -35,6 +35,7 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
 
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(maki, rabuka_engine::zones::MemberArea::Center);
+    game.drain_auto_ability_choices();
 
     // hand after play: filler only (1 card)
     let hand_after_play = game.state.player1.hand.cards.len();

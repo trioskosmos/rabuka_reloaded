@@ -3,20 +3,21 @@ Parser utilities for ability extraction.
 This module contains pure utility functions for text processing, regex extraction,
 pattern lists, and normalization used across the parsing pipeline.
 """
+
 import re
 from typing import Dict, List, Tuple
 
 # Precompiled regex patterns for performance
-DIGIT_PATTERN = re.compile(r'(\d+)')
-COUNT_PATTERN = re.compile(r'(\d+)枚')
-PEOPLE_PATTERN = re.compile(r'(\d+)人')
-COUNTER_PATTERN = re.compile(r'(\d+)つ')  # Generic counter (e.g., "3つ")
-ITEM_PATTERN = re.compile(r'(\d+)個')    # Item counter (e.g., "4個")
+DIGIT_PATTERN = re.compile(r"(\d+)")
+COUNT_PATTERN = re.compile(r"(\d+)枚")
+PEOPLE_PATTERN = re.compile(r"(\d+)人")
+COUNTER_PATTERN = re.compile(r"(\d+)つ")  # Generic counter (e.g., "3つ")
+ITEM_PATTERN = re.compile(r"(\d+)個")  # Item counter (e.g., "4個")
 GROUP_PATTERN = re.compile(r"『(.+?)』")
-QUOTED_NAME_PATTERN = re.compile(r'「(.+?)」')
-COST_PATTERN = re.compile(r'コスト(\d+)')
-HEART_PATTERN = re.compile(r'{{heart_(\d+)\.png\|heart\d+}}')
-BLADE_PATTERN = re.compile(r'{{icon_blade\.png\|ブレード}}')
+QUOTED_NAME_PATTERN = re.compile(r"「(.+?)」")
+COST_PATTERN = re.compile(r"コスト(\d+)")
+HEART_PATTERN = re.compile(r"{{heart_(\d+)\.png\|heart\d+}}")
+BLADE_PATTERN = re.compile(r"{{icon_blade\.png\|ブレード}}")
 
 
 def extract_int(pattern, text, default=None):
@@ -53,12 +54,12 @@ def has_any(text, phrases):
 
 def strip_suffix_period(text):
     """Remove trailing period from text."""
-    return text.rstrip('。')
+    return text.rstrip("。")
 
 
 def strip_prefix_period(text):
     """Remove leading period from text."""
-    return text.lstrip('。')
+    return text.lstrip("。")
 
 
 def parse_optional_flag(text, phrases):
@@ -68,14 +69,14 @@ def parse_optional_flag(text, phrases):
 
 def normalize_whitespace(text):
     """Normalize whitespace in text - collapse multiple spaces to single space."""
-    return re.sub(r'\s+', ' ', text).strip()
+    return re.sub(r"\s+", " ", text).strip()
 
 
 def normalize_fullwidth_digits(text):
     """Normalize full-width digits and symbols to half-width (e.g., １ -> 1, ＋ -> +, − -> -, － -> -)."""
     # Handle both U+2212 (minus sign) and U+FF0D (fullwidth hyphen-minus)
-    fullwidth = '０１２３４５６７８９＋−－'
-    halfwidth  = '0123456789+--'
+    fullwidth = "０１２３４５６７８９＋−－"
+    halfwidth = "0123456789+--"
     translation = str.maketrans(fullwidth, halfwidth)
     return text.translate(translation)
 
@@ -89,7 +90,13 @@ def normalize_text(text):
 
 
 def extract_count(text):
-    """Extract count from text (e.g., '3枚' -> 3, '2人' -> 2, '3つ' -> 3, '4個' -> 4)."""
+    """Extract count from text (e.g., '3枚' -> 3, '2人' -> 2, '3つ' -> 3, '4個' -> 4).
+    Prefers count from 'N枚まで' (up to N) over the first bare 'N枚' match.
+    """
+    # Prefer count from "X枚まで" (e.g., "3枚まで") over the first bare \d+枚
+    max_match = re.search(r"(\d+)枚まで", text)
+    if max_match:
+        return int(max_match.group(1))
     match = COUNT_PATTERN.search(text)
     if match:
         return int(match.group(1))
@@ -103,7 +110,7 @@ def extract_count(text):
     if match:
         return int(match.group(1))
     # Fallback: bare number before 以上 (e.g. "10以上" in "ブレードの合計が10以上")
-    bare = re.search(r'(\d+)以上', text)
+    bare = re.search(r"(\d+)以上", text)
     if bare:
         return int(bare.group(1))
     return None
@@ -113,47 +120,39 @@ def extract_dynamic_count(text):
     """Extract dynamic count references (e.g., score-based, card-based, energy-based).
     Returns a dict with 'type' and 'details' if found, None otherwise.
     """
-    if '数まで' in text:
+    if "数まで" in text:
         # Pattern: "Xの数まで" - count based on X
-        count_match = re.search(r'(.+?)の数まで', text)
+        count_match = re.search(r"(.+?)の数まで", text)
         if count_match:
             source = count_match.group(1).strip()
-            return {
-                'type': 'dynamic_count',
-                'reference': source,
-                'mode': 'max'
-            }
-    
-    if 'その枚数に' in text and 'を足した枚数' in text:
+            return {"type": "dynamic_count", "reference": source, "mode": "max"}
+
+    if "その枚数に" in text and "を足した枚数" in text:
         # Pattern: "その枚数にNを足した枚数" - count based on the previous moved/discarded cards plus N
-        count_match = re.search(r'その枚数に(\d+)を足した(?:枚数|数)', text)
+        count_match = re.search(r"その枚数に(\d+)を足した(?:枚数|数)", text)
         if count_match:
             return {
-                'type': 'dynamic_count',
-                'reference': 'previous_moved_cards',
-                'mode': 'equals',
-                'calculation': 'add',
-                'calculation_value': int(count_match.group(1))
+                "type": "dynamic_count",
+                "reference": "previous_moved_cards",
+                "mode": "equals",
+                "calculation": "add",
+                "calculation_value": int(count_match.group(1)),
             }
 
-    if 'に等しい枚数' in text or 'に等しい数' in text:
+    if "に等しい枚数" in text or "に等しい数" in text:
         # Pattern: "Xに等しい枚数" - count equals X
-        count_match = re.search(r'(.+?)に等しい(?:枚数|数)', text)
+        count_match = re.search(r"(.+?)に等しい(?:枚数|数)", text)
         if count_match:
             source = count_match.group(1).strip()
-            result = {
-                'type': 'dynamic_count',
-                'reference': source,
-                'mode': 'equals'
-            }
+            result = {"type": "dynamic_count", "reference": source, "mode": "equals"}
             # Check for calculation pattern like "スコアに2を足した数"
-            calc_match = re.search(r'(.+?)に(\d+)を足した', source)
+            calc_match = re.search(r"(.+?)に(\d+)を足した", source)
             if calc_match:
-                result['base_reference'] = calc_match.group(1).strip()
-                result['calculation'] = 'add'
-                result['calculation_value'] = int(calc_match.group(2))
+                result["base_reference"] = calc_match.group(1).strip()
+                result["calculation"] = "add"
+                result["calculation_value"] = int(calc_match.group(2))
             return result
-    
+
     return None
 
 
@@ -179,35 +178,35 @@ def extract_blade_count(text):
 
 def create_fallback(raw_text):
     """Create a fallback result with raw_text."""
-    return {'raw_text': raw_text}
+    return {"raw_text": raw_text}
 
 
 def is_fallback(result):
     """Check if a result is a fallback (contains raw_text)."""
-    return isinstance(result, dict) and 'raw_text' in result
+    return isinstance(result, dict) and "raw_text" in result
 
 
 def merge_position_requirement(result, action):
     """Merge position_requirement from action into result if present."""
-    if 'position_requirement' in action:
-        result['position_requirement'] = action['position_requirement']
-        del action['position_requirement']
+    if "position_requirement" in action:
+        result["position_requirement"] = action["position_requirement"]
+        del action["position_requirement"]
     return result
 
 
 def check_exclude_self(text):
     """Check if text contains 'other' patterns (ほかの/他の) that imply exclude_self."""
-    return 'ほかの' in text or '他の' in text or '以外' in text
+    return "ほかの" in text or "他の" in text or "以外" in text
 
 
 def check_distinct_name(text):
     """Check if text contains 'different name' pattern (名前の異なる)."""
-    return '名前の異なる' in text
+    return "名前の異なる" in text
 
 
 def check_original_value(text):
     """Check if text contains 'original value' pattern (元々持つ)."""
-    return '元々持つ' in text
+    return "元々持つ" in text
 
 
 def split_commas_smartly(text):
@@ -216,22 +215,22 @@ def split_commas_smartly(text):
     current = ""
     i = 0
     while i < len(text):
-        if text[i] == '、':
+        if text[i] == "、":
             if i >= 1:
-                prev_char = text[i-1]
-                if prev_char == 'は':
-                    current += '、'
+                prev_char = text[i - 1]
+                if prev_char == "は":
+                    current += "、"
                     i += 1
                     continue
-                if i >= 7 and text[i-7:i] == 'ライブ終了時まで':
-                    current += '、'
+                if i >= 7 and text[i - 7 : i] == "ライブ終了時まで":
+                    current += "、"
                     i += 1
                     continue
-                if i >= 2 and text[i-2:i] == '場合':
-                    current += '、'
+                if i >= 2 and text[i - 2 : i] == "場合":
+                    current += "、"
                     i += 1
                     continue
-            if i >= 3 and text[i-3:i] == 'その後':
+            if i >= 3 and text[i - 3 : i] == "その後":
                 parts.append(current)
                 current = ""
                 i += 1
@@ -249,21 +248,43 @@ def split_commas_smartly(text):
 
 # Main groups (large idol groups) - from rules v1.06 Appendix A
 MAIN_GROUPS = {
-    'μ\'s', 'Aqours', 'Saint Snow', '虹ヶ咲', 'Liella!',
-    'Nijigaku', 'Liella', 'SaintSnow', 'Muse',
-    '蓮ノ空',  # Hasunosora
-    'A-RISE', 'Sunny Passion',
+    "μ's",
+    "Aqours",
+    "Saint Snow",
+    "虹ヶ咲",
+    "Liella!",
+    "Nijigaku",
+    "Liella",
+    "SaintSnow",
+    "Muse",
+    "蓮ノ空",  # Hasunosora
+    "A-RISE",
+    "Sunny Passion",
 }
 
 # Subunits (smaller groups within main groups) - from rules v1.06 Appendix A
 SUBUNITS = {
-    'CYaRon!', 'AZALEA', 'Guilty Kiss', 'Dance',
-    'Qu4rtz', 'R3BIRTH',
-    'CatChu!', '5yncri5e!', 'BiBi', 'Printemps',
-    'lily white', 'DOLLCHESTRA', 'スリーズブーケ',
-    'みらくらぱーく！', 'MIRAPARK', 'EdelNote', 'Edel Note',
-    'KALEIDOSCORE',
-    'A・ZU・NA', 'DiverDiva', 'AiScReam',
+    "CYaRon!",
+    "AZALEA",
+    "Guilty Kiss",
+    "Dance",
+    "Qu4rtz",
+    "R3BIRTH",
+    "CatChu!",
+    "5yncri5e!",
+    "BiBi",
+    "Printemps",
+    "lily white",
+    "DOLLCHESTRA",
+    "スリーズブーケ",
+    "みらくらぱーく！",
+    "MIRAPARK",
+    "EdelNote",
+    "Edel Note",
+    "KALEIDOSCORE",
+    "A・ZU・NA",
+    "DiverDiva",
+    "AiScReam",
 }
 
 # Combined known units (both main groups and subunits)
@@ -275,25 +296,28 @@ def detect_group_type(group_name):
     Returns 'unit' if it's a known unit name, 'character' otherwise."""
     # Normalize the group name for comparison
     normalized = group_name.strip()
-    
+
     # Check against known units
     if normalized in KNOWN_UNITS:
-        return 'unit'
-    
+        return "unit"
+
     # Check for common unit patterns
     # Units often have special characters like !, ', or are in English
-    if '!' in normalized or "'" in normalized:
-        return 'unit'
-    
+    if "!" in normalized or "'" in normalized:
+        return "unit"
+
     # Japanese katakana/hiragana names are typically characters
     # Units are usually in English or have special formatting
     # This is a heuristic - may need refinement
-    if any(c in normalized for c in 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'):
+    if any(
+        c in normalized
+        for c in "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン"
+    ):
         # If it's mostly katakana and not a known unit, it's likely a character
-        return 'character'
-    
+        return "character"
+
     # Default to character if unknown
-    return 'character'
+    return "character"
 
 
 def extract_all_groups(text):
@@ -313,7 +337,7 @@ def annotate_tree(value, text):
     if not text or value is None:
         return value
     if isinstance(value, dict):
-        value.setdefault('text', text)
+        value.setdefault("text", text)
         for item in value.values():
             annotate_tree(item, text)
     elif isinstance(value, list):
@@ -327,92 +351,130 @@ def annotate_tree(value, text):
 # They live here so they can be imported without loading the full parser.
 
 SOURCE_PATTERNS: List[Tuple[str, str]] = [
-    ('デッキの一番下から', 'deck_bottom'),
-    ('デッキの上から', 'deck_top'),
-    ('デッキから', 'deck'),
-    ('山札から', 'deck'),
-    ('エネルギーデッキから', 'energy_deck'),
-    ('エネルギー置き場から', 'energy_zone'),
-    ('控え室か ら', 'discard'),
-    ('控え室にある', 'discard'),
-    ('控え室から', 'discard'),
-    ('相手の控え室にある', 'discard'),
-    ('相手の控え室から', 'discard'),
-    ('からライブカード', 'discard'),
-    ('手札から', 'hand'),
-    ('ステージから', 'stage'),
-    ('ライブカード置き場から', 'live_card_zone'),
-    ('成功ライブカード置き場から', 'success_live_zone'),
+    # Hardcoded high-priority patterns from extract_source()
+    ("デッキの一番上からカードを", "deck_top"),
+    ("デッキの一番上のカードを", "deck_top"),
+    ("これにより公開されたほかのすべてのカードを", "revealed_remaining"),
+    ("これにより公開したカードを", "revealed_cards"),
+    ("公開したカードをすべて", "revealed_cards"),
+    ("それらのカードの中から", "those_cards"),
+    ("このカードを手札に加えてもよい", "revealed_card"),
+    ("自分の成功ライブカード置き場にある", "success_live_zone"),
+    ("エールにより公開された", "revealed_cards"),
+    ("メンバーの下にある", "under_member"),
+    ("メンバー1人の下にある", "under_member"),
+    ("自分の控え室にある", "discard"),
+    ("控え室からライブカード", "discard"),
+    ("控え室を", "discard"),
+    ("手札を", "hand"),
+    ("手札の", "hand"),
+    ("手札から", "hand"),
+    # Standard patterns (longest-first for correct matching)
+    ("デッキの一番下から", "deck_bottom"),
+    ("デッキの上から", "deck_top"),
+    ("エネルギーデッキから", "energy_deck"),
+    ("デッキから", "deck"),
+    ("山札から", "deck"),
+    ("エネルギー置き場から", "energy_zone"),
+    ("控え室か ら", "discard"),
+    ("控え室にある", "discard"),
+    ("控え室から", "discard"),
+    ("相手の控え室にある", "discard"),
+    ("相手の控え室から", "discard"),
+    ("からライブカード", "discard"),
+    ("手札から", "hand"),
+    ("ステージから", "stage"),
+    ("ライブカード置き場から", "live_card_zone"),
+    ("成功ライブカード置き場から", "success_live_zone"),
 ]
 
+
 DESTINATION_PATTERNS: List[Tuple[str, str]] = [
-    ('デッキの一番上から4枚目に置く', 'deck_position_4'),
-    ('デッキの一番上から4枚目に置き', 'deck_position_4'),
-    ('デッキの一番上に置く', 'deck_top'),
-    ('デッキの一番上に置き', 'deck_top'),
-    ('デッキの上に置く', 'deck_top'),
-    ('デッキの上に置き', 'deck_top'),
-    ('デッキの一番下に置く', 'deck_bottom'),
-    ('デッキの一番下に置いて', 'deck_bottom'),
-    ('デッキの一番下に置き', 'deck_bottom'),
-    ('デッキの下に置く', 'deck_bottom'),
-    ('デッキの下に置き', 'deck_bottom'),
-    ('デッキに置く', 'deck'),
-    ('控え室に置く', 'discard'),
-    ('控え室に置いて', 'discard'),
-    ('控え室に置き', 'discard'),
-    ('枚控え室に置く', 'discard'),
-    ('枚控え室に置いて', 'discard'),
-    ('手札に加える', 'hand'),
-    ('手札に加えて', 'hand'),
-    ('手札に置く', 'hand'),
-    ('ステージに置く', 'stage'),
-    ('ステージに登場させる', 'stage'),
-    ('エネルギー置き場に置く', 'energy_zone'),
-    ('エネルギーゾーンに置く', 'energy_zone'),
-    ('エネルギー・デッキに置く', 'energy_deck'),
-    ('エネルギー・デッキに置いてもよい', 'energy_deck'),
-    ('ライブカード置き場に置く', 'live_card_zone'),
-    ('成功ライブカード置き場に置く', 'success_live_zone'),
-    ('メンバーのいないエリア', 'empty_area'),
-    ('そのメンバーがいたエリア', 'same_area'),
-    ('このメンバーの下に置く', 'under_member'),
-    ('このメンバーの下に置いて', 'under_member'),
-    ('このメンバーの下に置き', 'under_member'),
+    # Hardcoded high-priority patterns from extract_destination()
+    ("デッキの一番上に置いてもよい", "deck_top"),
+    ("そのメンバーの下に置く", "under_member"),
+    ("デッキの一番上か一番下に置く", "deck_top_or_bottom"),
+    ("デッキの一番上か一番下に置き", "deck_top_or_bottom"),
+    ("デッキの一番上か一番下に置いて", "deck_top_or_bottom"),
+    ("山札の上に置く", "deck_top"),
+    ("山札の下に置く", "deck_bottom"),
+    ("ライブカード置き場に置いてもよい", "live_card_zone"),
+    ("表向きでライブカード置き場に置く", "live_card_zone"),
+    ("いたエリアに", "same_area"),
+    ("置かれていたエリアに", "same_area"),
+    ("控え室に送る", "discard"),
+    ("デッキに戻す", "deck"),
+    # Standard patterns (longest-first for correct matching)
+    ("デッキの一番上から4枚目に置く", "deck_position_4"),
+    ("デッキの一番上から4枚目に置き", "deck_position_4"),
+    ("デッキの一番上に置く", "deck_top"),
+    ("デッキの一番上に置き", "deck_top"),
+    ("デッキの一番上に置いて", "deck_top"),
+    ("デッキの上に置く", "deck_top"),
+    ("デッキの上に置き", "deck_top"),
+    ("デッキの上に置いて", "deck_top"),
+    ("デッキの一番下に置く", "deck_bottom"),
+    ("デッキの一番下に置いて", "deck_bottom"),
+    ("デッキの一番下に置き", "deck_bottom"),
+    ("デッキの下に置く", "deck_bottom"),
+    ("デッキの下に置き", "deck_bottom"),
+    ("デッキの下に置いて", "deck_bottom"),
+    ("デッキに置く", "deck"),
+    ("控え室に置く", "discard"),
+    ("控え室に置いて", "discard"),
+    ("控え室に置き", "discard"),
+    ("枚控え室に置く", "discard"),
+    ("枚控え室に置いて", "discard"),
+    ("手札に加える", "hand"),
+    ("手札に加えて", "hand"),
+    ("手札に置く", "hand"),
+    ("ステージに置く", "stage"),
+    ("ステージに登場させる", "stage"),
+    ("エネルギー置き場に置く", "energy_zone"),
+    ("エネルギーゾーンに置く", "energy_zone"),
+    ("エネルギー・デッキに置く", "energy_deck"),
+    ("エネルギー・デッキに置いてもよい", "energy_deck"),
+    ("成功ライブカード置き場に置く", "success_live_zone"),
+    ("ライブカード置き場に置く", "live_card_zone"),
+    ("メンバーのいないエリア", "empty_area"),
+    ("そのメンバーがいたエリア", "same_area"),
+    ("このメンバーの下に置く", "under_member"),
+    ("このメンバーの下に置いて", "under_member"),
+    ("このメンバーの下に置き", "under_member"),
 ]
 
 STATE_CHANGE_PATTERNS: List[Tuple[str, str]] = [
-    ('ウェイトにする', 'wait'),
-    ('ウェイトにしてもよい', 'wait'),
-    ('ウェイトにし', 'wait'),
-    ('ウェイト状態で置く', 'wait'),
-    ('ウェイト状態で登場させる', 'wait'),
-    ('アクティブにする', 'active'),
+    ("ウェイトにする", "wait"),
+    ("ウェイトにしてもよい", "wait"),
+    ("ウェイトにし", "wait"),
+    ("ウェイト状態で置く", "wait"),
+    ("ウェイト状態で登場させる", "wait"),
+    ("アクティブにする", "active"),
 ]
 
 LOCATION_PATTERNS: List[Tuple[str, str]] = [
-    ('成功ライブカード置き場', 'success_live_card_zone'),
-    ('ライブカード置き場', 'live_card_zone'),
-    ('控え室', 'discard'),
-    ('手札', 'hand'),
-    ('ステージ', 'stage'),
-    ('デッキ', 'deck'),
-    ('エネルギーデッキ', 'energy_deck'),
-    ('エネルギー置き場', 'energy_zone'),
+    ("成功ライブカード置き場", "success_live_card_zone"),
+    ("ライブカード置き場", "live_card_zone"),
+    ("控え室", "discard"),
+    ("手札", "hand"),
+    ("ステージ", "stage"),
+    ("デッキ", "deck"),
+    ("エネルギーデッキ", "energy_deck"),
+    ("エネルギー置き場", "energy_zone"),
 ]
 
 CARD_TYPE_PATTERNS: List[Tuple[str, str]] = [
-    ('メンバーカード', 'member_card'),
-    ('メンバー', 'member_card'),
-    ('ライブカード', 'live_card'),
-    ('エネルギーカード', 'energy_card'),
+    ("メンバーカード", "member_card"),
+    ("メンバー", "member_card"),
+    ("ライブカード", "live_card"),
+    ("エネルギーカード", "energy_card"),
 ]
 
 OPERATOR_PATTERNS: List[Tuple[str, str]] = [
-    ('以上', '>='),
-    ('以下', '<='),
-    ('より少ない', '<'),
-    ('より多い', '>'),
-    ('未満', '<'),
-    ('超', '>'),
+    ("以上", ">="),
+    ("以下", "<="),
+    ("より少ない", "<"),
+    ("より多い", ">"),
+    ("未満", "<"),
+    ("超", ">"),
 ]

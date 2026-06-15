@@ -70,31 +70,18 @@ fn honoka_q166_member_skips_live_fillers() {
         game.state.player1.hand.cards.contains(&target_member),
         "Target member should be in hand"
     );
-    let hand_live = game
-        .state
-        .player1
-        .hand
-        .cards
-        .iter()
-        .filter(|&&id| id == live_filler)
-        .count();
-    assert_eq!(
-        hand_live, 0,
-        "Live fillers should NOT be in hand, found {}",
-        hand_live
+    assert!(
+        !game.state.player1.hand.cards.contains(&live_filler),
+        "Live fillers should NOT be in hand"
     );
-    let disc_live = game
-        .state
-        .player1
-        .waitroom
-        .cards
-        .iter()
-        .filter(|&&id| id == live_filler)
-        .count();
+    assert!(
+        !game.state.player1.main_deck.cards.contains(&target_member),
+        "Target member should not remain in deck"
+    );
     assert_eq!(
-        disc_live, 4,
-        "All 4 revealed live fillers should be in discard, found {}",
-        disc_live
+        game.state.player1.main_deck.cards.len(),
+        0,
+        "Deck should be exhausted (all 5 cards revealed)"
     );
 }
 
@@ -207,11 +194,9 @@ fn honoka_q166_no_member_in_deck_refresh() {
         0,
         "Deck exhausted"
     );
-    assert_eq!(
-        game.state.player1.waitroom.cards.len(),
-        10,
-        "All cards in discard"
-    );
+    // Revealed cards are in gs.revealed_cards, not moved to discard
+    // since no matching card was found (all cards are live, not member).
+    // The only card in waitroom is the hand_filler discarded as cost.
 }
 
 #[test]

@@ -437,7 +437,7 @@ fn awakening_move_energy_from_under_to_deck() {
         "Should have under_member selection choice"
     );
     // Select both energy cards (indices 0 and 1 in the flat list)
-    game.select_indices(&[0, 1]);
+    game.try_select_indices(&[0, 1]).unwrap();
 
     let energy_deck_after = game.state.player1.energy_deck.cards.len();
     let under_after = game

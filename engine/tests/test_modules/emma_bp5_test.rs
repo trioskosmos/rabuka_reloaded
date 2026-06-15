@@ -26,7 +26,10 @@ fn emma_bp5_q215_wait_energy_placed_then_activate() {
 
     // Select 2 energy to deactivate (the energy activation will remove them from zone)
     if game.has_pending_choice() {
-        game.select_indices(&[0, 1]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
 
     // Cost correctly removes 1 from zone (under member). 4 remain.

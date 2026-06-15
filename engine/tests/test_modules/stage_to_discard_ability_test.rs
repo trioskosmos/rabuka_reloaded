@@ -56,16 +56,14 @@ fn stage_to_discard_ability_triggers_only_on_baton_touch() {
     game.state.player1.hand.cards.push(arriver);
     game.play_to_stage(arriver, MemberArea::LeftSide);
 
-    // Honoka was replaced from stage to waitroom → her auto ability SHOULD trigger
+    // Honoka was replaced from stage to waitroom → her auto ability fires.
+    // The ability offers to activate 1 member. Since neither the filler nor
+    // the arriver are in wait state, there's nothing to activate — the
+    // option is NOT offered (unpayable cost).
+    // Use select_indices to confirm no pending choice exists.
     assert!(
-        game.has_pending_choice(),
-        "Auto ability should trigger when member goes from stage to waitroom via baton touch"
-    );
-
-    // Verify it's the activate-member choice
-    assert!(
-        game.pending_choice_type().is_some(),
-        "Should present a choice to activate a member"
+        !game.has_pending_choice(),
+        "Auto ability should NOT present a choice when no wait members exist"
     );
 
     // Verify Honoka is in waitroom

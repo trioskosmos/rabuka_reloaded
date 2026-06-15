@@ -1,9 +1,9 @@
+use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
 use super::super::types::{Choice, ExecutionContext};
 use super::super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
-
 
 pub(crate) fn draw_cards_for_player(
     player: &mut crate::player::Player,
@@ -27,9 +27,18 @@ pub(crate) fn draw_cards_for_player(
                 .exclude_self_opt(self_target_id)
                 .matches_card(card_db, card);
             if matches_type {
-                match destination {
-                    "hand" | "discard" | "deck_top" | "deck_bottom" | "deck" | "energy_zone"
-                    | "live_card_zone" | "success_live_zone" | "stage" => {
+                match Zone::from_str(destination) {
+                    Some(
+                        Zone::Hand
+                        | Zone::Discard
+                        | Zone::DeckTop
+                        | Zone::DeckBottom
+                        | Zone::Deck
+                        | Zone::Energy
+                        | Zone::LiveCardZone
+                        | Zone::SuccessLiveZone
+                        | Zone::Stage,
+                    ) => {
                         util::place_card_in_zone(player, card, destination, None, false, 1);
                     }
                     _ => {
@@ -62,7 +71,9 @@ impl AbilityResolver {
             }
         };
 
-        let mut count = match dc.reference.as_deref() {
+        let reference_text = dc.reference.as_deref().or(dc.base_reference.as_deref());
+
+        let mut count = match reference_text {
             Some("previous_moved_cards") | Some("previous_move") => {
                 if !self.moved_cards.is_empty() {
                     self.moved_cards.len() as u32
@@ -82,6 +93,53 @@ impl AbilityResolver {
                 }
             }
             Some("revealed_cards") | Some("previous_reveal") => get_revealed_count(gs),
+            Some("unit_count") => {
+                let player = gs.resolve_target_player("self");
+                player.stage.stage.iter().filter(|&&c| c != -1).count() as u32
+            }
+            Some("its_difference") | Some("その差") => {
+                let self_score: u32 = gs
+                    .player1
+                    .success_live_card_zone
+                    .cards
+                    .iter()
+                    .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
+                    .sum();
+                let opp_score: u32 = gs
+                    .player2
+                    .success_live_card_zone
+                    .cards
+                    .iter()
+                    .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
+                    .sum();
+                self_score.abs_diff(opp_score)
+            }
+            Some(ref reference) if reference.contains("これにより控え室に置いた数") => {
+                if let Some(ref moved) = gs.recently_moved_cards {
+                    moved.len() as u32
+                } else {
+                    self.moved_cards.len() as u32
+                }
+            }
+            Some(ref reference) if reference.contains("合計スコア") => {
+                let player = gs.resolve_target_player("self");
+                player
+                    .success_live_card_zone
+                    .cards
+                    .iter()
+                    .filter_map(|&id| gs.card_database.get_card(id).and_then(|c| c.score))
+                    .sum::<u32>()
+            }
+            Some(reference) if reference.contains("ステージ") && reference.contains("メンバー") =>
+            {
+                let target = if reference.contains("相手") || reference.contains("opponent") {
+                    "opponent"
+                } else {
+                    "self"
+                };
+                let player = gs.resolve_target_player(target);
+                player.stage.stage.iter().filter(|&&c| c != -1).count() as u32
+            }
             _ => match dc.count_type.as_str() {
                 "revealed_cards" => get_revealed_count(gs),
                 _ => 0,
@@ -99,9 +157,30 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
+        // Optional draw: create a yes/no choice instead of drawing unconditionally.
+        // The sequential compound handler (compound.rs) saves remaining actions when
+        // pending_choice is set, and skips them if the optional action is declined.
+        if effect.optional.unwrap_or(false) {
+            let count = effect.count_or(1);
+            self.pending_choice = Some(crate::ability::types::Choice::select_target(
+                "pay_optional_cost:skip_optional_cost",
+                &format!("Draw {} card(s)?", count),
+                false,
+            ));
+            return Ok(());
+        }
         let draw_count = if let Some(ref dc) = effect.dynamic_count {
             self.resolve_dynamic_count(gs, dc)
         } else if effect.count == Some(0) {
+            eprintln!("[DRAW_ZERO] self.moved_cards={:?}", self.moved_cards);
+            eprintln!(
+                "[DRAW_ZERO] gs.recently_moved_cards={:?}",
+                gs.recently_moved_cards
+            );
+            eprintln!(
+                "[DRAW_ZERO] last_cost_discard_count={}",
+                gs.mods.last_cost_discard_count
+            );
             if !self.moved_cards.is_empty() {
                 self.moved_cards.len() as u32
             } else if let Some(ref moved_cards) = gs.recently_moved_cards {
@@ -117,8 +196,8 @@ impl AbilityResolver {
             effect,
             draw_count,
             effect.target_name(),
-            effect.source_or("deck"),
-            effect.destination.as_deref().unwrap_or("hand"),
+            effect.source_or(Zone::Deck.to_str()),
+            effect.destination.as_deref().unwrap_or(Zone::Hand.to_str()),
             effect.card_type.as_deref(),
             effect.per_unit.unwrap_or(false),
             effect.per_unit_count.unwrap_or(1),
@@ -174,9 +253,9 @@ impl AbilityResolver {
             }
         }
         let source = if effect.card_type.as_deref() == Some("member_card") {
-            "stage"
+            Zone::Stage.to_str()
         } else {
-            effect.source_or("hand")
+            effect.source_or(Zone::Hand.to_str())
         };
         self.execute_select(
             gs,
@@ -284,8 +363,8 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        match source {
-            "deck" | "deck_top" => {
+        match Zone::from_str(source) {
+            Some(Zone::Deck | Zone::DeckTop) => {
                 if let Some(distinct) = is_distinct {
                     let mut drawn: Vec<i16> = Vec::new();
                     let mut attempts = 0;
@@ -324,7 +403,7 @@ impl AbilityResolver {
                     )?;
                 }
             }
-            "discard" => {
+            Some(Zone::Discard) => {
                 let mut cards: Vec<i16> = (0..final_count as usize)
                     .filter_map(|_| player.waitroom.cards.pop())
                     .collect();
@@ -350,8 +429,8 @@ impl AbilityResolver {
         destination: &str,
     ) {
         let player = gs.resolve_target_player_mut(target);
-        let current_count = match destination {
-            "hand" => player.hand.len(),
+        let current_count = match Zone::from_str(destination) {
+            Some(Zone::Hand) => player.hand.len(),
             _ => {
                 return;
             }
@@ -362,7 +441,7 @@ impl AbilityResolver {
             &AbilityEffect::default(),
             to_draw as u32,
             target,
-            "deck",
+            Zone::Deck.to_str(),
             destination,
             None,
             false,
@@ -481,7 +560,11 @@ impl AbilityResolver {
     }
 
     /// Build serde_json effect_data for a single-card resource grant (blade or heart).
-    pub(crate) fn make_card_effect_data(card_id: i16, amount: i32, color: Option<&str>) -> serde_json::Value {
+    pub(crate) fn make_card_effect_data(
+        card_id: i16,
+        amount: i32,
+        color: Option<&str>,
+    ) -> serde_json::Value {
         let mut data = serde_json::Map::new();
         data.insert("card_id".into(), serde_json::Value::Number(card_id.into()));
         data.insert("amount".into(), serde_json::Value::Number(amount.into()));

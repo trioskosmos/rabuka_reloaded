@@ -313,6 +313,7 @@ fn position_change_group_names_excludes_self() {
         .cards
         .push(game.id("PL!-sd1-010-SD"));
     game.pass(); // LiveCardSetP2 -> FirstAttackerPerformance
+    game.drain_auto_ability_choices();
 
     let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
     let position_actions: Vec<_> = actions

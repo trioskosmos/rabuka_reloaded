@@ -1,6 +1,7 @@
 use super::debug::AbDebug;
+use super::enums::Zone;
 use super::resolver::AbilityResolver;
-use super::types::Choice;
+use super::types::{Choice, ChoiceRoute};
 use super::util;
 use crate::card::{AbilityCost, AbilityEffect};
 use crate::game_state::GameState;
@@ -65,7 +66,10 @@ impl AbilityResolver {
                 let source = cost.source.as_deref().unwrap_or("");
                 let target_str = cost.target.as_deref().unwrap_or("self");
                 let player = gs.resolve_target_player(target_str);
-                if !["hand", "stage", "waitroom", "energy_zone"].contains(&source) {
+                if !matches!(
+                    Zone::from_str(source),
+                    Some(Zone::Hand | Zone::Stage | Zone::Waitroom | Zone::Energy)
+                ) {
                     return Ok(());
                 }
                 let available = util::get_zone_card_count(player, source);
@@ -133,7 +137,7 @@ impl AbilityResolver {
                     options: None,
                 });
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some("choice_cost".to_string());
+                    entry.choice_card_no = Some(ChoiceRoute::ChoiceCost);
                 }
                 Ok(())
             }
@@ -152,7 +156,7 @@ impl AbilityResolver {
                     .map_or(false, |t| t == crate::triggers::ACTIVATION);
 
                 let same_unit = cost.same_unit_name.unwrap_or(false);
-                let is_from_hand = source == "hand" && !same_unit;
+                let is_from_hand = Zone::from_str(source) == Some(Zone::Hand) && !same_unit;
                 if is_from_hand {
                     let target_str = cost.target.as_deref().unwrap_or("self");
                     let pl = gs.resolve_target_player(target_str);
@@ -228,7 +232,7 @@ impl AbilityResolver {
                         eprintln!("  └─ choice created (allow_skip={})", is_optional);
                         if optional {
                             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                                entry.choice_card_no = Some("optional_cost".to_string());
+                                entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
                             }
                         }
                         self.pending_choice = Some(
@@ -271,10 +275,13 @@ impl AbilityResolver {
                     let zone_cards = util::zone_cards(player, &source);
 
                     if same_unit {
-                        // Group source cards by unit, keep only the largest unit group
+                        let is_optional = optional && !is_activation;
+                        let player_ref = &*gs.resolve_target_player(target);
+                        let hand_cards = &player_ref.hand.cards;
+                        // Group hand cards by unit name
                         let mut unit_groups: std::collections::BTreeMap<String, Vec<i16>> =
                             std::collections::BTreeMap::new();
-                        for &cid in zone_cards {
+                        for &cid in hand_cards {
                             if filter.matches(card_db, cid, false) {
                                 let unit = card_db
                                     .get_card(cid)
@@ -283,45 +290,51 @@ impl AbilityResolver {
                                 unit_groups.entry(unit).or_default().push(cid);
                             }
                         }
-                        // Find the largest group
-                        let best = unit_groups.into_iter().max_by_key(|(_, cards)| cards.len());
-                        match best {
-                            Some((_, cards)) if cards.len() >= count => {
-                                // Found a unit with enough cards — modify flow to use only these cards
-                                if cards.len() > count {
-                                    self.pending_choice = Some(Choice::select_cards(
-                                        "hand",
-                                        count,
-                                        format!("Select {} card(s) from same-unit group ({} available in unit {})", count, cards.len(), card_db.get_card(cards[0]).and_then(|c| c.unit.clone()).unwrap_or_default()),
-                                        false,
-                                    )
-                                    .card_type(cost.card_type.clone())
-                                    .target_player_id(Some(cost.target.clone().unwrap_or_else(|| "self".to_string())))
-                                    .build());
-                                    return Ok(());
+                        // Collect ALL hand indices from units with >= count members
+                        let eligible_indices: Vec<usize> = hand_cards
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, &cid)| {
+                                if let Some(card) = card_db.get_card(cid) {
+                                    let unit = card.unit.as_deref().unwrap_or("");
+                                    unit_groups.get(unit).map_or(false, |g| g.len() >= count)
+                                } else {
+                                    false
                                 }
-                                // Exactly match count — auto-select
-                                for &cid in &cards {
-                                    let player = gs.resolve_target_player_mut(target);
-                                    if let Some(idx) =
-                                        player.hand.cards.iter().position(|&c| c == cid)
-                                    {
-                                        player.hand.cards.remove(idx);
-                                        player.waitroom.cards.push(cid);
-                                    }
-                                }
+                            })
+                            .map(|(idx, _)| idx)
+                            .collect();
+                        if eligible_indices.is_empty() {
+                            if is_optional {
                                 return Ok(());
                             }
-                            _ => {
-                                return Err(format!(
-                                    "Cannot pay cost: no unit has {} cards matching filter",
-                                    count
-                                ));
-                            }
+                            return Err(format!(
+                                "Cannot pay cost: no unit has {} cards matching filter",
+                                count
+                            ));
                         }
+                        self.pending_choice = Some(
+                            Choice::select_cards(
+                                Zone::Hand.to_str(),
+                                count,
+                                format!("Select {} card(s) with the same unit name", count),
+                                is_optional,
+                            )
+                            .card_type(cost.card_type.clone())
+                            .target_player_id(Some(
+                                cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                            ))
+                            .filtered_indices(Some(eligible_indices))
+                            .build(),
+                        );
+                        return Ok(());
                     }
 
-                    let zone_name = if source == "deck_top" { "deck" } else { source };
+                    let zone_name = if Zone::from_str(source) == Some(Zone::DeckTop) {
+                        Zone::Deck.to_str()
+                    } else {
+                        source
+                    };
                     let matching_count =
                         util::count_in_zone(player, zone_name, &filter, card_db) as usize;
 
@@ -398,7 +411,7 @@ impl AbilityResolver {
                         options: None,
                     });
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.choice_card_no = Some("optional_cost".to_string());
+                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
                     }
                     return Ok(());
                 }
@@ -428,7 +441,7 @@ impl AbilityResolver {
                     } else {
                         self.pending_choice = Some(
                             Choice::select_cards(
-                                "stage",
+                                Zone::Stage.to_str(),
                                 count,
                                 format!("Select {} stage member(s) to wait", count),
                                 false,
@@ -462,7 +475,7 @@ impl AbilityResolver {
                         options: None,
                     });
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                        entry.choice_card_no = Some("optional_cost".to_string());
+                        entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
                     }
                     return Ok(());
                 }
@@ -505,15 +518,15 @@ impl AbilityResolver {
                 Ok(())
             }
             Some("reveal") => {
-                let source = cost.source.as_deref().unwrap_or("hand");
+                let source = cost.source.as_deref().unwrap_or(Zone::Hand.to_str());
                 let target = cost.target.as_deref().unwrap_or("self");
                 let card_type = cost.card_type.clone();
 
-                let card_ids: Vec<i16> = {
+                let mut card_ids: Vec<i16> = {
                     let player = &*gs.resolve_target_player(target);
                     let card_db = &gs.card_database;
-                    match source {
-                        "hand" => player
+                    match Zone::from_str(source) {
+                        Some(Zone::Hand) => player
                             .hand
                             .cards
                             .iter()
@@ -530,13 +543,18 @@ impl AbilityResolver {
                     return Err("No cards to reveal".to_string());
                 }
 
+                // Dedup card_ids — multiple hand entries may share the same template ID
+                // when copies of the same card were created (same pool entry reused).
+                card_ids.sort();
+                card_ids.dedup();
+
                 let has_explicit_count = cost.count.is_some();
                 let explicit_count = cost.count.unwrap_or(1) as usize;
 
                 if has_explicit_count && card_ids.len() <= explicit_count {
                     for card_id in card_ids {
                         gs.revealed_cards.push(card_id);
-                        self.revealed_cost_cards.push(card_id);
+                        gs.revealed_cost_cards.push(card_id);
                     }
                     Ok(())
                 } else {
@@ -559,6 +577,7 @@ impl AbilityResolver {
                         .target_player_id(Some(
                             cost.target.clone().unwrap_or_else(|| "self".to_string()),
                         ))
+                        .is_reveal(true)
                         .build(),
                     );
                     Ok(())
@@ -576,7 +595,7 @@ impl AbilityResolver {
                 Ok(())
             }
             Some("custom") => {
-                if cost.destination.as_deref() == Some("under_member") {
+                if cost.destination.as_deref().and_then(Zone::from_str) == Some(Zone::UnderMember) {
                     self.execute_place_energy_under_member(
                         gs,
                         cost.count.unwrap_or(1),
@@ -612,18 +631,18 @@ impl AbilityResolver {
                     .cost
                     .as_ref()
                     .and_then(|c| c.alternative_effect.clone());
-                if alt.is_some() {
-                    entry.effect_started = false;
-                } else {
-                    entry.effect_started = false;
-                }
+                entry.effect_started = false;
                 entry.optional_cost_was_paid = false;
                 if let Some(alt_effect) = alt {
                     entry.pending_commands =
                         vec![crate::ability::types::Command::Effect(*alt_effect)];
+                } else {
+                    // No alternative effect: clear any pending sequential commands
+                    // (e.g. optional draw followed by conditional actions).
+                    entry.pending_commands.clear();
                 }
             }
-            return Ok(());
+            return self.resume_pending_commands(gs);
         }
         // "pay_optional_cost" or "1" from select_option(1)
         self.pending_choice = None;
@@ -710,7 +729,7 @@ impl AbilityResolver {
                 }
             }
             self.pending_choice = None;
-            let is_effect_optional = gs.entry_choice_card_no().as_deref() == Some("optional_cost");
+            let is_effect_optional = gs.entry_choice_card_no() == Some(ChoiceRoute::OptionalCost);
             eprintln!(
                 "[HANDLE_OPT_COST] entry_cost={:?} entry_effect={:?} effect_action={:?}",
                 gs.entry_cost().map(|c| c.state_change.as_deref()),

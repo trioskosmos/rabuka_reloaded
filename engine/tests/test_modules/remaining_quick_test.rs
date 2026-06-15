@@ -43,7 +43,9 @@ fn eternalize_q204_two_niko_hearts_reduced() {
         "Q204: need_heart modifier applied for 2+ 虹ヶ咲 members"
     );
     if let Some(mods) = needs_mod {
-        let h00_val = mods.get(&HeartColor::Heart00).copied().unwrap_or(0);
+        let h00_val = mods
+            .get(&HeartColor::Heart00)
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
         assert!(
             h00_val <= -3,
             "Q204: heart00 reduced by at least 3 (got {})",

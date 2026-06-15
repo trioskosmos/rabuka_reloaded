@@ -34,7 +34,10 @@ fn toubatsu_q118_2_distinct_live_cards_works() {
     // Debut fires: select 2 distinct live cards from discard
     if game.has_pending_choice() {
         // First choice: select which 2 distinct live cards
-        game.select_indices(&[0, 1]);
+        game.select_indices(&[0]);
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
 
     // After selection, the opponent chooses 1 → it goes to opponent's hand

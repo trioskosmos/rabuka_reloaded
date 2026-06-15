@@ -1,5 +1,6 @@
+use super::super::enums::Zone;
 use super::super::resolver::AbilityResolver;
-use super::super::types::{Choice, ExecutionContext};
+use super::super::types::{Choice, ChoiceRoute, ExecutionContext};
 use super::super::util;
 use crate::card::AbilityEffect;
 use crate::card::PositionInfo;
@@ -11,18 +12,41 @@ impl AbilityResolver {
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        if effect.multiple_targets.unwrap_or(false) && effect.source.as_deref() == Some("deck_top")
+        if effect.multiple_targets.unwrap_or(false)
+            && Zone::from_str(effect.source.as_deref().unwrap_or("")) == Some(Zone::DeckTop)
         {
+            if effect.optional.unwrap_or(false) {
+                self.pending_choice = Some(Choice::SelectTarget {
+                    target: "pay_optional_cost:skip_optional_cost".to_string(),
+                    description: "Reveal cards from deck (optional cost)?".to_string(),
+                    allow_skip: true,
+                    options: None,
+                });
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                    entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
+                }
+                return Ok(());
+            }
             let chosen = gs
                 .ability_queue
                 .current_entry()
                 .and_then(|e| e.conditional_choice.clone())
                 .or_else(|| effect.card_type.clone());
-            return self.execute_reveal_until_target(gs, effect.target_name(), chosen.as_deref());
+            // cost_limit and operator come from the reveal effect itself if set,
+            // or from the conditional_choice JSON if stored there by select.
+            let cl = effect.cost_limit;
+            let co = effect.cost_limit_operator.as_deref();
+            return self.execute_reveal_until_target(
+                gs,
+                effect.target_name(),
+                chosen.as_deref(),
+                cl,
+                co,
+            );
         }
         self.execute_reveal(
             gs,
-            effect.source_or("hand"),
+            effect.source_or(Zone::Hand.to_str()),
             effect.count_or(1),
             effect.target_name(),
             effect.card_type.as_deref(),
@@ -45,10 +69,10 @@ impl AbilityResolver {
             let mut routed = effect.clone();
             routed.action = "move_cards".into();
             if routed.source.is_none() {
-                routed.source = Some("looked_at".into());
+                routed.source = Some(Zone::LookedAt.to_str().to_string());
             }
             if routed.destination.is_none() {
-                routed.destination = Some("deck_top".into());
+                routed.destination = Some(Zone::DeckTop.to_str().to_string());
             }
             return self.execute_move_cards(gs, &routed);
         }
@@ -86,13 +110,19 @@ impl AbilityResolver {
 
         if let Some(card_type) = chosen_card_type {
             // Use the existing reveal_until_target functionality
-            self.execute_reveal_until_target(gs, effect.target_name(), Some(&card_type))?;
+            self.execute_reveal_until_target(
+                gs,
+                effect.target_name(),
+                Some(&card_type),
+                None,
+                None,
+            )?;
 
             // After reveal, we need to move the chosen card to hand and others to discard
             // The looked_at_cards should contain: [chosen_card, other_revealed_cards...]
-            if !self.looked_at_cards.is_empty() {
-                let chosen_card = self.looked_at_cards[0];
-                let other_cards = self.looked_at_cards[1..].to_vec();
+            if !gs.looked_at_cards.is_empty() {
+                let chosen_card = gs.looked_at_cards[0];
+                let other_cards = gs.looked_at_cards[1..].to_vec();
 
                 // Move chosen card to hand
                 let player = gs.resolve_target_player_mut(effect.target_name());
@@ -102,7 +132,7 @@ impl AbilityResolver {
                 player.waitroom.cards.extend(other_cards);
 
                 // Clear looked_at_cards
-                self.looked_at_cards.clear();
+                gs.looked_at_cards.clear();
             }
         } else if let Some(ref or_types) = effect.or_card_types {
             // No card type chosen yet — create the type choice prompt.
@@ -149,7 +179,7 @@ impl AbilityResolver {
             }
         } else {
             // If no card type was chosen and no available types, just clear any looked_at_cards
-            self.looked_at_cards.clear();
+            gs.looked_at_cards.clear();
         }
 
         Ok(())
@@ -163,7 +193,10 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<bool, String> {
         // Skip if not "both" or if this is position_change (handles "both" internally)
-        if effect.target.as_deref() != Some("both") || effect.action.as_str() == "position_change" {
+        if effect.target.as_deref() != Some("both")
+            || crate::ability::enums::ActionType::from_str(&effect.action)
+                == Some(crate::ability::enums::ActionType::PositionChange)
+        {
             return Ok(false);
         }
 
@@ -201,10 +234,13 @@ impl AbilityResolver {
             && effect.heart_type.as_deref() == Some("all")
         {
             if let Some(card_id) = gs.activating_card {
-                gs.mods.add_heart_modifier(
+                gs.mods.add_heart_modifier_with_trace(
                     card_id,
                     crate::card::HeartColor::Heart00,
                     effect.count_or(1) as i32,
+                    &mut gs.ability_applications,
+                    gs.activating_card.unwrap_or(-1),
+                    &effect.text,
                 );
             }
             return Ok(());
@@ -215,7 +251,7 @@ impl AbilityResolver {
         // For each distinct heart color present among recently_moved_cards, grant 1 heart of that color.
         if effect.resource.as_deref() == Some("heart")
             && effect.per_unit.unwrap_or(false)
-            && effect.per_unit_type.as_deref() == Some("discard")
+            && Zone::from_str(effect.per_unit_type.as_deref().unwrap_or("")) == Some(Zone::Discard)
             && effect.multiple_targets.unwrap_or(false)
         {
             let card_db = self.card_db();
@@ -251,7 +287,22 @@ impl AbilityResolver {
 
             if let Some(card_id) = activating_card_id {
                 for color in &distinct_colors {
-                    gs.mods.add_heart_modifier(card_id, *color, 1);
+                    gs.mods.add_heart_modifier_with_trace(
+                        card_id,
+                        *color,
+                        1,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
+                    gs.record_ability_application(
+                        card_id,
+                        effect.text.clone(),
+                        "heart_bonus",
+                        card_id,
+                        Some(color.index()),
+                        1,
+                    );
                 }
                 if is_temporary && !distinct_colors.is_empty() {
                     let color_names: Vec<String> = distinct_colors
@@ -328,7 +379,11 @@ impl AbilityResolver {
 
         let recently_moved = gs.recently_moved_cards.clone();
 
-        let exclude_self_id = effect.exclude_self.and_then(|_| gs.activating_card);
+        let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
+            gs.activating_card
+        } else {
+            None
+        };
 
         if effect.target_count.is_some()
             && !is_all
@@ -349,7 +404,7 @@ impl AbilityResolver {
                     .filter(|&id| id != -1)
                     .collect()
             };
-            let prelim_filter = util::filter_from_parts(
+            let mut prelim_filter = util::filter_from_parts(
                 effect.card_type.as_deref(),
                 effect.group_name(),
                 None,
@@ -358,7 +413,12 @@ impl AbilityResolver {
                 None,
                 exclude_self_id,
             );
-            let candidates = util::matching_ids_filtered(
+            if effect.filter_targets_by_heart_colors.unwrap_or(false) {
+                if !effect.heart_colors.is_empty() {
+                    prelim_filter.heart_colors = &effect.heart_colors;
+                }
+            }
+            let mut candidates = util::matching_ids_filtered(
                 &stage_ids,
                 &card_db,
                 &prelim_filter,
@@ -375,6 +435,16 @@ impl AbilityResolver {
                 },
                 None,
             );
+            // Filter target_count candidates by position if specified.
+            if let Some(ref pos) = effect.position {
+                if let Some(p) = pos.get_position() {
+                    if let Some(stage_idx) = util::stage_position_index(p) {
+                        let p = gs.resolve_target_player(&target);
+                        let expected = p.stage.stage.get(stage_idx).copied().unwrap_or(-1);
+                        candidates.retain(|&cid| cid == expected);
+                    }
+                }
+            }
             let tc = effect.target_count.unwrap_or(1) as usize;
             if candidates.len() > tc {
                 let stage_snapshot: Vec<i16> = {
@@ -392,7 +462,7 @@ impl AbilityResolver {
                 gs.ability_queue.set_pending_commands(pending);
                 self.pending_choice = Some(
                     crate::ability::types::Choice::select_cards(
-                        "stage".to_string(),
+                        Zone::Stage.to_str().to_string(),
                         tc,
                         format!("Select {} card(s) to receive {} {}", tc, count, resource),
                         false,
@@ -443,7 +513,8 @@ impl AbilityResolver {
                 // recently_moved=None, so we correctly get 0 (no gain).
                 // DO NOT fall back to counting waitroom — that would incorrectly give
                 // 1 blade even when the cost was skipped.
-                if per_unit_type_str.as_deref() == Some("discard") {
+                if Zone::from_str(per_unit_type_str.as_deref().unwrap_or("")) == Some(Zone::Discard)
+                {
                     if let Some(ref moved) = recently_moved {
                         let filtered = moved
                             .iter()
@@ -454,7 +525,8 @@ impl AbilityResolver {
                         // No recent move tracked → cost was skipped or 0 discarded.
                         matching_count = last_discard_count;
                     }
-                } else if (per_unit_type_str.as_deref() == Some("waitroom")
+                } else if (Zone::from_str(per_unit_type_str.as_deref().unwrap_or(""))
+                    == Some(Zone::Waitroom)
                     || per_unit_type_str.as_deref() == Some("waitroom_card"))
                     && (last_discard_count > 0 || recently_moved.is_some())
                 {
@@ -495,11 +567,11 @@ impl AbilityResolver {
             // use all_selected — apply the filter with exclusion to find the right targets.
             // Only use all_selected directly for pure sequential select→gain_resource.
             let use_raw = !all_selected.is_empty() && !has_selection_filter;
-            let blade_targets: Vec<i16> = if use_raw {
+            let mut blade_targets: Vec<i16> = if use_raw {
                 all_selected.clone()
             } else if has_blade_filter || is_all {
                 util::matching_ids_filtered(
-                    util::zone_cards(player, "stage"),
+                    util::zone_cards(player, Zone::Stage.to_str()),
                     &card_db,
                     &filter,
                     true,
@@ -515,14 +587,24 @@ impl AbilityResolver {
                 vec![]
             };
 
+            // Filter by position if the effect specifies one (e.g. "center").
+            if let Some(ref pos) = effect.position {
+                if let Some(p) = pos.get_position() {
+                    if let Some(stage_idx) = util::stage_position_index(p) {
+                        let expected = player.stage.stage[stage_idx];
+                        blade_targets.retain(|&cid| cid == expected);
+                    }
+                }
+            }
+
             let heart_color_inner = single_fixed_heart
                 .clone()
                 .or_else(|| effect.heart_colors.first().map(|s| s.to_string()));
-            let heart_targets: Vec<i16> = if use_raw {
+            let mut heart_targets: Vec<i16> = if use_raw {
                 all_selected.clone()
             } else if resource == "heart" || resource == "ハート" {
                 util::matching_ids_filtered(
-                    util::zone_cards(player, "stage"),
+                    util::zone_cards(player, Zone::Stage.to_str()),
                     &card_db,
                     &filter,
                     true,
@@ -537,6 +619,26 @@ impl AbilityResolver {
             } else {
                 vec![]
             };
+
+            // Filter heart targets by position if specified.
+            if let Some(ref pos) = effect.position {
+                if let Some(p) = pos.get_position() {
+                    if let Some(stage_idx) = util::stage_position_index(p) {
+                        let expected = player.stage.stage[stage_idx];
+                        heart_targets.retain(|&cid| cid == expected);
+                    }
+                }
+            }
+
+            // Apply heart_colors as a target filter when the effect
+            // specifies that targets must already possess the heart color.
+            if effect.filter_targets_by_heart_colors.unwrap_or(false) {
+                if !effect.heart_colors.is_empty() {
+                    heart_targets.retain(|&id| {
+                        util::card_matches_heart_colors(&card_db, id, &effect.heart_colors)
+                    });
+                }
+            }
 
             (blade_targets, heart_targets, heart_color_inner, final_count)
         };
@@ -585,15 +687,27 @@ impl AbilityResolver {
                     );
                 }
                 if resource == "blade" || resource == "ブレード" {
-                    gs.mods.add_blade_modifier(card_id, blades_to_add);
+                    gs.mods.add_blade_modifier_with_trace(
+                        card_id,
+                        blades_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
                     if is_temporary {
                         effect_data =
                             Some(Self::make_card_effect_data(card_id, blades_to_add, None));
                     }
                 }
                 if resource == "heart" || resource == "ハート" {
-                    gs.mods
-                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    gs.mods.add_heart_modifier_with_trace(
+                        card_id,
+                        heart_color_val,
+                        heart_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         effect_data = Some(Self::make_card_effect_data(
@@ -632,7 +746,13 @@ impl AbilityResolver {
                             .collect()
                     };
                     for card_id in stage_ids {
-                        gs.mods.add_blade_modifier(card_id, blades_to_add);
+                        gs.mods.add_blade_modifier_with_trace(
+                            card_id,
+                            blades_to_add,
+                            &mut gs.ability_applications,
+                            gs.activating_card.unwrap_or(-1),
+                            &effect.text,
+                        );
                     }
                     if is_temporary {
                         let mut data = serde_json::Map::new();
@@ -643,17 +763,31 @@ impl AbilityResolver {
                         );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
-                } else if let Some(card_id) = activating_card_id {
-                    gs.mods.add_blade_modifier(card_id, blades_to_add);
-                    if is_temporary {
-                        effect_data =
-                            Some(Self::make_card_effect_data(card_id, blades_to_add, None));
+                } else if effect.target_count.is_none() && effect.exclude_self.is_none() {
+                    if let Some(card_id) = activating_card_id {
+                        gs.mods.add_blade_modifier_with_trace(
+                            card_id,
+                            blades_to_add,
+                            &mut gs.ability_applications,
+                            gs.activating_card.unwrap_or(-1),
+                            &effect.text,
+                        );
+                        if is_temporary {
+                            effect_data =
+                                Some(Self::make_card_effect_data(card_id, blades_to_add, None));
+                        }
                     }
                 }
             } else if !all_selected.is_empty() && effect.source.is_none() {
                 // Pure sequential select→gain_resource: apply to ALL selected cards with full count
                 for &card_id in &blade_targets {
-                    gs.mods.add_blade_modifier(card_id, blades_to_add);
+                    gs.mods.add_blade_modifier_with_trace(
+                        card_id,
+                        blades_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
                 }
             } else {
                 let targets = if is_all {
@@ -665,23 +799,37 @@ impl AbilityResolver {
                         .collect()
                 };
                 for &card_id in &targets {
-                    gs.mods.add_blade_modifier(card_id, blades_to_add);
+                    gs.mods.add_blade_modifier_with_trace(
+                        card_id,
+                        blades_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
                 }
             }
         }
 
         if resource == "heart" || resource == "ハート" {
             if heart_targets.is_empty() {
-                if let Some(card_id) = activating_card_id {
-                    gs.mods
-                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
-                    if is_temporary && effect_data.is_none() {
-                        let color_name = heart_color_str.as_deref().unwrap_or("heart01");
-                        effect_data = Some(Self::make_card_effect_data(
+                if effect.target_count.is_none() && effect.exclude_self.is_none() {
+                    if let Some(card_id) = activating_card_id {
+                        gs.mods.add_heart_modifier_with_trace(
                             card_id,
+                            heart_color_val,
                             heart_to_add,
-                            Some(color_name),
-                        ));
+                            &mut gs.ability_applications,
+                            gs.activating_card.unwrap_or(-1),
+                            &effect.text,
+                        );
+                        if is_temporary && effect_data.is_none() {
+                            let color_name = heart_color_str.as_deref().unwrap_or("heart01");
+                            effect_data = Some(Self::make_card_effect_data(
+                                card_id,
+                                heart_to_add,
+                                Some(color_name),
+                            ));
+                        }
                     }
                 }
             } else if is_self_target
@@ -691,8 +839,14 @@ impl AbilityResolver {
                     && effect.card_type.is_none())
             {
                 if let Some(card_id) = activating_card_id {
-                    gs.mods
-                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    gs.mods.add_heart_modifier_with_trace(
+                        card_id,
+                        heart_color_val,
+                        heart_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
                     if is_temporary && effect_data.is_none() {
                         let color_name = heart_color_str.as_deref().unwrap_or("heart01");
                         effect_data = Some(Self::make_card_effect_data(
@@ -712,8 +866,14 @@ impl AbilityResolver {
                         .collect()
                 };
                 for &card_id in &targets {
-                    gs.mods
-                        .add_heart_modifier(card_id, heart_color_val, heart_to_add);
+                    gs.mods.add_heart_modifier_with_trace(
+                        card_id,
+                        heart_color_val,
+                        heart_to_add,
+                        &mut gs.ability_applications,
+                        gs.activating_card.unwrap_or(-1),
+                        &effect.text,
+                    );
                 }
             }
         }
@@ -740,15 +900,48 @@ impl AbilityResolver {
             "ハート"
         };
         let color_tag = heart_color_str.as_deref().unwrap_or("heart00");
+        // Collect target card names for the log entry so it's clear which
+        // cards received the bonus (avoids sounding like a global buff).
+        let target_names: Vec<String> = {
+            let mut names = Vec::new();
+            for &cid in &blade_targets_save {
+                if let Some(card) = gs.card_database.get_card(cid) {
+                    names.push(card.name.clone());
+                }
+            }
+            // is_all path: blade_targets_save is empty but all stage cards got the bonus
+            if names.is_empty() && is_all && (resource == "blade" || resource == "ブレード") {
+                let p = gs.resolve_target_player(&target);
+                for &cid in p.stage.stage.iter().filter(|&&c| c != -1) {
+                    if let Some(card) = gs.card_database.get_card(cid) {
+                        names.push(card.name.clone());
+                    }
+                }
+            }
+            // activating_card fallback (no blade_targets but single card got bonus)
+            if names.is_empty() {
+                if let Some(cid) = gs.activating_card {
+                    if let Some(card) = gs.card_database.get_card(cid) {
+                        names.push(card.name.clone());
+                    }
+                }
+            }
+            names
+        };
+        let target_suffix = if target_names.is_empty() {
+            String::new()
+        } else {
+            format!(" (→ {})", target_names.join(", "))
+        };
         if resource == "heart" || resource == "ハート" {
             gs.rule_log.push(format!(
-                "{} {}: {} {}獲得 ({})",
-                pp, act_name, final_count, resource_jp, color_tag
+                "{} {}: {} {}獲得 ({}){}",
+                pp, act_name, final_count, resource_jp, color_tag, target_suffix
             ));
         } else {
             gs.rule_log.push(format!(
-                "{} {}: {} {}獲得",
-                pp, act_name, final_count, resource_jp
+                "{} {}: {} {}獲得{}",
+                pp, act_name, final_count, resource_jp, target_suffix
             ));
         }
 
@@ -772,10 +965,54 @@ impl AbilityResolver {
         target: &str,
     ) -> Result<(), String> {
         eprintln!("play_baton_touch: count={}, target={}", count, target);
-        if gs.baton_touch_count == 0 {
-            return Err(
-                "Baton touch condition not met: card was not played via baton touch".to_string(),
-            );
+        if gs.baton_touch_count > 0 {
+            // Already performed baton touch during play action — no-op now.
+            return Ok(());
+        }
+        // Double baton: generate member pair choices so the player can pick
+        // which 2 occupied positions to replace. This path is used when the
+        // constant ability is triggered directly (e.g. via web UI buttons).
+        if count > 1 {
+            let area_enums = [
+                crate::zones::MemberArea::LeftSide,
+                crate::zones::MemberArea::Center,
+                crate::zones::MemberArea::RightSide,
+            ];
+            let player = gs.resolve_target_player(target);
+            let stage_ids = [
+                player.stage.stage[0],
+                player.stage.stage[1],
+                player.stage.stage[2],
+            ];
+            let occupied: Vec<(usize, &str)> = [0, 1, 2]
+                .iter()
+                .filter(|&&idx| stage_ids[idx] != -1)
+                .filter(|&&idx| !player.areas_locked_this_turn.contains(&area_enums[idx]))
+                .map(|&idx| {
+                    let area_names = ["left", "center", "right"];
+                    (idx, area_names[idx])
+                })
+                .collect();
+            if occupied.len() < 2 {
+                return Err(
+                    "Not enough unlocked occupied positions for double baton touch".to_string(),
+                );
+            }
+            let mut options = Vec::new();
+            for i in 0..occupied.len() {
+                for j in (i + 1)..occupied.len() {
+                    let (_idx1, name1) = occupied[i];
+                    let (_idx2, name2) = occupied[j];
+                    options.push(format!("{},{}", name1, name2));
+                }
+            }
+            self.pending_choice = Some(crate::ability::types::Choice::SelectTarget {
+                target: "double_baton_touch".to_string(),
+                description: "Choose 2 occupied areas for double baton touch".to_string(),
+                allow_skip: true,
+                options: Some(options),
+            });
+            return Ok(());
         }
         gs.prohibition_effects
             .push(format!("baton_touch_allowed:{}", count));
@@ -803,7 +1040,7 @@ impl AbilityResolver {
                 .iter()
                 .position(|&id| id == c)
         });
-        if source == Some("under_member") {
+        if Zone::from_str(source.unwrap_or("")) == Some(Zone::UnderMember) {
             // Handle moving from under_member to energy_deck
             let player = gs.resolve_target_player_mut(target);
             let target_index = match position.and_then(|p| p.get_position()) {
@@ -849,7 +1086,7 @@ impl AbilityResolver {
             // Create choice to select cards to move
             self.pending_choice = Some(
                 Choice::select_cards(
-                    "under_member",
+                    Zone::UnderMember.to_str(),
                     under_cards.len().min(count as usize),
                     "Select energy cards to move from under member to energy deck",
                     optional,
@@ -878,7 +1115,7 @@ impl AbilityResolver {
                     options: None,
                 });
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some("optional_cost".to_string());
+                    entry.choice_card_no = Some(ChoiceRoute::OptionalCost);
                 }
                 return;
             }
@@ -987,7 +1224,9 @@ impl AbilityResolver {
                     return Ok(());
                 }
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some("position_change:opponent:front".to_string());
+                    entry.choice_card_no = Some(ChoiceRoute::Raw(
+                        "position_change:opponent:front".to_string(),
+                    ));
                 }
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
@@ -999,6 +1238,40 @@ impl AbilityResolver {
             } else {
                 return self.execute_position_change_with_destination(gs, effect, dest);
             }
+        }
+
+        // "target_member: select" from parser — player must pick which member to move
+        if target_member == "select" {
+            let valid_sources: Vec<String> = {
+                let player = gs.resolve_target_player(target);
+                (0..3)
+                    .filter(|&i| player.stage.stage[i] != -1)
+                    .map(|i| {
+                        match i {
+                            0 => "left",
+                            1 => "center",
+                            _ => "right",
+                        }
+                        .to_string()
+                    })
+                    .collect()
+            };
+            if valid_sources.is_empty() {
+                return Ok(());
+            }
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                    "position_change:{}:select",
+                    target
+                )));
+            }
+            self.pending_choice = Some(Choice::SelectTarget {
+                target: "position|destination".to_string(),
+                description: "Choose which member to move".to_string(),
+                allow_skip: effect.optional.unwrap_or(false),
+                options: Some(valid_sources),
+            });
+            return Ok(());
         }
 
         // Handle "both" target: opponent first (choice), then self (choice via pending).
@@ -1086,7 +1359,10 @@ impl AbilityResolver {
                     return Ok(());
                 }
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some(format!("position_change:self:{}", card_nos[0]));
+                    entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                        "position_change:self:{}",
+                        card_nos[0]
+                    )));
                 }
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
@@ -1138,8 +1414,10 @@ impl AbilityResolver {
                     return Ok(());
                 }
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no =
-                        Some(format!("position_change:{}:{}", target, position_str));
+                    entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                        "position_change:{}:{}",
+                        target, position_str
+                    )));
                 }
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
@@ -1165,7 +1443,7 @@ impl AbilityResolver {
                 return Ok(());
             }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                entry.choice_card_no = Some("position_change:self".to_string());
+                entry.choice_card_no = Some(ChoiceRoute::Raw("position_change:self".to_string()));
             }
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "position|destination".to_string(),
@@ -1219,7 +1497,10 @@ impl AbilityResolver {
                     return Ok(());
                 }
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
-                    entry.choice_card_no = Some(format!("position_change:self:{}", card_no));
+                    entry.choice_card_no = Some(ChoiceRoute::Raw(format!(
+                        "position_change:self:{}",
+                        card_no
+                    )));
                 }
                 self.pending_choice = Some(Choice::SelectTarget {
                     target: "position|destination".to_string(),
@@ -1564,112 +1845,15 @@ impl AbilityResolver {
         Ok(())
     }
 
-    pub(crate) fn execute_appear(
+    pub(crate) fn execute_choice(
         &mut self,
         gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
-        let source = effect.source_or("");
-        let destination = effect.destination.as_deref().unwrap_or("stage");
-        let count = effect.count_or(1);
-        let target = effect.target_name();
-        let card_type = effect.card_type.as_deref();
-        let card_db = self.card_db();
-        let player = gs.resolve_target_player_mut(target);
-
-        match source {
-            "deck" => {
-                let mut appeared = 0;
-                let mut cards_to_record: Vec<i16> = Vec::new();
-                while appeared < count {
-                    if let Some(card) = player.main_deck.draw() {
-                        let matches_type = util::card_matches_type(&card_db, card, card_type);
-                        if matches_type {
-                            if destination == "stage" {
-                                if let Some(pos) = util::stage_first_empty(&player.stage.stage) {
-                                    player.stage.stage[pos] = card;
-                                    player.areas_locked_this_turn.insert(util::pos_to_area(pos));
-                                } else {
-                                    player.hand.add_card(card);
-                                }
-                                cards_to_record.push(card);
-                            } else {
-                                util::place_card_in_zone(player, card, destination, None, false, 1);
-                            }
-                            appeared += 1;
-                        } else {
-                            player.main_deck.cards.push(card);
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                for card_id in cards_to_record {
-                    gs.record_card_movement(card_id);
-                }
-            }
-            "discard" => {
-                let mut appeared = 0;
-                let mut indices_to_remove = Vec::new();
-                for (i, card) in player.waitroom.cards.iter().enumerate() {
-                    if appeared >= count {
-                        break;
-                    }
-                    let matches_type = util::card_matches_type(&card_db, *card, card_type);
-                    if matches_type {
-                        indices_to_remove.push(i);
-                        appeared += 1;
-                    }
-                }
-                for i in indices_to_remove.into_iter().rev() {
-                    let card = player.waitroom.cards.remove(i);
-                    player.hand.add_card(card);
-                }
-            }
-            "hand" => {
-                let eligible: Vec<i16> = player
-                    .hand
-                    .cards
-                    .iter()
-                    .copied()
-                    .filter(|&cid| {
-                        if let Some(ct) = card_type {
-                            if !util::card_matches_type(&card_db, cid, Some(ct)) {
-                                return false;
-                            }
-                        }
-                        if !util::card_matches_cost_limit_op(
-                            &card_db,
-                            cid,
-                            effect.cost_limit,
-                            effect.cost_limit_operator.as_deref(),
-                        ) {
-                            return false;
-                        }
-                        true
-                    })
-                    .collect();
-                if let Some(&card_id) = eligible.first() {
-                    if let Some(idx) = player.hand.cards.iter().position(|&c| c == card_id) {
-                        player.hand.cards.remove(idx);
-                        util::place_card_in_zone(player, card_id, destination, None, false, 1);
-                        gs.record_card_movement(card_id);
-                    }
-                }
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    pub(crate) fn execute_choice(
-        &mut self,
-        gs: &mut GameState,
-        choice_options: Option<&Vec<String>>,
-        choice_type: Option<&str>,
-        options: Option<&Vec<AbilityEffect>>,
-        choice_maker: Option<&str>,
-    ) -> Result<(), String> {
+        let choice_options = effect.choice_options.as_ref();
+        let choice_type = effect.choice_type.as_deref();
+        let options = effect.options.as_ref();
+        let choice_maker = effect.choice_maker.as_deref();
         // If a selection was already made (from a prior choice resolution),
         // execute the selected option's effect instead of creating another choice.
         if let Some(effect_options) = options {
@@ -1699,11 +1883,11 @@ impl AbilityResolver {
             .or_else(|| choice_options.and_then(|opts| serde_json::to_string(opts).ok()));
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.choice_card_no = if options.is_some() {
-                Some("choice".to_string())
+                Some(ChoiceRoute::Choice)
             } else if choice_options.is_some() {
-                Some("choice_string".to_string())
+                Some(ChoiceRoute::ChoiceString)
             } else {
-                Some("choice".to_string())
+                Some(ChoiceRoute::Choice)
             };
             entry.conditional_choice = options_json;
 
@@ -1734,21 +1918,21 @@ impl AbilityResolver {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
                 description,
-                allow_skip: false,
+                allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
         } else if let Some(string_options) = choice_options {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice_string".to_string(),
                 description: format!("Choose one: {}", string_options.join(", ")),
-                allow_skip: false,
+                allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
         } else if let Some(ct) = choice_type {
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "choice".to_string(),
                 description: format!("Choose: {}", ct),
-                allow_skip: false,
+                allow_skip: effect.optional.unwrap_or(false),
                 options: None,
             });
         }
@@ -1778,7 +1962,7 @@ impl AbilityResolver {
         let cards_to_discard = current_count - target_count as usize;
         self.pending_choice = Some(
             Choice::select_cards(
-                "hand",
+                Zone::Hand.to_str(),
                 cards_to_discard,
                 format!(
                     "Discard {} cards from hand (target: {} cards in hand)",
@@ -1825,9 +2009,17 @@ impl AbilityResolver {
             || restriction_type == Some("cannot_activate_by_effect")
             || restriction_type == Some("cannot_active")
         {
-            let resolved = gs.resolve_target_player(target).id.clone();
-            if !gs.cannot_activate_members.contains(&resolved) {
-                gs.cannot_activate_members.push(resolved);
+            if delayed {
+                // Per-card "next turn only" cannot_active flag.
+                // Only blocks the activating card, not the whole player.
+                if let Some(card_id) = gs.activating_card {
+                    gs.mods.add_delayed_cannot_active(card_id, 1);
+                }
+            } else {
+                let resolved = gs.resolve_target_player(target).id.clone();
+                if !gs.cannot_activate_members.contains(&resolved) {
+                    gs.cannot_activate_members.push(resolved);
+                }
             }
         }
         Ok(())
@@ -1887,12 +2079,12 @@ impl AbilityResolver {
 
     pub(crate) fn execute_shuffle(&mut self, gs: &mut GameState, target: &str, source: &str) {
         let player = gs.resolve_target_player_mut(target);
-        match source {
-            "deck" => {
+        match Zone::from_str(source) {
+            Some(Zone::Deck) => {
                 use rand::seq::SliceRandom;
                 player.main_deck.cards.shuffle(&mut rand::thread_rng());
             }
-            "energy_deck" => {
+            Some(Zone::EnergyDeck) => {
                 use rand::seq::SliceRandom;
                 player.energy_deck.cards.shuffle(&mut rand::thread_rng());
             }

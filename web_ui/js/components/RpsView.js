@@ -1,5 +1,4 @@
 import { ActionButtons } from './ActionButtons.js';
-import { ActionBases } from '../generated_constants.js';
 import * as i18n from '../i18n/index.js';
 
 export const RpsView = {
@@ -21,7 +20,6 @@ export const RpsView = {
         btnContainer.style.alignItems = 'center';
         btnContainer.style.gap = '10px';
 
-        const baseId = (perspectivePlayer === 1) ? ActionBases.RPS_P2 : ActionBases.RPS;
         const signs = [
             { actionType: 'RockChoice', snakeType: 'rock_choice', name: i18n.t('rps_rock') },
             { actionType: 'PaperChoice', snakeType: 'paper_choice', name: i18n.t('rps_paper') },

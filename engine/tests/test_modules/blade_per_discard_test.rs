@@ -40,14 +40,16 @@ fn triple_discard_gives_blade() {
 
     assert!(game.has_pending_choice(), "Optional cost should appear");
     game.select_indices(&[0]); // hand copy at index 0 — matches characters
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
 
     let blade = game
         .state
         .mods
         .blade_modifiers
         .get(&stage)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(blade, 1, "1 card discarded → 1 blade, got {}", blade);
 }
 
@@ -85,7 +87,6 @@ fn triple_no_matching_zero_blades() {
         .mods
         .blade_modifiers
         .get(&triple)
-        .copied()
-        .unwrap_or(0);
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(blade, 0, "No matching → 0 blades, got {}", blade);
 }

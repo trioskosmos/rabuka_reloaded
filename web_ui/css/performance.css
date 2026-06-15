@@ -258,26 +258,34 @@
     margin-top: 8px;
 }
 .perf-panel-body-grid {
-    display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: var(--space-md);
-    align-items: start;
-}
-
-.perf-body-column-left, .perf-body-column-right {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
+    align-items: stretch;
 }
 
-.perf-body-column-left > *, .perf-body-column-right > * {
-    break-inside: avoid;
-    page-break-inside: avoid;
+/* --- Performance Sub-Grids --- */
+.perf-contrib-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-md);
+}
+
+.perf-route-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-md);
+}
+
+.perf-live-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--space-md);
 }
 
 @media (max-width: 1200px) {
     .perf-panel-body-grid {
-        grid-template-columns: 1fr;
+        flex-direction: column;
     }
 }
 
@@ -420,6 +428,7 @@
     .perf-player-grid,
     .perf-route-grid,
     .perf-contrib-grid,
+    .perf-live-grid,
     .perf-effects-grid,
     .perf-flow-grid,
     .perf-source-lists {
@@ -750,4 +759,161 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
     transition: all 0.3s cubic-bezier(0.165, 0.84, 0.44, 1);
     pointer-events: none;
+}
+
+/* ── Stage breakdown rows ── */
+.perf-stage-breakdown {
+    padding: 8px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.perf-breakdown-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.perf-breakdown-row .perf-mini-heading {
+    min-width: 80px;
+    font-size: 0.7rem;
+}
+
+.perf-breakdown-row.sub {
+    padding-left: 16px;
+    opacity: 0.85;
+}
+
+.perf-breakdown-row.total {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 4px 8px;
+    margin: 0 -8px;
+}
+
+.perf-breakdown-row.total .perf-mini-heading {
+    color: var(--accent-gold);
+}
+
+.perf-breakdown-row.grand {
+    background: rgba(241, 186, 76, 0.08);
+    border-radius: 8px;
+    padding: 6px 8px;
+    margin: 0 -8px;
+    border: 1px solid rgba(241, 186, 76, 0.15);
+}
+
+.perf-breakdown-row.grand .perf-mini-heading {
+    color: var(--accent-gold);
+    font-weight: 700;
+}
+
+.perf-breakdown-sum {
+    margin-left: auto;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--text);
+    opacity: 0.7;
+}
+
+.perf-breakdown-row.total .perf-breakdown-sum,
+.perf-breakdown-row.grand .perf-breakdown-sum {
+    opacity: 1;
+    color: var(--accent-gold);
+}
+
+.perf-breakdown-subrows {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    margin-left: 8px;
+}
+
+.perf-breakdown-bonuses {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 0 4px 16px;
+    border-left: 1px solid rgba(255,255,255,0.06);
+    margin-left: 8px;
+}
+
+.perf-breakdown-detail {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-left: 4px;
+}
+
+.perf-breakdown-value {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.perf-breakdown-row.minor {
+    opacity: 0.6;
+    font-size: 0.75rem;
+}
+
+.perf-breakdown-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.08);
+    margin: 4px 0;
+}
+
+/* ── Bonus items compact variant ── */
+.perf-bonus-item.compact {
+    padding: 3px 0;
+    border: none;
+    background: none;
+}
+
+.perf-bonus-item.compact .perf-bonus-title {
+    font-size: 0.7rem;
+}
+
+.perf-bonus-item.compact .perf-bonus-text {
+    font-size: 0.65rem;
+    margin-top: 1px;
+    margin-left: 0;
+}
+
+.perf-bonus-meta {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+}
+
+/* ── Global bonuses contributor card ── */
+.perf-contrib-card.global-bonuses {
+    border: 1px dashed rgba(241, 186, 76, 0.25);
+    background: rgba(241, 186, 76, 0.03);
+}
+
+/* ── Yell summary ── */
+.perf-yell-summary {
+    padding: 8px 12px 4px;
+}
+
+.perf-yell-source-breakdown {
+    padding: 4px 12px 12px;
+}
+
+/* ── Total section ── */
+.perf-total-breakdown {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* ── Live breakdown ── */
+.perf-live-breakdown {
+    padding: 8px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
