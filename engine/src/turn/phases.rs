@@ -121,7 +121,9 @@ impl super::TurnEngine {
                         crate::triggers::LIVE_START,
                     );
                     game_state.process_pending_auto_abilities(&first_attacker_id);
-                    if game_state.has_pending_choice() {}
+                    if game_state.has_pending_choice() {
+                        return;
+                    }
                 }
                 Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance => {
                     let is_first =
@@ -339,7 +341,7 @@ impl super::TurnEngine {
         }
         game_state.mulligan_selected_indices.clear();
         game_state.current_phase = next_phase;
-        println!("Mulligan confirmed: {} cards mulliganed", mulligan_count);
+        log::debug!("Mulligan confirmed: {} cards mulliganed", mulligan_count);
         Ok(())
     }
 

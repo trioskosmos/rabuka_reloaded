@@ -829,7 +829,7 @@ impl super::resolver::AbilityResolver {
                             return Ok(());
                         }
                     } else if let ExecutionContext::LookAndSelect { .. } = self.execution_context {
-                        select_action_entry.is_some();
+                        let _ = select_action_entry.is_some();
                         self.handle_select_cards_looked_at(gs, &mapped_indices)?;
                     } else {
                         self.handle_select_cards_looked_at(gs, &mapped_indices)?;
@@ -1849,9 +1849,46 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
-        self.apply_effect_modification(gs, |effect| {
-            effect.destination = Some(selected.to_string());
-        })
+        // Check if we have a saved MoveCardsPosition context (card was already taken from source zone).
+        // If so, place the card directly instead of re-running the entire effect which would fail
+        // because the card is no longer in the source zone.
+        let ctx = std::mem::replace(&mut self.execution_context, ExecutionContext::None);
+        match ctx {
+            ExecutionContext::MoveCardsPosition {
+                card_id,
+                target,
+                source_zone,
+                ..
+            } => {
+                let player = gs.resolve_target_player_mut(&target);
+                let destination = selected;
+                eprintln!("[DECK_DIAG] handle_position_destination ctx=MoveCardsPosition card_id={} dest={} src={}",
+                    card_id, destination, source_zone);
+                // Remove card from source zone first, then place in destination.
+                // The card was left in place when the deck_top_or_bottom choice was created.
+                if source_zone == Zone::Discard.to_str() || source_zone == Zone::Waitroom.to_str() {
+                    eprintln!("[DECK_DIAG] waitroom before retain={:?} removing card_id={}", player.waitroom.cards, card_id);
+                    let before = player.waitroom.cards.len();
+                    player.waitroom.cards.retain(|c| *c != card_id);
+                    eprintln!("[DECK_DIAG] waitroom after retain={:?} ({} -> {})", player.waitroom.cards, before, player.waitroom.cards.len());
+                }
+                crate::ability::util::place_card_in_zone(
+                    player, card_id, &destination, None, false, 1,
+                );
+                let deck_len = player.main_deck.cards.len();
+                eprintln!("[DECK_DIAG] deck len={} first={:?} last={:?}",
+                    deck_len, player.main_deck.cards.first(), player.main_deck.cards.last());
+                self.clear_choice_state(gs);
+                self.resume_pending_commands(gs)
+            }
+            _ => {
+                // Fall back to effect modification for non-card-specific position choices
+                // (e.g. stage position selection).
+                self.apply_effect_modification(gs, |effect| {
+                    effect.destination = Some(selected.to_string());
+                })
+            }
+        }
     }
 
     fn handle_double_baton_touch(

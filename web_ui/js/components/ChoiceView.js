@@ -102,6 +102,16 @@ export const ChoiceView = {
                         action: action || { index: idx },
                     });
                 });
+            } else if (choice.options && choice.options.length > 0 && choice.options[0].card_index !== undefined) {
+                // SelectLiveSuccess: options have card_name + card_index, not ability_text
+                choice.options.forEach((opt, idx) => {
+                    optItems.push({
+                        card: null,
+                        name: opt.card_name || `Card ${idx + 1}`,
+                        action: { action_type: 'select_card', parameters: { card_indices: [idx] } },
+                        isText: true,
+                    });
+                });
             } else if (choice.options && choice.options.length > 0) {
                 // Check if options are plain strings (heart colors, etc.) vs WASM objects
                 const isStringOptions = typeof choice.options[0] === 'string';

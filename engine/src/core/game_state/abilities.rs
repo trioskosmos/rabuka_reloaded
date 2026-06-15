@@ -257,6 +257,8 @@ impl GameState {
                             card_id,
                             trigger_type,
                         );
+                        eprintln!("[QUEUE_DIAG] enqueue player={} card_no={}",
+                            entry.player_id, entry.card_no);
                         self.ability_queue.enqueue(entry);
                         break;
                     }
@@ -336,6 +338,8 @@ impl GameState {
     /// Internal: Process all standby abilities for a single player.
     /// Stops early if an ability creates a pending choice.
     fn process_player_abilities(&mut self, player_id: &str) {
+        eprintln!("[QUEUE_DIAG] process_player_abilities player={} queue_len={}",
+            player_id, self.ability_queue.len());
         loop {
             if !self.ability_queue.is_idle() {
                 break;
@@ -347,6 +351,8 @@ impl GameState {
                         && self.ability_queue.entry_player_id(i) == Some(player_id)
                 })
                 .collect();
+
+            eprintln!("[QUEUE_DIAG] available_indices={:?}", available_indices);
 
             if available_indices.is_empty() {
                 break;
@@ -662,7 +668,7 @@ impl GameState {
                                 .copied()
                                 .filter(|&id| id != -1)
                                 .collect(),
-                            Some(Zone::Energy) => {
+                            Some(Zone::Energy) | Some(Zone::EnergyZone) => {
                                 player.energy_zone.cards.iter().copied().collect()
                             }
                             Some(Zone::SelectedCards) => entry

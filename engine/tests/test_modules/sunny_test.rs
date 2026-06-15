@@ -99,8 +99,8 @@ fn sunny_branch3_3_members_score_plus_1() {
     game.set_live_card(sunny);
     advance_to_live_start(&mut game);
 
-    // Handle any pending choice from branch 1's discard
-    if game.has_pending_choice() {
+    // Handle pending choices: discard choice from branch 1, then heart target from branch 2
+    while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
 
@@ -135,6 +135,11 @@ fn sunny_branch3_3_members_duplicate_name_no_score() {
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(sunny);
     advance_to_live_start(&mut game);
+
+    // Handle pending choices: discard choice from branch 1, then heart target from branch 2
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
 
     let sunny_id = game.state.player1.live_card_zone.cards[0];
     let score_mod = game.state.mods.get_score_modifier(sunny_id);

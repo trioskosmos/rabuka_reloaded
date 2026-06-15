@@ -368,6 +368,24 @@ impl super::TurnEngine {
                                 }
                             }
                         }
+                        // For deck_top_or_bottom (position|destination with deck_ options),
+                        // return the option text instead of the raw index.
+                        if target == "position|destination" {
+                            if let Some(ref opts) = options {
+                                if let Some(id) = card_id {
+                                    if id >= 0 && (id as usize) < opts.len()
+                                        && opts.len() == 2
+                                        && opts[0] == Zone::DeckTop.to_str()
+                                    {
+                                        return Ok(
+                                            crate::ability::types::ChoiceResult::TargetSelected {
+                                                target: opts[id as usize].clone(),
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                        }
                         match card_id {
                             Some(-1) => "skip".to_string(),
                             Some(id) => id.to_string(),

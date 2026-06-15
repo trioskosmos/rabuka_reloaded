@@ -143,6 +143,12 @@ impl AbilityResolver {
                 false
             };
 
+            let exclude_self_id = if effect.exclude_self.unwrap_or(false) {
+                gs.activating_card
+            } else {
+                None
+            };
+
             let card_db = self.card_db();
             let player = gs.resolve_target_player_mut(&target);
 
@@ -152,6 +158,7 @@ impl AbilityResolver {
             filter.cost_limit = cost_limit;
             filter.cost_operator = cost_limit_operator.as_deref();
             filter.characters = characters;
+            filter.exclude_self = exclude_self_id;
             let filter = filter.original_blade_limit(blade_limit, blade_limit_operator);
             let mut candidates: Vec<(usize, i16)> = Vec::new();
 

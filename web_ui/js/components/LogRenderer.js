@@ -177,6 +177,26 @@ export const LogRenderer = {
                 });
             }
 
+            if (p.gained_abilities && p.gained_abilities.length > 0) {
+                p.gained_abilities.forEach(abText => {
+                    result.push({
+                        player: playerLabel,
+                        desc: `Gained: ${abText}`,
+                        type: 'buff'
+                    });
+                });
+            }
+
+            if (p.active_restrictions && p.active_restrictions.length > 0) {
+                p.active_restrictions.forEach(restriction => {
+                    result.push({
+                        player: playerLabel,
+                        desc: `Restriction: ${restriction}`,
+                        type: 'restriction'
+                    });
+                });
+            }
+
             return result;
         };
 

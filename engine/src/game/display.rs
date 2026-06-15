@@ -107,6 +107,10 @@ pub struct GameStateDisplay {
     pub performance_results: Option<std::collections::HashMap<String, PerformanceSnapshot>>,
     #[serde(default)]
     pub performance_history: Vec<PerformanceSnapshot>,
+    #[serde(default)]
+    pub game_over: bool,
+    #[serde(default)]
+    pub winner: Option<String>,
 }
 
 pub fn card_to_display(
@@ -749,5 +753,19 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         structured_log,
         performance_results: perf_results,
         performance_history: perf_history,
+        game_over: game_state.game_ended,
+        winner: match game_state.game_result {
+            crate::types::GameResult::FirstAttackerWins => {
+                Some(game_state.first_attacker().id.clone())
+            }
+            crate::types::GameResult::SecondAttackerWins => {
+                Some(if game_state.player1.is_first_attacker {
+                    game_state.player2.id.clone()
+                } else {
+                    game_state.player1.id.clone()
+                })
+            }
+            _ => None,
+        },
     }
 }

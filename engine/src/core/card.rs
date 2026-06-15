@@ -1273,6 +1273,9 @@ pub struct Condition {
     pub cause: Option<Box<Condition>>,
     #[serde(default)]
     pub effect: Option<Box<AbilityEffect>>,
+    // Same-name constraint: members must share a character name
+    #[serde(default)]
+    pub same_name: Option<bool>,
     // Parser-only fields that were missing struct fields
     #[serde(default)]
     pub from_state: Option<String>,

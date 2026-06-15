@@ -505,7 +505,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .enumerate()
                         .filter(|&(_, id)| id != -1)
                         .collect(),
-                    Some(Zone::Energy) => player
+                    Some(Zone::Energy) | Some(Zone::EnergyZone) => player
                         .energy_zone
                         .cards
                         .iter()

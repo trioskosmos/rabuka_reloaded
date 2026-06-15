@@ -21,12 +21,14 @@ impl<'a> ConditionContext<'a> {
                         || p1.hand.cards.contains(&cid)
                         || p1.live_card_zone.cards.contains(&cid)
                         || p1.energy_zone.cards.contains(&cid)
+                        || p1.success_live_card_zone.cards.contains(&cid)
                     {
                         Some(p1)
                     } else if p2.stage.stage.contains(&cid)
                         || p2.hand.cards.contains(&cid)
                         || p2.live_card_zone.cards.contains(&cid)
                         || p2.energy_zone.cards.contains(&cid)
+                        || p2.success_live_card_zone.cards.contains(&cid)
                     {
                         Some(p2)
                     } else {
@@ -1284,7 +1286,29 @@ impl<'a> ConditionContext<'a> {
                 _ => 0,
             },
         } as u32;
-        let passed = compare_counts(condition.operator.as_deref(), actual, count);
+        let mut passed = compare_counts(condition.operator.as_deref(), actual, count);
+        // Same-name constraint: if set, ensure at least 2 counted cards share a name
+        if passed && condition.same_name.unwrap_or(false) {
+            let stage_cards: Vec<i16> = if is_both {
+                let opp = self.resolve_condition_player("opponent");
+                let mut combined = player.stage.stage.to_vec();
+                combined.extend_from_slice(&opp.stage.stage);
+                combined
+            } else {
+                player.stage.stage.to_vec()
+            };
+            let mut name_counts: std::collections::HashMap<String, u32> =
+                std::collections::HashMap::new();
+            for &cid in &stage_cards {
+                if cid == -1 {
+                    continue;
+                }
+                if let Some(card) = card_db.get_card(cid) {
+                    *name_counts.entry(card.name.clone()).or_insert(0) += 1;
+                }
+            }
+            passed = name_counts.values().any(|&c| c >= 2);
+        }
         let mut dbg = AbDebug::new();
         dbg.condition(condition, actual, count, passed);
         passed
@@ -2131,7 +2155,6 @@ impl<'a> ConditionContext<'a> {
 
     pub(crate) fn get_group_card_count(&self, condition: &Condition) -> u32 {
         let group_filter = condition.group_names.as_ref();
-        let location = condition.location.as_deref().unwrap_or("");
         let target = condition.target.as_deref().unwrap_or("self");
         let player = self.resolve_condition_player(target);
         let group_name = group_filter.and_then(|g| g.first().map(|s| s.as_str()));
@@ -2144,6 +2167,26 @@ impl<'a> ConditionContext<'a> {
 
         let ct = condition.card_type.as_deref();
         let exc = condition.exclude_characters.as_deref();
+
+        // When `locations` has multiple entries, count across all listed zones.
+        // This handles zone-transition conditions (e.g. "card in live_card_zone OR discard").
+        if let Some(ref locs) = condition.locations {
+            if locs.len() >= 2 {
+                let mut total = 0u32;
+                for loc in locs {
+                    let cards = crate::ability::util::zone_cards(player, loc.as_str());
+                    total += self.count_group_cards_in_cards(
+                        cards,
+                        group_filter.map(|v| &**v),
+                        ct,
+                        exc,
+                    );
+                }
+                return total;
+            }
+        }
+
+        let location = condition.location.as_deref().unwrap_or("");
         match Zone::from_str(location) {
             Some(Zone::Stage) => self.count_group_cards_in_cards(
                 &player.stage.stage,

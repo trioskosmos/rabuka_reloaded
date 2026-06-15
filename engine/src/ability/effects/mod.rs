@@ -130,6 +130,8 @@ impl AbilityResolver {
 
         // Convert string action to typed enum for stronger dispatch
         let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
+        eprintln!("[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}", 
+            action_type, effect.effect_steps.is_some(), effect.compound.actions.is_some());
 
         // Sequential and LookAndSelect both route through the generic
         // sequential pipeline when they carry `effect_steps`. LookAndSelect
@@ -526,6 +528,18 @@ impl AbilityResolver {
                     effect.count_or(1)
                 };
                 self.execute_perform_yell(gs, count, effect.target_name());
+                Ok(())
+            }
+            ActionType::Look => {
+                log::warn!("Unimplemented action: Look ('{}')", action_str);
+                Ok(())
+            }
+            ActionType::RevealEffect => {
+                log::warn!("Unimplemented action: RevealEffect ('{}')", action_str);
+                Ok(())
+            }
+            ActionType::Rotation => {
+                log::warn!("Unimplemented action: Rotation ('{}')", action_str);
                 Ok(())
             }
             _ => {

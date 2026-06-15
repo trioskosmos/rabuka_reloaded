@@ -248,6 +248,24 @@ impl super::TurnEngine {
                     }
                 }
             }
+            for &card_id in &player.success_live_card_zone.cards {
+                if let Some(card) = game_state.card_database.get_card(card_id) {
+                    for ability in &card.abilities {
+                        if ability
+                            .triggers
+                            .as_ref()
+                            .is_some_and(|t| t.contains(crate::triggers::LIVE_START))
+                        {
+                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            abilities_to_trigger.push((
+                                ability_id,
+                                card.card_no.clone(),
+                                Some(card_id),
+                            ));
+                        }
+                    }
+                }
+            }
         }
 
         log::debug!(

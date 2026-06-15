@@ -213,8 +213,10 @@ impl AbilityResolver {
         if self.pending_choice.is_some() && !had_choice_before {
             let mut for_opponent = effect.clone();
             for_opponent.target = Some("opponent".to_string());
-            gs.ability_queue
-                .set_pending_commands(vec![crate::ability::types::Command::Effect(for_opponent)]);
+            // Preserve any existing pending commands (e.g. remaining sequential actions)
+            let mut existing = gs.ability_queue.take_pending_commands();
+            existing.push(crate::ability::types::Command::Effect(for_opponent));
+            gs.ability_queue.set_pending_commands(existing);
             return Ok(true);
         }
 
@@ -343,7 +345,13 @@ impl AbilityResolver {
                 && effect.card_type.as_deref() == Some("member_card")
                 && target == "self"
                 && !is_self_target
-                && effect.exclude_self.is_none());
+                && effect.exclude_self.is_none())
+            // Also detect "all members" when the effect has no target_count limit
+            // and targets "self" members (e.g. "自分のステージにいるメンバーは")
+            || (effect.card_type.as_deref() == Some("member_card")
+                && target == "self"
+                && effect.target_count.is_none()
+                && effect.distinct.is_none());
 
         if resource == "surplus_heart" {
             if sign == Some("negative") && is_all {
@@ -500,7 +508,10 @@ impl AbilityResolver {
                     .is_select_action(true)
                     .build(),
                 );
-                self.store_pending_choice(gs);
+                // Don't call store_pending_choice — keep self.pending_choice set
+                // so the caller (e.g. resume_pending_commands) can detect the
+                // sub-choice and properly save remaining commands before returning.
+                self.sub_choice_created = true;
                 return Ok(());
             }
         }
@@ -614,7 +625,7 @@ impl AbilityResolver {
             // use all_selected — apply the filter with exclusion to find the right targets.
             // Only use all_selected directly for pure sequential select→gain_resource.
             let use_raw = !all_selected.is_empty() && !has_selection_filter;
-            let mut blade_targets: Vec<i16> = if use_raw {
+            let mut all_candidates: Vec<i16> = if use_raw {
                 all_selected.clone()
             } else if has_blade_filter || is_all {
                 util::matching_ids_filtered(
@@ -622,7 +633,7 @@ impl AbilityResolver {
                     &card_db,
                     &filter,
                     true,
-                    tc,
+                    None, // don't truncate yet — we may need a player choice
                     if resource == "blade" || resource == "ブレード" {
                         dn
                     } else {
@@ -639,14 +650,35 @@ impl AbilityResolver {
                 if let Some(p) = pos.get_position() {
                     if let Some(stage_idx) = util::stage_position_index(p) {
                         let expected = player.stage.stage[stage_idx];
-                        blade_targets.retain(|&cid| cid == expected);
+                        all_candidates.retain(|&cid| cid == expected);
                     }
                 }
             }
             // Issue 6: Filter by timing_condition (e.g. "appeared_this_turn")
             if !appeared_ids.is_empty() {
-                blade_targets.retain(|&cid| appeared_ids.contains(&cid));
+                all_candidates.retain(|&cid| appeared_ids.contains(&cid));
             }
+
+            // If target_count is set and more candidates than needed,
+            // create a choice for the player (unless already selected via previous choice).
+            log::debug!("[GAIN_RESOURCE] res={} is_all={} has_filter={} tc={:?} dn={:?} all_cand={} selected={}",
+                resource, is_all, has_blade_filter, tc, dn, all_candidates.len(), self.selected_cards.len());
+            log::debug!("[GAIN_RESOURCE] blade_targets computation starts ({} candidates)", all_candidates.len());
+            let blade_targets: Vec<i16> = if let Some(tgt_count) = tc {
+                if !self.selected_cards.is_empty() {
+                    self.selected_cards.clone()
+                } else if (tgt_count as usize) < all_candidates.len() {
+                    // Multiple candidates — truncate to target_count for now
+                    // (future: create a SelectTarget choice for the player)
+                    all_candidates.truncate(tgt_count as usize);
+                    all_candidates
+                } else {
+                    all_candidates.truncate(tgt_count as usize);
+                    all_candidates
+                }
+            } else {
+                all_candidates
+            };
 
             let heart_color_inner = single_fixed_heart
                 .clone()

@@ -646,12 +646,17 @@ fn sayaka_use_limit_enforced() {
     game.state.player1.hand.cards.push(s2);
     game.give_energy(3);
     game.activate_ability(sayaka);
+    // First activation: resolve the reveal cost choice (select the first sayaka in hand)
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
     let under_after_first = game
         .state
         .player1
         .stage
         .get_under_cards(MemberArea::Center)
         .len();
+    assert_eq!(under_after_first, 1, "1 card should be under sayaka after first activation");
     // Second activation should fail due to use_limit=1
     let result = game.try_activate_ability(sayaka);
     assert!(

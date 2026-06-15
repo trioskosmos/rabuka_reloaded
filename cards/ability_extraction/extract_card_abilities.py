@@ -45,7 +45,7 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
 
     # Position icons that should NOT prevent trigger extraction.
     # These appear after trigger icons like {{live_start.png|ライブ開始時}}{{center.png|センター}}.
-    # They are NOT costs — they are activation position requirements.
+    # They are NOT costs -- they are activation position requirements.
     position_icon_patterns = ["center", "left", "right"]
 
     # Known trigger icon patterns (for debugging/validation)
@@ -106,7 +106,7 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
 
         # Check if this is a cost icon (not a trigger).
         # BUT: if we already found a trigger, don't skip subsequent position icons
-        # like {{center.png|センター}} — they are activation position requirements,
+        # like {{center.png|センター}} -- they are activation position requirements,
         # not costs. Only skip actual cost resources (energy, heart, blade, score).
         if any(cost_pattern in icon_file for cost_pattern in cost_icon_patterns):
             pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
@@ -284,7 +284,7 @@ def _enrich_effect_type(effect, triggerless=""):
     if heart_colors and "heart_colors" not in effect:
         effect["heart_colors"] = heart_colors
     # Propagate heart_colors into location_condition for collective heart checks.
-    # Skip check_self conditions — they check a specific card's location, not
+    # Skip check_self conditions -- they check a specific card's location, not
     # collective heart presence; heart_colors there is effect metadata leakage.
     if "heart_colors" in effect and "condition" in effect:
         cond = effect["condition"]
@@ -459,6 +459,70 @@ def main():
         json.dump(result, f, ensure_ascii=False, indent=2)
 
     print(f"Output written to {output_file}")
+
+    # Run basic validation: check for known gap patterns
+    _validate_output(result)
+    print("Validation complete.")
+
+
+def _validate_output(result):
+    """Post-extraction validation -- check for known parser gaps in output."""
+    import re
+    from collections import Counter
+
+    abilities = result["unique_abilities"]
+    gaps = Counter()
+
+    for a in abilities:
+        t = a.get("triggerless_text", "")
+        if not t:
+            continue
+        eff = a.get("effect") or {}
+        cond = eff.get("condition") or {}
+
+        # same_name
+        if "同じ名前" in t:
+            if not cond.get("same_name") and not eff.get("same_name"):
+                gaps["same_name"] += 1
+                continue
+
+        # different card names
+        if "カード名の異なる" in t:
+            def _find_distinct(obj, depth=0):
+                if depth > 10 or not isinstance(obj, dict):
+                    return False
+                if obj.get("distinct") == "card_name":
+                    return True
+                for v in obj.values():
+                    if isinstance(v, dict):
+                        if _find_distinct(v, depth + 1):
+                            return True
+                    elif isinstance(v, list):
+                        for item in v:
+                            if isinstance(item, dict) and _find_distinct(item, depth + 1):
+                                return True
+                return False
+            if not _find_distinct(eff):
+                gaps["different_name"] += 1
+
+        # or_location (zone1 + か + zone2)
+        if re.search(r'(?:成功)?ライブカード置き場(?:か(?!ら)|又は)', t):
+            locs = cond.get("locations", [])
+            if len(locs) < 2:
+                gaps["or_location"] += 1
+
+        # heart_content
+        if re.search(r'必要ハートに含まれる\{\{heart_\d+\.png\|heart\d+\}\}が\d+', t):
+            if not cond.get("heart_colors") or not cond.get("count"):
+                gaps["heart_content"] += 1
+
+    if gaps:
+        print("\n  GAPS DETECTED:")
+        for gap, count in gaps.most_common():
+            print(f"    {gap}: {count} cards")
+        print("    These should be fixed in parser.py before committing.")
+    else:
+        print("    No gaps detected -- all known patterns handled.")
 
 
 if __name__ == "__main__":

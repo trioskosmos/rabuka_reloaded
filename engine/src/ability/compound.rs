@@ -12,6 +12,9 @@ impl AbilityResolver {
         conditional: bool,
         is_further: bool,
     ) -> Result<(), String> {
+        eprintln!("[SEQ_ENTRY] execute_sequential_effect: action={} conditional={} is_further={} actions={}",
+            effect.action, conditional, is_further, 
+            effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0));
         // Trace sequential compound effect
         let seq_label = if conditional {
             "sequential_conditional".to_string()
@@ -76,6 +79,7 @@ impl AbilityResolver {
             );
             for _repeat in 0..repeat_max {
                 for (i, action) in repeat_actions.iter().enumerate() {
+                    eprintln!("[SEQ_TRACE] _repeat={} i={} action={}", _repeat, i, action.action);
                     log::debug!(
                         "[ABILITY]  >> sub-action[{}]: action={} has_condition={} card_id={:?}",
                         i,
@@ -131,6 +135,7 @@ impl AbilityResolver {
 
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
+                            eprintln!("[SEQ_TRACE] after execute: pending={:?}", self.pending_choice.is_some());
                             log::debug!(
                                 "[SEQ_LOOP] after execute: pending={:?}",
                                 self.pending_choice.is_some()

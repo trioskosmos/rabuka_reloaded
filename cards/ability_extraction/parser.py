@@ -629,6 +629,9 @@ def _try_distinct(text):
         result["locations"] = locs
     else:
         result["location"] = "stage"
+    # Override to revealed_cards for yell/reveal context
+    if "エールにより公開された" in text or "これにより公開された" in text:
+        result["location"] = "revealed_cards"
     if "エリアすべて" in text:
         result["all_areas"] = True
     m = re.search(r"(\d+)(人|枚|つ)以上いる", text)
@@ -703,6 +706,12 @@ def _try_card_count(text):
             # Detect negation in card count condition (ない場合 / いない場合 / がなく)
             if "ない" in text or "いない" in text or re.search(r"がなく", text):
                 result["negation"] = True
+            # Detect distinct card name constraint (カード名の異なる)
+            if "カード名の異なる" in text:
+                result["distinct"] = "card_name"
+            # Detect same name constraint (同じ名前)
+            if "同じ名前" in text:
+                result["same_name"] = True
             # Detect distinct cost constraint (コストがそれぞれ異なる)
             if "コストがそれぞれ異なる" in text:
                 result["distinct"] = "cost"
@@ -1864,6 +1873,10 @@ def parse_condition(text: str) -> Dict[str, Any]:
                 matched.discard(result["position"])
                 if matched:
                     result["position_compare"] = sorted(matched)[0]
+            # OR-location: zone1かzone2 pattern → add locations array
+            _enrich_or_location(result, text)
+            # Heart-content filter: 必要ハートに含まれるheartXXがN → add heart_colors
+            _enrich_heart_content(result, text)
             return result
 
     # Fall-through: generic field extraction + type inference
@@ -1893,7 +1906,52 @@ def parse_condition(text: str) -> Dict[str, Any]:
         matched.discard(condition.get("position"))
         if matched:
             condition["position_compare"] = sorted(matched)[0]
+    # OR-location and heart-content enrichment for fallthrough path
+    _enrich_or_location(condition, text)
+    _enrich_heart_content(condition, text)
     return _infer_condition_type(condition, text)
+
+
+def _enrich_or_location(cond, text):
+    """Detect zone1かzone2 pattern and add locations array."""
+    or_m = re.search(r'((?:成功)?ライブカード置き場|エネルギー置き場)(?:か(?!ら)|又は).{0,30}?(?:ライブ中|エネルギー置き場)', text)
+    if or_m and cond.get("location") and "locations" not in cond:
+        zone1 = or_m.group(1)
+        # Extract both zone names
+        full = or_m.group(0)
+        parts = re.split(r'[か又は]', full)
+        zones_seen = []
+        for p in parts:
+            p = p.strip()
+            if "成功" in p or "ライブカード置き場" in p:
+                zones_seen.append("success_live_card_zone")
+            elif "エネルギー置き場" in p:
+                zones_seen.append("energy_zone")
+            elif "ライブ中" in p:
+                zones_seen.append("live_card_zone")
+        if len(zones_seen) >= 2:
+            cond["locations"] = zones_seen
+
+
+def _enrich_heart_content(cond, text):
+    """Detect 必要ハートに含まれるheartXXがN and add heart_colors + count + group_names."""
+    hc_m = re.search(r'必要ハートに含まれる\{\{heart_(\d+)\.png\|heart\d+\}\}が(\d+)', text)
+    if hc_m:
+        heart_color = f"heart{hc_m.group(1).zfill(2)}"
+        heart_count = int(hc_m.group(2))
+        # Add heart_colors to the condition if not already present
+        if "heart_colors" not in cond:
+            cond["heart_colors"] = [heart_color]
+        elif heart_color not in cond["heart_colors"]:
+            cond["heart_colors"].append(heart_color)
+        # Add count if not already present and operator is "="
+        # (heart content = N is an exact match, not >=)
+        if "count" not in cond:
+            cond["count"] = heart_count
+        # Extract group name from 『X』 pattern (e.g. 『虹ヶ咲』のライブカード)
+        gn_m = re.search(r'『([^』]+)』', text)
+        if gn_m and "group_names" not in cond:
+            cond["group_names"] = [gn_m.group(1)]
 
 
 # ============== CONSOLIDATED NORMALIZATION ==============
@@ -1999,7 +2057,16 @@ def infer_count_from_icons(d, text):
         return
     heart_count = len(re.findall(r"{{heart_\d+\.png\|heart\d+}}", effect_text))
     if heart_count > 0:
-        d["count"] = heart_count
+        # Check for consecutive heart icons (e.g. 4 heart06 in a row = gain 4)
+        # This correctly handles "{{heart_06.png|heart06}}{{heart_06.png|heart06}}... = gain N"
+        # vs "{{heart_06.png|heart06}}を持つ" (has heart06, used as condition not count)
+        consecutive = re.findall(r"(?:{{heart_\d+\.png\|heart\d+}}){2,}", effect_text)
+        if consecutive:
+            # Use the longest consecutive run as the actual gain count
+            max_run = max(len(re.findall(r"{{heart_\d+\.png\|heart\d+}}", run)) for run in consecutive)
+            d["count"] = max_run
+        else:
+            d["count"] = heart_count
         return
 
 
@@ -2008,6 +2075,9 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     # Use the action's own text field if available — it may be trimmed of condition/duration
     action_text = action.get("text", text) or text
     a = action.get("action")
+    # Normalize "revealed_card" (singular) to "revealed_cards" (plural) for consistency
+    if action.get("source") == "revealed_card":
+        action["source"] = "revealed_cards"
     if a == "draw":
         action["action"] = "draw_card"
         a = "draw_card"
@@ -2041,8 +2111,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
     if a == "gain_resource" and "resource" not in action:
         infer_resource(action, text)
     if a == "gain_resource":
-        if action.get("count") is None:
-            infer_count_from_icons(action, action_text)
+        infer_count_from_icons(action, action_text)
         if action.get("count") is None:
             action["count"] = 1
         # Extract target_count from "N人" (e.g., "メンバー1人" → target_count=1)
@@ -2052,6 +2121,9 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         # Extract distinct_card_name from "名前の異なる" (different name constraint)
         if "名前の異なる" in text:
             action["distinct"] = "card_name"
+        # Extract same_name from "と同じ名前" / "同じ名前" (same name constraint)
+        if "と同じ名前" in text or ("同じ名前" in text and "持つ" in text):
+            action["same_name"] = True
     # Extract heart_colors for ALL action types, not just gain_resource
     if "heart_colors" not in action:
         hm = re.findall(r"\{\{heart_(\d+)\.png\|heart\d+\}\}", text)
@@ -2129,7 +2201,10 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         if "source" not in action:
             # Fallback: infer source from destination common patterns
             dest = action.get("destination", "")
-            if dest in ("deck_top", "deck_bottom", "deck"):
+            # "それらのカード" refers to cards from a preceding reveal/yell
+            if "それらのカード" in text:
+                action["source"] = "revealed_cards"
+            elif dest in ("deck_top", "deck_bottom", "deck"):
                 if "メンバー" not in text:
                     action["source"] = "hand"
             elif dest in ("discard",):
@@ -2246,7 +2321,7 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         }
     if (
         a == "move_cards"
-        and action.get("source") == "revealed_card"
+        and action.get("source") in ("revealed_card", "revealed_cards")
         and action.get("count") is None
     ):
         action["count"] = 1
@@ -2295,7 +2370,10 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
                     or "置いた枚数" in text
                     or bool(re.search(r"置いた.*枚数分", text))
                 ):
-                    action["count"] = 0
+                    action["dynamic_count"] = {
+                        "type": "drawn_cards",
+                        "reference": "previous_draw",
+                    }
                 else:
                     action["count"] = 1
     # Fix remaining custom actions that have enough parsed info
@@ -2537,8 +2615,8 @@ def parse_action(text: str) -> Dict[str, Any]:
                 "type": "revealed_cards",
                 "reference": "previous_reveal",
             }
-        # Special case: if source is revealed_card and no count was extracted, set to 1
-        elif source == "revealed_card" and "count" not in action:
+        # Special case: if source is revealed_card(s) and no count was extracted, set to 1
+        elif source in ("revealed_card", "revealed_cards") and "count" not in action:
             action["count"] = 1
 
     # Extract destination
@@ -2606,6 +2684,9 @@ def parse_action(text: str) -> Dict[str, Any]:
         dynamic_count = extract_dynamic_count(text)
         if dynamic_count:
             action["dynamic_count"] = dynamic_count
+            # If dynamic_count set for place_energy_under_member, remove fixed energy_count
+            if action.get("action") == "place_energy_under_member" and "energy_count" in action:
+                del action["energy_count"]
 
     if card_type:
         action["card_type"] = card_type
@@ -2644,6 +2725,13 @@ def parse_action(text: str) -> Dict[str, Any]:
     group_names = extract_group_names(text)
     if group_names:
         action["group_names"] = group_names
+        # Re-apply exclude_group_names if already set (line 2143 may have set it
+        # but group_names extraction above may re-add the excluded groups)
+        exc_gns = action.get("exclude_group_names")
+        if exc_gns:
+            action["group_names"] = [
+                g for g in action["group_names"] if g not in exc_gns
+            ]
 
     # Check for ability gain pattern - MUST BE CHECKED BEFORE general quoted text extraction
     # Pattern 1: Explicit "能力を得る" (gain ability) with quoted text
@@ -3156,8 +3244,38 @@ def parse_action(text: str) -> Dict[str, Any]:
     )
     R("以下から1つを選ぶ", "choice", None)
     R("ブレードの色を", "set_blade_type", None)
+    # "ハートをすべてheartXXにする" → set all hearts to specific color (not player choice)
     R(
-        lambda t: "ハートの色を" in t or ("ハートを" in t and "にする" in t),
+        lambda t: (
+            "ハートを" in t
+            and "すべて" in t
+            and "{{heart_" in t
+            and "にする" in t
+            and not "ハートの色を" in t
+        ),
+        "set_heart_type",
+        lambda t, a: a.update(
+            {
+                "heart_type": (
+                    f"heart{m.group(1)}"
+                    if (m := re.search(r"{{heart_(\d+)\.png\|heart\d+}}", t))
+                    else None
+                ),
+                "original_value": "元々" in t,
+                "self_target": "このメンバー" in t or "このカード" in t,
+                "card_type": "member_card" if "メンバー" in t else None,
+            }
+        ),
+    )
+    R(
+        lambda t: (
+            "ハートの色を" in t
+            or (
+                "ハートを" in t
+                and "にする" in t
+                and not ("すべて" in t and "{{heart_" in t)
+            )
+        ),
         "gain_resource",
         lambda t, a: a.update({"resource": "heart", "heart_selection": True}),
     )
@@ -3476,6 +3594,8 @@ def _extract_basic_cost_fields(cost, text):
     gns = extract_group_names(text)
     if gns:
         cost["group_names"] = gns
+    if "同じグループ名" in text:
+        cost["group_reference"] = "same_group_name"
     if extract_optional(text):
         cost["optional"] = True
     if "シャッフルする" in text or "シャッフルして" in text:
@@ -4464,7 +4584,26 @@ def _build_reveal_add_discard(fp, sa_text, select_text):
     if pg:
         result["per_group"] = True
         result["per_group_count"] = int(pg.group(1))
+    _add_or_card_types_if_needed(result, select_text)
     return result
+
+
+def _add_or_card_types_if_needed(d, text):
+    """If text describes an OR between card types (e.g. メンバーカードか...ライブカード),
+    add or_card_types to the dict and remove the single card_type."""
+    card_type_kws = [
+        ("live_card", "ライブカード"),
+        ("member_card", "メンバーカード"),
+        ("energy_card", "エネルギーカード"),
+    ]
+    if re.search(
+        r"(ライブカード|メンバーカード|エネルギーカード).*か.*(ライブカード|メンバーカード|エネルギーカード)",
+        text,
+    ):
+        or_types = [t for t, kw in card_type_kws if kw in text]
+        if len(or_types) >= 2:
+            d["or_card_types"] = or_types
+            d.pop("card_type", None)
 
 
 def _enrich_from_text(d, text):
@@ -4529,6 +4668,7 @@ def _build_look_select_actions(select_text):
                 ct = extract_card_type(select_text)
                 if ct:
                     result["card_type"] = ct
+                _add_or_card_types_if_needed(result, select_text)
                 if extract_optional(select_text):
                     result["optional"] = True
                 return result
@@ -4557,6 +4697,7 @@ def _build_look_select_actions(select_text):
         if ct:
             result["card_type"] = ct
         _enrich_from_text(result, select_text)
+        _add_or_card_types_if_needed(result, select_text)
         return result
 
     # Default: detect destination from text
@@ -5031,6 +5172,32 @@ def _try_conditional_sequential(text):
         fa = parse_action(fp)
         cond = None
 
+    # Fix 9c: Handle "select + energy payment" pattern where both appear
+    # before the conditional follow-up. E.g.:
+    # "ライブカードを1枚選び、そのカードのスコアに等しい数のEを支払ってもよい。そうした場合、..."
+    # Split into select + pay_energy(dynamic) + conditional_move
+    middle_pay = None
+    if (
+        fa.get("action") == "select"
+        and "{{icon_energy.png|E}}" in fp
+        and ("支払う" in fp or "支払って" in fp)
+    ):
+        # Split the first part on "、" to separate select from energy payment
+        fp_segments = fp.split("、")
+        if len(fp_segments) >= 2 and "選び" in fp_segments[0] and "{{icon_energy.png|E}}" in fp_segments[1]:
+            select_text = fp_segments[0] + "、"
+            pay_text = fp_segments[1]
+            # Re-parse select part (trimmed to exclude energy payment)
+            if fc and fat:
+                fa = parse_action(select_text)
+                fa["text"] = select_text
+            else:
+                fa = parse_action(select_text)
+            # Parse energy payment as a separate action
+            middle_pay = parse_action(pay_text)
+            if middle_pay.get("action") != "pay_energy":
+                middle_pay = None  # fallback: don't split
+
     # Process second part — use parse_effect to handle sequential sub-actions
     clean = sp.replace(CONDITIONAL_SEQUENTIAL_MARKER, "").strip().lstrip("、")
     sa = parse_effect(clean)
@@ -5056,7 +5223,7 @@ def _try_conditional_sequential(text):
     result = {
         "text": text,
         "action": "sequential",
-        "actions": [fa, sa],
+        "actions": [fa, middle_pay, sa] if middle_pay else [fa, sa],
         "conditional": True,
     }
     if cond:
@@ -5326,10 +5493,13 @@ def _try_conditional(text):
     result = {"text": text, "condition": cond}
 
     # Baton touch "this baton touch placed" — use recently_moved source
+    # Only override if the action text explicitly says "by this baton touch"
+    # (e.g. "このバトンタッチで控え室に置かれた"), not a generic discard search.
     if (
         cond.get("baton_touch_trigger")
         and action.get("action") == "move_cards"
         and action.get("source") == "discard"
+        and ("このバトンタッチで" in at or "このバトンタッチにより" in at)
     ):
         action["source"] = "recently_moved"
 
@@ -5434,9 +5604,13 @@ def _try_baton_touch_effect(text):
     cond["type"] = "baton_touch"
     action = parse_action(action_text)
     # Baton touch "this baton touch placed" — override source to recently_moved
-    # so the engine targets the specific card moved by the baton touch, not
-    # any matching card from the discard pile.
-    if cond.get("baton_touch_trigger") and action.get("source") == "discard":
+    # Only override if the action text explicitly says "by this baton touch"
+    # (e.g. "このバトンタッチで控え室に置かれた"), not a generic discard search.
+    if (
+        cond.get("baton_touch_trigger")
+        and action.get("source") == "discard"
+        and ("このバトンタッチで" in action_text or "このバトンタッチにより" in action_text)
+    ):
         action["source"] = "recently_moved"
     result = {"text": text, "condition": cond}
     result.update(action)
@@ -5996,7 +6170,20 @@ def _merge_parenthetical(target, parenthetical):
             # Informational notes like "対戦相手のカードの効果でも発動する"
             # are stored in text, not parsed.
             if "センター" in note or "サイド" in note or "エリアにいる場合" in note:
-                cond_parsed = parse_condition(note)
+                # Handle "エリアにいる場合のみ" patterns (e.g. "センターエリアにいる場合のみ発動する")
+                # where parse_condition returns "custom" because the text has "場合" but
+                # no matching handler. Build condition directly for these.
+                if "エリアにいる場合" in note:
+                    pos_map = {"センター": "center", "左サイド": "left_side", "右サイド": "right_side"}
+                    detected_pos = [v for k, v in pos_map.items() if k in note]
+                    cond_parsed = {
+                        "type": "location_condition",
+                        "location": "stage",
+                        "position": detected_pos[0] if len(detected_pos) == 1 else None,
+                        "text": note,
+                    }
+                else:
+                    cond_parsed = parse_condition(note)
                 if cond_parsed and cond_parsed.get("type") != "custom":
                     target["activation_condition_parsed"] = cond_parsed
             # Detect all mentioned positions
@@ -6436,6 +6623,13 @@ def _normalize_effect_tree(effect, original_text=None):
         d_ctx = d.get("text") or ctx_text or _full_text
         d_text = d.get("text") or ""
 
+        # Ensure every condition/effect dict has a text field
+        if "text" not in d and ("type" in d or "action" in d):
+            if ctx_text:
+                d["text"] = ctx_text
+            elif _full_text:
+                d["text"] = _full_text
+
         # Check activation position if not set — first from parenthetical notes,
         # then from position icons ({{center.png}}, {{leftside.png}}, {{rightside.png}})
         # in the original text (e.g. {{leftside.png|左サイド}} after a trigger).
@@ -6673,9 +6867,12 @@ def _normalize_effect_tree(effect, original_text=None):
                 if (
                     "それらの中に" in cond_text or "これにより" in cond_text
                 ) and prev_count is not None:
-                    if cond.get("type") == "card_count_condition" and cond.get(
-                        "source"
-                    ) in (None, "card", "discard"):
+                    if cond.get("type") in (
+                        "card_count_condition",
+                        "location_condition",
+                        "group_condition",
+                    ) and cond.get("source") in (None, "card", "discard"):
+                        cond["type"] = "card_count_condition"
                         cond["source"] = "preceding_moved"
                         cond.pop("location", None)
                 # Track the last preceding_moved condition so bare follow-up count
@@ -6770,7 +6967,7 @@ def _normalize_effect_tree(effect, original_text=None):
         if "group_reference" not in d and d_ctx:
             if "同じグループ名" in d_ctx:
                 d["group_reference"] = "same_group_name"
-            elif "グループ名が異なる" in d_ctx or "グループ名がそれぞれ異なる" in d_ctx:
+            elif "グループ名が異なる" in d_ctx or "グループ名がそれぞれ異なる" in d_ctx or "異なるグループ名" in d_ctx:
                 d["group_reference"] = "different_group_names"
 
         # Set same_unit_name for cost text containing '同じユニット名'

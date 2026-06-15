@@ -5,6 +5,7 @@
  */
 import { State } from '../state.js';
 import { fixImg, Phase, isMulliganPhase } from '../constants.js';
+import { resolveCardImagePath } from './CardRenderer.js';
 import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { TextEnricher } from '../utils/TextEnricher.js';
@@ -871,7 +872,7 @@ function renderYellSection(result) {
                     return `
                         <article class="perf-yell-card-modern" ${card?.id !== undefined ? `data-card-id="${card.id}"` : ''} ${rawText ? `data-text="${escapeHtml(rawText)}"` : ''}>
                             <div class="perf-yell-card-art-wrap">
-                                ${card?.img ? `<img src="${fixImg(card.img)}" alt="Yell card">` : ''}
+                                ${card?.card_no ? `<img src="${resolveCardImagePath(card.card_no)}" alt="Yell card">` : ''}
                             </div>
                             <div class="perf-yell-icons">
                                 ${renderHeartsCompact(card?.blade_hearts || [])}
@@ -1025,7 +1026,7 @@ function renderPlayerPanel(playerId, result) {
                     </div>
                     ${renderTextMetric('Lives Passed', `${passedLives} / ${totalLives}`)}
                     ${renderIconMetric('img/texticon/icon_score.png', 'Live Pts', String(baseLiveScore), 'score')}
-                    ${renderIconMetric('img/texticon/icon_score.png', 'Notes', String(result?.note_icons || 0), 'notes')}
+                    ${renderIconMetric('', 'Notes', `${result?.note_icons || 0}♪`, 'notes')}
                     ${renderIconMetric('img/texticon/icon_blade.png', 'Stage Blades', String(totalBlades), 'blades')}
                     ${renderTextMetric('Cheer Mult', `${cheerMult}x`)}
                     ${renderIconMetric('img/texticon/icon_blade.png', 'Yell Count', String(result?.yell_count || 0), 'yells')}

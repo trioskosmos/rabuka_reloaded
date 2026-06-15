@@ -82,6 +82,7 @@ pub struct TestGame {
     pub state: GameState,
     copy_pool: RefCell<HashMap<i16, Vec<i16>>>,
     debug_enabled: bool,
+    copy_counter: RefCell<i16>,
 }
 
 impl Drop for TestGame {
@@ -119,6 +120,7 @@ impl TestGame {
             state,
             copy_pool: RefCell::new(copy_pool),
             debug_enabled: true,
+            copy_counter: RefCell::new(20000),
         }
     }
 
@@ -143,7 +145,16 @@ impl TestGame {
     /// distinct from `id()` for the same card, but multiple `new_id()` calls
     /// for the same card may return the same template ID.
     pub fn new_id(&self, card_no: &str) -> i16 {
-        card_id(&self.db, card_no)
+        let template_id = card_id(&self.db, card_no);
+        self.copy_pool
+            .borrow_mut()
+            .get_mut(&template_id)
+            .and_then(|v| v.pop())
+            .unwrap_or_else(|| {
+                let cid = *self.copy_counter.borrow();
+                *self.copy_counter.borrow_mut() = cid + 1;
+                cid
+            })
     }
 
     /// Get a stable reference ID for a card_no (always returns the same copy).

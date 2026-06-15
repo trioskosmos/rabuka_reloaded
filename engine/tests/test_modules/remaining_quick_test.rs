@@ -8,6 +8,29 @@ fn advance_live(game: &mut TestGame) {
     }
 }
 
+fn setup_eternalize_base(game: &mut TestGame) -> (i16, i16) {
+    let live = game.id("PL!N-pb1-042-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..60 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.give_energy(15);
+    (live, filler)
+}
+
+fn run_live_with_eternalize(game: &mut TestGame, live: i16) {
+    advance_live(game);
+    game.set_live_card(live);
+    game.pass();
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+}
+
 /// Q204: Eternalize Love!! — 2+ 虹ヶ咲 members on stage → heart requirement reduced by 3 heart00.
 #[test]
 fn eternalize_q204_two_niko_hearts_reduced() {
@@ -87,6 +110,94 @@ fn eternalize_q204_zero_niko_hearts_unchanged() {
     assert!(
         game.state.mods.need_heart_modifiers.get(&live).is_none(),
         "Q204: 1 member (<2) → condition fails → no modification"
+    );
+}
+
+/// Eternalize: 2 same-name 虹ヶ咲 members → condition passes (same name + count >= 2)
+#[test]
+fn eternalize_same_name_two_niji_identical() {
+    let mut game = TestGame::new(load_real_database());
+    let (live, _) = setup_eternalize_base(&mut game);
+    let ayumu = game.id("PL!N-pb1-001-R");
+    // Two of the same card → same name
+    game.state.player1.stage.stage = [ayumu, ayumu, -1];
+    run_live_with_eternalize(&mut game, live);
+
+    let mods = game.state.mods.need_heart_modifiers.get(&live);
+    assert!(mods.is_some(), "same-name identical members → should trigger");
+    if let Some(m) = mods {
+        let h00 = m.get(&HeartColor::Heart00).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+        assert!(h00 <= -3, "heart00 reduction >= 3 (got {})", h00);
+    }
+}
+
+/// Eternalize: 2 different-name 虹ヶ咲 members → condition FAILS (same_name check)
+#[test]
+fn eternalize_different_names_no_reduction() {
+    let mut game = TestGame::new(load_real_database());
+    let (live, _) = setup_eternalize_base(&mut game);
+    let kasumi = game.id("PL!N-pb1-002-R");
+    let ayumu = game.id("PL!N-pb1-001-R");
+    // Two different cards → different names
+    game.state.player1.stage.stage = [kasumi, ayumu, -1];
+    run_live_with_eternalize(&mut game, live);
+
+    assert!(
+        game.state.mods.need_heart_modifiers.get(&live).is_none(),
+        "different names → should NOT trigger"
+    );
+}
+
+/// Eternalize: 2 same-name members but only 1 is 虹ヶ咲 → condition FAILS (count < 2 matching group)
+#[test]
+fn eternalize_one_niji_one_other_triggers_zero() {
+    let mut game = TestGame::new(load_real_database());
+    let (live, filler) = setup_eternalize_base(&mut game);
+    let niji = game.id("PL!N-pb1-001-R");
+    // Only 1 member has 虹ヶ咲 series → count < 2
+    game.state.player1.stage.stage = [niji, filler, -1];
+    run_live_with_eternalize(&mut game, live);
+
+    assert!(
+        game.state.mods.need_heart_modifiers.get(&live).is_none(),
+        "1 虹ヶ咲 member → count < 2 → should NOT trigger"
+    );
+}
+
+/// Eternalize: 3 members, 2 share a name → condition passes (same_name satisfied)
+#[test]
+fn eternalize_two_same_one_different_triggers() {
+    let mut game = TestGame::new(load_real_database());
+    let (live, _) = setup_eternalize_base(&mut game);
+    let kasumi = game.id("PL!N-pb1-002-R");
+    let ayumu = game.id("PL!N-pb1-001-R");
+    // Two ayumu (same name) + one kasumi (different) → at least 2 share a name
+    game.state.player1.stage.stage = [ayumu, ayumu, kasumi];
+    run_live_with_eternalize(&mut game, live);
+
+    let mods = game.state.mods.need_heart_modifiers.get(&live);
+    assert!(mods.is_some(), "2/3 share a name → should trigger");
+    if let Some(m) = mods {
+        let h00 = m.get(&HeartColor::Heart00).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+        assert!(h00 <= -3, "heart00 reduction >= 3 (got {})", h00);
+    }
+}
+
+/// Eternalize: 3 members all different names → condition FAILS
+#[test]
+fn eternalize_three_all_different_no_trigger() {
+    let mut game = TestGame::new(load_real_database());
+    let (live, _) = setup_eternalize_base(&mut game);
+    let kasumi = game.id("PL!N-pb1-002-R");
+    let ayumu = game.id("PL!N-pb1-001-R");
+    let karin = game.id("PL!N-pb1-004-R");
+    // Three different cards → all different names
+    game.state.player1.stage.stage = [kasumi, ayumu, karin];
+    run_live_with_eternalize(&mut game, live);
+
+    assert!(
+        game.state.mods.need_heart_modifiers.get(&live).is_none(),
+        "3 different names → should NOT trigger"
     );
 }
 

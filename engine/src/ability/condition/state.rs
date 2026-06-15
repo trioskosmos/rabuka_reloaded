@@ -87,22 +87,88 @@ impl<'a> ConditionContext<'a> {
                 crate::game_state::Phase::LiveVictoryDetermination
             ),
             "during_live" | "this_live" => {
-                matches!(
+                if !matches!(
                     self.game_state.current_phase,
                     crate::game_state::Phase::LiveCardSetFirstAttacker
-                ) || matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::LiveCardSetSecondAttacker
-                ) || matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::FirstAttackerPerformance
-                ) || matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::SecondAttackerPerformance
-                ) || matches!(
-                    self.game_state.current_phase,
-                    crate::game_state::Phase::LiveVictoryDetermination
-                )
+                        | crate::game_state::Phase::LiveCardSetSecondAttacker
+                        | crate::game_state::Phase::FirstAttackerPerformance
+                        | crate::game_state::Phase::SecondAttackerPerformance
+                        | crate::game_state::Phase::LiveVictoryDetermination
+                ) {
+                    return false;
+                }
+                // Build list of zones to check from condition.locations or condition.location
+                let zones_to_check: Vec<&str> = {
+                    let mut zones = Vec::new();
+                    if let Some(ref locs) = condition.locations {
+                        for z in locs {
+                            zones.push(z.as_str());
+                        }
+                    } else if let Some(ref loc) = condition.location {
+                        zones.push(loc.as_str());
+                    }
+                    zones
+                };
+                let has_success_or_live_zone = zones_to_check.iter().any(|z| {
+                    *z == "success_live_card_zone" || *z == "live_card_zone"
+                });
+                if has_success_or_live_zone {
+                    let target = condition.target.as_deref().unwrap_or("self");
+                    let player = self.resolve_condition_player(target);
+                    let mut found_match = false;
+                    'zone_loop: for zone_name in &zones_to_check {
+                        let cards: Vec<i16> = match *zone_name {
+                            "success_live_card_zone" => {
+                                player.success_live_card_zone.cards.iter().copied().collect()
+                            }
+                            "live_card_zone" => player.live_card_zone.cards.to_vec(),
+                            _ => continue,
+                        };
+                        eprintln!("[TEMP_DIAG] checking zone={} {} cards={:?}",
+                            zone_name, cards.len(), cards);
+                        for &cid in &cards {
+                            if let Some(card) = self.game_state.card_database.get_card(cid) {
+                                let group_ok = condition.group_names.as_ref().map_or(true, |groups| {
+                                    groups.iter().any(|g| {
+                                        crate::ability::util::card_matches_group_str(
+                                            &self.game_state.card_database,
+                                            cid,
+                                            Some(g),
+                                        )
+                                    })
+                                });
+                                eprintln!("[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
+                                    cid, card.name, group_ok, card.need_heart);
+                                if !group_ok { continue; }
+                                if let Some(ref hc_list) = condition.heart_colors {
+                                    if let Some(ref nh) = card.need_heart {
+                                        let target_count = condition.count.unwrap_or(1);
+                                        let heart_ok = hc_list.iter().any(|color_str| {
+                                            let color = crate::card::parse_heart_color(color_str);
+                                            nh.hearts.get(&color).copied().unwrap_or(0) == target_count
+                                        });
+                                        eprintln!("[TEMP_DIAG]   heart_ok={} target_count={}", heart_ok, target_count);
+                                        if heart_ok {
+                                            found_match = true;
+                                            break 'zone_loop;
+                                        }
+                                    } else {
+                                        eprintln!("[TEMP_DIAG]   no need_heart on card");
+                                    }
+                                } else {
+                                    found_match = true;
+                                    break 'zone_loop;
+                                }
+                            }
+                        }
+                    }
+                    if !found_match {
+                        eprintln!("[TEMP_DIAG] CONDITION FAILED: no matching card in zones");
+                        return false;
+                    }
+                    eprintln!("[TEMP_DIAG] CONDITION PASSED");
+                }
+                true
             }
             "before_live" => {
                 !matches!(

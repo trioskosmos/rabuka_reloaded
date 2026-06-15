@@ -1261,6 +1261,9 @@ Fields produced by the ability parser that may appear on cost or effect objects:
 | `need_heart_color` | Required heart color |
 | `need_heart_operator` | Operator for need_heart_total |
 | `need_heart_total` | Required heart total |
+| `same_name` | Boolean — condition/action requires same character name |
+| `locations` | string[] — multiple zone locations (for OR-zone patterns) |
+| `heart_colors` | string[] — heart color filter (also on conditions) |
 
 ---
 
@@ -1321,6 +1324,32 @@ Fields produced by the ability parser that may appear on cost or effect objects:
 - Appears when `abilities.json` has no cost (null cost)
 - These are typically constant (`常時`) abilities or abilities without costs
 - 527 abilities have `unknown` cost type (the largest group)
+
+## Parser Validation
+
+After each parser change, run validation to check for information loss:
+```bash
+python cards/card_analyzer.py validate
+```
+
+This checks every parsed ability against the original text for:
+1. Zone references (ステージ → `stage`, hand → `hand`, etc.)
+2. Card type references (メンバー → `member_card`, etc.)
+3. Resource references (ハート → `heart`, etc.)
+4. Action verbs (引く → `draw_card`, etc.)
+5. Condition markers (場合 → condition, たび → trigger_condition)
+6. **Known gap patterns**: same_name, or_location, heart_content, different_name
+
+### Previously fixed gaps
+
+These parser gaps were identified by the validator and fixed:
+
+| Gap | Cards affected | Fix |
+| :-- | :------------ | :-- |
+| `同じ名前` (same name) | 2 | Added `same_name: true` field to card_count_condition and gain_resource |
+| `カード名の異なる` (different names) | 3 | Added `distinct: "card_name"` to card_count_condition (was only in move_cards) |
+| `置き場かライブ中` (OR-zone) | 2 | Added `locations: [...]` array to condition via `_enrich_or_location()` |
+| `必要ハートに含まれるheartXXがN` (heart filter) | 2 | Added `heart_colors` + `count` to condition via `_enrich_heart_content()` |
 
 ### Effect Action: `unknown`
 - Appears when an effect has no `action` field

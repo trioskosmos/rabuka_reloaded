@@ -299,7 +299,14 @@ impl AbilityResolver {
         };
 
         // Get cards from source
-        let source_str = if source.is_empty() { "" } else { source };
+        let source_str = if source.is_empty() {
+            // No source specified in the parsed ability (e.g. auto abilities
+            // that trigger on zone transitions like "when X goes to waitroom").
+            // The card is now in the discard/waitroom — search there.
+            "discard"
+        } else {
+            source
+        };
         if !self.selected_cards.is_empty()
             && Zone::from_str(source_str) == Some(Zone::SelectedCards)
         {
@@ -1611,6 +1618,7 @@ impl AbilityResolver {
             } else {
                 Zone::Discard.to_str()
             });
+        eprintln!("[EXEC_SEL_DEST] zone={:?} destination={:?} dest={}", zone_enum, destination, dest);
         let mut moved = Vec::new();
         match zone_enum {
             Some(Zone::Hand) | Some(Zone::Discard) | Some(Zone::Deck) => {
@@ -1694,6 +1702,27 @@ impl AbilityResolver {
                         }
                         util::zone_remove_at_indices(player, zone, &filtered_indices);
                         moved = card_ids;
+                    }
+                    _ if dest == "deck_top_or_bottom" => {
+                        if let Some(&cid) = card_ids.first() {
+                            self.pending_choice = Some(Choice::SelectTarget {
+                                target: "position|destination".to_string(),
+                                description: "Choose deck top or bottom".to_string(),
+                                allow_skip: false,
+                                options: Some(vec![
+                                    Zone::DeckTop.to_str().to_string(),
+                                    Zone::DeckBottom.to_str().to_string(),
+                                ]),
+                            });
+                            self.sub_choice_created = true;
+                            self.execution_context = ExecutionContext::MoveCardsPosition {
+                                card_id: cid,
+                                state_change: None,
+                                target: target.clone(),
+                                source_zone: zone.to_string(),
+                            };
+                            return Ok(());
+                        }
                     }
                     _ => {
                         log::debug!(

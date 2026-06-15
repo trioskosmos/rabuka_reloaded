@@ -22,6 +22,8 @@ impl AbilityResolver {
         self_target: bool,
         heart_colors: &[String],
     ) -> Result<(), String> {
+        eprintln!("[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}", 
+            value, target, operation, effect.condition.is_some());
         let operation = operation.to_string();
         let target = target.to_string();
         let duration = duration.map(|s| s.to_string());
@@ -83,7 +85,13 @@ impl AbilityResolver {
                     &filter,
                     true,
                 ),
-                _ => player.live_card_zone.cards.iter().copied().collect(),
+                _ => player
+                    .live_card_zone
+                    .cards
+                    .iter()
+                    .chain(player.success_live_card_zone.cards.iter())
+                    .copied()
+                    .collect(),
             };
             let target_card_ids: Vec<(i16, i32)> = candidate_ids
                 .iter()
