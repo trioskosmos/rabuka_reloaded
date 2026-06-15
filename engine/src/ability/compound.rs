@@ -1,20 +1,42 @@
 use super::resolver::AbilityResolver;
-use super::types::{Choice, ExecutionContext};
+use super::types::{AbilityTraceNode, Choice, ExecutionContext, ZoneSnapshot};
 use crate::ability::types::Command;
 use crate::card::AbilityEffect;
+use crate::game_state::GameState;
 
-impl<'a> AbilityResolver<'a> {
+impl AbilityResolver {
     pub fn execute_sequential_effect(
         &mut self,
+        gs: &mut GameState,
         effect: &AbilityEffect,
         conditional: bool,
         is_further: bool,
     ) -> Result<(), String> {
+        // Trace sequential compound effect
+        let seq_label = if conditional {
+            "sequential_conditional".to_string()
+        } else if is_further {
+            "sequential_further".to_string()
+        } else {
+            "sequential".to_string()
+        };
+
+        let card_name = self
+            .activating_card_id
+            .and_then(|cid| gs.card_database.get_card(cid))
+            .map(|c| c.name.clone());
+
+        let before = ZoneSnapshot::from_game_state(gs);
+        let mut seq_node = AbilityTraceNode::new(seq_label)
+            .with_card(card_name)
+            .with_before(before);
+
         let cond_met = if conditional {
+            let ctx = super::condition::ConditionContext::new(gs);
             effect
                 .condition
                 .as_ref()
-                .map_or(true, |c| self.evaluate_condition(c))
+                .map_or(true, |c| ctx.evaluate_condition(c))
         } else {
             true
         };
@@ -85,8 +107,18 @@ impl<'a> AbilityResolver<'a> {
                         }
                     }
 
-                    match self.execute_effect(&action_to_execute) {
+                    eprintln!(
+                        "[SEQ_LOOP] executing action[{}] action={} pending_before={:?}",
+                        i,
+                        action.action,
+                        self.pending_choice.is_some()
+                    );
+                    match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
+                            eprintln!(
+                                "[SEQ_LOOP] after execute: pending={:?}",
+                                self.pending_choice.is_some()
+                            );
                             if self.pending_choice.is_some() {
                                 let current_was_optional = action.optional.unwrap_or(false);
                                 let remaining = if current_was_optional {
@@ -100,10 +132,9 @@ impl<'a> AbilityResolver<'a> {
                                     repeat_actions[i + 1..].to_vec()
                                 };
                                 if !remaining.is_empty() {
-                                    let mut existing =
-                                        self.game_state.ability_queue.take_pending_commands();
+                                    let mut existing = gs.ability_queue.take_pending_commands();
                                     existing.extend(remaining.into_iter().map(Command::Effect));
-                                    self.game_state.ability_queue.set_pending_commands(existing);
+                                    gs.ability_queue.set_pending_commands(existing);
                                 }
                                 return Ok(());
                             }
@@ -120,10 +151,9 @@ impl<'a> AbilityResolver<'a> {
                                 repeat_actions[i + 1..].to_vec()
                             };
                             if !remaining.is_empty() {
-                                let mut existing =
-                                    self.game_state.ability_queue.take_pending_commands();
+                                let mut existing = gs.ability_queue.take_pending_commands();
                                 existing.extend(remaining.into_iter().map(Command::Effect));
-                                self.game_state.ability_queue.set_pending_commands(existing);
+                                gs.ability_queue.set_pending_commands(existing);
                             }
                             return Ok(());
                         }
@@ -134,20 +164,44 @@ impl<'a> AbilityResolver<'a> {
         }
         // Clear context so resume_with_choice doesn't re-process the ability.
         self.execution_context = ExecutionContext::None;
-        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
-            entry.execution_context = None;
-        }
+
+        // Finalize sequential trace node
+        seq_node.after = Some(ZoneSnapshot::from_game_state(gs));
+        self.pipeline.trace.children.push(seq_node);
+
         Ok(())
     }
 
     pub fn execute_conditional_alternative(
         &mut self,
+        gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let has_primary = effect.compound.primary_effect.is_some();
         let has_alternative = effect.compound.alternative_effect.is_some();
 
         if has_primary && has_alternative {
+            // Check if the condition can decide which path to take automatically,
+            // using either the compound's alternative_condition or the top-level effect.condition.
+            let condition = effect
+                .compound
+                .alternative_condition
+                .as_ref()
+                .or(effect.condition.as_ref());
+            if let Some(cond) = condition {
+                let ctx =
+                    super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                if ctx.evaluate_condition(cond) {
+                    if let Some(ref alt_effect) = effect.compound.alternative_effect {
+                        return self.execute_effect(gs, alt_effect);
+                    }
+                } else if let Some(ref primary_effect) = effect.compound.primary_effect {
+                    return self.execute_effect(gs, primary_effect);
+                }
+                return Ok(());
+            }
+
+            // No condition — ask the player to choose
             let primary_text = effect
                 .compound
                 .primary_effect
@@ -175,15 +229,16 @@ impl<'a> AbilityResolver<'a> {
         }
 
         if let Some(ref alt_condition) = effect.compound.alternative_condition {
-            if self.evaluate_condition(alt_condition) {
+            let ctx = super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
+            if ctx.evaluate_condition(alt_condition) {
                 if let Some(ref alt_effect) = effect.compound.alternative_effect {
-                    return self.execute_effect(alt_effect);
+                    return self.execute_effect(gs, alt_effect);
                 }
             }
         }
 
         if let Some(ref primary_effect) = effect.compound.primary_effect {
-            self.execute_effect(primary_effect)
+            self.execute_effect(gs, primary_effect)
         } else {
             Ok(())
         }
@@ -191,6 +246,7 @@ impl<'a> AbilityResolver<'a> {
 
     pub fn execute_repeat_procedure(
         &mut self,
+        gs: &mut GameState,
         effect: &AbilityEffect,
         repeat_limit: u32,
     ) -> Result<(), String> {
@@ -198,24 +254,24 @@ impl<'a> AbilityResolver<'a> {
         if let Some(ref actions) = effect.compound.actions {
             for _ in 0..repeat_limit {
                 for action in actions {
-                    self.execute_effect(action)?;
+                    self.execute_effect(gs, action)?;
                 }
             }
         }
         Ok(())
     }
 
-    pub fn execute_conditional_on_result(&mut self, effect: &AbilityEffect) -> Result<(), String> {
+    pub fn execute_conditional_on_result(
+        &mut self,
+        gs: &mut GameState,
+        effect: &AbilityEffect,
+    ) -> Result<(), String> {
         // If the ability has an optional cost and it was NOT paid (skipped),
         // the primary effect should not run. This fixes "may pay" patterns
         // where the effect is gated behind the optional cost.
-        let cost_was_paid = self
-            .game_state
-            .ability_queue
-            .current_entry()
-            .map_or(true, |e| {
-                e.optional_cost_was_paid || !e.cost_paid || e.ability.cost.is_none()
-            });
+        let cost_was_paid = gs.ability_queue.current_entry().map_or(true, |e| {
+            e.optional_cost_was_paid || !e.cost_paid || e.ability.cost.is_none()
+        });
         if !cost_was_paid {
             return Ok(());
         }
@@ -225,19 +281,23 @@ impl<'a> AbilityResolver<'a> {
         let followup_action = effect.compound.followup_action.as_ref();
 
         if let Some(ref primary) = primary_action {
-            if let Err(e) = self.execute_effect(primary) {
+            if let Err(e) = self.execute_effect(gs, primary) {
                 eprintln!("Primary action failed in conditional_on_result: {}", e);
                 return Err(e);
             }
         }
 
         let condition_met = result_condition
-            .map(|c| self.evaluate_condition(c))
+            .map(|c| {
+                let ctx =
+                    super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
+                ctx.evaluate_condition(c)
+            })
             .unwrap_or(true);
 
         if condition_met {
             if let Some(ref followup) = followup_action {
-                self.execute_effect(followup)?;
+                self.execute_effect(gs, followup)?;
             }
         } else {
             eprintln!("Result condition not met, skipping followup action");
@@ -247,6 +307,7 @@ impl<'a> AbilityResolver<'a> {
 
     pub fn execute_conditional_on_optional(
         &mut self,
+        gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let optional_action = effect.compound.optional_action.as_ref();
@@ -262,17 +323,17 @@ impl<'a> AbilityResolver<'a> {
                 target: "conditional_optional".to_string(),
                 description: format!("{}?", desc),
                 allow_skip: true,
-                options: None,
+                options: Some(vec!["Skip".to_string(), "Pay".to_string()]),
             });
             return Ok(());
         }
 
         if let Some(ref optional) = optional_action {
-            self.execute_effect(optional)?;
+            self.execute_effect(gs, optional)?;
         }
         if let Some(ref conditional) = conditional_action {
             if !is_negation {
-                self.execute_effect(conditional)?;
+                self.execute_effect(gs, conditional)?;
             }
         }
         Ok(())
@@ -280,6 +341,7 @@ impl<'a> AbilityResolver<'a> {
 
     pub fn handle_choice_string_selection(
         &mut self,
+        gs: &mut GameState,
         selected: &str,
         conditional_choice: Option<String>,
     ) -> Result<(), String> {
@@ -291,8 +353,7 @@ impl<'a> AbilityResolver<'a> {
                         if val.starts_with("heart")
                             || ["赤", "桃", "緑", "青", "黄", "紫"].contains(&val.as_str())
                         {
-                            self.game_state
-                                .prohibition_effects
+                            gs.prohibition_effects
                                 .push(format!("selected_heart_color:{}", val));
                         }
                     }
@@ -300,13 +361,14 @@ impl<'a> AbilityResolver<'a> {
             }
         }
         self.pending_choice = None;
-        self.clear_choice_meta();
-        self.resume_pending_commands()?;
+        self.clear_choice_meta(gs);
+        self.resume_pending_commands(gs)?;
         Ok(())
     }
 
     pub fn handle_choice_string_store(
         &mut self,
+        gs: &mut GameState,
         selected: &str,
         conditional_choice: Option<String>,
     ) -> Result<(), String> {
@@ -321,13 +383,12 @@ impl<'a> AbilityResolver<'a> {
                 })
         });
         if let Some(s) = chosen {
-            self.game_state
-                .ability_queue
+            gs.ability_queue
                 .current_entry_mut()
                 .map(|e| e.conditional_choice = Some(s));
         }
         self.pending_choice = None;
-        self.resume_pending_commands()?;
+        self.resume_pending_commands(gs)?;
         Ok(())
     }
 }

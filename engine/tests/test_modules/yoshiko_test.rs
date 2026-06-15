@@ -1,8 +1,10 @@
-/// Tests for 津島善子 (PL!S-bp3-006-R＋) — Center ability: wait self, discard 1, search
-/// deck for Aqours member with cost = own_cost + 2, debut to same area.
+/// Tests for 津島善子 (PL!S-bp3-006-R＋) — Center activation ability:
+/// Cost: wait self + discard 1 from hand
+/// Effect: Move 1 other Aqours member from stage to discard → conditional summon 1 Aqours
+/// member from discard with cost = moved_member.cost + 2 to same area.
 ///
-/// Q154: When no matching Aqours member exists in deck, the search ends silently
-/// (no error, no add).
+/// Q154: When no other Aqours member exists on stage, the effect ends silently
+/// (cost paid, no cards moved).
 use crate::helpers::*;
 use rabuka_engine::turn::TurnEngine;
 
@@ -34,43 +36,26 @@ fn yoshiko_q154_no_candidate_in_deck_search_ends_cleanly() {
     game.state.player1.hand.cards.push(filler); // for the discard cost
     game.give_energy(15);
 
+    let before_stage = game.state.player1.stage.stage.clone();
+
     // Activate ability
     game.activate_ability(yoshiko);
 
-    // Cost 1: wait self (change_state)
-    if game.has_pending_choice() {
-        game.select_option(0);
-    } // pay wait cost
-      // Cost 2: discard 1 from hand (move_cards optional)
-    if game.has_pending_choice() {
+    // Resolve all choices: cost (hand discard) → effect (stage member selection)
+    // Since filler cards on stage are not Aqours, effect action 1 has 0 valid targets.
+    while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
-    // Cost 3: pay energy
-    // Then effect: search deck for Aqours member with cost = yoshiko_cost + 2
 
-    let before_stage = game.state.player1.stage.stage.clone();
-    let before_deck_len = game.state.player1.main_deck.cards.len();
+    eprintln!("[YOSHIKO] before: stage={:?}", before_stage);
     eprintln!(
-        "[YOSHIKO] before: stage={:?} deck={}",
-        before_stage, before_deck_len
+        "[YOSHIKO] after: stage={:?}",
+        game.state.player1.stage.stage
     );
 
-    // Handle any remaining choices (search result, etc.)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    let after_stage = game.state.player1.stage.stage.clone();
-    let after_deck_len = game.state.player1.main_deck.cards.len();
-    eprintln!(
-        "[YOSHIKO] after: stage={:?} deck={}",
-        after_stage, after_deck_len
-    );
-
-    // No new member was deployed (no Aqours members in deck)
     assert_eq!(
-        before_stage, after_stage,
-        "Stage unchanged when no Aqours member found"
+        before_stage, game.state.player1.stage.stage,
+        "Stage unchanged when no other Aqours member on stage"
     );
 }
 
@@ -101,31 +86,19 @@ fn yoshiko_q154_wrong_cost_aqours_in_deck_not_deployed() {
     game.give_energy(15);
 
     game.activate_ability(yoshiko);
-    if game.has_pending_choice() {
-        game.select_option(0);
-    }
-    if game.has_pending_choice() {
+
+    // Resolve all choices: cost + effect
+    while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
 
-    // Check if aqours_member was deployed or is still in deck
-    let on_stage = game.state.player1.stage.stage.contains(&aqours_member);
+    // Fillers on stage are not Aqours → effect action 1 has 0 targets → ability ends silently
+    // aqours_member stays in deck (was never considered for summon)
     let in_deck = game.state.player1.main_deck.cards.contains(&aqours_member);
-    eprintln!(
-        "[YOSHIKO] aqours_member on_stage={} in_deck={}",
-        on_stage, in_deck
-    );
-    // Card must be in exactly one place: either deployed to stage (if cost matched) or still in deck
+    eprintln!("[YOSHIKO] aqours_member in_deck={}", in_deck);
     assert!(
         in_deck,
-        "Aqours member should still be in deck (cost didn't match yoshiko_cost + 2)"
-    );
-    assert!(
-        !(on_stage && in_deck),
-        "Aqours member should not be in both stage and deck simultaneously"
+        "Aqours member should still be in deck (effect never reached conditional summon)"
     );
 }
 

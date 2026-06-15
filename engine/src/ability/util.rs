@@ -27,6 +27,86 @@ pub fn find_modify_cost<'a>(
     None
 }
 
+pub fn calculate_play_cost_reduction(
+    stage: &crate::core::zones::Stage,
+    hand_count: usize,
+    card_id: i16,
+    card_db: &CardDatabase,
+) -> u32 {
+    let card = match card_db.get_card(card_id) {
+        Some(c) => c,
+        None => return 0,
+    };
+
+    let mut cost_reduction: u32 = 0;
+    for ability in &card.abilities {
+        if let Some(ref effect) = ability.effect {
+            if let Some(_mod) = find_modify_cost(effect, Some("subtract"), Some("hand")) {
+                let per_unit = _mod.per_unit_count.unwrap_or(1) as usize;
+                cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
+                break;
+            }
+        }
+    }
+
+    if cost_reduction == 0 {
+        for &stage_id in &stage.stage {
+            if stage_id == -1 {
+                continue;
+            }
+            if let Some(stage_card) = card_db.get_card(stage_id) {
+                for ability in &stage_card.abilities {
+                    if let Some(ref effect) = ability.effect {
+                        if effect.action == "modify_cost"
+                            && effect.operation.as_deref() == Some("subtract")
+                            && effect.location.as_deref() == Some("hand")
+                        {
+                            let group_matches = effect
+                                .group_names
+                                .as_ref()
+                                .and_then(|gn| {
+                                    gn.first()
+                                        .map(|g| card_matches_group_str(card_db, card_id, Some(g)))
+                                })
+                                .unwrap_or(true);
+                            if !group_matches {
+                                continue;
+                            }
+                            if let Some(limit) = effect.cost_limit {
+                                if card.cost.map_or(true, |c| c != limit) {
+                                    continue;
+                                }
+                            }
+                            if let Some(ref ct) = effect.card_type {
+                                if ct != "member_card" && ct != "card" && ct != "member" {
+                                    continue;
+                                }
+                            }
+                            let reduction = effect.value.unwrap_or(1);
+                            cost_reduction = cost_reduction.max(reduction);
+                            break;
+                        }
+                    }
+                }
+            }
+            if cost_reduction > 0 {
+                break;
+            }
+        }
+    }
+    cost_reduction
+}
+
+pub fn target_player_label(target: &str, master: Option<&str>) -> &'static str {
+    match (target, master) {
+        ("self", Some("player2") | Some("p2")) => "P2",
+        ("self", _) => "P1",
+        ("opponent", Some("player2") | Some("p2")) => "P1",
+        ("opponent", _) => "P2",
+        (_, _) => "P1",
+    }
+}
+
 // ============== INDIVIDUAL CARD PREDICATES ==============
 
 pub fn card_matches_type(
@@ -112,9 +192,16 @@ pub fn card_matches_characters(
     characters: Option<&Vec<String>>,
 ) -> bool {
     match characters {
-        Some(names) if !names.is_empty() => card_db.get_card(card_id).map_or(false, |card| {
-            names.iter().any(|name| card.name.contains(name.as_str()))
-        }),
+        Some(names) if !names.is_empty() => {
+            let card_names = card_db.get_card_names(card_id);
+            names.iter().any(|name| {
+                let clean_name = name.replace(' ', "").replace('　', "");
+                card_names.iter().any(|cn| {
+                    let clean_cn = cn.replace(' ', "").replace('　', "");
+                    clean_cn.contains(&clean_name)
+                })
+            })
+        }
         _ => true,
     }
 }
@@ -196,14 +283,22 @@ pub struct CardFilter<'a> {
     pub groups: Option<&'a Vec<String>>,
     pub cost_limit: Option<u32>,
     pub cost_operator: Option<&'a str>,
+    /// Sum-total cost constraint — checked post-selection, not in per-card matches()
+    pub cost_total: Option<u32>,
+    pub cost_total_operator: Option<&'a str>,
     pub characters: Option<&'a Vec<String>>,
     pub exclude_characters: Option<&'a Vec<String>>,
     pub heart_colors: &'a [String],
+    pub need_heart_total: Option<u32>,
+    pub need_heart_operator: Option<&'a str>,
+    pub need_heart_color: Option<&'a str>,
     pub name_fragments: Option<&'a Vec<String>>,
     pub distinct: Option<&'a str>,
     pub exclude_self: Option<i16>,
     pub original_blade_limit: Option<u32>,
     pub original_blade_operator: Option<&'a str>,
+    /// Card IDs to exclude from matching (e.g. previously selected by a prior sequential action)
+    pub exclude_cards: Option<&'a [i16]>,
 }
 
 impl<'a> CardFilter<'a> {
@@ -235,6 +330,15 @@ impl<'a> CardFilter<'a> {
         self.distinct = Some(d);
         self
     }
+    pub fn exclude_cards_opt(mut self, ids: Option<&'a [i16]>) -> Self {
+        self.exclude_cards = ids;
+        self
+    }
+    pub fn original_blade_limit(mut self, obl: Option<u32>, obo: Option<&'a str>) -> Self {
+        self.original_blade_limit = obl;
+        self.original_blade_operator = obo;
+        self
+    }
     pub fn exclude_self(mut self, id: i16) -> Self {
         self.exclude_self = Some(id);
         self
@@ -248,6 +352,11 @@ impl<'a> CardFilter<'a> {
     pub fn matches(&self, db: &CardDatabase, id: i16, skip_empty: bool) -> bool {
         if skip_empty && id == -1 {
             return false;
+        }
+        if let Some(ex) = self.exclude_cards {
+            if ex.contains(&id) {
+                return false;
+            }
         }
         if let Some(ct) = self.card_type {
             if !card_matches_type(db, id, Some(ct)) {
@@ -287,6 +396,28 @@ impl<'a> CardFilter<'a> {
         if !self.heart_colors.is_empty() {
             if !card_matches_heart_colors(db, id, self.heart_colors) {
                 return false;
+            }
+        }
+        if let Some(need_total) = self.need_heart_total {
+            if let Some(color_str) = self.need_heart_color {
+                // Per-color check (e.g. heart06 >= 3)
+                let color = crate::zones::parse_heart_color(color_str);
+                let card_amount = db
+                    .get_card(id)
+                    .and_then(|c| c.need_heart.as_ref())
+                    .map(|nh| *nh.hearts.get(&color).unwrap_or(&0))
+                    .unwrap_or(0);
+                let op = self.need_heart_operator.unwrap_or(">=");
+                if !compare_counts(Some(op), card_amount, need_total) {
+                    return false;
+                }
+            } else {
+                // Total sum check (original behavior)
+                let card_total = db.get_card(id).map(|c| c.need_heart_total()).unwrap_or(0);
+                let op = self.need_heart_operator.unwrap_or(">=");
+                if !compare_counts(Some(op), card_total, need_total) {
+                    return false;
+                }
             }
         }
         if let Some(name) = self.name_fragments {
@@ -339,18 +470,24 @@ impl<'a> CardFilter<'a> {
             groups: effect.group_names.as_ref().map(|v| v.as_ref()),
             cost_limit: effect.cost_limit,
             cost_operator: effect.cost_limit_operator.as_deref(),
+            cost_total: effect.cost_total,
+            cost_total_operator: effect.cost_total_operator.as_deref(),
             characters: effect.characters.as_ref(),
             exclude_characters: effect.exclude_characters.as_ref(),
             heart_colors: &effect.heart_colors,
+            need_heart_total: effect.need_heart_total,
+            need_heart_operator: effect.need_heart_operator.as_deref(),
+            need_heart_color: effect.need_heart_color.as_deref(),
             name_fragments: None,
-            distinct: None,
+            distinct: effect.distinct.as_deref(),
             exclude_self: if effect.exclude_self.unwrap_or(false) {
                 Some(-1)
             } else {
                 None
             },
-            original_blade_limit: None,
-            original_blade_operator: None,
+            original_blade_limit: effect.blade_limit,
+            original_blade_operator: effect.blade_limit_operator.as_deref(),
+            exclude_cards: None,
         }
     }
 
@@ -361,6 +498,8 @@ impl<'a> CardFilter<'a> {
                 card_type,
                 cost_limit,
                 cost_limit_operator,
+                cost_total: _,
+                cost_total_operator: _,
                 group,
                 characters,
                 ..
@@ -370,6 +509,11 @@ impl<'a> CardFilter<'a> {
                 groups: None,
                 cost_limit: *cost_limit,
                 cost_operator: cost_limit_operator.as_deref(),
+                cost_total: None,
+                cost_total_operator: None,
+                need_heart_total: None,
+                need_heart_operator: None,
+                need_heart_color: None,
                 characters: characters.as_ref(),
                 exclude_characters: None,
                 heart_colors: &[],
@@ -378,6 +522,7 @@ impl<'a> CardFilter<'a> {
                 exclude_self: None,
                 original_blade_limit: None,
                 original_blade_operator: None,
+                exclude_cards: None,
             },
             _ => CardFilter::default(),
         }
@@ -423,12 +568,16 @@ pub fn filter_from_parts_full<'a>(
     name_fragments: Option<&'a Vec<String>>,
     distinct: Option<&'a str>,
     exclude_self: Option<i16>,
+    cost_total: Option<u32>,
+    cost_total_operator: Option<&'a str>,
 ) -> CardFilter<'a> {
     CardFilter {
         card_type,
         group,
         cost_limit,
         cost_operator,
+        cost_total,
+        cost_total_operator,
         characters,
         name_fragments,
         distinct,
@@ -468,6 +617,29 @@ pub fn matching_ids(
         .collect()
 }
 
+pub fn matching_ids_filtered(
+    cards: &[i16],
+    db: &CardDatabase,
+    filter: &CardFilter,
+    skip_empty: bool,
+    target_count: Option<u32>,
+    distinct: Option<&str>,
+    exclude_ids: Option<&[i16]>,
+) -> Vec<i16> {
+    let mut filter = filter.clone();
+    if let Some(ids) = exclude_ids {
+        filter.exclude_cards = Some(ids);
+    }
+    let mut results = matching_ids(cards, db, &filter, skip_empty);
+    if let Some(d) = distinct {
+        results = apply_distinct_filter(&results, Some(d), db);
+    }
+    if let Some(tc) = target_count {
+        results.truncate(tc as usize);
+    }
+    results
+}
+
 /// Count cards matching the filter.
 pub fn count_matching(
     cards: &[i16],
@@ -479,6 +651,17 @@ pub fn count_matching(
         .iter()
         .filter(|&&id| filter.matches(db, id, skip_empty))
         .count() as u32
+}
+
+/// Map a stage position string to its array index (0=left, 1=center, 2=right).
+/// Accepts English, Japanese, and shorthand forms.
+pub fn stage_position_index(pos: &str) -> Option<usize> {
+    match pos {
+        "center" | "センターエリア" => Some(1),
+        "left_side" | "左サイドエリア" | "left" => Some(0),
+        "right_side" | "右サイドエリア" | "right" => Some(2),
+        _ => None,
+    }
 }
 
 /// Deduplicate by card name when `filter.distinct` is set.
@@ -518,7 +701,7 @@ pub fn zone_cards<'a>(player: &'a crate::player::Player, zone: &str) -> &'a [i16
         "discard" | "waitroom" => &player.waitroom.cards,
         "energy_zone" => &player.energy_zone.cards,
         "live_card_zone" => &player.live_card_zone.cards,
-        "success_live_zone" => &player.success_live_card_zone.cards,
+        "success_live_zone" | "success_live_card_zone" => &player.success_live_card_zone.cards,
         "under_member" => {
             // Return all under_cards as a flat slice - needs allocation since
             // under_cards are stored as 3 separate SmallVecs.
@@ -610,6 +793,127 @@ pub fn sum_score_in_zone(
         .sum()
 }
 
+pub fn remove_card_from_zone(
+    player: &mut crate::player::Player,
+    card_id: i16,
+    zone: &str,
+    card_db: &CardDatabase,
+) -> bool {
+    match zone {
+        "hand" => {
+            if let Some(pos) = player.hand.cards.iter().position(|&id| id == card_id) {
+                player.hand.cards.remove(pos);
+                return true;
+            }
+        }
+        "stage" => {
+            if let Some(pos) = player.stage.stage.iter().position(|&id| id == card_id) {
+                player.remove_member_from_stage_with_recycling(pos, card_db);
+                return true;
+            }
+        }
+        "energy_zone" => {
+            if let Some(pos) = player
+                .energy_zone
+                .cards
+                .iter()
+                .position(|&id| id == card_id)
+            {
+                player.energy_zone.cards.remove(pos);
+                return true;
+            }
+        }
+        "discard" | "waitroom" => {
+            if let Some(pos) = player.waitroom.cards.iter().position(|&id| id == card_id) {
+                player.waitroom.cards.remove(pos);
+                return true;
+            }
+        }
+        "deck" => {
+            if let Some(pos) = player.main_deck.cards.iter().position(|&id| id == card_id) {
+                player.main_deck.cards.remove(pos);
+                return true;
+            }
+        }
+        "live_card_zone" => {
+            if let Some(pos) = player
+                .live_card_zone
+                .cards
+                .iter()
+                .position(|&id| id == card_id)
+            {
+                player.live_card_zone.cards.remove(pos);
+                return true;
+            }
+        }
+        "success_live_zone" => {
+            if let Some(pos) = player
+                .success_live_card_zone
+                .cards
+                .iter()
+                .position(|&id| id == card_id)
+            {
+                player.success_live_card_zone.cards.remove(pos);
+                return true;
+            }
+        }
+        _ => {}
+    }
+    false
+}
+
+pub fn move_card(
+    player: &mut crate::player::Player,
+    card_id: i16,
+    src_zone: &str,
+    dst_zone: &str,
+    vacated_stage_area: Option<usize>,
+    card_db: &CardDatabase,
+) -> bool {
+    // Attempt to remove from source zone
+    if remove_card_from_zone(player, card_id, src_zone, card_db) {
+        // Place in destination zone
+        return place_card_in_zone(player, card_id, dst_zone, vacated_stage_area, false, 1);
+    }
+    false
+}
+
+pub fn resolve_indices_to_ids(
+    player: &crate::player::Player,
+    zone: &str,
+    indices: &[usize],
+) -> Vec<i16> {
+    let cards = zone_cards(player, zone);
+    indices
+        .iter()
+        .filter_map(|&idx| cards.get(idx).copied())
+        .collect()
+}
+
+pub fn move_cards(
+    player: &mut crate::player::Player,
+    card_ids: &[i16],
+    src_zone: &str,
+    dst_zone: &str,
+    vacated_stage_area: Option<usize>,
+    card_db: &CardDatabase,
+) -> usize {
+    let mut count = 0;
+    for &card_id in card_ids {
+        if move_card(
+            player,
+            card_id,
+            src_zone,
+            dst_zone,
+            vacated_stage_area,
+            card_db,
+        ) {
+            count += 1;
+        }
+    }
+    count
+}
+
 /// Place a card in the given destination zone, handling all zone types.
 /// Returns true if the card was placed, false if skipped (stage full with max).
 pub fn place_card_in_zone(
@@ -644,7 +948,10 @@ pub fn place_card_in_zone(
             true
         }
         "deck" | "deck_top" => {
-            player.main_deck.cards.insert(0, card_id);
+            let idx = vacated_stage_area
+                .unwrap_or(0)
+                .min(player.main_deck.cards.len());
+            player.main_deck.cards.insert(idx, card_id);
             true
         }
         "deck_bottom" => {
@@ -690,7 +997,9 @@ pub fn place_card_in_zone(
             // Rule 4.5.5: Place card under a member
             // Fallback: prefer center, then left, then right
             // (callers that know the activating card's position should specify it)
-            let target_idx = if player.stage.stage[1] != -1 {
+            let target_idx = if let Some(pos) = vacated_stage_area {
+                pos
+            } else if player.stage.stage[1] != -1 {
                 1
             } else if player.stage.stage[0] != -1 {
                 0
@@ -711,7 +1020,7 @@ pub fn place_card_in_zone(
     }
 }
 
-fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
+pub fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
     if stage[1] == -1 {
         Some(1)
     } else if stage[0] == -1 {
@@ -723,11 +1032,19 @@ fn stage_first_empty(stage: &[i16; 3]) -> Option<usize> {
     }
 }
 
-fn pos_to_area(pos: usize) -> crate::zones::MemberArea {
+pub fn pos_to_area(pos: usize) -> crate::zones::MemberArea {
     match pos {
         0 => crate::zones::MemberArea::LeftSide,
         1 => crate::zones::MemberArea::Center,
         _ => crate::zones::MemberArea::RightSide,
+    }
+}
+
+pub fn area_to_index(area: &crate::zones::MemberArea) -> Option<usize> {
+    match area {
+        crate::zones::MemberArea::LeftSide => Some(0),
+        crate::zones::MemberArea::Center => Some(1),
+        crate::zones::MemberArea::RightSide => Some(2),
     }
 }
 
@@ -737,14 +1054,28 @@ pub fn calculate_per_unit_multiplier(
     per_unit: bool,
     per_unit_type: Option<&str>,
     player: &crate::player::Player,
+    orientation_modifiers: &std::collections::HashMap<i16, String>,
+    state_filter: Option<&str>,
 ) -> u32 {
     if !per_unit {
         return 1;
     }
+    let stage_count = |state: Option<&str>| -> u32 {
+        player
+            .stage
+            .stage
+            .iter()
+            .filter(|&&c| c != -1)
+            .filter(|&&cid| match state {
+                Some(s) => orientation_modifiers
+                    .get(&cid)
+                    .map_or(s == "active", |o| o.as_str() == s),
+                None => true,
+            })
+            .count() as u32
+    };
     match per_unit_type {
-        Some("member") | Some("人") | Some("members") => {
-            player.stage.stage.iter().filter(|&&c| c != -1).count() as u32
-        }
+        Some("member") | Some("人") | Some("members") => stage_count(state_filter),
         Some("hand") | Some("card") | Some("枚") => player.hand.cards.len() as u32,
         Some("energy") => player.energy_zone.cards.len() as u32,
         Some("live_card_zone") => player.live_card_zone.cards.len() as u32,
@@ -775,6 +1106,7 @@ pub fn resolve_per_unit_count(
     let zone = match per_unit_type {
         Some("stage") | Some("member") | Some("人") | Some("members") => "stage",
         Some("hand") | Some("card") => "hand",
+        Some("under_member") => "under_member",
         Some("枚") => {
             let has_member_ct = filter.card_type.map_or(false, |ct| ct == "member_card");
             if has_member_ct {
@@ -853,17 +1185,10 @@ pub fn apply_distinct_filter(
 // ============== ZONE CARD COUNT ==============
 
 pub fn get_zone_card_count(player: &crate::player::Player, zone: &str) -> usize {
-    match zone {
-        "stage" => player.stage.stage.iter().filter(|&&c| c != -1).count(),
-        "hand" => player.hand.cards.len(),
-        "deck" | "deck_top" => player.main_deck.cards.len(),
-        "discard" | "waitroom" => player.waitroom.cards.len(),
-        "energy_zone" => player.energy_zone.cards.len(),
-        "energy_deck" => player.energy_deck.cards.len(),
-        "live_card_zone" => player.live_card_zone.cards.len(),
-        "success_live_zone" => player.success_live_card_zone.cards.len(),
-        _ => 0,
+    if zone == "stage" {
+        return player.stage.stage.iter().filter(|&&c| c != -1).count();
     }
+    zone_cards(player, zone).len()
 }
 
 // ============== DURATION HELPERS ==============
@@ -926,4 +1251,122 @@ pub fn extract_heart_colors_from_text(text: &str) -> Vec<String> {
         pos = end.max(nums_start);
     }
     colors
+}
+
+// ============== SELECTION PRIMITIVES ==============
+// Shared across move_cards, cost, and any other zone-selection logic.
+
+/// How a zone selection resolves when there aren't enough matching cards.
+#[derive(Clone)]
+pub enum InsufficientBehavior {
+    /// Silently skip (treat as zero cards taken).
+    Silent,
+    /// Return an error with the given message.
+    Error(String),
+}
+
+/// The outcome of resolving a card selection from a zone.
+#[derive(Debug, Clone)]
+pub enum SelectionOutcome {
+    /// Exact match — the indices to take.
+    Exact(Vec<usize>),
+    /// Too many candidates — the caller must prompt the player.
+    Prompt,
+    /// Too few candidates — skip silently.
+    Skip,
+}
+
+/// Classify a set of candidate indices against a required count.
+pub fn classify_selection(
+    idxs: &[usize],
+    count: usize,
+    is_all: bool,
+    on_insufficient: InsufficientBehavior,
+) -> Result<SelectionOutcome, String> {
+    if is_all {
+        return Ok(SelectionOutcome::Exact(idxs.to_vec()));
+    }
+    if idxs.len() < count {
+        return match on_insufficient {
+            InsufficientBehavior::Silent => Ok(SelectionOutcome::Skip),
+            InsufficientBehavior::Error(msg) => Err(msg),
+        };
+    }
+    if idxs.len() > count {
+        return Ok(SelectionOutcome::Prompt);
+    }
+    Ok(SelectionOutcome::Exact(idxs.to_vec()))
+}
+
+/// Return indices into `cards` matching the filter, with optional self-target pinning.
+pub fn get_selection_indices(
+    cards: &[i16],
+    card_db: &CardDatabase,
+    activating_card: Option<i16>,
+    filter: &CardFilter,
+    self_target_only: bool,
+    skip_empty: bool,
+) -> Vec<usize> {
+    eprintln!(
+        "[GET_SEL] cards.len={} filter.nh_color={:?} filter.nh_total={:?}",
+        cards.len(),
+        filter.need_heart_color,
+        filter.need_heart_total
+    );
+    let mut idxs = matching_indices(cards, card_db, filter, skip_empty);
+    if self_target_only {
+        if let Some(aid) = activating_card {
+            idxs.retain(|&i| i < cards.len() && cards[i] == aid);
+        }
+    }
+    idxs
+}
+
+/// Full selection resolution: filter → classify → SelectionOutcome.
+pub fn resolve_selection(
+    cards: &[i16],
+    card_db: &CardDatabase,
+    activating_card: Option<i16>,
+    count: usize,
+    is_all: bool,
+    filter: &CardFilter,
+    self_target_only: bool,
+    behavior: InsufficientBehavior,
+    skip_empty: bool,
+) -> Result<SelectionOutcome, String> {
+    let idxs = get_selection_indices(
+        cards,
+        card_db,
+        activating_card,
+        filter,
+        self_target_only,
+        skip_empty,
+    );
+    classify_selection(&idxs, count, is_all, behavior)
+}
+
+/// Remove cards from a standard (non-stage, non-deck) zone at the given indices.
+/// Indices are sorted descending so earlier removals don't shift later ones.
+/// Returns the removed card IDs.
+/// Remove cards from a named zone by indices (indices processed in descending order).
+pub fn zone_remove_at_indices(
+    player: &mut crate::player::Player,
+    zone: &str,
+    indices: &[usize],
+) -> Vec<i16> {
+    let mut sorted = indices.to_vec();
+    sorted.sort_unstable_by(|a, b| b.cmp(a));
+    sorted
+        .iter()
+        .map(|&i| match zone {
+            "hand" => player.hand.cards.remove(i),
+            "discard" | "waitroom" | "those_cards" => player.waitroom.cards.remove(i),
+            "energy_zone" => player.energy_zone.cards.remove(i),
+            "live_card_zone" => player.live_card_zone.cards.remove(i),
+            "success_live_zone" => player.success_live_card_zone.cards.remove(i),
+            "energy_deck" => player.energy_deck.cards.remove(i),
+            _ => -1,
+        })
+        .filter(|&c| c != -1)
+        .collect()
 }

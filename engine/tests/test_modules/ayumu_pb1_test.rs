@@ -50,6 +50,11 @@ fn ayumu_pb1_q199_no_baton_touch_after_effect_placement() {
         game.select_indices(&[0]); // select target_ayumu from hand
     }
 
+    // Position choice for placing on stage (multiple empty slots)
+    if game.has_pending_choice() {
+        game.select_option(1); // choose center
+    }
+
     // The target card should now be on stage
     let stage_has_target = game.state.player1.stage.stage.contains(&target_ayumu);
     assert!(

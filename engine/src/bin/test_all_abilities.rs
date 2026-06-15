@@ -1,12 +1,12 @@
-use std::path::Path;
-use std::sync::Arc;
-use serde::{Deserialize, Serialize};
+use rabuka_engine::ability::resolver::AbilityResolver;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
 use rabuka_engine::game_state::GameState;
 use rabuka_engine::player::Player;
 use rabuka_engine::types::{Phase, TurnPhase};
-use rabuka_engine::ability::resolver::AbilityResolver;
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::sync::Arc;
 
 const FILLER: &str = "PL!-sd1-010-SD";
 const ENERGY_CARD: &str = "LL-E-001-SD";
@@ -81,8 +81,7 @@ struct TestResult {
 
 fn load_db() -> Arc<CardDatabase> {
     let cards_path = Path::new("../cards/cards.json");
-    let cards = CardLoader::load_cards_from_file(cards_path)
-        .expect("Failed to load cards");
+    let cards = CardLoader::load_cards_from_file(cards_path).expect("Failed to load cards");
     Arc::new(CardDatabase::load_or_create(cards))
 }
 
@@ -141,40 +140,65 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
     // Find a second member card of the same series as card_id for stage
     // (needed when exclude_self=true removes card_id and filler doesn't match group)
     let same_series_member = if card_id >= 0 {
-        db.get_card(card_id).and_then(|c| {
-            let _series = &c.series;
-            db.cards.iter().find(|(id, other)| {
-                **id != card_id && other.is_member() && &other.series == _series
-            }).map(|(id, _)| *id)
-        }).unwrap_or(filler)
-    } else { filler };
+        db.get_card(card_id)
+            .and_then(|c| {
+                let _series = &c.series;
+                db.cards
+                    .iter()
+                    .find(|(id, other)| {
+                        **id != card_id && other.is_member() && &other.series == _series
+                    })
+                    .map(|(id, _)| *id)
+            })
+            .unwrap_or(filler)
+    } else {
+        filler
+    };
     // Find a multi-purpose member card for stage[0]:
     //   - cost <= 2 for cost_limit filters
     //   - unit=Printemps for group-based filters like index 493
     //   - series containing common group keywords
     let stage0_card = if card_id >= 0 {
-        db.get_card(card_id).and_then(|c| {
-            let _series = &c.series;
-            db.cards.iter().find(|(id, other)| {
-                **id != card_id && other.is_member() && other.cost.map_or(false, |c| c <= 2)
-                    && other.unit.as_deref() == Some("Printemps")
-            }).map(|(id, _)| *id)
-        }).or_else(|| {
-            db.cards.iter().find(|(_, c)| {
-                c.is_member() && c.cost.map_or(false, |cost| cost <= 2)
-            }).map(|(id, _)| *id)
-        }).unwrap_or(filler)
-    } else { filler };
+        db.get_card(card_id)
+            .and_then(|c| {
+                let _series = &c.series;
+                db.cards
+                    .iter()
+                    .find(|(id, other)| {
+                        **id != card_id
+                            && other.is_member()
+                            && other.cost.map_or(false, |c| c <= 2)
+                            && other.unit.as_deref() == Some("Printemps")
+                    })
+                    .map(|(id, _)| *id)
+            })
+            .or_else(|| {
+                db.cards
+                    .iter()
+                    .find(|(_, c)| c.is_member() && c.cost.map_or(false, |cost| cost <= 2))
+                    .map(|(id, _)| *id)
+            })
+            .unwrap_or(filler)
+    } else {
+        filler
+    };
 
     // Find a same-series member for exclude_self scenarios (indices 61, 62)
     let _same_series_member = if card_id >= 0 {
-        db.get_card(card_id).and_then(|c| {
-            let _series = &c.series;
-            db.cards.iter().find(|(id, other)| {
-                **id != card_id && other.is_member() && &other.series == _series
-            }).map(|(id, _)| *id)
-        }).unwrap_or(filler)
-    } else { filler };
+        db.get_card(card_id)
+            .and_then(|c| {
+                let _series = &c.series;
+                db.cards
+                    .iter()
+                    .find(|(id, other)| {
+                        **id != card_id && other.is_member() && &other.series == _series
+                    })
+                    .map(|(id, _)| *id)
+            })
+            .unwrap_or(filler)
+    } else {
+        filler
+    };
 
     // Populate both players' stages for change_state/targeting abilities
     state.player1.stage.stage[0] = stage0_card;
@@ -209,7 +233,7 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
 
     // Set phase
     if scenario.setup.live_phase {
-        state.current_phase = Phase::LiveCardSetP1Turn;
+        state.current_phase = Phase::LiveCardSetFirstAttacker;
         state.current_turn_phase = TurnPhase::Live;
     } else {
         state.current_phase = Phase::Main;
@@ -269,11 +293,11 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
     }
 
     // Resolve the ability
-    let mut resolver = AbilityResolver::new(&mut state);
-    match resolver.resolve_ability(&ability, Some(card_id), 0) {
+    let mut resolver = AbilityResolver::new(state.card_database.clone(), state.activating_card);
+    match resolver.resolve_ability(&mut state, &ability, Some(card_id), 0) {
         Ok(()) => {
             result.status = "ok".into();
-            result.pending_choice = state.pending_choice.is_some();
+            result.pending_choice = state.has_pending_choice();
             result.hand_size_after = state.player1.hand.cards.len();
             result.discard_size_after = state.player1.waitroom.cards.len();
             result.energy_count_after = state.player1.energy_zone.cards.len();
@@ -289,13 +313,16 @@ fn run_scenario(db: &Arc<CardDatabase>, scenario: &Scenario) -> TestResult {
 
 fn main() {
     let scenarios_path = Path::new("../cards/scenarios.json");
-    let data = std::fs::read_to_string(scenarios_path)
-        .expect("Failed to read scenarios.json");
-    let scenarios: Vec<Scenario> = serde_json::from_str(&data)
-        .expect("Failed to parse scenarios.json");
+    let data = std::fs::read_to_string(scenarios_path).expect("Failed to read scenarios.json");
+    let scenarios: Vec<Scenario> =
+        serde_json::from_str(&data).expect("Failed to parse scenarios.json");
 
     let db = load_db();
-    eprintln!("Loaded {} cards, testing {} scenarios", db.cards.len(), scenarios.len());
+    eprintln!(
+        "Loaded {} cards, testing {} scenarios",
+        db.cards.len(),
+        scenarios.len()
+    );
 
     let mut results = Vec::new();
     for s in &scenarios {
@@ -314,4 +341,3 @@ fn main() {
     eprintln!("Results written to test_results.json");
     println!("{}", output_str);
 }
-

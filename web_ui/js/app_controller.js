@@ -10,6 +10,7 @@ import { DOMUtils } from './utils/DOMUtils.js';
 import { ModalManager } from './utils/ModalManager.js';
 import { DebugModal } from './modals/DebugModal.js';
 import { LogViewerModal } from './modals/LogViewerModal.js';
+import { LogDetailModal } from './modals/LogDetailModal.js';
 import { DOM_IDS, COLORS, DISPLAY_VALUES } from './constants_dom.js';
 
 const POLL_DELAYS = {
@@ -140,42 +141,39 @@ const actionHandlers = {
     'close-debug-modal': DebugModal.closeDebugModal,
     'show-performance-turn': ({ value }) => Modals.showPerformanceForTurn(Number(value)),
     'close-discard-modal': () => ModalManager.hide(DOM_IDS.MODAL_DISCARD),
+    'close-log-detail-modal': LogDetailModal.close,
     'reload-page': () => window.location.reload(),
     'cheat-add-energy': ({ player }) => {
-        const amount = parseInt(document.getElementById('cheat-energy-amount')?.value || '1', 10);
-        const code = `
-            let player_idx = ${player};
-            let amount = ${amount};
-            if let Some(game) = &mut window.game {
-                if let Some(player) = game.players.get_mut(player_idx) {
-                    for _ in 0..amount {
-                        let _ = player.draw_energy();
-                    }
-                }
-            }
-        `;
-        window.Actions.execCode(code);
+        const amount = document.getElementById('cheat-energy-amount')?.value || '1';
+        window.Actions.execCode(`player_idx=${player}; amount=${amount}; draw_energy`);
     },
     'cheat-add-card': ({ player }) => {
         const cardId = document.getElementById('cheat-card-id')?.value || '';
-        if (!cardId) {
-            alert('Please enter a card ID');
-            return;
-        }
-        // Escape the card ID for Rust string literal
-        const escapedCardId = cardId.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        const code = `
-            let player_idx = ${player};
-            let card_no = "${escapedCardId}";
-            if let Some(game) = &mut window.game {
-                if let Some(card) = game.card_database.get_card_by_no(card_no) {
-                    if let Some(player) = game.players.get_mut(player_idx) {
-                        player.hand.add_card(card.id);
-                    }
-                }
-            }
-        `;
-        window.Actions.execCode(code);
+        if (!cardId) { alert('Enter a card ID'); return; }
+        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; add_card`);
+    },
+    'cheat-draw-card': ({ player }) => {
+        const amount = document.getElementById('cheat-draw-amount')?.value || '1';
+        window.Actions.execCode(`player_idx=${player}; amount=${amount}; draw_card`);
+    },
+    'cheat-clear-hand': ({ player }) => {
+        window.Actions.execCode(`player_idx=${player}; clear_hand`);
+    },
+    'cheat-add-stage': ({ player }) => {
+        const cardId = document.getElementById('cheat-stage-id')?.value || '';
+        if (!cardId) { alert('Enter a card ID'); return; }
+        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; add_stage`);
+    },
+    'cheat-add-live': ({ player }) => {
+        const cardId = document.getElementById('cheat-live-id')?.value || '';
+        if (!cardId) { alert('Enter a card ID'); return; }
+        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; add_live_to_zone`);
+    },
+    'cheat-force-win': () => {
+        window.Actions.execCode(`force_win`);
+    },
+    'cheat-reshuffle': ({ player }) => {
+        window.Actions.execCode(`player_idx=${player}; reshuffle_deck`);
     },
 };
 
@@ -235,6 +233,21 @@ export const AppController = {
             isTabActive = !document.hidden;
         });
 
+        // Custom events for log entry clicks
+        document.addEventListener('opencode:show-performance', (e) => {
+            import('./modals/PerformanceModal.js').then(mod => {
+                const { turn } = e.detail;
+                if (turn > 0 && State.performanceHistory && State.performanceHistory[turn]) {
+                    mod.PerformanceModal.showPerformanceForTurn(turn);
+                } else {
+                    mod.PerformanceModal.showLastPerformance();
+                }
+            });
+        });
+        document.addEventListener('opencode:show-log-detail', (e) => {
+            LogDetailModal.open(e.detail.entryType, e.detail.body, e.detail.groupId);
+        });
+
         window.onRoomUpdate = () => { syncRoomDisplay(); Network.triggerRoomUpdate(); };
         Network.onOpenDeckModal = (playerIdx) => {
             if (playerIdx === State.perspectivePlayer) Modals.openDeckModal();
@@ -248,6 +261,7 @@ export const AppController = {
             Modals.openLobby();
         }
         DragDrop.init();
+        LogDetailModal.init();
 
         if (!healthCheckInterval) {
             healthCheckInterval = window.setInterval(() => {

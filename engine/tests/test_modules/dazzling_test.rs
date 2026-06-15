@@ -21,10 +21,8 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
     let filler = game.id("PL!-sd1-010-SD");
     // Liella! member (澁谷かのん) — one of the 3 named
     let kanon = game.id("PL!SP-pb1-001-R"); // 澁谷かのん, Liella!
-                                            // Another Liella! member (ウィーン or similar)
-                                            // PL!SP-bp2-010-R+ ウィーン・マルガレーテ — different set
-                                            // Use a generic Liella! member
-    let liella = game.id("PL!SP-sd1-001-SD"); // Liella! starter member
+                                            // Another Liella! member — use 唐 可可 (different name from Kanon)
+    let liella = game.id("PL!SP-sd1-002-SD"); // 唐 可可, Liella!
 
     game.state.player1.main_deck.cards.clear();
     for _ in 0..40 {
@@ -69,12 +67,15 @@ fn dazzling_q187_exclude_selected_liella_other_pickable() {
         game.state.mods.blade_modifiers.get(&kanon),
         game.state.mods.blade_modifiers.get(&liella)
     );
-    // Both should have blade if the sequence completed
-    assert_eq!(
-        game.state
-            .mods
-            .get_blade_modifier(game.state.player1.stage.stage[1]),
-        0,
-        "selected card did not gain blade (stage select not yet implemented)"
+    // Both selected members should have blade
+    let kanon_blade = game.state.mods.get_blade_modifier(kanon);
+    let liella_blade = game.state.mods.get_blade_modifier(liella);
+    assert!(
+        kanon_blade > 0,
+        "Kanon should gain blade from Dazzling Game"
+    );
+    assert!(
+        liella_blade > 0,
+        "Liella should gain blade from Dazzling Game"
     );
 }

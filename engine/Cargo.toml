@@ -15,6 +15,10 @@ debug = 0
 incremental = true
 codegen-units = 16
 
+[lib]
+test = false
+doctest = false
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -36,13 +40,36 @@ name = "performance"
 harness = false
 
 [[bin]]
+name = "rabuka_engine"
+path = "src/main.rs"
+test = false
+
+[[bin]]
 name = "run_qa_tests"
 path = "src/run_qa_tests.rs"
+test = false
 
 [[bin]]
 name = "test_failing"
 path = "src/bin/test_failing.rs"
+test = false
 
-# [[bin]]
-# name = "analyze_common_voters"
-# path = "src/bin/analyze_common_voters.rs"
+[[bin]]
+name = "check_abilities"
+path = "src/bin/check_abilities.rs"
+test = false
+
+[[bin]]
+name = "test_all_abilities"
+path = "src/bin/test_all_abilities.rs"
+test = false
+
+[[bin]]
+name = "verify_abilities"
+path = "src/bin/verify_abilities.rs"
+test = false
+
+[[bin]]
+name = "dump_coverage"
+path = "src/bin/dump_coverage.rs"
+test = false

@@ -1,4 +1,3 @@
-use crate::ability::types::ExecutionContext;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::game_state::Phase;
@@ -12,22 +11,22 @@ impl super::TurnEngine {
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
-        if game_state.pending_choice.is_some() {
+        if game_state.has_pending_choice() {
             return Self::resume_with_choice(game_state, card_id, card_indices);
         }
 
         match action {
             crate::game_setup::ActionType::Pass => match game_state.current_phase {
-                Phase::LiveCardSetP1Turn => {
+                Phase::LiveCardSetFirstAttacker => {
                     let player = game_state.active_player_mut();
                     let cards_placed = player.live_card_zone.cards.len();
                     for _ in 0..cards_placed {
                         let _ = player.draw_card();
                     }
-                    game_state.current_phase = Phase::LiveCardSetP2Turn;
+                    game_state.current_phase = Phase::LiveCardSetSecondAttacker;
                     Ok(())
                 }
-                Phase::LiveCardSetP2Turn => {
+                Phase::LiveCardSetSecondAttacker => {
                     let player = game_state.active_player_mut();
                     let cards_placed = player.live_card_zone.cards.len();
                     for _ in 0..cards_placed {
@@ -64,7 +63,7 @@ impl super::TurnEngine {
                     game_state.player1.draw_card();
                     game_state.player2.draw_card();
                 }
-                game_state.current_phase = Phase::MulliganP1Turn;
+                game_state.current_phase = Phase::MulliganFirstAttacker;
                 game_state.mulligan_selected_indices.clear();
                 Ok(())
             }
@@ -75,7 +74,7 @@ impl super::TurnEngine {
                     game_state.player1.draw_card();
                     game_state.player2.draw_card();
                 }
-                game_state.current_phase = Phase::MulliganP1Turn;
+                game_state.current_phase = Phase::MulliganFirstAttacker;
                 game_state.mulligan_selected_indices.clear();
                 Ok(())
             }
@@ -86,9 +85,13 @@ impl super::TurnEngine {
                 Self::handle_mulligan_confirmation(game_state)
             }
             crate::game_setup::ActionType::SkipMulligan => Self::handle_mulligan_skip(game_state),
-            crate::game_setup::ActionType::PlayMemberToStage => {
-                Self::handle_play_member_to_stage(game_state, card_id, stage_area, use_baton_touch)
-            }
+            crate::game_setup::ActionType::PlayMemberToStage => Self::handle_play_member_to_stage(
+                game_state,
+                card_id,
+                card_indices.clone(),
+                stage_area,
+                use_baton_touch,
+            ),
             crate::game_setup::ActionType::SetLiveCard => {
                 Self::handle_set_live_card(game_state, card_id)
             }
@@ -174,12 +177,22 @@ impl super::TurnEngine {
             }
         }
         let player_id = game_state.active_player().id.clone();
-        for (_, ability) in card.abilities.iter().enumerate() {
+        for (idx, ability) in card.abilities.iter().enumerate() {
             if ability
                 .triggers
                 .as_ref()
                 .map_or(false, |t| t == crate::triggers::ACTIVATION)
             {
+                // Check use_limit before queuing the ability
+                if let Some(use_limit) = ability.use_limit {
+                    let key = format!("{}_{}_{}", card_id, idx, game_state.turn_number);
+                    if game_state.turn_limited_abilities_used.contains(&key) {
+                        return Err(format!(
+                            "Ability already used this turn (use_limit: {})",
+                            use_limit
+                        ));
+                    }
+                }
                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                 game_state.trigger_auto_ability(
                     ability_id,
@@ -204,7 +217,34 @@ impl super::TurnEngine {
             .is_waiting_for_choice()
             .cloned()
             .ok_or("No pending choice to resume")?;
-        let result = Self::build_choice_result(&choice, card_id, card_indices)?;
+
+        let ci = card_indices.clone();
+        // Handle non-ability choices early (live success, etc.)
+        if matches!(
+            choice,
+            crate::ability::types::Choice::SelectLiveSuccess { .. }
+        ) {
+            let result = Self::build_choice_result(&choice, card_id, ci, None)?;
+            if let crate::ability::types::ChoiceResult::LiveSuccessSelected { card_index } = &result
+            {
+                let player_id = match &choice {
+                    crate::ability::types::Choice::SelectLiveSuccess { player_id, .. } => {
+                        player_id.clone()
+                    }
+                    _ => return Err("Wrong choice type".to_string()),
+                };
+                super::TurnEngine::handle_live_success_choice(game_state, *card_index, &player_id)?;
+                game_state.ability_queue.complete_current();
+                return Ok(());
+            }
+        }
+
+        let choice_card_no = game_state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_card_no.clone());
+        let result =
+            Self::build_choice_result(&choice, card_id, card_indices, choice_card_no.as_deref())?;
         Self::resume_queue_with_choice(game_state, choice, result)
     }
 
@@ -212,6 +252,7 @@ impl super::TurnEngine {
         choice: &crate::ability::types::Choice,
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
+        _choice_card_no: Option<&str>,
     ) -> Result<crate::ability::types::ChoiceResult, String> {
         match choice {
             crate::ability::types::Choice::SelectCard { .. } => {
@@ -222,7 +263,9 @@ impl super::TurnEngine {
                 });
                 Ok(crate::ability::types::ChoiceResult::CardSelected { indices })
             }
-            crate::ability::types::Choice::SelectTarget { target, .. } => {
+            crate::ability::types::Choice::SelectTarget {
+                target, options, ..
+            } => {
                 let selected = match target.as_str() {
                     "pay_optional_cost:skip_optional_cost" => {
                         if card_id == Some(1) {
@@ -241,11 +284,28 @@ impl super::TurnEngine {
                     "choice" | "choice_string" | "conditional_optional" => card_id
                         .map(|id| id.to_string())
                         .unwrap_or_else(|| "0".into()),
-                    _ => match card_id {
-                        Some(-1) => "skip".to_string(),
-                        Some(id) => id.to_string(),
-                        None => "0".into(),
-                    },
+                    _ => {
+                        // For position_change:opponent choices, use card_id as option index
+                        // to look up the actual option string instead of the raw index.
+                        if _choice_card_no == Some("position_change:opponent:front") {
+                            if let Some(ref opts) = options {
+                                if let Some(id) = card_id {
+                                    if id >= 0 && (id as usize) < opts.len() {
+                                        return Ok(
+                                            crate::ability::types::ChoiceResult::TargetSelected {
+                                                target: opts[id as usize].clone(),
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        match card_id {
+                            Some(-1) => "skip".to_string(),
+                            Some(id) => id.to_string(),
+                            None => "0".into(),
+                        }
+                    }
                 };
                 Ok(crate::ability::types::ChoiceResult::TargetSelected { target: selected })
             }
@@ -290,6 +350,26 @@ impl super::TurnEngine {
                     types: vec![chosen],
                 })
             }
+            crate::ability::types::Choice::SelectLiveSuccess { options, .. } => {
+                let idx = card_id.unwrap_or(0) as usize;
+                let card_index = if idx < options.len() {
+                    options[idx].card_index
+                } else {
+                    0
+                };
+                Ok(crate::ability::types::ChoiceResult::LiveSuccessSelected { card_index })
+            }
+            crate::ability::types::Choice::SelectAutoAbility { options, .. } => {
+                let idx = card_id.unwrap_or(0) as usize;
+                let queue_idx = if idx < options.len() {
+                    options[idx].queue_index
+                } else {
+                    0
+                };
+                Ok(crate::ability::types::ChoiceResult::AutoAbilitySelected {
+                    queue_index: queue_idx,
+                })
+            }
         }
     }
 
@@ -299,46 +379,34 @@ impl super::TurnEngine {
         result: crate::ability::types::ChoiceResult,
     ) -> Result<(), String> {
         game_state.ability_queue.resume_with_choice(result.clone());
-        let saved_ctx = game_state
-            .ability_queue
-            .current_entry()
-            .and_then(|e| e.execution_context.clone())
-            .unwrap_or(crate::ability::types::ExecutionContext::None);
-        // Capture whether pending sequential actions exist BEFORE choice resolution.
-        // True  = effect execution was paused mid-way (pending sequential actions saved).
-        // False = cost payment created the choice (effect hasn't started), or no sequential effect.
         let had_pending_sequential = game_state.ability_queue.has_pending_commands();
-        let (new_choice, looked_at, ctx, rev, res) = {
-            let mut resolver = crate::ability::resolver::AbilityResolver::new(game_state);
-            resolver.execution_context = saved_ctx.clone();
-            resolver.pending_choice = Some(choice);
-            let res = resolver.provide_choice_result(result);
-            let new_choice = resolver.get_pending_choice().cloned();
-            let looked_at = resolver.take_looked_at();
-            let ctx = resolver.execution_context.clone();
-            let rev = std::mem::take(&mut resolver.revealed_cost_cards);
-            (new_choice, looked_at, ctx, rev, res)
+
+        // Take the persistent resolver from the queue entry
+        let mut resolver = match game_state.ability_queue.take_resolver() {
+            Some(r) => r,
+            None => {
+                return Err("No resolver found on queue entry".to_string());
+            }
         };
-        game_state.looked_at_cards = looked_at;
-        game_state.revealed_cost_cards = rev;
+        resolver.pending_choice = Some(choice);
+        let res = resolver.provide_choice_result(game_state, result);
+
         if let Err(e) = res {
             game_state.ability_queue.complete_current();
-            game_state.pending_choice = None;
             return Err(e);
         }
-        if let Some(c) = new_choice {
-            eprintln!("[RWC] new_choice is Some, storing");
-            if let Some(e) = game_state.ability_queue.current_entry_mut() {
-                e.execution_context = Some(ctx);
-            }
-            let mut choice_json = c.to_frontend_json();
-            if let Some(ref mut j) = choice_json {
-                game_state.inject_choice_ability_context(j);
-            }
-            game_state.pending_choice = choice_json;
-            game_state.ability_queue.pause_for_choice(c);
+
+        if resolver.pending_choice.is_some() {
+            // Sub-choice created — store resolver back on entry and pause queue
+            // Sync resolver state to GameState before storing (handle_order_selection
+            // reads gs.looked_at_cards, not resolver.looked_at_cards).
+            game_state.looked_at_cards = resolver.looked_at_cards.clone();
+            let sub_choice = resolver.pending_choice.clone().unwrap();
+            resolver.store_pending_choice(game_state);
+            game_state.ability_queue.set_resolver(resolver);
+            game_state.ability_queue.pause_for_choice(sub_choice);
         } else {
-            eprintln!("[RWC] new_choice is None, starting else chain");
+            // No more choices — ability execution finished
             let cost_was_paid = game_state
                 .ability_queue
                 .current_entry()
@@ -347,36 +415,31 @@ impl super::TurnEngine {
                 .ability_queue
                 .current_entry()
                 .map_or(false, |e| e.effect_started);
-            eprintln!("[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}, saved_ctx={:?}",
-                cost_was_paid, effect_started, had_pending_sequential, saved_ctx);
-            game_state.pending_choice = None;
+            eprintln!(
+                "[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}",
+                cost_was_paid, effect_started, had_pending_sequential
+            );
             game_state.activating_card = None;
-            // Determine what to do based on ability state BEFORE any moves:
-            //   1. Optional cost was skipped → complete, recheck auto-triggers
-            //   2. Cost paid, effect not started → run the effect
-            //   3. Everything else → complete (effect done or stale state)
+
             let optional_skipped = game_state.ability_queue.current_entry().map_or(false, |e| {
                 e.cost_paid
                     && !e.optional_cost_was_paid
-                    && e.choice_card_no.as_deref() == Some("optional_sequential_cost")
+                    && e.choice_card_no.as_deref() == Some("optional_cost")
             });
-            let ctx_is_clear = saved_ctx == ExecutionContext::None || ctx == ExecutionContext::None;
-            if let Some(e) = game_state.ability_queue.current_entry_mut() {
-                e.execution_context = Some(ctx);
-            }
-            let effect_ready =
-                cost_was_paid && !had_pending_sequential && ctx_is_clear && !effect_started;
+            let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
 
             if optional_skipped {
                 game_state.ability_queue.complete_current();
+                game_state.clear_effect_tracking();
                 let player_id = game_state.active_player().id.clone();
                 game_state.process_pending_auto_abilities(&player_id);
             } else if effect_ready {
                 eprintln!("RWC: calling process_current_ability");
+                // Store resolver back on entry so process_current_ability can reuse it
+                // (the resolver carries cost-phase state like revealed_cost_cards).
+                game_state.ability_queue.set_resolver(resolver);
                 game_state.process_current_ability();
-                if game_state.pending_choice.is_some()
-                    || game_state.ability_queue.is_waiting_for_choice().is_some()
-                {
+                if game_state.has_pending_choice() {
                     let player_id = game_state
                         .ability_queue
                         .current_entry()
@@ -385,12 +448,35 @@ impl super::TurnEngine {
                     game_state.process_pending_auto_abilities(&player_id);
                 }
             } else if cost_was_paid {
-                // Effect done or post-finalization — complete and recheck triggers
+                // Record use_limit when ability completes (cost+effect both resolved)
+                if let Some(entry) = game_state.ability_queue.current_entry() {
+                    if let Some(cid) = entry.card_id {
+                        let turn = game_state.turn_number;
+                        for (idx, ab) in game_state
+                            .card_database
+                            .get_card(cid)
+                            .map(|c| &c.abilities)
+                            .into_iter()
+                            .flatten()
+                            .enumerate()
+                        {
+                            if ab.triggers.as_deref() == Some("起動") && ab.use_limit.is_some() {
+                                let key = format!("{}_{}_{}", cid, idx, turn);
+                                if !game_state.turn_limited_abilities_used.contains(&key) {
+                                    game_state.turn_limited_abilities_used.insert(key);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
                 game_state.ability_queue.complete_current();
+                game_state.clear_effect_tracking();
                 let player_id = game_state.active_player().id.clone();
                 game_state.process_pending_auto_abilities(&player_id);
             } else {
                 game_state.ability_queue.complete_current();
+                game_state.clear_effect_tracking();
                 let player_id = game_state.active_player().id.clone();
                 game_state.process_pending_auto_abilities(&player_id);
             }
@@ -415,9 +501,18 @@ impl super::TurnEngine {
             game_state.player2.main_deck.cards.append(&mut waitroom);
             game_state.player2.main_deck.shuffle();
         }
+        // Rule 10.4: Duplicate member processing
+        Self::check_duplicate_members(&mut game_state.player1, &game_state.card_database);
+        Self::check_duplicate_members(&mut game_state.player2, &game_state.card_database);
         Self::check_victory_condition(game_state);
-        Self::check_invalid_cards(&mut game_state.player1, &game_state.card_database);
-        Self::check_invalid_cards(&mut game_state.player2, &game_state.card_database);
+        // Rule 10.5: Invalid card processing
+        Self::check_invalid_live_cards(&mut game_state.player1, &game_state.card_database);
+        Self::check_invalid_live_cards(&mut game_state.player2, &game_state.card_database);
+        Self::check_invalid_energy_cards(&mut game_state.player1, &game_state.card_database);
+        Self::check_invalid_energy_cards(&mut game_state.player2, &game_state.card_database);
+        // Rule 10.5.3-4: Orphaned under-member cards
+        Self::check_orphaned_under_cards(&mut game_state.player1, &game_state.card_database);
+        Self::check_orphaned_under_cards(&mut game_state.player2, &game_state.card_database);
         Self::check_invalid_resolution_zone(game_state);
         if game_state.check_permanent_loop() {
             game_state.game_result = crate::game_state::GameResult::Draw;
@@ -461,7 +556,21 @@ impl super::TurnEngine {
         }
     }
 
-    fn check_invalid_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
+    /// Rule 10.4: Duplicate member processing.
+    /// If the stage area itself somehow has more than one top-level member,
+    /// keep only the most recent one. This is a safety check — under-card members
+    /// are intentional and not duplicates (they follow rule 4.5.5).
+    fn check_duplicate_members(player: &mut crate::player::Player, _card_db: &CardDatabase) {
+        // The stage array is already enforced to have 1 card per slot by the engine.
+        // Under-cards (4.5.5) are intentional stacking and NOT duplicates.
+        // This function is kept as a safety check but currently does nothing
+        // beyond what the stage enforces.
+        let _ = player;
+    }
+
+    /// Rule 10.5.1: Non-live cards in live card zone → moved to discard.
+    /// Also Rule 10.5.2: Non-energy cards in energy zone → moved to discard.
+    fn check_invalid_live_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
         let mut invalid_indices = Vec::new();
         for (i, card_id) in player.live_card_zone.cards.iter().enumerate() {
             if !card_db.get_card(*card_id).map_or(false, |c| c.is_live()) {
@@ -471,7 +580,47 @@ impl super::TurnEngine {
         for &i in invalid_indices.iter().rev() {
             if i < player.live_card_zone.cards.len() {
                 let card_id = player.live_card_zone.cards.remove(i);
+                // Rule 10.5.5: Energy cards go to energy deck, not discard
+                if card_db.get_card(card_id).map_or(false, |c| c.is_energy()) {
+                    player.energy_deck.cards.push(card_id);
+                } else {
+                    player.waitroom.add_card(card_id);
+                }
+            }
+        }
+    }
+
+    /// Rule 10.5.2: Non-energy cards in energy zone → moved to discard.
+    fn check_invalid_energy_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
+        let mut invalid_indices = Vec::new();
+        for (i, card_id) in player.energy_zone.cards.iter().enumerate() {
+            if !card_db.get_card(*card_id).map_or(false, |c| c.is_energy()) {
+                invalid_indices.push(i);
+            }
+        }
+        for &i in invalid_indices.iter().rev() {
+            if i < player.energy_zone.cards.len() {
+                let card_id = player.energy_zone.cards.remove(i);
                 player.waitroom.add_card(card_id);
+            }
+        }
+    }
+
+    /// Rule 10.5.3-4: Orphaned cards under members.
+    /// When a member leaves its area, any member cards under it go to discard (10.5.3)
+    /// and any energy cards under it go to energy deck (10.5.4).
+    fn check_orphaned_under_cards(player: &mut crate::player::Player, card_db: &CardDatabase) {
+        for area_idx in 0..3 {
+            let top = player.stage.stage[area_idx];
+            if top == -1 {
+                let under = std::mem::take(&mut player.stage.under_cards[area_idx]);
+                for cid in under {
+                    if card_db.get_card(cid).map_or(false, |c| c.is_energy()) {
+                        player.energy_deck.cards.push(cid);
+                    } else {
+                        player.waitroom.cards.push(cid);
+                    }
+                }
             }
         }
     }

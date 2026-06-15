@@ -518,8 +518,8 @@ export const CardRenderer = {
                     slotDiv.appendChild(img);
                 }
 
-                Tooltips.attachCardData(area, slot, isValid ? action : undefined);
-                Tooltips.attachCardData(slotDiv, slot, isValid ? action : undefined);
+                Tooltips.attachCardData(area, slot, isValid ? action.index : undefined);
+                Tooltips.attachCardData(slotDiv, slot, isValid ? action.index : undefined);
                 if (isValid) {
                     area.setAttribute('data-action-id', action.index);
                     slotDiv.setAttribute('data-action-id', action.index);
@@ -722,7 +722,9 @@ export const CardRenderer = {
         const content = DOMUtils.getElement(DOM_IDS.LOOKED_CARDS_CONTENT);
         if (!panel || !content) return;
 
-        const pendingSelectionCards = state.pending_choice?.selection_cards || [];
+        // Selection cards are handled by ChoiceView in the action area — skip them here
+        const hasChoice = state.pending_choice?.zone || state.pending_choice?.selection_cards?.length > 0;
+        const pendingSelectionCards = hasChoice ? [] : (state.pending_choice?.selection_cards || []);
         const cards = overrideCards || (pendingSelectionCards.length > 0 ? pendingSelectionCards : (state.looked_cards || []));
         if (cards.length === 0) {
             DOMUtils.setVisible(DOM_IDS.LOOKED_CARDS_PANEL, false);
@@ -763,7 +765,15 @@ export const CardRenderer = {
                 return;
             }
 
-            const action = validActionMap[idx];
+            // Match by card_id against legal_actions, not by array index
+            let action = validActionMap[idx];
+            if (!action && state.legal_actions) {
+                const cardId = c.id !== undefined ? c.id : c.card_id;
+                action = state.legal_actions.find(a => {
+                    const params = a.parameters || {};
+                    return params.card_id === cardId || params.card_id === c.card_id;
+                });
+            }
             const isClickable = (action !== undefined && action !== null);
 
             const viewModel = CardRenderer.getCardViewModel(c, {

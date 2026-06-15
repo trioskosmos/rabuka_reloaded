@@ -35,13 +35,7 @@ export const ActionMenu = {
             return;
         }
 
-        // 2. Pending Choice — let ActionListView render choice actions from legal_actions
-        // Legacy ChoiceView only handles WASM-style choices (opcode/options),
-        // the Rust backend uses legal_actions with action_type instead.
-        if (state.pending_choice && state.legal_actions && state.legal_actions.length > 0) {
-            ActionListView.render(state, perspectivePlayer, actionsDiv);
-            return;
-        }
+        // 2. Pending Choice — always render via ChoiceView (handles options, selection_cards, legal_actions)
         if (state.pending_choice) {
             ChoiceView.render(state, actionsDiv);
             return;

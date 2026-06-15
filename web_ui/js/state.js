@@ -132,8 +132,26 @@ const stateInternal = {
         const isMulliganOld = isMulliganPhase(State.lastPhase);
         const isMulliganNew = isMulliganPhase(newData.phase);
 
+        // Clear local selection on any phase change (including between mulligan players)
         if (State.lastPhase !== newData.phase) {
             State.localMulliganSelection.clear();
+        }
+
+        // During mulligan, keep local selection in sync with server
+        if (isMulliganOld || isMulliganNew) {
+            const pNew = State.perspectivePlayer === 0 ? newData.player1 : newData.player2;
+            if (pNew && pNew.mulligan_selection) {
+                State.localMulliganSelection.clear();
+                const sel = pNew.mulligan_selection;
+                if (Array.isArray(sel)) {
+                    sel.forEach(i => State.localMulliganSelection.add(i));
+                } else if (typeof sel === 'number') {
+                    const handCards = pNew.hand.cards;
+                    for (let i = 0; i < handCards.length; i++) {
+                        if ((sel >> i) & 1) State.localMulliganSelection.add(i);
+                    }
+                }
+            }
         }
 
         if (isMulliganOld && !isMulliganNew && State.lastMulliganCards.length > 0) {
@@ -439,7 +457,7 @@ const stateInternal = {
                 'my_player_id',
                 'needs_deck',
                 'spectators',
-                'triggered_abilities', 'opponent_triggered_abilities',
+
                 'game_over',
                 'queue_depth',
                 'ui_config'

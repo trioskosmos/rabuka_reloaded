@@ -1,43 +1,4 @@
 impl GameState {
-    pub fn can_play_turn1_ability(&self, ability_id: &str) -> bool {
-        !self.turn1_abilities_played.contains(ability_id)
-    }
-
-    pub fn can_play_turn2_ability(&self, ability_id: &str) -> bool {
-        let count = self.turn2_abilities_played.get(ability_id).unwrap_or(&0);
-        *count < 2
-    }
-
-    pub fn record_turn1_ability(&mut self, ability_id: String) {
-        self.turn1_abilities_played.insert(ability_id);
-    }
-
-    pub fn record_turn2_ability(&mut self, ability_id: String) {
-        *self.turn2_abilities_played.entry(ability_id).or_insert(0) += 1;
-    }
-
-    pub fn can_activate_area_ability(
-        &self,
-        player_id: &str,
-        card_no: &str,
-        area: crate::zones::MemberArea,
-    ) -> bool {
-        let player = if player_id == self.player1.id {
-            &self.player1
-        } else {
-            &self.player2
-        };
-        if let Some(card_in_zone) = player.stage.get_area(area) {
-            if let Some(card) = self.card_database.get_card(card_in_zone) {
-                card.card_no == card_no
-            } else {
-                false
-            }
-        } else {
-            false
-        }
-    }
-
     pub fn reset_keyword_tracking(&mut self) {
         self.turn1_abilities_played.clear();
         self.turn2_abilities_played.clear();

@@ -4,6 +4,7 @@
 ///   gain heart02 x2 until live end.
 /// ab#1 (LiveSuccess): If surplus heart >= 1, draw 2, then discard 1 from hand.
 use crate::helpers::*;
+use rabuka_engine::ability::condition::ConditionContext;
 use rabuka_engine::ability::resolver::AbilityResolver;
 fn advance_to_live_set(game: &mut TestGame) {
     for _ in 0..5 {
@@ -250,9 +251,9 @@ fn landing_action_yeah_surplus_heart_ge_3_true() {
     game.state.player1.stage.stage = [provider, provider, provider];
     game.state.player1.live_card_zone.cards.push(live);
 
-    let resolver = AbilityResolver::new(&mut game.state);
+    let ctx = ConditionContext::new(&game.state);
     assert!(
-        resolver.evaluate_condition(&condition),
+        ctx.evaluate_condition(&condition),
         "surplus heart >= 3 should evaluate to true"
     );
 }
@@ -269,9 +270,9 @@ fn landing_action_yeah_surplus_heart_below_3_false() {
     game.state.player1.stage.stage = [provider, -1, -1];
     game.state.player1.live_card_zone.cards.push(live);
 
-    let resolver = AbilityResolver::new(&mut game.state);
+    let ctx = ConditionContext::new(&game.state);
     assert!(
-        !resolver.evaluate_condition(&condition),
+        !ctx.evaluate_condition(&condition),
         "surplus heart below 3 should evaluate to false"
     );
 }
@@ -289,9 +290,10 @@ fn landing_action_yeah_surplus_heart_applies_score_bonus() {
     game.state.player1.live_card_zone.cards.push(live);
     game.state.activating_card = Some(live);
 
-    let mut resolver = AbilityResolver::new(&mut game.state);
+    let mut resolver =
+        AbilityResolver::new(game.state.card_database.clone(), game.state.activating_card);
     resolver
-        .execute_effect(&effect)
+        .execute_effect(&mut game.state, &effect)
         .expect("surplus-heart effect should execute cleanly");
 
     assert_eq!(

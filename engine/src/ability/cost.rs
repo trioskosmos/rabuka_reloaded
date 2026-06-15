@@ -3,14 +3,58 @@ use super::resolver::AbilityResolver;
 use super::types::Choice;
 use super::util;
 use crate::card::{AbilityCost, AbilityEffect};
+use crate::game_state::GameState;
 
-impl<'a> AbilityResolver<'a> {
-    pub fn validate_cost(&self, cost: &AbilityCost) -> Result<(), String> {
+fn get_change_state_candidates(
+    gs: &GameState,
+    target: &str,
+    card_type: Option<&str>,
+    group_names: Option<&Vec<String>>,
+    exclude_self: bool,
+    self_cost: bool,
+    check_name: bool,
+) -> Vec<i16> {
+    let player = gs.resolve_target_player(target);
+    let card_db = &gs.card_database;
+    let activating_id = gs.activating_card;
+
+    player
+        .stage
+        .stage
+        .iter()
+        .filter(|&&id| id != -1)
+        .copied()
+        .filter(|&id| {
+            if self_cost {
+                activating_id == Some(id)
+            } else {
+                !(exclude_self && activating_id == Some(id))
+            }
+        })
+        .filter(|&id| util::card_matches_type(card_db, id, card_type))
+        .filter(|&id| match group_names {
+            Some(gn) => {
+                let group_ok = gn
+                    .iter()
+                    .any(|g| util::card_matches_group_str(card_db, id, Some(g.as_str())));
+                if check_name {
+                    group_ok || util::card_matches_characters(card_db, id, Some(gn))
+                } else {
+                    group_ok
+                }
+            }
+            None => true,
+        })
+        .collect()
+}
+
+impl AbilityResolver {
+    pub fn validate_cost(&self, gs: &mut GameState, cost: &AbilityCost) -> Result<(), String> {
         match cost.cost_type.as_deref() {
             Some("sequential_cost") => {
                 if let Some(ref costs) = cost.costs {
                     for sub_cost in costs {
-                        self.validate_cost(sub_cost)?;
+                        self.validate_cost(gs, sub_cost)?;
                     }
                 }
                 Ok(())
@@ -19,14 +63,12 @@ impl<'a> AbilityResolver<'a> {
             Some("move_cards") => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let source = cost.source.as_deref().unwrap_or("");
-                let player = self.game_state.active_player();
-                let available = match source {
-                    "hand" => player.hand.cards.len(),
-                    "stage" => player.stage.stage.iter().filter(|&&id| id != -1).count(),
-                    "waitroom" => player.waitroom.cards.len(),
-                    "energy_zone" => player.energy_zone.cards.len(),
-                    _ => return Ok(()),
-                };
+                let target_str = cost.target.as_deref().unwrap_or("self");
+                let player = gs.resolve_target_player(target_str);
+                if !["hand", "stage", "waitroom", "energy_zone"].contains(&source) {
+                    return Ok(());
+                }
+                let available = util::get_zone_card_count(player, source);
                 if available < count {
                     return Err(format!(
                         "Not enough cards in {}: need {}, have {}",
@@ -37,7 +79,7 @@ impl<'a> AbilityResolver<'a> {
             }
             Some("energy_condition") => {
                 let count = cost.count.unwrap_or(1) as usize;
-                let player = self.game_state.active_player();
+                let player = gs.active_player();
                 if player.energy_zone.cards.len() < count {
                     return Err(format!(
                         "Not enough energy cards: need {}, have {}",
@@ -51,25 +93,24 @@ impl<'a> AbilityResolver<'a> {
         }
     }
 
-    fn pay_cost_inner(&mut self, cost: &AbilityCost) -> Result<(), String> {
+    fn pay_cost_inner(&mut self, gs: &mut GameState, cost: &AbilityCost) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         dbg.cost_pay(cost, true);
         match cost.cost_type.as_deref() {
             Some("sequential_cost") => {
                 if let Some(ref costs) = cost.costs {
-                    let start_idx = self
-                        .game_state
+                    let start_idx = gs
                         .ability_queue
                         .current_entry()
                         .map_or(0, |e| e.cost_paid_index);
                     for i in start_idx..costs.len() {
-                        if let Err(e) = self.validate_cost(&costs[i]) {
+                        if let Err(e) = self.validate_cost(gs, &costs[i]) {
                             return Err(format!("Cannot pay sequential cost: {}", e));
                         }
                     }
                     for i in start_idx..costs.len() {
-                        self.pay_cost(&costs[i])?;
-                        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                        self.pay_cost(gs, &costs[i])?;
+                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
                             entry.cost_paid_index = i + 1;
                         }
                         if self.pending_choice.is_some() {
@@ -91,13 +132,15 @@ impl<'a> AbilityResolver<'a> {
                     allow_skip: false,
                     options: None,
                 });
-                if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some("choice_cost".to_string());
                 }
                 Ok(())
             }
             Some("move_cards") => {
                 let source = cost.source.as_deref().unwrap_or("");
+                // None means "any number" (player chooses 0..N)
+                let is_any_number = cost.count.is_none();
                 let count = cost.count.unwrap_or(1) as usize;
                 let card_type = cost.card_type.clone();
                 let optional = cost.optional.unwrap_or(false);
@@ -112,8 +155,8 @@ impl<'a> AbilityResolver<'a> {
                 let is_from_hand = source == "hand" && !same_unit;
                 if is_from_hand {
                     let target_str = cost.target.as_deref().unwrap_or("self");
-                    let pl = self.game_state.resolve_target_player(target_str);
-                    let card_db = &self.game_state.card_database;
+                    let pl = gs.resolve_target_player(target_str);
+                    let card_db = &gs.card_database;
                     let cost_limit = cost.cost_limit;
                     let card_type_filter = card_type.as_deref();
                     let filter = util::filter_from_parts(
@@ -133,36 +176,80 @@ impl<'a> AbilityResolver<'a> {
                         .filter(|(_, &cid)| filter.matches(card_db, cid, false))
                         .map(|(i, _)| i)
                         .collect();
-                    let is_optional = optional && !is_activation;
+                    let is_optional = (optional || is_any_number) && !is_activation;
+                    let match_names: Vec<String> = matching_indices
+                        .iter()
+                        .filter_map(|&i| {
+                            if i < pl.hand.cards.len() {
+                                card_db.get_card(pl.hand.cards[i]).map(|c| c.name.clone())
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    // For "any number" costs, the effective max is all matching cards
+                    let effective_count = if is_any_number {
+                        matching_indices.len().max(1)
+                    } else {
+                        count
+                    };
+                    eprintln!(
+                        "▶ cost(move_cards, {}=>discard, effective_count={}, any_number={}, optional={})",
+                        source, effective_count, is_any_number, is_optional
+                    );
+                    eprintln!(
+                        "  ├─ hand[{}] → {} match{}: [{}]",
+                        pl.hand.cards.len(),
+                        matching_indices.len(),
+                        if matching_indices.len() == 1 {
+                            ""
+                        } else {
+                            "es"
+                        },
+                        match_names.join(", ")
+                    );
 
-                    if !is_optional
-                        && matching_indices.len() >= count as usize
-                        && matching_indices.len() <= count as usize
-                    {
-                        // Non-optional exact match: auto-select (fall through to old behavior)
-                    } else if is_optional && matching_indices.is_empty() {
-                        // Optional cost with no matching cards: skip silently
+                    if is_optional && matching_indices.is_empty() {
+                        eprintln!("  └─ skip (optional/any_number, no eligible cards in hand)");
                         return Ok(());
                     } else if !matching_indices.is_empty() {
-                        // Choice needed: multiple matches, or optional with some cards
+                        let desc = if is_any_number {
+                            format!(
+                                "Select any number of card(s) from hand (0-{}) (or skip)",
+                                matching_indices.len()
+                            )
+                        } else {
+                            format!(
+                                "Select {} card(s) from hand{}",
+                                effective_count,
+                                if is_optional { " (or skip)" } else { "" }
+                            )
+                        };
+                        eprintln!("  └─ choice created (allow_skip={})", is_optional);
+                        if optional {
+                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                entry.choice_card_no = Some("optional_cost".to_string());
+                            }
+                        }
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 source.to_string(),
-                                count,
-                                format!(
-                                    "Select {} card(s) from hand{}",
-                                    count,
-                                    if is_optional { " (or skip)" } else { "" }
-                                ),
+                                effective_count,
+                                desc,
                                 is_optional,
                             )
                             .card_type(card_type.clone())
                             .cost_limit(cost.cost_limit, cost.cost_limit_operator.clone())
                             .group(cost.group_names.clone().map(|v| v.join(",")))
                             .characters(cost.characters.clone())
+                            .target_player_id(Some(
+                                cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                            ))
                             .build(),
                         );
                         return Ok(());
+                    } else if !is_optional {
+                        // Non-optional, no matches — fall through to error
                     }
                 }
                 if !source.is_empty() {
@@ -170,8 +257,8 @@ impl<'a> AbilityResolver<'a> {
                     let cost_limit = cost.cost_limit;
                     let card_type_filter = card_type.as_deref();
 
-                    let player = &*self.game_state.resolve_target_player(target);
-                    let card_db = &self.game_state.card_database;
+                    let player = &*gs.resolve_target_player(target);
+                    let card_db = &gs.card_database;
                     let filter = util::filter_from_parts(
                         card_type_filter,
                         None,
@@ -209,12 +296,13 @@ impl<'a> AbilityResolver<'a> {
                                         false,
                                     )
                                     .card_type(cost.card_type.clone())
+                                    .target_player_id(Some(cost.target.clone().unwrap_or_else(|| "self".to_string())))
                                     .build());
                                     return Ok(());
                                 }
                                 // Exactly match count — auto-select
                                 for &cid in &cards {
-                                    let player = self.game_state.resolve_target_player_mut(target);
+                                    let player = gs.resolve_target_player_mut(target);
                                     if let Some(idx) =
                                         player.hand.cards.iter().position(|&c| c == cid)
                                     {
@@ -233,33 +321,9 @@ impl<'a> AbilityResolver<'a> {
                         }
                     }
 
-                    let matching_count = match source {
-                        "deck" | "deck_top" => util::count_matching(
-                            util::zone_cards(player, "deck"),
-                            card_db,
-                            &filter,
-                            false,
-                        ) as usize,
-                        "hand" => util::count_matching(
-                            util::zone_cards(player, "hand"),
-                            card_db,
-                            &filter,
-                            false,
-                        ) as usize,
-                        "discard" => util::count_matching(
-                            util::zone_cards(player, "discard"),
-                            card_db,
-                            &filter,
-                            false,
-                        ) as usize,
-                        "energy_zone" => util::count_matching(
-                            util::zone_cards(player, "energy_zone"),
-                            card_db,
-                            &filter,
-                            false,
-                        ) as usize,
-                        _ => usize::MAX,
-                    };
+                    let zone_name = if source == "deck_top" { "deck" } else { source };
+                    let matching_count =
+                        util::count_in_zone(player, zone_name, &filter, card_db) as usize;
 
                     if matching_count < count {
                         return Err(format!(
@@ -290,7 +354,7 @@ impl<'a> AbilityResolver<'a> {
                     effect_type: None,
                     ..Default::default()
                 };
-                self.execute_move_cards(&effect)
+                self.execute_move_cards(gs, &effect)
             }
             Some("change_state") => {
                 let state_change = cost.state_change.as_deref().unwrap_or("");
@@ -305,43 +369,16 @@ impl<'a> AbilityResolver<'a> {
                 if optional && !is_activation {
                     // For non-self_cost change_state, verify candidates exist before prompting
                     if state_change == "wait" && cost.self_cost != Some(true) {
-                        let count = cost.count.unwrap_or(1) as usize;
                         let exclude_self = cost.exclude_self.unwrap_or(false);
-                        let activating_id = self.game_state.activating_card;
-                        let card_db = &self.game_state.card_database;
-                        let group_names = cost.group_names.as_ref();
-
-                        let stage_cards: Vec<i16> = self
-                            .game_state
-                            .resolve_target_player(target)
-                            .stage
-                            .stage
-                            .iter()
-                            .filter(|&&id| id != -1)
-                            .copied()
-                            .collect();
-                        let candidates: Vec<i16> = stage_cards
-                            .into_iter()
-                            .filter(|id| !(exclude_self && activating_id == Some(*id)))
-                            .filter(|id| {
-                                super::util::card_matches_type(
-                                    card_db,
-                                    *id,
-                                    cost.card_type.as_deref(),
-                                )
-                            })
-                            .filter(|id| {
-                                group_names.as_ref().map_or(true, |gn| {
-                                    gn.iter().any(|g| {
-                                        super::util::card_matches_group_str(
-                                            card_db,
-                                            *id,
-                                            Some(g.as_str()),
-                                        )
-                                    })
-                                })
-                            })
-                            .collect();
+                        let candidates = get_change_state_candidates(
+                            gs,
+                            target,
+                            cost.card_type.as_deref(),
+                            cost.group_names.as_ref(),
+                            exclude_self,
+                            false,
+                            false,
+                        );
                         if candidates.is_empty() {
                             return Ok(());
                         }
@@ -360,7 +397,7 @@ impl<'a> AbilityResolver<'a> {
                         allow_skip: true,
                         options: None,
                     });
-                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());
                     }
                     return Ok(());
@@ -369,61 +406,15 @@ impl<'a> AbilityResolver<'a> {
                 if state_change == "wait" {
                     let count = cost.count.unwrap_or(1) as usize;
                     let exclude_self = cost.exclude_self.unwrap_or(false);
-                    let activating_id = self.game_state.activating_card;
-                    let card_db = &self.game_state.card_database;
-                    let group_names = cost.group_names.as_ref();
-
-                    let stage_cards: Vec<i16> = self
-                        .game_state
-                        .resolve_target_player(target)
-                        .stage
-                        .stage
-                        .iter()
-                        .filter(|&&id| id != -1)
-                        .copied()
-                        .collect();
-                    eprintln!("[CHANGE_STATE] stage={:?} card_type={:?} exclude_self={} activating_id={:?} self_cost={:?}",
-                        stage_cards, cost.card_type, exclude_self, activating_id, cost.self_cost);
-                    let candidates: Vec<i16> = stage_cards
-                        .into_iter()
-                        .filter(|&id| {
-                            // When self_cost is true, only include the activating card
-                            if cost.self_cost.unwrap_or(false) {
-                                activating_id == Some(id)
-                            } else {
-                                // When exclude_self is true, exclude the activating card
-                                !(exclude_self && activating_id == Some(id))
-                            }
-                        })
-                        .filter(|&id| {
-                            if !super::util::card_matches_type(
-                                card_db,
-                                id,
-                                cost.card_type.as_deref(),
-                            ) {
-                                eprintln!("[CHANGE_STATE] id={} FAIL type match", id);
-                                return false;
-                            }
-                            let group_ok = match group_names {
-                                Some(gn) => gn.iter().any(|g| {
-                                    super::util::card_matches_group_str(
-                                        card_db,
-                                        id,
-                                        Some(g.as_str()),
-                                    )
-                                }),
-                                None => true,
-                            };
-                            let name_ok =
-                                super::util::card_matches_characters(card_db, id, group_names);
-                            let ok = group_ok || name_ok;
-                            eprintln!(
-                                "[CHANGE_STATE] id={} group_ok={} name_ok={} ok={}",
-                                id, group_ok, name_ok, ok
-                            );
-                            ok
-                        })
-                        .collect();
+                    let candidates = get_change_state_candidates(
+                        gs,
+                        target,
+                        cost.card_type.as_deref(),
+                        cost.group_names.as_ref(),
+                        exclude_self,
+                        cost.self_cost.unwrap_or(false),
+                        true,
+                    );
                     eprintln!("[CHANGE_STATE] candidates={:?}", candidates);
 
                     if candidates.is_empty() {
@@ -432,9 +423,7 @@ impl<'a> AbilityResolver<'a> {
 
                     if candidates.len() <= count {
                         for &card_id in &candidates {
-                            self.game_state
-                                .mods
-                                .add_orientation_modifier(card_id, "wait");
+                            gs.mods.add_orientation_modifier(card_id, "wait");
                         }
                     } else {
                         self.pending_choice = Some(
@@ -445,6 +434,9 @@ impl<'a> AbilityResolver<'a> {
                                 false,
                             )
                             .card_type(cost.card_type.clone())
+                            .target_player_id(Some(
+                                cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                            ))
                             .build(),
                         );
                         return Ok(());
@@ -469,13 +461,13 @@ impl<'a> AbilityResolver<'a> {
                         allow_skip: true,
                         options: None,
                     });
-                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.choice_card_no = Some("optional_cost".to_string());
                     }
                     return Ok(());
                 }
 
-                if self.game_state.baton_touch_zero_cost && energy > 0 {
+                if gs.baton_touch_zero_cost && energy > 0 {
                     eprintln!(
                         "Skipping pay_energy cost of {} due to baton touch zero cost",
                         energy
@@ -483,7 +475,7 @@ impl<'a> AbilityResolver<'a> {
                     return Ok(());
                 }
 
-                let player = self.game_state.resolve_target_player_mut(target);
+                let player = gs.resolve_target_player_mut(target);
 
                 if energy > 0 {
                     if let Err(e) = player.energy_zone.pay_energy(energy as usize) {
@@ -495,7 +487,7 @@ impl<'a> AbilityResolver<'a> {
             Some("energy_condition") => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let target = cost.target.as_deref().unwrap_or("self");
-                let player = self.game_state.resolve_target_player_mut(target);
+                let player = gs.resolve_target_player_mut(target);
                 if player.energy_zone.cards.len() < count {
                     return Err(format!(
                         "Not enough energy cards: need {}, have {}",
@@ -518,8 +510,8 @@ impl<'a> AbilityResolver<'a> {
                 let card_type = cost.card_type.clone();
 
                 let card_ids: Vec<i16> = {
-                    let player = &*self.game_state.resolve_target_player(target);
-                    let card_db = &self.game_state.card_database;
+                    let player = &*gs.resolve_target_player(target);
+                    let card_db = &gs.card_database;
                     match source {
                         "hand" => player
                             .hand
@@ -543,7 +535,7 @@ impl<'a> AbilityResolver<'a> {
 
                 if has_explicit_count && card_ids.len() <= explicit_count {
                     for card_id in card_ids {
-                        self.game_state.revealed_cards.push(card_id);
+                        gs.revealed_cards.push(card_id);
                         self.revealed_cost_cards.push(card_id);
                     }
                     Ok(())
@@ -564,6 +556,9 @@ impl<'a> AbilityResolver<'a> {
                         .cost_limit(cost.cost_limit, cost.cost_limit_operator.clone())
                         .group(group)
                         .characters(cost.characters.clone())
+                        .target_player_id(Some(
+                            cost.target.clone().unwrap_or_else(|| "self".to_string()),
+                        ))
                         .build(),
                     );
                     Ok(())
@@ -571,6 +566,7 @@ impl<'a> AbilityResolver<'a> {
             }
             Some("place_energy_under_member") => {
                 self.execute_place_energy_under_member(
+                    gs,
                     cost.count.unwrap_or(1),
                     cost.target.as_deref().unwrap_or("self"),
                     cost.position.as_ref(),
@@ -582,6 +578,7 @@ impl<'a> AbilityResolver<'a> {
             Some("custom") => {
                 if cost.destination.as_deref() == Some("under_member") {
                     self.execute_place_energy_under_member(
+                        gs,
                         cost.count.unwrap_or(1),
                         cost.target.as_deref().unwrap_or("self"),
                         cost.position.as_ref(),
@@ -595,33 +592,52 @@ impl<'a> AbilityResolver<'a> {
         }
     }
 
-    pub fn pay_cost(&mut self, cost: &AbilityCost) -> Result<(), String> {
-        self.pay_cost_inner(cost)
+    pub fn pay_cost(&mut self, gs: &mut GameState, cost: &AbilityCost) -> Result<(), String> {
+        self.pay_cost_inner(gs, cost)
     }
 
-    pub fn handle_optional_cost_payment(&mut self, selected: &str) -> Result<(), String> {
+    pub fn handle_optional_cost_payment(
+        &mut self,
+        gs: &mut GameState,
+        selected: &str,
+    ) -> Result<(), String> {
         if selected == "skip_optional_cost" || selected == "0" {
             self.pending_choice = None;
-            if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.cost_paid = true;
-                entry.effect_started = true;
+                // If the cost has an alternative_effect ("unless you pay"),
+                // schedule it as a pending command so it fires after skip.
+                let alt = entry
+                    .ability
+                    .cost
+                    .as_ref()
+                    .and_then(|c| c.alternative_effect.clone());
+                if alt.is_some() {
+                    entry.effect_started = false;
+                } else {
+                    entry.effect_started = false;
+                }
                 entry.optional_cost_was_paid = false;
+                if let Some(alt_effect) = alt {
+                    entry.pending_commands =
+                        vec![crate::ability::types::Command::Effect(*alt_effect)];
+                }
             }
             return Ok(());
         }
         // "pay_optional_cost" or "1" from select_option(1)
         self.pending_choice = None;
-        if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+            entry.cost_paid = true;
             entry.optional_cost_was_paid = true;
         }
         let is_pay = true;
         if is_pay {
-            if let Some(cost) = self.game_state.entry_cost().cloned() {
+            if let Some(cost) = gs.entry_cost().cloned() {
                 if let Some(energy) = cost.energy {
                     if energy > 0 {
                         let tgt = cost.target.as_deref().unwrap_or("self");
-                        self.game_state
-                            .resolve_target_player_mut(tgt)
+                        gs.resolve_target_player_mut(tgt)
                             .energy_zone
                             .pay_energy(energy as usize)
                             .map_err(|e| e)?;
@@ -629,51 +645,24 @@ impl<'a> AbilityResolver<'a> {
                 }
                 if cost.state_change.as_deref() == Some("wait") {
                     if cost.self_cost == Some(true) {
-                        if let Some(id) = self.game_state.activating_card {
-                            self.game_state.mods.add_orientation_modifier(id, "wait");
+                        if let Some(id) = gs.activating_card {
+                            gs.mods.add_orientation_modifier(id, "wait");
                         }
                     } else {
                         let target = cost.target.as_deref().unwrap_or("self");
                         let count = cost.count.unwrap_or(1) as usize;
-                        let card_db = &self.game_state.card_database;
-                        let group_names = cost.group_names.as_ref();
                         let exclude_self = cost.exclude_self.unwrap_or(false);
-                        let activating_id = self.game_state.activating_card;
                         let state_change = cost.state_change.as_deref().unwrap_or("");
 
-                        let stage_cards: Vec<i16> = self
-                            .game_state
-                            .resolve_target_player(target)
-                            .stage
-                            .stage
-                            .iter()
-                            .filter(|&&id| id != -1)
-                            .copied()
-                            .collect();
-                        let candidates: Vec<i16> = stage_cards
-                            .into_iter()
-                            .filter(|id| !(exclude_self && activating_id == Some(*id)))
-                            .filter(|id| {
-                                super::util::card_matches_type(
-                                    card_db,
-                                    *id,
-                                    cost.card_type.as_deref(),
-                                )
-                            })
-                            .filter(|id| {
-                                let group_ok = match group_names {
-                                    Some(gn) => gn.iter().any(|g| {
-                                        super::util::card_matches_group_str(
-                                            card_db,
-                                            *id,
-                                            Some(g.as_str()),
-                                        )
-                                    }),
-                                    None => true,
-                                };
-                                group_ok
-                            })
-                            .collect();
+                        let candidates = get_change_state_candidates(
+                            gs,
+                            target,
+                            cost.card_type.as_deref(),
+                            cost.group_names.as_ref(),
+                            exclude_self,
+                            false,
+                            false,
+                        );
 
                         if candidates.is_empty() {
                             return Err("No matching members on stage to change state".to_string());
@@ -682,13 +671,9 @@ impl<'a> AbilityResolver<'a> {
                         let to_wait: Vec<i16> = candidates.into_iter().take(count).collect();
                         for &card_id in &to_wait {
                             if state_change == "wait" {
-                                self.game_state
-                                    .mods
-                                    .add_orientation_modifier(card_id, "wait");
+                                gs.mods.add_orientation_modifier(card_id, "wait");
                             } else if state_change == "rest" || state_change == "rested" {
-                                self.game_state
-                                    .mods
-                                    .add_orientation_modifier(card_id, "rest");
+                                gs.mods.add_orientation_modifier(card_id, "rest");
                             }
                         }
                     }
@@ -699,10 +684,10 @@ impl<'a> AbilityResolver<'a> {
                         if sub_cost.state_change.as_deref() == Some("wait")
                             && sub_cost.self_cost == Some(true)
                         {
-                            if let Some(id) = self.game_state.activating_card {
-                                self.game_state.mods.add_orientation_modifier(id, "wait");
+                            if let Some(id) = gs.activating_card {
+                                gs.mods.add_orientation_modifier(id, "wait");
                             }
-                        } else if let Err(e) = self.pay_cost(sub_cost) {
+                        } else if let Err(e) = self.pay_cost(gs, sub_cost) {
                             eprintln!("Warning: sub-cost payment error: {}", e);
                         }
                         if self.pending_choice.is_some() {
@@ -711,10 +696,11 @@ impl<'a> AbilityResolver<'a> {
                     }
                 }
                 eprintln!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
-                    cost.cost_type, self.game_state.entry_cost().is_some(), 
-                    self.game_state.entry_effect().map(|e| e.action.clone()));
+                    cost.cost_type, gs.entry_cost().is_some(), 
+                    gs.entry_effect().map(|e| e.action.clone()));
                 if cost.cost_type.as_deref() == Some("place_energy_under_member") {
                     self.execute_place_energy_under_member(
+                        gs,
                         cost.count.unwrap_or(1),
                         cost.target.as_deref().unwrap_or("self"),
                         cost.position.as_ref(),
@@ -724,25 +710,43 @@ impl<'a> AbilityResolver<'a> {
                 }
             }
             self.pending_choice = None;
-            let is_effect_optional =
-                self.game_state.entry_choice_card_no().as_deref() == Some("optional_cost");
-            if self.game_state.entry_cost().is_some() {
-                if let Some(effect) = self.game_state.entry_effect().cloned() {
-                    if let Err(e) = self.execute_effect(&effect) {
+            let is_effect_optional = gs.entry_choice_card_no().as_deref() == Some("optional_cost");
+            eprintln!(
+                "[HANDLE_OPT_COST] entry_cost={:?} entry_effect={:?} effect_action={:?}",
+                gs.entry_cost().map(|c| c.state_change.as_deref()),
+                gs.entry_effect().map(|e| e.action.clone()),
+                gs.entry_effect().map(|e| e.action.clone())
+            );
+            eprintln!(
+                "[HANDLE_OPT_COST2] entering if: entry_cost.is_some={}",
+                gs.entry_cost().is_some()
+            );
+            if gs.entry_cost().is_some() {
+                eprintln!(
+                    "[HANDLE_OPT_COST2] inside if: entry_effect.is_some={}",
+                    gs.entry_effect().is_some()
+                );
+                if let Some(effect) = gs.entry_effect().cloned() {
+                    eprintln!(
+                        "[HANDLE_OPT_COST2] calling execute_effect with action={}",
+                        effect.action
+                    );
+                    if let Err(e) = self.execute_effect(gs, &effect) {
                         eprintln!("Failed to execute effect after optional cost: {}", e);
                     }
-                    if let Some(entry) = self.game_state.ability_queue.current_entry_mut() {
+                    if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.effect_started = true;
                     }
                 }
-            } else if self.game_state.ability_queue.has_pending_commands() {
-                if let Err(e) = self.resume_pending_commands() {
+            } else if gs.ability_queue.has_pending_commands() {
+                if let Err(e) = self.resume_pending_commands(gs) {
                     eprintln!("Failed to execute action after optional: {}", e);
                 }
             } else if is_effect_optional {
-                if let Some(effect) = self.game_state.entry_effect().cloned() {
+                if let Some(effect) = gs.entry_effect().cloned() {
                     let new_count = effect.energy_count.unwrap_or(effect.count_or(1));
                     self.execute_place_energy_under_member(
+                        gs,
                         new_count,
                         effect.target_name(),
                         effect.position.as_ref(),

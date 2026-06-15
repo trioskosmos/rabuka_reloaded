@@ -95,6 +95,14 @@ fn chika_q171_live_end_persistence() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
     let chika = game.id("PL!S-bp3-001-R\u{ff0b}");
     let filler_live = game.id("PL!-sd1-019-SD");
 

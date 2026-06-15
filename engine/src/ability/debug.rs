@@ -2,14 +2,23 @@
 /// Every line shows WHAT is being checked, WHAT the expected value is,
 /// and WHAT the actual game state value is — all in one self-contained line.
 use crate::card::{Ability, AbilityCost, AbilityEffect, Condition};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
-// Toggle: change to `false` to silence all ability debug output.
-// Could also be a runtime flag or #[cfg(debug_assertions)] later.
-const ABILITY_DEBUG: bool = true;
+/// Toggle all ability debug output (eprintln! + rule_log buffer) at runtime.
+/// Default OFF in production, ON in tests via test helpers.
+pub static ABILITY_DEBUG: AtomicBool = AtomicBool::new(false);
+
+/// Enable/disable ability debug.
+pub fn set_debug(enabled: bool) {
+    ABILITY_DEBUG.store(enabled, Ordering::SeqCst);
+}
 
 // Global buffer to collect debug logs between game state updates
 static ABILITY_LOG_BUFFER: Mutex<Vec<String>> = Mutex::new(Vec::new());
+// Persisted set of (card_no, full_text) for every ability activated across all test runs.
+// Used to generate the coverage report (which abilities are tested vs untested).
+static COVERAGE_LOG: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
 pub struct AbDebug {
     indent: usize,
@@ -27,15 +36,18 @@ impl AbDebug {
     }
 
     pub fn p(&mut self, tag: &str, msg: impl std::fmt::Display) {
-        if !ABILITY_DEBUG {
+        if !ABILITY_DEBUG.load(Ordering::Relaxed) {
             return;
         }
         let pad = "  ".repeat(self.indent);
         let log_entry = format!("[AB]{pad}{tag} {msg}");
         eprintln!("{}", log_entry);
+        if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
+            buffer.push(log_entry);
+        }
     }
 
-    pub fn ability(&mut self, card_name: &str, card_id: &str, ability: &Ability) {
+    pub fn ability(&mut self, card_name: &str, card_no: &str, card_id: &str, ability: &Ability) {
         self.p("ABILITY", format_args!("\"{}\" ({})", card_name, card_id));
         self.indent += 1;
         let trigger_str = ability.triggers.as_deref().unwrap_or("none");
@@ -46,6 +58,12 @@ impl AbDebug {
         self.p("TRIGGER", format_args!("{} {}", trigger_str, limit_str));
         if !ability.full_text.is_empty() {
             self.p("TEXT", &ability.full_text);
+        }
+        // Record coverage: (card_no, full_text) for untested-ability reporting
+        if !ability.full_text.is_empty() {
+            if let Ok(mut cov) = COVERAGE_LOG.lock() {
+                cov.push((card_no.to_string(), ability.full_text.clone()));
+            }
         }
         if let Some(ref cost) = ability.cost {
             self.print_cost(cost, "");
@@ -295,6 +313,45 @@ impl AbDebug {
         };
         self.p("COST", format_args!("{}{}", prefix, msg));
     }
+}
+
+/// Return a deduplicated list of (card_no, full_text) for every ability activated.
+pub fn get_coverage_data() -> Vec<(String, String)> {
+    let mut seen = std::collections::HashSet::new();
+    let mut result = Vec::new();
+    if let Ok(cov) = COVERAGE_LOG.lock() {
+        for (card_no, text) in cov.iter() {
+            let key = format!("{}|{}", card_no, text);
+            if seen.insert(key) {
+                result.push((card_no.clone(), text.clone()));
+            }
+        }
+    }
+    result.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+    result
+}
+
+/// Write coverage data to a JSON file at the given path.
+/// Format: `{"covered": [{"card_no": "...", "full_text": "..."}, ...]}`
+pub fn write_coverage_json(path: &str) -> Result<(), std::io::Error> {
+    let data = get_coverage_data();
+    let mut entries: Vec<serde_json::Value> = Vec::new();
+    for (card_no, text) in &data {
+        entries.push(serde_json::json!({
+            "card_no": card_no,
+            "full_text": text,
+        }));
+    }
+    let output = serde_json::json!({ "covered": entries });
+    let file = std::fs::File::create(path)?;
+    let writer = std::io::BufWriter::new(file);
+    serde_json::to_writer_pretty(writer, &output)?;
+    eprintln!(
+        "Coverage data written to {} ({} unique abilities)",
+        path,
+        entries.len()
+    );
+    Ok(())
 }
 
 fn trunc(s: &str, max: usize) -> String {

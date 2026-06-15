@@ -7,6 +7,13 @@ use rabuka_engine::zones::MemberArea;
 fn cheer_pipeline_draw_and_score_icons() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     // Stage: 絢瀬絵里 (PL!-sd1-002-SD) — blade=1, blade_heart={b_heart06:1}, base_heart={heart06:1}
     let stage_member = game.id("PL!-sd1-002-SD");
@@ -68,11 +75,12 @@ fn cheer_pipeline_draw_and_score_icons() {
         waitroom_after
     );
 
-    // Verify the cheer_blade_heart_count was set (non-zero since we had blade hearts)
-    assert!(
-        game.state.player1_cheer_blade_heart_count > 0,
-        "Cheer blade heart count should be > 0 (blade heart icons were counted, got {})",
-        game.state.player1_cheer_blade_heart_count
+    // The yell card had a regular blade_heart (b_heart03 → heart03) which contributes to the
+    // heart pool but NOT to score (Rule 8.4.2.1 — only ♪ Score icons add to cheer count).
+    // So cheer_blade_heart_count should be 0 for regular blade_hearts.
+    assert_eq!(
+        game.state.player1_cheer_blade_heart_count, 0,
+        "Regular blade hearts do not contribute to score (Rule 8.4.2.1)"
     );
 }
 
@@ -81,6 +89,13 @@ fn cheer_pipeline_draw_and_score_icons() {
 fn cheer_pipeline_score_icon() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..20 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     // Stage: 絢瀬絵里 (PL!-sd1-002-SD) — blade=1, base_heart={heart06:1}
     let stage_member = game.id("PL!-sd1-002-SD");

@@ -30,6 +30,9 @@ fn triple_discard_gives_blade() {
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(filler);
     }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
@@ -64,6 +67,9 @@ fn triple_no_matching_zero_blades() {
     game.state.player1.hand.cards.push(live);
     for _ in 0..10 {
         game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
     }
 
     advance_to_live_card_set_p1(&mut game);

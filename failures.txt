@@ -1,0 +1,551 @@
+
+failures:
+
+---- test_modules::ayumu_pb1_test::ayumu_pb1_q199_no_baton_touch_after_effect_placement stdout ----
+[TRACK_MOVE] card_id=12544 player_id=p1
+[AUTO_TRIGGER] checking stage for player p1
+[AB]ABILITY "上原歩夢" (12544)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：手札からコスト4以下の「上原歩夢」のメンバーカードを1枚ステージに登場させる。
+[AB]  COST pay 2 E (optional)
+[AB]COST pay 2 E (optional) → OK
+[AB]  RESULT cost paid ✓
+[OPT_COST] checking cost_type: Some("pay_energy"), entry_cost: true, entry_effect_action: Some("move_cards")
+[HANDLE_OPT_COST] entry_cost=Some(None) entry_effect=Some("move_cards") effect_action=Some("move_cards")
+[HANDLE_OPT_COST2] entering if: entry_cost.is_some=true
+[HANDLE_OPT_COST2] inside if: entry_effect.is_some=true
+[HANDLE_OPT_COST2] calling execute_effect with action=move_cards
+[AB]EFFECT move 1 from hand → stage (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: hand, destination: stage
+[AB]EFFECT move 1 from hand → stage (type: member_card)
+[NEED_HEART] filter: color=None total=None op=None src="hand" card_type=Some("member_card")
+[GET_SEL] cards.len=2 filter.nh_color=None filter.nh_total=None
+[FINALIZE_MOVE] dest=stage cards=[] -> self.moved_cards=[]
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: SingleEffect { effect_index: 0 }
+[RWC] cost_was_paid=true, effect_started=true, had_pending_sequential=false, saved_ctx=SingleEffect { effect_index: 0 }
+
+thread 'test_modules::ayumu_pb1_test::ayumu_pb1_q199_no_baton_touch_after_effect_placement' (18588) panicked at tests\test_modules\ayumu_pb1_test.rs:60:5:
+Target 上原歩夢 should be placed on stage
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- test_modules::constant_edge_case_test::riko_compound_and_condition_both_met stdout ----
+[AB]COMPOUND 2 sub-conditions, operator=and
+[AB]COND location_condition   >=1 @success_live_card_zone.self → actual=0 FAIL
+[AB]COND card_count_condition >=1 xsuccess_live_card_zone opponent actual=1 PASS
+[AB]COND card_count_condition >=1 xsuccess_live_card_zone opponent actual=1 PASS
+[AB]COMPOUND → 1/2 passed = FAIL
+[AB]COND compound             2 sub-conditions
+
+thread 'test_modules::constant_edge_case_test::riko_compound_and_condition_both_met' (4632) panicked at tests\test_modules\constant_edge_case_test.rs:38:5:
+assertion `left == right` failed: Riko: own=0, opponent>=1 → should gain 3 blade, got 0
+  left: 0
+ right: 3
+
+---- test_modules::constant_edge_case_test::riko_compound_and_condition_removal stdout ----
+[AB]COMPOUND 2 sub-conditions, operator=and
+[AB]COND location_condition   >=1 @success_live_card_zone.self → actual=0 FAIL
+[AB]COND card_count_condition >=1 xsuccess_live_card_zone opponent actual=1 PASS
+[AB]COND card_count_condition >=1 xsuccess_live_card_zone opponent actual=1 PASS
+[AB]COMPOUND → 1/2 passed = FAIL
+[AB]COND compound             2 sub-conditions
+
+thread 'test_modules::constant_edge_case_test::riko_compound_and_condition_removal' (1716) panicked at tests\test_modules\constant_edge_case_test.rs:111:5:
+assertion `left == right` failed
+  left: 0
+ right: 3
+
+---- test_modules::dazzling_test::dazzling_q187_exclude_selected_liella_other_pickable stdout ----
+[LIVE_START_TRIGGER] triggering 3 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!SP-bp4-023-L_{{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。 card_no=PL!SP-bp4-023-L
+[LIVE_START_TRIGGER]   ability=PL!SP-bp4-023-L_{{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。 card_no=PL!SP-bp4-023-L
+[LIVE_START_TRIGGER]   ability=PL!SP-pb1-001-R_{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり、自分の手札を2枚控え室に置く。 card_no=PL!SP-pb1-001-R
+[AB]ABILITY "Dazzling Game" (4059)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、「澁谷かのん」「ウィーン・マルガレーテ」「鬼塚冬毬」のうちのメンバー1人と、これにより選んだメンバー以外の『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る。
+[AB]EFFECT multi-step (3 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (3 sub-actions)
+[ABILITY] sequential: 3 actions, repeat_max=1 card_id=Some(4059)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(4059)
+[AB]EFFECT select 1 member_card from ?
+DEBUG: execute_effect - action: select, source: none, destination: none
+[AB]EFFECT select 1 member_card from ?
+DEBUG: handle_select_card - zone: 'stage', indices: [0], context: SingleEffect { effect_index: 0 }
+[SELECT_STAGE] is_select_action=true cards=[10969] filtered_idx=Some([0, 1])
+▶ Select: 1 card(s) selected from zone="stage" → [澁谷かのん]
+[AB]EFFECT select 1 member_card from ?
+DEBUG: execute_effect - action: select, source: none, destination: none
+[AB]EFFECT select 1 member_card from ?
+[FINALIZE_CHOICE] pending=true selected=[10969] context=SingleEffect { effect_index: 0 }
+DEBUG: handle_select_card - zone: 'stage', indices: [0], context: SingleEffect { effect_index: 0 }
+[SELECT_STAGE] is_select_action=true cards=[10234] filtered_idx=Some([1])
+▶ Select: 1 card(s) selected from zone="stage" → [澁谷かのん]
+[AB]EFFECT gain 1 blade for live_end
+DEBUG: execute_effect - action: gain_resource, source: none, destination: none
+[AB]EFFECT gain 1 blade for live_end
+[FINALIZE_CHOICE] pending=true selected=[10234] context=SingleEffect { effect_index: 0 }
+[RWC] cost_was_paid=true, effect_started=true, had_pending_sequential=true, saved_ctx=SingleEffect { effect_index: 0 }
+[AB]ABILITY "Dazzling Game" (4059)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}ライブ終了時まで、エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレード]、[青ブレード]、{{icon_b_all.png|ALLブレード}}は、すべて[紫ブレード]になる。
+[AB]EFFECT set_blade_type: エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレー...
+DEBUG: execute_effect - action: set_blade_type, source: none, destination: none
+[AB]EFFECT set_blade_type: エールによって公開される自分のカードが持つ[桃ブレード]、[赤ブレード]、[黄ブレード]、[緑ブレー...
+[set_blade_type] Unknown blade type: "紫ブレード"
+[AB]  RESULT effect applied ✓
+[AB]ABILITY "澁谷かのん" (10969)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり、自分の手札を2枚控え室に置く。
+[AB]EFFECT conditional_on_optional: {{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり...
+DEBUG: execute_effect - action: conditional_on_optional, source: none, destination: none
+[AB]EFFECT conditional_on_optional: {{icon_energy.png|E}}{{icon_energy.png|E}}支払わないかぎり...
+[DAZZLING] kanon blade: Some(1), liella blade: None
+
+thread 'test_modules::dazzling_test::dazzling_q187_exclude_selected_liella_other_pickable' (4528) panicked at tests\test_modules\dazzling_test.rs:79:5:
+Liella should gain blade from Dazzling Game
+
+---- test_modules::eri_bp3_test::eri_q144_up_to_semantics_1_eligible_opponent_still_works stdout ----
+[TRACK_MOVE] card_id=12434 player_id=p1
+[AUTO_TRIGGER] checking stage for player p1
+[AB]ABILITY "絢瀬絵里" (12434)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST hand → discard (1 card)
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置いてもよい) → OK
+▶ cost(move_cards, hand=>discard, effective_count=1, any_number=false, optional=true)
+  ├─ hand[1] → 1 match: [START:DASH!!]
+  └─ choice created (allow_skip=true)
+[AB]  RESULT cost paid ✓
+DEBUG: handle_select_card - zone: 'hand', indices: [1], context: None
+[RWC] cost_was_paid=true, effect_started=false, had_pending_sequential=false, saved_ctx=None
+RWC: calling process_current_ability
+[AB]ABILITY "絢瀬絵里" (12434)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST hand → discard (1 card)
+[AB]EFFECT change state → wait
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[AB]EFFECT change state → wait
+[RWC] cost_was_paid=true, effect_started=false, had_pending_sequential=false, saved_ctx=None
+RWC: calling process_current_ability
+[AB]ABILITY "絢瀬絵里" (12434)
+[AB]  TRIGGER 登場 
+[AB]  TEXT {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：相手のステージにいるコスト4以下のメンバーを2人までウェイトにする。（ウェイト状態のメンバーが持つ{{icon_blade.png|ブレード}}は、エールで公開する枚数を増やさない。）
+[AB]  COST hand → discard (1 card)
+[AB]EFFECT change state → wait
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[AB]EFFECT change state → wait
+
+thread 'test_modules::eri_bp3_test::eri_q144_up_to_semantics_1_eligible_opponent_still_works' (16208) panicked at tests\test_modules\eri_bp3_test.rs:49:5:
+assertion `left == right` failed: 1 eligible opponent member was put to wait — 'up to 2' is an upper bound
+  left: None
+ right: Some("wait")
+
+---- test_modules::gameplay_test::distortion_exact_max_boundary_6_wait_all_refreshed stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!SP-pb1-023-L_{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。 card_no=PL!SP-pb1-023-L
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(11434)
+[ABILITY]  >> sub-action[0]: action=change_state has_condition=true card_id=Some(11434)
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[ENERGY] max=true: count=6 available=6 effective=6
+Failed to resolve ability: Not enough energy cards to deactivate: need 6, have 0
+
+thread 'test_modules::gameplay_test::distortion_exact_max_boundary_6_wait_all_refreshed' (6296) panicked at tests\test_modules\gameplay_test.rs:89:5:
+assertion `left == right` failed
+  left: 0
+ right: 6
+
+---- test_modules::gameplay_test::distortion_max_cap_8_wait_refresh_6_only stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!SP-pb1-023-L_{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。 card_no=PL!SP-pb1-023-L
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(11434)
+[ABILITY]  >> sub-action[0]: action=change_state has_condition=true card_id=Some(11434)
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[ENERGY] max=true: count=6 available=8 effective=6
+Failed to resolve ability: Not enough energy cards to deactivate: need 6, have 0
+
+thread 'test_modules::gameplay_test::distortion_max_cap_8_wait_refresh_6_only' (25056) panicked at tests\test_modules\gameplay_test.rs:498:5:
+assertion `left == right` failed: Only 6 of 8 wait cards should be refreshed (capped by max)
+  left: 0
+ right: 6
+
+---- test_modules::gameplay_test::distortion_basic_energy_refresh_with_catchu stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!SP-pb1-023-L_{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。 card_no=PL!SP-pb1-023-L
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(11434)
+[ABILITY]  >> sub-action[0]: action=change_state has_condition=true card_id=Some(11434)
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[ENERGY] max=true: count=6 available=4 effective=4
+Failed to resolve ability: Not enough energy cards to deactivate: need 4, have 0
+
+thread 'test_modules::gameplay_test::distortion_basic_energy_refresh_with_catchu' (23320) panicked at tests\test_modules\gameplay_test.rs:412:5:
+assertion `left == right` failed: All 7 energy should be active after refresh of 4 wait cards
+  left: 3
+ right: 7
+
+---- test_modules::gameplay_test::distortion_q103_two_triggers_only_one_plus_1 stdout ----
+[LIVE_START_TRIGGER] triggering 2 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!SP-pb1-023-L_{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。 card_no=PL!SP-pb1-023-L
+[LIVE_START_TRIGGER]   ability=PL!SP-pb1-023-L_{{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。 card_no=PL!SP-pb1-023-L
+[AB]ABILITY "ディストーション" (11434)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(11434)
+[ABILITY]  >> sub-action[0]: action=change_state has_condition=true card_id=Some(11434)
+[AB]EFFECT change state → active
+[AB]COND (gated by: 自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合)
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[AB]EFFECT change state → active
+[AB]COND (gated by: 自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合)
+[AB]COND location_condition   >=1 @stage.self distinct=names → actual=2 PASS
+[ENERGY] max=true: count=6 available=7 effective=6
+[AB]  RESULT EFFECT FAILED: Not enough energy cards to deactivate: need 6, have 0
+Failed to resolve ability: Not enough energy cards to deactivate: need 6, have 0
+[AB]ABILITY "ディストーション" (11434)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合、エネルギーを6枚までアクティブにする。その後、自分のエネルギーがすべてアクティブ状態の場合、このカードのスコアを＋１する。
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(11434)
+[ABILITY]  >> sub-action[0]: action=change_state has_condition=true card_id=Some(11434)
+[AB]EFFECT change state → active
+[AB]COND (gated by: 自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合)
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[AB]EFFECT change state → active
+[AB]COND (gated by: 自分のステージに名前の異なる『CatChu!』のメンバーが2人以上いる場合)
+[AB]COND location_condition   >=1 @stage.self distinct=names → actual=2 PASS
+[ENERGY] max=true: count=6 available=7 effective=6
+[AB]  RESULT EFFECT FAILED: Not enough energy cards to deactivate: need 6, have 0
+Failed to resolve ability: Not enough energy cards to deactivate: need 6, have 0
+
+thread 'test_modules::gameplay_test::distortion_q103_two_triggers_only_one_plus_1' (3992) panicked at tests\test_modules\gameplay_test.rs:619:5:
+assertion `left == right` failed
+  left: 0
+ right: 7
+
+---- test_modules::gameplay_test::you_q186_cost_reduced_playable stdout ----
+
+thread 'test_modules::gameplay_test::you_q186_cost_reduced_playable' (5876) panicked at tests\helpers\mod.rs:191:14:
+play_to_stage failed: "Could not pay 20 energy (only 4 active energy available, 4 total energy cards)"
+
+---- test_modules::konata_test::konata_q77_debuted_this_turn_activates_energy stdout ----
+[USE_LIMIT] inserting key=9289_0_1
+DEBUG: execute_effect - action: draw_card, source: deck, destination: hand
+[USE_LIMIT] inserting key=9289_0_1
+▶ cost(move_cards, hand=>discard, effective_count=1, any_number=false, optional=false)
+  ├─ hand[1] → 1 match: [優木せつ菜]
+  └─ choice created (allow_skip=false)
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+▶ Select: 1 card(s) selected from zone="hand" → [優木せつ菜]
+[FINALIZE_CHOICE] pending=false selected=[7589] context=None
+[RWC] cost_was_paid=true, effect_started=false, had_pending_sequential=false, saved_ctx=None
+RWC: calling process_current_ability
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[ENERGY] max=false: count=2 effectve=2
+Failed to resolve ability: Not enough energy cards to deactivate: need 2, have 0
+
+thread 'test_modules::konata_test::konata_q77_debuted_this_turn_activates_energy' (21692) panicked at tests\test_modules\konata_test.rs:45:5:
+assertion `left == right` failed: Ab#0 cost 2E + Ab#1 activate 2E = net 0 change
+  left: 2
+ right: 4
+
+---- test_modules::remaining_quick_test::eternalize_q204_two_niko_hearts_reduced stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!N-pb1-042-L_{{live_start.png|ライブ開始時}}自分のステージに同じ名前の『虹ヶ咲』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす。 card_no=PL!N-pb1-042-L
+[AB]ABILITY "Eternalize Love!!" (7789)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}自分のステージに同じ名前の『虹ヶ咲』のメンバーが2人以上いる場合、このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart_00.png|heart0}}{{heart_00.png|heart0}}減らす。
+[AB]EFFECT modify_required_hearts: このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart...
+[AB]COND (gated by: 自分のステージに同じ名前の『虹ヶ咲』のメンバーが2人以上いる場合)
+DEBUG: execute_effect - action: modify_required_hearts, source: none, destination: none
+[AB]EFFECT modify_required_hearts: このカードを成功させるための必要ハートを{{heart_00.png|heart0}}{{heart...
+[AB]COND (gated by: 自分のステージに同じ名前の『虹ヶ咲』のメンバーが2人以上いる場合)
+[HEART_COLORS] card_id=3024 result=false
+[HEART_COLORS] card_id=3024 result=false
+[AB]COND card_count_condition >=2 人stage self group=["虹ヶ咲"] actual=0 FAIL
+[AB]COND card_count_condition >=1 人stage self group=["虹ヶ咲"] actual=0 FAIL
+[CAN_ACTIVATE] condition FAILED for modify_required_hearts: type=Some("card_count_condition") location=Some("stage") group=Some(["虹ヶ咲"]) exclude=None
+DEBUG: cannot activate effect
+[AB]  RESULT effect applied ✓
+
+thread 'test_modules::remaining_quick_test::eternalize_q204_two_niko_hearts_reduced' (16176) panicked at tests\test_modules\remaining_quick_test.rs:41:5:
+Q204: need_heart modifier applied for 2+ 虹ヶ咲 members
+
+---- test_modules::setsuna_bp5_test::setsuna_q230_both_zero_heart02_gained stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!N-bp5-007-R＋_{{live_start.png|ライブ開始時}}自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。 card_no=PL!N-bp5-007-R＋
+[AB]ABILITY "優木せつ菜" (8964)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。
+[AB]EFFECT gain 2 heart for live_end
+[AB]COND (gated by: 自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合)
+DEBUG: execute_effect - action: gain_resource, source: none, destination: none
+[AB]EFFECT gain 2 heart for live_end
+[AB]COND (gated by: 自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合)
+[AB]COND location_condition   =1 @success_live_card_zone.both → actual=0 FAIL
+[CAN_ACTIVATE] condition FAILED for gain_resource: type=Some("location_condition") location=Some("success_live_card_zone") group=None exclude=None
+DEBUG: cannot activate effect
+[AB]  RESULT effect applied ✓
+
+thread 'test_modules::setsuna_bp5_test::setsuna_q230_both_zero_heart02_gained' (1536) panicked at tests\test_modules\setsuna_bp5_test.rs:53:5:
+assertion `left == right` failed: Q230: Both 0 success cards → heart02 x2 gained
+  left: 0
+ right: 2
+
+---- test_modules::setsuna_bp5_test::setsuna_unequal_success_cards_no_heart stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!N-bp5-007-R＋_{{live_start.png|ライブ開始時}}自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。 card_no=PL!N-bp5-007-R＋
+[AB]ABILITY "優木せつ菜" (8964)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合、ライブ終了時まで、{{heart_02.png|heart02}}{{heart_02.png|heart02}}を得る。
+[AB]EFFECT gain 2 heart for live_end
+[AB]COND (gated by: 自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合)
+DEBUG: execute_effect - action: gain_resource, source: none, destination: none
+[AB]EFFECT gain 2 heart for live_end
+[AB]COND (gated by: 自分と相手の成功ライブカード置き場にあるカードの枚数が同じ場合)
+[AB]COND location_condition   =1 @success_live_card_zone.both → actual=0 FAIL
+[CAN_ACTIVATE] condition FAILED for gain_resource: type=Some("location_condition") location=Some("success_live_card_zone") group=None exclude=None
+DEBUG: cannot activate effect
+[AB]  RESULT effect applied ✓
+
+thread 'test_modules::setsuna_bp5_test::setsuna_unequal_success_cards_no_heart' (6716) panicked at tests\test_modules\setsuna_bp5_test.rs:98:5:
+assertion `left == right` failed: Unequal success cards (P1=2, P2=1) → condition evaluates incorrectly → heart02 still applied
+  left: 0
+ right: 2
+
+---- test_modules::umi_bp3_test::umi_bp3_live_start_select_heart_and_scale_with_success stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!-bp3-013-N_{{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。 card_no=PL!-bp3-013-N
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(10954)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(10954)
+DEBUG: execute_effect - action: select, source: none, destination: none
+DEBUG: execute_effect - action: gain_resource, source: none, destination: none
+[FINALIZE_CHOICE] pending=true selected=[] context=None
+[FINALIZE_CHOICE] pending=false selected=[] context=None
+[RWC] cost_was_paid=true, effect_started=true, had_pending_sequential=false, saved_ctx=None
+
+thread 'test_modules::umi_bp3_test::umi_bp3_live_start_select_heart_and_scale_with_success' (23136) panicked at tests\test_modules\umi_bp3_test.rs:63:5:
+assertion `left == right` failed: Gained 3 heart01 from Umi's ability (1 per 3 success zone cards)
+  left: 0
+ right: 3
+
+---- test_modules::untested_abilities_test::test_change_state_choice_bug stdout ----
+[TRACK_MOVE] card_id=2999 player_id=p1
+[AUTO_TRIGGER] checking stage for player p1
+[OPT_COST] checking cost_type: Some("change_state"), entry_cost: true, entry_effect_action: Some("change_state")
+[HANDLE_OPT_COST] entry_cost=Some(Some("wait")) entry_effect=Some("change_state") effect_action=Some("change_state")
+[HANDLE_OPT_COST2] entering if: entry_cost.is_some=true
+[HANDLE_OPT_COST2] inside if: entry_effect.is_some=true
+[HANDLE_OPT_COST2] calling execute_effect with action=change_state
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+[RWC] cost_was_paid=true, effect_started=false, had_pending_sequential=false, saved_ctx=None
+RWC: calling process_current_ability
+DEBUG: execute_effect - action: change_state, source: none, destination: none
+
+thread 'test_modules::untested_abilities_test::test_change_state_choice_bug' (14612) panicked at tests\test_modules\untested_abilities_test.rs:274:5:
+assertion `left == right` failed: Target member should be in wait state
+  left: None
+ right: Some("wait")
+
+---- test_modules::untested_abilities_test::test_hand_size_cost_reduction_kotori stdout ----
+
+thread 'test_modules::untested_abilities_test::test_hand_size_cost_reduction_kotori' (11784) panicked at tests\test_modules\untested_abilities_test.rs:124:5:
+Should successfully play Kotori with 18 energy (base 20 - 2 reduction)
+
+---- test_modules::untested_abilities_test::test_success_live_zone_per_unit_heart stdout ----
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!-bp3-012-PR_{{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。 card_no=PL!-bp3-012-PR
+[AB]ABILITY "南 ことり" (3404)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(3404)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(3404)
+[AB]EFFECT select 1 card from ?
+DEBUG: execute_effect - action: select, source: none, destination: none
+[AB]EFFECT select 1 card from ?
+[AB]EFFECT gain 1 heart for live_end
+DEBUG: execute_effect - action: gain_resource, source: none, destination: none
+[AB]EFFECT gain 1 heart for live_end
+[FINALIZE_CHOICE] pending=true selected=[] context=None
+[LIVE_START_TRIGGER] triggering 1 abilities for player p1
+[LIVE_START_TRIGGER]   ability=PL!-bp3-012-PR_{{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。 card_no=PL!-bp3-012-PR
+[AB]ABILITY "南 ことり" (3404)
+[AB]  TRIGGER ライブ開始時 
+[AB]  TEXT {{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_03.png|heart03}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分の成功ライブカード置き場にあるカード1枚につき、選んだハートを1つ得る。
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(3404)
+[ABILITY]  >> sub-action[0]: action=select has_condition=false card_id=Some(3404)
+[AB]EFFECT select 1 card from ?
+DEBUG: execute_effect - action: select, source: none, destination: none
+[AB]EFFECT select 1 card from ?
+[AB]EFFECT gain 1 heart for live_end
+DEBUG: execute_effect - action: gain_resource, source: none, destination: none
+[AB]EFFECT gain 1 heart for live_end
+[FINALIZE_CHOICE] pending=true selected=[] context=None
+
+thread 'test_modules::untested_abilities_test::test_success_live_zone_per_unit_heart' (26452) panicked at tests\test_modules\untested_abilities_test.rs:468:9:
+assertion `left == right` failed: 3 cards in success zone → 3 hearts (got 0)
+  left: 0
+ right: 3
+
+---- test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_fails_no_hand_cards stdout ----
+Failed to resolve ability: Cannot pay sequential cost: Not enough cards in hand: need 1, have 0
+
+thread 'test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_fails_no_hand_cards' (13876) panicked at tests\test_modules\yoshiko_center_ability_test.rs:144:5:
+Ability activation should fail when no cards in hand for discard cost
+
+---- test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_cost_calculation stdout ----
+[CHANGE_STATE] candidates=[8774]
+▶ cost(move_cards, hand=>discard, effective_count=1, any_number=false, optional=false)
+  ├─ hand[1] → 1 match: [高坂 穂乃果]
+  └─ choice created (allow_skip=false)
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+▶ Select: 1 card(s) selected from zone="hand" → [高坂 穂乃果]
+[FINALIZE_CHOICE] pending=false selected=[4369] context=None
+[RWC] cost_was_paid=true, effect_started=false, had_pending_sequential=false, saved_ctx=None
+RWC: calling process_current_ability
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[APPEARANCE] no characters filter, stage_ids=[7604, 8774]
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(8774)
+[ABILITY]  >> sub-action[0]: action=move_cards has_condition=false card_id=Some(8774)
+DEBUG: execute_effect - action: move_cards, source: stage, destination: discard
+[GET_SEL] cards.len=3 filter.nh_color=None filter.nh_total=None
+[STAGE_EXACT] moved cards=[7604] vacated=Some(0) last_vacated=Some(0)
+[FINALIZE_MOVE] dest=discard cards=[7604] -> self.moved_cards=[7604]
+[ABILITY]  >> sub-action[1]: action=move_cards has_condition=false card_id=Some(8774)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: same_area
+[COST_REF] moved_cards=Some(7604) recently=Some(7604) self.moved=[7604]
+[COST_REF] referenced='previous_moved_card' name='高海千歌' base_cost=9 offset=2 resolved=11
+[NEED_HEART] filter: color=None total=None op=None src="discard" card_type=Some("member_card")
+[GET_SEL] cards.len=4 filter.nh_color=None filter.nh_total=None
+[FINALIZE_MOVE] dest=same_area cards=[9279] -> self.moved_cards=[7604]
+[APPEARANCE] no characters filter, stage_ids=[9279, 8774]
+
+thread 'test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_cost_calculation' (12708) panicked at tests\test_modules\yoshiko_center_ability_test.rs:275:5:
+Chika was moved from stage, area is now empty
+
+---- test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_no_valid_discard_targets stdout ----
+[AB]ABILITY "津島善子" (8774)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。（この能力はセンターエリアに登場している場合のみ起動できる。）
+[AB]  COST compound (2 sub-costs)
+[AB]COST compound (2 sub-costs) → OK
+[AB]COST set self → wait → OK
+[CHANGE_STATE] candidates=[8774]
+[AB]COST move 1 from hand to discard (src: 手札を1枚控え室に置く) → OK
+▶ cost(move_cards, hand=>discard, effective_count=1, any_number=false, optional=false)
+  ├─ hand[1] → 1 match: [絢瀬 絵里]
+  └─ choice created (allow_skip=false)
+[AB]  RESULT cost paid ✓
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+▶ Select: 1 card(s) selected from zone="hand" → [絢瀬 絵里]
+[FINALIZE_CHOICE] pending=false selected=[12549] context=None
+[RWC] cost_was_paid=true, effect_started=false, had_pending_sequential=false, saved_ctx=None
+RWC: calling process_current_ability
+[AB]ABILITY "津島善子" (8774)
+[AB]  TRIGGER 起動 1/turn
+[AB]  TEXT {{kidou.png|起動}}{{center.png|センター}}{{turn1.png|ターン1回}}このメンバーをウェイトにし、手札を1枚控え室に置く：このメンバー以外の『Aqours』のメンバー1人を自分のステージから控え室に置く。そうした場合、自分の控え室から、そのメンバーのコストに2を足した数に等しいコストの『Aqours』のメンバーカードを1枚、そのメンバーがいたエリアに登場させる。（この能力はセンターエリアに登場している場合のみ起動できる。）
+[AB]  COST compound (2 sub-costs)
+[AB]EFFECT multi-step (2 sub-actions)
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[AB]EFFECT multi-step (2 sub-actions)
+[APPEARANCE] no characters filter, stage_ids=[7604, 8774]
+[AB]COND appearance_condition check presence → PASS
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(8774)
+[ABILITY]  >> sub-action[0]: action=move_cards has_condition=false card_id=Some(8774)
+[AB]EFFECT move 1 from stage → discard (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: stage, destination: discard
+[AB]EFFECT move 1 from stage → discard (type: member_card)
+[GET_SEL] cards.len=3 filter.nh_color=None filter.nh_total=None
+[STAGE_EXACT] moved cards=[7604] vacated=Some(0) last_vacated=Some(0)
+[FINALIZE_MOVE] dest=discard cards=[7604] -> self.moved_cards=[7604]
+[ABILITY]  >> sub-action[1]: action=move_cards has_condition=false card_id=Some(8774)
+[AB]EFFECT move 1 from discard → same_area (type: member_card)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: same_area
+[AB]EFFECT move 1 from discard → same_area (type: member_card)
+[COST_REF] moved_cards=Some(7604) recently=Some(7604) self.moved=[7604]
+[COST_REF] referenced='previous_moved_card' name='高海千歌' base_cost=9 offset=2 resolved=11
+[NEED_HEART] filter: color=None total=None op=None src="discard" card_type=Some("member_card")
+[GET_SEL] cards.len=4 filter.nh_color=None filter.nh_total=None
+[FINALIZE_MOVE] dest=same_area cards=[9279] -> self.moved_cards=[7604]
+[AB]  RESULT effect applied ✓
+[AB]EFFECT multi-step (2 sub-actions)
+[APPEARANCE] no characters filter, stage_ids=[9279, 8774]
+[AB]COND appearance_condition check presence → PASS
+
+thread 'test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_no_valid_discard_targets' (17416) panicked at tests\test_modules\yoshiko_center_ability_test.rs:224:5:
+Chika was moved from stage, area is now empty
+
+---- test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_use_limit stdout ----
+[CHANGE_STATE] candidates=[8774]
+▶ cost(move_cards, hand=>discard, effective_count=1, any_number=false, optional=false)
+  ├─ hand[2] → 2 matches: [高坂 穂乃果, 絢瀬 絵里]
+  └─ choice created (allow_skip=false)
+DEBUG: handle_select_card - zone: 'hand', indices: [0], context: None
+▶ Select: 1 card(s) selected from zone="hand" → [高坂 穂乃果]
+[FINALIZE_CHOICE] pending=false selected=[4369] context=None
+[RWC] cost_was_paid=true, effect_started=false, had_pending_sequential=false, saved_ctx=None
+RWC: calling process_current_ability
+DEBUG: execute_effect - action: sequential, source: none, destination: none
+[APPEARANCE] no characters filter, stage_ids=[9664, 8774, 5229]
+[ABILITY] sequential: 2 actions, repeat_max=1 card_id=Some(8774)
+[ABILITY]  >> sub-action[0]: action=move_cards has_condition=false card_id=Some(8774)
+DEBUG: execute_effect - action: move_cards, source: stage, destination: discard
+[GET_SEL] cards.len=3 filter.nh_color=None filter.nh_total=None
+[FINALIZE_MOVE] dest=discard cards=[] -> self.moved_cards=[]
+[ABILITY]  >> sub-action[1]: action=move_cards has_condition=false card_id=Some(8774)
+DEBUG: execute_effect - action: move_cards, source: discard, destination: same_area
+[COST_REF] moved_cards=None recently=None self.moved=[]
+Failed to resolve ability: Unknown or unresolved cost reference: previous_moved_card
+[CHANGE_STATE] candidates=[8774]
+▶ cost(move_cards, hand=>discard, effective_count=1, any_number=false, optional=false)
+  ├─ hand[1] → 1 match: [絢瀬 絵里]
+  └─ choice created (allow_skip=false)
+
+thread 'test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_use_limit' (20980) panicked at tests\test_modules\yoshiko_center_ability_test.rs:329:5:
+Second activation should fail due to use limit
+
+
+failures:
+    test_modules::ayumu_pb1_test::ayumu_pb1_q199_no_baton_touch_after_effect_placement
+    test_modules::constant_edge_case_test::riko_compound_and_condition_both_met
+    test_modules::constant_edge_case_test::riko_compound_and_condition_removal
+    test_modules::dazzling_test::dazzling_q187_exclude_selected_liella_other_pickable
+    test_modules::eri_bp3_test::eri_q144_up_to_semantics_1_eligible_opponent_still_works
+    test_modules::gameplay_test::distortion_basic_energy_refresh_with_catchu
+    test_modules::gameplay_test::distortion_exact_max_boundary_6_wait_all_refreshed
+    test_modules::gameplay_test::distortion_max_cap_8_wait_refresh_6_only
+    test_modules::gameplay_test::distortion_q103_two_triggers_only_one_plus_1
+    test_modules::gameplay_test::you_q186_cost_reduced_playable
+    test_modules::konata_test::konata_q77_debuted_this_turn_activates_energy
+    test_modules::remaining_quick_test::eternalize_q204_two_niko_hearts_reduced
+    test_modules::setsuna_bp5_test::setsuna_q230_both_zero_heart02_gained
+    test_modules::setsuna_bp5_test::setsuna_unequal_success_cards_no_heart
+    test_modules::umi_bp3_test::umi_bp3_live_start_select_heart_and_scale_with_success
+    test_modules::untested_abilities_test::test_change_state_choice_bug
+    test_modules::untested_abilities_test::test_hand_size_cost_reduction_kotori
+    test_modules::untested_abilities_test::test_success_live_zone_per_unit_heart
+    test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_cost_calculation
+    test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_fails_no_hand_cards
+    test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_no_valid_discard_targets
+    test_modules::yoshiko_center_ability_test::test_yoshiko_center_ability_use_limit
+
+test result: FAILED. 505 passed; 22 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.69s
+
+error: test failed, to rerun pass `--test run_all`
+error: 1 target failed:
+    `--test run_all`
+PS C:\Users\trios\OneDrive\Documents\rabuka_reloaded\engine> 

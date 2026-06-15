@@ -1,0 +1,234 @@
+================================================================
+ABILITY COVERAGE ANALYSIS
+================================================================
+Unique abilities:   762
+Tested (resolver):  122  (16.0%)
+Untested:           640  (may include abilities tested outside resolver)
+
+--- BY TRIGGER TYPE ---
+  Note: '常時'(continuous) abilities are handled by recalculate_constants
+  outside the ability resolver, so 0% here is EXPECTED, not a gap.
+Trigger                         Total Tested     Rate
+----------------------------------------------------
+ライブ開始時                            218     40    18.3%
+登場                                212     36    17.0%
+ライブ成功時                             91     12    13.2%
+常時                                 90      0     0.0% (bypassed)
+起動                                 82     23    28.0%
+自動                                 58      8    13.8%
+ライブ開始時, 登場                          9      3    33.3%
+(none)                              2      0     0.0%
+
+--- BY ACTION TYPE ---
+  Status legend: 'tested (log)'=in resolver log | 'tested (file refs)'=in test
+  source but bypasses resolver (e.g. restriction) | 'UNTESTED'=nowhere
+Action Type                     Count Tested FileRefs                 Status
+--------------------------------------------------------------------------
+activate_ability                    3      0       86 tested (file refs)    
+appear                              3      1       89 tested (log)          
+change_state                       57      8        7 tested (log)          
+choice                             14      1      861 tested (log)          
+conditional_alternative             8      2        3 tested (log)          
+conditional_on_optional             3      2        1 tested (log)          
+conditional_on_result              10      4        0 tested (log)          
+discard_until_count                 1      1        0 tested (log)          
+do_nothing                          2      1        1 tested (log)          
+draw_card                         103     21        5 tested (log)          
+draw_until_count                    3      1        1 tested (log)          
+formation_change                    2      0        2 tested (file refs)    
+gain_ability                       12      3        8 tested (log)          
+gain_ability_from_source            1      0        1 tested (file refs)    
+gain_resource                     196     28        8 tested (log)          
+invalidate_ability                  1      0        0 UNTESTED              
+look_and_select                    70     10       35 tested (log)          
+look_at                             4      0        1 tested (file refs)    
+modify_cost                        15      1        0 tested (log)          
+modify_required_hearts             20      4        0 tested (log)          
+modify_score                       75     11       11 tested (log)          
+modify_yell_count                   1      1        1 tested (log)          
+move_cards                        221     32       16 tested (log)          
+opponent_action                     8      4        0 tested (log)          
+pay_energy                          3      1        3 tested (log)          
+place_energy_under_member           8      6        1 tested (log)          
+play_baton_touch                    1      0        0 UNTESTED              
+position_change                    20      6       33 tested (log)          
+re_yell                             1      0        1 tested (file refs)    
+repeat_procedure                    1      0        2 tested (file refs)    
+restriction                        13      1       29 tested (log)          
+reveal                              6      1      105 tested (log)          
+reveal_until_live_card              1      0        2 tested (file refs)    
+select                             27      6      676 tested (log)          
+sequential                        167     31       25 tested (log)          
+set_blade_count                     1      0        3 tested (file refs)    
+set_blade_type                      2      0        0 UNTESTED              
+set_card_identity                   3      0        2 tested (file refs)    
+set_heart_type                      5      1        0 tested (log)          
+set_required_hearts                 1      0        4 tested (file refs)    
+set_score                           1      1        1 tested (log)          
+
+--- UNTESTED ABILITIES BY CONDITION TYPE ---
+Condition Type                 Untested
+----------------------------------------
+card_count_condition                 88
+location_condition                   80
+comparison_condition                 68
+group_condition                      43
+revealed_cards                       22
+movement_condition                   20
+appearance_condition                 18
+temporal_condition                   18
+has_moved                             8
+dynamic_count                         5
+state_condition                       4
+ability_filter_condition              2
+custom                                2
+complex_condition                     1
+position_condition                    1
+per_unit                              1
+not_moved                             1
+otherwise_condition                   1
+card_blade_condition                  1
+state_change_condition                1
+energy_state_condition                1
+or_condition                          1
+drawn_cards                           1
+
+--- ZERO-TESTED ACTION TYPES (cross-referenced with test files) ---
+Action Type                     InLog FileRefs                         Status
+----------------------------------------------------------------------------
+invalidate_ability                  0        0                 TRULY UNTESTED
+play_baton_touch                    0        0                 TRULY UNTESTED
+set_blade_type                      0        0                 TRULY UNTESTED
+
+Truly untested action types (3):
+  invalidate_ability (1 abilities)
+  play_baton_touch (1 abilities)
+  set_blade_type (2 abilities)
+
+--- UNIQUE UNTESTED ABILITIES (first 40, by trigger+action) ---
+  [none        ][?               ] (必要ハートを確認する時、エールで出た{{icon_b_all.png|ALLブレード}}は任意の色のハートとして扱う。)
+      cards: PL!HS-PR-010-PR, PL!HS-PR-011-PR
+
+  [none        ][?               ] (エールで出た{{icon_score.png|スコア}}1つにつき、成功したライブのスコアの合計に1を加算する。)
+      cards: PL!HS-bp1-019-L, PL!N-sd1-025-SD
+
+  [ライブ成功時      ][choice          ] {{live_success.png|ライブ成功時}}{{icon_energy.png|E}}支払ってもよい：以下から1つを選ぶ。 ・自分の控え室からメンバー
+      cards: PL!HS-cl1-011-CL
+
+  [ライブ成功時      ][conditional_alte] {{live_success.png|ライブ成功時}}以下から1つを選ぶ。自分の成功ライブカード置き場に『虹ヶ咲』のカードがある場合、代わりに1つ以上を選ぶ。 
+      cards: PL!N-bp4-030-L
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_ener
+      cards: PL!SP-pb1-004-R, PL!SP-pb1-004-P＋
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、カードを1枚引く。
+      cards: PL!N-bp4-003-R, PL!N-bp4-003-P
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}自分のステージに、このメンバーよりコストが高いメンバーがいる場合、カードを1枚引く。
+      cards: PL!HS-pb1-013-R, PL!HS-pb1-013-P＋
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}自分のステージに、元々持つハートの数より多い数のハートを持つメンバーがいる場合、カードを1枚引く。
+      cards: PL!HS-PR-028-PR
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}自分のステージに「澁谷かのん」と「唐可可」がいる場合、カードを1枚引く。 (必要ハートを確認する時、エール
+      cards: PL!SP-bp1-024-L
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}自分の成功ライブカード置き場に『μ's』のカードがある場合、カードを1枚引く。
+      cards: PL!-pb1-032-L
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}自分が余剰ハートに{{heart_01.png|heart01}}を1つ以上持つ場合、カードを1枚引く。
+      cards: PL!-bp4-023-L
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}{{icon_energy.png|E}}支払ってもよい：カードを1枚引く。
+      cards: PL!SP-bp5-020-N
+
+  [ライブ成功時      ][draw_card       ] {{live_success.png|ライブ成功時}}自分のライブカード置き場に『DOLLCHESTRA』のカードがある場合、カードを1枚引く。
+      cards: PL!HS-pb1-021-N
+
+  [ライブ成功時      ][formation_change] {{live_success.png|ライブ成功時}}自分のステージにいるメンバーが『Liella!』のみの場合、自分のステージにいるメンバーをフォーメーション
+      cards: PL!SP-bp4-027-L
+
+  [ライブ成功時      ][look_and_select ] {{live_success.png|ライブ成功時}}手札を1枚控え室に置いてもよい：自分のデッキの上から、自分のライブの合計スコアに2を足した数に等しい枚数見
+      cards: PL!-bp5-001-R＋, PL!-bp5-001-P
+
+  [ライブ成功時      ][look_and_select ] {{live_success.png|ライブ成功時}}自分のデッキの上からカードを4枚見る。その中からハートに{{heart_04.png|heart04}}を
+      cards: PL!S-bp5-007-R, PL!S-bp5-007-P
+
+  [ライブ成功時      ][look_and_select ] {{live_success.png|ライブ成功時}}このターン、自分が余剰ハートを1つ以上持っている場合、自分のデッキの上からカードを2枚見る。その中から好き
+      cards: PL!HS-bp6-028-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}{{center.png|センター}}エールにより公開された自分のカードの中に、{{icon_score.
+      cards: PL!S-bp6-009-R＋, PL!S-bp6-009-P
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}{{icon_energy.png|E}}{{icon_energy.png|E}}{{icon_ener
+      cards: PL!SP-pb1-001-PR, PL!SP-pb1-001-R
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に『蓮ノ空』のメンバーカードが10枚以上ある場合、このカードのスコア
+      cards: PL!HS-bp1-022-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}このターン、自分のデッキがリフレッシュしていた場合、このカードのスコアを＋２する。
+      cards: PL!S-bp2-022-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}自分のステージにいるメンバーが持つハートの総数が、相手のステージにいるメンバーが持つハートの総数より多い場
+      cards: PL!-bp3-026-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}自分のステージにいるウェイト状態のメンバー1人につき、このカードのスコアを＋１する。
+      cards: PL!N-bp3-031-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}エールにより公開された自分の『虹ヶ咲』のメンバーカードが持つハートの中に{{heart_01.png|he
+      cards: PL!N-bp4-025-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}自分のステージのセンターエリアにいる『Liella!』のメンバーが、このターン中に移動している場合、このカ
+      cards: PL!SP-bp4-025-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中に名前が異なる『Liella!』のメンバーカードが5枚以上ある場合、
+      cards: PL!SP-bp4-026-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}自分が余剰ハートを3つ以上持っている場合、それらをすべて失い、このカードのスコアを＋１する。
+      cards: PL!S-bp5-020-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}自分か相手の成功ライブカード置き場にカードが2枚以上あり、かつエールにより公開された自分のカードの中に{{
+      cards: PL!SP-bp5-023-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}{{icon_energy.png|E}}を好きな数支払ってもよい：これにより支払った{{icon_ene
+      cards: PL!SP-bp5-025-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが2枚以上あるか、自分のステージにいるメンバーが持つハ
+      cards: LL-bp5-001-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}エールにより公開されている自分のライブカードの枚数が、エールにより公開されている相手のライブカードの枚数よ
+      cards: PL!S-bp5-022-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}相手のエネルギーが自分より多い場合、このカードのスコアを＋１する。
+      cards: PL!S-bp6-022-L
+
+  [ライブ成功時      ][modify_score    ] {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードがある場合、このカードのスコアを＋１する。
+      cards: PL!S-bp6-023-L
+
+  [ライブ成功時      ][move_cards      ] {{live_success.png|ライブ成功時}}自分と相手はそれぞれ、自身のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く。
+      cards: PL!N-bp4-007-R＋, PL!N-bp4-007-P
+
+  [ライブ成功時      ][move_cards      ] {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、カードを1枚デッキの一番上に置いてもよい。
+      cards: PL!HS-bp6-001-R＋, PL!HS-bp6-001-P
+
+  [ライブ成功時      ][move_cards      ] {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、『DOLLCHESTRA』のメンバーカードを1枚手札に加える。
+      cards: PL!HS-bp6-005-R＋, PL!HS-bp6-005-P
+
+  [ライブ成功時      ][move_cards      ] {{live_success.png|ライブ成功時}}手札を1枚控え室に置いてもよい：エールにより公開された自分のカードの中から、コスト2以下のメンバーカードか
+      cards: PL!N-PR-021-PR, PL!SP-PR-016-PR
+
+  [ライブ成功時      ][move_cards      ] {{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中にライブカードが1枚以上あるとき、自分のエネルギーデッキから、エネル
+      cards: PL!S-pb1-007-R, PL!S-pb1-007-P＋
+
+  [ライブ成功時      ][move_cards      ] {{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高い場合、このカードを手札に加えてもよい。この能力は、このカードが自分のエール
+      cards: PL!S-bp3-002-R, PL!S-bp3-002-P
+
+  [ライブ成功時      ][move_cards      ] {{live_success.png|ライブ成功時}}自分のエネルギーが相手より少ない場合、自分のエネルギーデッキから、エネルギーカードを1枚ウェイト状態で置く
+      cards: PL!N-bp4-001-R, PL!N-bp4-001-P
+
+  ... and 600 more unique untested abilities
+
+================================================================
+Generated by scripts/analyze_coverage.py
+Log: C:\Users\trios\OneDrive\Documents\rabuka_reloaded\test_debug.log
+================================================================

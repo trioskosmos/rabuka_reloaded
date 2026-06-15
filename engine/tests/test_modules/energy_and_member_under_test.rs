@@ -617,13 +617,20 @@ fn sayaka_activate_effect_does_not_place_under() {
         .push(game.id("PL!-sd1-010-SD"));
     game.give_energy(3);
     game.activate_ability(sayaka);
-    // GAP: reveal→under_member effect doesn't execute (engine skips effect after cost)
-    // The cost pays correctly (reveal removes from hand) but the move_cards effect is never reached.
+    // Cost: reveal 1 sayaka from hand → select the first (only) sayaka in hand
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+    // Effect: move revealed card under sayaka (Center)
     let under = game.state.player1.stage.get_under_cards(MemberArea::Center);
     assert_eq!(
         under.len(),
-        0,
-        "0 under (reveal→under_member not yet implemented in effect dispatch)"
+        1,
+        "1 card should be under sayaka after reveal→under_member"
+    );
+    assert_eq!(
+        under[0], sayaka_hand,
+        "The revealed sayaka should be under sayaka"
     );
 }
 

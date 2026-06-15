@@ -6,13 +6,18 @@ use std::collections::HashMap;
 #[derive(Debug, Clone)]
 pub struct GameModifiers {
     pub blade_modifiers: HashMap<i16, i32>,
+    pub set_blade_modifiers: HashMap<i16, i32>,
     pub blade_type_modifiers: HashMap<i16, BladeColor>,
     pub heart_modifiers: HashMap<i16, HashMap<HeartColor, i32>>,
+    pub set_heart_modifiers: HashMap<i16, HashMap<HeartColor, i32>>,
     pub heart_override: HashMap<i16, (HeartColor, u32)>,
     pub orientation_modifiers: HashMap<i16, String>,
     pub cost_modifiers: HashMap<i16, i32>,
+    pub set_cost_modifiers: HashMap<i16, i32>,
     pub score_modifiers: HashMap<i16, i32>,
+    pub set_score_modifiers: HashMap<i16, i32>,
     pub need_heart_modifiers: HashMap<i16, HashMap<HeartColor, i32>>,
+    pub set_need_heart_modifiers: HashMap<i16, HashMap<HeartColor, i32>>,
     pub constant_blade_bonuses: HashMap<i16, i32>,
     pub constant_cost_bonuses: HashMap<i16, i32>,
     pub constant_score_bonuses: HashMap<i16, i32>,
@@ -26,13 +31,18 @@ impl GameModifiers {
     pub fn new() -> Self {
         GameModifiers {
             blade_modifiers: HashMap::new(),
+            set_blade_modifiers: HashMap::new(),
             blade_type_modifiers: HashMap::new(),
             heart_modifiers: HashMap::new(),
+            set_heart_modifiers: HashMap::new(),
             heart_override: HashMap::new(),
             orientation_modifiers: HashMap::new(),
             cost_modifiers: HashMap::new(),
+            set_cost_modifiers: HashMap::new(),
             score_modifiers: HashMap::new(),
+            set_score_modifiers: HashMap::new(),
             need_heart_modifiers: HashMap::new(),
+            set_need_heart_modifiers: HashMap::new(),
             constant_blade_bonuses: HashMap::new(),
             constant_cost_bonuses: HashMap::new(),
             constant_score_bonuses: HashMap::new(),
@@ -55,7 +65,13 @@ impl GameModifiers {
     }
 
     pub fn get_blade_modifier(&self, card_id: i16) -> i32 {
-        self.blade_modifiers.get(&card_id).copied().unwrap_or(0)
+        let set = self.set_blade_modifiers.get(&card_id).copied().unwrap_or(0);
+        let add = self.blade_modifiers.get(&card_id).copied().unwrap_or(0);
+        set + add
+    }
+
+    pub fn set_blade_modifier(&mut self, card_id: i16, value: i32) {
+        self.set_blade_modifiers.insert(card_id, value);
     }
 
     pub fn set_blade_type_modifier(&mut self, card_id: i16, blade_color: BladeColor) {
@@ -78,6 +94,42 @@ impl GameModifiers {
         *colors.entry(color).or_insert(0) += delta;
     }
 
+    pub fn get_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
+        let set_v = self
+            .set_heart_modifiers
+            .get(&card_id)
+            .and_then(|colors| colors.get(&color))
+            .copied()
+            .unwrap_or(0);
+        let add_v = self
+            .heart_modifiers
+            .get(&card_id)
+            .and_then(|colors| colors.get(&color))
+            .copied()
+            .unwrap_or(0);
+        let wildcard_v = self
+            .heart_modifiers
+            .get(&card_id)
+            .and_then(|colors| colors.get(&HeartColor::Heart00))
+            .copied()
+            .unwrap_or(0);
+        let wildcard_set = self
+            .set_heart_modifiers
+            .get(&card_id)
+            .and_then(|colors| colors.get(&HeartColor::Heart00))
+            .copied()
+            .unwrap_or(0);
+        set_v + add_v + wildcard_v + wildcard_set
+    }
+
+    pub fn set_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i32) {
+        let colors = self
+            .set_heart_modifiers
+            .entry(card_id)
+            .or_insert_with(HashMap::new);
+        colors.insert(color, value);
+    }
+
     pub fn remove_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {
         if let Some(colors) = self.heart_modifiers.get_mut(&card_id) {
             if let Some(modifier) = colors.get_mut(&color) {
@@ -92,12 +144,17 @@ impl GameModifiers {
         }
     }
 
-    pub fn get_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
-        self.heart_modifiers
-            .get(&card_id)
+    pub fn get_heart_modifier_wildcard(&self, card_id: i16, color: HeartColor) -> i32 {
+        let by_color = self.heart_modifiers.get(&card_id);
+        let specific = by_color
             .and_then(|colors| colors.get(&color))
             .copied()
-            .unwrap_or(0)
+            .unwrap_or(0);
+        let wildcard = by_color
+            .and_then(|colors| colors.get(&HeartColor::Heart00))
+            .copied()
+            .unwrap_or(0);
+        specific + wildcard
     }
 
     pub fn set_heart_override(&mut self, card_id: i16, color: HeartColor, count: u32) {
@@ -125,11 +182,13 @@ impl GameModifiers {
     }
 
     pub fn get_score_modifier(&self, card_id: i16) -> i32 {
-        self.score_modifiers.get(&card_id).copied().unwrap_or(0)
+        let set = self.set_score_modifiers.get(&card_id).copied().unwrap_or(0);
+        let add = self.score_modifiers.get(&card_id).copied().unwrap_or(0);
+        set + add
     }
 
     pub fn set_score_modifier(&mut self, card_id: i16, value: i32) {
-        self.score_modifiers.insert(card_id, value);
+        self.set_score_modifiers.insert(card_id, value);
     }
 
     pub fn add_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, delta: i32) {
@@ -141,15 +200,23 @@ impl GameModifiers {
     }
 
     pub fn get_need_heart_modifier(&self, card_id: i16, color: HeartColor) -> i32 {
-        self.need_heart_modifiers
+        let set = self
+            .set_need_heart_modifiers
             .get(&card_id)
             .and_then(|colors| colors.get(&color))
             .copied()
-            .unwrap_or(0)
+            .unwrap_or(0);
+        let add = self
+            .need_heart_modifiers
+            .get(&card_id)
+            .and_then(|colors| colors.get(&color))
+            .copied()
+            .unwrap_or(0);
+        set + add
     }
 
     pub fn set_need_heart_modifier(&mut self, card_id: i16, color: HeartColor, value: i32) {
-        self.need_heart_modifiers
+        self.set_need_heart_modifiers
             .entry(card_id)
             .or_default()
             .insert(color, value);
@@ -172,12 +239,14 @@ impl GameModifiers {
         }
     }
 
-    pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
-        self.cost_modifiers.insert(card_id, value);
+    pub fn get_cost_modifier(&self, card_id: i16) -> i32 {
+        let set = self.set_cost_modifiers.get(&card_id).copied().unwrap_or(0);
+        let add = self.cost_modifiers.get(&card_id).copied().unwrap_or(0);
+        set + add
     }
 
-    pub fn get_cost_modifier(&self, card_id: i16) -> i32 {
-        self.cost_modifiers.get(&card_id).copied().unwrap_or(0)
+    pub fn set_cost_modifier(&mut self, card_id: i16, value: i32) {
+        self.set_cost_modifiers.insert(card_id, value);
     }
 
     pub fn get_orientation_modifier(&self, card_id: i16) -> Option<&String> {

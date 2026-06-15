@@ -26,23 +26,25 @@ fn test_yoshiko_single_target() {
     // Activate ability
     game.activate_ability(yoshiko);
 
-    // Process the ability
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
+    // Handle all pending choices: cost (hand discard) + effect (stage member selection if needed)
+    while game.has_pending_choice() {
+        println!("Resolving pending choice...");
+        game.select_indices(&[0]);
+    }
 
     println!("=== AFTER ACTIVATION ===");
     println!("Stage: {:?}", game.player().stage.stage);
     println!("Hand: {:?}", game.player().hand.cards);
     println!("Discard: {:?}", game.player().waitroom.cards);
 
-    // Verify results
+    // Verify cost: Yoshiko in wait state, hand card discarded
     assert!(
         game.player().stage.stage[1] == yoshiko,
         "Yoshiko should still be on stage in wait state"
     );
-    assert!(
-        game.player().hand.cards.len() < 1,
+    assert_eq!(
+        game.player().hand.cards.len(),
+        0,
         "Hand card should be discarded"
     );
     assert!(
@@ -50,9 +52,15 @@ fn test_yoshiko_single_target() {
         "Hand card should be in discard"
     );
 
-    // Note: Single target should work without choice, but main effect execution has engine limitations
-    // The debug output shows the ability executed correctly with costs paid and effects triggered
+    // Effect: Chika (only other Aqours member) moved to discard, conditional summon failed (no discard targets)
+    assert!(
+        game.player().waitroom.cards.contains(&chika),
+        "Chika should be in discard (moved by effect)"
+    );
+    assert!(
+        !game.player().stage.stage.contains(&chika),
+        "Chika should no longer be on stage"
+    );
 
-    println!("✅ Test passed - Yoshiko ability mechanics working correctly with single target!");
-    println!("Note: Main effect execution has engine limitations but core functionality verified");
+    println!("✅ Test passed - Yoshiko ability working correctly with single target!");
 }

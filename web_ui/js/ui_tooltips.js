@@ -27,18 +27,25 @@ export const Tooltips = {
             const idMatch = cardOrId.match(/ID: (\d+)/);
             if (idMatch) card = Tooltips.findCardById(parseInt(idMatch[1]));
         }
+        // Stage slot objects have card_no but not id/card_id — resolve from database
+        if (!card && cardOrId.card_no) {
+            card = State.resolveCardData(cardOrId.card_no);
+        }
 
         if (!card) {
             if (actionId !== undefined && actionId !== 0) el.setAttribute('data-action-id', actionId);
             return;
         }
 
+        if ((card.id === undefined && card.card_id === undefined) && card.card_no) {
+            const resolved = State.resolveCardData(card.card_no);
+            if (resolved) card = resolved;
+        }
+
         const cid = card.id !== undefined ? card.id : card.card_id;
         if (cid !== undefined && cid !== -1) el.setAttribute('data-card-id', cid);
         if (card.name) el.setAttribute('data-card-name', card.name);
 
-        // Always attach card text - ability text is public knowledge from master data
-        // VANILLA MODE: Don't attach ability text in vanilla/abilityless mode
         const rawText = (State.cardSet === 'vanilla') ? "" : TextEnricher.getEffectiveRawText(card);
         if (rawText) el.setAttribute('data-text', rawText);
 
@@ -153,6 +160,12 @@ export const Tooltips = {
             return;
         }
 
+        // Product/series prefix from card_no (e.g. "PL!-pb1" from "PL!-pb1-014-R")
+        let productLabel = "";
+        if (cardObj && cardObj.card_no) {
+            const parts = cardObj.card_no.match(/^(PL!-[A-Za-z0-9]+)/);
+            if (parts) productLabel = parts[1];
+        }
         const cardIdLabel = (cardObj && cardObj.id !== undefined && cardObj.id >= 0) ? ` <span style="opacity:0.6; font-size:0.8em;">(ID: ${cardObj.id})</span>` : "";
         
         let titleText = (dataSource.dataset.cardName || "Card Detail");
@@ -160,16 +173,26 @@ export const Tooltips = {
 
         if (cardObj) {
             const translated = window.translateCard ? window.translateCard(cardObj) : { name: cardObj.name, groups: cardObj.groups, units: cardObj.units };
-            titleText = translated.name;
+            titleText = productLabel ? `${productLabel} — ${translated.name}` : translated.name;
         }
-        
+
+        // Show raw ability JSON when Shift is held
+        let rawJsonHtml = "";
+        if (cardObj && e?.shiftKey) {
+            const abilityText = TextEnricher.getEffectiveRawText(cardObj);
+            if (abilityText) {
+                const escaped = abilityText.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                rawJsonHtml = `<pre style="margin-top:8px; padding:6px; background:#1a1a2e; border:1px solid #444; border-radius:4px; font-size:0.7rem; line-height:1.3; max-height:200px; overflow:auto; white-space:pre-wrap; word-break:break-all;">${escaped}</pre>`;
+            }
+        }
+
         if (descTitle) {
             descTitle.innerHTML = titleText + cardIdLabel;
             descTitle.style.display = titleText ? 'block' : 'none';
         }
 
         const enrichedText = combinedText ? TextEnricher.enrichAbilityText(combinedText) : "";
-        descContent.innerHTML = metadataHtml + enrichedText;
+        descContent.innerHTML = metadataHtml + enrichedText + rawJsonHtml;
         descContent.dataset.rawText = enrichedText;
         descPanel.classList.add('active');
 

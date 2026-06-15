@@ -48,6 +48,8 @@ fn test_yoshiko_group_matching() {
             None,
             None,
             None,
+            None,
+            None,
         );
         assert!(
             filter.matches(&game.state.card_database, card_id, true),

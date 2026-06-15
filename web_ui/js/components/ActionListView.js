@@ -102,7 +102,9 @@ export const ActionListView = {
 
         if (systemActions.length > 0) {
             addHeader(i18n.t('system'));
-            systemActions.forEach(a => listDiv.appendChild(ActionButtons.createActionButton(a, false, a.action_type === 'Pass' ? 'confirm system' : 'system', state)));
+            systemActions.forEach(a => {
+                listDiv.appendChild(ActionButtons.createActionButton(a, false, a.action_type === 'Pass' ? 'confirm system' : 'system', state));
+            });
         }
 
         if (abilityActions.length > 0) {
@@ -215,6 +217,75 @@ export const ActionListView = {
                         }
                     });
                     groupDiv.appendChild(areasDiv);
+
+                    // Double Baton grid: render pair+placement buttons if available
+                    const doubleBatonPairs = firstA.parameters?.double_baton_pairs;
+                    if (doubleBatonPairs && doubleBatonPairs.length > 0) {
+                        const dbDiv = document.createElement('div');
+                        dbDiv.style.cssText = 'margin-top: 6px; border-top: 1px dashed rgba(255, 215, 0, 0.3); background: rgba(0,0,0,0.15); padding: 6px; border-radius: 4px;';
+                        
+                        const dbLabel = document.createElement('div');
+                        dbLabel.style.cssText = 'font-size: 0.7em; color: #ffda79; margin-bottom: 4px; font-weight: bold;';
+                        dbLabel.textContent = 'DOUBLE BATON';
+                        dbDiv.appendChild(dbLabel);
+
+                        // Group pairs by their 2 replacement areas
+                        const pairGroups = {};
+                        doubleBatonPairs.forEach(pair => {
+                            const key = pair.areas.sort().join('&');
+                            if (!pairGroups[key]) { pairGroups[key] = []; }
+                            pairGroups[key].push(pair);
+                        });
+
+                        const areaOrder = ['left', 'center', 'right'];
+                        Object.keys(pairGroups).forEach(key => {
+                            const row = document.createElement('div');
+                            row.className = 'action-group-buttons grid-3';
+                            row.style.cssText = 'padding: 2px; border-radius: 4px; margin-top: 2px;';
+
+                            const areas = key.split('&');
+                            areaOrder.forEach(expectedArea => {
+                                const pairForPlacement = pairGroups[key].find(p => p.placement === expectedArea);
+                                if (pairForPlacement) {
+                                    const btn = document.createElement('button');
+                                    btn.className = 'action-btn';
+                                    btn.style.cssText = 'background: linear-gradient(180deg, rgba(255,215,0,0.2) 0%, rgba(255,215,0,0.1) 100%); border: 1px solid rgba(255,215,0,0.3); width: 100%; padding: 6px; min-height: 40px; color: #ffda79; border-radius: 4px; cursor: pointer; font-size: 0.75em;';
+                                    
+                                    const areaA = areas[0].charAt(0).toUpperCase() + areas[0].slice(1, 2);
+                                    const areaB = areas[1].charAt(0).toUpperCase() + areas[1].slice(1, 2);
+                                    const placeLabel = expectedArea.charAt(0).toUpperCase() + expectedArea.slice(1);
+                                    btn.innerHTML = `<div style="font-size:0.7em;">(${areaA}&${areaB})→${placeLabel}</div><div>♡${pairForPlacement.cost}</div>`;
+                                    
+                                    // On click: send PlayMemberToStage with card_indices specifying the 2 areas
+                                    const areaIndexMap = { 'left': 0, 'center': 1, 'right': 2 };
+                                    const replaceIndices = areas.map(a => areaIndexMap[a]);
+                                    const placement = areaIndexMap[expectedArea];
+                                    
+                                    const dbActionParams = {
+                                        card_id: firstA.parameters?.card_id,
+                                        card_index: firstA.parameters?.card_index,
+                                        card_indices: replaceIndices,
+                                        stage_area: expectedArea,
+                                        use_baton_touch: true,
+                                        card_name: firstA.parameters?.card_name,
+                                        card_no: firstA.parameters?.card_no,
+                                    };
+                                    btn.onclick = () => {
+                                        if (window.doAction) window.doAction({ action_type: 'PlayMemberToStage', parameters: dbActionParams });
+                                    };
+                                    row.appendChild(btn);
+                                } else {
+                                    const spacer = document.createElement('div');
+                                    spacer.style.cssText = 'min-height: 30px; display: flex; align-items: center; justify-content: center; opacity: 0.2; font-size: 0.6em; border: 1px dashed rgba(255,255,255,0.1);';
+                                    spacer.textContent = '--';
+                                    row.appendChild(spacer);
+                                }
+                            });
+                            dbDiv.appendChild(row);
+                        });
+
+                        groupDiv.appendChild(dbDiv);
+                    }
                 } else {
                     console.warn('[ActionListView] No available_areas found for action:', firstA);
                 }

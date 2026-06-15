@@ -71,7 +71,13 @@ export const ViewState = {
 
         const pendingChoice = state.pending_choice;
         const selectionCards = pendingChoice?.selection_cards || [];
-        const selectionActions = selectionCards.map((_, idx) => validTargets.selection[idx]);
+        const selectionActions = selectionCards.map(c => {
+            const cardId = c.id !== undefined ? c.id : c.card_id;
+            return state.legal_actions?.find(a => {
+                const params = a.parameters || {};
+                return params.card_id === cardId || params.card_id === c.card_id;
+            });
+        });
 
         return {
             perspectivePlayer,

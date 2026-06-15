@@ -26,9 +26,11 @@ fn test_yoshiko_debug_behavior() {
     // Activate ability
     game.activate_ability(yoshiko);
 
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
+    // Handle all pending choices: cost (hand discard) + any effect choices
+    while game.has_pending_choice() {
+        println!("Resolving pending choice...");
+        game.select_indices(&[0]);
+    }
 
     println!("=== AFTER ACTIVATION ===");
     println!("Stage: {:?}", game.player().stage.stage);
@@ -39,27 +41,15 @@ fn test_yoshiko_debug_behavior() {
     let yoshiko_still_on_stage = game.player().stage.stage[1] == yoshiko;
     let chika_still_on_stage = game.player().stage.stage[0] == chika;
     let hand_card_discarded = game.player().waitroom.cards.contains(&hand_card);
-    let someone_in_discard = game
-        .player()
-        .waitroom
-        .cards
-        .iter()
-        .any(|&id| id == yoshiko || id == chika);
 
     println!("Yoshiko still on stage: {}", yoshiko_still_on_stage);
     println!("Chika still on stage: {}", chika_still_on_stage);
     println!("Hand card discarded: {}", hand_card_discarded);
-    println!("Someone in discard: {}", someone_in_discard);
 
     assert_eq!(
         game.player().stage.stage[1],
         yoshiko,
         "Yoshiko remains on stage after activation (wait state)"
-    );
-    assert_eq!(
-        game.player().stage.stage[0],
-        chika,
-        "Chika remains on stage"
     );
     assert!(
         game.player().waitroom.cards.contains(&hand_card),
@@ -68,6 +58,13 @@ fn test_yoshiko_debug_behavior() {
     assert_eq!(
         game.state.player1.hand.cards.len(),
         0,
-        "hand card was discarded as cost, no card drawn back"
+        "hand card was discarded as cost"
+    );
+    // Effect action 1: no valid Aqours stage targets (chika is SD filler, not Aqours)
+    // → effect errors or skips, stage unchanged for chika
+    assert_eq!(
+        game.player().stage.stage[0],
+        chika,
+        "Chika remains on stage (not Aqours, effect has no valid targets)"
     );
 }

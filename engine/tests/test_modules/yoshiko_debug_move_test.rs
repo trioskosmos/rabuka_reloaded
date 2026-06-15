@@ -36,6 +36,8 @@ fn test_yoshiko_debug_move_execution() {
         None,
         None,
         Some(yoshiko), // exclude_self
+        None,
+        None,
     );
 
     let stage_data = game.player().stage.stage.clone();
@@ -64,9 +66,11 @@ fn test_yoshiko_debug_move_execution() {
     println!("\n=== ACTUAL ABILITY EXECUTION ===");
     game.activate_ability(yoshiko);
 
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
+    // Handle all pending choices: cost (hand discard) + effect (stage member selection if any)
+    while game.has_pending_choice() {
+        println!("Resolving pending choice...");
+        game.select_indices(&[0]);
+    }
 
     println!("=== AFTER ACTIVATION ===");
     println!("Stage: {:?}", game.player().stage.stage);

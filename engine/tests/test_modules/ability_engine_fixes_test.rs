@@ -1,0 +1,830 @@
+use crate::helpers::*;
+use rabuka_engine::zones::MemberArea;
+
+// ====================================================================
+// PL!SP-pb1-008-R (若菜四季) — 登場 trigger: draw → select area → move → conditional swap
+// ====================================================================
+// Full text:
+//   カードを1枚引く。その後、登場したエリアとは別の自分のエリア1つを選ぶ。
+//   このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、
+//   そのメンバーは、このメンバーがいたエリアに移動させる。
+//
+// Parsed structure (after 移動する dispatch rule fix):
+//   sequential [
+//     draw_card(1),
+//     sequential [
+//       select(area, count=1),
+//       position_change(no dest),
+//       position_change(destination="same_area", condition=card_count_condition)
+//     ]
+//   ]
+//
+// Parts:
+//   - Trigger: 登場 (debut, auto-fires on play_to_stage)
+//   - Step 1: draw 1 card from deck to hand
+//   - Step 2a: area_select choice (excludes current position)
+//   - Step 2b: position_change uses selected area as destination
+//   - Step 2c: conditional position_change with same_area → no-op (swap already done)
+// ====================================================================
+
+/// Play 若菜四季 to Center, select empty Right → card moves to Right.
+#[test]
+fn wakana_008_debut_move_to_empty_area() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let wakana = game.id("PL!SP-pb1-008-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Fill deck so draw works
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_hand(wakana);
+    game.give_energy(15);
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 1,
+        "Deck should have 1 fewer card after draw"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "Should have drawn 1 card"
+    );
+    assert!(
+        !game.state.player1.hand.cards.contains(&wakana),
+        "Wakana should not be in hand (played to stage)"
+    );
+
+    // Step 2a: area_select choice should appear
+    let choice = game
+        .state
+        .ability_queue
+        .is_waiting_for_choice()
+        .cloned()
+        .expect("Area select choice should be pending");
+    // Verify it's a SelectTarget with area_select target
+    match &choice {
+        rabuka_engine::ability::types::Choice::SelectTarget {
+            target, options, ..
+        } => {
+            assert_eq!(target, "area_select", "Choice target should be area_select");
+            // Current position is Center(1), so options should exclude center
+            if let Some(opts) = options {
+                assert!(
+                    !opts.contains(&"center".to_string()),
+                    "Center should NOT be a valid option (current position)"
+                );
+                assert!(
+                    opts.contains(&"left".to_string()),
+                    "Left should be a valid option"
+                );
+                assert!(
+                    opts.contains(&"right".to_string()),
+                    "Right should be a valid option"
+                );
+            }
+        }
+        _ => panic!("Expected SelectTarget choice, got {:?}", choice),
+    }
+
+    // Select Right (index 2 among [left, right] → option 1 since we have 2 options)
+    // Options are ["left", "right"], so option 1 = "right"
+    game.select_option(1);
+
+    // After position_change: wakana should be at Right, Center empty
+    assert_eq!(
+        game.state.player1.stage.stage[0], -1,
+        "Left should be empty"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], -1,
+        "Center should be empty (wakana moved out)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], wakana,
+        "Wakana should now be at Right"
+    );
+
+    // No further choice should be pending (same_area was a no-op)
+    assert!(
+        game.state.ability_queue.is_waiting_for_choice().is_none(),
+        "No choice should remain after position change completes"
+    );
+}
+
+/// Play 若菜四季 to Center where Right is occupied → swap occurs.
+#[test]
+fn wakana_008_debut_move_to_occupied_area() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let wakana = game.id("PL!SP-pb1-008-R");
+    let occupant = game.id("PL!-sd1-010-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.add_to_hand(wakana);
+    game.give_energy(15);
+
+    // Occupant at Right, Center empty for debut
+    game.state.player1.stage.stage = [-1, -1, occupant];
+
+    game.play_to_stage(wakana, MemberArea::Center);
+
+    // Draw happened
+    // Area select choice → pick Right
+    assert!(
+        game.has_pending_choice(),
+        "Area select choice should appear"
+    );
+
+    // Options should exclude Center (current), include Left and Right
+    // Options: ["left", "right"] → option 1 = "right"
+    game.select_option(1);
+
+    // After position_change (swap): occupant goes to Center, wakana goes to Right
+    assert_eq!(
+        game.state.player1.stage.stage[0], -1,
+        "Left should be empty"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], occupant,
+        "Occupant should now be at Center (swapped)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], wakana,
+        "Wakana should be at Right"
+    );
+
+    assert!(
+        game.state.ability_queue.is_waiting_for_choice().is_none(),
+        "No choice should remain"
+    );
+}
+
+// ====================================================================
+// PL!SP-bp2-008-R (若菜四季) — 起動 trigger: select area → move → conditional swap
+// ====================================================================
+// Text:
+//   起動 ターン1回 E：このメンバーがいるエリアとは別の自分のエリア1つを選ぶ。
+//   このメンバーをそのエリアに移動する。選んだエリアにメンバーがいる場合、
+//   そのメンバーは、このメンバーがいたエリアに移動させる。
+//
+// Parts:
+//   - Trigger: 起動 (activation, manual)
+//   - Use limit: ターン1回 (once per turn)
+//   - Cost: E (1 active energy)
+//   - Effect: identical body to pb1-008-R (area select → position_change → same_area)
+// ====================================================================
+
+/// Activate bp2-008-R, pay cost, select empty area → move succeeds.
+#[test]
+fn wakana_bp2_008_activate_move_to_empty_area() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let wakana = game.id("PL!SP-bp2-008-R");
+    let _filler = game.id("PL!-sd1-010-SD");
+
+    // Deploy wakana to stage manually (no debut ability test here)
+    game.state.player1.stage.stage = [wakana, -1, -1];
+    game.give_energy(1);
+
+    let energy_before = game.state.player1.energy_zone.active_energy_count;
+
+    // Activate ability
+    game.activate_ability(wakana);
+
+    // Cost is paid first (1 energy)
+    assert_eq!(
+        game.state.player1.energy_zone.active_energy_count,
+        energy_before - 1,
+        "1 energy should be consumed"
+    );
+
+    // Then area_select choice appears
+    let choice = game
+        .state
+        .ability_queue
+        .is_waiting_for_choice()
+        .cloned()
+        .expect("Area select choice should appear after cost payment");
+    match &choice {
+        rabuka_engine::ability::types::Choice::SelectTarget {
+            target, options, ..
+        } => {
+            assert_eq!(target, "area_select", "Choice target should be area_select");
+            // Current position is Left(0), so options should exclude left
+            if let Some(opts) = options {
+                assert!(
+                    !opts.contains(&"left".to_string()),
+                    "Left should NOT be a valid option (current position)"
+                );
+                assert!(
+                    opts.contains(&"center".to_string()),
+                    "Center should be valid"
+                );
+                assert!(opts.contains(&"right".to_string()), "Right should be valid");
+            }
+        }
+        _ => panic!("Expected SelectTarget choice, got {:?}", choice),
+    }
+
+    // Select Center → wakana moves from Left to Center
+    // Options: ["center", "right"] → option 0 = "center"
+    game.select_option(0);
+
+    assert_eq!(
+        game.state.player1.stage.stage[0], -1,
+        "Left should be empty after move"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], wakana,
+        "Wakana should be at Center"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], -1,
+        "Right should still be empty"
+    );
+
+    assert!(
+        game.state.ability_queue.is_waiting_for_choice().is_none(),
+        "No choice should remain"
+    );
+}
+
+/// Activate bp2-008-R, swap with occupant at selected area.
+#[test]
+fn wakana_bp2_008_activate_move_to_occupied_area() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let wakana = game.id("PL!SP-bp2-008-R");
+    let occupant = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [wakana, occupant, -1];
+    game.give_energy(1);
+
+    game.activate_ability(wakana);
+
+    // Cost paid, area select appears
+    assert!(
+        game.has_pending_choice(),
+        "Area select should appear after cost"
+    );
+
+    // Current position is Left(0), options: ["center", "right"]
+    // Select Center → option 0 (occupied → triggers swap)
+    game.select_option(0);
+
+    // Swap: occupant→Left, wakana→Center
+    assert_eq!(
+        game.state.player1.stage.stage[0], occupant,
+        "Occupant should be at Left (swapped)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], wakana,
+        "Wakana should be at Center (swapped)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], -1,
+        "Right should be empty"
+    );
+
+    assert!(
+        game.state.ability_queue.is_waiting_for_choice().is_none(),
+        "No choice should remain"
+    );
+}
+
+/// Use limit: second activation in same turn is blocked.
+#[test]
+fn wakana_bp2_008_use_limit_blocks_second_activation() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let wakana = game.id("PL!SP-bp2-008-R");
+    let _filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [wakana, -1, -1];
+    game.give_energy(3);
+
+    // First activation: succeeds
+    game.activate_ability(wakana);
+    // Pay cost, select Center
+    assert!(
+        game.has_pending_choice(),
+        "Area select for first activation"
+    );
+    game.select_option(0); // Center
+    assert!(
+        game.state.player1.energy_zone.active_energy_count == 2,
+        "1 energy spent, 2 remaining"
+    );
+
+    // Second activation: should fail due to use limit
+    let result = game.try_activate_ability(wakana);
+    assert!(result.is_err(), "Second activation should fail (use limit)");
+}
+
+// ====================================================================
+// PL!SP-pb1-003-R (嵐 千砂都) — 登場 trigger: rotation
+// ====================================================================
+// Text:
+//   自分のステージにいるメンバーが『5yncri5e!』のみの場合、自分と対戦相手は、
+//   センター→左、左→右、右→センターにそれぞれ移動させる。
+//
+// Parts:
+//   - Trigger: 登場 (debut)
+//   - Condition: all stage members are 5yncri5e!
+//   - Target: both (self then opponent)
+//   - Rotation: center→left, left→right, right→center
+// ====================================================================
+
+/// Full 3-member 5yncri5e! rotation on self stage.
+#[test]
+fn chisato_003_rotation_full_stage() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chisato = game.id("PL!SP-pb1-003-R");
+    // Two other 5yncri5e! members (use N rarity for filler status but same unit)
+    let member_a = game.id("PL!SP-pb1-014-N");
+    let member_b = game.id("PL!SP-pb1-019-N");
+
+    game.add_to_hand(chisato);
+    game.give_energy(9);
+
+    // Set up: 2 existing 5yncri5e! members at Left and Center
+    game.state.player1.stage.stage = [member_a, member_b, -1];
+    // We'll play chisato to Right
+
+    game.play_to_stage(chisato, MemberArea::RightSide);
+
+    // Debut trigger fires, condition check passes (all are 5yncri5e!)
+    // Rotation should have happened automatically:
+    // Before: [member_a, member_b, chisato]
+    // After:  [member_b, chisato, member_a]
+    //   left(0)←center(1): member_b←old member_b (stays... wait)
+    //   Actually rotation: center→left, left→right, right→center
+    //   center(1)→left(0): member_b moves to left
+    //   left(0)→right(2): member_a moves to right
+    //   right(2)→center(1): chisato moves to center
+    //   Result: [member_b, chisato, member_a]
+
+    assert!(
+        game.state.ability_queue.is_waiting_for_choice().is_none(),
+        "Rotation should complete without choices (predetermined destinations)"
+    );
+
+    assert_eq!(
+        game.state.player1.stage.stage[0], member_b,
+        "Left should have the member that was at Center (rotation: center→left)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], chisato,
+        "Center should have the member that was at Right (rotation: right→center)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], member_a,
+        "Right should have the member that was at Left (rotation: left→right)"
+    );
+}
+
+/// Partial stage (2 members): only occupied positions rotate.
+#[test]
+fn chisato_003_rotation_partial_stage() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chisato = game.id("PL!SP-pb1-003-R");
+    let member_a = game.id("PL!SP-pb1-014-N");
+
+    game.add_to_hand(chisato);
+    game.give_energy(9);
+
+    // Only 1 other 5yncri5e! member at Left
+    game.state.player1.stage.stage = [member_a, -1, -1];
+
+    game.play_to_stage(chisato, MemberArea::Center);
+
+    // Before: [member_a, chisato, -1]
+    // Rotation: center(1)→left(0): chisato moves to Left
+    //           left(0)→right(2): member_a moves to Right
+    //           right(2)→center(1): empty, nothing moves
+    // Result: [chisato, -1, member_a]
+
+    assert!(
+        game.state.ability_queue.is_waiting_for_choice().is_none(),
+        "Rotation should complete without choices"
+    );
+
+    assert_eq!(
+        game.state.player1.stage.stage[0], chisato,
+        "Left should have chisato (center→left)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], -1,
+        "Center should be empty (right was empty)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], member_a,
+        "Right should have member_a (left→right)"
+    );
+}
+
+/// Condition fails when non-5yncri5e! member on stage → no rotation.
+#[test]
+fn chisato_003_rotation_condition_fails_with_non_5yncri5e() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chisato = game.id("PL!SP-pb1-003-R");
+    let non_5yncri5e = game.id("PL!-sd1-010-SD");
+
+    game.add_to_hand(chisato);
+    game.give_energy(9);
+
+    game.state.player1.stage.stage = [non_5yncri5e, -1, -1];
+
+    game.play_to_stage(chisato, MemberArea::Center);
+
+    // Condition fails → no rotation, card stays in its debut position
+    assert_eq!(
+        game.state.player1.stage.stage[0], non_5yncri5e,
+        "Left should still have non-5yncri5e member"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], chisato,
+        "Center should still have chisato (no rotation)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], -1,
+        "Right should still be empty"
+    );
+}
+
+/// Single occupant 5yncri5e! only.
+#[test]
+fn chisato_003_rotation_single_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chisato = game.id("PL!SP-pb1-003-R");
+
+    game.add_to_hand(chisato);
+    game.give_energy(9);
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(chisato, MemberArea::Center);
+
+    // Before: [-1, chisato, -1]
+    // Rotation: center(1)→left(0): chisato moves to Left
+    //           left was empty, right was empty → result: [chisato, -1, -1]
+
+    assert_eq!(
+        game.state.player1.stage.stage[0], chisato,
+        "Left should have chisato (center→left rotation of solo member)"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], -1,
+        "Center should be empty after move"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[2], -1,
+        "Right should still be empty"
+    );
+}
+
+// ====================================================================
+// PL!SP-pb1-009-R (鬼塚夏美) — 登場 trigger: conditional draw
+// ====================================================================
+// Text:
+//   自分のステージにほかの『5yncri5e!』のメンバーがいる場合、カードを1枚引く。
+//
+// Parts:
+//   - Trigger: 登場 (debut)
+//   - Condition: group_condition(5yncri5e!, location=stage, exclude_self=true)
+//   - Effect: draw_card(1)
+// ====================================================================
+
+/// Other 5yncri5e! member on stage → draw 1.
+#[test]
+fn natsumi_009_draw_with_other_5yncri5e() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let natsumi = game.id("PL!SP-pb1-009-R");
+    let other_5yncri5e = game.id("PL!SP-pb1-014-N");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_hand(natsumi);
+    game.give_energy(4);
+
+    game.state.player1.stage.stage = [other_5yncri5e, -1, -1];
+
+    game.play_to_stage(natsumi, MemberArea::Center);
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&natsumi),
+        "Natsumi should not be in hand (played to stage)"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 1,
+        "Deck should have 1 fewer card after draw"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
+        "Should draw 1 card when other 5yncri5e! on stage"
+    );
+}
+
+/// No other 5yncri5e! member → no draw.
+#[test]
+fn natsumi_009_no_draw_when_alone() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let natsumi = game.id("PL!SP-pb1-009-R");
+    let non_5yncri5e = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.push(non_5yncri5e);
+    }
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_hand(natsumi);
+    game.give_energy(4);
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+
+    game.play_to_stage(natsumi, MemberArea::Center);
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&natsumi),
+        "Natsumi should not be in hand (played to stage)"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "Should NOT draw when no other 5yncri5e! on stage"
+    );
+}
+
+/// Non-5yncri5e! member on stage instead → no draw.
+#[test]
+fn natsumi_009_no_draw_with_non_5yncri5e() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let natsumi = game.id("PL!SP-pb1-009-R");
+    let non_5yncri5e = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.push(non_5yncri5e);
+    }
+    let hand_before = game.state.player1.hand.cards.len();
+
+    game.add_to_hand(natsumi);
+    game.give_energy(4);
+
+    game.state.player1.stage.stage = [non_5yncri5e, -1, -1];
+
+    game.play_to_stage(natsumi, MemberArea::Center);
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&natsumi),
+        "Natsumi should not be in hand (played to stage)"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "Should NOT draw when only non-5yncri5e! on stage"
+    );
+}
+
+// ====================================================================
+// Duplicate card_no regression: second copy in hand should not break exclude_self
+// ====================================================================
+// Bug: trigger_debut_abilities found the card on stage but passed None for
+// explicit_card_id, causing find_card_by_number_for_player to search hand
+// first. If a second copy of the same card_no was in hand, activating_card_id
+// pointed to the hand copy, making exclude_self fail because the hand copy
+// wasn't on stage.
+//
+// Fix: pass the stage card_id as explicit_card_id so the unique i16 is used.
+// ====================================================================
+
+/// Two copies of PL!SP-pb1-009-R in hand. Play one to empty stage.
+/// The second copy in hand should NOT cause a false draw.
+#[test]
+fn natsumi_009_no_draw_with_duplicate_in_hand() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let natsumi1 = game.id("PL!SP-pb1-009-R");
+    let natsumi2 = game.id("PL!SP-pb1-009-R");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    for _ in 0..3 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    game.add_to_hand(natsumi1);
+    game.add_to_hand(natsumi2);
+    game.give_energy(4);
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+    let hand_before = game.state.player1.hand.cards.len(); // 2: natsumi1 + natsumi2
+    game.play_to_stage(natsumi1, MemberArea::Center);
+
+    assert!(
+        !game.state.player1.hand.cards.contains(&natsumi1),
+        "natsumi1 should not be in hand (played to stage)"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&natsumi2),
+        "natsumi2 should still be in hand"
+    );
+    // After play: natsumi1 removed from hand → hand = [natsumi2] → len = 1
+    // If draw occurred: hand = [natsumi2, drawn_card] → len = 2
+    let hand_after = game.state.player1.hand.cards.len();
+    assert!(
+        hand_after == hand_before - 1,
+        "Should NOT draw when playing to empty stage with duplicate in hand. hand {} -> {}",
+        hand_before,
+        hand_after
+    );
+}
+
+// ====================================================================
+// PL!SP-pb1-001-R (澁谷かのん ab#0) — unless-pay (しないかぎり) pattern
+// LiveStart: {{E}}{{E}}支払わないかぎり、自分の手札を2枚控え室に置く。
+// ====================================================================
+
+fn advance_to_live_card_set_p1_kanon(game: &mut TestGame) {
+    for _ in 0..5 {
+        game.pass();
+    }
+    assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
+}
+
+fn advance_to_live_start_kanon(game: &mut TestGame) {
+    game.pass();
+    game.pass();
+}
+
+/// Pay 2 energy → discard effect is skipped (hand unchanged).
+#[test]
+fn kanon_unless_pay_pay_avoids_discard() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let kanon = game.id("PL!SP-pb1-001-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_card = game.id("PL!-sd1-019-SD");
+
+    // Kanon is a member — play her to stage for live_start ability
+    game.state.player1.hand.cards.push(kanon);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.give_energy(13);
+
+    // Seed deck for yell + draws
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.hand.cards.push(live_card);
+    // Play Kanon to Center, then set live card
+    game.play_to_stage(kanon, rabuka_engine::zones::MemberArea::Center);
+
+    advance_to_live_card_set_p1_kanon(&mut game);
+    game.set_live_card(live_card);
+    // Record hand AFTER live card is set (removed from hand)
+    let hand_before = game.state.player1.hand.cards.len();
+    // Passing from LiveCardSetFirstAttacker draws 1 card per live card placed
+    advance_to_live_start_kanon(&mut game);
+
+    // Kanon's ability fires: "unless pay 2, discard 2"
+    // Pay 2 energy to avoid discard
+    if game.has_pending_choice() {
+        game.select_option(1);
+    }
+
+    let hand_after = game.state.player1.hand.cards.len();
+    // LiveCardSet pass draws 1 card; card selection prompt might exist but no discard
+    assert_eq!(
+        hand_after,
+        hand_before + 1,
+        "Paying 2 energy should avoid discard (hand {} -> {})",
+        hand_before,
+        hand_after
+    );
+    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    assert!(
+        energy_after < 11,
+        "2 energy should be consumed (had 11 after playing kanon, now {})",
+        energy_after
+    );
+    // Consume any remaining choices
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+}
+
+/// Skip paying → discard effect fires (2 cards removed from hand).
+#[test]
+fn kanon_unless_pay_skip_triggers_discard() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let kanon = game.id("PL!SP-pb1-001-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_card = game.id("PL!-sd1-019-SD");
+
+    // Kanon is a member — play her to stage for live_start ability
+    // Hand: kanon + 3 extra fillers to have cards after play_to_stage
+    game.state.player1.hand.cards.push(kanon);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(live_card);
+    game.give_energy(13);
+
+    // Seed deck for yell + draws
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // Play Kanon to Center (removes kanon from hand)
+    game.play_to_stage(kanon, rabuka_engine::zones::MemberArea::Center);
+    // After play_to_stage: hand has 3 fillers + live_card = 4
+
+    advance_to_live_card_set_p1_kanon(&mut game);
+    game.set_live_card(live_card);
+    // Record hand AFTER live card is set (removed from hand)
+    let hand_before = game.state.player1.hand.cards.len();
+    // Passing from LiveCardSetFirstAttacker draws 1 card per live card placed
+    advance_to_live_start_kanon(&mut game);
+
+    // Kanon's ability fires: "unless pay 2, discard 2"
+    // Skip paying → discard 2 should fire → then choose first 2 cards to discard
+    if game.has_pending_choice() {
+        game.select_option(0); // skip (don't pay)
+    }
+    // Card selection prompt for which 2 to discard
+    if game.has_pending_choice() {
+        game.select_indices(&[0, 1]); // discard first 2 cards
+    }
+
+    let hand_after = game.state.player1.hand.cards.len();
+    // LiveCardSet pass draws 1 card; discard removes 2 → hand = hand_before - 1
+    assert_eq!(
+        hand_after,
+        hand_before - 1,
+        "Skipping payment should discard 2 cards from hand (hand {} -> {}; expected {})",
+        hand_before,
+        hand_after,
+        hand_before - 1
+    );
+    // Energy should NOT be consumed (we skipped payment)
+    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    assert_eq!(
+        energy_after, 2,
+        "Energy should remain 2 when skipping payment (was 2, now {})",
+        energy_after
+    );
+    // Consume any remaining choices
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    assert!(
+        energy_after < 11,
+        "2 energy should be consumed (had 11 after playing kanon, now {})",
+        energy_after
+    );
+}

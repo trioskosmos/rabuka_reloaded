@@ -11,6 +11,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
+use rabuka_engine::ability::debug::AbDebug;
 use rabuka_engine::ability::types::Choice;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
@@ -62,6 +63,16 @@ pub struct TestGame {
     pub db: Arc<CardDatabase>,
     pub state: GameState,
     copy_pool: RefCell<HashMap<i16, Vec<i16>>>,
+    debug_enabled: bool,
+}
+
+impl Drop for TestGame {
+    fn drop(&mut self) {
+        if self.debug_enabled {
+            rabuka_engine::ability::debug::set_debug(false);
+            AbDebug::flush_to_rule_log(&mut self.state.rule_log);
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -78,6 +89,7 @@ impl TestGame {
         state.current_phase = Phase::Main;
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
+        rabuka_engine::ability::debug::set_debug(true);
 
         // Pre-create copy IDs for every card template
         let mut copy_pool: HashMap<i16, Vec<i16>> = HashMap::new();
@@ -98,6 +110,7 @@ impl TestGame {
             db: db_with_copies,
             state,
             copy_pool: RefCell::new(copy_pool),
+            debug_enabled: true,
         }
     }
 
@@ -230,8 +243,7 @@ impl TestGame {
 
     /// Check if the ability queue is waiting for a player choice.
     pub fn has_pending_choice(&self) -> bool {
-        self.state.pending_choice.is_some()
-            || self.state.ability_queue.is_waiting_for_choice().is_some()
+        self.state.has_pending_choice()
     }
 
     /// Select cards by waitroom/hand indices (for SelectCard choices).
@@ -324,14 +336,18 @@ impl TestGame {
                 Choice::SelectPosition { .. } => Some("SelectPosition".to_string()),
                 Choice::SelectHeartColor { .. } => Some("SelectHeartColor".to_string()),
                 Choice::SelectHeartType { .. } => Some("SelectHeartType".to_string()),
+                Choice::SelectAutoAbility { .. } => Some("SelectAutoAbility".to_string()),
+                Choice::SelectLiveSuccess { .. } => Some("SelectLiveSuccess".to_string()),
             }
-        } else if let Some(ref pc) = self.state.pending_choice {
+        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
             match pc["choice_type"].as_str() {
                 Some("SelectCard") => Some("SelectCard".to_string()),
                 Some("SelectTarget") => Some("SelectTarget".to_string()),
                 Some("SelectPosition") => Some("SelectPosition".to_string()),
                 Some("SelectHeartColor") => Some("SelectHeartColor".to_string()),
                 Some("SelectHeartType") => Some("SelectHeartType".to_string()),
+                Some("SelectAutoAbility") => Some("SelectAutoAbility".to_string()),
+                Some("SelectLiveSuccess") => Some("SelectLiveSuccess".to_string()),
                 _ => Some("Unknown".to_string()),
             }
         } else {
@@ -343,7 +359,7 @@ impl TestGame {
     pub fn dbg_choice(&self) {
         if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
             eprintln!("[CHOICE] {:?}", choice);
-        } else if let Some(ref pc) = self.state.pending_choice {
+        } else if let Some(ref pc) = self.state.get_pending_choice_json() {
             eprintln!("[CHOICE] (json) {:?}", pc);
         } else {
             eprintln!("[CHOICE] none");
@@ -356,5 +372,180 @@ impl TestGame {
         self.dbg_discard();
         self.dbg_stage();
         self.dbg_choice();
+    }
+
+    /// Print the execution trace from the last ability resolution.
+    pub fn print_trace(&self) {
+        if let Some(ref trace) = self.state.last_ability_trace {
+            Self::print_trace_node(trace, 0);
+        } else {
+            eprintln!("[TRACE] no trace available (no ability resolved yet)");
+        }
+    }
+
+    fn print_trace_node(node: &rabuka_engine::ability::types::AbilityTraceNode, depth: usize) {
+        let pad = "  ".repeat(depth);
+        let card_info = node
+            .card
+            .as_deref()
+            .map(|c| format!(" [{}]", c))
+            .unwrap_or_default();
+        eprintln!("{}{}▸ {}{}", pad, depth, node.label, card_info);
+        if let Some(ref before) = node.before {
+            eprintln!(
+                "{}  before: hand={} stage={} waitroom={} energy={} active_energy={} deck={}",
+                pad,
+                before.hand_count,
+                before.stage_count,
+                before.waitroom_count,
+                before.energy_count,
+                before.active_energy_count,
+                before.deck_count,
+            );
+        }
+        if let Some(ref after) = node.after {
+            eprintln!(
+                "{}  after:  hand={} stage={} waitroom={} energy={} active_energy={} deck={}",
+                pad,
+                after.hand_count,
+                after.stage_count,
+                after.waitroom_count,
+                after.energy_count,
+                after.active_energy_count,
+                after.deck_count,
+            );
+        }
+        for child in &node.children {
+            Self::print_trace_node(child, depth + 1);
+        }
+    }
+
+    /// Assert the trace contains a node whose label matches the given substring.
+    pub fn assert_trace_contains(&self, pattern: &str, msg: &str) {
+        let trace = self
+            .state
+            .last_ability_trace
+            .as_ref()
+            .expect("assert_trace_contains: no trace available");
+        let found = Self::trace_node_matches(trace, pattern);
+        assert!(
+            found,
+            "{}: expected trace to contain '{}', but no node matched.\n{}",
+            msg,
+            pattern,
+            self.format_trace_string(),
+        );
+    }
+
+    /// Assert the trace does NOT contain a node whose label matches the given substring.
+    pub fn assert_trace_not_contains(&self, pattern: &str, msg: &str) {
+        if let Some(ref trace) = self.state.last_ability_trace {
+            let found = Self::trace_node_matches(trace, pattern);
+            assert!(
+                !found,
+                "{}: expected trace NOT to contain '{}', but a node matched.\n{}",
+                msg,
+                pattern,
+                self.format_trace_string(),
+            );
+        }
+    }
+
+    fn trace_node_matches(
+        node: &rabuka_engine::ability::types::AbilityTraceNode,
+        pattern: &str,
+    ) -> bool {
+        node.label.contains(pattern)
+            || node.card.as_deref().map_or(false, |c| c.contains(pattern))
+            || node
+                .children
+                .iter()
+                .any(|c| Self::trace_node_matches(c, pattern))
+    }
+
+    fn format_trace_string(&self) -> String {
+        let mut buf = String::new();
+        if let Some(ref trace) = self.state.last_ability_trace {
+            Self::format_trace_node(trace, 0, &mut buf);
+        } else {
+            buf.push_str("  (no trace)\n");
+        }
+        buf
+    }
+
+    fn format_trace_node(
+        node: &rabuka_engine::ability::types::AbilityTraceNode,
+        depth: usize,
+        buf: &mut String,
+    ) {
+        let pad = "  ".repeat(depth);
+        let card_info = node
+            .card
+            .as_deref()
+            .map(|c| format!(" [{}]", c))
+            .unwrap_or_default();
+        buf.push_str(&format!("{}{}▸ {}{}\n", pad, depth, node.label, card_info));
+        for child in &node.children {
+            Self::format_trace_node(child, depth, buf);
+        }
+    }
+
+    /// Assert hand contains exactly n cards.
+    pub fn assert_hand(&self, expected: usize, msg: &str) {
+        let actual = self.state.player1.hand.len();
+        assert_eq!(
+            actual, expected,
+            "{}: expected {} cards in hand, got {}",
+            msg, expected, actual
+        );
+    }
+
+    /// Assert stage position contains the given card.
+    pub fn assert_stage_pos(&self, pos: MemberArea, card_id: i16, msg: &str) {
+        let actual = self.state.player1.stage.get_area(pos);
+        assert_eq!(
+            actual,
+            Some(card_id),
+            "{}: expected {:?} at position {:?}, got {:?}",
+            msg,
+            self.state.card_database.get_card(card_id).map(|c| &c.name),
+            pos,
+            actual.and_then(|id| self.state.card_database.get_card(id).map(|c| &c.name))
+        );
+    }
+
+    /// Assert energy count equals expected value.
+    pub fn assert_energy(&self, expected: u32, msg: &str) {
+        let actual = self.state.player1.energy_zone.active_energy_count;
+        assert_eq!(
+            actual, expected as usize,
+            "{}: expected {} energy, got {}",
+            msg, expected, actual
+        );
+    }
+
+    /// Assert pending choice type matches expected variant name.
+    pub fn assert_pending_choice_type(&self, expected: &str, msg: &str) {
+        if let Some(choice) = self.state.ability_queue.is_waiting_for_choice() {
+            let actual = match choice {
+                Choice::SelectCard { .. } => "SelectCard",
+                Choice::SelectTarget { .. } => "SelectTarget",
+                Choice::SelectPosition { .. } => "SelectPosition",
+                Choice::SelectHeartColor { .. } => "SelectHeartColor",
+                Choice::SelectHeartType { .. } => "SelectHeartType",
+                Choice::SelectAutoAbility { .. } => "SelectAutoAbility",
+                Choice::SelectLiveSuccess { .. } => "SelectLiveSuccess",
+            };
+            assert_eq!(
+                actual, expected,
+                "{}: expected choice type {}, got {}",
+                msg, expected, actual
+            );
+        } else {
+            panic!(
+                "{}: expected pending choice of type {}, got none",
+                msg, expected
+            );
+        }
     }
 }

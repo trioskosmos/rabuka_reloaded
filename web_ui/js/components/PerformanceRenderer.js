@@ -46,15 +46,36 @@ function sumPassedLiveScores(lives) {
 }
 
 function getDisplayResults(results) {
+    // If caller passed a structured object (not array), use it directly
     if (results && typeof results === 'object' && !Array.isArray(results)) {
-        return results;
+        return arrayFromPerformanceMap(results);
     }
 
-    if (State.data?.performance_results && Object.keys(State.data.performance_results).length > 0) {
-        return State.data.performance_results;
+    // Prefer the ordered performance_history array — it's indexed [0]=P1, [1]=P2
+    if (State.data?.performance_history && State.data.performance_history.length > 0) {
+        return State.data.performance_history;
     }
 
-    return State.data?.last_performance_results || {};
+    // Fallback: convert the HashMap to an ordered array
+    const perfMap = State.data?.performance_results || {};
+    return arrayFromPerformanceMap(perfMap);
+}
+
+/// Convert a player_id → snapshot HashMap to an ordered array [P1, P2].
+function arrayFromPerformanceMap(perfMap) {
+    const keys = Object.keys(perfMap);
+    if (keys.length === 0) return [];
+    // Try to order using known player_id patterns
+    const knownOrder = ['player1', 'player2', 'p1', 'p2', '0', '1'];
+    const ordered = [];
+    for (const key of knownOrder) {
+        if (perfMap[key] !== undefined) ordered.push(perfMap[key]);
+    }
+    // If we got nothing from known patterns, just use whatever keys exist
+    if (ordered.length === 0) {
+        for (const key of keys) ordered.push(perfMap[key]);
+    }
+    return ordered;
 }
 
 function getPlayerName(playerId) {
@@ -119,9 +140,10 @@ function renderHeartsGrid(hearts) {
     return `
         <div class="perf-hearts-grid">
             ${filtered.map(h => `
-                <div class="heart-grid-cell color-${h.index}">
+                <div class="heart-grid-cell${h.index === 0 ? ' color-any' : ' color-'+h.index}">
                     <img src="${h.icon}" class="heart-mini-icon" alt="${escapeHtml(h.label)}">
                     <span class="count-value">${h.count}</span>
+                    ${h.index === 0 ? '<span class="heart-any-label">Any</span>' : ''}
                 </div>
             `).join('')}
         </div>
@@ -246,54 +268,188 @@ function renderTurnNavigation() {
     `;
 }
 
-function renderEngineFlow() {
-    const steps = [
-        {
-            title: 'Reveal Live Zone',
-            body: 'All three live slots flip first. Non-live cards in the live zone are discarded before the phase continues.'
-        },
-        {
-            title: 'Check Live Start',
-            body: 'FLAG_CANNOT_LIVE skips the whole performance. Otherwise, On Live Start effects resolve before any yell happens.'
-        },
-        {
-            title: 'Count Blades and Yell',
-            body: 'Stage members and cheer modifiers determine blade total. That many cards are yelled from deck into stage energy.'
-        },
-        {
-            title: 'Total Hearts and Notes',
-            body: 'The engine totals member hearts, yell hearts, note icons, color transforms, and requirement modifiers into one snapshot.'
-        },
-        {
-            title: 'Judge Lives in Slot Order',
-            body: 'Live 0, then 1, then 2. Hearts are consumed sequentially. One failed live discards the entire live zone.'
-        },
-        {
-            title: 'Lock In Live Result',
-            body: 'Performers rest, score lines are stored, then Live Result compares both players and marks who actually wins the phase.'
-        }
-    ];
+function renderPerfSteps(result) {
+    if (!result) return '<div class="perf-empty-state">No performance data available.</div>';
+
+    const H = ['h00','h01','h02','h03','h04','h05','h06'];
+    const fmtH = (arr) => arr ? H.map((h,i) => arr[i] > 0 ? `${h}:${arr[i]}` : null).filter(Boolean).join(' ') : 'none';
+    const fmtHShort = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="img/texticon/heart_0${i}.png" class="heart-mini-icon">${v}` : '').join('') : '';
+
+    const totalBlades = (result.member_contributions || []).reduce((s, m) => s + m.base_blades + m.bonus_blades, 0);
+    const passedLives = (result.lives || []).filter(l => l.passed).length;
+    const baseLiveScore = (result.lives || []).reduce((s, l) => l.passed ? s + l.score : s, 0);
 
     return `
-        <section class="perf-engine-flow">
-            <div class="perf-section-heading-row">
+        <section class="perf-steps-all">
+            <div class="perf-section-heading-row compact">
                 <div>
-                    <div class="perf-eyebrow">Engine Order</div>
-                    <h3>How this phase resolves in code</h3>
+                    <div class="perf-eyebrow">Live Phase — Step by Step</div>
                 </div>
-                <p>The copy below follows the Rust phase order in performance.rs, not a simplified mock flow.</p>
             </div>
-            <div class="perf-flow-grid">
-                ${steps.map((step, index) => `
-                    <article class="perf-flow-step">
-                        <div class="perf-flow-index">${index + 1}</div>
-                        <div class="perf-flow-copy">
-                            <h4>${escapeHtml(step.title)}</h4>
-                            <p>${escapeHtml(step.body)}</p>
+
+            <!-- Step 1: Live Zone -->
+            <details class="perf-step-detail" open>
+                <summary class="perf-step-summary">1. Live Zone — ${result.lives?.length || 0} card(s)</summary>
+                <div class="perf-step-body">
+                    ${(result.lives || []).map((live, i) => {
+                        const cardData = live.card_no ? State.resolveCardData(live.card_no) : null;
+                        const imgSrc = cardData ? fixImg(cardData.img || '') : '';
+                        return `
+                            <div class="perf-step-live-card">
+                                ${imgSrc ? `<img src="${imgSrc}" class="perf-step-card-img">` : ''}
+                                <div class="perf-step-live-info">
+                                    <div>Require: ${fmtHShort(live.required)}</div>
+                                    <div>Score: ${live.score}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('') || '<div class="perf-empty-state small">No live cards</div>'}
+                    <div class="perf-step-note">§8.3.1: Live card zone 확인. Non-live cards는 제거됨.</div>
+                </div>
+            </details>
+
+            <!-- Step 2: Live Start Triggers -->
+            <details class="perf-step-detail" open>
+                <summary class="perf-step-summary">2. Live Start — ${result.triggered_abilities?.length || 0} trigger(s)</summary>
+                <div class="perf-step-body">
+                    ${(result.triggered_abilities || []).map(t => {
+                        const cd = State.resolveCardData(t.source_card_id);
+                        return `<div class="perf-step-trigger">${cd?.name || t.card_name || '?'}: ${t.name || 'triggered'}</div>`;
+                    }).join('') || '<div class="perf-empty-state small">No live-start triggers</div>'}
+                    <div class="perf-step-note">§8.3.2: Live start triggers resolve before yell.</div>
+                </div>
+            </details>
+
+            <!-- Step 3: Blades + Yell -->
+            <details class="perf-step-detail" open>
+                <summary class="perf-step-summary">3. Blades → Yell — ${totalBlades} blades → ${result.yell_count || 0} yell</summary>
+                <div class="perf-step-body">
+                    <div class="perf-step-members">
+                        ${(result.member_contributions || []).map(m => {
+                            const cd = m.card_no ? State.resolveCardData(m.card_no) : null;
+                            const imgSrc = cd ? fixImg(cd.img || '') : '';
+                            return `
+                                <div class="perf-step-member">
+                                    ${imgSrc ? `<img src="${imgSrc}" class="perf-step-member-img">` : ''}
+                                    <div>Blade: ${m.base_blades}${m.bonus_blades > 0 ? '+' + m.bonus_blades : ''}</div>
+                                    <div>${fmtHShort(m.base_hearts)}</div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <div class="perf-step-note">§8.3.3: Total blades × cheer modifier = yell count.</div>
+                </div>
+            </details>
+
+            <!-- Step 4: Stage Hearts -->
+            <details class="perf-step-detail" open>
+                <summary class="perf-step-summary">4. Stage Hearts — ${fmtH(result.total_hearts)}</summary>
+                <div class="perf-step-body">
+                    <div class="perf-step-hearts-row">
+                        ${result.total_hearts ? H.map((h,i) =>
+                            result.total_hearts[i] > 0
+                                ? `<span class="perf-step-heart-cell"><img src="img/texticon/heart_0${i}.png" class="heart-mini-icon"> ${result.total_hearts[i]}</span>`
+                                : ''
+                        ).join('') : ''}
+                    </div>
+                    <div class="perf-step-note">§8.3.4: Sum of stage member hearts + yell blade hearts.</div>
+                </div>
+            </details>
+
+            <!-- Step 5: Yell Cards -->
+            <details class="perf-step-detail" open>
+                <summary class="perf-step-summary">5. Yell Cards — ${result.yell_cards?.length || 0} card(s)</summary>
+                <div class="perf-step-body">
+                    <div class="perf-step-yells">
+                        ${(result.yell_cards || []).map(y => {
+                            const cd = y.card_no ? State.resolveCardData(y.card_no) : null;
+                            const imgSrc = cd ? fixImg(cd.img || '') : '';
+                            return `
+                                <div class="perf-step-yell-card">
+                                    ${imgSrc ? `<img src="${imgSrc}" class="perf-step-card-img-sm">` : ''}
+                                    <div>♥ ${fmtHShort(y.blade_hearts)}</div>
+                                    <div>♪${y.note_icons} ⎋${y.draw_icons}</div>
+                                </div>
+                            `;
+                        }).join('') || '<div class="perf-empty-state small">No yell cards</div>'}
+                    </div>
+                    <div class="perf-step-note">§8.3.5: Yell cards provide blade hearts + note/draw icons.</div>
+                </div>
+            </details>
+
+            <!-- Step 6: Color Transforms -->
+            <details class="perf-step-detail">
+                <summary class="perf-step-summary">6. Color Transforms — ${result.breakdown?.transforms?.length || 0} change(s)</summary>
+                <div class="perf-step-body">
+                    ${(result.breakdown?.transforms || []).map(t =>
+                        `<div class="perf-step-transform">${t.source}: ${t.desc}</div>`
+                    ).join('') || '<div class="perf-empty-state small">No color transforms</div>'}
+                    <div class="perf-step-note">§8.3.7: Heart color conversion effects apply.</div>
+                </div>
+            </details>
+
+            <!-- Step 7: Requirements Modifiers -->
+            <details class="perf-step-detail">
+                <summary class="perf-step-summary">7. Requirement Mods — ${result.breakdown?.requirements?.length || 0} change(s)</summary>
+                <div class="perf-step-body">
+                    ${(result.breakdown?.requirements || []).map(r =>
+                        `<div class="perf-step-req">${r.source}: ${r.desc}</div>`
+                    ).join('') || '<div class="perf-empty-state small">No requirement changes</div>'}
+                    <div class="perf-step-note">§8.3.6–8.3.7: Effects modify required hearts.</div>
+                </div>
+            </details>
+
+            <!-- Step 8: Judge Each Live -->
+            <details class="perf-step-detail" open>
+                <summary class="perf-step-summary">8. Judge Lives — ${passedLives}/${result.lives?.length || 0} passed</summary>
+                <div class="perf-step-body">
+                    ${(result.lives || []).map((live, i) => {
+                        const cardData = live.card_no ? State.resolveCardData(live.card_no) : null;
+                        const imgSrc = cardData ? fixImg(cardData.img || '') : '';
+                        const failedReason = live.adjustments?.filter(a => a.adjustment_type === 'failure') || [];
+                        return `
+                            <div class="perf-step-judge ${live.passed ? 'pass' : 'fail'}">
+                                <div class="perf-step-judge-header">
+                                    ${imgSrc ? `<img src="${imgSrc}" class="perf-step-card-img-sm">` : ''}
+                                    <span>Slot ${i}: <b>${live.passed ? '✓ PASS' : '✗ FAIL'}</b> score +${live.score}</span>
+                                </div>
+                                <div class="perf-step-judge-detail">
+                                    need ${fmtHShort(live.required)} / filled ${fmtHShort(live.filled)} / spare ${fmtHShort(live.spare)}
+                                </div>
+                                ${failedReason.map(a => `<div class="perf-step-fail-reason">${a.desc}</div>`).join('')}
+                            </div>
+                        `;
+                    }).join('') || '<div class="perf-empty-state small">No live cards</div>'}
+                    <div class="perf-step-note">§8.3.8: Lives judged in slot order 0→1→2. One failure = whole zone fails.</div>
+                </div>
+            </details>
+
+            <!-- Step 9: Score + Winner -->
+            <details class="perf-step-detail" open>
+                <summary class="perf-step-summary">9. Result — Score ${result.total_score || 0} ${result.success ? '✓ PASS' : '✗ FAIL'}</summary>
+                <div class="perf-step-body">
+                    <div class="perf-step-result-row">
+                        <div class="perf-step-result-item">
+                            <img src="img/texticon/icon_score.png" class="heart-mini-icon">
+                            Base live score: ${baseLiveScore}
                         </div>
-                    </article>
-                `).join('')}
-            </div>
+                        <div class="perf-step-result-item">
+                            <img src="img/texticon/icon_score.png" class="heart-mini-icon">
+                            Triggered bonuses: ${(result.lives || []).reduce((s, l) => l.passed ? s + (l.score) : s, 0) - baseLiveScore > 0 ? '+' : ''}${(result.lives || []).reduce((s, l) => l.passed ? s + (l.score) : s, 0) - baseLiveScore}
+                        </div>
+                        <div class="perf-step-result-item total">
+                            Total: <b>${result.total_score || 0}</b>
+                        </div>
+                        <div class="perf-step-result-item outcome ${result.success ? 'success' : 'failure'}">
+                            ${result.success ? '✓ PASS' : '✗ FAIL'}
+                            ${result.p0_wins ? ' — P1 wins!' : ''}
+                            ${result.p1_wins ? ' — P2 wins!' : ''}
+                            ${result.p0_wins && result.p1_wins ? ' — Draw' : ''}
+                        </div>
+                    </div>
+                    <div class="perf-step-note">§8.3.9: Compare scores. Top live card moved to success if passed. §1.2: Win at 3+ success.</div>
+                </div>
+            </details>
         </section>
     `;
 }
@@ -404,8 +560,7 @@ function renderLiveCards(result) {
                             <div class="perf-live-card-head">
                                 <div class="perf-card-id-badge">Live ${index + 1}</div>
                                 <div class="perf-live-card-title">
-                                    // Support both img and img_path field names
-                                    ${live?.img || live?.img_path ? `<img src="${fixImg(live.img || live.img_path)}" class="perf-live-art" alt="${escapeHtml(live.name || 'Live')}">` : ''}
+                                    ${(() => { const cd = live.card_no ? State.resolveCardData(live.card_no) : null; return cd?.img ? `<img src="${fixImg(cd.img)}" class="perf-live-art" alt="${escapeHtml(live.name || 'Live')}">` : ''; })()}
                                     <div>
                                         <h4>${escapeHtml(live?.name || 'Live')}</h4>
                                         <div class="perf-live-card-meta">Printed score ${live?.score || 0}</div>
@@ -423,10 +578,20 @@ function renderLiveCards(result) {
                                     <div class="perf-hearts-grid">${renderHeartsGrid(live?.filled || [])}</div>
                                 </div>
                             </div>
+                            <div class="perf-heart-legend" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">
+                                <span class="heart-tag color-any" style="display:inline-flex;align-items:center;gap:2px;padding:0 4px;border-radius:3px;"><img src="img/texticon/heart_00.png" class="heart-mini-icon">Any</span> = wildcard fills any missing color
+                            </div>
                             ${renderSuccessEquation(live?.filled || [], live?.required || [])}
-                            ${spareTotal > 0 ? `
-                                <div class="perf-live-footnote">
-                                    ${spareTotal} spare hearts remained after this card's simulated slot-order check.
+                            ${!live?.passed ? `
+                                <div class="perf-live-fail-reason">
+                                    Not enough hearts: needed ${HEART_LABELS.map((l,i)=>{
+                                        const n = (live?.required||[])[i]||0;
+                                        return n ? `<b>${n} ${l}</b>` : '';
+                                    }).filter(Boolean).join(', ')}
+                                    ${(live?.filled||[]).some(f=>f>0) ? `, had ${HEART_LABELS.map((l,i)=>{
+                                        const f = (live?.filled||[])[i]||0;
+                                        return f ? `${f} ${l}` : '';
+                                    }).filter(Boolean).join(', ')}` : ''}
                                 </div>
                             ` : ''}
                             ${adjustments.length > 0 ? `
@@ -779,6 +944,8 @@ function renderPlayerPanel(playerId, result) {
     `;
 }
 
+let _lastDisplayResults = null;
+
 export const PerformanceRenderer = {
     renderHeartProgress,
 
@@ -797,25 +964,51 @@ export const PerformanceRenderer = {
         }
 
         panel.style.display = 'block';
+
+        // Collect member hearts breakdown from performance results
+        const perfResults = state.performance_results || {};
+        const perfResult = perfResults[perspectivePlayer] || perfResults[0];
+        let memberHtml = '';
+        if (perfResult && perfResult.member_contributions && perfResult.member_contributions.length > 0) {
+            memberHtml = '<div class="perf-guide-members">';
+            perfResult.member_contributions.forEach(mc => {
+                const cardData = mc.card_no ? State.resolveCardData(mc.card_no) : null;
+                const imgSrc = cardData ? fixImg(cardData.img) : null;
+                const name = cardData?.name || mc.source || 'Member';
+                const heartHtml = renderHeartsCompact(mc.total_hearts || mc.base_hearts || []);
+                memberHtml += `
+                    <div class="perf-guide-member">
+                        ${imgSrc ? `<img src="${imgSrc}" class="perf-guide-member-img" alt="${escapeHtml(name)}">` : ''}
+                        <div class="perf-guide-member-info">
+                            <div class="perf-guide-member-name">${escapeHtml(name)}</div>
+                            <div class="perf-guide-member-hearts">${heartHtml}</div>
+                        </div>
+                    </div>
+                `;
+            });
+            memberHtml += '</div>';
+        }
+
         let html = `
             <div class="perf-guide-header">
-                <span>Blades: <b>${guide.total_blades}</b></span>
-                <span>Hearts: ${renderHeartsCompact(guide.total_hearts)}</span>
+                <span><img src="img/texticon/icon_blade.png" class="heart-mini-icon"> <b>${guide.total_blades}</b></span>
+                <span>${renderHeartsCompact(guide.total_hearts)}</span>
             </div>
+            ${memberHtml}
         `;
 
         guide.lives.forEach((live) => {
             if (!live || typeof live !== 'object') return;
+            const liveImgSrc = live.img || live.img_path ? fixImg(live.img || live.img_path) : null;
             html += `
                 <div class="perf-guide-entry" style="opacity:${live.passed ? 1 : 0.72}">
-                    // Support both img and img_path field names
-                    ${live.img || live.img_path ? `<img src="${fixImg(live.img || live.img_path)}" class="perf-guide-img" alt="${escapeHtml(live.name || 'Live')}">` : ''}
+                    ${liveImgSrc ? `<img src="${liveImgSrc}" class="perf-guide-img" alt="${escapeHtml(live.name || 'Live')}">` : ''}
                     <div class="perf-guide-info">
                         <div class="perf-guide-name">${escapeHtml(live.name || 'Live')} <span class="perf-guide-score">(${live.score || 0} pts)</span></div>
                         <div class="perf-guide-pips">${renderHeartProgress(live.filled, live.required)}</div>
                         ${!live.passed && live.reason ? `<div class="perf-guide-reason">${escapeHtml(live.reason)}</div>` : ''}
                     </div>
-                    <div class="perf-guide-status" style="color:${live.passed ? '#78d08b' : '#f26d6d'}">${live.passed ? 'READY' : 'RISK'}</div>
+                    <div class="perf-guide-status" style="color:${live.passed ? '#78d08b' : '#f26d6d'}">${live.passed ? '✓ READY' : '✗ RISK'}</div>
                 </div>
             `;
         });
@@ -830,6 +1023,7 @@ export const PerformanceRenderer = {
         if (!modal || !content) return;
 
         const displayResults = getDisplayResults(results);
+        _lastDisplayResults = displayResults;
         if (!displayResults || Object.keys(displayResults).length === 0) {
             content.innerHTML = `<div class="perf-empty-state">${escapeHtml(tr('no_perf_data', 'No performance data is available yet.'))}</div>`;
             if (title) title.textContent = 'Performance Breakdown';
@@ -883,7 +1077,8 @@ export const PerformanceRenderer = {
             engineBtn?.classList.add('active');
             const engineContent = document.getElementById('performance-engine-content');
             if (engineContent) {
-                engineContent.innerHTML = renderEngineFlow();
+                const firstResult = _lastDisplayResults?.[0] || _lastDisplayResults?.[1];
+                engineContent.innerHTML = renderPerfSteps(firstResult);
             }
         } else {
             historyTab.style.display = 'block';

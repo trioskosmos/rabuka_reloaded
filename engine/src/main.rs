@@ -1,9 +1,9 @@
-use rabuka_engine::*;
-use rabuka_engine::game_setup::{ActionParameters, AreaInfo};
-use rabuka_engine::player::Player;
+use rabuka_engine::game_setup::{ActionParameters, AreaInfo, DoubleBatonPair};
 use rabuka_engine::game_state::GameState;
+use rabuka_engine::player::Player;
+use rabuka_engine::*;
+use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
-use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Action {
@@ -25,7 +25,7 @@ static GAME_STATE: Mutex<Option<game_state::GameState>> = Mutex::new(None);
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    
+
     if args.len() > 1 {
         match args[1].as_str() {
             "get-state" => {
@@ -55,8 +55,6 @@ fn main() {
         initialize_game();
     }
 }
-
-
 
 fn output_game_state() {
     let game_state = GAME_STATE.lock().unwrap();
@@ -99,7 +97,10 @@ fn initialize_game() {
     let card_numbers1 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck1);
     let card_numbers2 = deck_parser::DeckParser::deck_list_to_card_numbers(&deck2);
 
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers1) {
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(
+        &mut card_database,
+        card_numbers1,
+    ) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -111,7 +112,10 @@ fn initialize_game() {
         }
     };
 
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers2) {
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(
+        &mut card_database,
+        card_numbers2,
+    ) {
         Ok(mut deck) => {
             deck.shuffle_main_deck();
             deck.shuffle_energy_deck();
@@ -124,8 +128,14 @@ fn initialize_game() {
     };
 
     // Add default energy cards if needed
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &mut card_database);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &mut card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+        &mut player1_deck,
+        &mut card_database,
+    );
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+        &mut player2_deck,
+        &mut card_database,
+    );
 
     // Initialize players with decks
     let mut player1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
@@ -167,13 +177,28 @@ fn output_actions() {
                     card_no: p.card_no,
                     base_cost: p.base_cost,
                     final_cost: p.final_cost,
-                    available_areas: p.available_areas.map(|areas| areas.into_iter().map(|ai| AreaInfo {
-                        area: ai.area,
-                        available: ai.available,
-                        cost: ai.cost,
-                        is_baton_touch: ai.is_baton_touch,
-                        existing_member_name: ai.existing_member_name,
-                    }).collect()),
+                    double_baton_pairs: p.double_baton_pairs.map(|pairs| {
+                        pairs
+                            .into_iter()
+                            .map(|db| DoubleBatonPair {
+                                areas: db.areas,
+                                placement: db.placement,
+                                cost: db.cost,
+                            })
+                            .collect()
+                    }),
+                    available_areas: p.available_areas.map(|areas| {
+                        areas
+                            .into_iter()
+                            .map(|ai| AreaInfo {
+                                area: ai.area,
+                                available: ai.available,
+                                cost: ai.cost,
+                                is_baton_touch: ai.is_baton_touch,
+                                existing_member_name: ai.existing_member_name,
+                            })
+                            .collect()
+                    }),
                 }),
             })
             .collect();
@@ -188,15 +213,15 @@ fn execute_action(index: usize) {
     let mut game_state = GAME_STATE.lock().unwrap();
     if let Some(ref mut state) = *game_state {
         let actions = game_setup::generate_possible_actions(state);
-        
+
         if index >= actions.len() {
             eprintln!("Invalid action index");
             return;
         }
-        
+
         let action = &actions[index];
         println!("Executing action: {}", action.description);
-        
+
         // Execute the action (simplified - in real implementation would call execute_action from web_server)
         match action.action_type.to_string().as_str() {
             "activate_energy" => {
@@ -207,10 +232,13 @@ fn execute_action(index: usize) {
             }
             _ => {
                 // Handle unknown action types gracefully
-                eprintln!("Warning: Unknown action type '{}' - no specific handler implemented", action.action_type);
+                eprintln!(
+                    "Warning: Unknown action type '{}' - no specific handler implemented",
+                    action.action_type
+                );
             }
         }
-        
+
         println!("Action executed successfully");
     } else {
         eprintln!("Game not initialized. Run 'init' command first.");
@@ -227,12 +255,10 @@ fn choose_deck(deck_lists: &[deck_parser::DeckList], player_name: &str) -> deck_
 fn run_web_server() {
     println!("Web server starting on http://127.0.0.1:8080");
     match tokio::runtime::Runtime::new() {
-        Ok(runtime) => {
-            match runtime.block_on(web_server::run_web_server()) {
-                Ok(_) => println!("Server shutdown gracefully"),
-                Err(e) => eprintln!("Server error: {}", e),
-            }
-        }
+        Ok(runtime) => match runtime.block_on(web_server::run_web_server()) {
+            Ok(_) => println!("Server shutdown gracefully"),
+            Err(e) => eprintln!("Server error: {}", e),
+        },
         Err(e) => eprintln!("Failed to create runtime: {}", e),
     }
 }

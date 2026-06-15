@@ -21,9 +21,9 @@ fn test_yoshiko_detailed_debug() {
     game.add_to_stage(MemberArea::RightSide, riko);
     game.add_to_hand(hand_card);
 
-    // Add a valid target for conditional effect
-    let you = game.id("PL!S-bp2-003-R"); // You Watanabe (cost 6)
-    game.add_to_discard(you);
+    // Add a valid target for conditional effect (need cost = moved_card.cost + 2)
+    let dia = game.id("PL!S-bp2-004-R"); // Dia Kurosawa (cost 11 = Chika cost 9 + 2)
+    game.add_to_discard(dia);
 
     game.give_energy(5);
 
@@ -35,35 +35,11 @@ fn test_yoshiko_detailed_debug() {
     // Activate ability
     game.activate_ability(yoshiko);
 
-    // Check if there's a pending choice and make it
-    if game.has_pending_choice() {
-        println!("Pending choice detected, making selection...");
-        println!("Choice details: {:?}", game.state.get_pending_choice());
-
-        // Auto-select the first valid target (Chika at index 0)
+    // Handle all pending choices iteratively
+    while game.has_pending_choice() {
+        println!("Resolving pending choice...");
         game.select_indices(&[0]);
-        println!("Selected index 0 (Chika)");
-
-        // Continue ability execution after choice
-        let player_id = game.state.player1.id.clone();
-        TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-        game.state.process_pending_auto_abilities(&player_id);
     }
-
-    // Handle conditional effect choice if needed
-    if game.has_pending_choice() {
-        println!("Conditional effect choice detected");
-        game.select_indices(&[0]); // Select You
-
-        let player_id = game.state.player1.id.clone();
-        TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-        game.state.process_pending_auto_abilities(&player_id);
-    }
-
-    // Process any remaining abilities
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
 
     println!("=== AFTER ACTIVATION ===");
     println!("Stage: {:?}", game.player().stage.stage);
@@ -85,19 +61,33 @@ fn test_yoshiko_detailed_debug() {
         riko_on_stage, riko_in_discard
     );
 
-    // Verify that the ability activation process is working (costs paid, choices triggered)
-    // Note: Due to engine limitations, the main effect execution after choice selection may not work perfectly
-    // But the core ability mechanics (cost payment, choice triggering) are working
-
-    // Verify costs were paid (hand card moved to discard)
+    // Verify cost: hand card discarded, Yoshiko in wait state
     assert!(
         game.player().waitroom.cards.contains(&hand_card),
         "Hand card should be in discard (cost paid)"
     );
+    assert_eq!(
+        game.player().hand.cards.len(),
+        0,
+        "Hand card should be discarded"
+    );
 
-    // Verify choice system is working (choice was detected and handled)
-    // The debug output shows the choice was properly triggered and handled
+    // Effect action 1: one Aqours member moved from stage to discard (2 candidates → choice selects index 0)
+    assert!(
+        chika_in_discard || riko_in_discard,
+        "At least one Aqours member should be moved to discard"
+    );
+    assert!(
+        !chika_on_stage || !riko_on_stage,
+        "At least one Aqours member should be removed from stage"
+    );
+
+    // Effect action 2: conditional summon — Dia (cost 11) = Chika cost (9) + 2 = 11
+    let dia_on_stage = game.player().stage.stage.contains(&dia);
+    assert!(
+        dia_on_stage,
+        "Dia should be summoned to stage (conditional effect)"
+    );
 
     println!("✅ Test passed - Yoshiko ability mechanics working correctly!");
-    println!("Note: Main effect execution has engine limitations but core functionality verified");
 }

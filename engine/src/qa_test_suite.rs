@@ -2096,7 +2096,7 @@ fn test_ability_live_success_draw_then_discard() {
         crate::game_state::AbilityTrigger::LiveSuccess,
         "player1".to_string(),
         Some(member_card.card_no.clone()),
-        None,
+        Some(member_id),
     );
 
     println!(
@@ -2110,9 +2110,9 @@ fn test_ability_live_success_draw_then_discard() {
 
     println!(
         "After processing - pending_choice: {:?}",
-        game_state.pending_choice.is_some()
+        game_state.has_pending_choice()
     );
-    if let Some(ref choice) = game_state.pending_choice {
+    if let Some(ref choice) = game_state.get_pending_choice_json() {
         println!("Pending choice JSON: {:?}", choice);
     }
     println!("Hand count: {}", game_state.player1.hand.cards.len());
@@ -2126,11 +2126,11 @@ fn test_ability_live_success_draw_then_discard() {
     // After drawing 2 cards, player has hand_count + 2 cards, needs to discard 1
     // take_n! should create a SelectCard choice since hand size > 1
     assert!(
-        game_state.pending_choice.is_some(),
+        game_state.has_pending_choice(),
         "A pending choice for selecting which card to discard should exist"
     );
 
-    if let Some(ref choice_val) = game_state.pending_choice {
+    if let Some(ref choice_val) = game_state.get_pending_choice_json() {
         // Parse the pending choice to check it's a SelectCard choice
         if let Ok(choice) =
             serde_json::from_value::<crate::ability::types::Choice>(choice_val.clone())

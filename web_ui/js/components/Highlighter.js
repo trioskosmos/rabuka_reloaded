@@ -310,7 +310,8 @@ export const Highlighter = {
                     }
                 }
             }
-            if (p.discard && p.discard.some(c => (typeof c === 'object' ? c.card_no === srcId : c === srcId))) {
+            const discardCards = p.discard?.cards || p.discard || [];
+            if (Array.isArray(discardCards) && discardCards.some(c => (typeof c === 'object' ? c.card_no === srcId : c === srcId))) {
                 Highlighter.addHighlight(`${pMap.prefix}-discard-visual`, className);
                 if (firstOnly) return;
             }

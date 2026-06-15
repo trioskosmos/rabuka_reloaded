@@ -23,75 +23,105 @@ from parser import (
     _normalize_effect_tree,
 )
 
-TRIGGER_PATTERN = re.compile(r'\{\{([^|]+)\|([^}]+)\}\}')
+TRIGGER_PATTERN = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
 # Also match patterns with / prefix like /{{...}}
-SLASH_TRIGGER_PATTERN = re.compile(r'/\{\{([^|]+)\|([^}]+)\}\}')
+SLASH_TRIGGER_PATTERN = re.compile(r"/\{\{([^|]+)\|([^}]+)\}\}")
 
 
-def extract_trigger(text: str) -> tuple[list, str, str]:
+def extract_trigger(text: str) -> tuple[list, int | None, str]:
     """Extract triggers and use limits from ability text and return (triggers, use_limit, effect)."""
-    # Cost icon patterns to exclude from triggers
+    # Cost icon patterns to exclude from triggers.
+    # IMPORTANT: Only filter as cost AFTER a trigger has been found.
+    # If at the very start of text, treat as position/activation requirement,
+    # not as a cost (e.g. {{live_start.png|ライブ開始時}}{{center.png|センター}}).
     cost_icon_patterns = [
-        'icon_energy', 'heart', 'icon_blade', 'icon_b_all', 'icon_score', 'center'
+        "icon_energy",
+        "heart",
+        "icon_blade",
+        "icon_b_all",
+        "icon_score",
     ]
-    
+
+    # Position icons that should NOT prevent trigger extraction.
+    # These appear after trigger icons like {{live_start.png|ライブ開始時}}{{center.png|センター}}.
+    # They are NOT costs — they are activation position requirements.
+    position_icon_patterns = ["center", "left", "right"]
+
     # Known trigger icon patterns (for debugging/validation)
     trigger_icon_patterns = [
-        'kidou', 'jidou', 'toujyou', 'live_start', 'live_success', 
-        'live_end', 'turn', 'center'  # center can be both cost and trigger
+        "kidou",
+        "jidou",
+        "toujyou",
+        "live_start",
+        "live_success",
+        "live_end",
+        "turn",
+        "center",  # center can be both cost, trigger, and position requirement
     ]
-    
+
     # Use limit patterns (turn restrictions)
-    use_limit_patterns = [
-        'turn', 'ターン'
-    ]
-    
+    use_limit_patterns = ["turn", "ターン"]
+
     triggers = []
     use_limit = None
+    # Strip leading/trailing quote chars that may be JSON artifacts
+    text = text.strip().lstrip('"').lstrip("\u201c").lstrip("\u201d").strip()
     effect = text
-    
+
     # Handle ［ターン1回］ bracket format (non-icon turn limit notation)
-    bracket_turn_match = re.search(r'［ターン1回］', effect)
+    bracket_turn_match = re.search(r"［ターン1回］", effect)
     if bracket_turn_match:
         use_limit = 1
-        effect = effect.replace('［ターン1回］', '', 1).strip()
-    
+        effect = effect.replace("［ターン1回］", "", 1).strip()
+
     # First, remove / prefix trigger patterns
     slash_matches = SLASH_TRIGGER_PATTERN.findall(text)
     for match in slash_matches:
         icon_file = match[0]
         icon_text = match[1]
         slash_pattern = f"/{{{{{icon_file}|{icon_text}}}}}"
-        effect = effect.replace(slash_pattern, '', 1)
+        effect = effect.replace(slash_pattern, "", 1)
         triggers.append(icon_text)
-    
+
     # Find all trigger patterns
     trigger_matches = TRIGGER_PATTERN.findall(text)
-    
+
     # Only consider triggers at the very start (before any non-trigger, non-whitespace text)
     pos = 0
     for match in trigger_matches:
         icon_file = match[0]
         icon_text = match[1]
         match_start = text.find(f"{{{{{icon_file}|{icon_text}}}}}", pos)
-        
+
         # Check if there's any non-trigger text before this match
         before = text[pos:match_start]
-        if before.strip() and before.strip() != '：':
+        if before.strip() and before.strip() != "：":
             # If the only non-trigger text is a slash prefix (from /{{trigger}}), skip it
-            if before.strip() == '/':
+            if before.strip() == "/":
                 pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
                 continue
             # Found non-trigger text, stop here
             break
-        
-        # Check if this is a cost icon (not a trigger)
+
+        # Check if this is a cost icon (not a trigger).
+        # BUT: if we already found a trigger, don't skip subsequent position icons
+        # like {{center.png|センター}} — they are activation position requirements,
+        # not costs. Only skip actual cost resources (energy, heart, blade, score).
         if any(cost_pattern in icon_file for cost_pattern in cost_icon_patterns):
             pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
             continue
-        
+
+        # Position icons (center, left, right) at the start should be skipped
+        # only if no trigger has been found yet AND no other trigger icon precedes.
+        # If they appear after a trigger icon, they're position requirements, not costs.
+        if triggers and any(p in icon_file for p in position_icon_patterns):
+            pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
+            continue
+
         # Check if this is a use limit (turn restriction)
-        if any(use_limit_pattern in icon_text for use_limit_pattern in use_limit_patterns):
+        if any(
+            use_limit_pattern in icon_text for use_limit_pattern in use_limit_patterns
+        ):
             use_limit_text = icon_text
             # Convert Japanese turn limit text to integer
             if use_limit_text == "ターン1回":
@@ -102,22 +132,22 @@ def extract_trigger(text: str) -> tuple[list, str, str]:
                 use_limit = 3
             else:
                 # Try to extract any number from text like "ターンN回"
-                num_match = re.match(r'ターン(\d+)回', use_limit_text)
+                num_match = re.match(r"ターン(\d+)回", use_limit_text)
                 use_limit = int(num_match.group(1)) if num_match else use_limit_text
             # Remove use limit from effect
             trigger_pattern = f"{{{{{icon_file}|{icon_text}}}}}"
-            effect = effect.replace(trigger_pattern, '', 1)
+            effect = effect.replace(trigger_pattern, "", 1)
             pos = match_start + len(trigger_pattern)
             continue
-        
+
         # Check if we're inside quoted text
         # Count quotes before this position
-        quote_count = text[:match_start].count('「') - text[:match_start].count('」')
+        quote_count = text[:match_start].count("「") - text[:match_start].count("」")
         if quote_count > 0:
             # We're inside quoted text, skip
             pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
             continue
-        
+
         # Skip if this trigger was already extracted (e.g. via slash prefix)
         if icon_text in triggers:
             pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
@@ -125,47 +155,92 @@ def extract_trigger(text: str) -> tuple[list, str, str]:
         triggers.append(icon_text)
         # Remove this trigger icon from effect
         trigger_pattern = f"{{{{{icon_file}|{icon_text}}}}}"
-        effect = effect.replace(trigger_pattern, '', 1)
+        effect = effect.replace(trigger_pattern, "", 1)
         pos = match_start + len(trigger_pattern)
-    
+
     effect = effect.strip()
-    
+
     return triggers, use_limit, effect
 
 
 def extract_abilities_from_card(card_id: str, card: dict) -> list:
     """Extract all abilities from a single card."""
     abilities = []
-    
+
     ability_text = card.get("ability", "")
     if not ability_text:
         return abilities
-    
+
     # Split by newline for multiple abilities
-    ability_lines = ability_text.split('\n')
-    
+    ability_lines = ability_text.split("\n")
+
     for i, line in enumerate(ability_lines):
         line = line.strip()
         if not line:
             continue
-        
+
         # Check if this is a continuation line (starts with ・)
-        if line.startswith('・'):
+        if line.startswith("・"):
             # Append to previous ability
             if abilities:
                 abilities[-1]["full_text"] += "\n" + line
                 abilities[-1]["triggerless_text"] += "\n" + line
             continue
-        
+
         # Check if this is a parenthetical note (wrapped in parentheses)
         # These should be appended to the previous ability
-        if (line.startswith('(') and line.endswith(')')) or (line.startswith('（') and line.endswith('）')):
+        if (line.startswith("(") and line.endswith(")")) or (
+            line.startswith("（") and line.endswith("）")
+        ):
             if abilities:
                 abilities[-1]["full_text"] += "\n" + line
                 abilities[-1]["triggerless_text"] += "\n" + line
             else:
                 # Standalone parenthetical note - treat as null ability (no-op)
-                abilities.append({
+                abilities.append(
+                    {
+                        "card_id": card_id,
+                        "full_text": line,
+                        "triggerless_text": "",
+                        "use_limit": None,
+                        "triggers": [],
+                        "trigger_count": 0,
+                        "ability_index": i,
+                        "is_null": True,
+                    }
+                )
+            continue
+
+        # Check if this line starts with a trigger pattern (new ability)
+        # If it doesn't have a trigger but the previous ability had one, it might be a continuation
+        triggers, use_limit, effect = extract_trigger(line)
+
+        # Check if this is a continuation of a previous ability (no trigger, but previous had trigger)
+        # This handles cases like "回答がチョコミントの場合、..." which are conditional outcomes
+        if not triggers and abilities and abilities[-1]["trigger_count"] > 0:
+            # Check if this looks like a conditional outcome (starts with "回答が" or similar patterns)
+            if line.startswith("回答が") or line.startswith("場合") or "の場合" in line:
+                # Append to previous ability
+                abilities[-1]["full_text"] += "\n" + line
+                abilities[-1]["triggerless_text"] += "\n" + line
+                continue
+            # Check if this is a fragment continuation (starts with "とき、" or similar)
+            # This handles cases where abilities are split incorrectly across newlines
+            if (
+                line.startswith("とき、")
+                or line.startswith("なら、")
+                or line.startswith("場合、")
+            ):
+                # Append to previous ability
+                abilities[-1]["full_text"] += line
+                abilities[-1]["triggerless_text"] += line
+                continue
+
+        # If this line has no trigger at all, treat it as a note (is_null: True)
+        # Only parse as regular ability if it has trigger brackets
+        if not triggers:
+            abilities.append(
+                {
                     "card_id": card_id,
                     "full_text": line,
                     "triggerless_text": "",
@@ -174,55 +249,22 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
                     "trigger_count": 0,
                     "ability_index": i,
                     "is_null": True,
-                })
-            continue
-        
-        # Check if this line starts with a trigger pattern (new ability)
-        # If it doesn't have a trigger but the previous ability had one, it might be a continuation
-        triggers, use_limit, effect = extract_trigger(line)
-        
-        # Check if this is a continuation of a previous ability (no trigger, but previous had trigger)
-        # This handles cases like "回答がチョコミントの場合、..." which are conditional outcomes
-        if not triggers and abilities and abilities[-1]["trigger_count"] > 0:
-            # Check if this looks like a conditional outcome (starts with "回答が" or similar patterns)
-            if line.startswith('回答が') or line.startswith('場合') or 'の場合' in line:
-                # Append to previous ability
-                abilities[-1]["full_text"] += "\n" + line
-                abilities[-1]["triggerless_text"] += "\n" + line
-                continue
-            # Check if this is a fragment continuation (starts with "とき、" or similar)
-            # This handles cases where abilities are split incorrectly across newlines
-            if line.startswith('とき、') or line.startswith('なら、') or line.startswith('場合、'):
-                # Append to previous ability
-                abilities[-1]["full_text"] += line
-                abilities[-1]["triggerless_text"] += line
-                continue
-        
-        # If this line has no trigger at all, treat it as a note (is_null: True)
-        # Only parse as regular ability if it has trigger brackets
-        if not triggers:
-            abilities.append({
-                "card_id": card_id,
-                "full_text": line,
-                "triggerless_text": "",
-                "use_limit": None,
-                "triggers": [],
-                "trigger_count": 0,
-                "ability_index": i,
-                "is_null": True,
-            })
+                }
+            )
         else:
-            abilities.append({
-                "card_id": card_id,
-                "full_text": line,
-                "triggerless_text": effect,
-                "use_limit": use_limit,
-                "once_per_turn": use_limit == 1 if use_limit else False,
-                "triggers": triggers,
-                "trigger_count": len(triggers),
-                "ability_index": i,
-            })
-    
+            abilities.append(
+                {
+                    "card_id": card_id,
+                    "full_text": line,
+                    "triggerless_text": effect,
+                    "use_limit": use_limit,
+                    "once_per_turn": use_limit == 1 if use_limit else False,
+                    "triggers": triggers,
+                    "trigger_count": len(triggers),
+                    "ability_index": i,
+                }
+            )
+
     return abilities
 
 
@@ -233,71 +275,81 @@ def _enrich_effect_type(effect, triggerless=""):
         return
     heart_colors = []
     seen = set()
-    for m in re.findall(r'{{heart_(\d+)\.png\|heart\d+}}', triggerless):
-        h = f'heart{m.zfill(2)}'
+    for m in re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", triggerless):
+        h = f"heart{m.zfill(2)}"
         if h not in seen:
             seen.add(h)
             heart_colors.append(h)
-    if heart_colors and 'heart_colors' not in effect:
-        effect['heart_colors'] = heart_colors
+    if heart_colors and "heart_colors" not in effect:
+        effect["heart_colors"] = heart_colors
     # Propagate heart_colors into location_condition for collective heart checks
-    if 'heart_colors' in effect and 'condition' in effect:
-        cond = effect['condition']
-        if isinstance(cond, dict) and cond.get('type') == 'location_condition' and 'heart_colors' not in cond:
-            cond['heart_colors'] = effect['heart_colors']
+    if "heart_colors" in effect and "condition" in effect:
+        cond = effect["condition"]
+        if (
+            isinstance(cond, dict)
+            and cond.get("type") == "location_condition"
+            and "heart_colors" not in cond
+        ):
+            cond["heart_colors"] = effect["heart_colors"]
 
 
 def extract_all_abilities(cards_file: Path) -> dict:
     """Extract all abilities from cards.json."""
-    with open(cards_file, encoding='utf-8') as f:
+    with open(cards_file, encoding="utf-8") as f:
         cards = json.load(f)
-    
+
     all_abilities = []
     ability_groups = defaultdict(list)
-    
+
     # Handle both dict and list formats
     if isinstance(cards, list):
-        cards_dict = {card.get('card_no', str(i)): card for i, card in enumerate(cards)}
+        cards_dict = {card.get("card_no", str(i)): card for i, card in enumerate(cards)}
     else:
         cards_dict = cards
-    
+
     for card_id, card in cards_dict.items():
         abilities = extract_abilities_from_card(card_id, card)
         for ability in abilities:
             all_abilities.append(ability)
-            card_example = f"{card_id} | {card.get('name', '')} (ab#{ability['ability_index']})"
+            card_example = (
+                f"{card_id} | {card.get('name', '')} (ab#{ability['ability_index']})"
+            )
             ability_groups[ability["full_text"]].append(card_example)
-    
+
     # Group abilities by full_text
     unique_abilities = []
     for full_text, card_examples in ability_groups.items():
         sample = next(a for a in all_abilities if a["full_text"] == full_text)
-        
+
         # Parse semantic effect and cost
         effect_text = sample["triggerless_text"]
-        
+
         # Skip parsing for is_null abilities (notes without triggers)
         if sample.get("is_null", False):
-            unique_abilities.append({
-                "full_text": full_text,
-                "triggerless_text": sample["triggerless_text"],
-                "card_count": len(card_examples),
-                "cards": card_examples,
-                "triggers": ', '.join(sample["triggers"]) if sample["triggers"] else None,
-                "use_limit": sample["use_limit"],
-                "is_null": True,
-                "cost": None,
-                "effect": None,
-            })
+            unique_abilities.append(
+                {
+                    "full_text": full_text,
+                    "triggerless_text": sample["triggerless_text"],
+                    "card_count": len(card_examples),
+                    "cards": card_examples,
+                    "triggers": ", ".join(sample["triggers"])
+                    if sample["triggers"]
+                    else None,
+                    "use_limit": sample["use_limit"],
+                    "is_null": True,
+                    "cost": None,
+                    "effect": None,
+                }
+            )
             continue
-        
+
         # Split cost and effect
         cost_text = None
         if "：" in effect_text:
             parts = effect_text.split("：", 1)
             cost_text = parts[0].strip()
             effect_text = parts[1].strip()
-        
+
         # Parse cost
         cost = None
         if cost_text:
@@ -305,7 +357,7 @@ def extract_all_abilities(cards_file: Path) -> dict:
                 cost = parse_cost(cost_text)
             except:
                 cost = None
-        
+
         # Parse effect
         effect = {}
         try:
@@ -313,38 +365,69 @@ def extract_all_abilities(cards_file: Path) -> dict:
             # Run post-processing normalizer (propagates exclude_self, distinct, position, original_value, etc.)
             effect = _normalize_effect_tree(effect, sample["triggerless_text"])
             # Check if effect has empty actions array
-            if 'actions' in effect and not effect['actions']:
+            if "actions" in effect and not effect["actions"]:
                 print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
                 print(f"Effect dict: {effect}")
             _enrich_effect_type(effect, triggerless=sample["triggerless_text"])
-            
+
         except Exception as e:
             print(f"Error parsing effect: {effect_text}")
             print(f"Exception: {e}")
             import traceback
+
             traceback.print_exc()
             effect = {"text": effect_text, "actions": []}
-        
+
+        # Extract activation_position from cost text (e.g. {{center.png|センター}})
+        if "activation_position" not in effect:
+            t = sample["triggerless_text"]
+            if "{{center.png|センター}}" in t:
+                effect["activation_position"] = "center"
+            elif "{{left.png|左サイド}}" in t:
+                effect["activation_position"] = "left_side"
+            elif "{{right.png|右サイド}}" in t:
+                effect["activation_position"] = "right_side"
+        # Also extract activation_position from trigger icons (e.g. 登場 + position icon)
+        if "activation_position" not in effect:
+            trigs = sample.get("triggers", [])
+            positions = []
+            for trig_text in ["左サイド", "右サイド", "センター"]:
+                if trig_text in trigs:
+                    pos_map = {
+                        "左サイド": "left_side",
+                        "右サイド": "right_side",
+                        "センター": "center",
+                    }
+                    positions.append(pos_map[trig_text])
+            if len(positions) == 1:
+                effect["activation_position"] = positions[0]
+            elif len(positions) > 1:
+                effect["activation_position"] = ",".join(positions)
+
         # If the effect handler embedded a cost (e.g. "unless pay N energy"),
         # lift it to the ability level (Q92: player chooses whether to pay)
-        if isinstance(effect, dict) and 'cost' in effect:
-            cost = effect.pop('cost')
-        
-        unique_abilities.append({
-            "full_text": full_text,
-            "triggerless_text": sample["triggerless_text"],
-            "card_count": len(card_examples),
-            "cards": card_examples,
-            "triggers": ', '.join(sample["triggers"]) if sample["triggers"] else None,
-            "use_limit": sample["use_limit"],
-            "is_null": sample.get("is_null", False),
-            "cost": cost,
-            "effect": effect,
-        })
-    
+        if isinstance(effect, dict) and "cost" in effect:
+            cost = effect.pop("cost")
+
+        unique_abilities.append(
+            {
+                "full_text": full_text,
+                "triggerless_text": sample["triggerless_text"],
+                "card_count": len(card_examples),
+                "cards": card_examples,
+                "triggers": ", ".join(sample["triggers"])
+                if sample["triggers"]
+                else None,
+                "use_limit": sample["use_limit"],
+                "is_null": sample.get("is_null", False),
+                "cost": cost,
+                "effect": effect,
+            }
+        )
+
     # Sort by card count
     unique_abilities.sort(key=lambda x: -x["card_count"])
-    
+
     return {
         "schema": "extracted_abilities.v1",
         "generated_at": datetime.now().isoformat(),
@@ -352,7 +435,9 @@ def extract_all_abilities(cards_file: Path) -> dict:
         "source_file": str(cards_file),
         "statistics": {
             "total_cards": len(cards_dict),
-            "cards_with_abilities": len([c for c in cards_dict.values() if c.get("ability")]),
+            "cards_with_abilities": len(
+                [c for c in cards_dict.values() if c.get("ability")]
+            ),
             "total_abilities": len(all_abilities),
             "unique_abilities": len(unique_abilities),
         },
@@ -363,7 +448,7 @@ def extract_all_abilities(cards_file: Path) -> dict:
 def test_parsing():
     test_ability = "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。"
     triggers, use_limit, effect = extract_trigger(test_ability)
-    
+
     print("=== Test Parsing ===")
     print(f"Original: {test_ability}")
     print(f"Triggers: {triggers}")
@@ -374,19 +459,21 @@ def test_parsing():
 
 def main():
     test_parsing()
-    
+
     cards_file = Path(__file__).parent.parent / "cards.json"
     output_file = Path(__file__).parent.parent / "abilities.json"
-    
+
     print(f"Extracting abilities from {cards_file}...")
     result = extract_all_abilities(cards_file)
-    
-    print(f"Found {result['statistics']['total_abilities']} abilities across {result['statistics']['cards_with_abilities']} cards")
+
+    print(
+        f"Found {result['statistics']['total_abilities']} abilities across {result['statistics']['cards_with_abilities']} cards"
+    )
     print(f"Unique abilities: {result['statistics']['unique_abilities']}")
-    
-    with open(output_file, 'w', encoding='utf-8') as f:
+
+    with open(output_file, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
-    
+
     print(f"Output written to {output_file}")
 
 

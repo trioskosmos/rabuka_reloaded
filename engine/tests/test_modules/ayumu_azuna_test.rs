@@ -46,6 +46,14 @@ fn azuna_q158_blade_all_members() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
     let ayumu = game.id("PL!N-bp3-001-R\u{ff0b}");
     let member_left = game.id("PL!-sd1-010-SD");
     let member_right = game.id("PL!-sd1-013-SD");
@@ -86,6 +94,14 @@ fn azuna_q158_blade_single_member() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
     let ayumu = game.id("PL!N-bp3-001-R\u{ff0b}");
     let filler_live = game.id("PL!-sd1-019-SD");
 
@@ -111,6 +127,14 @@ fn azuna_q158_blade_not_gained_if_energy_not_placed() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
     let ayumu = game.id("PL!N-bp3-001-R\u{ff0b}");
     let filler_live = game.id("PL!-sd1-019-SD");
 
@@ -134,6 +158,14 @@ fn azuna_q158_blade_not_gained_if_energy_not_placed() {
 fn azuna_q157_energy_under_member_uses_any_energy() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     let ayumu = game.id("PL!N-bp3-001-R\u{ff0b}");
     let filler_live = game.id("PL!-sd1-019-SD");
@@ -168,6 +200,14 @@ fn azuna_q157_energy_under_member_uses_any_energy() {
 fn azuna_q184_energy_under_member_not_counted() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     let ayumu = game.id("PL!N-bp3-001-R\u{ff0b}");
     let filler_live = game.id("PL!-sd1-019-SD");

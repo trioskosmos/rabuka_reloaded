@@ -29,6 +29,9 @@ fn live_succeeds_when_hearts_met() {
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);
     }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
@@ -57,6 +60,9 @@ fn live_fails_with_insufficient_hearts() {
     game.state.player1.hand.cards.push(live);
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
     }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
@@ -119,6 +125,9 @@ fn q147_empty_need_heart_live_succeeds() {
     game.state.player1.hand.cards.push(live);
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
     }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
@@ -184,6 +193,9 @@ fn one_player_live_auto_higher_score() {
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);
     }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live);
     advance_to_live_start(&mut game);
@@ -212,6 +224,13 @@ fn no_live_card_no_yell_no_success() {
     for _ in 0..50 {
         game.state
             .player1
+            .main_deck
+            .cards
+            .push(game.id("PL!-sd1-010-SD"));
+    }
+    for _ in 0..20 {
+        game.state
+            .player2
             .main_deck
             .cards
             .push(game.id("PL!-sd1-010-SD"));
@@ -247,6 +266,9 @@ fn any_card_fails_hearts_all_fail() {
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);
     }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live_a);
     advance_to_live_start(&mut game);
@@ -274,6 +296,9 @@ fn winner_takes_one_to_success_zone() {
     game.state.player1.hand.cards.push(live_b);
     for _ in 0..50 {
         game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
     }
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(live_a);

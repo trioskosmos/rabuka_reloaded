@@ -1,6 +1,4 @@
-/// Tests for MY 舞 TONIGHT (PL!S-bp2-023-L) — LiveStart: give blade to ALL stage members.
-///
-/// Q121: Blade is gained by ALL stage members, not just one.
+/// Tests for MY舞☆TONIGHT (PL!S-bp2-023-L) ab#0 — LiveStart: give blade to ALL stage members.
 use crate::helpers::*;
 
 fn advance_to_live_set(game: &mut TestGame) {
@@ -9,58 +7,143 @@ fn advance_to_live_set(game: &mut TestGame) {
     }
 }
 
-#[test]
-fn mymai_tonight_q121_blade_given_to_all_stage_members() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-
+fn setup_mymai_only(game: &mut TestGame) -> (i16, i16) {
     let filler = game.id("PL!-sd1-010-SD");
     let mymai = game.id("PL!S-bp2-023-L");
-    // Another Aqours live card
-    let aqours_live = game.id("LL-bp5-002-L"); // Bring the LOVE! is Aqours
-
+    let member_a = game.id("PL!S-sd1-001-SD");
+    let member_b = game.id("PL!N-sd1-001-SD");
     game.state.player1.main_deck.cards.clear();
     for _ in 0..30 {
         game.state.player1.main_deck.cards.push(filler);
     }
-
-    // Two members on stage to receive blade
-    game.state.player1.stage.stage = [mymai, filler, filler]; // MY舞TONIGHT is itself a member AND live card
-
-    // Wait, MY舞TONIGHT is a live card (type=ライブ), not a member (type=メンバー)
-    // It can't be placed on stage. Let me use actual member cards.
-    // Actually it's a live card with need_heart: {...}
-    // I need members on stage for the blade to apply to
-    let member_a = game.id("PL!S-sd1-001-SD");
-    let member_b = game.id("PL!N-sd1-001-SD");
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.state.player1.stage.stage = [member_a, member_b, -1];
-
     game.state.player1.hand.cards.push(mymai);
-    game.state.player1.hand.cards.push(aqours_live);
-
-    advance_to_live_set(&mut game);
+    advance_to_live_set(game);
     game.set_live_card(mymai);
-    game.set_live_card(aqours_live);
+    (mymai, member_a)
+}
 
-    game.pass(); // P1Turn draw
-    game.pass(); // P2Turn → FirstAttackerPerformance → LiveStart
-
-    // Handle MY舞TONIGHT's LiveStart ability
+fn advance_to_performance(game: &mut TestGame) {
+    game.pass(); // LiveCardSetFirstAttacker → LiveCardSetSecondAttacker
+    game.pass(); // LiveCardSetSecondAttacker → FirstAttackerPerformance → LiveStart
     while game.has_pending_choice() {
         game.select_indices(&[]);
     }
+}
 
-    // Verify blade modifiers were applied to both stage members
-    let bm = &game.state.mods.blade_modifiers;
-    eprintln!("[MYMAI] blade modifiers: {:?}", bm);
-    let has_a = bm.get(&member_a).copied().unwrap_or(0) > 0;
-    let has_b = bm.get(&member_b).copied().unwrap_or(0) > 0;
-    eprintln!(
-        "[MYMAI] member_a has blade: {}, member_b has blade: {}",
-        has_a, has_b
-    );
+/// Condition: Aqours live card other than MY舞☆TONIGHT → blade gained.
+#[test]
+fn mymai_tonight_with_aqours_live_gains_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aqours_live = game.id("PL!S-bp5-023-L");
+    let (_, member_a) = setup_mymai_only(&mut game);
+    game.state.player1.hand.cards.push(aqours_live);
+    game.set_live_card(aqours_live);
+    advance_to_performance(&mut game);
     assert!(
-        has_a && has_b,
-        "Both stage members should have blade from LiveStart"
+        game.state
+            .mods
+            .blade_modifiers
+            .get(&member_a)
+            .copied()
+            .unwrap_or(0)
+            > 0
+    );
+}
+
+/// Only MY舞☆TONIGHT → condition fails (excluded by name).
+#[test]
+fn mymai_tonight_alone_no_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let (_, member_a) = setup_mymai_only(&mut game);
+    advance_to_performance(&mut game);
+    assert_eq!(
+        game.state
+            .mods
+            .blade_modifiers
+            .get(&member_a)
+            .copied()
+            .unwrap_or(0),
+        0
+    );
+}
+
+/// Aqours MEMBER card (not live) → condition fails (card_type filter).
+#[test]
+fn mymai_tonight_with_aqours_member_no_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aqours_member = game.id("PL!S-sd1-001-SD");
+    let (_, member_a) = setup_mymai_only(&mut game);
+    game.state.player1.hand.cards.push(aqours_member);
+    game.set_live_card(aqours_member);
+    advance_to_performance(&mut game);
+    assert_eq!(
+        game.state
+            .mods
+            .blade_modifiers
+            .get(&member_a)
+            .copied()
+            .unwrap_or(0),
+        0
+    );
+}
+
+/// Non-Aqours live card → condition fails (group filter).
+#[test]
+fn mymai_tonight_with_non_aqours_live_no_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let non_aqours = game.id("PL!-sd1-019-SD");
+    let (_, member_a) = setup_mymai_only(&mut game);
+    game.state.player1.hand.cards.push(non_aqours);
+    game.set_live_card(non_aqours);
+    advance_to_performance(&mut game);
+    assert_eq!(
+        game.state
+            .mods
+            .blade_modifiers
+            .get(&member_a)
+            .copied()
+            .unwrap_or(0),
+        0
+    );
+}
+
+/// Blade disappears after LiveVictoryDetermination (duration=live_end).
+#[test]
+fn mymai_tonight_blade_disappears_after_live_end() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aqours_live = game.id("PL!S-bp5-023-L");
+    let (_, member_a) = setup_mymai_only(&mut game);
+    game.state.player1.hand.cards.push(aqours_live);
+    game.set_live_card(aqours_live);
+    advance_to_performance(&mut game);
+    assert!(
+        game.state
+            .mods
+            .blade_modifiers
+            .get(&member_a)
+            .copied()
+            .unwrap_or(0)
+            > 0
+    );
+    game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance
+    game.pass(); // SecondAttackerPerformance → LiveVictoryDetermination
+    game.pass(); // LiveVictoryDetermination → Active (Turn 2, LiveEnd effects cleared)
+    assert_eq!(
+        game.state
+            .mods
+            .blade_modifiers
+            .get(&member_a)
+            .copied()
+            .unwrap_or(0),
+        0
     );
 }

@@ -30,13 +30,13 @@ fn eli_bp5_sequential_wait_then_discard_works() {
     assert!(game.has_pending_choice(), "Discard prompt");
     assert_eq!(
         game.state
-            .pending_choice
+            .get_pending_choice_json()
             .as_ref()
             .and_then(|v| v.get("zone"))
             .and_then(|v| v.as_str()),
         Some("hand"),
         "Should be hand discard, got {:?}",
-        game.state.pending_choice
+        game.state.get_pending_choice_json()
     );
     game.select_indices(&[0]);
 

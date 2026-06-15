@@ -98,12 +98,11 @@ fn maki_edge_cost5_opponent_draws_nothing() {
         game.select_indices(&[0]);
     }
 
-    // cost_limit is not checked by state_change_condition evaluator
-    // (parser gap: cost_limit not extracted from condition text).
-    // So the ability may still fire. This test documents current behavior.
-    eprintln!(
-        "[MAKI] hand after: {} (cost_limit check not implemented in evaluator)",
-        game.state.player1.hand.cards.len()
+    // cost_limit=4 check: cost-9 opponent should NOT trigger draw
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "Cost-9 opponent should NOT trigger draw (cost_limit=4)"
     );
 }
 

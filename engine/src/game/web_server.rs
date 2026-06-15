@@ -15,7 +15,6 @@ use crate::card::CardDatabase;
 use crate::deck_parser;
 use crate::deck_builder;
 use crate::game_setup::{ActionParameters, ActionType};
-use crate::ability::resolver::AbilityResolver;
 use crate::display;
 
 pub use crate::display::{CardDisplay, ZoneDisplay, PlayerDisplay, StageDisplay, GameStateDisplay};
@@ -333,9 +332,9 @@ fn is_live_card_set_phase(game_state: &GameState) -> bool {
 
         game_state.current_phase,
 
-        crate::game_state::Phase::LiveCardSetP1Turn
+        crate::game_state::Phase::LiveCardSetFirstAttacker
 
-            | crate::game_state::Phase::LiveCardSetP2Turn
+            | crate::game_state::Phase::LiveCardSetSecondAttacker
 
     )
 }
@@ -347,7 +346,7 @@ fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> 
     loop {
 
         // If the player needs to make a choice, stop and wait for their input
-        if game_state.pending_choice.is_some() { break; }
+        if game_state.has_pending_choice() { break; }
 
         if is_automatic_phase(game_state) {
 
@@ -532,58 +531,109 @@ async fn exec_code(
     req: web::Json<ExecCodeRequest>,
 ) -> impl Responder {
     let mut game_state = lock_state!(data.game_state, write);
-
-
-
-    // Parse and execute the code
-
     let code = &req.code;
 
-
-
-    let mut params: std::collections::HashMap<String, String> = std::collections::HashMap::new();
-    for segment in code.split(';') {
-        let seg = segment.trim();
-        if let Some(eq_pos) = seg.find('=') {
-            let key = seg[..eq_pos].trim().to_lowercase();
-            let value = seg[eq_pos + 1..].trim().trim_matches('"').to_string();
-            params.insert(key, value);
+    // Parse key=value pairs from Rust-like code
+    fn parse_param(code: &str, key: &str) -> Option<String> {
+        for segment in code.split(';') {
+            let seg = segment.trim();
+            // handle "let key = value" and "key=value" formats
+            let without_let = if let Some(rest) = seg.strip_prefix("let ") { rest } else { seg };
+            if let Some(eq_pos) = without_let.find('=') {
+                let k = without_let[..eq_pos].trim().to_lowercase();
+                if k == key {
+                    let v = without_let[eq_pos + 1..].trim().trim_matches('"').to_string();
+                    return Some(v);
+                }
+            }
         }
+        None
     }
 
-    let player_idx: usize = params.get("player_idx")
+    let player_idx: usize = parse_param(code, "player_idx")
         .and_then(|v| v.parse().ok())
         .unwrap_or(0);
 
-    if code.contains("draw_energy") {
-        let amount: usize = params.get("amount")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(1);
-
-        let player = if player_idx == 0 {
-            &mut game_state.player1
-        } else {
-            &mut game_state.player2
+    macro_rules! with_player {
+        ($p:ident, $body:block) => {
+            let $p = if player_idx == 0 { &mut game_state.player1 } else { &mut game_state.player2 };
+            $body
         };
+    }
 
-        for _ in 0..amount {
-            let _ = player.draw_energy();
-        }
+    let amount: u32 = parse_param(code, "amount")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1);
+
+    if code.contains("draw_energy") {
+        with_player!(p, {
+            for _ in 0..amount {
+                let _ = p.draw_energy();
+            }
+        });
     }
 
     if code.contains("add_card") && code.contains("card_no") {
-        let card_no = params.get("card_no").cloned().unwrap_or_default();
+        let card_no = parse_param(code, "card_no").unwrap_or_default();
         if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
-            let player = if player_idx == 0 {
-                &mut game_state.player1
-            } else {
-                &mut game_state.player2
-            };
-            player.hand.add_card(card_id);
+            with_player!(p, { p.hand.add_card(card_id); });
         }
     }
 
+    if code.contains("draw_card") {
+        for _ in 0..amount {
+            with_player!(p, {
+                if let Some(cid) = p.main_deck.draw() {
+                    p.hand.add_card(cid);
+                }
+            });
+        }
+    }
 
+    if code.contains("clear_hand") {
+        with_player!(p, {
+            let cards: Vec<i16> = p.hand.cards.drain(..).collect();
+            for cid in cards {
+                p.waitroom.add_card(cid);
+            }
+        });
+    }
+
+    if code.contains("force_win") {
+        let p = &mut game_state.player1;
+        if let Some(cid) = p.live_card_zone.cards.first().copied() {
+            if cid >= 0 {
+                for _ in 0..3 {
+                    p.success_live_card_zone.cards.push(cid);
+                }
+            }
+        }
+    }
+
+    if code.contains("reshuffle_deck") {
+        with_player!(p, { p.main_deck.shuffle(); });
+    }
+
+    if code.contains("add_live_to_zone") {
+        let card_no = parse_param(code, "card_no").unwrap_or_default();
+        if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
+            with_player!(p, { p.live_card_zone.cards.push(card_id); });
+        }
+    }
+
+    if code.contains("add_stage") {
+        let card_no = parse_param(code, "card_no").unwrap_or_default();
+        if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
+            with_player!(p, {
+                for slot in 0..3 {
+                    if p.stage.stage[slot] == -1 {
+                        p.stage.stage[slot] = card_id;
+                        break;
+                    }
+                }
+            });
+        }
+    }
 
     let display = crate::display::game_state_to_display(&game_state);
     let actions = actions_with_index(&game_state);
@@ -716,15 +766,15 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
 
     }
 
-    let mut state_clone = game_state.clone();
+    let state_clone = game_state.clone();
 
     drop(game_state);
 
-    let resolver = AbilityResolver::new(&mut state_clone);
+    let ctx = crate::ability::condition::ConditionContext::new(&state_clone);
 
     let evaluated: Vec<serde_json::Value> = results.into_iter().map(|(player_idx, zone_name, card_id, card_name, ability_idx, field_name, condition)| {
 
-        let result = resolver.evaluate_condition(&condition);
+        let result = ctx.evaluate_condition(&condition);
 
         serde_json::json!({
 

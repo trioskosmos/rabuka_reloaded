@@ -42,7 +42,7 @@ fn mia_q190_heart_selection_excludes_heart00() {
     // Heart color choice appears (SelectHeartColor with 6 options: heart01-06)
     if game.has_pending_choice() {
         // Verify the choice options don't include heart00
-        if let Some(ref pc) = game.state.pending_choice {
+        if let Some(ref pc) = game.state.get_pending_choice_json() {
             let json = pc.as_object().expect("pending_choice should be an object");
             if let Some(opts) = json.get("options").and_then(|o| o.as_array()) {
                 for opt in opts {
@@ -56,7 +56,7 @@ fn mia_q190_heart_selection_excludes_heart00() {
     }
 
     let hand_count = game.state.player1.hand.cards.len();
-    let had_choice = game.state.pending_choice.is_some();
+    let had_choice = game.state.has_pending_choice();
     eprintln!(
         "[MIA] hand after: {}, had_choice: {}",
         hand_count, had_choice

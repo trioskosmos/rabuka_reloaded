@@ -1,6 +1,6 @@
+use crate::ability::resolver::AbilityResolver;
 use crate::ability::types::{Choice, Command};
-use crate::ability::types::ExecutionContext;
-use crate::card::{Ability, AbilityEffect};
+use crate::card::Ability;
 use crate::game_state::AbilityTrigger;
 
 /// Unique identifier for an ability instance in the queue
@@ -49,10 +49,6 @@ pub struct AbilityQueueEntry {
     pub choice_card_no: Option<String>,
     /// JSON-serialized options for choice/choice_string discriminators
     pub conditional_choice: Option<String>,
-    /// Execution context saved across resolver create/destroy cycles
-    pub execution_context: Option<ExecutionContext>,
-    /// Cards selected across sequential steps (for exclude_selected)
-    pub selected_card_ids: Vec<i16>,
     /// Whether the effect has started executing (prevents re-processing)
     pub effect_started: bool,
     /// Whether the optional cost was actually paid (not skipped)
@@ -60,11 +56,13 @@ pub struct AbilityQueueEntry {
     /// Player who must make the pending choice (if different from activating player)
     pub choice_player_id: Option<String>,
     /// Deferred sequential sub-effects interrupted by a player choice.
-    /// Replaces the global `GameState::pending_sequential_actions` side-channel.
     /// When a sequential ability is processing actions [A, B, C] and B pauses for a
     /// choice, the remaining actions [C, ...] are stored here and resumed in
     /// `finalize_choice` after the player responds.
     pub pending_commands: Vec<Command>,
+    /// Persistent ability resolver — stays alive across choice round-trips
+    /// instead of being destroyed and recreated. Eliminates manual save/restore.
+    pub resolver: Option<AbilityResolver>,
 }
 
 /// Unified ability queue with proper state management
@@ -258,6 +256,66 @@ impl AbilityQueue {
     pub fn has_pending_commands(&self) -> bool {
         self.current_entry()
             .map_or(false, |e| !e.pending_commands.is_empty())
+    }
+
+    /// Move the entry at `from_index` to the front of the queue (position 0).
+    /// Used by Rule 9.5.3 auto-ability ordering: player picks which standby ability
+    /// resolves first, and this moves it to the head of the queue.
+    pub fn promote_entry(&mut self, from_index: usize) {
+        let absolute = self.current_index + from_index;
+        if absolute >= self.entries.len() || from_index == 0 {
+            return;
+        }
+        let entry = self.entries.remove(absolute);
+        self.entries.insert(0, entry);
+        if self.current_index > absolute {
+            self.current_index = self.current_index.saturating_sub(1);
+        } else {
+            self.current_index = 0;
+        }
+    }
+    /// Check if an entry exists and is not completed.
+    pub fn is_entry_available(&self, index: usize) -> bool {
+        index < self.entries.len() && !self.entries[index].completed
+    }
+
+    /// Get the player_id of an entry.
+    pub fn entry_player_id(&self, index: usize) -> Option<&str> {
+        self.entries.get(index).map(|e| e.player_id.as_str())
+    }
+
+    /// Move an entry at an absolute index to position 0 and reset current_index.
+    /// Unlike promote_entry which uses relative-from-current_index, this uses
+    /// the direct absolute index in the entries array.
+    pub fn promote_entry_by_abs(&mut self, absolute: usize) {
+        if absolute >= self.entries.len() || absolute == 0 {
+            if absolute == 0 {
+                self.current_index = 0;
+            }
+            return;
+        }
+        let entry = self.entries.remove(absolute);
+        self.entries.insert(0, entry);
+        self.current_index = 0;
+    }
+
+    /// Take the resolver out of the current entry (for use with game_state).
+    pub fn take_resolver(&mut self) -> Option<AbilityResolver> {
+        self.current_entry_mut().and_then(|e| e.resolver.take())
+    }
+
+    /// Put the resolver back into the current entry.
+    pub fn set_resolver(&mut self, resolver: AbilityResolver) {
+        if let Some(entry) = self.current_entry_mut() {
+            entry.resolver = Some(resolver);
+        }
+    }
+
+    /// Check if the current entry has a resolver (i.e. ability execution is in progress).
+    pub fn has_resolver(&self) -> bool {
+        self.current_entry()
+            .and_then(|e| e.resolver.as_ref())
+            .is_some()
     }
 }
 

@@ -57,6 +57,9 @@ fn tote_mari_q68_can_still_set_live_card() {
     for _ in 0..30 {
         game.state.player1.main_deck.cards.push(filler);
     }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.hand.cards.push(totemari);
     game.state.player1.hand.cards.push(live);
@@ -81,5 +84,92 @@ fn tote_mari_q68_can_still_set_live_card() {
     assert!(
         game.state.player1.live_card_zone.cards.contains(&live),
         "Live card can be set despite cannot_live"
+    );
+}
+
+/// Performance phase discards live cards when cannot_live is active (Q68).
+#[test]
+fn tote_mari_q68_live_performance_discards_live_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let totemari = game.id("PL!HS-bp2-014-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live = game.id("LL-bp5-001-L");
+    let opp_live = game.id("LL-bp5-001-L");
+
+    // Fill decks
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // P1 hand: totemari + live card
+    game.state.player1.hand.cards.push(totemari);
+    game.state.player1.hand.cards.push(live);
+    // P2 hand: live card
+    game.state.player2.hand.cards.push(opp_live);
+
+    game.give_energy(4);
+
+    game.play_to_stage(totemari, rabuka_engine::zones::MemberArea::Center);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Advance to LiveCardSetFirstAttacker (P1's turn to set live cards).
+    // Each pass() advances ONE phase without settle: Main→Active→Energy→Draw→Main→LiveCardSetFirstAttacker
+    game.pass(); // P1 Main → Active (SecondAttacker)
+    game.pass(); // Active → Energy
+    game.pass(); // Energy → Draw
+    game.pass(); // Draw → Main (P2's Main)
+    game.pass(); // Main → LiveCardSetFirstAttacker
+
+    // P1 live card set: set the live card (cannot_live should NOT block this)
+    game.set_live_card(live);
+    assert!(game.state.player1.live_card_zone.cards.contains(&live));
+
+    // Pass to LiveCardSetSecondAttacker (P2's turn)
+    game.pass();
+
+    // P2 can also set a live card
+    game.set_live_card(opp_live);
+    assert!(game.state.player2.live_card_zone.cards.contains(&opp_live));
+
+    // Pass to performance phase and execute P1's performance
+    // First pass: LiveCardSetSecondAttacker → FirstAttackerPerformance (sets phase)
+    // Second pass: FirstAttackerPerformance → execute_performance_phase → SecondAttackerPerformance
+    game.pass();
+    game.pass();
+
+    // Performance happens — cannot_live P1's live card should be discarded
+    // P1 is first attacker, so P1's performance resolves first
+    // After P1's performance, live card should go to waitroom
+
+    // P1's live card should have been discarded during performance due to cannot_live
+    assert!(
+        !game.state.player1.live_card_zone.cards.contains(&live),
+        "P1 live card discarded during performance (cannot_live)"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live),
+        "P1 live card moved to waitroom"
+    );
+
+    // P2's live card should still be present (opponent unaffected by cannot_live)
+    // P2 performs second
+    assert!(
+        game.state.player2.live_card_zone.cards.contains(&opp_live),
+        "P2 live card remains (opponent cannot_live does not affect P2)"
+    );
+
+    // Cheer count should be 0 for P1 (no yell occurs with cannot_live)
+    assert_eq!(
+        game.state.player1_cheer_blade_heart_count, 0,
+        "P1 cheer count is 0 (cannot_live)"
     );
 }

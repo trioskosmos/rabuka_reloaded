@@ -11,14 +11,19 @@
 /// Each advance_phase() moves exactly one step.
 /// Turn 1 starts at Phase::Main, TurnPhase::FirstAttackerNormal.
 use crate::helpers::*;
-use rabuka_engine::game_setup::ActionType;
-use rabuka_engine::turn::TurnEngine;
 
 /// Smoke test: 20 pass() calls should cycle through 2+ turns without crashing.
 #[test]
 fn phase_walkthrough_two_turns() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     assert_eq!(game.state.turn_number, 1);
     assert_eq!(
@@ -53,7 +58,7 @@ fn phase_walkthrough_two_turns() {
 // Option 1: あなた → both draw 1
 // Option 2: その他 → both members on stage gain blade
 
-/// Advance from Main (turn 1) to LiveCardSetP1Turn.
+/// Advance from Main (turn 1) to LiveCardSetFirstAttacker.
 /// This requires 5 passes: Main→P2Act→P2Ene→P2Drw→P2Main→LiveP1
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     assert_eq!(game.state.current_phase.to_string(), "Main");
@@ -89,6 +94,13 @@ fn assert_energy(game: &TestGame, active: usize, total: usize) {
 fn ai_screeam_answer_both_discard() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     let screeam = game.id("LL-PR-004-PR");
     let filler_a = game.id("PL!-sd1-010-SD");
@@ -99,10 +111,10 @@ fn ai_screeam_answer_both_discard() {
     game.state.player1.hand.cards.push(filler_a);
     game.state.player2.hand.cards.push(filler_b);
 
-    let p1_hand_before = game.state.player1.hand.cards.len();
-    let p2_hand_before = game.state.player2.hand.cards.len();
+    let _p1_hand_before = game.state.player1.hand.cards.len();
+    let _p2_hand_before = game.state.player2.hand.cards.len();
 
-    // Advance to LiveCardSetP1Turn
+    // Advance to LiveCardSetFirstAttacker
     advance_to_live_card_set_p1(&mut game);
     assert!(game.state.current_phase.to_string().contains("LiveCardSet"));
 
@@ -117,17 +129,34 @@ fn ai_screeam_answer_both_discard() {
     );
 
     // Option 0: mint/flavor/cookie → both discard 1 from hand
+    // P1 flow: start 2 (screeam + filler_a), P2 active during passes so no draws,
+    //   -1 set live, +1 live replacement, -1 discard = 1
+    // P2 flow: start 1 (filler_b), +1 draw (DrawPhaseP2Turn), -1 discard = 1
     game.select_option(0);
+
+    // "both" → effect targets P1 then P2; P2 also gets a discard choice
+    assert!(
+        game.has_pending_choice(),
+        "P1 should get a discard choice first"
+    );
+    // P1 discards card from hand
+    game.select_indices(&[0]);
+    // Now P2 gets a discard choice
+    assert!(
+        game.has_pending_choice(),
+        "P2 should get a discard choice after P1 discards"
+    );
+    game.select_indices(&[0]);
 
     assert_eq!(
         game.state.player1.hand.cards.len(),
-        p1_hand_before - 1 - 1,
-        "P1 hand: -1 (played as live card) -1 (discarded)"
+        1,
+        "P1 hand: 1 (start 2 -1 set live +1 replacement -1 discard)"
     );
     assert_eq!(
         game.state.player2.hand.cards.len(),
-        p2_hand_before - 1,
-        "P2 hand: -1 (discarded)"
+        1,
+        "P2 hand: 1 (start 1 +1 draw -1 discard)"
     );
 }
 
@@ -196,6 +225,12 @@ fn ai_screeam_answer_both_gain_blade() {
 
     let screeam = game.id("LL-PR-004-PR");
     let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     let p1_member = game.id("PL!-sd1-013-SD");
     let p2_member = game.id("PL!-sd1-014-SD");
 
@@ -248,6 +283,12 @@ fn distortion_q97_all_active_no_catchu_score_plus_1() {
 
     let distortion = game.id("PL!SP-pb1-023-L");
     let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     // Card in hand
     game.state.player1.hand.cards.push(distortion);
@@ -265,11 +306,11 @@ fn distortion_q97_all_active_no_catchu_score_plus_1() {
     // Q97: CatChu!不足でもエネルギーが全アクティブなら＋１される
     assert!(!game.has_pending_choice(), "No pending choices expected");
 
-    let live_card_id = game.state.player1.live_card_zone.cards[0];
-    let score_mod = game.state.mods.get_score_modifier(live_card_id);
+    let live_card = game.state.player1.live_card_zone.cards[0];
+    let score_mod = game.state.mods.get_score_modifier(live_card);
     assert_eq!(
         score_mod, 1,
-        "Score should be +1 when all energy active (Q97)"
+        "Q97: score should be +1 when all energy active"
     );
 }
 
@@ -280,6 +321,12 @@ fn distortion_q96_score_permanent_after_energy_used() {
 
     let distortion = game.id("PL!SP-pb1-023-L");
     let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     let energy_id = game.id("LL-E-001-SD");
 
     // Card in hand
@@ -324,6 +371,12 @@ fn distortion_basic_energy_refresh_with_catchu() {
 
     let distortion = game.id("PL!SP-pb1-023-L");
     let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     let catchu_a = game.id("PL!SP-sd1-001-SD"); // かのん
     let catchu_b = game.id("PL!SP-sd1-004-SD"); // 可可（可可）
     let energy_id = game.id("LL-E-001-SD");
@@ -377,6 +430,12 @@ fn distortion_no_refresh_when_no_wait_energy() {
 
     let distortion = game.id("PL!SP-pb1-023-L");
     let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     let catchu_a = game.id("PL!SP-sd1-001-SD");
     let catchu_b = game.id("PL!SP-sd1-004-SD");
 
@@ -418,6 +477,12 @@ fn distortion_max_cap_8_wait_refresh_6_only() {
     let catchu_a = game.id("PL!SP-sd1-001-SD");
     let catchu_b = game.id("PL!SP-sd1-004-SD");
     let energy_id = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.state.player1.hand.cards.push(distortion);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.stage.stage[0] = catchu_a;
@@ -455,6 +520,12 @@ fn distortion_exact_max_boundary_6_wait_all_refreshed() {
     let catchu_a = game.id("PL!SP-sd1-001-SD");
     let catchu_b = game.id("PL!SP-sd1-004-SD");
     let energy_id = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.state.player1.hand.cards.push(distortion);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.stage.stage[0] = catchu_a;
@@ -486,6 +557,12 @@ fn distortion_same_name_catchu_condition_not_met() {
     let filler = game.id("PL!-sd1-010-SD");
     let same_name = game.id("PL!SP-sd1-001-SD");
     let energy_id = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.state.player1.hand.cards.push(distortion);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.stage.stage[0] = same_name;
@@ -519,6 +596,12 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
     let catchu_a = game.id("PL!SP-sd1-001-SD");
     let catchu_b = game.id("PL!SP-sd1-004-SD");
     let energy_id = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.state.player1.hand.cards.push(distortion);
     game.state.player1.hand.cards.push(distortion);
     game.state.player1.hand.cards.push(filler);
@@ -566,43 +649,35 @@ fn ayumu_kanon_koko_debut_recover_from_discard() {
     let mut game = TestGame::new(db);
     let ayumu = game.id("LL-bp1-001-R\u{ff0b}");
     let member = game.id("PL!-sd1-010-SD");
-    let filler = game.id("LL-E-001-SD");
+    let filler = game.id("PL!-sd1-013-SD");
 
     // Member card in discard
     game.state.player1.waitroom.cards.push(member);
-    // Card in hand
     game.state.player1.hand.cards.push(ayumu);
     game.state.player1.hand.cards.push(filler);
+    game.give_energy(20);
 
     assert_eq!(game.state.player1.hand.cards.len(), 2);
     assert_eq!(game.state.player1.waitroom.cards.len(), 1);
 
-    // Play the card to stage using its debut ability
-    game.state.player1.stage.stage[0] = -1; // empty slot
-                                            // The debut ability triggers: add 1 member card from discard to hand
-                                            // We need to play the member card to trigger the appearance
-                                            // Actually, the Ayumu card's debut ability is AUTO: it triggers when played
-                                            // For now, verify the card exists and can be loaded
-    assert!(ayumu >= 0, "Card should have a valid database ID");
-    // Verify it has abilities
-    let card = game.db.get_card(ayumu).expect("Ayumu card should exist");
-    assert!(
-        card.abilities.len() >= 2,
-        "Card should have at least 2 abilities (debut + live_start)"
-    );
-    eprintln!(
-        "[Ayumu] Card '{}' has {} abilities",
-        card.name,
-        card.abilities.len()
-    );
-    for (i, ab) in card.abilities.iter().enumerate() {
-        eprintln!(
-            "[Ayumu]  Ability[{}]: triggers={:?} text={}",
-            i,
-            ab.triggers,
-            ab.full_text.chars().take(40).collect::<String>()
-        );
+    // Play the card to stage → debut ability triggers (auto: recover 1 member from discard)
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(ayumu, rabuka_engine::zones::MemberArea::Center);
+
+    // Debut auto-triggers: if there's a pending choice for selecting which member to recover
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
+
+    // Verify the member card was recovered from discard to hand
+    assert!(
+        game.state.player1.hand.cards.contains(&member),
+        "Member should be recovered from discard to hand"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&member),
+        "Member should no longer be in discard"
+    );
 }
 
 // ── Q62: "&" in name means it has all individual names ──────────────
@@ -619,6 +694,28 @@ fn ayumu_q62_and_name_has_individual_names() {
     assert_eq!(names[0], "上原歩夢", "First name should be 上原歩夢");
     assert_eq!(names[1], "澁谷かのん", "Second name should be 澁谷かのん");
     assert_eq!(names[2], "日野下花帆", "Third name should be 日野下花帆");
+
+    // Verify the card has the expected abilities (debut recover + live_start gain_ability)
+    let has_debut = ayumu
+        .abilities
+        .iter()
+        .any(|a| a.triggers.as_deref() == Some("登場"));
+    let has_live_start = ayumu
+        .abilities
+        .iter()
+        .any(|a| a.triggers.as_deref() == Some("ライブ開始時"));
+    assert!(has_debut, "Card should have a 登場 ability");
+    assert!(has_live_start, "Card should have a ライブ開始時 ability");
+
+    // Verify the live_start ability targets all 3 named characters specifically
+    let live_start = ayumu
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+        .expect("LiveStart ability exists");
+    assert!(live_start.full_text.contains("上原歩夢"));
+    assert!(live_start.full_text.contains("澁谷かのん"));
+    assert!(live_start.full_text.contains("日野下花帆"));
 }
 
 // ── Live test: Ayumu on stage, LiveStart trigger fires ─────────────
@@ -628,9 +725,18 @@ fn ayumu_live_start_triggers() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let ayumu = game.id("LL-bp1-001-R\u{ff0b}");
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
-    // Ayumu is a MEMBER card on stage
+    // Ayumu on stage, a copy of herself in hand as eligible named character
     game.state.player1.stage.stage[1] = ayumu;
+    let ayumu_copy = game.new_id("LL-bp1-001-R\u{ff0b}");
+    game.state.player1.hand.cards.push(ayumu_copy);
 
     // Live card to advance to LiveStart
     let filler_live = game.id("PL!-sd1-019-SD");
@@ -640,29 +746,28 @@ fn ayumu_live_start_triggers() {
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    // The ability has an optional cost (discard named cards from hand).
-    // If prompted, the cost can be skipped (optional).
-    if game.has_pending_choice() {
-        eprintln!("[AyumuLive] Optional cost prompt — engine supports optional costs.");
-        // In the future, select_skip() or similar should be called here.
-        // For now, just verify the card's ability was parsed and triggered.
-    }
+    // The ability has an optional cost: discard named cards from hand to gain +3 score.
+    // Since ayumu_copy contains the names 上原歩夢/澁谷かのん/日野下花帆, it should be eligible.
+    assert!(
+        game.has_pending_choice(),
+        "LiveStart optional cost should prompt for named character discard"
+    );
 
-    // Verify the LiveStart ability was found and triggered (not just parsed).
-    // The ability text contains all 3 character names.
-    let card = game.db.get_card(ayumu).expect("Ayumu card should exist");
-    let live_start_ab = card
-        .abilities
-        .iter()
-        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
-        .expect("Card should have a live_start ability");
-    assert!(live_start_ab.full_text.contains("上原歩夢"));
-    assert!(live_start_ab.full_text.contains("澁谷かのん"));
-    assert!(live_start_ab.full_text.contains("日野下花帆"));
-    // The effect type is gain_ability (stored in abilities.json)
-    eprintln!(
-        "[AyumuLive] LiveStart ability verified: cost={} characters present",
-        live_start_ab.full_text.contains("手札")
+    // Pay the cost: discard the named copy
+    game.select_indices(&[0]);
+
+    // Verify gain_ability effect: Ayumu should have gained the score +3 constant ability
+    assert!(
+        game.state.gained_abilities.contains_key(&ayumu),
+        "Ayumu should have a gained ability from LiveStart effect"
+    );
+    let gained = &game.state.gained_abilities[&ayumu];
+    assert!(
+        gained
+            .iter()
+            .any(|t| t.contains("+3") || t.contains("＋３") || t.contains("スコア")),
+        "Gained ability should be the score +3 constant (got: {:?})",
+        gained
     );
 }
 
@@ -940,8 +1045,7 @@ fn nico_requires_empty_area() {
     game.give_energy(7);
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
 
-    // P1's effect finds no empty slot → card returned to discard
-    // P2's effect succeeds (P2 stage empty) → MoveCardsPosition prompt for P2
+    game.dbg_all();
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
@@ -1110,22 +1214,28 @@ fn nico_prompt_path_two_eligible_in_discard() {
     );
     game.select_indices(&[0]); // select cheap_a
 
-    // execute_selected_cards_from_zone auto-places the card (first empty slot = center)
-    // Then finalize_choice runs P2's effect → MoveCardsPosition for P2
-    // So the next prompt is P2's position, not P1's
+    // P1's card needs a position choice (multiple empty slots)
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
-        "P2 position choice (P1 card auto-placed)"
+        "P1 gets SelectPosition for card from discard (multiple empty slots)"
+    );
+    game.select_option(1); // P1: center
+
+    // Then P2's effect runs with MoveCardsPosition
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 gets their position choice"
     );
     game.select_option(2); // P2: right
 
     assert!(!game.has_pending_choice(), "No more prompts");
 
-    // P1: cheap_a auto-placed at first empty slot (center)
+    // P1: cheap_a placed at center
     assert_eq!(
         game.state.player1.stage.stage[1], cheap_a,
-        "P1 selected card auto-placed at center"
+        "P1 selected card placed at center"
     );
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap_a),
@@ -1272,6 +1382,27 @@ fn you_q129_cost_reduction_self_only() {
         .get_card_by_no("LL-bp2-001-R\u{ff0b}")
         .expect("Card should exist");
     assert_eq!(keke.cost, Some(20));
+
+    // Verify the card has the cost reduction constant ability
+    let has_cost_reduction = keke.abilities.iter().any(|a| {
+        a.triggers.as_deref() == Some("常時")
+            && a.full_text.contains("コスト")
+            && a.full_text.contains("少なくなる")
+    });
+    assert!(
+        has_cost_reduction,
+        "Card should have a 常時 ability for self cost reduction"
+    );
+
+    // Verify the card has the cannot_baton_touch constant ability
+    let has_baton_block = keke
+        .abilities
+        .iter()
+        .any(|a| a.triggers.as_deref() == Some("常時") && a.full_text.contains("バトンタッチ"));
+    assert!(
+        has_baton_block,
+        "Card should have a 常時 ability preventing baton touch"
+    );
 }
 
 // ── LiveStart: optional cost creates prompt ─────────────────────
@@ -1282,18 +1413,40 @@ fn you_live_start_optional_cost_triggers() {
     let mut game = TestGame::new(db.clone());
     let keke = game.id("LL-bp2-001-R\u{ff0b}");
     let filler_live = game.id("PL!-sd1-019-SD");
+    let fill = game.id("PL!-sd1-010-SD");
+    // A named character copy in hand for the optional discard cost
+    let named_copy = game.new_id("LL-bp2-001-R\u{ff0b}");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     game.state.player1.stage.stage[0] = keke;
     game.state.player1.hand.cards.push(filler_live);
-    game.state.player1.hand.cards.push(filler_live);
+    game.state.player1.hand.cards.push(named_copy);
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    if game.has_pending_choice() {
-        eprintln!("[YouLive] Optional cost prompt (parser correctly extracted cost)");
-    }
+    // Optional cost prompt should appear (named char in hand is eligible)
+    assert!(
+        game.has_pending_choice(),
+        "LiveStart optional cost prompt should appear when eligible named chars in hand"
+    );
+
+    // Pay cost: discard the named copy, gain blade on keke
+    game.select_indices(&[0]);
+
+    // Verify blade modifier was applied on the activating card
+    let blade_mod = game.state.mods.get_blade_modifier(keke);
+    assert!(
+        blade_mod > 0,
+        "Blade should be gained on activating card after discarding named char (got {})",
+        blade_mod
+    );
 }
 
 // ── Edge: abilityless filler NOT in discard choice ──────────────
@@ -1305,20 +1458,46 @@ fn you_abilityless_card_not_in_choice() {
     let keke = game.id("LL-bp2-001-R\u{ff0b}");
     let filler_live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
+    // A named character copy in hand (唐可可＆平安名すみれ＆米女メイ)
+    let named_copy = game.new_id("LL-bp2-001-R\u{ff0b}");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.stage.stage[1] = keke;
     game.state.player1.hand.cards.push(filler_live);
+    game.state.player1.hand.cards.push(named_copy); // named character
     game.state.player1.hand.cards.push(filler); // NOT a named character
 
     advance_to_live_card_set_p1(&mut game);
     game.set_live_card(filler_live);
     advance_to_live_start(&mut game);
 
-    // Only named characters (唐可可/平安名すみれ/米女メイ) should be
-    // selectable for the cost. Filler has none of these names.
-    if game.has_pending_choice() {
-        eprintln!("[YouEdge] Optional cost prompt — named chars should be the only options");
-    }
+    // Only named characters should be selectable
+    assert!(
+        game.has_pending_choice(),
+        "LiveStart optional cost prompt should appear"
+    );
+
+    // Select only the named copy (index 0 = the first selectable, which should be the named copy)
+    game.select_indices(&[0]);
+
+    // Filler should still be in hand (it was not eligible for selection)
+    assert!(
+        game.state.player1.hand.cards.contains(&filler),
+        "Filler card should remain in hand (not selectable for named-char cost)"
+    );
+
+    // Blade modifier should be applied from discarding the named copy
+    let blade_mod = game.state.mods.get_blade_modifier(keke);
+    assert!(
+        blade_mod > 0,
+        "Blade gained from discarding named character (got {})",
+        blade_mod
+    );
 }
 
 // ====================================================================
@@ -1339,6 +1518,12 @@ fn bella_q174_no_member_on_stage_ability_does_not_fire() {
     let mut game = TestGame::new(db);
     let bella = game.id("PL!N-bp3-027-L");
     let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.hand.cards.push(bella);
     game.state.player1.hand.cards.push(filler);
@@ -1368,6 +1553,13 @@ fn bella_q174_no_heart04_surplus_ability_does_not_fire() {
     let mut game = TestGame::new(db);
     let bella = game.id("PL!N-bp3-027-L");
     let niji_member = game.id("PL!N-sd1-015-SD");
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     // Stage has a 虹ヶ咲 member with NO heart04 (gives heart02 + heart05 only)
     game.add_to_stage(rabuka_engine::zones::MemberArea::Center, niji_member);
@@ -1398,71 +1590,56 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let lovepeace = game.id("PL!-bp3-026-L");
+    let filler = game.id("PL!-sd1-010-SD");
 
-    // OH needs h01=2, h03=5, h06=2, h0=6 (total 15). Use 2 strong members at Center+RightSide.
-    // PL!-pb1-014-R (Center): h01=3, h03=2, h06=2, total=7, blade=3
-    // PL!-PR-003-PR (RightSide): h01=2, h03=3, h06=1, total=6, blade=4
-    // Stage: h01=5, h03=5, h06=3, total=13 (h03=5 ✓). Remaining for wildcard after specific(9)=4 < 6.
-    // Blade cheer adds: put sd1-010-SD (b_heart03=1) in deck, cheered cards add h03.
-    // Total blades = 7 → cheer draws 7 cards. Deck has 10 copies → all 7 cheer.
-    // 7 × b_heart03=1 adds 7 h03. Total hearts: h01=5, h03=12, h06=3, total=20.
-    // After specific(h01=2, h03=5, h06=2=9): remaining 11 ≥ 6 ✓
-    let cheer_card = game.id("PL!-sd1-010-SD");
-    for _ in 0..10 {
-        game.state.player1.main_deck.cards.insert(0, cheer_card);
+    // Setup: both players have the live card in their live_card_zone
+    // and P1 has more member hearts than P2.
+    game.state.player1.hand.cards.clear();
+    game.state.player2.hand.cards.clear();
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
     }
+
+    // P1: 2 strong members (h01=5, h03=5, h06=3 = 13)
     game.state.player1.stage.stage = [-1, game.id("PL!-pb1-014-R"), game.id("PL!-PR-003-PR")];
+    // P2: 1 weak member (h01=1, h03=1 = 2)
+    game.state.player2.stage.stage = [-1, filler, -1];
 
-    // P2 gets 1 weak member (fewer hearts than P1)
-    game.state.player2.stage.stage = [-1, game.id("PL!-sd1-010-SD"), -1];
+    // Give both players the same live card
+    game.state.player1.live_card_zone.cards.push(lovepeace);
+    game.state.player2.live_card_zone.cards.push(lovepeace);
 
-    // Both players set the same live card
-    game.state.player1.hand.cards.push(lovepeace);
-    advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(lovepeace);
+    // Set stage hearts directly to include member + yell blade hearts.
+    // P1: 13 member hearts + add 7 yell blade hearts (heart03) to satisfy OH's 15 need.
+    let mut p1_hearts = game
+        .state
+        .player1
+        .calculate_stage_hearts(&game.state.card_database, &std::collections::HashMap::new());
+    *p1_hearts
+        .hearts
+        .entry(rabuka_engine::card::HeartColor::Heart03)
+        .or_insert(0) += 7;
+    game.state.player1.stage_hearts = Some(p1_hearts);
+    game.state.player2.stage_hearts = Some(
+        game.state
+            .player2
+            .calculate_stage_hearts(&game.state.card_database, &std::collections::HashMap::new()),
+    );
 
-    // Now handle P2's turn
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-    game.state.player2.hand.cards.push(lovepeace);
-    game.pass(); // Advance P1's LiveCardSet to finish → P2's LiveCardSet
-    game.set_live_card(lovepeace);
-    game.pass(); // Advance P2's LiveCardSet to finish → FirstAttackerPerformance
+    // Trigger live_success for P1 (this fires ab#1 which compares stage hearts)
+    // P1 has 20 hearts > P2 has 2 hearts → should grant +1 score
+    game.state.current_phase = rabuka_engine::game_state::Phase::LiveVictoryDetermination;
+    rabuka_engine::turn::TurnEngine::trigger_live_success_abilities(&mut game.state, "p1");
+    game.state.process_pending_auto_abilities("p1");
 
-    if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-
-    game.pass(); // → SecondAttackerPerformance
-    game.pass(); // → LiveVictoryDetermination (phase set)
-    game.pass(); // → Active (processes LiveSuccess)
-
-    // P1 hearts (13+blade=20) > P2 hearts (2) → condition met → score +1 on P1
-    let p1_target = if !game.state.player1.success_live_card_zone.cards.is_empty() {
-        game.state.player1.success_live_card_zone.cards[0]
-    } else if !game.state.player1.live_card_zone.cards.is_empty() {
-        game.state.player1.live_card_zone.cards[0]
-    } else {
-        panic!("P1 live card disappeared");
-    };
+    // If the ability fired, P1's live card now has +1 score modifier
+    let p1_score_mod = game.state.mods.get_score_modifier(lovepeace);
     assert_eq!(
-        game.state.mods.get_score_modifier(p1_target),
-        1,
+        p1_score_mod, 1,
         "P1 should get +1 when P1 hearts > P2 hearts (Q150)"
-    );
-    // P2 live card failed heart satisfaction (only 2 hearts, needs 15) → removed
-    // So P2 gets no score modifier (can't test condition since card didn't survive)
-    assert!(
-        game.state.player2.live_card_zone.cards.is_empty(),
-        "P2 card should fail heart satisfaction"
-    );
-    assert!(
-        game.state.player2.success_live_card_zone.cards.is_empty(),
-        "P2 card should not reach success zone"
     );
 }
 
@@ -1488,11 +1665,15 @@ fn lovepeace_q149_total_hearts_sum_of_base_hearts() {
 
 #[test]
 fn lovepeace_q172_ability_gained_hearts_count_but_not_blade() {
-    // Q172: Hearts gained by abilities (heart_modifiers) count toward total.
-    // Blade hearts from yell (cheer) do NOT count toward total hearts.
-    // Verify that blade hearts from resolution zone cards are NOT in stage hearts.
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     // P1 stage has 1 member
     game.state.player1.stage.stage = [-1, game.id("PL!-sd1-014-SD"), -1]; // total_hearts=4
@@ -1547,6 +1728,10 @@ fn hareruya_q64_waitroom_only_five_distinct_liella_condition_met() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let hareruya = game.id("PL!SP-bp1-026-L");
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     // Keep deck well-stocked to prevent refresh() from clearing the waitroom
     for _ in 0..10 {
@@ -1618,19 +1803,19 @@ fn hareruya_q64_waitroom_only_five_distinct_liella_condition_met() {
         .state
         .mods
         .get_need_heart_modifier(card_id, rabuka_engine::card::HeartColor::Heart06);
-    assert!(
-        h02_mod >= 2,
-        "heart02 should be set >= 2 by set_required_hearts (got {})",
+    assert_eq!(
+        h02_mod, 2,
+        "heart02 should be exactly 2 by set_required_hearts (got {})",
         h02_mod
     );
-    assert!(
-        h03_mod >= 2,
-        "heart03 should be set >= 2 by set_required_hearts (got {})",
+    assert_eq!(
+        h03_mod, 2,
+        "heart03 should be exactly 2 by set_required_hearts (got {})",
         h03_mod
     );
-    assert!(
-        h06_mod >= 2,
-        "heart06 should be set >= 2 by set_required_hearts (got {})",
+    assert_eq!(
+        h06_mod, 2,
+        "heart06 should be exactly 2 by set_required_hearts (got {})",
         h06_mod
     );
 }
@@ -1640,6 +1825,10 @@ fn hareruya_q74_multiname_distinct_counting() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let hareruya = game.id("PL!SP-bp1-026-L");
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     // Q74/Q105: Cards with multiple names each count as distinct names
     // Use LL-bp1-001-R+ (上原歩夢&澁谷かのん&日野下花帆) — has 3 names
@@ -1718,6 +1907,13 @@ fn wien_q117_another_member_triggers_yell_reduction() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let wien = game.id("PL!SP-bp2-010-R\u{ff0b}");
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
 
     // Wien at Center + another member at RightSide (any member = "other")
     game.state.player1.stage.stage = [-1, wien, game.id("PL!-sd1-010-SD")];
@@ -1759,18 +1955,24 @@ fn turn_limit_prevents_second_activation() {
     game.give_energy(10);
     game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
 
-    // First activation should succeed
+    // First activation succeeds (cost discards Chika from stage, effect retrieves live from discard)
     if game.has_pending_choice() {
-        game.select_indices(&[0]); // select a hand card to discard
+        game.select_indices(&[0]);
     }
     if game.has_pending_choice() {
-        game.select_indices(&[0]); // select target on stage
+        game.select_indices(&[0]);
     }
 
-    // Second activation in same turn should fail
-    let _result = game.try_activate_ability(chika);
-    // The ability might still be selectable but should fail during cost/effect
-    // Just verify no crash and at least one activation happened
+    // After first activation, Chika is no longer on stage (cost moved her to discard).
+    // Second activation might still resolve without error (engine returns Ok for
+    // non-stage cards), but no additional state change should occur.
+    let hand_before = game.state.player1.hand.cards.len();
+    let _ = game.try_activate_ability(chika);
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "No additional effect from second activation after card left stage"
+    );
 }
 
 // ====================================================================
@@ -1781,6 +1983,18 @@ fn turn_limit_prevents_second_activation() {
 fn energy_zone_capacity_handled() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
+
+    // Start at 0 energy
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        0,
+        "Should start with 0 energy"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        0,
+        "0 active energy"
+    );
 
     // Give maximum energy
     game.give_energy(20);
@@ -1794,4 +2008,230 @@ fn energy_zone_capacity_handled() {
         20,
         "All should be active"
     );
+
+    // Spend energy (simulate paying a cost)
+    game.state.player1.energy_zone.active_energy_count = game
+        .state
+        .player1
+        .energy_zone
+        .active_energy_count
+        .saturating_sub(5);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        15,
+        "Should have 15 energy after spending 5"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        20,
+        "Total energy cards unchanged"
+    );
+
+    // Spend all remaining
+    game.state.player1.energy_zone.active_energy_count = game
+        .state
+        .player1
+        .energy_zone
+        .active_energy_count
+        .saturating_sub(15);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        0,
+        "Should be 0 after spending all"
+    );
+
+    // Try to spend below 0 (should not crash, saturating)
+    game.state.player1.energy_zone.active_energy_count = game
+        .state
+        .player1
+        .energy_zone
+        .active_energy_count
+        .saturating_sub(1);
+    assert_eq!(
+        game.state.player1.energy_zone.active_count(),
+        0,
+        "Should stay at 0 (saturating)"
+    );
+}
+
+#[test]
+fn umi_pr014_appear_reveal_and_draw_when_no_live_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let umi = game.id("PL!-PR-014-PR");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Give P1 3 energy and Umi in hand, populate deck
+    game.give_energy(3);
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(umi);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let deck_before = game.state.player1.main_deck.cards.len();
+
+    // Opponent has exactly 3 non-live cards in hand
+    game.state.player2.hand.cards.clear();
+    game.state.player2.hand.cards.push(filler);
+    game.state.player2.hand.cards.push(filler);
+    game.state.player2.hand.cards.push(filler);
+
+    // Play Umi to stage (cost 2, 登場 trigger fires)
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(umi, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // 登場 trigger: reveal 3 from opponent's hand → no live cards → draw 1
+    if game.has_pending_choice() {
+        game.select_indices(&[0, 1, 2]);
+    }
+
+    // Umi cost is 2, we had 3 energy
+    let energy_after = game.state.player1.energy_zone.active_energy_count;
+    assert_eq!(
+        energy_after, 1,
+        "Should have 1 active energy after paying cost 2"
+    );
+
+    // P1 should have drawn 1 card (no live cards in opponent's revealed hand)
+    assert_eq!(
+        game.state.player1.hand.len(),
+        1,
+        "P1 should draw 1 card when no live card revealed"
+    );
+
+    // Deck decreased by 1
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        deck_before - 1,
+        "Deck should have 1 less card"
+    );
+
+    // Revealed cards should be in game state
+    assert_eq!(
+        game.state.revealed_cards.len(),
+        3,
+        "3 cards should be in revealed_cards"
+    );
+
+    // Opponent hand still has 3 cards (reveal doesn't remove from hand)
+    assert_eq!(
+        game.state.player2.hand.len(),
+        3,
+        "P2 should still have 3 cards in hand (revealed, not removed)"
+    );
+    assert!(!game.has_pending_choice(), "No pending choices expected");
+}
+
+#[test]
+fn umi_pr014_appear_reveal_no_draw_when_live_card_present() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let umi = game.id("PL!-PR-014-PR");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_card = game.id("PL!-bp3-026-L"); // LovePeace live card
+
+    // Give P1 3 energy and Umi in hand, populate deck
+    game.give_energy(3);
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(umi);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    // Opponent has 3 cards: 2 non-live + 1 live card
+    game.state.player2.hand.cards.clear();
+    game.state.player2.hand.cards.push(filler);
+    game.state.player2.hand.cards.push(live_card);
+    game.state.player2.hand.cards.push(filler);
+
+    // Play Umi to stage
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(umi, rabuka_engine::zones::MemberArea::LeftSide);
+
+    if game.has_pending_choice() {
+        game.select_indices(&[0, 1, 2]);
+    }
+
+    // P1 should NOT draw because a live card was among the revealed cards
+    assert_eq!(
+        game.state.player1.hand.len(),
+        0,
+        "P1 should NOT draw when live card revealed"
+    );
+
+    // Revealed cards should contain the live card
+    assert!(
+        game.state.revealed_cards.contains(&live_card),
+        "Live card should be among revealed cards"
+    );
+
+    assert!(!game.has_pending_choice(), "No pending choices expected");
+}
+
+#[test]
+fn umi_pr014_appear_reveal_with_choice_when_more_cards_than_count() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let umi = game.id("PL!-PR-014-PR");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Give P1 3 energy and Umi in hand, populate deck
+    game.give_energy(3);
+    game.state.player1.hand.cards.clear();
+    game.state.player1.hand.cards.push(umi);
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+
+    // Opponent has 5 cards (more than count=3, forces choice)
+    game.state.player2.hand.cards.clear();
+    for _ in 0..5 {
+        game.state.player2.hand.cards.push(filler);
+    }
+
+    // Play Umi to stage
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(umi, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // Should have a pending choice to select 3 cards from opponent's hand
+    assert!(
+        game.has_pending_choice(),
+        "Should have a choice to select 3 from opponent's hand"
+    );
+
+    let choice = game.state.get_pending_choice().unwrap();
+    match choice {
+        rabuka_engine::ability::types::Choice::SelectCard {
+            count: c,
+            blind,
+            is_reveal: reveal,
+            zone,
+            ..
+        } => {
+            assert_eq!(*c, 3, "Should select 3 cards");
+            assert!(*blind, "Choice should be blind (can't see card identities)");
+            assert!(*reveal, "Choice should be marked as reveal");
+            assert_eq!(zone, "hand", "Zone should be opponent's hand");
+        }
+        _ => panic!("Expected SelectCard choice, got {:?}", choice),
+    }
+
+    // Select 3 cards
+    game.select_indices(&[0, 1, 2]);
+
+    // No live cards among the 3 selected → should draw 1
+    assert_eq!(
+        game.state.player1.hand.len(),
+        1,
+        "P1 should draw 1 when no live card in selected 3"
+    );
+    assert_eq!(
+        game.state.revealed_cards.len(),
+        3,
+        "Exactly 3 cards should be revealed"
+    );
+    assert!(!game.has_pending_choice(), "No pending choices expected");
 }

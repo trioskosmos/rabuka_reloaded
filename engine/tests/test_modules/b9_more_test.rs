@@ -60,7 +60,7 @@ fn kaguya_live_success_cheer_recover() {
     game.state.player1.hand.cards.push(filler); // For optional discard cost
 
     // Deck: need exactly 1 filler before member because:
-    // - LiveCardSetP1Turn replacement draw consumes 1 card from P1's deck
+    // - LiveCardSetFirstAttacker replacement draw consumes 1 card from P1's deck
     // - Yell then draws from index 0 = member = first in revealed_cards
     // (Odd trivia: the draw phase during the first 5 passes draws from P2, not P1)
     game.state.player1.main_deck.cards.clear();

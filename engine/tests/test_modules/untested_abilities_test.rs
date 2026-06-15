@@ -62,8 +62,13 @@ fn test_named_baton_touch_mia() {
     // Scenario 2: Invalid Baton Touch (Mia replaces Kasumi)
     let mia2 = game.new_id("PL!N-pb1-022-P+"); // A second copy of Mia
 
-    // Clear center and put Kasumi there
+    // Clear center and put Kasumi there.
+    // Also unlock Center so baton touch is allowed (simulating fresh occupancy).
     game.state.player1.stage.stage[1] = -1;
+    game.state
+        .player1
+        .areas_locked_this_turn
+        .remove(&MemberArea::Center);
     game.add_to_stage(MemberArea::Center, kasumi);
     game.state.player1.hand.cards.push(mia2);
 
@@ -92,7 +97,7 @@ fn test_hand_size_cost_reduction_kotori() {
     let kotori = game.id("LL-bp2-001-R\u{ff0b}");
     let filler = game.id("PL!-sd1-010-SD");
 
-    let base_cost = game.db.get_card(kotori).unwrap().cost.unwrap();
+    let _base_cost = game.db.get_card(kotori).unwrap().cost.unwrap();
 
     // Scenario 1: Insufficient energy for reduced cost
     // Hand has 3 cards (Kotori + 2 filler). Other cards = 2.
@@ -400,6 +405,13 @@ fn test_success_live_zone_per_unit_heart() {
         g.state.player1.stage.stage[1] = kotori;
         g.state.player1.hand.cards.push(live);
         g.give_energy(10);
+        let filler = g.new_id("PL!-sd1-010-SD");
+        for _ in 0..10 {
+            g.state.player1.main_deck.cards.push(filler);
+        }
+        for _ in 0..10 {
+            g.state.player2.main_deck.cards.push(filler);
+        }
 
         h_advance_to_live_card_set_p1(&mut g);
         g.set_live_card(live);
@@ -434,6 +446,13 @@ fn test_success_live_zone_per_unit_heart() {
                 .push(g.new_id("PL!-sd1-010-SD"));
         }
         g.give_energy(10);
+        let filler = g.new_id("PL!-sd1-010-SD");
+        for _ in 0..10 {
+            g.state.player1.main_deck.cards.push(filler);
+        }
+        for _ in 0..10 {
+            g.state.player2.main_deck.cards.push(filler);
+        }
 
         h_advance_to_live_card_set_p1(&mut g);
         g.set_live_card(live);

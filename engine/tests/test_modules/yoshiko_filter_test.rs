@@ -39,6 +39,8 @@ fn test_yoshiko_filter_logic() {
         None,
         None,
         Some(yoshiko), // exclude_self
+        None,
+        None,
     );
 
     println!("Testing filter with exclude_self={}", yoshiko);

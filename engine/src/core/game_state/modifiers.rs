@@ -3,40 +3,7 @@ impl GameState {
     /// Handles gain_resource(blade, heart), modify_score, modify_cost.
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     pub fn recalculate_constants(&mut self) {
-        struct Entry {
-            card_id: i16,
-            effect: crate::card::AbilityEffect,
-        }
-        let mut entries: Vec<Entry> = Vec::new();
-        for &cid in self
-            .player1
-            .stage
-            .stage
-            .iter()
-            .chain(self.player2.stage.stage.iter())
-        {
-            if cid == -1 {
-                continue;
-            }
-            let card = match self.card_database.get_card(cid) {
-                Some(c) => c,
-                None => continue,
-            };
-            for ability in &card.abilities {
-                if ability
-                    .triggers
-                    .as_ref()
-                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
-                {
-                    if let Some(ref effect) = ability.effect {
-                        entries.push(Entry {
-                            card_id: cid,
-                            effect: effect.clone(),
-                        });
-                    }
-                }
-            }
-        }
+        let entries = self.collect_constant_stage_effects();
 
         let mut exp_blade: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
         let mut exp_cost: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
@@ -68,19 +35,19 @@ impl GameState {
             entry_positions.insert(cid, pos);
         }
 
-        for e in &entries {
+        for (card_id, effect) in &entries {
             // Set activating_card so condition evaluators (e.g. exclude_self in
             // location_condition) know which card is "self" for this entry.
             let prev_activating = self.activating_card;
-            self.activating_card = Some(e.card_id);
+            self.activating_card = Some(*card_id);
 
             {
-                let resolver = crate::ability::resolver::AbilityResolver::new(self);
+                let ctx = crate::ability::condition::ConditionContext::new(self);
 
                 // Check effect-level position requirement
-                let pos_ok = if let Some(ref pos) = e.effect.position {
+                let pos_ok = if let Some(ref pos) = effect.position {
                     let pos_str = pos.get_position();
-                    let card_pos = entry_positions.get(&e.card_id).copied().flatten();
+                    let card_pos = entry_positions.get(card_id).copied().flatten();
                     matches!(
                         (pos_str, card_pos),
                         (Some("center"), Some(1))
@@ -93,47 +60,141 @@ impl GameState {
                 };
 
                 if pos_ok {
-                    let cond_met = e
-                        .effect
+                    let cond_met = effect
                         .condition
                         .as_ref()
-                        .map_or(true, |c| resolver.evaluate_condition(c));
+                        .map_or(true, |c| ctx.evaluate_condition(c));
 
                     if cond_met {
-                        match e.effect.action.as_str() {
-                            "gain_resource" => match e.effect.resource.as_deref().unwrap_or("") {
+                        match effect.action.as_str() {
+                            "gain_resource" => match effect.resource.as_deref().unwrap_or("") {
                                 "blade" | "ブレード" => {
-                                    let n = e
-                                        .effect
-                                        .resource_icon_count
-                                        .unwrap_or(e.effect.count.unwrap_or(1))
-                                        as i32;
-                                    *exp_blade.entry(e.card_id).or_insert(0) += n;
+                                    let n = if effect.per_unit.unwrap_or(false) {
+                                        let player = if self.player1.stage.stage.contains(card_id) {
+                                            &self.player1
+                                        } else {
+                                            &self.player2
+                                        };
+                                        let zone = effect
+                                            .location
+                                            .as_deref()
+                                            .or(effect.per_unit_type.as_deref())
+                                            .unwrap_or("hand");
+                                        let filter = crate::ability::util::CardFilter {
+                                            card_type: effect.card_type.as_deref(),
+                                            ..Default::default()
+                                        };
+                                        let per_count =
+                                            crate::ability::util::resolve_per_unit_count(
+                                                true,
+                                                Some(zone),
+                                                player,
+                                                &self.card_database,
+                                                &filter,
+                                                &[],
+                                            );
+                                        let base = effect.resource_icon_count.unwrap_or(1);
+                                        let mut units = per_count as i32
+                                            / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                                        if effect.max.unwrap_or(false) {
+                                            if let Some(cap) = effect.count {
+                                                units = units.min(cap as i32);
+                                            }
+                                        }
+                                        units * base as i32
+                                    } else {
+                                        effect
+                                            .resource_icon_count
+                                            .unwrap_or(effect.count.unwrap_or(1))
+                                            as i32
+                                    };
+                                    *exp_blade.entry(*card_id).or_insert(0) += n;
                                 }
                                 "heart" | "ハート" => {
-                                    let n = e.effect.count.unwrap_or(1);
-                                    for hc in &e.effect.heart_colors {
+                                    let n = if effect.per_unit.unwrap_or(false) {
+                                        let player = if self.player1.stage.stage.contains(card_id) {
+                                            &self.player1
+                                        } else {
+                                            &self.player2
+                                        };
+                                        let zone = effect
+                                            .location
+                                            .as_deref()
+                                            .or(effect.per_unit_type.as_deref())
+                                            .unwrap_or("hand");
+                                        let filter = crate::ability::util::CardFilter {
+                                            card_type: effect.card_type.as_deref(),
+                                            ..Default::default()
+                                        };
+                                        let per_count =
+                                            crate::ability::util::resolve_per_unit_count(
+                                                true,
+                                                Some(zone),
+                                                player,
+                                                &self.card_database,
+                                                &filter,
+                                                &effect.heart_colors,
+                                            );
+                                        let mut units = per_count as i32
+                                            / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                                        if effect.max.unwrap_or(false) {
+                                            if let Some(cap) = effect.count {
+                                                units = units.min(cap as i32);
+                                            }
+                                        }
+                                        units
+                                    } else {
+                                        effect.count.unwrap_or(1) as i32
+                                    };
+                                    for hc in &effect.heart_colors {
                                         *exp_heart
-                                            .entry(e.card_id)
+                                            .entry(*card_id)
                                             .or_default()
                                             .entry(hc.clone())
-                                            .or_insert(0) += n as i32;
+                                            .or_insert(0) += n;
                                     }
                                 }
                                 _ => {}
                             },
                             "modify_score" => {
-                                *exp_score.entry(e.card_id).or_insert(0) +=
-                                    e.effect.value.unwrap_or(0) as i32;
+                                *exp_score.entry(*card_id).or_insert(0) +=
+                                    effect.value.unwrap_or(0) as i32;
                             }
                             "modify_cost" => {
-                                *exp_cost.entry(e.card_id).or_insert(0) +=
-                                    e.effect.value.unwrap_or(0) as i32;
+                                *exp_cost.entry(*card_id).or_insert(0) +=
+                                    effect.value.unwrap_or(0) as i32;
                             }
                             "restriction" => {
-                                if let Some(ref rt) = e.effect.restriction_type {
+                                if let Some(ref rt) = effect.restriction_type {
                                     exp_prohibition.push(format!("const_restriction:{}:", rt));
                                 }
+                            }
+                            "gain_ability" => {
+                                if effect.ability_gain.as_deref() == Some("{{icon_all.png|ハート}}")
+                                    || effect
+                                        .ability_gain
+                                        .as_deref()
+                                        .map_or(false, |t| t.contains("ALL"))
+                                {
+                                    let all_colors = [
+                                        "heart01", "heart02", "heart03", "heart04", "heart05",
+                                        "heart06",
+                                    ];
+                                    for hc in &all_colors {
+                                        *exp_heart
+                                            .entry(*card_id)
+                                            .or_default()
+                                            .entry(hc.to_string())
+                                            .or_insert(0) += 1i32;
+                                    }
+                                }
+                            }
+                            "gain_ability_from_source" => {
+                                let mut resolver = crate::ability::resolver::AbilityResolver::new(
+                                    self.card_database.clone(),
+                                    self.activating_card,
+                                );
+                                let _ = resolver.execute_gain_ability_from_source(self, &effect);
                             }
                             _ => {}
                         }
@@ -200,57 +261,68 @@ impl GameState {
         for p in &exp_prohibition {
             self.prohibition_effects.push(p.clone());
         }
+
+        // Also recalculate cost modifiers from hand cards (hand-based cost reductions)
+        self.recalculate_constant_cost_modifiers();
     }
 
     pub fn recalculate_constant_blade_modifiers(&mut self) {
-        let mut blade_abilities: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
-        for &cid in self
-            .player1
-            .stage
-            .stage
-            .iter()
-            .chain(self.player2.stage.stage.iter())
-        {
-            if cid == -1 {
-                continue;
-            }
-            let card = match self.card_database.get_card(cid) {
-                Some(c) => c,
-                None => continue,
-            };
-            for ability in &card.abilities {
-                if ability
-                    .triggers
-                    .as_ref()
-                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
-                {
-                    if let Some(ref effect) = ability.effect {
-                        if effect.action == "gain_resource"
-                            && matches!(
-                                effect.resource.as_deref(),
-                                Some("blade") | Some("ブレード")
-                            )
-                        {
-                            blade_abilities.push((cid, effect.clone()));
-                        }
-                    }
-                }
-            }
-        }
+        let blade_abilities: Vec<(i16, crate::card::AbilityEffect)> = self
+            .collect_constant_stage_effects()
+            .into_iter()
+            .filter(|(_, effect)| {
+                effect.action == "gain_resource"
+                    && matches!(effect.resource.as_deref(), Some("blade") | Some("ブレード"))
+            })
+            .collect();
 
         let mut expected: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
         {
-            let resolver = crate::ability::resolver::AbilityResolver::new(self);
+            let ctx = crate::ability::condition::ConditionContext::new(self);
             for &(cid, ref effect) in &blade_abilities {
                 let cond_met = effect
                     .condition
                     .as_ref()
-                    .map_or(true, |c| resolver.evaluate_condition(c));
+                    .map_or(true, |c| ctx.evaluate_condition(c));
                 if cond_met {
-                    let count = effect
-                        .resource_icon_count
-                        .unwrap_or(effect.count.unwrap_or(1));
-                    *expected.entry(cid).or_insert(0) += count as i32;
+                    let count = if effect.per_unit.unwrap_or(false) {
+                        let player = if self.player1.stage.stage.contains(&cid) {
+                            &self.player1
+                        } else {
+                            &self.player2
+                        };
+                        let zone = effect
+                            .location
+                            .as_deref()
+                            .or(effect.per_unit_type.as_deref())
+                            .unwrap_or("hand");
+                        let filter = crate::ability::util::CardFilter {
+                            card_type: effect.card_type.as_deref(),
+                            ..Default::default()
+                        };
+                        let per_count = crate::ability::util::resolve_per_unit_count(
+                            true,
+                            Some(zone),
+                            player,
+                            &self.card_database,
+                            &filter,
+                            &[],
+                        );
+                        let base = effect.resource_icon_count.unwrap_or(1);
+                        let mut units =
+                            per_count as i32 / effect.per_unit_count.unwrap_or(1).max(1) as i32;
+                        if effect.max.unwrap_or(false) {
+                            if let Some(cap) = effect.count {
+                                units = units.min(cap as i32);
+                            }
+                        }
+                        units * base as i32
+                    } else {
+                        effect
+                            .resource_icon_count
+                            .unwrap_or(effect.count.unwrap_or(1)) as i32
+                    };
+                    *expected.entry(cid).or_insert(0) += count;
                 }
             }
         }
@@ -267,49 +339,57 @@ impl GameState {
     }
 
     pub fn recalculate_constant_cost_modifiers(&mut self) {
-        let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = Vec::new();
-        for &cid in self
-            .player1
-            .stage
-            .stage
-            .iter()
-            .chain(self.player2.stage.stage.iter())
-        {
-            if cid == -1 {
-                continue;
-            }
-            let card = match self.card_database.get_card(cid) {
-                Some(c) => c,
-                None => continue,
-            };
-            for ability in &card.abilities {
-                if ability
-                    .triggers
-                    .as_ref()
-                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
-                {
-                    if let Some(ref effect) = ability.effect {
-                        if effect.action == "modify_cost" {
-                            cost_abilities.push((cid, effect.clone()));
-                        }
-                    }
-                }
-            }
-        }
+        let mut cost_abilities: Vec<(i16, crate::card::AbilityEffect)> = self
+            .collect_constant_stage_effects()
+            .into_iter()
+            .filter(|(_, effect)| effect.action == "modify_cost")
+            .collect();
+        let hand_cost_abilities = self
+            .collect_constant_hand_effects()
+            .into_iter()
+            .filter(|(_, effect)| effect.action == "modify_cost");
+        cost_abilities.extend(hand_cost_abilities);
 
         let mut expected: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
         {
-            let resolver = crate::ability::resolver::AbilityResolver::new(self);
+            let ctx = crate::ability::condition::ConditionContext::new(self);
             for &(cid, ref effect) in &cost_abilities {
                 let cond_met = effect
                     .condition
                     .as_ref()
-                    .map_or(true, |c| resolver.evaluate_condition(c));
+                    .map_or(true, |c| ctx.evaluate_condition(c));
                 if cond_met {
-                    let value = effect.value.unwrap_or(0) as i32;
+                    let mut value = effect.value.unwrap_or(0) as i32;
+
+                    // Handle per_unit cost reduction (e.g. "1 per other card in hand")
+                    if effect.per_unit.unwrap_or(false) {
+                        let player = self.resolve_target_player(&effect.target_name());
+                        let zone = effect.location.as_deref().unwrap_or("hand");
+                        let cards: Vec<i16> =
+                            crate::ability::util::zone_cards(player, zone).to_vec();
+                        let count = cards.len() as u32;
+                        let per_unit_count = effect.per_unit_count.unwrap_or(1);
+                        let exclude_self = effect.exclude_self.unwrap_or(false);
+                        let effective = if exclude_self {
+                            count.saturating_sub(1)
+                        } else {
+                            count
+                        };
+                        value = ((effective / per_unit_count) * (value as u32)) as i32;
+                        eprintln!("[COST_MOD] cid={} zone={} count={} eff={} per_unit_cnt={} val={} exclude={}",
+                            cid, zone, count, effective, per_unit_count, value, exclude_self);
+                    }
+                    eprintln!(
+                        "[COST_MOD] cid={} op={:?} val={}",
+                        cid,
+                        effect.operation.as_deref(),
+                        value
+                    );
+
                     let op = effect.operation.as_deref().unwrap_or("add");
                     match op {
                         "add" => *expected.entry(cid).or_insert(0) += value,
+                        "subtract" => *expected.entry(cid).or_insert(0) -= value,
                         "set" => {
                             expected.insert(cid, value);
                         }

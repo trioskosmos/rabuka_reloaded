@@ -30,6 +30,8 @@ pub enum ActionType {
     ChoiceSkip,
     ChoiceOption,
     ChoicePosition,
+    EnergyCharge,
+    PassRemaining,
 }
 
 impl std::fmt::Display for ActionType {
@@ -54,6 +56,8 @@ impl std::fmt::Display for ActionType {
             ActionType::ChoiceSkip => write!(f, "select_skip"),
             ActionType::ChoiceOption => write!(f, "choose_option"),
             ActionType::ChoicePosition => write!(f, "select_position"),
+            ActionType::EnergyCharge => write!(f, "energy_charge"),
+            ActionType::PassRemaining => write!(f, "pass_remaining"),
         }
     }
 }
@@ -82,7 +86,9 @@ impl std::str::FromStr for ActionType {
             "select_skip" => Ok(ActionType::ChoiceSkip),
             "choose_option" => Ok(ActionType::ChoiceOption),
             "select_position" => Ok(ActionType::ChoicePosition),
-            _ => Err(format!("Invalid action type: {}", s)),
+            "energy_charge" => Ok(ActionType::EnergyCharge),
+            "pass_remaining" => Ok(ActionType::PassRemaining),
+            _ => Err(format!("Unknown action type: {}", s)),
         }
     }
 }
@@ -107,6 +113,7 @@ pub struct ActionParameters {
     pub base_cost: Option<u32>,
     pub final_cost: Option<u32>,
     pub available_areas: Option<Vec<AreaInfo>>,
+    pub double_baton_pairs: Option<Vec<DoubleBatonPair>>, // Available double baton pair+placement options
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -118,12 +125,11 @@ pub struct AreaInfo {
     pub existing_member_name: Option<String>,
 }
 
-impl ActionParameters {
-    pub fn stage_area_member(&self) -> Option<MemberArea> {
-        self.stage_area
-            .as_ref()
-            .and_then(|s| s.parse::<MemberArea>().ok())
-    }
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DoubleBatonPair {
+    pub areas: Vec<String>, // The 2 members to replace (e.g., ["left", "center"])
+    pub placement: String,  // Where the card ends up (e.g., "left")
+    pub cost: u32,          // Effective cost after both cost reductions
 }
 
 pub fn setup_game(game_state: &mut GameState) {
@@ -166,6 +172,7 @@ fn make_params() -> ActionParameters {
         base_cost: None,
         final_cost: None,
         available_areas: None,
+        double_baton_pairs: None,
     }
 }
 
@@ -179,15 +186,16 @@ pub fn generate_possible_actions(game_state: &GameState) -> Vec<Action> {
         crate::game_state::Phase::ChooseFirstAttacker => {
             generate_choose_first_attacker_actions(game_state)
         }
-        crate::game_state::Phase::MulliganP1Turn | crate::game_state::Phase::MulliganP2Turn => {
-            generate_mulligan_actions(game_state)
-        }
+        crate::game_state::Phase::MulliganFirstAttacker
+        | crate::game_state::Phase::MulliganSecondAttacker => generate_mulligan_actions(game_state),
         crate::game_state::Phase::Active
         | crate::game_state::Phase::Energy
         | crate::game_state::Phase::Draw => Vec::new(),
         crate::game_state::Phase::Main => generate_main_phase_actions(game_state),
-        crate::game_state::Phase::LiveCardSetP1Turn
-        | crate::game_state::Phase::LiveCardSetP2Turn => generate_live_card_set_actions(game_state),
+        crate::game_state::Phase::LiveCardSetFirstAttacker
+        | crate::game_state::Phase::LiveCardSetSecondAttacker => {
+            generate_live_card_set_actions(game_state)
+        }
         crate::game_state::Phase::FirstAttackerPerformance
         | crate::game_state::Phase::SecondAttackerPerformance
         | crate::game_state::Phase::LiveVictoryDetermination => Vec::new(),
@@ -231,18 +239,19 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 let mut actions: Vec<Action> = positions
                     .iter()
                     .map(|pos| {
-                        let (label, stage_area, card_id) = match pos.as_str() {
-                            "left_side" | "left" => ("Move to Left", "left", 0),
-                            "center" => ("Move to Center", "center", 1),
-                            "right_side" | "right" => ("Move to Right", "right", 2),
-                            _ => ("Move", pos.as_str(), -1),
+                        let idx = crate::ability::util::stage_position_index(&pos);
+                        let (label, stage_area, card_id) = match idx {
+                            Some(0) => ("Move to Left", "left".to_string(), 0),
+                            Some(1) => ("Move to Center", "center".to_string(), 1),
+                            Some(2) => ("Move to Right", "right".to_string(), 2),
+                            _ => ("Move", pos.clone(), -1),
                         };
                         make_action_params(
                             ActionType::ChoicePosition,
                             label,
                             ActionParameters {
                                 card_id: Some(card_id),
-                                stage_area: Some(stage_area.to_string()),
+                                stage_area: Some(stage_area),
                                 card_no: Some("select".to_string()),
                                 ..make_params()
                             },
@@ -418,60 +427,84 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             count: _,
             description,
             allow_skip,
+            cost_limit,
+            cost_limit_operator,
+            characters,
+            ref filtered_indices,
+            ref target_player_id,
             ..
         } => {
             let mut actions = Vec::new();
-            let active = game_state.active_player();
-            let card_ids: Vec<(usize, i16)> = match zone.as_str() {
-                "hand" => active
-                    .hand
-                    .cards
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .map(|(i, id)| (i, id))
-                    .collect(),
-                "discard" => active
-                    .waitroom
-                    .cards
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .map(|(i, id)| (i, id))
-                    .collect(),
-                "stage" => active
-                    .stage
-                    .stage
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .filter(|&(_, id)| id != -1)
-                    .map(|(i, id)| (i, id))
-                    .collect(),
-                "energy_zone" => active
-                    .energy_zone
-                    .cards
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .map(|(i, id)| (i, id))
-                    .collect(),
-                "looked_at" => game_state
-                    .looked_at_cards
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .map(|(i, id)| (i, id))
-                    .collect(),
-                "revealed_cards" => game_state
-                    .revealed_cards
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .map(|(i, id)| (i, id))
-                    .collect(),
-                _ => Vec::new(),
+            let target = target_player_id.as_deref().unwrap_or("self");
+            let master = game_state.ability_master_id();
+            let card_ids: Vec<(usize, i16)> = {
+                let player = match (target, master.as_deref()) {
+                    ("self", Some("player2") | Some("p2")) => &game_state.player2,
+                    ("self", _) => &game_state.player1,
+                    ("opponent", Some("player2") | Some("p2")) => &game_state.player1,
+                    ("opponent", _) => &game_state.player2,
+                    _ => &game_state.player1,
+                };
+                match zone.as_str() {
+                    "hand" => player
+                        .hand
+                        .cards
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .map(|(i, id)| (i, id))
+                        .collect(),
+                    "discard" => player
+                        .waitroom
+                        .cards
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .map(|(i, id)| (i, id))
+                        .collect(),
+                    "stage" => player
+                        .stage
+                        .stage
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .filter(|&(_, id)| id != -1)
+                        .map(|(i, id)| (i, id))
+                        .collect(),
+                    "energy_zone" => player
+                        .energy_zone
+                        .cards
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .map(|(i, id)| (i, id))
+                        .collect(),
+                    "looked_at" => game_state
+                        .looked_at_cards
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .map(|(i, id)| (i, id))
+                        .collect(),
+                    "revealed_cards" => game_state
+                        .revealed_cards
+                        .iter()
+                        .copied()
+                        .enumerate()
+                        .map(|(i, id)| (i, id))
+                        .collect(),
+                    _ => Vec::new(),
+                }
             };
+            // Apply filtered_indices: exclude already-selected cards (used for sequential hand selection)
+            let card_ids: Vec<(usize, i16)> = match filtered_indices {
+                Some(fi) if !fi.is_empty() => card_ids
+                    .into_iter()
+                    .filter(|(idx, _)| !fi.contains(idx))
+                    .collect(),
+                _ => card_ids,
+            };
+
             if !card_ids.is_empty() {
                 for (zone_index, card_id) in &card_ids {
                     let card_matches = match card_type.as_deref() {
@@ -496,11 +529,34 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     if !card_matches {
                         continue;
                     }
+                    // Apply per-card cost_limit filter (NOT sum cost_total)
+                    if let Some(lim) = cost_limit {
+                        if !crate::ability::util::card_matches_cost_limit_op(
+                            &game_state.card_database,
+                            *card_id,
+                            Some(*lim),
+                            cost_limit_operator.as_deref(),
+                        ) {
+                            continue;
+                        }
+                    }
+                    if !crate::ability::util::card_matches_characters(
+                        &game_state.card_database,
+                        *card_id,
+                        characters.as_ref(),
+                    ) {
+                        continue;
+                    }
                     let card_name = game_state
                         .card_database
                         .get_card(*card_id)
                         .map(|c| c.name.as_str())
                         .unwrap_or("Unknown");
+                    let real_card_no = game_state
+                        .card_database
+                        .get_card(*card_id)
+                        .map(|c| c.card_no.clone())
+                        .unwrap_or_default();
                     actions.push(make_action_params(
                         ActionType::ChoiceSelect,
                         &format!("{} ({})", card_name, zone_index),
@@ -509,7 +565,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                             card_index: Some(*zone_index),
                             card_indices: Some(vec![*zone_index]),
                             card_name: Some(card_name.to_string()),
-                            card_no: Some("select".to_string()),
+                            card_no: Some(real_card_no.clone()),
                             ..make_params()
                         },
                     ));
@@ -539,22 +595,31 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
         }
         Choice::SelectPosition {
             position,
-            description,
+            description: _,
             ..
         } => position
             .split(',')
             .map(|a| a.trim())
             .map(|area| {
-                let stage_area_str = match area {
-                    "left" | "left_side" | "左サイドエリア" => Some("left".to_string()),
-                    "center" | "センターエリア" => Some("center".to_string()),
-                    "right" | "right_side" | "右サイドエリア" => Some("right".to_string()),
-                    _ => Some(area.to_string()),
+                let (stage_area_str, card_id) = match area {
+                    "left" | "left_side" | "左サイドエリア" => {
+                        (Some("left".to_string()), Some(0i16))
+                    }
+                    "center" | "センターエリア" => (Some("center".to_string()), Some(1i16)),
+                    "right" | "right_side" | "右サイドエリア" => {
+                        (Some("right".to_string()), Some(2i16))
+                    }
+                    _ => (Some(area.to_string()), Some(1i16)),
                 };
+                let label = stage_area_str
+                    .as_deref()
+                    .map(|s| format!("Place at {}", s))
+                    .unwrap_or_else(|| format!("Place at {}", area));
                 make_action_params(
                     ActionType::ChoicePosition,
-                    &format!("Place at {}: {}", area, description),
+                    &label,
                     ActionParameters {
+                        card_id,
                         stage_area: stage_area_str,
                         card_no: Some("select".to_string()),
                         ..make_params()
@@ -586,6 +651,44 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 )
             })
             .collect(),
+        Choice::SelectLiveSuccess {
+            options,
+            description,
+            ..
+        } => options
+            .iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                make_action_params(
+                    ActionType::ChoiceOption,
+                    &format!("{}: {}", opt.card_name, description),
+                    ActionParameters {
+                        card_id: Some(i as i16),
+                        card_no: Some(opt.card_name.clone()),
+                        ..make_params()
+                    },
+                )
+            })
+            .collect(),
+        Choice::SelectAutoAbility {
+            options,
+            description,
+            ..
+        } => options
+            .iter()
+            .enumerate()
+            .map(|(i, opt)| {
+                make_action_params(
+                    ActionType::ChoiceOption,
+                    &format!("{}: {}", opt.card_name, description),
+                    ActionParameters {
+                        card_id: Some(i as i16),
+                        card_no: Some(opt.card_name.clone()),
+                        ..make_params()
+                    },
+                )
+            })
+            .collect(),
     }
 }
 
@@ -609,10 +712,22 @@ fn generate_choose_first_attacker_actions(game_state: &GameState) -> Vec<Action>
 }
 
 fn generate_mulligan_actions(game_state: &GameState) -> Vec<Action> {
-    let (mulligan_player, player_name) = match game_state.current_phase {
-        crate::game_state::Phase::MulliganP1Turn => (&game_state.player1, "Player 1"),
-        _ => (&game_state.player2, "Player 2"),
+    let is_first = matches!(
+        game_state.current_phase,
+        crate::game_state::Phase::MulliganFirstAttacker
+    );
+    let player_name = if is_first {
+        if game_state.first_attacker().id == game_state.player1.id {
+            "Player 1"
+        } else {
+            "Player 2"
+        }
+    } else if game_state.first_attacker().id == game_state.player1.id {
+        "Player 2"
+    } else {
+        "Player 1"
     };
+    let mulligan_player = game_state.active_player();
 
     let mut actions = vec![make_action(
         ActionType::MulliganHeader,
@@ -769,6 +884,70 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                             format!("Cost: {}", cost_details.join(", "))
                         };
 
+                        // Check if this card has play_baton_touch with count > 1 (double baton)
+                        let has_double_baton = card.abilities.iter().any(|a| {
+                            a.effect.as_ref().map_or(false, |ef| {
+                                ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
+                            })
+                        });
+
+                        let double_baton_pairs = if has_double_baton {
+                            let area_enums = [
+                                crate::zones::MemberArea::LeftSide,
+                                crate::zones::MemberArea::Center,
+                                crate::zones::MemberArea::RightSide,
+                            ];
+                            let occupied: Vec<(usize, &str, i16)> = [0, 1, 2]
+                                .iter()
+                                .filter(|&&idx| stage_card_ids[idx] != -1)
+                                .filter(|&&idx| {
+                                    !active_player
+                                        .areas_locked_this_turn
+                                        .contains(&area_enums[idx])
+                                })
+                                .map(|&idx| {
+                                    let area_names = ["left", "center", "right"];
+                                    (idx, area_names[idx], stage_card_ids[idx])
+                                })
+                                .collect();
+                            let mut pairs = Vec::new();
+                            for i in 0..occupied.len() {
+                                for j in (i + 1)..occupied.len() {
+                                    let (_idx1, name1, cid1) = occupied[i];
+                                    let (_idx2, name2, cid2) = occupied[j];
+                                    let cost1 = game_state
+                                        .card_database
+                                        .get_card(cid1)
+                                        .and_then(|c| c.cost)
+                                        .unwrap_or(0);
+                                    let cost2 = game_state
+                                        .card_database
+                                        .get_card(cid2)
+                                        .and_then(|c| c.cost)
+                                        .unwrap_or(0);
+                                    let combined = cost1 + cost2;
+                                    let pair_cost = effective_cost.saturating_sub(combined);
+                                    let area_names = [name1.to_string(), name2.to_string()];
+                                    for placement in [name1.to_string(), name2.to_string()] {
+                                        if (active_energy_count as u32) >= pair_cost {
+                                            pairs.push(DoubleBatonPair {
+                                                areas: area_names.to_vec(),
+                                                placement,
+                                                cost: pair_cost,
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            if pairs.is_empty() {
+                                None
+                            } else {
+                                Some(pairs)
+                            }
+                        } else {
+                            None
+                        };
+
                         actions.push(make_action_params(
                             ActionType::PlayMemberToStage,
                             &format!("{} ({}) - {}", card.name, card.card_no, cost_str),
@@ -779,6 +958,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                                 card_no: Some(card.card_no.clone()),
                                 base_cost: Some(card_cost),
                                 available_areas: Some(available_areas),
+                                double_baton_pairs,
                                 ..make_params()
                             },
                         ));
@@ -882,7 +1062,7 @@ fn generate_live_card_set_actions(game_state: &GameState) -> Vec<Action> {
     )];
 
     let can_add_more = active_player.live_card_zone.cards.len() < 3;
-    if can_add_more && !game_state.is_action_prohibited("cannot_live") {
+    if can_add_more {
         for (hand_index, card_id) in active_player.hand.cards.iter().enumerate() {
             let card_name = game_state
                 .card_database

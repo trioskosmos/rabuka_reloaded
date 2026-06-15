@@ -12,8 +12,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     
     <!-- CSS Load Order managed by Vite via style.css -->
-  <script type="module" crossorigin src="./assets/main-Bs0qcCiL.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/main-DL645y7U.css">
+  <script type="module" crossorigin src="./assets/main-DvM5pKCU.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/main-DnG_WliR.css">
 </head>
 
 <body class="rabukasim-root">
@@ -166,7 +166,6 @@
                     <div id="card-desc-content" class="card-desc-content"></div>
                 </div>
                 <div id="active-abilities-panel" class="active-abilities-panel">
-                    <h3 data-i18n="active_effects_applied">適用中の効果</h3>
                     <div id="active-abilities-list" class="ability-list"></div>
                 </div>
                 <div class="log-container">
@@ -344,21 +343,57 @@
                     <h3>Cheats</h3>
                 </div>
                 <div class="cheat-container">
-                    <div class="cheat-input-group">
-                        <label>Add Energy:</label>
-                        <input type="number" id="cheat-energy-amount" value="1" min="1" max="10" style="width: 60px; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: white; border-radius: 4px;">
+                    <!-- Energy -->
+                    <div class="cheat-row">
+                        <label>Energy:</label>
+                        <input type="number" id="cheat-energy-amount" value="1" min="1" max="10" class="cheat-num">
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-add-energy" data-player="0">P1</button>
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-add-energy" data-player="1">P2</button>
                     </div>
-                    <div class="cheat-buttons-row">
-                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-add-energy" data-player="0">P1 +Energy</button>
-                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-add-energy" data-player="1">P2 +Energy</button>
+                    <!-- Draw Cards -->
+                    <div class="cheat-row">
+                        <label>Draw:</label>
+                        <input type="number" id="cheat-draw-amount" value="1" min="1" max="10" class="cheat-num">
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-draw-card" data-player="0">P1</button>
+                        <button class="btn btn-accent-blue btn-sm" data-action="cheat-draw-card" data-player="1">P2</button>
                     </div>
-                    <div class="cheat-input-group" style="margin-top: 10px;">
-                        <label>Add Card to Hand:</label>
-                        <input type="text" id="cheat-card-id" placeholder="PL!S-PR-026-PR" style="width: 140px; padding: 4px; background: rgba(0,0,0,0.3); border: 1px solid #444; color: white; border-radius: 4px;">
+                    <!-- Clear Hand -->
+                    <div class="cheat-row">
+                        <label>Clear Hand:</label>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-clear-hand" data-player="0">P1</button>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-clear-hand" data-player="1">P2</button>
                     </div>
-                    <div class="cheat-buttons-row">
-                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="0">P1 +Card</button>
-                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="1">P2 +Card</button>
+                    <!-- Add Card -->
+                    <div class="cheat-row">
+                        <label>Add Card:</label>
+                        <input type="text" id="cheat-card-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="0">P1</button>
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-card" data-player="1">P2</button>
+                    </div>
+                    <!-- Add to Stage -->
+                    <div class="cheat-row">
+                        <label>To Stage:</label>
+                        <input type="text" id="cheat-stage-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-stage" data-player="0">P1</button>
+                        <button class="btn btn-accent-green btn-sm" data-action="cheat-add-stage" data-player="1">P2</button>
+                    </div>
+                    <!-- Add Live -->
+                    <div class="cheat-row">
+                        <label>To Live:</label>
+                        <input type="text" id="cheat-live-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-add-live" data-player="0">P1</button>
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-add-live" data-player="1">P2</button>
+                    </div>
+                    <!-- Force Win -->
+                    <div class="cheat-row">
+                        <label>Force Win (P1):</label>
+                        <button class="btn btn-accent-gold btn-sm" data-action="cheat-force-win">Go</button>
+                    </div>
+                    <!-- Reshuffle -->
+                    <div class="cheat-row">
+                        <label>Reshuffle Deck:</label>
+                        <button class="btn btn-secondary btn-sm" data-action="cheat-reshuffle" data-player="0">P1</button>
+                        <button class="btn btn-secondary btn-sm" data-action="cheat-reshuffle" data-player="1">P2</button>
                     </div>
                 </div>
             </div>
@@ -438,7 +473,7 @@
                         <span data-t="perf_result">結果概要</span>
                     </button>
                     <button id="tab-btn-engine" class="tab-btn" data-action="show-performance-tab" data-value="engine">
-                        <span data-t="engine_mechanics">エンジン解説</span>
+                        <span data-t="engine_mechanics">詳細解説</span>
                     </button>
                     <button id="tab-btn-history" class="tab-btn" data-action="show-performance-tab" data-value="history">
                         <span data-t="turn_history">ターン履歴</span>
@@ -795,6 +830,24 @@
             </div>
             <div class="modal-body">
                 <div id="discard-modal-cards" class="discard-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Log Detail Modal (for expandable rule log entries) -->
+    <div id="log-detail-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <span class="modal-title" id="log-detail-title">ログ詳細</span>
+                <button class="close-btn" data-action="close-log-detail-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="log-detail-content" class="log-detail-content">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-action="close-log-detail-modal">閉じる</button>
             </div>
         </div>
     </div>

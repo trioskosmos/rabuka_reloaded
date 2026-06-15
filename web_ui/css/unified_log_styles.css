@@ -4,6 +4,14 @@
     padding-bottom: var(--space-xs);
 }
 
+.log-empty-message {
+    padding: 8px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 0.75rem;
+    font-style: italic;
+}
+
 .log-section:last-child {
     border-bottom: none;
 }
@@ -409,4 +417,276 @@
     font-weight: 500;
     font-size: 0.75rem;
     color: var(--accent-gold, #e8c84a);
+}
+
+/* Perf-guide member section */
+.perf-guide-members {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 4px 0;
+}
+
+.perf-guide-member {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 4px;
+}
+
+.perf-guide-member-img {
+    width: 40px;
+    height: auto;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+}
+
+.perf-guide-member-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+    font-size: 0.7rem;
+}
+
+.perf-guide-member-name {
+    color: var(--text-secondary);
+    min-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.perf-guide-member-hearts {
+    display: flex;
+    gap: 2px;
+}
+
+/* Clickable log entries (open detail modals) */
+.log-entry.clickable-log {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.log-entry.clickable-log:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-left-color: var(--accent-blue);
+}
+
+/* ChoiceView card items */
+.choice-cards-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    justify-content: center;
+}
+
+.choice-card-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    transition: background 0.15s ease;
+    max-width: 120px;
+}
+
+.choice-card-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.choice-card-visual {
+    width: 100px;
+    height: 140px;
+    overflow: hidden;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.choice-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.choice-card-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+    font-size: 0.7rem;
+    text-align: center;
+    color: var(--text-dim);
+}
+
+.choice-card-name {
+    font-size: 0.7rem;
+    text-align: center;
+    color: var(--text-secondary);
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Compact choice cards - replaces bulky choice-card-item */
+.compact-choice-card {
+    position: relative;
+    width: 60px;
+    height: 84px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: rgba(255,255,255,0.05);
+    background-size: cover;
+    background-position: center;
+    cursor: pointer;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.compact-choice-card.has-image {
+    border-color: rgba(255,255,255,0.15);
+}
+
+.compact-choice-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent-gold);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.compact-choice-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 2px 3px;
+    background: rgba(0,0,0,0.75);
+    font-size: 0.55rem;
+    color: var(--text);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.choice-cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+    justify-content: center;
+}
+
+/* Snapshot block (performance log) */
+.snapshot-block {
+    margin-bottom: 2px;
+}
+
+.snapshot-block .snapshot-header .log-entry-icon {
+    font-size: 0.8rem;
+}
+
+.snapshot-details {
+    padding: 1px 0 2px 0;
+}
+
+.snapshot-details .log-entry {
+    padding: 1px 6px;
+    border-left: 2px solid transparent;
+    background: transparent;
+}
+
+.snapshot-details .log-entry .log-entry-content {
+    font-size: 0.68rem;
+    color: var(--text-secondary, #bbb);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+}
+
+.snapshot-details .snapshot-subhead-line .log-entry-content {
+    color: var(--accent-gold, #e8c84a);
+    font-weight: 600;
+    font-size: 0.7rem;
+}
+
+.snapshot-details .snapshot-score-line .log-entry-content {
+    color: #78d08b;
+    font-weight: 700;
+    font-size: 0.75rem;
+}
+
+.snapshot-line .heart-mini-icon,
+.perf-guide-info .heart-mini-icon,
+.perf-guide-member-hearts .heart-mini-icon {
+    width: 12px;
+    height: 12px;
+    vertical-align: middle;
+    display: inline-block;
+}
+
+/* Snapshot enriched spans */
+.snapshot-section {
+    font-weight: 700;
+    color: var(--accent-gold, #e8c84a);
+    font-size: 0.75rem;
+}
+
+.snapshot-stage {
+    font-size: 0.68rem;
+}
+
+.snapshot-yell-card {
+    font-size: 0.65rem;
+}
+
+.snapshot-label {
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    font-style: italic;
+}
+
+.snapshot-ability-bonus {
+    color: var(--accent-pink);
+    font-size: 0.65rem;
+}
+
+.snapshot-live-pass,
+.snapshot-live-fail {
+    font-size: 0.7rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    flex-wrap: wrap;
+}
+
+.snapshot-live-pass { color: #78d08b; }
+.snapshot-live-fail { color: #f26d6d; }
+
+.snapshot-score-pass {
+    color: #78d08b;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.snapshot-score-fail {
+    color: #f26d6d;
+    font-weight: 700;
+    font-size: 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
 }

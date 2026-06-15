@@ -177,76 +177,12 @@ impl Player {
             // Rule: Cost reduction from 常時 abilities (parsed as modify_cost/subtract/hand)
             // Card was already removed from hand, so add 1 to get true hand count
             let hand_count = self.hand.cards.len() + 1;
-            let mut cost_reduction: u32 = 0;
-            for ability in &card.abilities {
-                if let Some(ref effect) = ability.effect {
-                    if let Some(_mod) = crate::ability::util::find_modify_cost(
-                        effect,
-                        Some("subtract"),
-                        Some("hand"),
-                    ) {
-                        let per_unit = _mod.per_unit_count.unwrap_or(1) as usize;
-                        cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
-                        break;
-                    }
-                }
-            }
-            // Cross-card cost reduction: scan stage members for modify_cost abilities
-            // that apply to the card being played (group match, cost limit match, etc.)
-            if cost_reduction == 0 {
-                for &stage_id in &self.stage.stage {
-                    if stage_id == -1 {
-                        continue;
-                    }
-                    if let Some(stage_card) = card_db.get_card(stage_id) {
-                        for ability in &stage_card.abilities {
-                            if let Some(ref effect) = ability.effect {
-                                if effect.action == "modify_cost"
-                                    && effect.operation.as_deref() == Some("subtract")
-                                    && effect.location.as_deref() == Some("hand")
-                                {
-                                    // Check group filter: does the played card match?
-                                    let group_matches = effect
-                                        .group_names
-                                        .as_ref()
-                                        .and_then(|gn| {
-                                            gn.first().map(|g| {
-                                                crate::ability::util::card_matches_group_str(
-                                                    card_db,
-                                                    card_id,
-                                                    Some(g),
-                                                )
-                                            })
-                                        })
-                                        .unwrap_or(true);
-                                    if !group_matches {
-                                        continue;
-                                    }
-                                    // Check cost limit: does the played card's cost match?
-                                    if let Some(limit) = effect.cost_limit {
-                                        if card.cost.map_or(true, |c| c != limit) {
-                                            continue;
-                                        }
-                                    }
-                                    // Check card_type filter
-                                    if let Some(ref ct) = effect.card_type {
-                                        if ct != "member_card" && ct != "card" && ct != "member" {
-                                            continue;
-                                        }
-                                    }
-                                    // Apply reduction
-                                    let reduction = effect.value.unwrap_or(1);
-                                    cost_reduction = cost_reduction.max(reduction);
-                                    break; // Take the largest reduction found
-                                }
-                            }
-                        }
-                    }
-                    if cost_reduction > 0 {
-                        break;
-                    }
-                }
-            }
+            let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
+                &self.stage,
+                hand_count,
+                card_id,
+                card_db,
+            );
             // Rule: Cost increase from 常時 abilities (e.g. success_live_zone cards → +cost)
             let mut cost_increase: u32 = 0;
             for ability in &card.abilities {
@@ -284,7 +220,8 @@ impl Player {
                     // Rule 9.6.2.1.2.1: Cannot baton touch to an area that had a card moved from non-stage to stage this turn
 
                     if self.areas_locked_this_turn.contains(&stage_area) {
-                        false
+                        self.hand.cards.insert(hand_index, card_id);
+                        return Err("Cannot baton touch: area is locked this turn".to_string());
                     } else {
                         // Get the member card ID and cost first
                         let member_card_id = existing_member;
@@ -355,45 +292,24 @@ impl Player {
                 }
             }
 
-            // Store the replaced member card ID if using baton touch
-
-            let replaced_member = if baton_touch_used {
-                self.stage.get_area(stage_area)
-            } else {
-                None
-            };
-
             let index = match stage_area {
                 crate::zones::MemberArea::LeftSide => 0,
                 crate::zones::MemberArea::Center => 1,
                 crate::zones::MemberArea::RightSide => 2,
             };
 
-            if !baton_touch_used && self.stage.stage[index] != -1 {
-                if let Some(old_card) = self.remove_member_from_stage_with_recycling(index, card_db)
-                {
+            let replaced_member = if self.stage.stage[index] != -1 {
+                let old_card_opt = self.remove_member_from_stage_with_recycling(index, card_db);
+                if let Some(old_card) = old_card_opt {
                     self.waitroom.cards.push(old_card);
                 }
-            }
+                old_card_opt
+            } else {
+                None
+            };
 
             self.stage.stage[index] = card_id;
-
             self.areas_locked_this_turn.insert(stage_area);
-
-            // Send replaced member to waitroom if baton touch was used
-
-            if let Some(member_id) = replaced_member {
-                self.waitroom.cards.push(member_id);
-                // Rule 10.5.3-10.5.4: Recycle under-cards of the replaced member
-                let (member_under, energy_under) =
-                    self.stage.recycle_under_cards(stage_area, card_db);
-                for cid in member_under {
-                    self.waitroom.add_card(cid);
-                }
-                for cid in energy_under {
-                    self.energy_deck.cards.push(cid);
-                }
-            }
 
             // Rule 9.6.2.3.2.1: If baton touch performed, trigger 'baton touch' event
 
@@ -517,6 +433,10 @@ impl Player {
     pub fn draw_card(&mut self) -> Option<i16> {
         // Rule 8.1: Draw Phase - Active player draws 1 card from main deck to hand
 
+        debug_assert!(
+            !self.main_deck.is_empty(),
+            "draw_card called with empty deck — tests must fill player.main_deck.cards"
+        );
         self.main_deck.draw().map(|card_id| {
             self.add_card_to_hand(card_id);
 

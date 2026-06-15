@@ -73,13 +73,43 @@ pub fn check_trigger_position(triggers: Option<&str>, card_position: MemberArea)
 }
 
 /// Check if a card matches the required stage position from a parsed
-/// `activation_position` field (e.g. "center", "left", "right").
+/// `activation_position` field (e.g. "center", "left", "right", or comma-separated "left_side,right_side").
 pub fn check_effect_position(effect_pos: Option<&str>, card_position: MemberArea) -> bool {
-    match effect_pos {
-        Some("center") | Some("中央") => card_position == MemberArea::Center,
-        Some("left") | Some("左") | Some("左側") => card_position == MemberArea::LeftSide,
-        Some("right") | Some("右") | Some("右側") => card_position == MemberArea::RightSide,
-        _ => true,
+    let pos = match effect_pos {
+        Some(p) => p,
+        None => return true,
+    };
+    // Support comma-separated multiple positions (e.g. "left_side,right_side")
+    if pos.contains(',') {
+        return pos.split(',').any(|p| {
+            let trimmed = p.trim();
+            matches!(
+                (trimmed, card_position),
+                ("center" | "中央", MemberArea::Center)
+                    | ("left" | "左" | "左側" | "left_side", MemberArea::LeftSide)
+                    | (
+                        "right" | "右" | "右側" | "right_side",
+                        MemberArea::RightSide
+                    )
+            )
+        });
+    }
+    match (pos, card_position) {
+        ("center" | "中央", MemberArea::Center) => true,
+        ("left" | "左" | "左側" | "left_side", MemberArea::LeftSide) => true,
+        ("right" | "右" | "右側" | "right_side", MemberArea::RightSide) => true,
+        _ => {
+            !(pos == "center"
+                || pos == "left"
+                || pos == "right"
+                || pos == "左"
+                || pos == "右"
+                || pos == "中央"
+                || pos == "左側"
+                || pos == "右側"
+                || pos == "left_side"
+                || pos == "right_side")
+        }
     }
 }
 
@@ -453,12 +483,18 @@ impl LiveCardZone {
                 std::collections::HashMap<crate::card::HeartColor, i32>,
             >,
         >,
+        score_modifiers: Option<&std::collections::HashMap<i16, i32>>,
     ) -> u32 {
         let mut total_score = 0;
 
         for card_id in &self.cards {
             if let Some(card) = card_db.get_card(*card_id) {
-                total_score += card.get_score();
+                let base_score = card.get_score() as i32;
+                let modifier = score_modifiers
+                    .and_then(|sm| sm.get(card_id))
+                    .copied()
+                    .unwrap_or(0);
+                total_score += (base_score + modifier).max(0) as u32;
 
                 if let Some(ref need_heart) = card.need_heart {
                     if !need_heart.hearts.is_empty() {
@@ -479,34 +515,8 @@ impl LiveCardZone {
                         };
                         let ref_need = effective_need.as_ref().unwrap_or(need_heart);
                         let satisfied = stage_hearts.map_or(false, |sh| {
-                            let wildcard_count = *sh
-                                .hearts
-                                .get(&crate::card::HeartColor::Heart00)
-                                .unwrap_or(&0);
-                            for (color, needed_amount) in &ref_need.hearts {
-                                if let Some(&provided_amount) = sh.hearts.get(color) {
-                                    if provided_amount + wildcard_count >= *needed_amount {
-                                        let remaining_needed = if provided_amount >= *needed_amount
-                                        {
-                                            0
-                                        } else {
-                                            *needed_amount - provided_amount
-                                        };
-                                        if remaining_needed > wildcard_count {
-                                            return false;
-                                        }
-                                    } else if *needed_amount > wildcard_count {
-                                        return false;
-                                    }
-                                } else if *needed_amount > wildcard_count {
-                                    return false;
-                                }
-                            }
-                            true
+                            crate::card::Card::need_heart_satisfied(ref_need, sh)
                         });
-                        if satisfied {
-                            total_score += 1;
-                        }
                     }
                 }
             }

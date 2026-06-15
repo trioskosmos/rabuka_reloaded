@@ -49,7 +49,7 @@ fn hanamusubi_q213_member_card_moved_before_live_start() {
     // The member will be removed during check_invalid_cards before LiveStart.
 
     let before_waitroom = game.state.player1.waitroom.cards.len();
-    game.pass(); // LiveCardSetP1Turn → P2Turn (draws 2, triggers check_invalid_cards)
+    game.pass(); // LiveCardSetFirstAttacker → P2Turn (draws 2, triggers check_invalid_cards)
     game.pass(); // P2Turn → FirstAttackerPerformance → LiveStart
 
     // After phase transitions, the member card should be in waitroom

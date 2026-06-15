@@ -40,19 +40,53 @@ impl super::TurnEngine {
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
         let p1_mult = &game_state.mods.heart_color_multiplier.clone();
         let p2_mult = &game_state.mods.heart_color_multiplier.clone();
-        game_state.player1.stage_hearts = Some(
-            game_state
-                .player1
-                .calculate_stage_hearts(&game_state.card_database, p1_mult),
-        );
-        game_state.player2.stage_hearts = Some(
-            game_state
-                .player2
-                .calculate_stage_hearts(&game_state.card_database, p2_mult),
-        );
+        // Include yell blade hearts in stage_hearts so should_trigger_live_success
+        // checks against the same total hearts the performance used.
+        let mut p1_stage = game_state
+            .player1
+            .calculate_stage_hearts(&game_state.card_database, p1_mult);
+        let mut p2_stage = game_state
+            .player2
+            .calculate_stage_hearts(&game_state.card_database, p2_mult);
+        for snap in &game_state.performance_snapshots {
+            let target = if snap.player_id == game_state.player1.id {
+                &mut p1_stage
+            } else {
+                &mut p2_stage
+            };
+            for yc in &snap.yell_cards {
+                for (i, &count) in yc.blade_hearts.iter().enumerate() {
+                    if count > 0 {
+                        let color = match i {
+                            0 => crate::card::HeartColor::Heart00,
+                            1 => crate::card::HeartColor::Heart01,
+                            2 => crate::card::HeartColor::Heart02,
+                            3 => crate::card::HeartColor::Heart03,
+                            4 => crate::card::HeartColor::Heart04,
+                            5 => crate::card::HeartColor::Heart05,
+                            6 => crate::card::HeartColor::Heart06,
+                            _ => continue,
+                        };
+                        *target.hearts.entry(color).or_insert(0) += count as u32;
+                    }
+                }
+            }
+        }
+        game_state.player1.stage_hearts = Some(p1_stage);
+        game_state.player2.stage_hearts = Some(p2_stage);
 
         let player1_id = game_state.player1.id.clone();
         let player2_id = game_state.player2.id.clone();
+
+        // Capture pre-trigger score modifiers (including set_score) so we can
+        // avoid double-counting: calculate_live_score gets the PRE values,
+        // and pX_extra carries only the delta from LiveSuccess-triggered abilities.
+        let pre_score_mods = game_state.mods.score_modifiers.clone();
+        let pre_set_score = game_state.mods.set_score_modifiers.clone();
+        let mut pre_merged: HashMap<i16, i32> = pre_score_mods.clone();
+        for (&k, &v) in &pre_set_score {
+            pre_merged.entry(k).or_insert(v);
+        }
 
         let p1_extra;
         let p2_extra;
@@ -62,43 +96,44 @@ impl super::TurnEngine {
         } else {
             game_state.live_success_triggered_this_turn = true;
 
-            let pre_p1 = game_state.mods.score_modifiers.clone();
             Self::trigger_live_success_abilities(game_state, &player1_id);
             game_state.process_pending_auto_abilities(&player1_id);
-            if game_state.pending_choice.is_some() {
+            if game_state.has_pending_choice() {
                 return;
             }
             p1_extra = Self::score_delta_since(
                 &game_state.mods.score_modifiers,
-                &pre_p1,
+                &pre_score_mods,
                 &game_state.player1.live_card_zone.cards,
             );
 
-            let pre_p2 = game_state.mods.score_modifiers.clone();
             Self::trigger_live_success_abilities(game_state, &player2_id);
             game_state.process_pending_auto_abilities(&player2_id);
-            if game_state.pending_choice.is_some() {
+            if game_state.has_pending_choice() {
                 return;
             }
             p2_extra = Self::score_delta_since(
                 &game_state.mods.score_modifiers,
-                &pre_p2,
+                &pre_score_mods,
                 &game_state.player2.live_card_zone.cards,
             );
         }
 
-        // Determine winner
+        // Determine winner — use PRE-trigger modifiers so LiveSuccess
+        // triggered changes only apply via pX_extra (no double-count).
         let player1_score = game_state.player1.live_card_zone.calculate_live_score(
             &game_state.card_database,
             game_state.player1_cheer_blade_heart_count,
             game_state.player1.stage_hearts.as_ref(),
             Some(&game_state.mods.need_heart_modifiers),
+            Some(&pre_merged),
         ) + p1_extra;
         let player2_score = game_state.player2.live_card_zone.calculate_live_score(
             &game_state.card_database,
             game_state.player2_cheer_blade_heart_count,
             game_state.player2.stage_hearts.as_ref(),
             Some(&game_state.mods.need_heart_modifiers),
+            Some(&pre_merged),
         ) + p2_extra;
         let player1_has_cards = !game_state.player1.live_card_zone.cards.is_empty();
         let player2_has_cards = !game_state.player2.live_card_zone.cards.is_empty();
@@ -139,32 +174,23 @@ impl super::TurnEngine {
                                 filled[alloc.color] += alloc.amount;
                             }
                         }
-                        let mut passed = true;
                         let mut required_arr = empty_h7();
                         for (color, needed) in &nh.hearts {
                             let idx = heart_color_index(color);
                             required_arr[idx] = *needed;
-                            // Wildcard (heart00) can fill deficit if specfic color is insufficient
-                            let deficit = if filled[idx] >= *needed {
-                                0
-                            } else {
-                                *needed - filled[idx]
-                            };
-                            if deficit > 0 && filled[0] >= deficit {
-                                filled[0] -= deficit;
-                                filled[idx] += deficit;
-                            }
-                            if filled[idx] < *needed {
-                                passed = false;
-                            }
                         }
-                        // Remaining hearts are spares
-                        for (color, amount) in &player
-                            .stage_hearts
-                            .as_ref()
-                            .map(|sh| sh.hearts.clone())
-                            .unwrap_or_default()
-                        {
+                        // Use the engine's upstream heart satisfaction check (handles heart00 wildcard)
+                        let stage_hearts =
+                            player
+                                .stage_hearts
+                                .clone()
+                                .unwrap_or(player.calculate_stage_hearts(
+                                    &game_state.card_database,
+                                    &std::collections::HashMap::new(),
+                                ));
+                        let passed = card.satisfies_heart_requirement(&stage_hearts);
+                        // Build spare from remaining stage hearts after allocations
+                        for (color, amount) in &stage_hearts.hearts {
                             let idx = heart_color_index(color);
                             if idx < 7 {
                                 spare[idx] = *amount;
@@ -177,7 +203,9 @@ impl super::TurnEngine {
                     } else {
                         snap.lives[i].passed = true;
                     }
-                    snap.lives[i].score = card.get_score();
+                    let base_score = card.get_score() as i32;
+                    let mod_score = game_state.mods.get_score_modifier(lc_id);
+                    snap.lives[i].score = (base_score + mod_score).max(0) as u32;
                 }
             }
 
@@ -189,6 +217,14 @@ impl super::TurnEngine {
             } else {
                 player2_score
             };
+            // Rule 8.3.16: If ANY live card failed its heart requirement, ALL lives fail.
+            // The zone was already cleared in player_perform_live, so snap.lives[i].passed
+            // may still be true for cards that would have passed individually.
+            if player.live_card_zone.cards.is_empty() {
+                for lr in snap.lives.iter_mut() {
+                    lr.passed = false;
+                }
+            }
             // Success: at least one live card passed + total_score > 0
             snap.success = snap.lives.iter().any(|l| l.passed) && snap.total_score > 0;
         }
@@ -203,7 +239,21 @@ impl super::TurnEngine {
 
         Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);
         Self::move_restricted_cards_to_discard(&mut game_state.player2, &card_db);
+        let p1_before = game_state.player1.success_live_card_zone.cards.len();
+        let p2_before = game_state.player2.success_live_card_zone.cards.len();
         Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
+        // Rule 8.4.13: If only one player moved a card to success this live, they become first attacker
+        let p1_now = game_state.player1.success_live_card_zone.cards.len();
+        let p2_now = game_state.player2.success_live_card_zone.cards.len();
+        let p1_added = p1_now > p1_before;
+        let p2_added = p2_now > p2_before;
+        if p1_added && !p2_added {
+            game_state.player1.is_first_attacker = true;
+            game_state.player2.is_first_attacker = false;
+        } else if p2_added && !p1_added {
+            game_state.player1.is_first_attacker = false;
+            game_state.player2.is_first_attacker = true;
+        }
     }
 
     fn move_restricted_cards_to_discard(
@@ -248,7 +298,7 @@ impl super::TurnEngine {
     ) {
         let card_count = player.live_card_zone.cards.len();
         if won && !must_skip && card_count > 0 {
-            let card_id = player.live_card_zone.cards.remove(card_count - 1);
+            let card_id = player.live_card_zone.cards.remove(0);
             if can_place {
                 player.success_live_card_zone.cards.push(card_id);
             } else {
@@ -274,6 +324,71 @@ impl super::TurnEngine {
         let p1_must_skip = player1_won && player2_won && p1_cards >= 2;
         let p2_must_skip = player1_won && player2_won && p2_cards >= 2;
 
+        // Check if multiple live cards need a success zone choice (Rule 8.4.7)
+        if player1_won && !p1_must_skip && p1_cards > 1 {
+            let p1_top = game_state.player1.live_card_zone.cards.last().copied();
+            let p1_can_place = p1_top.map_or(false, |cid| {
+                game_state.can_place_card_in_zone(cid, "success_live_zone", &p1_id)
+            });
+            if p1_can_place {
+                let options: Vec<crate::ability::types::LiveSuccessOption> = game_state
+                    .player1
+                    .live_card_zone
+                    .cards
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &cid)| crate::ability::types::LiveSuccessOption {
+                        card_name: game_state
+                            .card_database
+                            .get_card(cid)
+                            .map(|c| c.name.clone())
+                            .unwrap_or_default(),
+                        card_index: i,
+                    })
+                    .collect();
+                let choice = crate::ability::types::Choice::SelectLiveSuccess {
+                    player_id: p1_id.clone(),
+                    count: 1,
+                    options,
+                    description: "Choose which live card goes to your success zone".to_string(),
+                };
+                game_state.ability_queue.pause_for_choice(choice);
+                return;
+            }
+        }
+        if player2_won && !p2_must_skip && p2_cards > 1 {
+            let p2_top = game_state.player2.live_card_zone.cards.last().copied();
+            let p2_can_place = p2_top.map_or(false, |cid| {
+                game_state.can_place_card_in_zone(cid, "success_live_zone", &p2_id)
+            });
+            if p2_can_place {
+                let options: Vec<crate::ability::types::LiveSuccessOption> = game_state
+                    .player2
+                    .live_card_zone
+                    .cards
+                    .iter()
+                    .enumerate()
+                    .map(|(i, &cid)| crate::ability::types::LiveSuccessOption {
+                        card_name: game_state
+                            .card_database
+                            .get_card(cid)
+                            .map(|c| c.name.clone())
+                            .unwrap_or_default(),
+                        card_index: i,
+                    })
+                    .collect();
+                let choice = crate::ability::types::Choice::SelectLiveSuccess {
+                    player_id: p2_id.clone(),
+                    count: 1,
+                    options,
+                    description: "Choose which live card goes to your success zone".to_string(),
+                };
+                game_state.ability_queue.pause_for_choice(choice);
+                return;
+            }
+        }
+
+        // Single card or no choice needed — process normally
         let p1_top = game_state.player1.live_card_zone.cards.last().copied();
         let p2_top = game_state.player2.live_card_zone.cards.last().copied();
         let p1_can_place = p1_top.map_or(false, |cid| {
@@ -297,6 +412,32 @@ impl super::TurnEngine {
         );
     }
 
+    /// Handle the result of a live success zone card choice.
+    pub(crate) fn handle_live_success_choice(
+        game_state: &mut GameState,
+        selected_index: usize,
+        player_id: &str,
+    ) -> Result<(), String> {
+        let player = if player_id == game_state.player1.id {
+            &mut game_state.player1
+        } else if player_id == game_state.player2.id {
+            &mut game_state.player2
+        } else {
+            return Err("Player not found for live success choice".to_string());
+        };
+        if selected_index >= player.live_card_zone.cards.len() {
+            return Err("Invalid card index for live success choice".to_string());
+        }
+        let card_id = player.live_card_zone.cards.remove(selected_index);
+        player.success_live_card_zone.cards.push(card_id);
+        while !player.live_card_zone.cards.is_empty() {
+            player
+                .waitroom
+                .add_card(player.live_card_zone.cards.remove(0));
+        }
+        Ok(())
+    }
+
     pub fn player_perform_live(
         player: &mut crate::player::Player,
         resolution_zone: &mut crate::zones::ResolutionZone,
@@ -307,7 +448,30 @@ impl super::TurnEngine {
         heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
         blade_type_modifiers: &HashMap<i16, BladeColor>,
         orientation_modifiers: &HashMap<i16, String>,
+        need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, i32>>,
+        cannot_live: bool,
     ) -> LivePerformanceData {
+        // Q68/Rule: "cannot_live" discards live cards during performance; no yell, no live.
+        if cannot_live {
+            player
+                .waitroom
+                .cards
+                .extend(player.live_card_zone.cards.drain(..));
+            return LivePerformanceData {
+                yell_count: 0,
+                note_icons: 0,
+                revealed_ids: Vec::new(),
+                member_contributions: Vec::new(),
+                yell_cards: Vec::new(),
+                total_hearts: [0; 7],
+                allocations: Vec::new(),
+                heart_sources: Vec::new(),
+                blade_sources: Vec::new(),
+                draw_effects_occurred: false,
+                live_card_ids: vec![],
+            };
+        }
+
         // Q32/Rule 8.3.6: If the live card zone is empty, no yell, no card processing.
         if player.live_card_zone.cards.is_empty() {
             return LivePerformanceData {
@@ -321,6 +485,7 @@ impl super::TurnEngine {
                 heart_sources: Vec::new(),
                 blade_sources: Vec::new(),
                 draw_effects_occurred: false,
+                live_card_ids: vec![],
             };
         }
 
@@ -503,9 +668,11 @@ impl super::TurnEngine {
                                 bh_arr[idx] += count;
                                 total_hearts_arr[idx] += count;
                             }
-                            cheer_icon_count += count;
+                            // Regular hearts do NOT add to score (Rule 8.4.2 — only ♪ icons count)
                         }
                     }
+                } else {
+                    // No blade_heart — no hearts from this yell card
                 }
 
                 yell_cards.push(YellCardResult {
@@ -560,11 +727,23 @@ impl super::TurnEngine {
             }
         }
 
-        // Build heart allocations (direct fill per live card)
+        // Build heart allocations (direct fill per live card, using adjusted need_heart)
         let live_card_ids: Vec<i16> = player.live_card_zone.cards.iter().copied().collect();
         for live_idx in 0..live_card_ids.len() {
             if let Some(card) = card_db.get_card(live_card_ids[live_idx]) {
-                if let Some(ref nh) = card.need_heart {
+                // Apply need_heart modifiers (e.g. heart requirement -1)
+                let effective_need = card.need_heart.as_ref().map(|nh| {
+                    let mut adjusted = nh.clone();
+                    if let Some(card_mods) = need_heart_modifiers.get(&live_card_ids[live_idx]) {
+                        for (color, delta) in card_mods {
+                            let entry = adjusted.hearts.entry(*color).or_insert(0);
+                            *entry = (*entry as i32 + delta).max(0) as u32;
+                        }
+                    }
+                    adjusted
+                });
+                let use_need = effective_need.clone().or_else(|| card.need_heart.clone());
+                if let Some(ref nh) = use_need {
                     let mut remaining = owned_hearts.clone();
                     for (color, needed) in &nh.hearts {
                         let c_idx = heart_color_index(color);
@@ -619,12 +798,24 @@ impl super::TurnEngine {
             }
         }
 
-        // Check each live card's requirement
+        // Check each live card's requirement (with modifiers applied for heart reduction)
         let any_requirement_failed = live_card_ids.iter().any(|&lc_id| {
             card_db.get_card(lc_id).map_or(false, |card| {
-                card.need_heart.as_ref().map_or(false, |nh| {
-                    !nh.hearts.is_empty() && !card.satisfies_heart_requirement(&owned_hearts)
-                })
+                let nh = match card.need_heart.as_ref() {
+                    Some(nh) => {
+                        let mut adjusted = nh.clone();
+                        if let Some(card_mods) = need_heart_modifiers.get(&lc_id) {
+                            for (color, delta) in card_mods {
+                                let entry = adjusted.hearts.entry(*color).or_insert(0);
+                                *entry = (*entry as i32 + delta).max(0) as u32;
+                            }
+                        }
+                        adjusted
+                    }
+                    None => return false,
+                };
+                !nh.hearts.is_empty()
+                    && !crate::card::Card::need_heart_satisfied(&nh, &owned_hearts)
             })
         });
         if any_requirement_failed {
@@ -650,6 +841,7 @@ impl super::TurnEngine {
             heart_sources,
             blade_sources,
             draw_effects_occurred: true, // Flag to trigger auto abilities after draw effects
+            live_card_ids: live_card_ids.clone(),
         }
     }
 }
@@ -665,7 +857,8 @@ pub fn build_snapshot(
     note_icons: u32,
 ) -> crate::types::PerformanceSnapshot {
     let mut lives = Vec::new();
-    for &lc_id in &player.live_card_zone.cards {
+    // Use perf.live_card_ids (captured before heart check cleared the zone)
+    for &lc_id in &perf.live_card_ids {
         let score = card_db.get_card(lc_id).map(|c| c.get_score()).unwrap_or(0);
         let card_no = card_db
             .get_card(lc_id)
@@ -702,7 +895,41 @@ pub fn build_snapshot(
             transforms: Vec::new(),
             scores: Vec::new(),
         },
-        triggered_abilities: Vec::new(),
+        triggered_abilities: {
+            let mut seen = std::collections::HashSet::new();
+            let mut tas = Vec::new();
+            for mc in &perf.member_contributions {
+                for ab in mc
+                    .ability_heart_bonuses
+                    .iter()
+                    .chain(mc.ability_blade_bonuses.iter())
+                {
+                    if !seen.insert(&ab.ability_text) {
+                        continue;
+                    }
+                    let card = card_db.get_card(mc.source_id);
+                    tas.push(crate::types::TriggeredAbility {
+                        source_card_id: mc.source_id,
+                        name: ab.source.clone(),
+                        card_name: card.map(|c| c.name.clone()).unwrap_or_default(),
+                        effect_text: ab.ability_text.clone(),
+                        condition_text: None,
+                        is_public: true,
+                    });
+                }
+            }
+            if perf.draw_effects_occurred {
+                tas.push(crate::types::TriggeredAbility {
+                    source_card_id: -1,
+                    name: "Draw Effect".to_string(),
+                    card_name: String::new(),
+                    effect_text: "カードを引く効果が発動しました".to_string(),
+                    condition_text: None,
+                    is_public: true,
+                });
+            }
+            tas
+        },
         p0_wins: false,
         p1_wins: false,
     }

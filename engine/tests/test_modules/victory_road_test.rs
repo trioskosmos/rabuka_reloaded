@@ -52,8 +52,8 @@ fn victory_road_q217_q227_cost_handling() {
     game.set_live_card(victory);
 
     // Pass through live set phases to trigger LiveStart
-    game.pass(); // LiveCardSetP1Turn → P2Turn
-    game.pass(); // LiveCardSetP2Turn → FirstAttackerPerformance → LiveStart
+    game.pass(); // LiveCardSetFirstAttacker → P2Turn
+    game.pass(); // LiveCardSetSecondAttacker → FirstAttackerPerformance → LiveStart
 
     // Multi-member's LiveStart fires. The optional cost displays.
     // Handle whatever choices come up
@@ -65,7 +65,7 @@ fn victory_road_q217_q227_cost_handling() {
     while game.has_pending_choice() && safety < 10 {
         safety += 1;
         // If there's a pending_choice, try option -1 (skip/decline)
-        if game.state.pending_choice.is_some() {
+        if game.state.has_pending_choice() {
             game.select_option(-1);
         } else {
             game.select_indices(&[]);

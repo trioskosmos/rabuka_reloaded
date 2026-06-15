@@ -198,6 +198,13 @@ fn position_change_filters_by_group_names() {
     // Put himeno in hand and play to stage
     game.state.player1.hand.cards.push(himeno);
     game.give_energy(11);
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::RightSide);
 
     // Play himeno to RightSide — debut/live trigger will fire later.
@@ -206,7 +213,7 @@ fn position_change_filters_by_group_names() {
     game.pass(); // Active -> Energy
     game.pass(); // Energy -> Draw
     game.pass(); // Draw -> Main
-    game.pass(); // Main -> LiveCardSetP1Turn
+    game.pass(); // Main -> LiveCardSetFirstAttacker
 
     // Set a live card so live starts
     game.state
@@ -214,7 +221,7 @@ fn position_change_filters_by_group_names() {
         .live_card_zone
         .cards
         .push(game.id("PL!-sd1-010-SD"));
-    game.pass(); // LiveCardSetP1 -> LiveCardSetP2Turn
+    game.pass(); // LiveCardSetP1 -> LiveCardSetSecondAttacker
     game.state
         .player2
         .live_card_zone
@@ -226,7 +233,7 @@ fn position_change_filters_by_group_names() {
     // First sub-action: position_change with group_names=[みらくらぱーく！], exclude_self=true
     // Only Center (member_same) should be offered — Left (member_other) should NOT.
     if game.has_pending_choice() {
-        let choice_type = game.pending_choice_type();
+        let _choice_type = game.pending_choice_type();
         // Should be a position choice (SelectTarget with position|destination)
         // or possibly a select card choice
         game.dbg_choice();
@@ -271,6 +278,13 @@ fn position_change_group_names_excludes_self() {
     // Put himeno in hand and play to stage — himeno is also みらくらぱーく！
     game.state.player1.hand.cards.push(himeno);
     game.give_energy(11);
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::Center);
 
     // Add another みらくらぱーく！ member on stage
@@ -285,14 +299,14 @@ fn position_change_group_names_excludes_self() {
     game.pass(); // Active -> Energy
     game.pass(); // Energy -> Draw
     game.pass(); // Draw -> Main
-    game.pass(); // Main -> LiveCardSetP1Turn
+    game.pass(); // Main -> LiveCardSetFirstAttacker
 
     game.state
         .player1
         .live_card_zone
         .cards
         .push(game.id("PL!-sd1-010-SD"));
-    game.pass(); // LiveCardSetP1 -> LiveCardSetP2Turn
+    game.pass(); // LiveCardSetP1 -> LiveCardSetSecondAttacker
     game.state
         .player2
         .live_card_zone
@@ -329,6 +343,13 @@ fn position_change_skip_when_no_valid_destinations() {
     // Put himeno in hand and play to stage
     game.state.player1.hand.cards.push(himeno);
     game.give_energy(11);
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.play_to_stage(himeno, rabuka_engine::zones::MemberArea::RightSide);
 
     // Advance to live start
@@ -336,14 +357,14 @@ fn position_change_skip_when_no_valid_destinations() {
     game.pass(); // Active -> Energy
     game.pass(); // Energy -> Draw
     game.pass(); // Draw -> Main
-    game.pass(); // Main -> LiveCardSetP1Turn
+    game.pass(); // Main -> LiveCardSetFirstAttacker
 
     game.state
         .player1
         .live_card_zone
         .cards
         .push(game.id("PL!-sd1-010-SD"));
-    game.pass(); // LiveCardSetP1 -> LiveCardSetP2Turn
+    game.pass(); // LiveCardSetP1 -> LiveCardSetSecondAttacker
     game.state
         .player2
         .live_card_zone

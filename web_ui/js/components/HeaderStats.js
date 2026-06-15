@@ -55,35 +55,14 @@ export const HeaderStats = {
         if (HeaderStats.cache.phase) HeaderStats.cache.phase.textContent = i18n.t(phaseKey);
 
         if (HeaderStats.cache.player1Score && HeaderStats.cache.player2Score) {
-            // Calculate base scores from success_live_card_zone
-            const p0Success = p0.success_live_card_zone?.cards || [];
-            const p1Success = p1.success_live_card_zone?.cards || [];
-            const p0BaseScore = p0Success.length || 0;
-            const p1BaseScore = p1Success.length || 0;
+            const p0Success = (p0.success_live_card_zone?.cards || []).length;
+            const p1Success = (p1.success_live_card_zone?.cards || []).length;
 
-            // Calculate ability bonuses from score modifiers (handle missing data gracefully)
-            let p0Bonus = 0;
-            let p1Bonus = 0;
+            HeaderStats.cache.player1Score.textContent = `${p0Success}/3`;
+            HeaderStats.cache.player1Score.title = `Success zone cards: ${p0Success} (win at 3)`;
 
-            // Only calculate bonuses if score_modifiers data exists
-            if (p0.score_modifiers) {
-                for (const cardId of p0Success) {
-                    if (p0.score_modifiers[cardId]) {
-                        p0Bonus += p0.score_modifiers[cardId];
-                    }
-                }
-            }
-            if (p1.score_modifiers) {
-                for (const cardId of p1Success) {
-                    if (p1.score_modifiers[cardId]) {
-                        p1Bonus += p1.score_modifiers[cardId];
-                    }
-                }
-            }
-
-            // Display in "base +bonus" format
-            HeaderStats.cache.player1Score.textContent = `${p0BaseScore} +${p0Bonus}`;
-            HeaderStats.cache.player2Score.textContent = `${p1BaseScore} +${p1Bonus}`;
+            HeaderStats.cache.player2Score.textContent = `${p1Success}/3`;
+            HeaderStats.cache.player2Score.title = `Success zone cards: ${p1Success} (win at 3)`;
         }
 
         // P1 Energy

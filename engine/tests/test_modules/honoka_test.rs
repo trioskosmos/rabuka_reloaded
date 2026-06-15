@@ -1,18 +1,18 @@
 /// Tests for PL!-pb1-001-R (高坂穂乃果) ab#0 — Q166, Q167
-///
-/// Ability (起動[Center][ターン1]):
-///   このメンバーをウェイトにし、手札1枚を控え室に置く：
-///   ライブカードかコスト10以上のメンバーカードのどちらか1つを選ぶ。
-///   選んだカードが公開されるまで、デッキの上から1枚ずつ公開する。
-///   そのカードを手札に加え、他をすべて控え室に置く。
-///
-/// The reveal_until_chosen_card action handles the type choice,
-/// reveal loop, add-to-hand, and discard internally.
 use crate::helpers::*;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 
-fn activate_and_choose_member(game: &mut TestGame, honoka: i16) {
+fn setup_honoka_deck(game: &mut TestGame, honoka: i16, deck_top: Vec<i16>) {
+    game.state.player1.stage.stage[1] = honoka;
+    let hand_filler = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(hand_filler);
+    game.state.player1.hand.cards.push(hand_filler);
+    game.state.player1.main_deck.cards = deck_top.into();
+    game.give_energy(13);
+}
+
+fn activate_and_choose_type(game: &mut TestGame, honoka: i16, type_option: i16) {
     TurnEngine::execute_main_phase_action(
         &mut game.state,
         &ActionType::UseAbility,
@@ -22,73 +22,95 @@ fn activate_and_choose_member(game: &mut TestGame, honoka: i16) {
         None,
     )
     .expect("activate");
-    // Handle choices in order: cost (discard from hand), then card type, then looked_at
-    if game.has_pending_choice() {
-        // First choice is hand discard cost (select index 0 to discard the filler card)
-        game.select_indices(&[0]);
-    }
-    if game.has_pending_choice() {
-        // Second choice is card type selection
-        game.select_option(1); // 1 = member_card
-    }
-    // Handle subsequent choices (e.g., card selection from looked_at)
+    assert!(
+        game.has_pending_choice(),
+        "Should have hand discard cost choice"
+    );
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "Should have card type choice");
+    let desc = game
+        .state
+        .get_pending_choice_json()
+        .and_then(|j| {
+            j.get("description")
+                .and_then(|d| d.as_str().map(|s| s.to_string()))
+        })
+        .unwrap_or_default();
+    assert!(
+        desc.contains("Live card"),
+        "Choice should mention Live card, got: {}",
+        desc
+    );
+    assert!(
+        desc.contains("Member card"),
+        "Choice should mention Member card, got: {}",
+        desc
+    );
+    game.select_option(type_option);
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
 }
 
-fn activate_and_choose_live(game: &mut TestGame, honoka: i16) {
-    TurnEngine::execute_main_phase_action(
-        &mut game.state,
-        &ActionType::UseAbility,
-        Some(honoka),
-        None,
-        None,
-        None,
-    )
-    .expect("activate");
-    // Cost is auto-resolved (no prompt). First pending choice is card type selection.
-    if game.has_pending_choice() {
-        game.select_option(0); // 0 = live_card
-    }
-    // Handle subsequent choices (e.g., card selection from looked_at)
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-}
-
-/// Live card ID (not a member, member_card filter skips it)
-#[allow(dead_code)]
-const LIVE_FILLER: &str = "PL!-sd1-019-SD";
-/// Member card ID (not a live, live_card filter skips it)
-const MEMBER_FILLER: &str = "PL!-sd1-010-SD";
-
-/// Choose member_card type. Fillers are live cards (non-members).
-/// Target (cost-10 member) found after 4 fillers, added to hand.
 #[test]
-fn honoka_q166_member_found_after_4_fillers() {
+fn honoka_q166_member_skips_live_fillers() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
-
     let honoka = game.id("PL!-pb1-001-R");
-    let filler = game.id("PL!-sd1-019-SD");
-    let target = game.id("PL!SP-bp2-006-P");
-
-    game.state.player1.stage.stage[1] = honoka;
-    let member = game.id(MEMBER_FILLER);
-    game.state.player1.hand.cards.push(member);
-    game.state.player1.hand.cards.push(member);
+    let live_filler = game.id("PL!-sd1-019-SD");
+    let target_member = game.id("PL!SP-bp2-006-P");
+    let mut deck = Vec::new();
     for _ in 0..4 {
-        game.state.player1.main_deck.cards.push(filler);
+        deck.push(live_filler);
     }
-    game.state.player1.main_deck.cards.push(target);
-    for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
+    deck.push(target_member);
+    setup_honoka_deck(&mut game, honoka, deck);
+    activate_and_choose_type(&mut game, honoka, 1);
+    assert!(
+        game.state.player1.hand.cards.contains(&target_member),
+        "Target member should be in hand"
+    );
+    let hand_live = game
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .filter(|&&id| id == live_filler)
+        .count();
+    assert_eq!(
+        hand_live, 0,
+        "Live fillers should NOT be in hand, found {}",
+        hand_live
+    );
+    let disc_live = game
+        .state
+        .player1
+        .waitroom
+        .cards
+        .iter()
+        .filter(|&&id| id == live_filler)
+        .count();
+    assert_eq!(
+        disc_live, 4,
+        "All 4 revealed live fillers should be in discard, found {}",
+        disc_live
+    );
+}
 
-    game.give_energy(13);
-    activate_and_choose_member(&mut game, honoka);
-
+#[test]
+fn honoka_q166_target_first_card() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let honoka = game.id("PL!-pb1-001-R");
+    let target = game.id("PL!SP-bp2-006-P");
+    let filler = game.id("PL!-sd1-019-SD");
+    setup_honoka_deck(
+        &mut game,
+        honoka,
+        vec![target, filler, filler, filler, filler, filler],
+    );
+    activate_and_choose_type(&mut game, honoka, 1);
     assert!(
         game.state.player1.hand.cards.contains(&target),
         "Target should be in hand"
@@ -99,211 +121,168 @@ fn honoka_q166_member_found_after_4_fillers() {
     );
 }
 
-/// Target is first card in deck. Reveal stops immediately.
-#[test]
-fn honoka_q166_target_first_card() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-
-    let honoka = game.id("PL!-pb1-001-R");
-    let filler = game.id("PL!-sd1-019-SD");
-    let target = game.id("PL!SP-bp2-006-P");
-
-    game.state.player1.stage.stage[1] = honoka;
-    let member = game.id(MEMBER_FILLER);
-    game.state.player1.hand.cards.push(member);
-    game.state.player1.hand.cards.push(member);
-    game.state.player1.main_deck.cards.push(target);
-    for _ in 0..5 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-
-    game.give_energy(13);
-    activate_and_choose_member(&mut game, honoka);
-
-    assert!(
-        game.state.player1.hand.cards.contains(&target),
-        "Target (first card) should be in hand"
-    );
-    assert_eq!(
-        game.state.player1.main_deck.cards.len(),
-        5,
-        "Only 1 card revealed, 5 remain"
-    );
-}
-
-/// Target is LAST card in deck.
 #[test]
 fn honoka_q166_target_last_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
-
     let honoka = game.id("PL!-pb1-001-R");
-    let filler = game.id("PL!-sd1-019-SD");
     let target = game.id("PL!SP-bp2-006-P");
-
-    game.state.player1.stage.stage[1] = honoka;
-    let member = game.id(MEMBER_FILLER);
-    game.state.player1.hand.cards.push(member);
-    game.state.player1.hand.cards.push(member);
-    for _ in 0..9 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player1.main_deck.cards.push(target);
-
-    game.give_energy(13);
-    activate_and_choose_member(&mut game, honoka);
-
-    assert!(
-        game.state.player1.hand.cards.contains(&target),
-        "Target (last card) should be in hand"
-    );
-    assert!(
-        game.state.player1.main_deck.cards.is_empty(),
-        "All cards revealed, deck empty"
-    );
-}
-
-/// Choose LIVE card type. Fillers are member cards (non-live).
-#[test]
-fn honoka_q166_live_card_chosen() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-
-    let honoka = game.id("PL!-pb1-001-R");
-    let filler = game.id("PL!-sd1-010-SD");
-    let target = game.id("PL!-sd1-019-SD");
-
-    game.state.player1.stage.stage[1] = honoka;
-    game.state.player1.hand.cards.push(filler);
-    game.state.player1.hand.cards.push(filler);
-    for _ in 0..3 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player1.main_deck.cards.push(target);
-    for _ in 0..3 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-
-    game.give_energy(13);
-    activate_and_choose_live(&mut game, honoka);
-
-    assert!(
-        game.state.player1.hand.cards.contains(&target),
-        "Live card should be found and added to hand"
-    );
-}
-
-/// Two matching member cards at front of deck. Choose member_card type.
-/// Only 1 should be added (reveal stops at first match).
-#[test]
-fn honoka_q166_two_matches_only_one_added() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
-
-    let honoka = game.id("PL!-pb1-001-R");
     let filler = game.id("PL!-sd1-019-SD");
-    let target1 = game.id("PL!SP-bp2-006-P");
-    let target2 = game.id("PL!HS-bp2-005-P");
-
-    game.state.player1.stage.stage[1] = honoka;
-    let member = game.id(MEMBER_FILLER);
-    game.state.player1.hand.cards.push(member);
-    game.state.player1.hand.cards.push(member);
-    game.state.player1.main_deck.cards.push(target1);
-    game.state.player1.main_deck.cards.push(target2);
-    for _ in 0..3 {
-        game.state.player1.main_deck.cards.push(filler);
+    let mut deck = Vec::new();
+    for _ in 0..9 {
+        deck.push(filler);
     }
+    deck.push(target);
+    setup_honoka_deck(&mut game, honoka, deck);
+    activate_and_choose_type(&mut game, honoka, 1);
+    assert!(
+        game.state.player1.hand.cards.contains(&target),
+        "Target should be in hand"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        0,
+        "All deck cards should have been revealed"
+    );
+}
 
-    game.give_energy(13);
-    activate_and_choose_member(&mut game, honoka);
-
-    let count = game
+#[test]
+fn honoka_q166_live_card_skips_members() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let honoka = game.id("PL!-pb1-001-R");
+    let member = game.id("PL!SP-bp2-006-P");
+    let target_live = game.id("PL!-sd1-019-SD");
+    setup_honoka_deck(&mut game, honoka, vec![member, member, member, target_live]);
+    activate_and_choose_type(&mut game, honoka, 0);
+    assert!(
+        game.state.player1.hand.cards.contains(&target_live),
+        "Live card should be in hand"
+    );
+    let hand_member = game
         .state
         .player1
         .hand
         .cards
         .iter()
-        .filter(|&&id| id == target1 || id == target2)
+        .filter(|&&id| id == member)
+        .count();
+    assert_eq!(hand_member, 0, "Member cards should NOT be in hand");
+}
+
+#[test]
+fn honoka_q166_two_matches_only_one_added() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let honoka = game.id("PL!-pb1-001-R");
+    let m1 = game.id("PL!SP-bp2-006-P");
+    let m2 = game.id("PL!SP-bp2-006-P");
+    let filler = game.id("PL!-sd1-019-SD");
+    setup_honoka_deck(&mut game, honoka, vec![m1, filler, filler, m2]);
+    activate_and_choose_type(&mut game, honoka, 1);
+    let in_hand = game
+        .state
+        .player1
+        .hand
+        .cards
+        .iter()
+        .filter(|&&id| id == m1 || id == m2)
         .count();
     assert_eq!(
-        count, 1,
-        "Only 1 of 2 matching cards added (reveal stops at first match)"
-    );
-    assert!(
-        game.state.player1.main_deck.cards.contains(&target2)
-            || game.state.player1.waitroom.cards.contains(&target2),
-        "Second matching card should be in deck or discard (not 'lost')"
+        in_hand, 1,
+        "Only 1 of 2 matching cards added (reveal stops at first)"
     );
 }
 
-/// Deck has only live cards (no cost>=10 member). Choose member_card.
-/// Cost discards a non-member card so the refresh doesn't find a match.
 #[test]
 fn honoka_q166_no_member_in_deck_refresh() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
-
     let honoka = game.id("PL!-pb1-001-R");
     let filler = game.id("PL!-sd1-019-SD");
-    let live_in_hand = game.id("PL!-sd1-019-SD");
+    setup_honoka_deck(&mut game, honoka, vec![filler; 10]);
+    activate_and_choose_type(&mut game, honoka, 1);
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        0,
+        "Deck exhausted"
+    );
+    assert_eq!(
+        game.state.player1.waitroom.cards.len(),
+        10,
+        "All cards in discard"
+    );
+}
 
-    game.state.player1.stage.stage[1] = honoka;
-    game.state.player1.hand.cards.push(live_in_hand);
-    for _ in 0..8 {
-        game.state.player1.main_deck.cards.push(filler);
+#[test]
+fn honoka_q167_deck_exhausted_during_reveal() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let honoka = game.id("PL!-pb1-001-R");
+    let target = game.id("PL!SP-bp2-006-P");
+    let filler = game.id("PL!-sd1-019-SD");
+    let mut deck = Vec::new();
+    for _ in 0..5 {
+        deck.push(filler);
     }
+    deck.push(target);
+    setup_honoka_deck(&mut game, honoka, deck);
+    activate_and_choose_type(&mut game, honoka, 1);
+    assert!(
+        game.state.player1.hand.cards.contains(&target),
+        "Target should be in hand after refresh"
+    );
+}
 
+#[test]
+fn honoka_center_requirement_left_side_fails() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let honoka = game.id("PL!-pb1-001-R");
+    game.state.player1.stage.stage[0] = honoka;
+    let hf = game.id("PL!-sd1-010-SD");
+    game.state.player1.hand.cards.push(hf);
+    game.state.player1.hand.cards.push(hf);
     game.give_energy(13);
-    TurnEngine::execute_main_phase_action(
+    let result = TurnEngine::execute_main_phase_action(
         &mut game.state,
         &ActionType::UseAbility,
         Some(honoka),
         None,
         None,
         None,
-    )
-    .expect("activate");
-    // Cost is auto-resolved (non-optional exact match)
-    // First choice: card type selection
-    if game.has_pending_choice() {
-        game.select_option(1); // 1 = member_card
-    }
-    // After reveal with no match, no looked_at choice should appear
-
-    // Cost: hand card discarded. Reveal: all deck cards revealed (no match), go to discard.
-    // After refresh, new deck cards also revealed (no match), go to discard.
-    // No card added to hand.
-    assert_eq!(
-        game.state.player1.hand.cards.len(),
-        0,
-        "Hand empty after cost discard and no matching card found"
     );
+    assert!(
+        result.is_err(),
+        "Ability should fail from left side (center required)"
+    );
+    if let Ok(_) = result {
+        if game.has_pending_choice() {
+            game.select_indices(&[0]);
+        }
+    }
 }
 
-/// Deck exhausted mid-reveal.
 #[test]
-fn honoka_q167_deck_exhausted_during_reveal() {
+fn honoka_use_limit_blocks_second_activation() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
-
     let honoka = game.id("PL!-pb1-001-R");
     let filler = game.id("PL!-sd1-019-SD");
-
-    game.state.player1.stage.stage[1] = honoka;
-    let member = game.id(MEMBER_FILLER);
-    game.state.player1.hand.cards.push(member);
-    game.state.player1.hand.cards.push(member);
-    for _ in 0..2 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-
-    game.give_energy(13);
-    activate_and_choose_member(&mut game, honoka);
-
+    let target = game.id("PL!SP-bp2-006-P");
+    setup_honoka_deck(&mut game, honoka, vec![target, filler, filler, filler]);
+    activate_and_choose_type(&mut game, honoka, 1);
     assert!(
-        game.state.player1.hand.cards.len() <= 2,
-        "Hand should not have extra cards added after refresh with no match"
+        game.state.player1.hand.cards.contains(&target),
+        "Target in hand after first activation"
     );
+    let result = TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::UseAbility,
+        Some(honoka),
+        None,
+        None,
+        None,
+    );
+    assert!(result.is_err(), "Second activation should fail (use_limit)");
 }

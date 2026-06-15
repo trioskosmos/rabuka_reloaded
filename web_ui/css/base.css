@@ -1,3 +1,11 @@
+@import './layout.css';
+@import './cards.css';
+@import './components.css';
+@import './modals.css';
+@import './performance.css';
+@import './log_styles.css';
+@import './deck_validation.css';
+
 :root {
     /* --- Brand & Theme Colors --- */
     --bg-primary: #0f141e;
@@ -156,3 +164,10 @@ body {
 /* All component selectors are implicitly scoped by HTML structure hierarchy,
    which is fine since the app uses semantic class names and explicit
    descendant selectors. No additional prefixing needed. */
+
+@import './cards.css';
+@import './components.css';
+@import './modals.css';
+@import './performance.css';
+@import './log_styles.css';
+@import './deck_validation.css';

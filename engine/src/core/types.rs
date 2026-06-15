@@ -31,14 +31,14 @@ impl std::fmt::Display for TurnPhase {
 pub enum Phase {
     RockPaperScissors,
     ChooseFirstAttacker,
-    MulliganP1Turn,
-    MulliganP2Turn,
+    MulliganFirstAttacker,
+    MulliganSecondAttacker,
     Active,
     Energy,
     Draw,
     Main,
-    LiveCardSetP1Turn,
-    LiveCardSetP2Turn,
+    LiveCardSetFirstAttacker,
+    LiveCardSetSecondAttacker,
     FirstAttackerPerformance,
     SecondAttackerPerformance,
     LiveVictoryDetermination,
@@ -49,14 +49,14 @@ impl std::fmt::Display for Phase {
         match self {
             Phase::RockPaperScissors => write!(f, "RockPaperScissors"),
             Phase::ChooseFirstAttacker => write!(f, "ChooseFirstAttacker"),
-            Phase::MulliganP1Turn => write!(f, "MulliganP1Turn"),
-            Phase::MulliganP2Turn => write!(f, "MulliganP2Turn"),
+            Phase::MulliganFirstAttacker => write!(f, "MulliganFirstAttacker"),
+            Phase::MulliganSecondAttacker => write!(f, "MulliganSecondAttacker"),
             Phase::Active => write!(f, "Active"),
             Phase::Energy => write!(f, "Energy"),
             Phase::Draw => write!(f, "Draw"),
             Phase::Main => write!(f, "Main"),
-            Phase::LiveCardSetP1Turn => write!(f, "LiveCardSetP1Turn"),
-            Phase::LiveCardSetP2Turn => write!(f, "LiveCardSetP2Turn"),
+            Phase::LiveCardSetFirstAttacker => write!(f, "LiveCardSetFirstAttacker"),
+            Phase::LiveCardSetSecondAttacker => write!(f, "LiveCardSetSecondAttacker"),
             Phase::FirstAttackerPerformance => write!(f, "FirstAttackerPerformance"),
             Phase::SecondAttackerPerformance => write!(f, "SecondAttackerPerformance"),
             Phase::LiveVictoryDetermination => write!(f, "LiveVictoryDetermination"),
@@ -118,6 +118,7 @@ pub struct LivePerformanceData {
     pub heart_sources: Vec<HeartSource>,
     pub blade_sources: Vec<BladeSource>,
     pub draw_effects_occurred: bool,
+    pub live_card_ids: Vec<i16>,
 }
 
 // ============== PERFORMANCE SNAPSHOT ==============
@@ -232,6 +233,9 @@ pub struct TriggeredAbility {
     pub source_card_id: i16,
     pub name: String,
     pub card_name: String,
+    pub effect_text: String,
+    pub condition_text: Option<String>,
+    pub is_public: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

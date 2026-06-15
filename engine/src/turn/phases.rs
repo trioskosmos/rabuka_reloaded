@@ -10,7 +10,7 @@ impl super::TurnEngine {
 
         if matches!(
             game_state.current_phase,
-            Phase::MulliganP1Turn | Phase::MulliganP2Turn
+            Phase::MulliganFirstAttacker | Phase::MulliganSecondAttacker
         ) {
             return;
         }
@@ -21,10 +21,21 @@ impl super::TurnEngine {
             match game_state.current_phase {
                 Phase::Active => {
                     game_state.reset_keyword_tracking();
-                    game_state.reset_keyword_tracking();
                     game_state.recalculate_constants();
                     // Rule 7.4.1: Only the turn player activates their wait cards
-                    let to_activate: Vec<i16> = {
+                    // Check if the turn player's activation is restricted
+                    let turn_player_id = &game_state.active_player().id.clone();
+                    let is_activation_blocked = game_state
+                        .cannot_activate_members
+                        .iter()
+                        .any(|t| t == turn_player_id)
+                        || game_state
+                            .constant_cannot_activate_members
+                            .iter()
+                            .any(|t| t == turn_player_id);
+                    let to_activate: Vec<i16> = if is_activation_blocked {
+                        Vec::new()
+                    } else {
                         let turn_player = game_state.active_player();
                         turn_player
                             .stage
@@ -74,30 +85,22 @@ impl super::TurnEngine {
                         game_state.current_phase = Phase::Active;
                     } else {
                         game_state.current_turn_phase = crate::game_state::TurnPhase::Live;
-                        game_state.current_phase = if game_state.player1.is_first_attacker {
-                            Phase::LiveCardSetP1Turn
-                        } else {
-                            Phase::LiveCardSetP2Turn
-                        };
+                        game_state.current_phase = Phase::LiveCardSetFirstAttacker;
                     }
                 }
                 _ => {}
             }
         } else if game_state.current_turn_phase == crate::game_state::TurnPhase::Live {
             match game_state.current_phase {
-                Phase::LiveCardSetP1Turn => {
-                    game_state.current_phase = Phase::LiveCardSetP2Turn;
+                Phase::LiveCardSetFirstAttacker => {
+                    game_state.current_phase = Phase::LiveCardSetSecondAttacker;
                     return;
                 }
-                Phase::LiveCardSetP2Turn => {
+                Phase::LiveCardSetSecondAttacker => {
                     game_state.recalculate_constants();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::FirstAttackerPerformance;
-                    let first_attacker_id = if game_state.player1.is_first_attacker {
-                        game_state.player1.id.clone()
-                    } else {
-                        game_state.player2.id.clone()
-                    };
+                    let first_attacker_id = game_state.first_attacker().id.clone();
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
                     game_state.process_pending_auto_abilities(&first_attacker_id);
                     return;
@@ -109,7 +112,7 @@ impl super::TurnEngine {
                 }
                 Phase::LiveVictoryDetermination => {
                     Self::execute_live_victory_determination(game_state);
-                    if game_state.pending_choice.is_some() {
+                    if game_state.has_pending_choice() {
                         return;
                     }
                     game_state.clear_revealed_cards();
@@ -134,7 +137,8 @@ impl super::TurnEngine {
         let hm = game_state.mods.heart_modifiers.clone();
         let btm = game_state.mods.blade_type_modifiers.clone();
         let om = game_state.mods.orientation_modifiers.clone();
-
+        let nhm = game_state.mods.need_heart_modifiers.clone();
+        let cannot_live = game_state.is_action_prohibited("cannot_live");
         let player = if is_first {
             game_state.first_attacker_mut()
         } else {
@@ -151,6 +155,8 @@ impl super::TurnEngine {
             &hm,
             &btm,
             &om,
+            &nhm,
+            cannot_live,
         );
         drop(resolution_zone);
 
@@ -160,41 +166,27 @@ impl super::TurnEngine {
             game_state.revealed_cards.push(*cid);
         }
 
-        if is_first {
-            for cid in &perf_data.revealed_ids {
-                game_state.player1_cheer_revealed_cards.push(*cid);
-            }
-            game_state.player1_cheer_blade_heart_count = perf_data.yell_count + note_icons;
-            let snap = crate::turn::live::build_snapshot(
-                turn,
-                &game_state.player1.id,
-                &perf_data,
-                &game_state.card_database,
-                &game_state.player1,
-                note_icons,
-            );
-            game_state.performance_snapshots.push(snap);
-        } else {
-            for cid in &perf_data.revealed_ids {
-                game_state.player2_cheer_revealed_cards.push(*cid);
-            }
-            game_state.player2_cheer_blade_heart_count = perf_data.yell_count + note_icons;
-            let snap = crate::turn::live::build_snapshot(
-                turn,
-                &game_state.player2.id,
-                &perf_data,
-                &game_state.card_database,
-                &game_state.player2,
-                note_icons,
-            );
-            game_state.performance_snapshots.push(snap);
+        for cid in &perf_data.revealed_ids {
+            game_state.cheer_revealed_cards_first(is_first).push(*cid);
         }
-
-        let pid = if is_first {
-            game_state.player1.id.clone()
+        *game_state.cheer_blade_heart_count_mut(is_first) = note_icons;
+        let (perf_player_id, perf_player) = if is_first {
+            let p = game_state.first_attacker();
+            (p.id.clone(), p)
         } else {
-            game_state.player2.id.clone()
+            let p = game_state.second_attacker();
+            (p.id.clone(), p)
         };
+        let snap = crate::turn::live::build_snapshot(
+            turn,
+            &perf_player_id,
+            &perf_data,
+            &game_state.card_database,
+            perf_player,
+            note_icons,
+        );
+        game_state.performance_snapshots.push(snap);
+        let pid = perf_player_id;
         Self::trigger_auto_abilities_for_player(game_state, &pid);
         game_state.process_pending_auto_abilities(&pid);
         if perf_data.draw_effects_occurred {
@@ -216,12 +208,10 @@ impl super::TurnEngine {
         let idx = if let Some(indices) = _card_indices {
             indices.get(0).copied().unwrap_or(0)
         } else if let Some(cid) = card_id {
-            let mulligan_player = match game_state.current_phase {
-                Phase::MulliganP1Turn => &game_state.player1,
-                Phase::MulliganP2Turn => &game_state.player2,
-                _ => &game_state.player1,
-            };
-            mulligan_player.get_card_index_by_id(cid).unwrap_or(0)
+            game_state
+                .active_player()
+                .get_card_index_by_id(cid)
+                .unwrap_or(0)
         } else {
             0
         };
@@ -238,13 +228,15 @@ impl super::TurnEngine {
     }
 
     pub(crate) fn handle_mulligan_confirmation(game_state: &mut GameState) -> Result<(), String> {
-        let mulligan_count = game_state.mulligan_selected_indices.len();
-        let (player, next_phase) = match game_state.current_phase {
-            Phase::MulliganP1Turn => (&mut game_state.player1, Phase::MulliganP2Turn),
-            Phase::MulliganP2Turn => (&mut game_state.player2, Phase::Active),
+        let next_phase = match game_state.current_phase {
+            Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
+            Phase::MulliganSecondAttacker => Phase::Active,
             _ => return Ok(()),
         };
-        for &idx in game_state.mulligan_selected_indices.iter().rev() {
+        let mulligan_indices: Vec<usize> = game_state.mulligan_selected_indices.clone();
+        let mulligan_count = mulligan_indices.len();
+        let player = game_state.active_player_mut();
+        for &idx in mulligan_indices.iter().rev() {
             if idx < player.hand.cards.len() {
                 let card = player.hand.cards.remove(idx);
                 player.main_deck.cards.push(card);
@@ -256,21 +248,19 @@ impl super::TurnEngine {
                 player.hand.add_card(card);
             }
         }
+        game_state.mulligan_selected_indices.clear();
         game_state.current_phase = next_phase;
         println!("Mulligan confirmed: {} cards mulliganed", mulligan_count);
         Ok(())
     }
 
     pub(crate) fn handle_mulligan_skip(game_state: &mut GameState) -> Result<(), String> {
-        match game_state.current_phase {
-            Phase::MulliganP1Turn => {
-                game_state.current_phase = Phase::MulliganP2Turn;
-            }
-            Phase::MulliganP2Turn => {
-                game_state.current_phase = Phase::Active;
-            }
-            _ => {}
-        }
+        game_state.mulligan_selected_indices.clear();
+        game_state.current_phase = match game_state.current_phase {
+            Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
+            Phase::MulliganSecondAttacker => Phase::Active,
+            _ => return Ok(()),
+        };
         Ok(())
     }
 
@@ -296,9 +286,11 @@ impl super::TurnEngine {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn handle_play_member_to_stage(
         game_state: &mut GameState,
         card_id: Option<i16>,
+        card_indices: Option<Vec<usize>>, // For double baton: [area1_idx, area2_idx]
         stage_area: Option<crate::zones::MemberArea>,
         use_baton_touch: Option<bool>,
     ) -> Result<(), String> {
@@ -308,6 +300,11 @@ impl super::TurnEngine {
         }
 
         let card_db = game_state.card_database.clone();
+
+        // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
+        // BEFORE paying cost, so the modifiers are in effect.
+        game_state.recalculate_constants();
+
         let player = game_state.active_player_mut();
         let idx = if let Some(cid) = card_id {
             player
@@ -322,29 +319,130 @@ impl super::TurnEngine {
                 .ok_or_else(|| "No member cards in hand".to_string())?
         };
 
-        let area = stage_area.unwrap_or_else(|| {
-            let areas = [
-                crate::zones::MemberArea::LeftSide,
-                crate::zones::MemberArea::Center,
-                crate::zones::MemberArea::RightSide,
-            ];
-            // Prefer empty areas, but if all occupied, auto-select first for baton touch
-            if let Some(empty) = areas.iter().find(|&&a| player.stage.get_area(a).is_none()) {
-                *empty
-            } else if !use_baton_touch {
-                // No empty areas and baton touch not explicitly requested — try it
-                areas[0]
-            } else {
-                areas[0]
-            }
-        });
-
         let card_id = player.hand.cards[idx];
+
+        // Check if double baton: card_indices provides the 2 area indices to replace
+        let double_baton_areas: Option<[crate::zones::MemberArea; 2]> =
+            card_indices.as_ref().and_then(|indices| {
+                if indices.len() == 2 {
+                    let areas = [
+                        crate::zones::MemberArea::LeftSide,
+                        crate::zones::MemberArea::Center,
+                        crate::zones::MemberArea::RightSide,
+                    ];
+                    Some([areas[indices[0]], areas[indices[1]]])
+                } else {
+                    None
+                }
+            });
+
+        let area = if let Some(ref db_areas) = double_baton_areas {
+            // For double baton, stage_area specifies which of the 2 vacated areas to place in
+            stage_area.unwrap_or(db_areas[0])
+        } else {
+            stage_area.unwrap_or_else(|| {
+                let areas = [
+                    crate::zones::MemberArea::LeftSide,
+                    crate::zones::MemberArea::Center,
+                    crate::zones::MemberArea::RightSide,
+                ];
+                if let Some(empty) = areas.iter().find(|&&a| player.stage.get_area(a).is_none()) {
+                    *empty
+                } else if !use_baton_touch {
+                    areas[0]
+                } else {
+                    areas[0]
+                }
+            })
+        };
+
         let card_no = card_db
             .get_card(card_id)
             .map(|c| c.card_no.clone())
             .unwrap_or_default();
         let player_id = player.id.clone();
+
+        // Check if this card has play_baton_touch with count > 1 (double baton touch)
+        let has_double_baton = double_baton_areas.is_some()
+            || card_db.get_card(card_id).map_or(false, |c| {
+                c.abilities.iter().any(|a| {
+                    a.effect.as_ref().map_or(false, |ef| {
+                        ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
+                    })
+                })
+            });
+
+        // If double baton with explicit areas, replace ALL specified members BEFORE placing the card
+        if let Some(db_areas) = double_baton_areas {
+            // Replace both specified members first
+            let double_replaced_ids: Vec<i16> = {
+                let player = game_state.active_player_mut();
+                let mut replaced = Vec::new();
+                for &area2 in &db_areas {
+                    if let Some(existing_card_id) = player.stage.get_area(area2) {
+                        let _ = player
+                            .remove_member_from_stage_with_recycling(area2 as usize, &card_db);
+                        player.waitroom.cards.push(existing_card_id);
+                        replaced.push(existing_card_id);
+                    }
+                }
+                replaced
+            };
+            // Track the non-placement vacated area for empty_area deployment
+            let other_vacated = if db_areas[0] != area {
+                Some(db_areas[0] as usize)
+            } else {
+                Some(db_areas[1] as usize)
+            };
+            game_state.last_vacated_stage_area = other_vacated;
+            // Remove card from hand
+            let player = game_state.active_player_mut();
+            player.hand.cards.remove(idx);
+            // Place card in chosen placement area
+            player.stage.stage[area as usize] = card_id;
+            game_state.record_card_movement(card_id);
+            // Record 2 baton touches
+            for _ in 0..2 {
+                game_state.record_baton_touch();
+            }
+            game_state.baton_touch_replaced_member_id =
+                double_baton_areas.as_ref().and_then(|_areas| {
+                    let player = game_state.active_player();
+                    player.waitroom.cards.last().copied()
+                });
+            game_state.active_player_mut().debut_count_this_turn += 1;
+            game_state.record_card_appearance(card_id);
+            game_state.baton_touch_arriving_card_id = Some(card_id);
+
+            Self::trigger_debut_abilities(
+                game_state, &player_id, &card_no, 0,    // cost_paid
+                true, // baton_touch_used
+            );
+            Self::trigger_auto_abilities_for_player(game_state, &player_id);
+            for &replaced_id in &double_replaced_ids {
+                Self::trigger_discard_auto_abilities(game_state, &player_id, replaced_id);
+            }
+            game_state.process_pending_auto_abilities(&player_id);
+            game_state.recalculate_constants();
+
+            for area in [
+                crate::zones::MemberArea::LeftSide,
+                crate::zones::MemberArea::Center,
+                crate::zones::MemberArea::RightSide,
+            ] {
+                if game_state.active_player().stage.get_area(area).is_none() {
+                    game_state
+                        .active_player_mut()
+                        .areas_locked_this_turn
+                        .insert(area);
+                }
+            }
+
+            eprintln!("[TRACK_MOVE] card_id={} player_id={}", card_id, player_id);
+            game_state.last_area_move_card_id = Some(card_id);
+            game_state.last_area_move_by_player = Some(player_id.clone());
+            return Ok(());
+        }
 
         let (cost_paid, baton_touch_used, replaced_member_cost, replaced_member_id) =
             player.move_card_from_hand_to_stage(idx, area, use_baton_touch, &card_db)?;
@@ -359,6 +457,42 @@ impl super::TurnEngine {
         if baton_touch_used {
             game_state.record_baton_touch();
             game_state.baton_touch_arriving_card_id = Some(card_id);
+            if has_double_baton {
+                let second_area = {
+                    let player = game_state.active_player();
+                    let areas = [
+                        crate::zones::MemberArea::LeftSide,
+                        crate::zones::MemberArea::Center,
+                        crate::zones::MemberArea::RightSide,
+                    ];
+                    areas
+                        .iter()
+                        .find(|&&a| {
+                            a != area
+                                && !player.areas_locked_this_turn.contains(&a)
+                                && player.stage.get_area(a).is_some()
+                        })
+                        .copied()
+                };
+                // Track the second vacated area for empty_area deployment
+                let other_vacated = second_area.map(|a| a as usize);
+                if let Some(area2) = second_area {
+                    let existing_card_id = {
+                        let player = game_state.active_player();
+                        player.stage.get_area(area2)
+                    };
+                    if let Some(eid) = existing_card_id {
+                        let player = game_state.active_player_mut();
+                        let _ = player
+                            .remove_member_from_stage_with_recycling(area2 as usize, &card_db);
+                        player.waitroom.cards.push(eid);
+                    }
+                    game_state.record_baton_touch();
+                    game_state.baton_touch_replaced_member_id =
+                        Some(replaced_member_id.unwrap_or(-1));
+                }
+                game_state.last_vacated_stage_area = other_vacated;
+            }
         }
 
         // Track area move for movement_condition "moves"
@@ -386,6 +520,7 @@ impl super::TurnEngine {
                 let card_no = if let Some(card_id) = game_state.active_player().stage.get_area(area)
                 {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
+                        let bt_card_id = card_id;
                         card.abilities
                             .iter()
                             .filter(|ability| {
@@ -398,6 +533,7 @@ impl super::TurnEngine {
                                 (
                                     format!("{}_{}", card.card_no, ability.full_text),
                                     card.card_no.clone(),
+                                    bt_card_id,
                                 )
                             })
                             .collect()
@@ -407,61 +543,69 @@ impl super::TurnEngine {
                 } else {
                     Vec::new()
                 };
-                for (ability_id, card_no) in card_no {
+                for (ability_id, card_no, bt_card_id) in card_no {
                     game_state.trigger_auto_ability(
                         ability_id,
                         crate::game_state::AbilityTrigger::Debut,
                         player_id.clone(),
                         Some(card_no),
-                        None,
+                        Some(bt_card_id),
                     );
                 }
             }
         }
 
-        // Check the replaced (baton-touched) member's auto abilities for movement triggers.
-        // e.g. "when baton-touched to waitroom by cost 10+ 蓮ノ空 → activate 2 energy"
+        // Check the replaced member's auto abilities for movement triggers.
         if let Some(replaced_id) = replaced_member_id {
-            let abilities: Vec<(String, String)> = game_state
-                .card_database
-                .get_card(replaced_id)
-                .map(|card| {
-                    card.abilities
-                        .iter()
-                        .filter(|ability| {
-                            ability
-                                .triggers
-                                .as_ref()
-                                .map_or(false, |t| t == crate::triggers::AUTO)
-                                && ability
-                                    .effect
-                                    .as_ref()
-                                    .and_then(|e| e.condition.as_ref())
-                                    .and_then(|c| c.location.as_deref())
-                                    .map_or(false, |loc| loc == "discard" || loc == "waitroom")
-                        })
-                        .map(|ability| {
-                            (
-                                format!("{}_{}", card.card_no, ability.full_text),
-                                card.card_no.clone(),
-                            )
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            for (ability_id, card_no) in abilities {
-                game_state.trigger_auto_ability(
-                    ability_id,
-                    crate::game_state::AbilityTrigger::Auto,
-                    player_id.clone(),
-                    Some(card_no),
-                    None,
-                );
-            }
+            Self::trigger_discard_auto_abilities(game_state, &player_id, replaced_id);
             game_state.process_pending_auto_abilities(&player_id);
         }
 
         Ok(())
+    }
+
+    /// Trigger auto abilities for a card that was placed in discard/waitroom from stage.
+    /// Checks the card's auto abilities for discard/waitroom location conditions.
+    pub fn trigger_discard_auto_abilities(
+        game_state: &mut GameState,
+        player_id: &str,
+        card_id: i16,
+    ) {
+        let abilities: Vec<(String, String)> = game_state
+            .card_database
+            .get_card(card_id)
+            .map(|card| {
+                card.abilities
+                    .iter()
+                    .filter(|ability| {
+                        ability.triggers.as_deref() == Some(crate::triggers::AUTO)
+                            && ability
+                                .effect
+                                .as_ref()
+                                .and_then(|e| e.condition.as_ref())
+                                .map_or(false, |c| {
+                                    c.location.as_deref() == Some("discard")
+                                        || c.location.as_deref() == Some("waitroom")
+                                })
+                    })
+                    .map(|ability| {
+                        (
+                            format!("{}_{}", card.card_no, ability.full_text),
+                            card.card_no.clone(),
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (ability_id, card_no) in abilities {
+            game_state.trigger_auto_ability(
+                ability_id,
+                crate::game_state::AbilityTrigger::Auto,
+                player_id.to_string(),
+                Some(card_no),
+                Some(card_id),
+            );
+        }
     }
 
     pub fn setup_initial_energy(game_state: &mut GameState) {

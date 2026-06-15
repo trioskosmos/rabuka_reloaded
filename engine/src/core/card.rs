@@ -451,6 +451,11 @@ pub struct AbilityCost {
     pub placement_order: Option<String>,
     #[serde(default)]
     pub shuffle: Option<bool>,
+    /// Effect that fires instead when this optional cost is skipped ("unless you pay").
+    #[serde(default)]
+    pub alternative_effect: Option<Box<AbilityEffect>>,
+    #[serde(default)]
+    pub any_number: Option<bool>,
 }
 
 /// Grouped sub-effect fields used by compound action handlers
@@ -503,6 +508,8 @@ pub struct AbilityEffect {
     pub effect_constraint: Option<String>,
     pub resource_icon_count: Option<u32>,
     pub ability_gain: Option<String>,
+    #[serde(default)]
+    pub gained_effect: Option<Box<AbilityEffect>>,
     pub quoted_text: Option<QuotedText>,
     pub per_unit: Option<bool>,
     pub condition: Option<Condition>,
@@ -541,10 +548,23 @@ pub struct AbilityEffect {
     pub cost_limit: Option<u32>,
     #[serde(default)]
     pub cost_limit_operator: Option<String>,
+    /// Sum-total cost constraint (e.g. "total cost ≤ 4")
+    #[serde(default)]
+    pub cost_total: Option<u32>,
+    #[serde(default)]
+    pub cost_total_operator: Option<String>,
     #[serde(default)]
     pub any_number: Option<bool>,
     #[serde(default)]
     pub discard_remaining: Option<bool>,
+    /// Required hearts sum filter (e.g. "total need_heart ≥ 8")
+    #[serde(default)]
+    pub need_heart_total: Option<u32>,
+    #[serde(default)]
+    pub need_heart_operator: Option<String>,
+    /// Per-color need_heart filter (e.g. "heart06 >= 3")
+    #[serde(default)]
+    pub need_heart_color: Option<String>,
     #[serde(default)]
     pub reveal: Option<bool>,
     pub distinct: Option<String>,
@@ -634,6 +654,10 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub location: Option<String>,
     #[serde(default)]
+    pub source_location: Option<String>,
+    #[serde(default)]
+    pub trigger_filter: Option<Vec<String>>,
+    #[serde(default)]
     pub multiple_targets: Option<bool>,
     #[serde(default)]
     pub question: Option<String>,
@@ -663,12 +687,26 @@ pub struct AbilityEffect {
     /// "元々持つ" — refers to original/natural value, not current modified value
     #[serde(default)]
     pub original_value: Option<bool>,
+    /// "この効果は重複しない" — this effect does not stack with copies of itself
+    #[serde(default)]
+    pub non_stackable: Option<bool>,
+    /// Delayed restriction — applied at a later timing (e.g. アクティブしない)
+    #[serde(default)]
+    pub delayed: Option<bool>,
+    /// Blind selection: "見ないで" — the selecting player should not see card identities
+    #[serde(default)]
+    pub blind: Option<bool>,
     /// Dynamic group reference (same_group_name, different_group_names)
     #[serde(default)]
     pub group_reference: Option<String>,
     /// Conditional trigger for each_time / たび patterns (e.g. OR conditions)
     #[serde(default)]
     pub trigger_condition: Option<Box<Condition>>,
+    /// Original blade limit filter (元々持つブレードの数)
+    #[serde(default)]
+    pub blade_limit: Option<u32>,
+    #[serde(default)]
+    pub blade_limit_operator: Option<String>,
 }
 
 impl AbilityEffect {
@@ -767,6 +805,7 @@ pub struct Condition {
     pub negation: Option<bool>,
     pub baton_touch_trigger: Option<bool>,
     pub baton_touch_source: Option<String>,
+    pub min_baton_touch_count: Option<u32>,
     pub movement_state: Option<String>,
     pub energy_state: Option<String>,
     pub comparison_target: Option<String>,
@@ -784,6 +823,8 @@ pub struct Condition {
     pub all_areas: Option<bool>,
     pub no_excess_heart: Option<bool>,
     pub resource_type: Option<String>,
+    pub turn_number: Option<u32>,
+    pub activation_position: Option<String>,
     pub all: Option<bool>,
     pub unit: Option<String>,
     pub values: Option<Vec<u32>>,
@@ -804,9 +845,20 @@ pub struct Condition {
     /// Heart colors required collectively from stage members (e.g. all 6 colors)
     #[serde(default)]
     pub heart_colors: Option<Vec<String>>,
-    /// ability_negation flag for "能力を持たない" (does not have ability) conditions
+    /// ability_filter: "no_ability" for "能力を持たない" (card does not have abilities)
+    /// or "has_ability" for "能力を持つ" (card has abilities)
+    /// or "no_ability_type" for "能力も...能力も持たない" (card has neither type)
     #[serde(default)]
-    pub ability_negation: Option<bool>,
+    pub ability_filter: Option<String>,
+    /// Trigger types excluded by ability_filter (e.g. ["live_start", "live_success"])
+    /// Used when ability_filter is "no_ability_type"
+    #[serde(default)]
+    pub ability_filter_triggers: Option<Vec<String>>,
+    /// Sum-total cost comparison value (e.g. "コストの合計がN")
+    #[serde(default)]
+    pub cost_total: Option<u32>,
+    #[serde(default)]
+    pub cost_total_operator: Option<String>,
     /// "元々持つ" — compare against original/natural value, not current modified value
     #[serde(default)]
     pub original_value: Option<bool>,
@@ -826,6 +878,15 @@ pub struct Condition {
     /// "エネルギーが置かれた" — trigger is specifically about energy being placed in the energy zone.
     #[serde(default)]
     pub energy_placed: Option<bool>,
+    /// Cost comparison between characters: 「A」よりコストの(大きい|高い)「B」
+    /// When set, the subject character (characters list) must have cost greater
+    /// than cost_reference_character on the target's stage.
+    #[serde(default)]
+    pub cost_reference_character: Option<String>,
+    #[serde(default)]
+    pub cost_reference_operator: Option<String>,
+    #[serde(default)]
+    pub cost_reference_type: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -865,8 +926,59 @@ impl Card {
         }
     }
 
+    /// Total required hearts (sum of all need_heart values).
+    pub fn need_heart_total(&self) -> u32 {
+        self.need_heart
+            .as_ref()
+            .map(|nh| nh.hearts.values().sum())
+            .unwrap_or(0)
+    }
+
     pub fn has_blade_heart(&self) -> bool {
         self.blade_heart.is_some() || self.blade > 0
+    }
+
+    /// Check if a given need_heart is satisfied by provided hearts.
+    /// This is identical to satisfies_heart_requirement but allows an
+    /// externally-adjusted need_heart (e.g. with modifiers applied).
+    pub fn need_heart_satisfied(need: &BaseHeart, provided_hearts: &BaseHeart) -> bool {
+        if need.hearts.is_empty() {
+            return true;
+        }
+        let mut wildcard_remaining = *provided_hearts
+            .hearts
+            .get(&HeartColor::Heart00)
+            .unwrap_or(&0) as i32;
+        // Track remaining hearts per color. As specific colors are fulfilled,
+        // the used hearts are deducted from this map so that the heart0 check
+        // sees only hearts that have NOT already been allocated.
+        let mut remaining = provided_hearts.hearts.clone();
+        for (color, &needed_amount) in &need.hearts {
+            if *color == HeartColor::Heart00 {
+                // heart0: sum of specific-color hearts that are still available
+                // (not yet consumed by heart01–heart06 requirements)
+                let leftover_sum: i32 = remaining
+                    .iter()
+                    .filter(|(c, _)| **c != HeartColor::Heart00)
+                    .map(|(_, v)| *v as i32)
+                    .sum();
+                if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
+                    return false;
+                }
+            } else {
+                let provided = *remaining.get(color).unwrap_or(&0) as i32;
+                if provided + wildcard_remaining < needed_amount as i32 {
+                    return false;
+                }
+                let shortfall = (needed_amount as i32 - provided).max(0);
+                wildcard_remaining -= shortfall;
+                let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
+                if let Some(rem) = remaining.get_mut(color) {
+                    *rem -= consumed;
+                }
+            }
+        }
+        true
     }
 
     pub fn satisfies_heart_requirement(&self, provided_hearts: &BaseHeart) -> bool {
@@ -877,21 +989,29 @@ impl Card {
                 .hearts
                 .get(&HeartColor::Heart00)
                 .unwrap_or(&0) as i32;
-            let total_all: i32 = provided_hearts.hearts.values().sum::<u32>() as i32;
+            let mut remaining = provided_hearts.hearts.clone();
 
             for (color, &needed_amount) in &need_heart.hearts {
                 if *color == HeartColor::Heart00 {
-                    // heart0: total hearts of any color (Rule 8.2.8) — specific color hearts also count
-                    if total_all + wildcard_remaining.max(0) < needed_amount as i32 {
+                    let leftover_sum: i32 = remaining
+                        .iter()
+                        .filter(|(c, _)| **c != HeartColor::Heart00)
+                        .map(|(_, v)| *v as i32)
+                        .sum();
+                    if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
                         return false;
                     }
                 } else {
-                    let provided = *provided_hearts.hearts.get(color).unwrap_or(&0) as i32;
+                    let provided = *remaining.get(color).unwrap_or(&0) as i32;
                     if provided + wildcard_remaining < needed_amount as i32 {
                         return false;
                     }
                     let shortfall = (needed_amount as i32 - provided).max(0);
                     wildcard_remaining -= shortfall;
+                    let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
+                    if let Some(rem) = remaining.get_mut(color) {
+                        *rem -= consumed;
+                    }
                 }
             }
             true
@@ -913,6 +1033,7 @@ pub fn parse_heart_color(s: &str) -> HeartColor {
         "b_all" => HeartColor::BAll,
         "draw" => HeartColor::Draw,
         "score" => HeartColor::Score,
+        _ if s.starts_with("b_") => parse_heart_color(&s[2..]),
         _ => HeartColor::Heart00,
     }
 }

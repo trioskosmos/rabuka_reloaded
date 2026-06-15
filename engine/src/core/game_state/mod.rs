@@ -3,7 +3,7 @@ use crate::card::CardDatabase;
 use crate::constants::DEFAULT_HISTORY_SIZE;
 use crate::core::game_modifiers::GameModifiers;
 use crate::player::Player;
-use crate::zones::ResolutionZone;
+use crate::zones::{MemberArea, ResolutionZone};
 use std::sync::Arc;
 
 pub use crate::types::{
@@ -22,7 +22,6 @@ pub struct GameState {
     pub card_database: Arc<CardDatabase>,
     pub mods: GameModifiers,
     pub resolution_zone: ResolutionZone,
-    pub pending_choice: Option<serde_json::Value>,
     pub heart_color_decision_phase: String,
     pub game_state_history: Vec<String>,
     pub max_state_history_size: usize,
@@ -32,7 +31,10 @@ pub struct GameState {
     pub live_owned_hearts: std::collections::HashMap<String, Vec<(String, u32)>>,
     pub temporary_effects: Vec<TemporaryEffect>,
     pub prohibition_effects: Vec<String>,
+    pub delayed_prohibition_effects: Vec<String>,
+    pub non_stackable_effects: std::collections::HashSet<String>,
     pub cannot_activate_members: Vec<String>,
+    pub constant_cannot_activate_members: Vec<String>,
     pub turn_limited_abilities_used: std::collections::HashSet<String>,
     pub mulligan_selected_indices: Vec<usize>,
     pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>,
@@ -50,6 +52,7 @@ pub struct GameState {
     pub player2_cheer_revealed_cards: Vec<i16>,
     pub looked_at_cards: Vec<i16>,
     pub recently_moved_cards: Option<Vec<i16>>,
+    pub debut_ability_triggers: Vec<(String, i16)>,
     pub last_vacated_stage_area: Option<usize>,
     // --- 4-byte aligned (u32, Option<i32>) ---
     pub turn_number: u32,
@@ -97,6 +100,8 @@ pub struct GameState {
     pub live_success_triggered_this_turn: bool,
     pub self_no_excess_heart_this_turn: bool,
     pub performance_snapshots: Vec<PerformanceSnapshot>,
+    /// Trace from the last ability resolution (for debugging).
+    pub last_ability_trace: Option<crate::ability::types::AbilityTraceNode>,
 }
 
 impl GameState {
@@ -105,8 +110,8 @@ impl GameState {
             self.current_phase,
             Phase::RockPaperScissors
                 | Phase::ChooseFirstAttacker
-                | Phase::MulliganP1Turn
-                | Phase::MulliganP2Turn
+                | Phase::MulliganFirstAttacker
+                | Phase::MulliganSecondAttacker
         ) {
             return true;
         }
@@ -120,8 +125,8 @@ impl GameState {
             TurnPhase::Live => {
                 matches!(
                     self.current_phase,
-                    Phase::LiveCardSetP1Turn
-                        | Phase::LiveCardSetP2Turn
+                    Phase::LiveCardSetFirstAttacker
+                        | Phase::LiveCardSetSecondAttacker
                         | Phase::FirstAttackerPerformance
                         | Phase::SecondAttackerPerformance
                         | Phase::LiveVictoryDetermination
@@ -138,7 +143,6 @@ impl GameState {
             card_database,
             mods: GameModifiers::new(),
             resolution_zone: ResolutionZone::new(),
-            pending_choice: None,
             heart_color_decision_phase: "none".to_string(),
             game_state_history: Vec::new(),
             max_state_history_size: DEFAULT_HISTORY_SIZE,
@@ -148,7 +152,10 @@ impl GameState {
             live_owned_hearts: std::collections::HashMap::new(),
             temporary_effects: Vec::new(),
             prohibition_effects: Vec::new(),
+            delayed_prohibition_effects: Vec::new(),
+            non_stackable_effects: std::collections::HashSet::new(),
             cannot_activate_members: Vec::new(),
+            constant_cannot_activate_members: Vec::new(),
             turn_limited_abilities_used: std::collections::HashSet::new(),
             mulligan_selected_indices: Vec::new(),
             auto_ability_trigger_counts: std::collections::HashMap::new(),
@@ -166,6 +173,7 @@ impl GameState {
             player2_cheer_revealed_cards: Vec::new(),
             looked_at_cards: Vec::new(),
             recently_moved_cards: None,
+            debut_ability_triggers: Vec::new(),
             last_vacated_stage_area: None,
             // 4-byte aligned
             turn_number: 1,
@@ -210,6 +218,7 @@ impl GameState {
             live_success_triggered_this_turn: false,
             self_no_excess_heart_this_turn: false,
             performance_snapshots: Vec::new(),
+            last_ability_trace: None,
         };
         debug_assert!(
             state.phase_invariant(),
@@ -220,10 +229,10 @@ impl GameState {
 
     pub fn active_player(&self) -> &Player {
         match self.current_phase {
-            Phase::MulliganP1Turn => &self.player1,
-            Phase::MulliganP2Turn => &self.player2,
-            Phase::LiveCardSetP1Turn => &self.player1,
-            Phase::LiveCardSetP2Turn => &self.player2,
+            Phase::MulliganFirstAttacker | Phase::LiveCardSetFirstAttacker => self.first_attacker(),
+            Phase::MulliganSecondAttacker | Phase::LiveCardSetSecondAttacker => {
+                self.second_attacker()
+            }
             _ => match self.current_turn_phase {
                 TurnPhase::FirstAttackerNormal => self.first_attacker(),
                 TurnPhase::SecondAttackerNormal => self.second_attacker(),
@@ -234,10 +243,12 @@ impl GameState {
 
     pub fn active_player_mut(&mut self) -> &mut Player {
         match self.current_phase {
-            Phase::MulliganP1Turn => &mut self.player1,
-            Phase::MulliganP2Turn => &mut self.player2,
-            Phase::LiveCardSetP1Turn => &mut self.player1,
-            Phase::LiveCardSetP2Turn => &mut self.player2,
+            Phase::MulliganFirstAttacker | Phase::LiveCardSetFirstAttacker => {
+                self.first_attacker_mut()
+            }
+            Phase::MulliganSecondAttacker | Phase::LiveCardSetSecondAttacker => {
+                self.second_attacker_mut()
+            }
             _ => match self.current_turn_phase {
                 TurnPhase::FirstAttackerNormal => {
                     if self.player1.is_first_attacker {
@@ -309,6 +320,74 @@ impl GameState {
             &mut self.player2
         } else {
             &mut self.player1
+        }
+    }
+
+    /// Clear tracking fields that transiently live across effect resolution.
+    /// Must be called whenever an ability completes (success or failure) and
+    /// when post-choice state machine exits.
+    pub fn find_card_stage_position(&self, card_id: i16) -> Option<MemberArea> {
+        for (idx, &cid) in self.player1.stage.stage.iter().enumerate() {
+            if cid == card_id {
+                return Some(match idx {
+                    0 => MemberArea::LeftSide,
+                    1 => MemberArea::Center,
+                    2 => MemberArea::RightSide,
+                    _ => unreachable!(),
+                });
+            }
+        }
+        for (idx, &cid) in self.player2.stage.stage.iter().enumerate() {
+            if cid == card_id {
+                return Some(match idx {
+                    0 => MemberArea::LeftSide,
+                    1 => MemberArea::Center,
+                    2 => MemberArea::RightSide,
+                    _ => unreachable!(),
+                });
+            }
+        }
+        None
+    }
+
+    pub fn clear_effect_tracking(&mut self) {
+        self.last_area_move_card_id = None;
+        self.last_area_move_by_player = None;
+        self.last_energy_placed_by_effect = false;
+        self.recently_moved_cards = None;
+        self.mods.last_cost_discard_count = 0;
+    }
+
+    /// Resolve which player's cheer_revealed_cards to use based on ability master.
+    pub fn cheer_revealed_cards_mut(&mut self) -> &mut Vec<i16> {
+        match self.ability_master_id().as_deref() {
+            Some("player2") | Some("p2") => &mut self.player2_cheer_revealed_cards,
+            _ => &mut self.player1_cheer_revealed_cards,
+        }
+    }
+
+    pub fn cheer_revealed_cards(&self) -> &Vec<i16> {
+        match self.ability_master_id().as_deref() {
+            Some("player2") | Some("p2") => &self.player2_cheer_revealed_cards,
+            _ => &self.player1_cheer_revealed_cards,
+        }
+    }
+
+    /// Cheer blade heart count, keyed by first/second attacker.
+    pub fn cheer_blade_heart_count_mut(&mut self, is_first: bool) -> &mut u32 {
+        if is_first {
+            &mut self.player1_cheer_blade_heart_count
+        } else {
+            &mut self.player2_cheer_blade_heart_count
+        }
+    }
+
+    /// Cheer revealed cards, keyed by first/second attacker.
+    pub fn cheer_revealed_cards_first(&mut self, is_first: bool) -> &mut Vec<i16> {
+        if is_first {
+            &mut self.player1_cheer_revealed_cards
+        } else {
+            &mut self.player2_cheer_revealed_cards
         }
     }
 }

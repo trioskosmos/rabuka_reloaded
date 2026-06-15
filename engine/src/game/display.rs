@@ -18,6 +18,7 @@ pub struct CardDisplay {
     pub blade: u32,
     pub total_blade: u32,
     pub id: i16,
+    pub ability_text: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -42,6 +43,26 @@ pub struct PlayerDisplay {
     pub score_modifiers: std::collections::HashMap<i16, i32>,
     #[serde(default)]
     pub total_hearts: Vec<u32>,
+    #[serde(default)]
+    pub live_card_scores: std::collections::HashMap<String, u32>,
+    #[serde(default)]
+    pub gained_abilities: Vec<String>,
+    #[serde(default)]
+    pub active_restrictions: Vec<String>,
+    #[serde(default)]
+    pub need_heart_modifiers: std::collections::HashMap<String, Vec<i32>>,
+    #[serde(default)]
+    pub mulligan_selection: Option<Vec<usize>>,
+    #[serde(default)]
+    pub blade_buffs: Vec<i32>,
+    #[serde(default)]
+    pub heart_buffs: Vec<Vec<i32>>,
+    #[serde(default)]
+    pub cost_reduction: i32,
+    #[serde(default)]
+    pub prevent_baton_touch: i32,
+    #[serde(default)]
+    pub prevent_baton: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -114,6 +135,7 @@ pub fn card_to_display(
                 ((card.blade as i32) + blade_modifier).max(0) as u32
             },
             id: card_id,
+            ability_text: Some(card.ability.clone()),
         }
     })
 }
@@ -196,6 +218,14 @@ pub fn player_to_display(
         std::collections::HashMap<crate::card::HeartColor, i32>,
     >,
     orientation_modifiers: &std::collections::HashMap<i16, String>,
+    gained_abilities: &std::collections::HashMap<i16, Vec<String>>,
+    need_heart_modifiers: &std::collections::HashMap<
+        i16,
+        std::collections::HashMap<crate::card::HeartColor, i32>,
+    >,
+    prohibition_effects: &[String],
+    cannot_activate_members: &[String],
+    mulligan_selection: Option<&[usize]>,
 ) -> PlayerDisplay {
     let energy_cards: Vec<(i16, Option<Orientation>)> = player
         .energy_zone
@@ -270,6 +300,81 @@ pub fn player_to_display(
         }
     }
 
+    // Compute live_card_scores: card_no -> total score
+    let mut live_card_scores = std::collections::HashMap::new();
+    for &cid in &player.live_card_zone.cards {
+        if let Some(card) = card_db.get_card(cid) {
+            let base = card.score.unwrap_or(0);
+            let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
+            live_card_scores.insert(card.card_no.clone(), (base as i32 + bonus).max(0) as u32);
+        }
+    }
+    for &cid in &player.success_live_card_zone.cards {
+        if let Some(card) = card_db.get_card(cid) {
+            let base = card.score.unwrap_or(0);
+            let bonus = score_modifiers.get(&cid).copied().unwrap_or(0);
+            live_card_scores.insert(card.card_no.clone(), (base as i32 + bonus).max(0) as u32);
+        }
+    }
+
+    // Collect gained abilities for this player's cards
+    let player_card_ids: std::collections::HashSet<i16> = player
+        .stage
+        .stage
+        .iter()
+        .chain(&player.hand.cards)
+        .chain(&player.live_card_zone.cards)
+        .chain(&player.success_live_card_zone.cards)
+        .copied()
+        .filter(|&id| id != -1)
+        .collect();
+    let mut my_gained: Vec<String> = Vec::new();
+    for (cid, abilities) in gained_abilities {
+        if player_card_ids.contains(cid) {
+            for a in abilities {
+                my_gained.push(format!("Card#{}: {}", cid, a));
+            }
+        }
+    }
+
+    // Collect need_heart_modifiers for live cards (card_no -> [h00..h06] modifiers)
+    let mut nh_mods = std::collections::HashMap::new();
+    for (&cid, colors) in need_heart_modifiers {
+        if player.live_card_zone.cards.contains(&cid)
+            || player.success_live_card_zone.cards.contains(&cid)
+        {
+            if let Some(card) = card_db.get_card(cid) {
+                let mut arr = vec![0i32; 7];
+                for (color, &val) in colors {
+                    let idx = match color {
+                        crate::card::HeartColor::Heart00 => 0,
+                        crate::card::HeartColor::Heart01 => 1,
+                        crate::card::HeartColor::Heart02 => 2,
+                        crate::card::HeartColor::Heart03 => 3,
+                        crate::card::HeartColor::Heart04 => 4,
+                        crate::card::HeartColor::Heart05 => 5,
+                        crate::card::HeartColor::Heart06 => 6,
+                        _ => continue,
+                    };
+                    arr[idx] = val;
+                }
+                nh_mods.insert(card.card_no.clone(), arr);
+            }
+        }
+    }
+
+    // Collect active restrictions for this player
+    let mut restrictions: Vec<String> = Vec::new();
+    for pe in prohibition_effects.iter() {
+        restrictions.push(pe.clone());
+    }
+    if cannot_activate_members
+        .iter()
+        .any(|t| t == "self" || t == &player.id)
+    {
+        restrictions.push("cannot_activate_members".to_string());
+    }
+
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display(&player.hand.cards, card_db),
@@ -292,6 +397,67 @@ pub fn player_to_display(
             .collect(),
         score_modifiers: score_modifiers.clone(),
         total_hearts,
+        live_card_scores,
+        gained_abilities: my_gained,
+        active_restrictions: restrictions.clone(),
+        need_heart_modifiers: nh_mods,
+        mulligan_selection: mulligan_selection.map(|v| v.to_vec()),
+        // Derive display fields from existing modifier data
+        blade_buffs: player
+            .stage
+            .stage
+            .iter()
+            .map(|&cid| {
+                if cid != -1 {
+                    *blade_modifiers.get(&cid).unwrap_or(&0)
+                } else {
+                    0
+                }
+            })
+            .collect(),
+        heart_buffs: player
+            .stage
+            .stage
+            .iter()
+            .map(|&cid| {
+                if cid == -1 {
+                    return vec![0i32; 6];
+                }
+                let mut arr = vec![0i32; 6];
+                if let Some(card_hm) = heart_modifiers.get(&cid) {
+                    for (color, modifier) in card_hm {
+                        let idx = match color {
+                            crate::card::HeartColor::Heart01 => 0,
+                            crate::card::HeartColor::Heart02 => 1,
+                            crate::card::HeartColor::Heart03 => 2,
+                            crate::card::HeartColor::Heart04 => 3,
+                            crate::card::HeartColor::Heart05 => 4,
+                            crate::card::HeartColor::Heart06 => 5,
+                            _ => continue,
+                        };
+                        arr[idx] = *modifier;
+                    }
+                }
+                arr
+            })
+            .collect(),
+        cost_reduction: 0,
+        prevent_baton_touch: if restrictions
+            .iter()
+            .any(|r| r.contains("cannot_baton") || r.contains("prevent_baton"))
+        {
+            1
+        } else {
+            0
+        },
+        prevent_baton: if restrictions
+            .iter()
+            .any(|r| r.contains("cannot_baton") || r.contains("prevent_baton"))
+        {
+            1
+        } else {
+            0
+        },
     }
 }
 
@@ -299,7 +465,7 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Collect looked-at cards: looked_at_cards + revealed_cards + pending_choice selection cards
     let mut looked_ids: Vec<i16> = game_state.looked_at_cards.clone();
     looked_ids.extend(&game_state.revealed_cards);
-    if let Some(ref pc) = game_state.pending_choice {
+    if let Some(ref pc) = game_state.get_pending_choice_json() {
         if let Some(cards) = pc.get("selection_cards").and_then(|v| v.as_array()) {
             for val in cards {
                 if let Some(id) = val
@@ -318,6 +484,10 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     // Create a mutable copy of rule_log to add ability debug logs
     let mut rule_log = game_state.rule_log.clone();
     AbDebug::flush_to_rule_log(&mut rule_log);
+    // Cap rule_log to prevent unbounded growth
+    if rule_log.len() > 500 {
+        rule_log.drain(0..rule_log.len() - 500);
+    }
 
     // Build performance results (grouped by player_id)
     let perf_history = game_state.performance_snapshots.clone();
@@ -330,6 +500,28 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         perf_results = Some(map);
     }
 
+    let mulligan_player_id = match game_state.current_phase {
+        crate::game_state::Phase::MulliganFirstAttacker => {
+            Some(game_state.first_attacker().id.clone())
+        }
+        crate::game_state::Phase::MulliganSecondAttacker => {
+            Some(if game_state.first_attacker().id == game_state.player1.id {
+                game_state.player2.id.clone()
+            } else {
+                game_state.player1.id.clone()
+            })
+        }
+        _ => None,
+    };
+    let p1_mulligan = mulligan_player_id
+        .as_ref()
+        .map_or(false, |id| *id == game_state.player1.id)
+        .then_some(game_state.mulligan_selected_indices.as_slice());
+    let p2_mulligan = mulligan_player_id
+        .as_ref()
+        .map_or(false, |id| *id == game_state.player2.id)
+        .then_some(game_state.mulligan_selected_indices.as_slice());
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
@@ -340,6 +532,11 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             &game_state.mods.score_modifiers,
             &game_state.mods.heart_modifiers,
             &game_state.mods.orientation_modifiers,
+            &game_state.gained_abilities,
+            &game_state.mods.need_heart_modifiers,
+            &game_state.prohibition_effects,
+            &game_state.cannot_activate_members,
+            p1_mulligan,
         ),
         player2: player_to_display(
             &game_state.player2,
@@ -348,8 +545,13 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             &game_state.mods.score_modifiers,
             &game_state.mods.heart_modifiers,
             &game_state.mods.orientation_modifiers,
+            &game_state.gained_abilities,
+            &game_state.mods.need_heart_modifiers,
+            &game_state.prohibition_effects,
+            &game_state.cannot_activate_members,
+            p2_mulligan,
         ),
-        pending_choice: game_state.pending_choice.clone(),
+        pending_choice: game_state.get_pending_choice_json(),
         looked_cards: zone_to_display(&looked_ids, &game_state.card_database),
         rule_log,
         performance_results: perf_results,

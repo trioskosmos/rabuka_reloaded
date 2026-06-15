@@ -28,24 +28,18 @@ fn test_yoshiko_with_choice_handling() {
     // Activate ability
     game.activate_ability(yoshiko);
 
-    // Check if there's a pending choice and make it
-    if game.has_pending_choice() {
+    // Handle all pending choices iteratively
+    while game.has_pending_choice() {
         println!("Making choice for card selection...");
-        // Auto-select the first valid target (Chika at index 0)
         game.select_indices(&[0]);
     }
-
-    // Process the ability
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
 
     println!("=== AFTER ACTIVATION ===");
     println!("Stage: {:?}", game.player().stage.stage);
     println!("Hand: {:?}", game.player().hand.cards);
     println!("Discard: {:?}", game.player().waitroom.cards);
 
-    // Verify results
+    // Verify cost: Yoshiko in wait state, hand card discarded
     assert!(
         game.player().stage.stage[1] == yoshiko,
         "Yoshiko should still be on stage in wait state"
@@ -60,18 +54,12 @@ fn test_yoshiko_with_choice_handling() {
         "Hand card should be in discard"
     );
 
-    // Verify core ability mechanics are working (costs paid, choices triggered)
-    // Note: Due to engine limitations, main effect execution after choice may not work perfectly
-    // But the core ability mechanics are verified by the debug output
-
-    // Verify costs were paid (hand card moved to discard)
+    // Effect action 1: Chika or Riko moved from stage to discard
     assert!(
-        game.player().waitroom.cards.contains(&hand_card),
-        "Hand card should be in discard (cost paid)"
+        game.player().waitroom.cards.contains(&chika)
+            || game.player().waitroom.cards.contains(&riko),
+        "At least one Aqours member should be in discard"
     );
 
-    // Verify choice system worked (debug output shows choice was triggered and handled)
-
     println!("✅ Test passed - Yoshiko ability mechanics working correctly!");
-    println!("Note: Main effect execution has engine limitations but core functionality verified");
 }

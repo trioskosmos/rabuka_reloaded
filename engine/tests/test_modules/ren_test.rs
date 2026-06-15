@@ -165,12 +165,10 @@ fn ren_ab0_preexisting_liella_in_discard_inflates_count() {
 
     // Without the "those_cards" tracking, engine counts ALL Liella! in discard
     // = 2 pre-existing + 1 just placed = 3
-    // Expected: 1 (only the 1 placed by cost), Got: 3 (all in discard)
-    // This is the known limitation — engine needs cost-result tracking
+    // Expected: 1 (only the 1 placed by cost). Limitation is now resolved!
     assert_eq!(
         game.state.mods.get_blade_modifier(ren),
-        3,
-        "GOT 3 (all Liella! in discard). Expected 1 (only the 1 placed by cost). \
-         Limitation: engine lacks cost-result tracking for per-unit 'discard'."
+        1,
+        "Expected 1 (only the 1 placed by cost). Limitation is now resolved!"
     );
 }

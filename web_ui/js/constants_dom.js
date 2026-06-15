@@ -64,6 +64,11 @@ export const DOM_IDS = {
   // Special
   LOOKED_CARDS_PANEL: 'looked-cards-panel',
   LOOKED_CARDS_CONTENT: 'looked-cards-content',
+
+  // Log Detail Modal
+  MODAL_LOG_DETAIL: 'log-detail-modal',
+  LOG_DETAIL_TITLE: 'log-detail-title',
+  LOG_DETAIL_CONTENT: 'log-detail-content',
 };
 
 export const DISPLAY_VALUES = {

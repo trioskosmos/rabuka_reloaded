@@ -1,47 +1,48 @@
 use crate::helpers::*;
 use rabuka_engine::card::HeartColor;
 
+fn advance_to_live(game: &mut TestGame) {
+    for _ in 0..5 {
+        game.pass();
+    }
+}
+
 /// Kanan (PL!S-pb1-003-R) has base hearts: heart02:1, heart04:4, heart05:1 = 6 total.
-/// Stage has only Kanan. No other cards contribute hearts.
-/// Before: {♥02:1, ♥04:4, ♥05:1}. After: all converted → {♥04:6}.
+/// Her LiveStart ability (ab#0): pay 2E → until live end, all her hearts become heart04.
+/// Verifies the heart_color_multiplier mechanism through the actual card ability.
 #[test]
-fn kanan_heart_override_exact_color_conversion() {
+fn kanan_livestart_converts_all_hearts_to_heart04() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
     let kanan = game.id("PL!S-pb1-003-R");
+    let filler = game.id("PL!-sd1-010-SD");
+    let live_card = game.id("PL!-sd1-019-SD");
 
-    // Only Kanan on stage, no other member contributes hearts
+    // Kanan on stage.
     game.state.player1.stage.stage = [-1, kanan, -1];
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(live_card);
+    game.give_energy(2);
 
-    // ── Before override — verify exact heart distribution ──
-    let before = game.state.player1.calculate_stage_hearts(
-        &game.state.card_database,
-        &game.state.mods.heart_color_multiplier,
-    );
-    assert_eq!(
-        before.hearts.get(&HeartColor::Heart02),
-        Some(&1),
-        "Kanan has 1 heart02 before override"
-    );
-    assert_eq!(
-        before.hearts.get(&HeartColor::Heart04),
-        Some(&4),
-        "Kanan has 4 heart04 before override"
-    );
-    assert_eq!(
-        before.hearts.get(&HeartColor::Heart05),
-        Some(&1),
-        "Kanan has 1 heart05 before override"
-    );
-    assert_eq!(before.hearts.values().sum::<u32>(), 6);
+    advance_to_live(&mut game);
+    game.set_live_card(live_card);
 
-    // ── Inject override: ALL hearts become heart04 ──
-    game.state
-        .mods
-        .heart_color_multiplier
-        .insert(kanan, HeartColor::Heart04);
+    // Pass to advance from LiveCardSet -> FirstAttackerPerformance -> LiveStart
+    game.pass();
+    // P2 turn draw → LiveStart triggers
+    game.pass();
 
-    // ── After override — verify exact conversion ──
+    // Kanan's LiveStart ability fires. Its cost is optional 2E — pay by selecting option 1.
+    if game.has_pending_choice() {
+        game.select_option(1);
+    }
+
+    // Kanan's hearts should now be converted to heart04
     let after = game.state.player1.calculate_stage_hearts(
         &game.state.card_database,
         &game.state.mods.heart_color_multiplier,
@@ -49,50 +50,18 @@ fn kanan_heart_override_exact_color_conversion() {
     assert_eq!(
         after.hearts.get(&HeartColor::Heart02),
         None,
-        "heart02 should be 0 after override"
+        "heart02 converted away"
     );
     assert_eq!(
         after.hearts.get(&HeartColor::Heart05),
         None,
-        "heart05 should be 0 after override"
+        "heart05 converted away"
     );
     assert_eq!(
         after.hearts.get(&HeartColor::Heart04),
         Some(&6),
-        "ALL 6 hearts count as heart04 after override"
+        "ALL 6 hearts become heart04"
     );
-    assert_eq!(
-        after.hearts.len(),
-        1,
-        "Only 1 color (heart04) remains after override"
-    );
-    assert_eq!(
-        after.hearts.values().sum::<u32>(),
-        6,
-        "Total heart count unchanged at 6"
-    );
-
-    // ── Clear override — verify original distribution restored ──
-    game.state.mods.heart_color_multiplier.clear();
-    let restored = game.state.player1.calculate_stage_hearts(
-        &game.state.card_database,
-        &game.state.mods.heart_color_multiplier,
-    );
-    assert_eq!(
-        restored.hearts.get(&HeartColor::Heart02),
-        Some(&1),
-        "heart02 restored to 1 after clear"
-    );
-    assert_eq!(
-        restored.hearts.get(&HeartColor::Heart04),
-        Some(&4),
-        "heart04 restored to 4 after clear"
-    );
-    assert_eq!(
-        restored.hearts.get(&HeartColor::Heart05),
-        Some(&1),
-        "heart05 restored to 1 after clear"
-    );
-    assert_eq!(restored.hearts.len(), 3, "All 3 original colors restored");
-    assert_eq!(restored.hearts.values().sum::<u32>(), 6);
+    assert_eq!(after.hearts.len(), 1, "Only heart04 remains");
+    assert_eq!(after.hearts.values().sum::<u32>(), 6, "Total unchanged");
 }

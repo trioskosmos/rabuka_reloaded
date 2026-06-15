@@ -323,8 +323,6 @@ export const LogRenderer = {
             logData = logData.filter(entry => entry.includes(turnStr));
         }
 
-        if (logData.length === 0) return null;
-
         const section = document.createElement('div');
         section.className = 'log-section rule-log-section';
 
@@ -333,14 +331,30 @@ export const LogRenderer = {
         header.textContent = i18n.t('rule_log');
         section.appendChild(header);
 
+        if (logData.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'log-empty-message';
+            emptyMsg.textContent = i18n.t('no_logs') || 'No log entries yet';
+            section.appendChild(emptyMsg);
+            return section;
+        }
+
         let groupedLogs = [];
         let currentGroup = null;
         let currentAbGroup = null;
+        let currentSnapshot = null;
 
         const flushAbGroup = () => {
             if (currentAbGroup) {
                 groupedLogs.push({ type: 'ability_debug', ...currentAbGroup });
                 currentAbGroup = null;
+            }
+        };
+
+        const flushSnapshot = () => {
+            if (currentSnapshot) {
+                groupedLogs.push({ type: 'snapshot', ...currentSnapshot });
+                currentSnapshot = null;
             }
         };
 
@@ -353,12 +367,15 @@ export const LogRenderer = {
 
             if (executionId) {
                 flushAbGroup();
+                flushSnapshot();
                 if (!currentGroup || currentGroup.id !== executionId) {
                     currentGroup = { id: executionId, entries: [], turnPrefix };
                     groupedLogs.push(currentGroup);
                 }
                 currentGroup.entries.push(body);
             } else if (body.startsWith('[AB]')) {
+                flushAbGroup();
+                flushSnapshot();
                 currentGroup = null;
                 const abLine = body.replace(/^\[AB\]\s*/, '');
                 if (/^ABILITY\s/.test(abLine)) {
@@ -373,16 +390,33 @@ export const LogRenderer = {
                 } else if (currentAbGroup) {
                     currentAbGroup.entries.push(abLine);
                 }
+            } else if (body.includes('Performance ──') || (currentSnapshot && body.startsWith(' '))) {
+                // Snapshot block: header starts a new block, indented lines continue it
+                flushAbGroup();
+                currentGroup = null;
+                if (body.includes('Performance ──')) {
+                    flushSnapshot();
+                    currentSnapshot = { header: body, entries: [], turnPrefix };
+                } else if (currentSnapshot) {
+                    currentSnapshot.entries.push(body);
+                } else {
+                    groupedLogs.push({ entry, body, turnPrefix });
+                }
             } else {
                 flushAbGroup();
+                flushSnapshot();
                 currentGroup = null;
                 groupedLogs.push({ entry, body, turnPrefix });
             }
         });
         flushAbGroup();
+        flushSnapshot();
 
         groupedLogs.forEach(group => {
-            if (group.type === 'ability_debug') {
+            if (group.type === 'snapshot') {
+                const block = LogRenderer.createSnapshotBlock(group, currentLang, showFriendlyAbilities);
+                section.appendChild(block);
+            } else if (group.type === 'ability_debug') {
                 const block = LogRenderer.createAbilityDebugBlock(group, currentLang, showFriendlyAbilities);
                 section.appendChild(block);
             } else if (group.entries) {
@@ -406,8 +440,9 @@ export const LogRenderer = {
         let detailEntries = group.entries.slice(1);
 
         const headerDiv = document.createElement('div');
-        headerDiv.className = 'log-entry ability group-header';
+        headerDiv.className = 'log-entry ability group-header clickable-log';
         headerDiv.setAttribute('data-group-id', group.id);
+        headerDiv.setAttribute('data-log-type', 'ability_effect');
 
         const headerContent = LogRenderer.formatLogEntry(headerEntry, group.turnPrefix, currentLang, showFriendlyAbilities);
         const enrichedHeader = Tooltips.enrichAbilityText(headerContent);
@@ -421,6 +456,11 @@ export const LogRenderer = {
             ${detailEntries.length > 0 ? '<div class="log-group-toggle">▼</div>' : ''}
             ${modalButton}
         `;
+
+        headerDiv.onclick = (e) => {
+            if (e.target.closest('.log-modal-btn')) return;
+            LogRenderer.onLogEntryClick('ability_effect', { body: group.entries.join('\n'), entry: headerEntry, id: group.id });
+        };
 
         LogRenderer.enrichLogEntryWithCard(headerDiv, headerEntry, currentLang, showFriendlyAbilities);
 
@@ -463,35 +503,72 @@ export const LogRenderer = {
         const enrichedBody = Tooltips.enrichAbilityText(bodyContent);
 
         const entryUpper = group.entry.toUpperCase();
+        let entryType = 'generic';
 
         if ((entryUpper.includes("---") && entryUpper.includes("PHASE")) || entryUpper.includes("[ACTIVE PHASE]")) {
             div.classList.add('phase');
+            entryType = 'phase';
         } else if (entryUpper.includes('PLAYS') || entryUpper.includes('MULLIGAN') || entryUpper.includes('SELECTED')) {
             div.classList.add('action');
+            entryType = 'action';
         } else if (entryUpper.includes('EFFECT:') || entryUpper.includes('RULE')) {
             div.classList.add('effect');
-        } else if (entryUpper.includes('SCORE') || entryUpper.includes('SUCCESS LIVE')) {
+            entryType = 'effect';
+        } else if (entryUpper.includes('SCORE') || entryUpper.includes('PASS') || entryUpper.includes('FAIL')) {
             div.classList.add('score');
+            entryType = 'score';
         } else if (entryUpper.includes('PERFORMANCE')) {
             div.classList.add('performance');
+            entryType = 'performance';
         } else if (group.entry.includes('===')) {
             div.classList.add('turn');
+            entryType = 'turn';
+        } else if (entryUpper.includes('ハート') || entryUpper.includes('heart') || entryUpper.includes('ブレード') || entryUpper.includes('blade')) {
+            div.classList.add('effect');
+            entryType = 'heart_effect';
+        } else if (entryUpper.includes('能力') || entryUpper.includes('ability') || entryUpper.includes('スコア') || entryUpper.includes('コスト')) {
+            div.classList.add('effect');
+            entryType = 'ability_effect';
         }
+
+        div.setAttribute('data-log-type', entryType);
+        div.setAttribute('data-log-body', group.body || '');
+        div.classList.add('clickable-log');
 
         div.innerHTML = `
             <div class="log-entry-icon"></div>
             <div class="log-entry-content">${enrichedBody}</div>
         `;
 
+        div.onclick = () => LogRenderer.onLogEntryClick(entryType, group);
+
         LogRenderer.enrichLogEntryWithCard(div, group.body, currentLang, showFriendlyAbilities);
 
-        // For standalone entries also show full ability
         const cardData = LogRenderer.resolveCardFromBody(group.body);
         if (cardData && !group.entry.includes('Mulligan') && !group.entry.includes('PLAYS')) {
             LogRenderer.appendFullAbility(div, cardData);
         }
 
         return div;
+    },
+
+    onLogEntryClick: (entryType, group) => {
+        const body = group.body || group.entry || '';
+        const turnMatch = body.match(/Turn (\d+)/i);
+        const turn = turnMatch ? parseInt(turnMatch[1]) : -1;
+
+        if (entryType === 'score' || entryType === 'performance' || body.includes('Score:') || body.includes('PASS') || body.includes('FAIL')) {
+            document.dispatchEvent(new CustomEvent('opencode:show-performance', {
+                detail: { turn, entry: body }
+            }));
+            return;
+        }
+        if (entryType === 'effect' || entryType === 'ability_effect' || entryType === 'heart_effect' || entryType === 'generic') {
+            document.dispatchEvent(new CustomEvent('opencode:show-log-detail', {
+                detail: { entryType, body, groupId: group.id }
+            }));
+            return;
+        }
     },
 
     createAbilityDebugBlock: (group, currentLang, showFriendlyAbilities) => {
@@ -504,13 +581,16 @@ export const LogRenderer = {
             : `${group.turnPrefix} Ability evaluation`;
 
         const headerDiv = document.createElement('div');
-        headerDiv.className = 'log-entry ability group-header ability-debug-header';
+        headerDiv.className = 'log-entry ability group-header ability-debug-header clickable-log';
+        headerDiv.setAttribute('data-log-type', 'ability_debug');
         const hasDetails = group.entries.length > 0;
+        const fullBody = group.entries.join('\n');
         headerDiv.innerHTML = `
             <div class="log-entry-icon">⚡</div>
             <div class="log-entry-content">${headerText}</div>
             ${hasDetails ? '<div class="log-group-toggle">▼</div>' : ''}
         `;
+        headerDiv.onclick = () => LogRenderer.onLogEntryClick('ability_effect', { body: fullBody, entry: headerText, id: group.id });
         blockDiv.appendChild(headerDiv);
 
         const cardData = State.resolveCardDataByName(cardName);
@@ -569,6 +649,52 @@ export const LogRenderer = {
             blockDiv.appendChild(detailsContainer);
         }
 
+        return blockDiv;
+    },
+
+    createSnapshotBlock: (group, currentLang, showFriendlyAbilities) => {
+        const blockDiv = document.createElement('div');
+        blockDiv.className = 'log-group-block snapshot-block';
+
+        const headerFormatted = LogRenderer.formatLogEntry(group.header, group.turnPrefix, currentLang, showFriendlyAbilities);
+        const enriched = Tooltips.enrichAbilityText(headerFormatted);
+
+        const headerDiv = document.createElement('div');
+        headerDiv.className = 'log-entry snapshot-header clickable-log';
+        headerDiv.setAttribute('data-log-type', 'performance');
+        const allText = [group.header, ...(group.entries || [])].join('\n');
+        headerDiv.innerHTML = `
+            <div class="log-entry-icon">📊</div>
+            <div class="log-entry-content">${enriched}</div>
+            <div class="log-group-toggle">▼</div>
+        `;
+        headerDiv.onclick = () => LogRenderer.onLogEntryClick('performance', { body: allText, entry: group.header });
+        blockDiv.appendChild(headerDiv);
+
+        const detailsContainer = document.createElement('div');
+        detailsContainer.className = 'log-group-details snapshot-details';
+        detailsContainer.style.display = 'block';
+
+        (group.entries || []).forEach((line, i) => {
+            const formatted = LogRenderer.formatLogEntry(line, '', currentLang, showFriendlyAbilities);
+            if (!formatted.trim()) return;
+            const div = document.createElement('div');
+            div.className = 'log-entry effect detail snapshot-line';
+
+            const isSubhead = line.match(/Yell\s*\(\d+\s*cards?\):/) || line.match(/Hearts breakdown|Total hearts|Base hearts|Yell hearts/);
+            if (isSubhead) {
+                div.classList.add('snapshot-subhead-line');
+            }
+            const isHeader = line.match(/Score:/);
+            if (isHeader) {
+                div.classList.add('snapshot-score-line');
+            }
+
+            div.innerHTML = `<div class="log-entry-icon"></div><div class="log-entry-content">${formatted}</div>`;
+            detailsContainer.appendChild(div);
+        });
+
+        blockDiv.appendChild(detailsContainer);
         return blockDiv;
     },
 
@@ -671,7 +797,120 @@ export const LogRenderer = {
             .replace(/HEART_PINK/g, '[Pink]')
             .replace(/HEART_WILD/g, '[Wild]');
 
+        // Enrich snapshot debug output (performance/snapshot format)
+        displayText = LogRenderer.enrichSnapshotLine(displayText);
+
         return (turnPrefix ? `<span class="log-turn-prefix">${turnPrefix}</span> ` : "") + playerTag + displayText;
+    },
+
+    enrichSnapshotLine: (text) => {
+        if (!text) return text;
+
+        // Hearts breakdown formatting: [h00:N h01:N ...]
+        if (text.match(/\[(h\d{2}:\d+(?:\s+h\d{2}:\d+)*)\]/)) {
+            text = text.replace(/\[(h\d{2}:\d+(?:\s+h\d{2}:\d+)*)\]/g, (match, inner) => {
+                const parts = inner.split(/\s+/);
+                const icons = parts.map(p => {
+                    const m = p.match(/h(\d{2}):(\d+)/);
+                    if (!m) return p;
+                    return `<img src="img/texticon/heart_0${parseInt(m[1])}.png" class="heart-mini-icon" title="${p}">${m[2]}`;
+                }).join(' ');
+                return `[${icons}]`;
+            });
+        }
+
+        // Performance phase header: "── P1 Performance ──"
+        if (text.includes('Performance ──') || text.includes('Performance──')) {
+            const pMatch = text.match(/(P[12])/);
+            const playerClass = pMatch ? pMatch[1].toLowerCase() : '';
+            text = text.replace(/──\s*(P[12])\s*Performance\s*──/,
+                `<span class="snapshot-section ${playerClass}">⚡ $1 Performance ⚡</span>`);
+        }
+
+        // "Score: N PASS" or "Score: N FAIL"
+        if (text.match(/Score:\s*\d+\s*(PASS|FAIL)/)) {
+            text = text.replace(/Score:\s*(\d+)\s*(PASS|FAIL)/,
+                (m, score, result) => {
+                    const cls = result === 'PASS' ? 'snapshot-score-pass' : 'snapshot-score-fail';
+                    const icon = result === 'PASS' ? '✓' : '✗';
+                    return `<span class="${cls}"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Score: <b>${score}</b> ${icon} ${result}</span>`;
+                });
+        }
+
+        // "Live: Name need[...] filled[...] score +N → PASS/FAIL"
+        if (text.startsWith('Live:')) {
+            text = text.replace(/Live:\s+(.*?)\s+need\[(.*?)\]\s+filled\[(.*?)\]\s+spare\[(.*?)\]\s+score\s+\+?(\d+)\s*→\s*(PASS|FAIL)/,
+                (m, name, needStr, filledStr, spareStr, score, result) => {
+                    const cls = result === 'PASS' ? 'snapshot-live-pass' : 'snapshot-live-fail';
+                    const icon = result === 'PASS' ? '✓' : '✗';
+                    const need = needStr.replace(/(h\d{2}):(\d+)/g,
+                        (_, h, n) => `<img src="img/texticon/heart_0${parseInt(h.substring(1))}.png" class="heart-mini-icon">${n}`);
+                    const filled = filledStr.replace(/(h\d{2}):(\d+)/g,
+                        (_, h, n) => `<img src="img/texticon/heart_0${parseInt(h.substring(1))}.png" class="heart-mini-icon">${n}`);
+                    const spare = spareStr.replace(/(h\d{2}):(\d+)/g,
+                        (_, h, n) => `<img src="img/texticon/heart_0${parseInt(h.substring(1))}.png" class="heart-mini-icon">${n}`);
+                    return `<span class="${cls}"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${name} need[${need}] filled[${filled}] score+${score} ${icon}${result}</span>`;
+                });
+        }
+
+        // "Stage: Name ★N ♥[h00:N ...]"
+        if (text.match(/Stage:\s/)) {
+            text = text.replace(/Stage:\s+(.*?)\s+(★\d+(?:\s*\(.*?\))?)\s*♥\[(.*?)\]/g,
+                (m, name, starStr, heartStr) => {
+                    const h = heartStr.replace(/(h\d{2}):(\d+)/g,
+                        (_, hh, n) => `<img src="img/texticon/heart_0${parseInt(hh.substring(1))}.png" class="heart-mini-icon">${n}`);
+                    return `<span class="snapshot-stage"><img src="img/texticon/icon_blade.png" class="heart-mini-icon"> ${name} ${starStr} ♥[${h}]</span>`;
+                });
+            // Also handle Stage without hearts
+            text = text.replace(/Stage:\s+(.*?)\s+(★\d+(?:\s*\(.*?\))?)\s*$/g,
+                (m, name, starStr) => {
+                    return `<span class="snapshot-stage"><img src="img/texticon/icon_blade.png" class="heart-mini-icon"> ${name} ${starStr}</span>`;
+                });
+        }
+
+        // "Yell (N cards):" heading
+        if (text.match(/Yell\s*\(\d+\s*cards?\):/)) {
+            text = text.replace(/(Yell\s*\(\d+\s*cards?\):)/, '<span class="snapshot-subhead">📋 $1</span>');
+        }
+
+        // Indented yell card line: "Name ♥[h00:N] ♪N ⎋N"
+        if (text.match(/^\s{4}\S.*♥\[/) || text.match(/^\s{4}\S.*♪\d/)) {
+            text = text.replace(/^\s{4}(.*?)\s*♥\[(.*?)\]\s*♪(\d+)\s*⎋(\d+)/,
+                (m, name, heartStr, noteIcons, drawIcons) => {
+                    const h = heartStr.replace(/(h\d{2}):(\d+)/g,
+                        (_, hh, n) => `<img src="img/texticon/heart_0${parseInt(hh.substring(1))}.png" class="heart-mini-icon">${n}`);
+                    return `<span class="snapshot-yell-card"><img src="img/texticon/icon_blade.png" class="heart-mini-icon"> ${name} ♥[${h}] ♪${noteIcons} ⎋${drawIcons}</span>`;
+                });
+            // Without heart
+            text = text.replace(/^\s{4}(.*?)\s*♪(\d+)\s*⎋(\d+)/,
+                (m, name, noteIcons, drawIcons) => {
+                    return `<span class="snapshot-yell-card"><img src="img/texticon/icon_blade.png" class="heart-mini-icon"> ${name} ♪${noteIcons} ⎋${drawIcons}</span>`;
+                });
+        }
+
+        // "Hearts breakdown:", "Total hearts:", "Base hearts:", "Yell hearts:"
+        if (text.match(/^\s*(Hearts breakdown|Total hearts|Base hearts|Yell hearts):/)) {
+            text = text.replace(/^\s*(Hearts breakdown|Total hearts|Base hearts|Yell hearts):/,
+                '<span class="snapshot-label">$1:</span>');
+        }
+
+        // Ability bonus lines
+        if (text.match(/^\s{4}Ability:/)) {
+            text = text.replace(/^\s{4}Ability:\s+(.*?)\s+♥(\w+)\+(\d+)/,
+                (m, source, colorStr, amount) => {
+                    const hIdx = parseInt(colorStr.replace('heart', ''));
+                    const icon = hIdx >= 0 && hIdx < 7
+                        ? `<img src="img/texticon/heart_0${hIdx}.png" class="heart-mini-icon">`
+                        : '♥';
+                    return `<span class="snapshot-ability-bonus">↳ ${source} ${icon}+${amount}</span>`;
+                });
+            text = text.replace(/^\s{4}Ability:\s+(.*?)\s*★\+(\d+)/,
+                (m, source, amount) => {
+                    return `<span class="snapshot-ability-bonus">↳ ${source} <img src="img/texticon/icon_blade.png" class="heart-mini-icon">+${amount}</span>`;
+                });
+        }
+
+        return text;
     },
 
     resolveCardFromBody: (body) => {

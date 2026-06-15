@@ -42,25 +42,16 @@ fn test_yoshiko_center_ability_basic_success() {
     // Activate Yoshiko's ability
     game.activate_ability(yoshiko);
 
-    // Handle choice if needed (multiple targets available)
-    if game.has_pending_choice() {
-        // Auto-select the first valid target (Chika at index 0)
+    // Handle all pending choices: cost (hand discard) + effect (stage member selection)
+    while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
 
-    // Process the ability
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
-
-    // Verify cost payment: Yoshiko should be in wait state but still on stage
+    // Verify cost: Yoshiko in wait state, hand card discarded
     assert!(
         game.player().stage.stage[1] == yoshiko,
         "Yoshiko should still be on stage but in wait state"
     );
-    // Note: wait state changes active/wait status but doesn't move card from stage
-
-    // Verify cost payment: Hand card was discarded
     assert!(
         !game.player().hand.cards.contains(&hand_card),
         "Hand card should not be in hand (discarded as cost)"
@@ -70,7 +61,7 @@ fn test_yoshiko_center_ability_basic_success() {
         "Hand card should be in discard (paid as cost)"
     );
 
-    // Verify sub-action 1: Dia should be summoned from discard to the area vacated by Chika (LeftSide, index 0)
+    // Effect action 1: Chika (idx 0 selected) moved from stage to discard
     assert!(
         game.player().stage.stage[0] == dia,
         "Dia should be summoned to the stage from discard"
@@ -80,8 +71,7 @@ fn test_yoshiko_center_ability_basic_success() {
         "Dia should no longer be in discard"
     );
 
-    // Verify conditional effect: New member summoned to same area where stage member was removed
-    // Yoshiko should stay on stage, but one of the other members should be replaced
+    // Effect action 2: Dia (cost 11 = Chika cost 9 + 2) summoned to vacated area
     assert!(
         game.player().stage.stage[1] == yoshiko,
         "Yoshiko should stay on stage in center"
@@ -141,7 +131,7 @@ fn test_yoshiko_center_ability_fails_no_hand_cards() {
     let mut game = TestGame::new(db);
 
     let yoshiko = game.id("PL!S-bp3-006-R＋");
-    let chika = game.id("PL!-sd1-001-SD");
+    let chika = game.id("PL!S-bp2-001-R"); // Aqours Chika
 
     game.add_to_stage(MemberArea::Center, yoshiko);
     game.add_to_stage(MemberArea::LeftSide, chika);
@@ -149,16 +139,24 @@ fn test_yoshiko_center_ability_fails_no_hand_cards() {
     // Don't add any cards to hand
     game.give_energy(5);
 
-    let initial_yoshiko_position = game.player().stage.stage[1];
-
-    // Try to activate ability
+    // Activate ability — cost validation fails (hand empty, need 1 discard)
+    // Error is caught internally, ability completes with no state change
     game.activate_ability(yoshiko);
 
-    // Verify Yoshiko is still on stage (cost not paid, no wait state change)
-    assert_eq!(
-        game.player().stage.stage[1],
-        initial_yoshiko_position,
-        "Yoshiko should still be on stage when cost cannot be paid"
+    // No pending choice was created (cost validation failed before choice)
+    assert!(
+        !game.has_pending_choice(),
+        "No choice should exist when cost cannot be paid"
+    );
+
+    // No cost was actually paid — hand still empty, Yoshiko unchanged
+    assert!(
+        game.player().hand.cards.is_empty(),
+        "Hand should still be empty"
+    );
+    assert!(
+        game.player().waitroom.cards.is_empty(),
+        "Nothing should be in discard"
     );
 }
 
@@ -182,11 +180,12 @@ fn test_yoshiko_center_ability_no_other_aqours_on_stage() {
     // Activate ability
     game.activate_ability(yoshiko);
 
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
+    // Handle cost choice (hand discard)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
 
-    // Verify cost was paid but main effect failed
+    // Verify cost was paid but effect had no valid targets
     assert!(
         game.player().stage.stage[1] == yoshiko,
         "Yoshiko should still be on stage but in wait state (cost paid)"
@@ -195,12 +194,6 @@ fn test_yoshiko_center_ability_no_other_aqours_on_stage() {
         game.player().waitroom.cards.len(),
         initial_discard_size + 1,
         "Only hand card should be discarded, no stage member moved"
-    );
-
-    // Verify conditional effect doesn't trigger (no member was moved)
-    assert!(
-        game.player().stage.stage[1] == yoshiko,
-        "Yoshiko should remain since main effect failed"
     );
 }
 
@@ -211,7 +204,7 @@ fn test_yoshiko_center_ability_no_valid_discard_targets() {
     let mut game = TestGame::new(db);
 
     let yoshiko = game.id("PL!S-bp3-006-R＋");
-    let chika = game.id("PL!S-bp2-001-R"); // Aqours Chika, cost 4
+    let chika = game.id("PL!S-bp2-001-R"); // Aqours Chika, cost 9
     let low_cost_card = game.id("PL!-sd1-010-SD"); // Non-Aqours card
     let hand_card = game.id("PL!-sd1-011-SD");
 
@@ -220,8 +213,8 @@ fn test_yoshiko_center_ability_no_valid_discard_targets() {
     game.add_to_hand(hand_card);
 
     // Add a valid conditional effect target to ensure full ability execution
-    let you = game.id("PL!S-bp2-003-R"); // Aqours You, cost 6 (Chika cost 4 + 2 = 6)
-    game.add_to_discard(you); // Valid target for conditional effect
+    let dia = game.id("PL!S-bp2-004-R"); // Aqours Dia, cost 11 (Chika cost 9 + 2 = 11)
+    game.add_to_discard(dia); // Valid target for conditional effect
     game.add_to_discard(low_cost_card); // Non-Aqours card
 
     game.give_energy(5);
@@ -229,33 +222,32 @@ fn test_yoshiko_center_ability_no_valid_discard_targets() {
     // Activate ability
     game.activate_ability(yoshiko);
 
-    // Handle choice if needed for conditional effect
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // Select You for conditional effect
+    // Handle all pending choices: cost + effect (stage member selection)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]); // Select Chika (only Aqours on stage)
     }
 
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
-
-    // Verify cost paid and main effect worked
+    // Verify cost paid
     assert!(
         game.player().stage.stage[1] == yoshiko,
         "Yoshiko should still be on stage but in wait state"
     );
 
-    // Verify main effect worked - Chika was moved from stage
-    assert!(
-        game.player().stage.stage[0] == -1,
-        "Chika was moved from stage, area is now empty"
-    );
+    // Effect action 1: Chika was moved from stage
     assert!(
         game.player().waitroom.cards.contains(&chika),
         "Chika should be in discard"
     );
 
-    // Verify conditional effect behavior (may not work perfectly due to engine limitations)
-    // The main effect (stage→discard) is working correctly
+    // Effect action 2: Dia (cost 11 = Chika cost 9 + 2) summoned to vacated area
+    assert!(
+        game.player().stage.stage[0] == dia,
+        "Dia should be summoned to the vacated area (cost 11 = 9 + 2)"
+    );
+    assert!(
+        !game.player().waitroom.cards.contains(&dia),
+        "Dia should no longer be in discard"
+    );
 }
 
 /// Test case 6: Cost calculation test - summon correct cost member
@@ -265,51 +257,45 @@ fn test_yoshiko_center_ability_cost_calculation() {
     let mut game = TestGame::new(db);
 
     let yoshiko = game.id("PL!S-bp3-006-R＋");
-    let riko = game.id("PL!S-bp2-002-R"); // Aqours Riko, cost 4
-    let you = game.id("PL!S-bp2-003-R"); // Aqours You, cost 6 (4 + 2 = 6, should be summonable)
-    let chika = game.id("PL!S-bp2-001-R"); // Aqours Chika, cost 4 (4 + 2 = 6, should be summonable)
+    let chika = game.id("PL!S-bp2-001-R"); // Aqours Chika, cost 9
+    let dia = game.id("PL!S-bp2-004-R"); // Aqours Dia, cost 11 (9 + 2 = 11, should be summonable)
+    let you = game.id("PL!S-bp2-003-R"); // Aqours You, cost 9 (9 + 2 = 11, should NOT be summonable - wrong cost)
     let hand_card = game.id("PL!-sd1-010-SD");
 
     game.add_to_stage(MemberArea::Center, yoshiko);
-    game.add_to_stage(MemberArea::LeftSide, riko); // Cost 4 member to be sent to discard
+    game.add_to_stage(MemberArea::LeftSide, chika); // Cost 9 member to be sent to discard
     game.add_to_hand(hand_card);
 
-    // Put correct cost Aqours members in discard (need cost 6 for conditional effect: 4 + 2 = 6)
-    game.add_to_discard(you); // Cost 6 - should be summonable
-    game.add_to_discard(chika); // Cost 4 - should NOT be summonable (wrong cost)
+    // Put correct cost Aqours members in discard (need cost 11 for conditional effect: 9 + 2 = 11)
+    game.add_to_discard(dia); // Cost 11 - should be summonable
+    game.add_to_discard(you); // Cost 9 - should NOT be summonable (wrong cost)
 
     game.give_energy(5);
 
     // Activate ability
     game.activate_ability(yoshiko);
 
-    // Handle choice if needed for conditional effect
-    if game.has_pending_choice() {
-        game.select_indices(&[0]); // Select You (cost 6)
+    // Handle all pending choices: cost + effect (stage→Chika selected) + conditional summon
+    while game.has_pending_choice() {
+        game.select_indices(&[0]); // Select Chika (only Aqours on stage besides self)
     }
 
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
-
-    // Verify Riko was sent to discard
+    // Effect action 1: Chika moved from stage to discard
     assert!(
-        game.player().waitroom.cards.contains(&riko),
-        "Riko should be in discard"
+        game.player().waitroom.cards.contains(&chika),
+        "Chika should be in discard"
     );
 
-    // Verify main effect worked - Riko was moved from stage
+    // Effect action 2: Dia (cost 11 = Chika cost 9 + 2) summoned to vacated area
     assert!(
-        game.player().stage.stage[0] == -1,
-        "Riko was moved from stage, area is now empty"
+        game.player().stage.stage[0] == dia,
+        "Dia should be summoned to vacated area (cost 11 = 9 + 2)"
     );
     assert!(
-        game.player().waitroom.cards.contains(&riko),
-        "Riko should be in discard"
+        !game.player().waitroom.cards.contains(&dia),
+        "Dia should no longer be in discard"
     );
-
-    // Verify conditional effect behavior (may not work perfectly due to engine limitations)
-    // The main effect (stage→discard) is working correctly
+    // You (cost 9) stays in discard — cost 9 ≠ 11, not a valid summon target
 }
 
 /// Test case 7: Use limit test - can only use once per turn
@@ -319,31 +305,37 @@ fn test_yoshiko_center_ability_use_limit() {
     let mut game = TestGame::new(db);
 
     let yoshiko = game.id("PL!S-bp3-006-R＋");
-    let chika = game.id("PL!-sd1-001-SD");
-    let ruby = game.id("PL!-sd1-003-SD");
+    let chika = game.id("PL!S-bp2-001-R"); // Aqours Chika
+    let riko = game.id("PL!S-bp2-002-R"); // Aqours Riko (other valid stage target so choice is needed)
+    let dia = game.id("PL!S-bp2-004-R"); // Aqours Dia (cost 11 = Chika cost 9 + 2)
     let hand_card1 = game.id("PL!-sd1-010-SD");
     let hand_card2 = game.id("PL!-sd1-011-SD");
 
     game.add_to_stage(MemberArea::Center, yoshiko);
     game.add_to_stage(MemberArea::LeftSide, chika);
-    game.add_to_stage(MemberArea::RightSide, ruby);
+    game.add_to_stage(MemberArea::RightSide, riko);
     game.add_to_hand(hand_card1);
     game.add_to_hand(hand_card2);
-    game.add_to_discard(chika); // For summoning
+    game.add_to_discard(dia);
 
     game.give_energy(10);
 
     // First activation should succeed
     game.activate_ability(yoshiko);
 
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
+    // Handle all choices for the first ability (cost discard + stage selection + possible discard selection)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
 
     let initial_hand_size_after_first = game.player().hand.cards.len();
 
-    // Try to activate again - should fail due to use limit
-    game.activate_ability(yoshiko);
+    // Try to activate again - should fail due to use limit (turn_limited_abilities_used check)
+    let result = game.try_activate_ability(yoshiko);
+    assert!(
+        result.is_err(),
+        "Second activation should fail due to use limit"
+    );
 
     // Verify no additional cost was paid
     assert_eq!(
@@ -367,24 +359,21 @@ fn test_yoshiko_center_ability_exclude_self() {
     game.add_to_stage(MemberArea::LeftSide, chika);
     game.add_to_hand(hand_card);
 
-    // Add a cost 6 Aqours member to discard for conditional effect (Chika cost 4 + 2 = 6)
-    let you = game.id("PL!S-bp2-003-R"); // You Watanabe (Aqours, cost 6)
-    game.add_to_discard(you);
+    // Add a cost 11 Aqours member to discard for conditional effect (Chika cost 9 + 2 = 11)
+    let dia = game.id("PL!S-bp2-004-R"); // Dia Kurosawa (Aqours, cost 11)
+    game.add_to_discard(dia);
 
     game.give_energy(5);
 
     // Activate ability
     game.activate_ability(yoshiko);
 
-    // Handle choice if needed for conditional effect
-    if game.has_pending_choice() {
-        // Auto-select the first valid target from discard
+    // Handle all pending choices: cost + effect (stage member selection) + conditional summon
+    while game.has_pending_choice() {
+        // Stage choice: only Chika (Aqours, not self) is available
+        // Discard choice: Dia (cost 11 = Chika cost 9 + 2) auto-resolves (1 candidate)
         game.select_indices(&[0]);
     }
-
-    let player_id = game.state.player1.id.clone();
-    TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
-    game.state.process_pending_auto_abilities(&player_id);
 
     // Verify Yoshiko is still on stage in wait state, not moved by main effect
     assert!(
@@ -392,15 +381,21 @@ fn test_yoshiko_center_ability_exclude_self() {
         "Yoshiko should still be on stage in wait state"
     );
 
-    // Verify Chika was the one moved by main effect (not Yoshiko)
+    // Verify Chika was moved from stage (effect exclude_self = true)
     assert!(
         game.player().waitroom.cards.contains(&chika),
         "Chika should be the one moved by main effect"
     );
 
-    // Verify Yoshiko was NOT moved by main effect (only wait state change)
+    // Verify Yoshiko was NOT moved (exclude_self prevents targeting the activator)
     assert!(
         !game.player().waitroom.cards.contains(&yoshiko),
         "Yoshiko should not be in discard from main effect"
+    );
+
+    // Verify Dia (cost 11 = Chika cost 9 + 2) summoned to vacated area
+    assert!(
+        game.player().stage.stage[0] == dia,
+        "Dia should be summoned to vacated area (cost 11 = 9 + 2)"
     );
 }

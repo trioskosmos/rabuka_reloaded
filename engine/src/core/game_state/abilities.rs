@@ -1,4 +1,180 @@
 impl GameState {
+    fn stage_card_ids(&self) -> impl Iterator<Item = i16> + '_ {
+        self.player1
+            .stage
+            .stage
+            .iter()
+            .chain(self.player2.stage.stage.iter())
+            .copied()
+            .filter(|cid| *cid != -1)
+    }
+
+    pub(crate) fn ability_matches_trigger(
+        ability: &crate::card::Ability,
+        trigger: &crate::game_state::AbilityTrigger,
+    ) -> bool {
+        ability.triggers.as_ref().map_or(false, |t| match trigger {
+            crate::game_state::AbilityTrigger::Activation => {
+                t.contains(crate::triggers::ACTIVATION)
+            }
+            crate::game_state::AbilityTrigger::Debut => {
+                t.contains(crate::triggers::DEBUT) || t.contains(crate::triggers::DEBUT_EN)
+            }
+            crate::game_state::AbilityTrigger::LiveStart => t.contains(crate::triggers::LIVE_START),
+            crate::game_state::AbilityTrigger::LiveSuccess => {
+                t.contains(crate::triggers::LIVE_SUCCESS)
+            }
+            crate::game_state::AbilityTrigger::Constant => t.contains(crate::triggers::CONSTANT),
+            crate::game_state::AbilityTrigger::Auto => t.contains(crate::triggers::AUTO),
+        })
+    }
+
+    fn build_ability_queue_entry(
+        &self,
+        card_no: String,
+        player_id: String,
+        ability: crate::card::Ability,
+        ability_index: usize,
+        card_id: Option<i16>,
+        trigger_type: crate::game_state::AbilityTrigger,
+    ) -> crate::ability_queue::AbilityQueueEntry {
+        use crate::ability_queue::{AbilityId, AbilityQueueEntry};
+
+        AbilityQueueEntry {
+            id: AbilityId::new(&card_no, ability_index, &format!("{:?}", trigger_type)),
+            card_no,
+            player_id,
+            ability,
+            ability_index,
+            card_id,
+            trigger_type,
+            completed: false,
+            cost_paid: false,
+            cost_paid_index: 0,
+            pending_choice_result: None,
+            choice_card_no: None,
+            conditional_choice: None,
+            effect_started: false,
+            optional_cost_was_paid: false,
+            choice_player_id: None,
+            pending_commands: Vec::new(),
+            resolver: None,
+        }
+    }
+
+    pub(crate) fn collect_constant_hand_effects(&self) -> Vec<(i16, crate::card::AbilityEffect)> {
+        let mut effects = Vec::new();
+        for cid in self
+            .player1
+            .hand
+            .cards
+            .iter()
+            .chain(self.player2.hand.cards.iter())
+        {
+            let card = match self.card_database.get_card(*cid) {
+                Some(card) => card,
+                None => continue,
+            };
+            for ability in &card.abilities {
+                if Self::ability_matches_trigger(
+                    ability,
+                    &crate::game_state::AbilityTrigger::Constant,
+                ) {
+                    if let Some(ref effect) = ability.effect {
+                        effects.push((*cid, effect.clone()));
+                    }
+                }
+            }
+        }
+        effects
+    }
+
+    pub(crate) fn collect_constant_stage_effects(&self) -> Vec<(i16, crate::card::AbilityEffect)> {
+        let mut effects = Vec::new();
+        for cid in self.stage_card_ids() {
+            let card = match self.card_database.get_card(cid) {
+                Some(card) => card,
+                None => continue,
+            };
+            for ability in &card.abilities {
+                if Self::ability_matches_trigger(
+                    ability,
+                    &crate::game_state::AbilityTrigger::Constant,
+                ) {
+                    if let Some(ref effect) = ability.effect {
+                        effects.push((cid, effect.clone()));
+                    }
+                }
+            }
+        }
+        effects
+    }
+
+    /// Scan a player's stage and enqueue auto abilities for that player.
+    /// Guards against triggering discard-location abilities when the card isn't in discard.
+    pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
+        let player_id_clone = player_id.to_string();
+        let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
+        {
+            let player = if player_id_clone == self.player1.id {
+                &self.player1
+            } else {
+                &self.player2
+            };
+            for &card_id in &player.stage.stage {
+                if card_id == -1 {
+                    continue;
+                }
+                if let Some(card) = self.card_database.get_card(card_id) {
+                    for ability in &card.abilities {
+                        if ability
+                            .triggers
+                            .as_ref()
+                            .map_or(false, |t| t == crate::triggers::AUTO)
+                        {
+                            // Guard: skip discard-location abilities when the card
+                            // is on stage (prevents premature triggering).
+                            if let Some(ref effect) = ability.effect {
+                                if let Some(ref condition) = effect.condition {
+                                    if condition.location.as_deref() == Some("discard")
+                                        && condition.card_type.as_deref() == Some("member_card")
+                                    {
+                                        let in_discard =
+                                            self.player1.waitroom.cards.contains(&card_id)
+                                                || self.player2.waitroom.cards.contains(&card_id);
+                                        if !in_discard {
+                                            continue;
+                                        }
+                                    }
+                                }
+                                // Evaluate trigger_condition (e.g. "このメンバーがエリアを移動する"
+                                // for each-time triggers). If not met, skip.
+                                if let Some(ref trigger_cond) = effect.trigger_condition {
+                                    let ctx =
+                                        crate::ability::condition::ConditionContext::new(self);
+                                    if !ctx.evaluate_condition(trigger_cond) {
+                                        continue;
+                                    }
+                                }
+                            }
+                            let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
+                        }
+                    }
+                }
+            }
+        }
+        for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
+            self.trigger_auto_ability(
+                ability_id,
+                AbilityTrigger::Auto,
+                player_id_clone.clone(),
+                Some(card_no),
+                Some(stage_card_id),
+            );
+        }
+    }
+
     pub fn trigger_auto_ability(
         &mut self,
         ability_id: String,
@@ -7,8 +183,6 @@ impl GameState {
         source_card_id: Option<String>,
         explicit_card_id: Option<i16>,
     ) {
-        use crate::ability_queue::{AbilityId, AbilityQueueEntry};
-
         if let Some(ref card_no) = source_card_id {
             let (card, card_id) = if let Some(cid) = explicit_card_id {
                 (self.card_database.get_card(cid).cloned(), Some(cid))
@@ -17,33 +191,17 @@ impl GameState {
             };
             if let Some(card) = card {
                 for (ability_index, ability) in card.abilities.iter().enumerate() {
-                    if ability_id.contains(&ability.full_text) {
-                        let entry = AbilityQueueEntry {
-                            id: AbilityId::new(
-                                card_no,
-                                ability_index,
-                                &format!("{:?}", trigger_type),
-                            ),
-                            card_no: card_no.clone(),
+                    if Self::ability_matches_trigger(ability, &trigger_type)
+                        && ability_id.contains(&ability.full_text)
+                    {
+                        let entry = self.build_ability_queue_entry(
+                            card_no.clone(),
                             player_id,
-                            ability: ability.clone(),
+                            ability.clone(),
                             ability_index,
                             card_id,
                             trigger_type,
-                            completed: false,
-                            cost_paid: false,
-                            cost_paid_index: 0,
-                            pending_choice_result: None,
-                            choice_card_no: None,
-                            conditional_choice: None,
-                            execution_context: None,
-                            selected_card_ids: Vec::new(),
-                            effect_started: false,
-                            optional_cost_was_paid: false,
-                            choice_player_id: None,
-                            pending_commands: Vec::new(),
-                        };
-
+                        );
                         self.ability_queue.enqueue(entry);
                         break;
                     }
@@ -120,68 +278,201 @@ impl GameState {
         (None, None)
     }
 
-    pub fn process_pending_auto_abilities(&mut self, _active_player_id: &str) {
+    /// Internal: Process all standby abilities for a single player.
+    /// Stops early if an ability creates a pending choice.
+    fn process_player_abilities(&mut self, player_id: &str) {
         loop {
             if !self.ability_queue.is_idle() {
                 break;
             }
+            let idx = (0..self.ability_queue.len()).find(|&i| {
+                self.ability_queue.is_entry_available(i)
+                    && self.ability_queue.entry_player_id(i) == Some(player_id)
+            });
+            let idx = match idx {
+                Some(i) => i,
+                None => break,
+            };
+            self.ability_queue.promote_entry_by_abs(idx);
             if !self.ability_queue.start_next() {
                 break;
             }
             self.process_current_ability();
-            // If a choice is pending, stop processing and wait for player input
-            if self.pending_choice.is_some() {
+            if self.has_pending_choice() {
                 break;
             }
         }
     }
 
+    pub fn process_pending_auto_abilities(&mut self, active_player_id: &str) {
+        // Rule 9.5.3.2: Active player resolves ALL their standby abilities first
+        // (one at a time, back to rule processing between each)
+        self.process_player_abilities(active_player_id);
+        if self.has_pending_choice() {
+            return;
+        }
+
+        // Rule 9.5.3.3: Then non-active player resolves ALL theirs
+        let non_active_id = {
+            let pending = self.ability_queue.pending_entries();
+            pending
+                .iter()
+                .find(|e| e.player_id != active_player_id)
+                .map(|e| e.player_id.clone())
+                .unwrap_or_default()
+        };
+        if !non_active_id.is_empty() {
+            self.process_player_abilities(&non_active_id);
+        }
+    }
+
+    fn trigger_auto_for_discarded_cards(&mut self, player_id: &str) {
+        let trigger_data: Vec<(String, String, i16)> = if let Some(ref moved_cards) =
+            self.recently_moved_cards.clone()
+        {
+            moved_cards
+                .iter()
+                .filter_map(|&moved_id| {
+                    let card = self.card_database.get_card(moved_id)?;
+                    let mut results = Vec::new();
+                    for ability in &card.abilities {
+                        let is_auto = ability.triggers.as_deref() == Some(crate::triggers::AUTO);
+                        let has_discard_condition = ability
+                            .effect
+                            .as_ref()
+                            .and_then(|e| e.condition.as_ref())
+                            .map(|c| {
+                                c.location.as_deref() == Some("discard")
+                                    || c.location.as_deref() == Some("waitroom")
+                            })
+                            .unwrap_or(false);
+                        if is_auto && has_discard_condition {
+                            results.push((
+                                format!("{}_{}", card.card_no, ability.full_text),
+                                card.card_no.clone(),
+                                moved_id,
+                            ));
+                        }
+                    }
+                    Some(results)
+                })
+                .flatten()
+                .collect()
+        } else {
+            Vec::new()
+        };
+        for (ability_id, card_no, moved_id) in trigger_data {
+            self.trigger_auto_ability(
+                ability_id,
+                AbilityTrigger::Auto,
+                player_id.to_string(),
+                Some(card_no),
+                Some(moved_id),
+            );
+        }
+    }
+
     pub(crate) fn process_current_ability(&mut self) {
-        if let Some(entry) = self.ability_queue.current_entry().cloned() {
-            self.activating_card = entry.card_id;
-            let cost_already_paid = entry.cost_paid;
-
-            let (choice, looked_at, ctx, rev, result) = {
-                let mut resolver = crate::ability::resolver::AbilityResolver::new(self);
-                let result =
-                    resolver.resolve_ability(&entry.ability, entry.card_id, entry.ability_index);
-                let choice = resolver.get_pending_choice().cloned();
-                let looked_at = resolver.take_looked_at();
-                let ctx = resolver.execution_context.clone();
-                let rev = std::mem::take(&mut resolver.revealed_cost_cards);
-                (choice, looked_at, ctx, rev, result)
+        let (card_id, ability, ability_index, cost_already_paid) = {
+            let entry = match self.ability_queue.current_entry() {
+                Some(e) => e,
+                None => return,
             };
-            self.looked_at_cards = looked_at;
-            if !rev.is_empty() {
-                self.revealed_cost_cards = rev;
-            }
+            (
+                entry.card_id,
+                entry.ability.clone(),
+                entry.ability_index,
+                entry.cost_paid,
+            )
+        };
 
-            if let Err(e) = result {
+        self.activating_card = card_id;
+
+        // Check if a resolver already exists (e.g., cost phase completed, effect needs to run).
+        // If so, reuse it — it carries state (revealed_cost_cards, etc.) needed by the effect.
+        let mut resolver = if self.ability_queue.has_resolver() {
+            eprintln!("[PCA] Reusing existing resolver for effect execution");
+            let mut r = self.ability_queue.take_resolver().unwrap();
+            // Sync resolver state to GameState before effect execution, since the
+            // condition system reads GameState fields directly (e.g., revealed_cost_cards).
+            if !r.revealed_cost_cards.is_empty() {
+                self.revealed_cost_cards = r.revealed_cost_cards.clone();
+            }
+            if !r.looked_at_cards.is_empty() {
+                self.looked_at_cards = r.looked_at_cards.clone();
+            }
+            // Reset cost-phase state so the fresh effect execution doesn't see stale data
+            // (moved_cards, selected_cards, etc. were set during cost payment).
+            r.moved_cards = Vec::new();
+            r.selected_cards = Vec::new();
+            r.revealed_cost_cards = Vec::new();
+            r.looked_at_cards = Vec::new();
+            r.last_effect_target = None;
+            r.pending_stage_cards = Vec::new();
+            r.execution_context = crate::ability::types::ExecutionContext::None;
+            r
+        } else {
+            crate::ability::resolver::AbilityResolver::new(self.card_database.clone(), card_id)
+        };
+
+        match resolver.resolve_ability(self, &ability, card_id, ability_index) {
+            Ok(()) => {}
+            Err(e) => {
                 eprintln!("Failed to resolve ability: {}", e);
                 self.ability_queue.complete_current();
+                self.clear_effect_tracking();
                 return;
             }
+        }
 
-            if let Some(c) = choice {
+        // Sync resolver state to GameState before the resolver may be dropped.
+        // The condition system and other subsystems read GameState directly.
+        self.last_ability_trace = Some(resolver.pipeline.trace.clone());
+        if !resolver.revealed_cost_cards.is_empty() {
+            self.revealed_cost_cards = resolver.revealed_cost_cards.clone();
+        }
+        self.looked_at_cards = resolver.looked_at_cards.clone();
+
+        if let Some(ref c) = resolver.pending_choice {
+            let is_choice_type = self
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.choice_card_no.clone())
+                .as_deref()
+                == Some("choice");
+
+            if !cost_already_paid {
                 if let Some(e) = self.ability_queue.current_entry_mut() {
-                    e.execution_context = Some(ctx);
-                    // Mark effect as started when cost was already paid before this run.
-                    // The cost_already_paid variable captures cost_paid BEFORE resolve_ability
-                    // runs, which distinguishes cost-creation from effect-execution.
-                    if cost_already_paid || entry.ability.cost.is_none() {
-                        e.effect_started = true;
-                    }
+                    e.cost_paid = true;
                 }
-                self.ability_queue.pause_for_choice(c);
-            } else {
-                self.ability_queue.complete_current();
-                self.activating_card = None;
+            }
+            if let Some(e) = self.ability_queue.current_entry_mut() {
+                if (cost_already_paid || ability.cost.is_none()) && !is_choice_type {
+                    e.effect_started = true;
+                }
+            }
+
+            let choice = c.clone();
+            resolver.store_pending_choice(self);
+            self.ability_queue.set_resolver(resolver);
+            self.ability_queue.pause_for_choice(choice);
+        } else {
+            self.ability_queue.complete_current();
+            self.activating_card = None;
+            self.clear_effect_tracking();
+            let master_id = self.ability_master_id();
+            if let Some(pid) = master_id {
+                self.trigger_auto_for_discarded_cards(&pid);
             }
         }
     }
 
     pub fn get_pending_choice(&self) -> Option<&crate::ability::types::Choice> {
         self.ability_queue.is_waiting_for_choice()
+    }
+
+    pub fn has_pending_choice(&self) -> bool {
+        self.ability_queue.is_waiting_for_choice().is_some()
     }
 
     pub fn entry_effect(&self) -> Option<&crate::card::AbilityEffect> {
@@ -196,11 +487,16 @@ impl GameState {
             .and_then(|e| e.ability.cost.as_ref())
     }
 
-    pub fn entry_characters(&self) -> Option<&Vec<String>> {
-        self.entry_cost().and_then(|c| c.characters.as_ref())
-    }
-
     pub fn entry_destination(&self) -> Option<&str> {
+        if let Some(entry) = self.ability_queue.current_entry() {
+            if !entry.effect_started {
+                if let Some(ref cost) = entry.ability.cost {
+                    if let Some(ref dest) = cost.destination {
+                        return Some(dest);
+                    }
+                }
+            }
+        }
         self.entry_effect().and_then(|e| e.destination.as_deref())
     }
 
@@ -218,9 +514,19 @@ impl GameState {
 
     /// Inject card and ability identity into the pending_choice JSON so the frontend
     /// can display which card+ability is responsible for the current choice prompt.
+    /// Get the serialized JSON for the frontend from the ability queue's waiting choice.
+    pub fn get_pending_choice_json(&self) -> Option<serde_json::Value> {
+        let choice = self.ability_queue.is_waiting_for_choice()?;
+        let mut json = choice.to_frontend_json()?;
+        self.inject_choice_ability_context(&mut json);
+        Some(json)
+    }
+
     pub fn inject_choice_ability_context(&self, json: &mut serde_json::Value) {
+        let entry = self.ability_queue.current_entry();
+        let entry_ref = entry.as_ref();
         if let Some(obj) = json.as_object_mut() {
-            if let Some(entry) = self.ability_queue.current_entry() {
+            if let Some(entry) = entry_ref {
                 obj.insert(
                     "card_no".into(),
                     serde_json::Value::String(entry.card_no.clone()),
@@ -250,6 +556,79 @@ impl GameState {
                         "choice_player_id".into(),
                         serde_json::Value::String(pid.clone()),
                     );
+                }
+                // Inject selection_cards for SelectCard choices so the frontend can render options.
+                if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
+                    if let crate::ability::types::Choice::SelectCard {
+                        ref zone,
+                        ref card_type,
+                        cost_limit,
+                        ref cost_limit_operator,
+                        ref target_player_id,
+                        ..
+                    } = choice
+                    {
+                        let target = target_player_id.as_deref().unwrap_or("self");
+                        let player = self.resolve_target_player(target);
+                        let card_ids: Vec<i16> = match zone.as_str() {
+                            "hand" => player.hand.cards.iter().copied().collect(),
+                            "discard" => player.waitroom.cards.iter().copied().collect(),
+                            "stage" => player
+                                .stage
+                                .stage
+                                .iter()
+                                .copied()
+                                .filter(|&id| id != -1)
+                                .collect(),
+                            "energy_zone" => player.energy_zone.cards.iter().copied().collect(),
+                            "selected_cards" => entry
+                                .resolver
+                                .as_ref()
+                                .map(|r| r.selected_cards.clone())
+                                .unwrap_or_default(),
+                            _ => Vec::new(),
+                        };
+                        let filtered: Vec<i16> = card_ids
+                            .into_iter()
+                            .filter(|&cid| {
+                                let type_ok = match card_type.as_deref() {
+                                    Some("member_card") => self
+                                        .card_database
+                                        .get_card(cid)
+                                        .map(|c| c.is_member())
+                                        .unwrap_or(false),
+                                    Some("live_card") => self
+                                        .card_database
+                                        .get_card(cid)
+                                        .map(|c| c.is_live())
+                                        .unwrap_or(false),
+                                    Some("energy_card") => self
+                                        .card_database
+                                        .get_card(cid)
+                                        .map(|c| c.is_energy())
+                                        .unwrap_or(false),
+                                    None => true,
+                                    _ => true,
+                                };
+                                type_ok
+                                    && if let Some(lim) = cost_limit {
+                                        crate::ability::util::card_matches_cost_limit_op(
+                                            &self.card_database,
+                                            cid,
+                                            Some(*lim),
+                                            cost_limit_operator.as_deref(),
+                                        )
+                                    } else {
+                                        true
+                                    }
+                            })
+                            .collect();
+                        let sel: Vec<serde_json::Value> = filtered.iter().map(|&cid| {
+                            let card = self.card_database.get_card(cid);
+                            serde_json::json!({"id": cid, "card_no": card.map(|c| c.card_no.clone()).unwrap_or_default(), "name": card.map(|c| c.name.clone()).unwrap_or_default()})
+                        }).collect();
+                        obj.insert("selection_cards".into(), serde_json::Value::Array(sel));
+                    }
                 }
             }
         }
@@ -326,25 +705,6 @@ impl GameState {
             ("opponent", Some("player2") | Some("p2")) => &self.player1,
             ("opponent", _) => &self.player2,
             _ => &self.player1,
-        }
-    }
-
-    pub fn check_victory(&self) -> GameResult {
-        use crate::constants::VICTORY_CARD_COUNT;
-        let p1_success = self.player1.success_live_card_zone.len();
-        let p2_success = self.player2.success_live_card_zone.len();
-
-        let p1_wins = p1_success >= VICTORY_CARD_COUNT && p2_success <= VICTORY_CARD_COUNT - 1;
-        let p2_wins = p2_success >= VICTORY_CARD_COUNT && p1_success <= VICTORY_CARD_COUNT - 1;
-
-        if p1_success >= VICTORY_CARD_COUNT && p2_success >= VICTORY_CARD_COUNT {
-            GameResult::Draw
-        } else if p1_wins && !p2_wins {
-            GameResult::FirstAttackerWins
-        } else if p2_wins && !p1_wins {
-            GameResult::SecondAttackerWins
-        } else {
-            GameResult::Ongoing
         }
     }
 
@@ -445,8 +805,13 @@ impl GameState {
         if player.live_card_zone.cards.is_empty() {
             return false;
         }
-        let stage_hearts =
-            player.calculate_stage_hearts(&self.card_database, &self.mods.heart_color_multiplier);
+        // stage_hearts is set in execute_live_victory_determination to include
+        // yell blade hearts, matching the total the performance heart check used.
+        let empty_mult = std::collections::HashMap::new();
+        let stage_hearts = player
+            .stage_hearts
+            .clone()
+            .unwrap_or_else(|| player.calculate_stage_hearts(&self.card_database, &empty_mult));
         for card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*card_id) {
                 if card.satisfies_heart_requirement(&stage_hearts) {
@@ -460,11 +825,10 @@ impl GameState {
     pub fn can_place_card_in_zone(&self, card_id: i16, zone: &str, _player_id: &str) -> bool {
         if let Some(card) = self.card_database.get_card(card_id) {
             for ability in &card.abilities {
-                if ability
-                    .triggers
-                    .as_ref()
-                    .map_or(false, |t| t.contains(crate::triggers::CONSTANT))
-                {
+                if Self::ability_matches_trigger(
+                    ability,
+                    &crate::game_state::AbilityTrigger::Constant,
+                ) {
                     if let Some(ref effect) = ability.effect {
                         let restricted_to = effect
                             .restricted_destination
@@ -551,64 +915,23 @@ impl GameState {
                     return false;
                 }
 
+                let trigger_match = Self::ability_matches_trigger(ability, &trigger);
                 match trigger {
-                    AbilityTrigger::Activation => {
-                        let trigger_match = ability
-                            .triggers
-                            .as_ref()
-                            .map_or(false, |t| t.contains(crate::triggers::ACTIVATION));
-                        trigger_match
-                    }
+                    AbilityTrigger::Activation
+                    | AbilityTrigger::Constant
+                    | AbilityTrigger::Auto => trigger_match,
                     AbilityTrigger::Debut => {
-                        let trigger_match = ability.triggers.as_ref().map_or(false, |t| {
-                            t.contains(crate::triggers::DEBUT)
-                                || t.contains(crate::triggers::DEBUT_EN)
-                        });
-                        let should_trigger =
-                            trigger_match && self.should_trigger_debut(player, card);
-                        should_trigger
+                        trigger_match && self.should_trigger_debut(player, card)
                     }
                     AbilityTrigger::LiveStart => {
-                        let trigger_match = ability
-                            .triggers
-                            .as_ref()
-                            .map_or(false, |t| t.contains(crate::triggers::LIVE_START));
-                        let should_trigger =
-                            trigger_match && self.should_trigger_live_start(player);
-                        should_trigger
+                        trigger_match && self.should_trigger_live_start(player)
                     }
                     AbilityTrigger::LiveSuccess => {
-                        let trigger_match = ability
-                            .triggers
-                            .as_ref()
-                            .map_or(false, |t| t.contains(crate::triggers::LIVE_SUCCESS));
-                        let should_trigger =
-                            trigger_match && self.should_trigger_live_success(player);
-                        should_trigger
-                    }
-                    AbilityTrigger::Constant => {
-                        let trigger_match = ability
-                            .triggers
-                            .as_ref()
-                            .map_or(false, |t| t.contains(crate::triggers::CONSTANT));
-                        trigger_match
-                    }
-                    AbilityTrigger::Auto => {
-                        let trigger_match = ability
-                            .triggers
-                            .as_ref()
-                            .map_or(false, |t| t.contains(crate::triggers::AUTO));
-                        trigger_match
+                        trigger_match && self.should_trigger_live_success(player)
                     }
                 }
             })
             .collect()
-    }
-
-    pub fn get_temporary_effects_in_order(&self) -> Vec<&TemporaryEffect> {
-        let mut effects = self.temporary_effects.iter().collect::<Vec<_>>();
-        effects.sort_by_key(|e| e.creation_order);
-        effects
     }
 
     pub fn check_expired_effects(&mut self) {
@@ -616,7 +939,14 @@ impl GameState {
 
         for (i, effect) in self.temporary_effects.iter().enumerate() {
             let is_expired = match effect.duration {
-                Duration::LiveEnd => self.current_turn_phase != TurnPhase::Live,
+                Duration::LiveEnd => {
+                    let expired = self.current_turn_phase != TurnPhase::Live;
+                    eprintln!(
+                        "[EXPIRY] LiveEnd check: phase={:?} turn_phase={:?} expired={}",
+                        self.current_phase, self.current_turn_phase, expired
+                    );
+                    expired
+                }
                 Duration::ThisTurn => self.turn_number > effect.created_turn,
                 Duration::ThisLive => self.current_turn_phase != TurnPhase::Live,
                 Duration::Permanent => false,
@@ -757,13 +1087,11 @@ impl GameState {
                 }
             }
         }
-    }
 
-    pub fn get_active_effects_for_player(&self, player_id: &str) -> Vec<&TemporaryEffect> {
-        self.temporary_effects
-            .iter()
-            .filter(|e| e.target_player_id == player_id)
-            .collect()
+        // Clear prohibition effects (e.g. "cannot_live") when the live phase ends.
+        if self.current_turn_phase != TurnPhase::Live && !self.prohibition_effects.is_empty() {
+            self.prohibition_effects.clear();
+        }
     }
 
     pub fn add_replacement_effect(
@@ -782,10 +1110,6 @@ impl GameState {
             is_choice_based,
             applied_this_event: false,
         });
-    }
-
-    pub fn remove_replacement_effects_for_card(&mut self, card_id: i16) {
-        self.replacement_effects.retain(|e| e.card_id != card_id);
     }
 
     pub fn get_replacement_effects_for_event(&self, event: &str) -> Vec<&ReplacementEffect> {
@@ -814,10 +1138,6 @@ impl GameState {
     pub fn set_opponent_live_success(&mut self, no_excess_heart: bool) {
         self.opponent_live_success_this_turn = true;
         self.opponent_live_no_excess_heart_this_turn = no_excess_heart;
-    }
-
-    pub fn set_formation_change_occurred(&mut self) {
-        self.formation_change_occurred_this_turn = true;
     }
 
     pub fn reset_change_flags(&mut self) {
