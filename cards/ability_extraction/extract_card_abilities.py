@@ -21,6 +21,7 @@ from parser import (
     parse_cost,
     parse_effect,
     _normalize_effect_tree,
+    _collapse_to_effect_steps,
 )
 
 TRIGGER_PATTERN = re.compile(r"\{\{([^|]+)\|([^}]+)\}\}")
@@ -282,13 +283,16 @@ def _enrich_effect_type(effect, triggerless=""):
             heart_colors.append(h)
     if heart_colors and "heart_colors" not in effect:
         effect["heart_colors"] = heart_colors
-    # Propagate heart_colors into location_condition for collective heart checks
+    # Propagate heart_colors into location_condition for collective heart checks.
+    # Skip check_self conditions — they check a specific card's location, not
+    # collective heart presence; heart_colors there is effect metadata leakage.
     if "heart_colors" in effect and "condition" in effect:
         cond = effect["condition"]
         if (
             isinstance(cond, dict)
             and cond.get("type") == "location_condition"
             and "heart_colors" not in cond
+            and not cond.get("check_self")
         ):
             cond["heart_colors"] = effect["heart_colors"]
 
@@ -364,6 +368,12 @@ def extract_all_abilities(cards_file: Path) -> dict:
             effect = parse_effect(effect_text)
             # Run post-processing normalizer (propagates exclude_self, distinct, position, original_value, etc.)
             effect = _normalize_effect_tree(effect, sample["triggerless_text"])
+            # Collapse the 4 specialized compound shapes (look_and_select,
+            # conditional_alternative, conditional_on_result,
+            # conditional_on_optional) into the unified `effect_steps` form
+            # so the engine can dispatch them through the single sequential
+            # pipeline. This eliminates per-shape code paths.
+            effect = _collapse_to_effect_steps(effect)
             # Check if effect has empty actions array
             if "actions" in effect and not effect["actions"]:
                 print(f"Warning: Effect parsed with empty actions: {effect_text[:100]}")
@@ -377,32 +387,6 @@ def extract_all_abilities(cards_file: Path) -> dict:
 
             traceback.print_exc()
             effect = {"text": effect_text, "actions": []}
-
-        # Extract activation_position from cost text (e.g. {{center.png|センター}})
-        if "activation_position" not in effect:
-            t = sample["triggerless_text"]
-            if "{{center.png|センター}}" in t:
-                effect["activation_position"] = "center"
-            elif "{{left.png|左サイド}}" in t:
-                effect["activation_position"] = "left_side"
-            elif "{{right.png|右サイド}}" in t:
-                effect["activation_position"] = "right_side"
-        # Also extract activation_position from trigger icons (e.g. 登場 + position icon)
-        if "activation_position" not in effect:
-            trigs = sample.get("triggers", [])
-            positions = []
-            for trig_text in ["左サイド", "右サイド", "センター"]:
-                if trig_text in trigs:
-                    pos_map = {
-                        "左サイド": "left_side",
-                        "右サイド": "right_side",
-                        "センター": "center",
-                    }
-                    positions.append(pos_map[trig_text])
-            if len(positions) == 1:
-                effect["activation_position"] = positions[0]
-            elif len(positions) > 1:
-                effect["activation_position"] = ",".join(positions)
 
         # If the effect handler embedded a cost (e.g. "unless pay N energy"),
         # lift it to the ability level (Q92: player chooses whether to pay)

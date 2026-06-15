@@ -42,15 +42,14 @@ impl AbilityResolver {
         let (live_card_ids, final_value) = {
             let player = gs.resolve_target_player_mut(&target);
 
-            let filter = util::filter_from_parts(
-                card_type_filter.as_deref(),
-                group_filter.as_deref(),
-                effect.cost_limit,
-                effect.cost_limit_operator.as_deref(),
-                effect.characters.as_ref(),
-                effect.exclude_characters.as_ref(),
-                exclude_self_id,
-            );
+            let mut filter = effect.filter_subset();
+            if let Some(ref ct) = card_type_filter {
+                filter.card_type = Some(ct.as_str());
+            }
+            if let Some(ref g) = group_filter {
+                filter.group = Some(g.as_str());
+            }
+            filter.exclude_self = exclude_self_id;
 
             let final_value = if per_unit {
                 let matching_count = if per_unit_type_str.as_deref() == Some("つ") {
@@ -132,10 +131,9 @@ impl AbilityResolver {
         for (card_id, delta) in &live_card_ids {
             if let Some(constraint) = &effect_constraint {
                 let current_mod = gs.mods.get_score_modifier(*card_id);
-                if constraint.as_str() == "min:0"
-                    && current_mod + delta < 0 {
-                        continue;
-                    }
+                if constraint.as_str() == "min:0" && current_mod + delta < 0 {
+                    continue;
+                }
             }
             if operation == "set" {
                 gs.mods.set_score_modifier(*card_id, *delta);
@@ -187,6 +185,9 @@ impl AbilityResolver {
         group_name: Option<&str>,
         timing_condition: Option<&str>,
         location: Option<&str>,
+        original_value: Option<bool>,
+        original_count: Option<u32>,
+        original_operator: Option<&str>,
     ) -> Result<(), String> {
         if per_unit {
             let card_db = &gs.card_database;
@@ -231,6 +232,44 @@ impl AbilityResolver {
             let player = gs.resolve_target_player_mut(target);
             player.live_card_zone.cards.to_vec()
         };
+        let db = &gs.card_database;
+        let card_ids: Vec<i16> = card_ids
+            .into_iter()
+            .filter(|&card_id| {
+                // Filter by group_name (e.g. "μ's")
+                if let Some(gn) = group_name {
+                    if !util::card_matches_group_str(db, card_id, Some(gn)) {
+                        return false;
+                    }
+                }
+                // Filter by original score when original_value is set
+                if original_value.unwrap_or(false) {
+                    let card = db.get_card(card_id);
+                    match (
+                        card.and_then(|c| c.score),
+                        original_count,
+                        original_operator,
+                    ) {
+                        (Some(score), Some(threshold), Some(op)) => {
+                            let met = match op {
+                                ">=" => score >= threshold,
+                                "<=" => score <= threshold,
+                                ">" => score > threshold,
+                                "<" => score < threshold,
+                                "==" => score == threshold,
+                                "!=" => score != threshold,
+                                _ => true,
+                            };
+                            if !met {
+                                return false;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                true
+            })
+            .collect();
         let pp = self.player_prefix(gs);
         let act_name = gs
             .activating_card

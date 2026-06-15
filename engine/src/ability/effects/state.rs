@@ -63,9 +63,7 @@ impl AbilityResolver {
                     }
                     true
                 })
-            } else if state_change == "wait"
-                && effect.state.as_deref() == Some("active")
-            {
+            } else if state_change == "wait" && effect.state.as_deref() == Some("active") {
                 // wait effect targeting only active members:
                 // check if there is at least one active (non-wait) member
                 let p = gs.resolve_target_player(&target);
@@ -131,7 +129,10 @@ impl AbilityResolver {
         if is_member_op {
             log::debug!(
                 "[EXEC_CHANGE_STATE] member_op: target={} count={} max={} state_change={}",
-                target, count, max, state_change
+                target,
+                count,
+                max,
+                state_change
             );
 
             // Check cannot_activate_by_effect restriction before mutable borrow.
@@ -145,16 +146,13 @@ impl AbilityResolver {
             let card_db = self.card_db();
             let player = gs.resolve_target_player_mut(&target);
 
-            let filter = util::filter_from_parts(
-                card_type_filter.as_deref(),
-                group_filter.as_deref(),
-                cost_limit,
-                cost_limit_operator.as_deref(),
-                characters,
-                None, // exclude_characters
-                None, // exclude_self
-            )
-            .original_blade_limit(blade_limit, blade_limit_operator);
+            let mut filter = crate::ability::util::CardFilter::default();
+            filter.card_type = card_type_filter.as_deref();
+            filter.group = group_filter.as_deref();
+            filter.cost_limit = cost_limit;
+            filter.cost_operator = cost_limit_operator.as_deref();
+            filter.characters = characters;
+            let filter = filter.original_blade_limit(blade_limit, blade_limit_operator);
             let mut candidates: Vec<(usize, i16)> = Vec::new();
 
             // If we have selected cards from a previous choice, use them
@@ -392,15 +390,10 @@ impl AbilityResolver {
         let (wait_cards, deactivate_count) = {
             let player = gs.resolve_target_player_mut(target);
 
-            let filter = util::filter_from_parts(
-                card_type_filter,
-                group_filter,
-                effect.cost_limit,
-                effect.cost_limit_operator.as_deref(),
-                effect.characters.as_ref(),
-                effect.exclude_characters.as_ref(),
-                exclude_self_id,
-            );
+            let mut filter = effect.filter_subset();
+            filter.card_type = card_type_filter;
+            filter.group = group_filter;
+            filter.exclude_self = exclude_self_id;
             let valid_indices =
                 util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
 
@@ -416,7 +409,9 @@ impl AbilityResolver {
                 let capped = (count as usize).min(available) as u32;
                 log::debug!(
                     "[ENERGY] max=true: count={} available={} effective={}",
-                    count, available, capped
+                    count,
+                    available,
+                    capped
                 );
                 capped
             } else {
@@ -432,26 +427,29 @@ impl AbilityResolver {
                 ));
             }
 
-            if !max && valid_indices.len() > effective_count as usize
-                && state_change != "active" && state_change != "アクティブ" {
-                    self.pending_choice = Some(
-                        Choice::select_cards(
-                            Zone::Energy.to_str(),
-                            effective_count as usize,
-                            format!(
-                                "Select {} energy card(s) to deactivate (set to wait)",
-                                effective_count
-                            ),
-                            false,
-                        )
-                        .card_type(card_type_filter.map(|s| s.to_string()))
-                        .group(group_filter.map(|s| s.to_string()))
-                        .target_player_id(Some(target.to_string()))
-                        .build(),
-                    );
-                    self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-                    return Ok(());
-                }
+            if !max
+                && valid_indices.len() > effective_count as usize
+                && state_change != "active"
+                && state_change != "アクティブ"
+            {
+                self.pending_choice = Some(
+                    Choice::select_cards(
+                        Zone::Energy.to_str(),
+                        effective_count as usize,
+                        format!(
+                            "Select {} energy card(s) to deactivate (set to wait)",
+                            effective_count
+                        ),
+                        false,
+                    )
+                    .card_type(card_type_filter.map(|s| s.to_string()))
+                    .group(group_filter.map(|s| s.to_string()))
+                    .target_player_id(Some(target.to_string()))
+                    .build(),
+                );
+                self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
+                return Ok(());
+            }
 
             let wait_cards: Vec<i16> = valid_indices
                 .iter()
@@ -478,12 +476,10 @@ impl AbilityResolver {
                     break;
                 }
                 if let Some(&card_id) = player.energy_zone.cards.get(i) {
-                    let matches_type = card_type_filter.is_none_or(|ct| {
-                        util::card_matches_type(&card_db, card_id, Some(ct))
-                    });
-                    let matches_grp = group_filter.is_none_or(|gf| {
-                        util::card_matches_group_str(&card_db, card_id, Some(gf))
-                    });
+                    let matches_type = card_type_filter
+                        .is_none_or(|ct| util::card_matches_type(&card_db, card_id, Some(ct)));
+                    let matches_grp = group_filter
+                        .is_none_or(|gf| util::card_matches_group_str(&card_db, card_id, Some(gf)));
                     if matches_type && matches_grp {
                         result.push(card_id);
                         active_count += 1;

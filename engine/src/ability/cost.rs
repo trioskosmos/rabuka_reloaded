@@ -50,18 +50,18 @@ fn get_change_state_candidates(
 }
 
 impl AbilityResolver {
-    pub fn validate_cost(&self, gs: &mut GameState, cost: &AbilityCost) -> Result<(), String> {
-        match cost.cost_type.as_deref() {
-            Some("sequential_cost") => {
-                if let Some(ref costs) = cost.costs {
+    pub fn validate_cost(&self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
+        match cost.action.as_str() {
+            "sequential_cost" => {
+                if let Some(ref costs) = cost.compound.actions {
                     for sub_cost in costs {
                         self.validate_cost(gs, sub_cost)?;
                     }
                 }
                 Ok(())
             }
-            Some("choice_condition") => Ok(()),
-            Some("move_cards") => {
+            "choice_condition" => Ok(()),
+            "move_cards" => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let source = cost.source.as_deref().unwrap_or("");
                 let target_str = cost.target.as_deref().unwrap_or("self");
@@ -81,7 +81,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            Some("energy_condition") => {
+            "energy_condition" => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let player = gs.active_player();
                 if player.energy_zone.cards.len() < count {
@@ -97,12 +97,12 @@ impl AbilityResolver {
         }
     }
 
-    fn pay_cost_inner(&mut self, gs: &mut GameState, cost: &AbilityCost) -> Result<(), String> {
+    fn pay_cost_inner(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         let mut dbg = AbDebug::new();
         dbg.cost_pay(cost, true);
-        match cost.cost_type.as_deref() {
-            Some("sequential_cost") => {
-                if let Some(ref costs) = cost.costs {
+        match cost.action.as_str() {
+            "sequential_cost" => {
+                if let Some(ref costs) = cost.compound.actions {
                     let start_idx = gs
                         .ability_queue
                         .current_entry()
@@ -124,9 +124,10 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            Some("choice_condition") => {
+            "choice_condition" => {
                 let texts: Vec<String> = cost
-                    .options
+                    .compound
+                    .actions
                     .as_ref()
                     .map(|o| o.iter().map(|opt| opt.text.clone()).collect())
                     .unwrap_or_default();
@@ -141,7 +142,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            Some("move_cards") => {
+            "move_cards" => {
                 let source = cost.source.as_deref().unwrap_or("");
                 // None means "any number" (player chooses 0..N)
                 let is_any_number = cost.count.is_none();
@@ -163,15 +164,9 @@ impl AbilityResolver {
                     let card_db = &gs.card_database;
                     let cost_limit = cost.cost_limit;
                     let card_type_filter = card_type.as_deref();
-                    let filter = util::filter_from_parts(
-                        card_type_filter,
-                        None,
-                        cost_limit,
-                        None,
-                        cost.characters.as_ref(),
-                        None,
-                        None,
-                    );
+                    let mut filter = cost.filter_subset();
+                    filter.card_type = card_type_filter;
+                    filter.cost_limit = cost_limit;
                     let matching_indices: Vec<usize> = pl
                         .hand
                         .cards
@@ -263,15 +258,9 @@ impl AbilityResolver {
 
                     let player = gs.resolve_target_player(target);
                     let card_db = &gs.card_database;
-                    let filter = util::filter_from_parts(
-                        card_type_filter,
-                        None,
-                        cost_limit,
-                        None,
-                        cost.characters.as_ref(),
-                        None,
-                        None,
-                    );
+                    let mut filter = cost.filter_subset();
+                    filter.card_type = card_type_filter;
+                    filter.cost_limit = cost_limit;
                     let _zone_cards = util::zone_cards(player, source);
 
                     if same_unit {
@@ -353,7 +342,7 @@ impl AbilityResolver {
 
                 let effect = AbilityEffect {
                     text: cost.text.clone(),
-                    action: cost.cost_type.clone().unwrap_or_default(),
+                    action: cost.action.clone(),
                     source: cost.source.clone(),
                     destination: cost.destination.clone(),
                     count: cost.count,
@@ -369,7 +358,7 @@ impl AbilityResolver {
                 };
                 self.execute_move_cards(gs, &effect)
             }
-            Some("change_state") => {
+            "change_state" => {
                 let state_change = cost.state_change.as_deref().unwrap_or("");
                 let target = cost.target.as_deref().unwrap_or("self");
                 let optional = cost.optional.unwrap_or(false);
@@ -457,8 +446,8 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            Some("pay_energy") => {
-                let energy = cost.energy.unwrap_or(0);
+            "pay_energy" => {
+                let energy = cost.energy_count.unwrap_or(0);
                 let target = cost.target.as_deref().unwrap_or("self");
                 let optional = cost.optional.unwrap_or(false);
                 let any_number = cost.any_number.unwrap_or(false);
@@ -529,7 +518,7 @@ impl AbilityResolver {
                 }
                 Ok(())
             }
-            Some("energy_condition") => {
+            "energy_condition" => {
                 let count = cost.count.unwrap_or(1) as usize;
                 let target = cost.target.as_deref().unwrap_or("self");
                 let player = gs.resolve_target_player_mut(target);
@@ -549,7 +538,7 @@ impl AbilityResolver {
                     player.energy_zone.active_energy_count.saturating_sub(count);
                 Ok(())
             }
-            Some("reveal") => {
+            "reveal" => {
                 let source = cost.source.as_deref().unwrap_or(Zone::Hand.to_str());
                 let target = cost.target.as_deref().unwrap_or("self");
                 let card_type = cost.card_type.clone();
@@ -615,7 +604,7 @@ impl AbilityResolver {
                     Ok(())
                 }
             }
-            Some("place_energy_under_member") => {
+            "place_energy_under_member" => {
                 self.execute_place_energy_under_member(
                     gs,
                     cost.count.unwrap_or(1),
@@ -626,7 +615,7 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            Some("custom") => {
+            "custom" => {
                 if cost.destination.as_deref().and_then(Zone::from_str) == Some(Zone::UnderMember) {
                     self.execute_place_energy_under_member(
                         gs,
@@ -643,7 +632,7 @@ impl AbilityResolver {
         }
     }
 
-    pub fn pay_cost(&mut self, gs: &mut GameState, cost: &AbilityCost) -> Result<(), String> {
+    pub fn pay_cost(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         self.pay_cost_inner(gs, cost)
     }
 
@@ -685,7 +674,7 @@ impl AbilityResolver {
         let is_pay = true;
         if is_pay {
             if let Some(cost) = gs.entry_cost().cloned() {
-                if let Some(energy) = cost.energy {
+                if let Some(energy) = cost.energy_count {
                     if energy > 0 {
                         let tgt = cost.target.as_deref().unwrap_or("self");
                         gs.resolve_target_player_mut(tgt)
@@ -729,7 +718,7 @@ impl AbilityResolver {
                     }
                 }
                 // Handle sequential_cost sub-costs — pay each after user confirmed
-                if let Some(ref costs) = cost.costs {
+                if let Some(ref costs) = cost.compound.actions {
                     for sub_cost in costs {
                         if sub_cost.state_change.as_deref() == Some("wait")
                             && sub_cost.self_cost == Some(true)
@@ -745,10 +734,10 @@ impl AbilityResolver {
                         }
                     }
                 }
-                log::debug!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}", 
-                    cost.cost_type, gs.entry_cost().is_some(), 
+                log::debug!("[OPT_COST] checking cost_type: {:?}, entry_cost: {:?}, entry_effect_action: {:?}",
+                    cost.action, gs.entry_cost().is_some(),
                     gs.entry_effect().map(|e| e.action.clone()));
-                if cost.cost_type.as_deref() == Some("place_energy_under_member") {
+                if cost.action == "place_energy_under_member" {
                     self.execute_place_energy_under_member(
                         gs,
                         cost.count.unwrap_or(1),

@@ -53,7 +53,9 @@ impl super::TurnEngine {
                     if let Some(card) = game_state.card_database.get_card(card_id) {
                         log::debug!(
                             "[DEBUT_TRIG_DBG] stage card_id={} card_no={} card_no_clone={}",
-                            card_id, card.card_no, card_no_clone
+                            card_id,
+                            card.card_no,
+                            card_no_clone
                         );
                         if card.card_no == card_no_clone {
                             for ability in &card.abilities {
@@ -63,7 +65,9 @@ impl super::TurnEngine {
                                 });
                                 log::debug!(
                                     "[DEBUT_TRIG_DBG]   ability={} triggers={:?} match={}",
-                                    ability.full_text, ability.triggers, trigger_match
+                                    ability.full_text,
+                                    ability.triggers,
+                                    trigger_match
                                 );
                                 if trigger_match {
                                     // Skip abilities that require baton touch if baton touch wasn't used
@@ -72,9 +76,7 @@ impl super::TurnEngine {
                                             .effect
                                             .as_ref()
                                             .and_then(|e| e.condition.as_ref())
-                                            .is_some_and(|c| {
-                                                c.baton_touch_trigger.unwrap_or(false)
-                                            })
+                                            .is_some_and(|c| c.baton_touch_trigger.unwrap_or(false))
                                     {
                                         continue;
                                     }
@@ -256,7 +258,8 @@ impl super::TurnEngine {
         for (ability_id, card_no, explicit_card_id) in abilities_to_trigger {
             log::debug!(
                 "[LIVE_START_TRIGGER]   ability={} card_no={}",
-                ability_id, card_no
+                ability_id,
+                card_no
             );
             game_state.trigger_auto_ability(
                 ability_id,
@@ -280,6 +283,10 @@ impl super::TurnEngine {
     }
 
     pub fn trigger_live_success_abilities(game_state: &mut GameState, player_id: &str) {
+        // Evaluate constant modify_required_hearts abilities on cards in the
+        // success_live_card_zone before checking live success conditions.
+        game_state.evaluate_success_zone_heart_reductions();
+
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
 
@@ -314,7 +321,8 @@ impl super::TurnEngine {
                             {
                                 log::debug!(
                                     "[TRIGGER] live_success stage: card={} trigger={:?}",
-                                    card.card_no, ability.triggers
+                                    card.card_no,
+                                    ability.triggers
                                 );
                                 let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                                 abilities_to_trigger.push((
@@ -336,7 +344,9 @@ impl super::TurnEngine {
                         });
                         log::debug!(
                             "[TRIGGER] live_success live_card: card={} trigger={:?} match={}",
-                            card.card_no, ability.triggers, trigger_match
+                            card.card_no,
+                            ability.triggers,
+                            trigger_match
                         );
                         if trigger_match {
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);

@@ -27,6 +27,11 @@ impl super::TurnEngine {
     }
 
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
+        // Evaluate constant modify_required_hearts abilities on cards in the
+        // success_live_card_zone (e.g. PL!-bp6-022-L) before any scoring or
+        // heart requirement checks.
+        game_state.evaluate_success_zone_heart_reductions();
+
         let p1_mult = &game_state.mods.heart_color_multiplier.clone();
         let p2_mult = &game_state.mods.heart_color_multiplier.clone();
         // Include yell blade hearts in stage_hearts so should_trigger_live_success
@@ -423,13 +428,20 @@ impl super::TurnEngine {
             for (i, l) in snap.lives.iter().enumerate() {
                 log::debug!(
                     "[SURPLUS]   live[{}] passed={} required={:?} filled={:?} spare={:?}",
-                    i, l.passed, l.required, l.filled, l.spare
+                    i,
+                    l.passed,
+                    l.required,
+                    l.filled,
+                    l.spare
                 );
             }
             for a in &snap.breakdown.allocations {
                 log::debug!(
                     "[SURPLUS]   alloc target={} color={} amount={} wildcard={}",
-                    a.target_idx, a.color, a.amount, a.wildcard
+                    a.target_idx,
+                    a.color,
+                    a.amount,
+                    a.wildcard
                 );
             }
             if snap.player_id == player2_id {
@@ -462,7 +474,8 @@ impl super::TurnEngine {
         let p2_before = game_state.player2.success_live_card_zone.cards.len();
         log::debug!(
             "[MULTI_DEBUG] About to call move_live_to_success p1_won={} p2_won={}",
-            player1_won, player2_won
+            player1_won,
+            player2_won
         );
         Self::move_live_to_success_and_handle_wins(game_state, player1_won, player2_won);
         // Rule 8.4.13: If only one player moved a card to success this live, they become first attacker
@@ -552,7 +565,12 @@ impl super::TurnEngine {
 
         log::debug!(
             "[MULTI_LIVE] p1_won={} p2_won={} p1_cards={} p2_cards={} p1_must={} p2_must={}",
-            player1_won, player2_won, p1_cards, p2_cards, p1_must_skip, p2_must_skip
+            player1_won,
+            player2_won,
+            p1_cards,
+            p2_cards,
+            p1_must_skip,
+            p2_must_skip
         );
         // Check if multiple live cards need a success zone choice (Rule 8.4.7)
         if player1_won && !p1_must_skip && p1_cards > 1 {
@@ -687,14 +705,14 @@ impl super::TurnEngine {
                 continue;
             }
             let cond_matches = effect.condition.as_ref().is_some_and(|c| {
-                c.location.as_deref().is_some_and(|loc| {
-                    Zone::from_str(loc) == Some(Zone::SuccessLiveZone)
-                })
+                c.location
+                    .as_deref()
+                    .is_some_and(|loc| Zone::from_str(loc) == Some(Zone::SuccessLiveZone))
             });
             if !cond_matches {
                 continue;
             }
-            let alt = match &effect.compound.alternative_effect {
+            let alt = match &effect.alternative_effect {
                 Some(a) => a,
                 None => continue,
             };

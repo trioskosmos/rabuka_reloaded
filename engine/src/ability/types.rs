@@ -2,6 +2,8 @@ use std::fmt;
 
 use serde_json::Value;
 
+use crate::card::AbilityEffect;
+
 /// Discriminator for routing choice results to the correct handler.
 /// Statically known routes are enum variants; dynamic routes (e.g. position_change
 /// with card_no) use `Raw`.
@@ -320,6 +322,45 @@ impl Choice {
         }
     }
 
+    /// Build a CardFilter from the basic filter fields this choice carries.
+    /// Used by `handle_select_card` to validate the user's picks against
+    /// the choice's advertised constraints. Falls back to a default filter
+    /// for non-`SelectCard` variants.
+    pub fn as_filter<'a>(&'a self) -> crate::ability::util::CardFilter<'a> {
+        match self {
+            Choice::SelectCard {
+                card_type,
+                cost_limit,
+                cost_limit_operator,
+                group,
+                characters,
+                ..
+            } => crate::ability::util::CardFilter {
+                card_type: card_type.as_deref(),
+                group: group.as_deref(),
+                groups: None,
+                cost_limit: *cost_limit,
+                cost_operator: cost_limit_operator.as_deref(),
+                cost_limit_min: None,
+                cost_total: None,
+                cost_total_operator: None,
+                need_heart_total: None,
+                need_heart_operator: None,
+                need_heart_color: None,
+                characters: characters.as_ref(),
+                exclude_characters: None,
+                heart_colors: &[],
+                name_fragments: None,
+                distinct: None,
+                exclude_self: None,
+                original_blade_limit: None,
+                original_blade_operator: None,
+                exclude_cards: None,
+            },
+            _ => crate::ability::util::CardFilter::default(),
+        }
+    }
+
     /// Convert to the JSON format expected by the frontend.
     /// Flattens enum variants and adds frontend-specific fields (choose_count, v_remaining, title).
     pub fn to_frontend_json(&self) -> Option<Value> {
@@ -467,6 +508,113 @@ pub struct EffectSpawnContext {
 }
 
 // ====================================================================
+// StepOutput — the output of one step in a sequential compound effect,
+// stored in AbilityResolver::step_results under the step's `id`.
+// ====================================================================
+
+/// The set of values a step can produce for downstream `ref` resolution.
+/// Empty variants represent "this step produced no value" (e.g. a no-op
+/// `draw` with optional:false) and are simply not stored.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StepOutput {
+    /// Card ids the step "produced" — selected by `select_cards`, revealed by
+    /// `reveal`/`look_at`, moved by `move_cards` (for `self` targets), or
+    /// otherwise identified as the result of the step. Most steps populate
+    /// this; downstream steps that need a card reference read it.
+    pub cards: Vec<i16>,
+    /// Numeric value the step produced — for steps like "draw N cards" the
+    /// count drawn, for `gain_resource` the count gained, for `modify_score`
+    /// the score delta, etc. Downstream `ValueRef::StepValue` reads this.
+    pub value: Option<i32>,
+    /// True iff the step was a yes/no choice and the player chose "yes" /
+    /// "perform". Used for `ValueRef::StepAccepted` patterns.
+    pub accepted: Option<bool>,
+}
+
+impl StepOutput {
+    pub fn from_cards(cards: Vec<i16>) -> Self {
+        StepOutput {
+            cards,
+            value: None,
+            accepted: None,
+        }
+    }
+    pub fn from_value(value: i32) -> Self {
+        StepOutput {
+            cards: Vec::new(),
+            value: Some(value),
+            accepted: None,
+        }
+    }
+    pub fn from_accepted(accepted: bool) -> Self {
+        StepOutput {
+            cards: Vec::new(),
+            value: None,
+            accepted: Some(accepted),
+        }
+    }
+    pub fn merge(&mut self, other: &StepOutput) {
+        self.cards.extend_from_slice(&other.cards);
+        if other.value.is_some() {
+            self.value = other.value;
+        }
+        if other.accepted.is_some() {
+            self.accepted = other.accepted;
+        }
+    }
+}
+
+// ====================================================================
+// ValueRef / TargetRef — refer to either a literal or a step output.
+// ====================================================================
+
+/// Discriminated union for a field that is either a literal value in JSON
+/// or a reference to a step's output. Engine code resolves this against
+/// the resolver's `step_results` map before using the underlying value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ValueRef {
+    /// Plain literal value (parsed from JSON number, or from a step output
+    /// during a transition where the type hasn't been upgraded yet).
+    Literal(i32),
+    /// Reference to step_results[step_id].value.
+    StepValue(String),
+    /// Reference to step_results[step_id].accepted (used for yes/no
+    /// "perform the effect?" choices — true means 1, false means 0).
+    StepAccepted(String),
+    /// Reference to step_results[step_id].value with an offset added.
+    /// Used for patterns like "selected card's score - 1".
+    StepValueOffset { step: String, offset: i32 },
+}
+
+impl ValueRef {
+    /// Resolve to a concrete i32 against the step_results map.
+    /// If `step_id` is not present, returns `fallback`.
+    pub fn resolve(
+        &self,
+        step_results: &std::collections::HashMap<String, StepOutput>,
+        fallback: i32,
+    ) -> i32 {
+        match self {
+            ValueRef::Literal(v) => *v,
+            ValueRef::StepValue(id) => step_results
+                .get(id)
+                .and_then(|o| o.value)
+                .unwrap_or(fallback),
+            ValueRef::StepAccepted(id) => step_results
+                .get(id)
+                .and_then(|o| o.accepted)
+                .map(|b| if b { 1 } else { 0 })
+                .unwrap_or(fallback),
+            ValueRef::StepValueOffset { step, offset } => step_results
+                .get(step)
+                .and_then(|o| o.value)
+                .map(|v| v + offset)
+                .unwrap_or(fallback),
+        }
+    }
+}
+
+// ====================================================================
 // Execution trace nodes
 // ====================================================================
 
@@ -554,6 +702,85 @@ impl EffectPipeline {
     pub fn new() -> Self {
         EffectPipeline {
             trace: AbilityTraceNode::new("root"),
+        }
+    }
+}
+
+// ====================================================================
+// StepState — cross-step data flow machinery, extracted from
+// AbilityResolver so the resolver struct stays focused on dispatch.
+// ====================================================================
+
+use std::collections::HashMap;
+
+/// Owns the state required for one effect's steps to communicate with later
+/// steps. Created fresh for every `AbilityResolver` and reset at the start
+/// of every sequential (so data never leaks between abilities).
+#[derive(Clone, Debug, Default)]
+pub struct StepState {
+    /// Per-step output, keyed by the step's `id` field. Populated by
+    /// `record_step_output` and read by `step_output` / `resolve_ref_*`.
+    pub step_results: HashMap<String, StepOutput>,
+    /// Number of cards drawn by the most recent draw step. Read by the
+    /// sequential handler to populate `StepOutput::value` for the step.
+    pub last_draw_count: u32,
+    /// Total count of cards looked at by the most recent look step. Read
+    /// by the sequential handler for `StepOutput::value` on look steps.
+    pub looked_at_total_count: usize,
+}
+
+impl StepState {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Record a step's output under its id. No-op if the effect has no id.
+    /// If the id already has an output, the new output is merged in.
+    pub fn record(&mut self, effect: &AbilityEffect, output: StepOutput) {
+        if let Some(ref id) = effect.id {
+            self.step_results
+                .entry(id.clone())
+                .or_insert_with(StepOutput::default)
+                .merge(&output);
+        }
+    }
+
+    /// Look up a step's stored output by id. Returns an empty output if
+    /// not present (callers can chain `.cards` / `.value` without unwrap).
+    pub fn get(&self, id: &str) -> StepOutput {
+        self.step_results.get(id).cloned().unwrap_or_default()
+    }
+
+    /// Drop all stored step outputs. Called by the sequential handler at
+    /// the start of every sequential so steps from one sequential never
+    /// leak to another.
+    pub fn clear(&mut self) {
+        self.step_results.clear();
+        self.last_draw_count = 0;
+        self.looked_at_total_count = 0;
+    }
+
+    /// Resolve a `ref` field on an effect to the list of card ids the
+    /// referenced step produced. Returns an empty Vec when the reference
+    /// is not present in step_results (or when `ref` is None).
+    pub fn resolve_ref_cards(&self, effect: &AbilityEffect) -> Vec<i16> {
+        match &effect.r#ref {
+            Some(id) => self.get(id).cards,
+            None => Vec::new(),
+        }
+    }
+
+    /// Resolve a `ref_value` field on an effect to the integer value the
+    /// referenced step produced, plus an optional offset. Returns `fallback`
+    /// when the reference is not present (or `ref_value` is None).
+    pub fn resolve_ref_value(&self, effect: &AbilityEffect, fallback: i32) -> i32 {
+        match &effect.ref_value {
+            Some(id) => self
+                .get(id)
+                .value
+                .map(|v| v + effect.ref_offset.unwrap_or(0))
+                .unwrap_or(fallback),
+            None => fallback,
         }
     }
 }

@@ -1,0 +1,27 @@
+# Hugging Face Spaces sync commands for rabuka_reloaded
+# Run these from PowerShell in the repository root.
+
+cd "C:\Users\trios\OneDrive\Documents\rabuka_reloaded"
+
+# Set your Hugging Face token here.
+$HF_TOKEN = "<your_token_here>"
+
+# Create or reset a clean branch for deployment.
+git checkout -B hf-sync master
+
+# Remove already tracked local artifacts and build outputs.
+# .gitignore prevents new files from being tracked, but tracked files must be removed from Git first.
+git rm -r --cached .kilo .opencode web_ui/node_modules web_ui/dist root_files poll_data || true
+
+# Add deployment artifacts to .gitignore so they stay out of the repo.
+Add-Content .gitignore "`n# Hugging Face deployment artifacts`n.kilo/`n.opencode/`nweb_ui/dist/`nroot_files/`npoll_data/`n"
+
+# Commit the cleanup.
+git add .gitignore
+git commit -m "Prepare clean branch for Hugging Face Spaces deploy"
+
+# Push the clean branch to Hugging Face Spaces main.
+git push --force "https://hf:$HF_TOKEN@huggingface.co/spaces/trioskosmos/rabuka_reloaded.git" hf-sync:main
+
+# Verify the remote branch hash.
+git ls-remote "https://hf:$HF_TOKEN@huggingface.co/spaces/trioskosmos/rabuka_reloaded.git" refs/heads/main

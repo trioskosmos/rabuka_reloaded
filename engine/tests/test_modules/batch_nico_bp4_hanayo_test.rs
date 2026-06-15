@@ -2,30 +2,78 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-/// PL!-bp4-009-R (矢澤にこ) Q189: Debut — put 1 active member on stage to wait.
+/// PL!-bp4-009-R (矢澤にこ) Q189: Debut — opponent chooses 1 of their own active members to wait.
 #[test]
-fn nico_bp4_q189_debut_active_to_wait() {
+fn nico_bp4_q189_debut_opponent_waits_own_member() {
     let db = load_real_database();
     let mut game = TestGame::new(db.clone());
 
     let nico = game.id("PL!-bp4-009-R");
-    let friend = game.id("PL!-sd1-010-SD");
+    let p2_member = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.stage.stage = [friend, -1, -1];
+    // Opponent has an active member on stage
+    game.state.player2.stage.stage[0] = p2_member;
     game.add_to_hand(nico);
     game.give_energy(10);
     game.play_to_stage(nico, MemberArea::Center);
 
-    // Debut fires: choice to put active member to wait.
-    // If a choice is pending, the ability targets self's stage only.
-    if game.has_pending_choice() {
-        game.select_option(1);
-        if game.has_pending_choice() {
-            game.select_indices(&[0]);
-        }
+    // Debut fires: opponent waits 1 of their own active members
+    // (with only 1 eligible target, the effect auto-resolves)
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
     }
 
-    // Q189: only self's stage members are targeted, ability resolves
+    // Verify the member is now in wait state (stays on stage)
+    assert!(
+        game.state.player2.stage.stage.contains(&p2_member),
+        "Opponent member should still be on stage"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(p2_member),
+        Some(&"wait".to_string()),
+        "Opponent member should be in wait state"
+    );
+}
+
+/// PL!-bp4-009-R (矢澤にこ): Multiple opponent members — forces a choice.
+#[test]
+fn nico_bp4_multi_opponent_choice() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let nico = game.id("PL!-bp4-009-R");
+    let p2_member_a = game.id("PL!-sd1-010-SD");
+    let p2_member_b = game.id("PL!-sd1-013-SD");
+
+    // Opponent has 2 active members on stage
+    game.state.player2.stage.stage = [p2_member_a, p2_member_b, -1];
+    game.add_to_hand(nico);
+    game.give_energy(10);
+    game.play_to_stage(nico, MemberArea::Center);
+
+    // Debut fires: opponent must choose which member to wait
+    assert!(
+        game.has_pending_choice(),
+        "Opponent must choose which member to wait with 2+ eligible"
+    );
+
+    // Opponent selects p2_member_b (index 1)
+    game.select_indices(&[1]);
+
+    // Verify: p2_member_b is waited, p2_member_a stays active
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(p2_member_b),
+        Some(&"wait".to_string()),
+        "p2_member_b should be in wait state"
+    );
+    assert!(
+        game.state
+            .mods
+            .get_orientation_modifier(p2_member_a)
+            .is_none()
+            || game.state.mods.get_orientation_modifier(p2_member_a) == Some(&"active".to_string()),
+        "p2_member_a should stay active (not waited)"
+    );
 }
 
 /// PL!-sd1-019-SD (START:DASH!!) Q36: LiveSuccess timing definition.

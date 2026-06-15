@@ -928,7 +928,38 @@ impl GameState {
         });
         for card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*card_id) {
-                if card.satisfies_heart_requirement(&stage_hearts) {
+                if let Some(ref need_heart) = card.need_heart {
+                    let effective_need = {
+                        let has_set = self
+                            .mods
+                            .need_heart_modifiers
+                            .get(card_id)
+                            .is_some_and(|m| m.values().any(|e| e.set != 0));
+                        if has_set {
+                            let mut hearts = std::collections::HashMap::new();
+                            if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
+                                for (color, me) in color_mods {
+                                    if me.set != 0 {
+                                        hearts.insert(*color, me.set as u32);
+                                    }
+                                }
+                            }
+                            crate::card::BaseHeart { hearts }
+                        } else {
+                            let mut hearts = need_heart.hearts.clone();
+                            if let Some(color_mods) = self.mods.need_heart_modifiers.get(card_id) {
+                                for (color, me) in color_mods {
+                                    let entry = hearts.entry(*color).or_insert(0);
+                                    *entry = ((*entry as i32) + me.additive).max(0) as u32;
+                                }
+                            }
+                            crate::card::BaseHeart { hearts }
+                        }
+                    };
+                    if crate::card::check_heart_requirement(&effective_need, &stage_hearts) {
+                        return true;
+                    }
+                } else {
                     return true;
                 }
             }
@@ -974,7 +1005,8 @@ impl GameState {
         }) {
             log::debug!(
                 "Card {} cannot be placed in {} due to dynamic prohibition",
-                card_id, zone
+                card_id,
+                zone
             );
             return false;
         }
@@ -1080,7 +1112,9 @@ impl GameState {
                     let expired = self.current_turn_phase != TurnPhase::Live;
                     log::debug!(
                         "[EXPIRY] LiveEnd check: phase={:?} turn_phase={:?} expired={}",
-                        self.current_phase, self.current_turn_phase, expired
+                        self.current_phase,
+                        self.current_turn_phase,
+                        expired
                     );
                     expired
                 }
@@ -1140,7 +1174,8 @@ impl GameState {
                                             .remove_blade_modifier(card_id as i16, amount as i32);
                                         log::debug!(
                                             "Reverted {} blades from card {}",
-                                            amount, card_id
+                                            amount,
+                                            card_id
                                         );
                                     }
                                 }
@@ -1181,7 +1216,9 @@ impl GameState {
                                         );
                                         log::debug!(
                                             "Reverted {} hearts from card {} (color {:?})",
-                                            amount, card_id, color
+                                            amount,
+                                            card_id,
+                                            color
                                         );
                                     }
                                 }
@@ -1204,7 +1241,9 @@ impl GameState {
                                     );
                                     log::debug!(
                                         "Reverted {} hearts from card {} (color {:?})",
-                                        amount, card_id, color
+                                        amount,
+                                        card_id,
+                                        color
                                     );
                                 }
                             }
@@ -1233,7 +1272,8 @@ impl GameState {
                                             .remove_cost_modifier(card_id as i16, amount as i32);
                                         log::debug!(
                                             "Reverted cost modifier {} from card {}",
-                                            amount, card_id
+                                            amount,
+                                            card_id
                                         );
                                     }
                                 }
@@ -1248,7 +1288,8 @@ impl GameState {
                                         .remove_cost_modifier(card_id as i16, amount as i32);
                                     log::debug!(
                                         "Reverted cost modifier {} from card {}",
-                                        amount, card_id
+                                        amount,
+                                        card_id
                                     );
                                 }
                             }
@@ -1284,8 +1325,6 @@ impl GameState {
             applied_this_event: false,
         });
     }
-
-
 
     pub fn reset_replacement_effect_flags(&mut self) {
         for effect in &mut self.replacement_effects {

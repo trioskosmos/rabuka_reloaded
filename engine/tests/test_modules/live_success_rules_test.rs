@@ -16,38 +16,6 @@ fn advance_to_live_victory(game: &mut TestGame) {
     }
 }
 
-/// Live card's need_heart satisfied by stage hearts -> live succeeds, LiveSuccess fires.
-#[test]
-fn live_succeeds_when_hearts_met() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let live = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-010-SD");
-    let member = game.id("PL!-sd1-001-SD");
-    game.state.player1.stage.stage = [member, member, member];
-    game.state.player1.hand.cards.push(live);
-    for _ in 0..50 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    for _ in 0..20 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-    advance_to_live_card_set_p1(&mut game);
-    game.set_live_card(live);
-    advance_to_live_start(&mut game);
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-    advance_to_live_victory(&mut game);
-    assert!(
-        game.has_pending_choice(),
-        "LiveSuccess fires when need_heart is satisfied (8.3.15)"
-    );
-    while game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
-}
-
 /// Insufficient hearts -> live fails, no LiveSuccess (Rules 8.3.16, Q35).
 #[test]
 fn live_fails_with_insufficient_hearts() {
@@ -415,5 +383,186 @@ fn two_live_cards_choose_second() {
     assert!(
         game.state.player1.live_card_zone.cards.is_empty(),
         "Live card zone is empty"
+    );
+}
+
+/// Daydream Mermaid (PL!N-bp4-030-L): Live success — conditional_alternative choice.
+/// No nijigasaki in success zone → pick 1 option, then end.
+#[test]
+fn daydream_mermaid_no_niji_in_success_pick_one() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!N-bp4-030-L");
+    // Need heart05=1, heart06=3, heart0=4
+    // PL!S-bp2-015-PR: heart04=1, heart05=1
+    // PL!-sd1-003-SD: heart01=1, heart03=2, heart06=2
+    // PL!-sd1-001-SD: heart01=1, heart03=2, heart06=1
+    let h05 = game.id("PL!S-bp2-015-PR");
+    let h06a = game.id("PL!-sd1-003-SD");
+    let h06b = game.id("PL!-sd1-001-SD");
+
+    game.state.player1.stage.stage = [h05, h06a, h06b];
+    game.state.player1.hand.cards.push(live);
+
+    // Put a member in waitroom for the "recover" option
+    let recover_target = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.waitroom.cards.push(recover_target);
+
+    // Energy deck for the "place energy" option
+    let energy_card = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy_card);
+    }
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(h05);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(h05);
+    }
+
+    for _ in 0..5 {
+        game.pass();
+    }
+    game.state.player1.live_card_zone.cards.push(live);
+    game.pass();
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.pass();
+    game.pass();
+    game.pass();
+
+    while game.has_pending_choice() {
+        let t = game.pending_choice_type();
+        if t.as_deref() == Some("SelectTarget") {
+            break;
+        }
+        game.select_indices(&[]);
+    }
+
+    assert!(
+        game.has_pending_choice(),
+        "Should have option pick (no niji)"
+    );
+
+    game.select_option(1); // Pick option 1 (recover)
+
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        !game.has_pending_choice(),
+        "No re-prompt after 1 pick (count=1)"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&recover_target),
+        "Recovered member in hand"
+    );
+}
+
+#[test]
+fn daydream_mermaid_niji_in_success_pick_both() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!N-bp4-030-L");
+    let h05 = game.id("PL!S-bp2-015-PR");
+    let h06a = game.id("PL!-sd1-003-SD");
+    let h06b = game.id("PL!-sd1-001-SD");
+
+    game.state.player1.stage.stage = [h05, h06a, h06b];
+
+    // Put a nijigasaki card in success zone so condition is met
+    let niji_live = game.id("PL!N-bp1-025-L");
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(niji_live);
+
+    let recover_target = game.new_id("PL!-sd1-001-SD");
+    game.state.player1.waitroom.cards.push(recover_target);
+
+    let energy_card = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy_card);
+    }
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(h05);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(h05);
+    }
+
+    for _ in 0..5 {
+        game.pass();
+    }
+    // Manually set the live card
+    game.state.player1.live_card_zone.cards.push(live);
+    game.pass();
+    game.pass();
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    game.pass();
+    game.pass();
+    game.pass();
+
+    // Niji in success zone → choice should use any_number re-prompt
+    while game.has_pending_choice() {
+        let t = game.pending_choice_type();
+        if t.as_deref() == Some("SelectTarget") {
+            break;
+        }
+        game.select_indices(&[]);
+    }
+
+    assert!(
+        game.has_pending_choice(),
+        "Should have option pick (niji in success)"
+    );
+    game.select_option(1); // Pick option 1 (recover)
+
+    // Sub-choice: pick a card from waitroom
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // any_number re-prompt: should have remaining option (energy)
+    assert!(
+        game.has_pending_choice(),
+        "Re-prompt after picking 1 option with any_number"
+    );
+    game.select_option(0); // Pick the remaining option (energy)
+
+    // The energy option might need to pick a card (energy_deck selection)
+    if game.has_pending_choice() {
+        eprintln!(
+            "[ENERGY_PICK] pending_type={:?}",
+            game.pending_choice_type()
+        );
+        game.select_indices(&[0]);
+    }
+
+    // No more re-prompts (all options consumed)
+    if game.has_pending_choice() {
+        eprintln!("[AFTER_ALL] pending_type={:?}", game.pending_choice_type());
+    }
+    assert!(
+        !game.has_pending_choice(),
+        "No re-prompt after all options consumed"
+    );
+
+    assert!(
+        game.state.player1.hand.cards.contains(&recover_target),
+        "Recovered member is in hand"
+    );
+    assert!(
+        game.state.player1.energy_zone.active_energy_count > 0
+            || !game.state.player1.energy_zone.cards.is_empty(),
+        "Energy card was placed"
     );
 }

@@ -65,13 +65,14 @@ impl AbilityResolver {
             return Ok(());
         }
 
-        let replacement_indices: Vec<usize> = gs.replacement_effects
+        let replacement_indices: Vec<usize> = gs
+            .replacement_effects
             .iter()
             .enumerate()
             .filter(|(_, r)| r.original_event == action_str && !r.applied_this_event)
             .map(|(i, _)| i)
             .collect();
-            
+
         if !replacement_indices.is_empty() {
             for idx in replacement_indices {
                 if gs.replacement_effects[idx].is_choice_based {
@@ -85,7 +86,8 @@ impl AbilityResolver {
                     });
                     return Err("Pending choice required: apply replacement effect".to_string());
                 } else {
-                    let effects_to_execute = gs.replacement_effects[idx].replacement_effects.clone();
+                    let effects_to_execute =
+                        gs.replacement_effects[idx].replacement_effects.clone();
                     let card_id = gs.replacement_effects[idx].card_id;
                     for replacement_effect in &effects_to_execute {
                         self.execute_effect(gs, replacement_effect)?;
@@ -129,6 +131,30 @@ impl AbilityResolver {
         // Convert string action to typed enum for stronger dispatch
         let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
 
+        // Sequential and LookAndSelect both route through the generic
+        // sequential pipeline when they carry `effect_steps`. LookAndSelect
+        // is collapsed by the parser into [look_step, select_cards_step,
+        // move_selected_step]; the sequential pipeline executes them in
+        // order, creating a pending choice on the select_cards step and
+        // resuming naturally when the player responds. The legacy dedicated
+        // handlers remain as a fallback for the (increasingly rare) case
+        // where effect_steps is absent.
+        if action_type == ActionType::Sequential || action_type == ActionType::LookAndSelect {
+            let steps = effect.normalized_steps();
+            if !steps.is_empty() {
+                let mut normalized = effect.clone();
+                normalized.effect_steps = None;
+                normalized.compound.actions = Some(steps);
+                normalized.action = "sequential".to_string();
+                return self.execute_sequential_effect(
+                    gs,
+                    &normalized,
+                    normalized.conditional.unwrap_or(false),
+                    normalized.is_further.unwrap_or(false),
+                );
+            }
+        }
+
         match action_type {
             ActionType::Sequential => self.execute_sequential_effect(
                 gs,
@@ -166,15 +192,8 @@ impl AbilityResolver {
                     let player = gs.resolve_target_player(effect.target_name());
                     let location = effect.location.as_deref().unwrap_or(Zone::Stage.to_str());
                     let cards: Vec<i16> = util::zone_cards(player, location).to_vec();
-                    let per_unit_filter = util::filter_from_parts(
-                        effect.card_type.as_deref(),
-                        change_group,
-                        change_cost_limit,
-                        None,
-                        effect.characters.as_ref(),
-                        None,
-                        None,
-                    );
+                    let mut per_unit_filter = effect.filter_subset();
+                    per_unit_filter.cost_limit = change_cost_limit;
                     let count = cards
                         .iter()
                         .filter(|&&cid| per_unit_filter.matches(&gs.card_database, cid, false))
@@ -230,6 +249,9 @@ impl AbilityResolver {
                 effect.group_name(),
                 effect.timing_condition.as_deref(),
                 effect.location.as_deref(),
+                effect.original_value,
+                effect.original_count,
+                effect.original_operator.as_deref(),
             ),
             ActionType::SetCost => {
                 self.execute_set_cost(
@@ -277,9 +299,9 @@ impl AbilityResolver {
             ActionType::PlayBatonTouch => {
                 self.execute_play_baton_touch(gs, effect.count_or(1), effect.target_name())
             }
-            ActionType::Reveal => self.execute_reveal_effect(gs, effect),
+            ActionType::Reveal | ActionType::RevealEffect => self.execute_reveal_effect(gs, effect),
             ActionType::Select => self.execute_select_effect(gs, effect),
-            ActionType::LookAt => {
+            ActionType::Look | ActionType::LookAt => {
                 let count = if let Some(ref dc) = effect.dynamic_count {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
@@ -336,6 +358,7 @@ impl AbilityResolver {
                 effect.target_name(),
                 effect.target_member.as_deref().unwrap_or("this_member"),
             ),
+            ActionType::Rotation => self.execute_rotation(gs, effect, effect.target_name()),
 
             ActionType::Choice => self.execute_choice(gs, effect),
             ActionType::PayEnergy => {

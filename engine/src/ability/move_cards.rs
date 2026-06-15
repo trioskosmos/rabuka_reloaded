@@ -54,7 +54,9 @@ impl AbilityResolver {
             .and_then(|cards| cards.last().copied());
         log::debug!(
             "[COST_REF] moved_cards={:?} recently={:?} self.moved={:?}",
-            moved, recently, self.moved_cards
+            moved,
+            recently,
+            self.moved_cards
         );
         let referenced_id = match reference {
             "previous_moved_card" => moved.or(recently),
@@ -81,7 +83,11 @@ impl AbilityResolver {
         let resolved = (base_cost as i32).saturating_add(offset).max(0) as u32;
         log::debug!(
             "[COST_REF] referenced='{}' name='{}' base_cost={} offset={} resolved={}",
-            reference, card_name, base_cost, offset, resolved
+            reference,
+            card_name,
+            base_cost,
+            offset,
+            resolved
         );
         Ok(Some(resolved))
     }
@@ -305,10 +311,30 @@ impl AbilityResolver {
         }
 
         // Handle special source identifiers before the Zone match
+        if source_str == "recently_moved" {
+            // Baton touch / cost payment — target the card(s) just moved.
+            // This ensures "the card placed by this baton touch" actually
+            // refers to the specific card that was moved, not any matching
+            // card from the zone.
+            let cards: Vec<i16> = gs
+                .recently_moved_cards
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|&cid| {
+                    let ty = card_type_filter.unwrap_or("");
+                    ty.is_empty() || util::card_matches_type(card_db, cid, Some(ty))
+                })
+                .filter(|&cid| {
+                    group_name.is_none() || util::card_matches_group_str(card_db, cid, group_name)
+                })
+                .collect();
+            for &card_id in &cards {
+                remove_card_from_any_zone(player, &mut gs.last_vacated_stage_area, card_id);
+            }
+            return Ok(cards);
+        }
         if source_str == "looked_at_remaining" {
-            // All remaining looked_at cards go to the destination.
-            // The matched card was already removed from looked_at_cards
-            // by the preceding move_cards (source=looked_at), so drain ALL.
             let cards: Vec<i16> = gs.looked_at_cards.drain(..).collect();
             for &card in &cards {
                 player.waitroom.add_card(card);
@@ -418,7 +444,9 @@ impl AbilityResolver {
                             gs.last_vacated_stage_area = vacated;
                             log::debug!(
                                 "[STAGE_EXACT] moved cards={:?} vacated={:?} last_vacated={:?}",
-                                cards, vacated, gs.last_vacated_stage_area
+                                cards,
+                                vacated,
+                                gs.last_vacated_stage_area
                             );
                             Ok(cards)
                         }
@@ -722,7 +750,9 @@ impl AbilityResolver {
                             options: None,
                         });
                         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
-                        if let Some(e) = gs.ability_queue.current_entry_mut() { e.conditional_choice = Some(serde_json::to_string(&or_types).unwrap()); }
+                        if let Some(e) = gs.ability_queue.current_entry_mut() {
+                            e.conditional_choice = Some(serde_json::to_string(&or_types).unwrap());
+                        }
                         return Ok(());
                     }
                 }
@@ -1272,7 +1302,9 @@ impl AbilityResolver {
         }
         log::debug!(
             "[FINALIZE_MOVE] dest={} cards={:?} -> self.moved_cards={:?}",
-            destination, moved_cards, self.moved_cards
+            destination,
+            moved_cards,
+            self.moved_cards
         );
 
         if !moved_cards.is_empty() {
@@ -1527,7 +1559,10 @@ impl AbilityResolver {
         let vacated_area = gs.last_vacated_stage_area;
         log::debug!(
             "[EXEC_SEL] zone={} indices={:?} dest={:?} target={}",
-            zone, indices, destination, target
+            zone,
+            indices,
+            destination,
+            target
         );
 
         let passes = |cid: i16| -> bool {
@@ -1608,7 +1643,8 @@ impl AbilityResolver {
                     if !ok {
                         log::debug!(
                             "Sum-total cost {} exceeds limit (max {}), selection rejected",
-                            total_cost, limit
+                            total_cost,
+                            limit
                         );
                         return Ok(());
                     }
@@ -1662,7 +1698,11 @@ impl AbilityResolver {
                     _ => {
                         log::debug!(
                             "[MOVE_CARDS] zone={} dest={} card_ids={:?} moved={:?} target={}",
-                            zone, dest, card_ids, moved, target
+                            zone,
+                            dest,
+                            card_ids,
+                            moved,
+                            target
                         );
                         // Check for success zone replacement (e.g. 錯覚CROSSROADS)
                         if Zone::from_str(dest) == Some(Zone::SuccessLiveZone) {

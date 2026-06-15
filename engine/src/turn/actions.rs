@@ -225,11 +225,8 @@ impl super::TurnEngine {
         card_id: Option<i16>,
         card_indices: Option<Vec<usize>>,
     ) -> Result<(), String> {
-        let choice = game_state
-            .ability_queue
-            .is_waiting_for_choice()
-            .cloned()
-            .ok_or("No pending choice to resume")?;
+        let pending = game_state.ability_queue.is_waiting_for_choice().cloned();
+        let choice = pending.ok_or("No pending choice to resume")?;
 
         let ci = card_indices.clone();
         // Handle non-ability choices early (live success, etc.)
@@ -326,11 +323,8 @@ impl super::TurnEngine {
     ) -> Result<crate::ability::types::ChoiceResult, String> {
         match choice {
             crate::ability::types::Choice::SelectCard { .. } => {
-                let indices = card_indices.unwrap_or_else(|| {
-                    // Allow select_option(0) to produce indices [0] for SelectCard choices
-                    // (instead of requiring card_indices to be explicitly passed)
-                    card_id.map(|id| vec![id as usize]).unwrap_or_default()
-                });
+                let indices = card_indices
+                    .unwrap_or_else(|| card_id.map(|id| vec![id as usize]).unwrap_or_default());
                 Ok(crate::ability::types::ChoiceResult::CardSelected { indices })
             }
             crate::ability::types::Choice::SelectTarget {
@@ -456,9 +450,10 @@ impl super::TurnEngine {
         choice: crate::ability::types::Choice,
         result: crate::ability::types::ChoiceResult,
     ) -> Result<(), String> {
-        if let crate::ability_queue::QueueState::WaitingForAutoAbilityChoice { .. } = game_state.ability_queue.get_state() {
-            if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } =
-                result
+        if let crate::ability_queue::QueueState::WaitingForAutoAbilityChoice { .. } =
+            game_state.ability_queue.get_state()
+        {
+            if let crate::ability::types::ChoiceResult::AutoAbilitySelected { queue_index } = result
             {
                 let player_id = if let crate::ability::types::Choice::SelectAutoAbility {
                     ref player_id,
@@ -493,7 +488,8 @@ impl super::TurnEngine {
             Some(r) => {
                 log::debug!(
                     "[RWC] took resolver: moved_cards={:?} selected={:?}",
-                    r.moved_cards, r.selected_cards
+                    r.moved_cards,
+                    r.selected_cards
                 );
                 r
             }
@@ -535,7 +531,9 @@ impl super::TurnEngine {
                 .is_some_and(|e| e.effect_started);
             log::debug!(
                 "[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}",
-                cost_was_paid, effect_started, had_pending_sequential
+                cost_was_paid,
+                effect_started,
+                had_pending_sequential
             );
             game_state.activating_card = None;
 
@@ -558,7 +556,8 @@ impl super::TurnEngine {
             if optional_skipped || pending_cleared {
                 log::debug!(
                     "[RWC] optional_skipped={} pending_cleared={} completing ability",
-                    optional_skipped, pending_cleared
+                    optional_skipped,
+                    pending_cleared
                 );
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
@@ -776,9 +775,7 @@ impl super::TurnEngine {
         let mut held_back = Vec::new();
         while let Some(card_id) = player.hand.cards.pop() {
             if cards_set.len() < num_cards_to_set
-                && card_database
-                    .get_card(card_id)
-                    .is_some_and(|c| c.is_live())
+                && card_database.get_card(card_id).is_some_and(|c| c.is_live())
             {
                 cards_set.push(card_id);
             } else {

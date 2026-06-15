@@ -84,8 +84,9 @@ impl AbilityResolver {
                 }
             }
             Some("previous_draw") => {
-                if self.last_draw_count > 0 {
-                    self.last_draw_count
+                let last_draw = self.step_state.last_draw_count;
+                if last_draw > 0 {
+                    last_draw
                 } else if let Some(ref moved_cards) = gs.recently_moved_cards {
                     moved_cards.len() as u32
                 } else {
@@ -214,7 +215,10 @@ impl AbilityResolver {
         let has_heart_icons = effect.text.contains("heart_");
         log::debug!(
             "[SELECT_EFFECT] heart_colors={:?} has_icons={} source={:?} card_type={:?}",
-            effect.heart_colors, has_heart_icons, effect.source, effect.card_type
+            effect.heart_colors,
+            has_heart_icons,
+            effect.source,
+            effect.card_type
         );
         if effect.source.is_none()
             && effect.heart_colors.is_empty()

@@ -1,3 +1,4 @@
+use super::condition::ConditionContext;
 use super::enums::Zone;
 use super::types::{Choice, ChoiceResult, ChoiceRoute, ExecutionContext, LookAndSelectStep};
 use super::util;
@@ -25,7 +26,7 @@ impl super::resolver::AbilityResolver {
     /// If another choice interrupts execution, the remaining actions are safely parked back.
     pub fn resume_pending_commands(&mut self, gs: &mut GameState) -> Result<(), String> {
         let pending = gs.ability_queue.take_pending_commands();
-        for (i, command) in pending.iter().enumerate() {
+        for (idx, command) in pending.iter().enumerate() {
             match command {
                 Command::Effect(effect) => {
                     self.spawn_context.target = effect.target.clone();
@@ -55,9 +56,9 @@ impl super::resolver::AbilityResolver {
             }
 
             if self.pending_choice.is_some() {
-                if i + 1 < pending.len() {
+                if idx + 1 < pending.len() {
                     let mut existing = gs.ability_queue.take_pending_commands();
-                    existing.extend(pending[i + 1..].to_vec());
+                    existing.extend(pending[idx + 1..].to_vec());
                     gs.ability_queue.set_pending_commands(existing);
                 }
                 return Ok(());
@@ -113,7 +114,9 @@ impl super::resolver::AbilityResolver {
         }
         log::debug!(
             "[FINALIZE_CHOICE] pending={} selected={:?} context={:?}",
-            has_pending_sequential, self.selected_cards, context
+            has_pending_sequential,
+            self.selected_cards,
+            context
         );
         Ok(())
     }
@@ -180,6 +183,7 @@ impl super::resolver::AbilityResolver {
                 ChoiceResult::CardSelected { indices },
             ) => self.handle_select_card(
                 gs,
+                choice.as_ref().unwrap(),
                 zone,
                 card_type,
                 *count,
@@ -253,6 +257,7 @@ impl super::resolver::AbilityResolver {
     fn handle_select_card(
         &mut self,
         gs: &mut GameState,
+        choice: &Choice,
         zone: &str,
         card_type: &Option<String>,
         count: usize,
@@ -365,8 +370,7 @@ impl super::resolver::AbilityResolver {
             return self.resume_pending_commands(gs);
         }
 
-        if !effect_started && gs.entry_cost().and_then(|c| c.cost_type.as_deref()) == Some("reveal")
-        {
+        if !effect_started && gs.entry_cost().map(|c| c.action.as_str()) == Some("reveal") {
             let cost = gs.entry_cost().cloned().unwrap();
             let card_db = gs.card_database.clone();
             let player = gs.active_player();
@@ -438,15 +442,7 @@ impl super::resolver::AbilityResolver {
         }
 
         let card_db = gs.card_database.clone();
-        let validate_filter = util::filter_from_parts(
-            card_type.as_deref(),
-            group.as_deref(),
-            cost_limit,
-            cost_limit_operator.as_deref(),
-            characters.as_ref(),
-            None,
-            None,
-        );
+        let validate_filter = choice.as_filter();
         let mut validate_card =
             |cid: i16| -> bool { validate_filter.matches(&card_db, cid, false) };
 
@@ -922,7 +918,8 @@ impl super::resolver::AbilityResolver {
 
         log::debug!(
             "[OUTER_MATCH] zone={} effect_started={}",
-            zone, effect_started
+            zone,
+            effect_started
         );
         match Zone::from_str(zone) {
             Some(Zone::Hand) => {
@@ -942,7 +939,9 @@ impl super::resolver::AbilityResolver {
                 };
                 log::debug!(
                     "[HAND_HANDLER] hand_idx={:?} count={} allow_skip={}",
-                    hand_idx, count, allow_skip
+                    hand_idx,
+                    count,
+                    allow_skip
                 );
                 if !hand_idx.is_empty() || allow_skip {
                     if !hand_idx.is_empty() && count > 0 && hand_idx.len() < count {
@@ -1109,7 +1108,10 @@ impl super::resolver::AbilityResolver {
                     // These were saved by execute_sequential_effect and should NOT run
                     // when the user chose not to pay the optional cost.
                     // Effect any_number selections (count == 0) should NOT drain — sequential continues.
-                    if indices.is_empty() && count > 0 {
+                    // EXCEPTION: opponent actions — when opponent skips, the conditional_on_optional
+                    // MUST fire (it has the "if you didn't do so" effect like blade gain).
+                    let is_opponent_action = target_player_id.as_deref() == Some("opponent");
+                    if indices.is_empty() && count > 0 && !is_opponent_action {
                         gs.ability_queue.take_pending_commands();
                     }
                 }
@@ -1408,7 +1410,8 @@ impl super::resolver::AbilityResolver {
             Some(Zone::SelectedCards) => {
                 log::debug!(
                     "[SELECTED_CARDS_BEFORE] self.selected_cards={:?} indices={:?}",
-                    self.selected_cards, indices
+                    self.selected_cards,
+                    indices
                 );
                 let mut cards = Vec::new();
                 for &i in indices.iter() {
@@ -1454,7 +1457,8 @@ impl super::resolver::AbilityResolver {
                     }
                     log::debug!(
                         "[SELECT_STAGE] is_select_action=true cards={:?} filtered_idx={:?}",
-                        cards, filtered_indices
+                        cards,
+                        filtered_indices
                     );
                     for &cid in &cards {
                         if !self.selected_cards.contains(&cid) {
@@ -1531,15 +1535,67 @@ impl super::resolver::AbilityResolver {
         match choice_card_no.as_ref() {
             Some(ChoiceRoute::Choice) => {
                 if let Some(ref options_json) = conditional_choice {
-                    if let Ok(options) = serde_json::from_str::<Vec<AbilityEffect>>(options_json) {
+                    if let Ok(all_options) =
+                        serde_json::from_str::<Vec<AbilityEffect>>(options_json)
+                    {
                         let idx: usize = selected.parse().unwrap_or(0);
-                        if idx < options.len() {
-                            gs.ability_queue
-                                .set_pending_commands(vec![Command::Effect(options[idx].clone())]);
+                        if idx < all_options.len() {
+                            let selected_effect = all_options[idx].clone();
+                            let mut remaining = all_options.clone();
+                            remaining.remove(idx);
+                            // Schedule the selected effect and optional re-prompt
+                            // as pending commands. resume_pending_commands runs them
+                            // sequentially — after the selected effect completes (and
+                            // any sub-choices), the re-prompt command re-enters
+                            // execute_choice which sees the updated conditional_choice
+                            // JSON array and creates a new SelectTarget for the
+                            // remaining options.
+                            let mut commands = vec![Command::Effect(selected_effect)];
+                            let wants_re_prompt = !remaining.is_empty()
+                                && gs.entry_effect().map_or(false, |eff| {
+                                    if eff.any_number.unwrap_or(false) {
+                                        return true;
+                                    }
+                                    if let Some(ref alt_cond) = eff.compound.alternative_condition {
+                                        let ctx = ConditionContext::with_moved_cards(
+                                            gs,
+                                            &self.moved_cards,
+                                        );
+                                        ctx.evaluate_condition(alt_cond)
+                                            && eff.alternative_count_type.as_deref()
+                                                == Some("any_number")
+                                    } else {
+                                        false
+                                    }
+                                });
+                            if wants_re_prompt {
+                                if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                    entry.conditional_choice =
+                                        serde_json::to_string(&remaining).ok();
+                                }
+                                let desc: Vec<String> = remaining
+                                    .iter()
+                                    .map(|o| {
+                                        o.answers
+                                            .as_ref()
+                                            .map(|a| a.join(", "))
+                                            .unwrap_or_else(|| o.text.clone())
+                                    })
+                                    .collect();
+                                commands.push(Command::Choice(Choice::SelectTarget {
+                                    target: "choice".to_string(),
+                                    description: desc.join(" / "),
+                                    allow_skip: true,
+                                    options: None,
+                                }));
+                            }
+                            let n_cmds = commands.len();
+                            gs.ability_queue.set_pending_commands(commands);
                         }
                     }
                 }
-                return self.clear_choice_state_and_resume(gs);
+                self.pending_choice = None;
+                return self.resume_pending_commands(gs);
             }
             Some(ChoiceRoute::ChoiceString) => {
                 return self.handle_choice_string_selection(gs, selected, conditional_choice);
@@ -1776,7 +1832,6 @@ impl super::resolver::AbilityResolver {
             let chosen = if selected == "1" || selected == "alternative" || selected == "secondary"
             {
                 effect
-                    .compound
                     .alternative_effect
                     .clone()
                     .or(effect.compound.primary_effect.clone())
@@ -1865,8 +1920,17 @@ impl super::resolver::AbilityResolver {
         gs: &mut GameState,
         selected: &str,
     ) -> Result<(), String> {
+        // Read before clear_choice_state since it nullifies conditional_choice.
+        let entry_eff = gs.entry_effect().cloned();
+        let cond_choice = gs.entry_conditional_choice();
         self.clear_choice_state(gs);
-        if let Some(effect) = gs.entry_effect().cloned() {
+
+        // Prefer cond_choice (the sub-effect with optional_action/conditional_action)
+        // over entry_eff (which may return a parent sequential effect lacking these fields).
+        let effect = cond_choice
+            .and_then(|json| serde_json::from_str::<AbilityEffect>(&json).ok())
+            .or_else(|| entry_eff);
+        if let Some(effect) = effect {
             let is_negation = effect.compound.conditional_negation.unwrap_or(false);
             let chose_yes = selected == "1" || selected == "yes";
             let cmd = match (chose_yes, is_negation) {
@@ -1913,7 +1977,7 @@ impl super::resolver::AbilityResolver {
         selected: &str,
     ) -> Result<(), String> {
         let idx: usize = selected.parse().unwrap_or(0);
-        if let Some(options) = gs.entry_cost().and_then(|c| c.options.clone()) {
+        if let Some(options) = gs.entry_cost().and_then(|c| c.compound.actions.clone()) {
             if idx < options.len() {
                 if let Err(e) = self.pay_cost(gs, &options[idx]) {
                     log::debug!("Failed to pay cost option: {}", e);

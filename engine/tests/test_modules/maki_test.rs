@@ -45,9 +45,11 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
         game.select_option(1);
     }
     // Opponent chooses a member to wait (select cheap_opp at index 0)
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
+    assert!(
+        game.has_pending_choice(),
+        "Opponent should have a choice to wait a member"
+    );
+    game.select_indices(&[0]);
     // Consume any remaining choices
     while game.has_pending_choice() {
         game.select_indices(&[]);
@@ -63,6 +65,11 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
     assert!(
         game.state.player2.stage.stage.contains(&cheap_opp),
         "Opponent member should still be on stage (wait state)"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_opp),
+        Some(&"wait".to_string()),
+        "Opponent's cheap member should be in wait state"
     );
 }
 
@@ -92,18 +99,36 @@ fn maki_edge_cost5_opponent_draws_nothing() {
     game.state.player1.stage.stage[1] = -1;
     game.play_to_stage(maki, rabuka_engine::zones::MemberArea::Center);
 
+    // Skip optional cost (choose "Skip" option index 0)
     if game.has_pending_choice() {
+        game.select_option(0); // skip → no effect fires
+    }
+    // Cost was skipped → opponent action doesn't fire → no choice
+    while game.has_pending_choice() {
         game.select_indices(&[]);
     }
-    if game.has_pending_choice() {
-        game.select_indices(&[0]);
-    }
 
-    // cost_limit=4 check: cost-9 opponent should NOT trigger draw
+    // Member was NOT waited (cost wasn't paid)
+    assert!(
+        game.state
+            .mods
+            .get_orientation_modifier(expensive_opp)
+            .is_none(),
+        "Opponent member should NOT be waited when cost was skipped"
+    );
+
+    // No trigger for Ab#1 draw
     assert_eq!(
         game.state.player1.hand.cards.len(),
         1,
-        "Cost-9 opponent should NOT trigger draw (cost_limit=4)"
+        "No draw when optional cost skipped"
+    );
+
+    // No trigger for Ab#1 draw
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "No draw when optional cost skipped"
     );
 }
 
@@ -129,7 +154,12 @@ fn maki_edge_no_opponent_member_no_draw() {
 
     let hand_after_play = game.state.player1.hand.cards.len();
 
+    // Skip optional cost (choose "Skip" option index 0)
     if game.has_pending_choice() {
+        game.select_option(0);
+    }
+    // Opponent has no members → no pending choice after skip
+    while game.has_pending_choice() {
         game.select_indices(&[]);
     }
 

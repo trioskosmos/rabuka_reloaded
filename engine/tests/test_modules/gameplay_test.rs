@@ -128,6 +128,18 @@ fn ai_screeam_answer_both_discard() {
         "Live card set should trigger answer choice"
     );
 
+    // Verify choice_player_id is set to opponent
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Queue should have an entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p2"),
+        "Choice player should be p2 (opponent decides flavor)"
+    );
+
     // Option 0: mint/flavor/cookie → both discard 1 from hand
     // P1 flow: start 2 (screeam + filler_a), P2 active during passes so no draws,
     //   -1 set live, +1 live replacement, -1 discard = 1
@@ -186,6 +198,17 @@ fn ai_screeam_answer_both_draw() {
     advance_to_live_start(&mut game);
     assert!(game.has_pending_choice());
 
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Queue should have an entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p2"),
+        "Choice player should be p2 (opponent decides flavor)"
+    );
+
     game.select_option(1);
 
     // P1: 2 initial - 1 live card + 1 (replacement draw from pass) + 1 (ability draw) = 3
@@ -243,6 +266,17 @@ fn ai_screeam_answer_both_gain_blade() {
     game.set_live_card(screeam);
     advance_to_live_start(&mut game);
     assert!(game.has_pending_choice());
+
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Queue should have an entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p2"),
+        "Choice player should be p2 (opponent decides flavor)"
+    );
 
     // Option 2: それ以外 → both members gain blade
     game.select_option(2);

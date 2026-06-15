@@ -8,8 +8,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 use rabuka_engine::ability::debug::AbDebug;
 use rabuka_engine::ability::types::Choice;
@@ -22,18 +21,37 @@ use rabuka_engine::turn::TurnEngine;
 use rabuka_engine::types::{Phase, TurnPhase};
 use rabuka_engine::zones::MemberArea;
 
-/// Load the real card database from `cards/cards.json` + `cards/abilities.json`.
-/// This includes ALL real cards (both the tested ability cards and filler cards).
-/// The database is loaded once per process and cached via `OnceLock`.
+/// Pre-seeded database + copy pool, initialised once per process.
+/// The database has 5 copies per template pre-created and registered,
+/// so tests never need to mutate the `Arc<CardDatabase>`.
+struct PreloadedDb {
+    db: CardDatabase,
+    pool: HashMap<i16, Vec<i16>>,
+}
+
+static PRELOADED: OnceLock<PreloadedDb> = OnceLock::new();
+
+/// Load (once) and return a pre-seeded database with 5 copies per template.
 pub fn load_real_database() -> Arc<CardDatabase> {
-    static DB: OnceLock<Arc<CardDatabase>> = OnceLock::new();
-    DB.get_or_init(|| {
+    PRELOADED.get_or_init(|| {
         let cards_path = Path::new("../cards/cards.json");
         let cards = CardLoader::load_cards_from_file(cards_path)
             .expect("Failed to load real cards from ../cards/cards.json");
-        Arc::new(CardDatabase::load_or_create(cards))
-    })
-    .clone()
+        let mut db = CardDatabase::load_or_create(cards);
+        let tids: Vec<i16> = db.cards.keys().copied().collect();
+        let mut pool: HashMap<i16, Vec<i16>> = HashMap::new();
+        for &tid in &tids {
+            let mut v = Vec::with_capacity(5);
+            for _ in 0..5 {
+                v.push(db.create_copy(tid));
+            }
+            pool.insert(tid, v);
+        }
+        PreloadedDb { db, pool }
+    });
+    static DB: OnceLock<Arc<CardDatabase>> = OnceLock::new();
+    DB.get_or_init(|| Arc::new(PRELOADED.get().unwrap().db.clone()))
+        .clone()
 }
 
 /// Get a card's database ID by its card_no string.
@@ -69,7 +87,9 @@ pub struct TestGame {
 impl Drop for TestGame {
     fn drop(&mut self) {
         if self.debug_enabled {
-            rabuka_engine::ability::debug::set_debug(false);
+            // Don't set_debug(false) here — ABILITY_DEBUG is a global AtomicBool
+            // and turning it off in one test's Drop can disable it for another
+            // test running in parallel. Just flush the log buffer.
             AbDebug::flush_to_rule_log(&mut self.state.rule_log);
         }
     }
@@ -85,22 +105,14 @@ impl TestGame {
         let p2 = Player::new("p2".into(), "Player 2".into(), false);
         p1.is_first_attacker = true;
 
-        let mut state = GameState::new(p1, p2, db.clone());
+        let mut state = GameState::new(p1, p2, db);
         state.current_phase = Phase::Main;
         state.current_turn_phase = TurnPhase::FirstAttackerNormal;
         state.turn_number = 1;
         rabuka_engine::ability::debug::set_debug(true);
 
-        // Pre-create 1 copy per template (down from 5). Most tests reference
-        // each card once. Arc::make_mut is called ONCE (not 25000×) to give us
-        // a mutable database we can populate copies into.
-        let mut copy_pool: HashMap<i16, Vec<i16>> = HashMap::new();
-        let db_mut = Arc::make_mut(&mut state.card_database);
-        let template_ids: Vec<i16> = db_mut.cards.keys().copied().collect();
-        for &tid in &template_ids {
-            let cid = db_mut.create_copy(tid);
-            copy_pool.insert(tid, vec![cid]);
-        }
+        // Clone the pre-seeded copy pool (once-populated, cheap per-test clone)
+        let copy_pool = PRELOADED.get().unwrap().pool.clone();
 
         TestGame {
             db: state.card_database.clone(),
@@ -124,16 +136,14 @@ impl TestGame {
             .unwrap_or(template_id)
     }
 
-    /// Get a NEW unique copy_id (different from `id_ref()`).
-    /// Each call returns a distinct ID, used when multiple copies of the same card
-    /// are needed in the same zone.
+    /// Get a NEW unique copy_id (different from `id()` and `id_ref()`).
+    /// Returns the template ID directly, matching the original behavior when
+    /// the 1-copy-per-template pool was empty after `id()` consumed it.
+    /// This preserves the original semantic: `new_id()` provides an ID that's
+    /// distinct from `id()` for the same card, but multiple `new_id()` calls
+    /// for the same card may return the same template ID.
     pub fn new_id(&self, card_no: &str) -> i16 {
-        let template_id = card_id(&self.db, card_no);
-        self.copy_pool
-            .borrow_mut()
-            .get_mut(&template_id)
-            .and_then(|v| v.pop())
-            .unwrap_or(template_id)
+        card_id(&self.db, card_no)
     }
 
     /// Get a stable reference ID for a card_no (always returns the same copy).

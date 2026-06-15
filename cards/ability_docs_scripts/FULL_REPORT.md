@@ -7,36 +7,36 @@
 | Metric | Value |
 |---|---|
 | Total abilities | 762 |
-| Tested | 285 (37%) |
-| Untested | 477 (63%) |
-| Unique card IDs in tests | 282 |
+| Tested | 339 (44%) |
+| Untested | 423 (56%) |
+| Unique card IDs in tests | 343 |
 | Effect action types | 28 |
-| Untested key combos | 157 |
+| Untested key combos | 132 |
 
 ## Coverage by Action Type
 
 | Action | Tested | Total | % | Combos | Untested Combos |
 |---|---|---|---|---|---|
-| change_state | 12 | 45 | 27% | 28 | 19 |
-| choice | 4 | 14 | 29% | 11 | 7 |
-| look_and_select | 20 | 69 | 29% | 8 | 3 |
-| gain_resource | 41 | 139 | 29% | 64 | 42 |
-| draw_until_count | 1 | 3 | 33% | 2 | 1 |
+| choice | 5 | 15 | 33% | 13 | 8 |
+| look_and_select | 23 | 69 | 33% | 12 | 4 |
 | modify_required_hearts_global | 1 | 3 | 33% | 2 | 1 |
-| position_change | 5 | 15 | 33% | 14 | 9 |
-| sequential | 59 | 172 | 34% | 42 | 17 |
-| conditional_on_result | 4 | 10 | 40% | 7 | 3 |
-| draw_card | 16 | 39 | 41% | 14 | 5 |
-| move_cards | 51 | 123 | 41% | 55 | 24 |
-| modify_score | 27 | 58 | 47% | 21 | 8 |
-| modify_required_hearts | 7 | 15 | 47% | 9 | 3 |
-| conditional_alternative | 4 | 8 | 50% | 4 | 3 |
-| gain_ability | 5 | 10 | 50% | 7 | 3 |
+| gain_resource | 47 | 137 | 34% | 62 | 34 |
+| change_state | 16 | 45 | 36% | 28 | 16 |
+| draw_card | 17 | 39 | 44% | 15 | 5 |
+| sequential | 79 | 174 | 45% | 53 | 12 |
+| move_cards | 57 | 123 | 46% | 54 | 20 |
+| position_change | 7 | 15 | 47% | 14 | 7 |
+| conditional_on_result | 5 | 10 | 50% | 7 | 2 |
 | place_energy_under_member | 2 | 4 | 50% | 3 | 1 |
-| restriction | 4 | 8 | 50% | 8 | 4 |
+| modify_required_hearts | 8 | 15 | 53% | 9 | 3 |
+| modify_score | 31 | 58 | 53% | 23 | 8 |
+| conditional_alternative | 4 | 7 | 57% | 4 | 2 |
+| gain_ability | 6 | 10 | 60% | 7 | 3 |
 | modify_cost | 8 | 13 | 62% | 12 | 4 |
+| restriction | 6 | 8 | 75% | 8 | 2 |
 | activate_ability | 1 | 1 | 100% | 1 | 0 |
 | conditional_on_optional | 1 | 1 | 100% | 1 | 0 |
+| draw_until_count | 3 | 3 | 100% | 2 | 0 |
 | gain_ability_from_source | 1 | 1 | 100% | 1 | 0 |
 | modify_yell_count | 1 | 1 | 100% | 1 | 0 |
 | opponent_action | 3 | 3 | 100% | 3 | 0 |
@@ -50,12 +50,12 @@
 
 | Trigger | Tested | Total | % |
 |---|---|---|---|
-| ライブ成功時 | 35 | 91 | 38% |
-| ライブ開始時 | 74 | 227 | 33% |
-| 常時 | 37 | 90 | 41% |
-| 登場 | 81 | 221 | 37% |
-| 自動 | 24 | 58 | 41% |
-| 起動 | 34 | 82 | 41% |
+| ライブ成功時 | 42 | 91 | 46% |
+| ライブ開始時 | 96 | 227 | 42% |
+| 常時 | 38 | 90 | 42% |
+| 登場 | 93 | 221 | 42% |
+| 自動 | 31 | 58 | 53% |
+| 起動 | 39 | 82 | 48% |
 
 ## Coverage by Action + Cost Pairing
 
@@ -66,68 +66,68 @@
 | change_state + choice_condition | 0 | 1 | 0% |
 | change_state + custom | 1 | 1 | 100% |
 | change_state + move_cards | 2 | 5 | 40% |
-| change_state + unknown | 7 | 31 | 23% |
+| change_state + unknown | 11 | 31 | 35% |
 | choice + pay_energy | 0 | 3 | 0% |
-| choice + unknown | 4 | 11 | 36% |
+| choice + unknown | 5 | 12 | 42% |
 | conditional_alternative + sequential_cost | 1 | 1 | 100% |
-| conditional_alternative + unknown | 3 | 7 | 43% |
+| conditional_alternative + unknown | 3 | 6 | 50% |
 | conditional_on_optional + unknown | 1 | 1 | 100% |
 | conditional_on_result + move_cards | 0 | 2 | 0% |
 | conditional_on_result + pay_energy | 0 | 2 | 0% |
-| conditional_on_result + unknown | 4 | 6 | 67% |
+| conditional_on_result + unknown | 5 | 6 | 83% |
 | draw_card + change_state | 2 | 2 | 100% |
-| draw_card + move_cards | 1 | 4 | 25% |
+| draw_card + move_cards | 2 | 4 | 50% |
 | draw_card + pay_energy | 2 | 4 | 50% |
 | draw_card + sequential_cost | 1 | 2 | 50% |
 | draw_card + unknown | 10 | 27 | 37% |
-| draw_until_count + move_cards | 0 | 1 | 0% |
-| draw_until_count + unknown | 1 | 2 | 50% |
+| draw_until_count + move_cards | 1 | 1 | 100% |
+| draw_until_count + unknown | 2 | 2 | 100% |
 | gain_ability + change_state | 1 | 1 | 100% |
 | gain_ability + choice_condition | 0 | 1 | 0% |
 | gain_ability + move_cards | 0 | 1 | 0% |
 | gain_ability + reveal | 1 | 1 | 100% |
-| gain_ability + unknown | 3 | 6 | 50% |
+| gain_ability + unknown | 4 | 6 | 67% |
 | gain_ability_from_source + unknown | 1 | 1 | 100% |
-| gain_resource + change_state | 0 | 4 | 0% |
-| gain_resource + move_cards | 3 | 18 | 17% |
+| gain_resource + change_state | 1 | 4 | 25% |
+| gain_resource + move_cards | 6 | 18 | 33% |
 | gain_resource + pay_energy | 8 | 13 | 62% |
-| gain_resource + unknown | 30 | 104 | 29% |
+| gain_resource + unknown | 32 | 102 | 31% |
 | look_and_select + change_state | 1 | 2 | 50% |
-| look_and_select + move_cards | 7 | 29 | 24% |
+| look_and_select + move_cards | 8 | 29 | 28% |
 | look_and_select + pay_energy | 2 | 3 | 67% |
 | look_and_select + reveal | 1 | 1 | 100% |
 | look_and_select + sequential_cost | 2 | 8 | 25% |
-| look_and_select + unknown | 7 | 26 | 27% |
+| look_and_select + unknown | 9 | 26 | 35% |
 | modify_cost + move_cards | 0 | 1 | 0% |
 | modify_cost + pay_energy | 1 | 1 | 100% |
 | modify_cost + unknown | 7 | 11 | 64% |
-| modify_required_hearts + unknown | 7 | 15 | 47% |
+| modify_required_hearts + unknown | 8 | 15 | 53% |
 | modify_required_hearts_global + unknown | 1 | 3 | 33% |
-| modify_score + pay_energy | 3 | 4 | 75% |
-| modify_score + unknown | 24 | 54 | 44% |
+| modify_score + pay_energy | 4 | 4 | 100% |
+| modify_score + unknown | 27 | 54 | 50% |
 | modify_yell_count + unknown | 1 | 1 | 100% |
 | move_cards + change_state | 1 | 2 | 50% |
 | move_cards + custom | 1 | 2 | 50% |
-| move_cards + move_cards | 13 | 27 | 48% |
-| move_cards + pay_energy | 6 | 18 | 33% |
+| move_cards + move_cards | 15 | 27 | 56% |
+| move_cards + pay_energy | 8 | 18 | 44% |
 | move_cards + reveal | 1 | 1 | 100% |
 | move_cards + sequential_cost | 4 | 11 | 36% |
-| move_cards + unknown | 25 | 62 | 40% |
+| move_cards + unknown | 27 | 62 | 44% |
 | opponent_action + change_state | 1 | 1 | 100% |
 | opponent_action + unknown | 2 | 2 | 100% |
 | place_energy_under_member + unknown | 2 | 4 | 50% |
 | play_baton_touch + unknown | 1 | 1 | 100% |
 | position_change + move_cards | 1 | 1 | 100% |
 | position_change + pay_energy | 0 | 2 | 0% |
-| position_change + unknown | 4 | 12 | 33% |
-| restriction + unknown | 4 | 8 | 50% |
-| sequential + change_state | 0 | 7 | 0% |
+| position_change + unknown | 6 | 12 | 50% |
+| restriction + unknown | 6 | 8 | 75% |
+| sequential + change_state | 2 | 7 | 29% |
 | sequential + custom | 1 | 2 | 50% |
-| sequential + move_cards | 9 | 22 | 41% |
-| sequential + pay_energy | 3 | 7 | 43% |
+| sequential + move_cards | 10 | 22 | 45% |
+| sequential + pay_energy | 4 | 7 | 57% |
 | sequential + reveal | 1 | 3 | 33% |
 | sequential + sequential_cost | 3 | 5 | 60% |
-| sequential + unknown | 42 | 126 | 33% |
+| sequential + unknown | 58 | 128 | 45% |
 | set_blade_count + unknown | 1 | 1 | 100% |
 | set_blade_type + unknown | 2 | 2 | 100% |
 | set_card_identity + unknown | 1 | 1 | 100% |
@@ -144,50 +144,46 @@ These key combos have **zero** test coverage.
 | 2 | `blade_limit, blade_limit_operator, card_type, condition, count, original_value, state_change, target` | PL!SP-bp4-011-R＋, PL!SP-bp4-011-P, PL!SP-bp4-011-P＋ +3 more |
 | 2 | `card_type, count, max, state_change, target` | PL!-bp3-001-R, PL!-bp3-001-P, PL!S-bp3-010-N +1 more |
 | 2 | `card_type, condition, cost_limit, cost_limit_operator, count, state_change, target` | PL!HS-pb1-010-R, PL!HS-pb1-010-P＋, PL!SP-PR-021-PR |
-| 1 | `card_type, count, position, state_change` | PL!SP-bp4-008-R＋, PL!SP-bp4-008-P, PL!SP-bp4-008-P＋ +1 more |
+| 1 | `activation_position, card_type, count, position, state_change` | PL!SP-bp4-008-R＋, PL!SP-bp4-008-P, PL!SP-bp4-008-P＋ +1 more |
 | 1 | `activation_position, all, blade_limit, blade_limit_operator, card_type, condition, original_value, position, state_change, target` | PL!S-bp5-002-R＋, PL!S-bp5-002-P, PL!S-bp5-002-AR +1 more |
 | 1 | `blade_limit, blade_limit_operator, card_type, count, original_value, parenthetical, state_change, target` | PL!N-bp5-004-R, PL!N-bp5-004-P, PL!N-bp5-004-AR |
 | 1 | `all, card_type, state_change, target` | PL!-bp3-005-R, PL!-bp3-005-P |
 | 1 | `card_type, count, parenthetical, state_change` | PL!N-bp3-006-R, PL!N-bp3-006-P |
 | 1 | `blade_limit, blade_limit_operator, card_type, condition, count, group_names, original_value, state_change, target` | PL!-pb1-002-R, PL!-pb1-002-P＋ |
 | 1 | `card_type, count, group_names, location, per_unit, per_unit_count, per_unit_type, state_change, target` | PL!-pb1-003-R, PL!-pb1-003-P＋ |
-| 1 | `blade_limit, blade_limit_operator, card_type, count, original_value, state_change, target` | PL!-pb1-009-R, PL!-pb1-009-P＋ |
-| 1 | `card_type, condition, cost_limit, cost_limit_operator, count, distinct, group_names, state_change, target` | PL!-pb1-011-R, PL!-pb1-011-P＋ |
-| 1 | `card_type, count, group_names, max, state_change, target` | PL!-pb1-012-R, PL!-pb1-012-P＋ |
 | 1 | `card_type, count, group_names, state_change` | PL!N-bp4-008-R, PL!N-bp4-008-P |
 | 1 | `all, blade_limit, blade_limit_operator, card_type, original_value, state_change, target` | PL!HS-pb1-008-R, PL!HS-pb1-008-P＋ |
 | 1 | `card_type, count, exclude_self, state_change, target` | PL!-bp6-008-R, PL!-bp6-008-P |
 | 1 | `card_type, condition, cost_limit, cost_limit_operator, count, position, position_compare, state_change, target` | PL!S-bp6-001-R, PL!S-bp6-001-P |
 | 1 | `card_type, count, max, state_change` | LL-bp3-001-R＋ |
-| 1 | `blade_limit, blade_limit_operator, card_type, count, group_names, original_value, state_change, target` | PL!HS-bp6-013-R |
+| 1 | `blade_limit, blade_limit_operator, card_type, count, exclude_group_names, group_names, original_value, state_change, target` | PL!HS-bp6-013-R |
 
-### choice (14 abilities)
+### choice (15 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 2 | `options` | PL!SP-bp5-001-R＋, PL!SP-bp5-001-P, PL!SP-bp5-001-AR +2 more |
-| 1 | `all, options` | PL!-PR-005-PR, PL!-PR-006-PR, PL!-PR-008-PR |
-| 1 | `group_reference, options` | PL!N-bp5-011-R, PL!N-bp5-011-P, PL!N-bp5-011-AR |
+| 2 | `count, options` | PL!SP-bp5-001-R＋, PL!SP-bp5-001-P, PL!SP-bp5-001-AR +2 more |
+| 2 | `count, group_names, options` | PL!N-pb1-010-R, PL!N-pb1-010-P＋, PL!HS-cl1-011-CL |
+| 1 | `all, count, options` | PL!-PR-005-PR, PL!-PR-006-PR, PL!-PR-008-PR |
+| 1 | `count, group_reference, options` | PL!N-bp5-011-R, PL!N-bp5-011-P, PL!N-bp5-011-AR |
 | 1 | `choice_maker, choice_type, options, question` | LL-PR-004-PR |
-| 1 | `condition, group_names, options, position` | PL!S-bp3-024-L |
-| 1 | `condition, group_names, options` | PL!HS-bp5-022-L |
-| 1 | `condition, group_names, options, original_value` | PL!-bp5-024-L |
+| 1 | `condition, count, group_names, options, position` | PL!S-bp3-024-L |
+| 1 | `condition, count, group_names, heart_colors, options` | PL!HS-bp5-022-L |
+| 1 | `condition, count, group_names, options, original_value` | PL!-bp5-024-L |
 
-### conditional_alternative (8 abilities)
+### conditional_alternative (7 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
 | 1 | `activation_condition_parsed, activation_position, alternative_effect, condition, group_names, parenthetical, position, primary_effect` | PL!-pb1-004-R, PL!-pb1-004-P＋ |
 | 1 | `alternative_effect, condition, primary_effect` | PL!N-bp3-026-L |
-| 1 | `alternative_effect, condition, group_names` | PL!-bp6-024-L |
 
 ### conditional_on_result (10 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 1 | `followup_action, group_names, original_value, primary_effect, result_condition` | PL!HS-bp5-005-R, PL!HS-bp5-005-P, PL!HS-bp5-005-AR |
+| 1 | `followup_action, group_names, heart_colors, original_value, primary_effect, result_condition` | PL!HS-bp5-005-R, PL!HS-bp5-005-P, PL!HS-bp5-005-AR |
 | 1 | `all, followup_action, primary_effect, result_condition, shuffle` | PL!HS-pb1-012-R, PL!HS-pb1-012-P＋ |
-| 1 | `all, followup_action, group_names, primary_effect, result_condition, shuffle` | PL!HS-bp6-031-L |
 
 ### draw_card (39 abilities)
 
@@ -197,76 +193,63 @@ These key combos have **zero** test coverage.
 | 2 | `condition, count, destination, group_names, source` | PL!-pb1-032-L, PL!HS-pb1-021-N |
 | 1 | `condition, count, destination, original_value, source` | PL!HS-PR-028-PR |
 | 1 | `count, destination, parenthetical, source, trigger_condition, trigger_type` | PL!SP-pb1-020-N |
-| 1 | `activation_condition_parsed, count, destination, duration, source, target` | PL!HS-bp6-014-R |
-
-### draw_until_count (3 abilities)
-
-| # | Keys | Sample Card IDs |
-|---|---|---|
-| 1 | `count, destination, source, target, target_count` | PL!N-PR-028-PR, PL!HS-PR-031-PR |
+| 1 | `condition, count, destination, heart_colors, source` | PL!-bp4-023-L |
 
 ### gain_ability (10 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 1 | `ability_gain, condition, gained_effect, group_names` | PL!HS-bp1-003-R＋, PL!HS-bp1-003-P, PL!HS-bp1-003-P＋ +1 more |
-| 1 | `ability_gain, card_type, condition, count, duration, gained_effect, group_names, max, target` | PL!S-bp6-007-R, PL!S-bp6-007-P |
-| 1 | `ability_gain, duration, gained_effect, parenthetical` | LL-bp1-001-R＋ |
+| 1 | `ability_gain, condition, group_names` | PL!HS-bp1-003-R＋, PL!HS-bp1-003-P, PL!HS-bp1-003-P＋ +1 more |
+| 1 | `ability_gain, card_type, condition, count, duration, group_names, max, target` | PL!S-bp6-007-R, PL!S-bp6-007-P |
+| 1 | `ability_gain, duration, parenthetical` | LL-bp1-001-R＋ |
 
-### gain_resource (139 abilities)
+### gain_resource (137 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
+| 3 | `activation_position, count, heart_colors, position, resource` | PL!SP-bp5-011-R, PL!SP-bp5-011-P, PL!SP-bp5-011-AR +6 more |
 | 3 | `condition, count, duration, heart_colors, parenthetical, resource` | PL!SP-sd2-002-P, PL!SP-sd2-002-SD2, PL!SP-sd2-013-SD2 +2 more |
-| 2 | `count, heart_colors, position, resource` | PL!SP-bp5-011-R, PL!SP-bp5-011-P, PL!SP-bp5-011-AR +3 more |
 | 2 | `count, duration, per_unit, per_unit_count, per_unit_type, resource` | PL!S-bp3-003-R＋, PL!S-bp3-003-P, PL!S-bp3-003-P＋ +1 more |
-| 2 | `activation_position, all, card_type, condition, duration, group_names, position, resource, target` | PL!-bp6-001-R＋, PL!-bp6-001-P, PL!-bp6-001-P＋ +1 more |
-| 2 | `card_type, count, duration, group_names, heart_colors, resource, target, target_count` | PL!HS-bp6-003-R, PL!HS-bp6-003-P, PL!HS-bp6-025-L |
+| 2 | `card_type, condition, count, duration, resource, target, target_count` | PL!S-bp2-025-L, PL!-bp4-014-N |
 | 2 | `card_type, count, duration, group_names, position, resource, target` | PL!-bp4-011-N, PL!-bp4-017-N |
-| 2 | `card_type, count, duration, group_names, resource, target, target_count` | PL!-bp4-024-L, PL!HS-cl1-003-CL |
 | 2 | `activation_position, condition, count, duration, parenthetical, position, resource` | PL!SP-bp4-017-N, PL!SP-bp4-020-N |
 | 1 | `card_type, condition, count, duration, heart_colors, resource, target_count` | PL!HS-bp2-007-R＋, PL!HS-bp2-007-P, PL!HS-bp2-007-P＋ +1 more |
-| 1 | `card_type, count, duration, filter_targets_by_heart_colors, group_reference, heart_colors, resource, target_count` | PL!HS-bp5-003-R＋, PL!HS-bp5-003-P, PL!HS-bp5-003-AR +1 more |
-| 1 | `condition, count, duration, dynamic_count, resource` | PL!S-bp6-009-R＋, PL!S-bp6-009-P, PL!S-bp6-009-P＋ +1 more |
-| 1 | `activation_position, count, heart_colors, position, resource` | PL!SP-bp5-011-R, PL!SP-bp5-011-P, PL!SP-bp5-011-AR |
+| 1 | `condition, conditional, count, duration, dynamic_count, resource` | PL!S-bp6-009-R＋, PL!S-bp6-009-P, PL!S-bp6-009-P＋ +1 more |
 | 1 | `cost_limit, cost_limit_operator, count, group_names, location, per_unit, per_unit_count, per_unit_type, resource, target` | PL!HS-bp5-004-R, PL!HS-bp5-004-P, PL!HS-bp5-004-AR |
 | 1 | `condition, count, duration, filter_targets_by_heart_colors, group_reference, heart_colors, resource` | PL!S-PR-040-PR, PL!N-PR-023-PR |
 | 1 | `condition, count, filter_targets_by_heart_colors, heart_colors, position, resource` | PL!SP-bp2-004-R, PL!SP-bp2-004-P |
 | 1 | `count, duration, location, per_unit, per_unit_count, per_unit_type, resource, target` | PL!-bp3-006-R, PL!-bp3-006-P |
 | 1 | `count, heart_colors, location, per_unit, per_unit_count, per_unit_type, resource, state, target` | PL!-pb1-002-R, PL!-pb1-002-P＋ |
 | 1 | `card_type, count, duration, exclude_self, resource, target` | PL!-pb1-010-R, PL!-pb1-010-P＋ |
-| 1 | `count, exclude_self, group_names, heart_colors, location, per_unit, per_unit_count, per_unit_type, resource, target` | PL!-bp5-111-R, PL!-bp5-111-P＋ |
+| 1 | `count, group_names, heart_colors, location, per_unit, per_unit_count, per_unit_type, resource, target` | PL!-bp5-111-R, PL!-bp5-111-P＋ |
 | 1 | `activation_position, count, duration, position, resource, trigger_condition, trigger_type` | PL!HS-pb1-009-R, PL!HS-pb1-009-P＋ |
-| 1 | `condition, count, duration, resource, sign` | PL!HS-pb1-015-R, PL!HS-pb1-015-P＋ |
-| 1 | `card_type, condition, count, duration, resource, target, target_count` | PL!S-bp2-025-L |
+| 1 | `condition, conditional, count, duration, resource, sign` | PL!HS-pb1-015-R, PL!HS-pb1-015-P＋ |
 | 1 | `count, duration, parenthetical, per_unit, per_unit_count, per_unit_type, resource` | LL-bp2-001-R＋ |
 | 1 | `card_type, count, duration, exclude_self, heart_colors, resource, target, target_count` | PL!-bp4-013-N |
-| 1 | `card_type, condition, count, duration, exclude_self, resource, target, target_count` | PL!-bp4-014-N |
-| 1 | `card_type, condition, count, duration, group_names, position, resource, target` | PL!-bp4-020-L |
+| 1 | `card_type, condition, conditional, count, duration, group_names, position, resource, target` | PL!-bp4-020-L |
 | 1 | `card_type, condition, count, duration, group_names, resource, target, target_count` | PL!N-bp4-026-L |
 | 1 | `count, duration, heart_colors, parenthetical, resource, trigger_condition, trigger_type` | PL!SP-bp4-016-N |
 | 1 | `count, duration, per_unit, per_unit_count, resource` | PL!SP-bp4-022-N |
 | 1 | `card_type, condition, count, duration, heart_colors, position, resource` | PL!SP-bp4-024-L |
 | 1 | `card_type, condition, count, duration, filter_targets_by_heart_colors, group_names, heart_colors, resource, target, target_count` | PL!N-pb1-039-L |
-| 1 | `all, condition, count, duration, resource` | PL!S-bp5-016-N |
 | 1 | `activation_position, count, duration, position, resource` | PL!SP-bp5-015-N |
 | 1 | `card_type, count, duration, group_names, heart_colors, heart_selection, original_value, resource, target, target_count` | PL!HS-bp5-021-L |
 | 1 | `card_type, condition, count, duration, group_reference, position, resource, target` | LL-bp5-002-L |
 | 1 | `card_type, count, duration, exclude_self, group_names, heart_colors, resource, target, target_count` | PL!HS-sd1-003-SD |
-| 1 | `card_type, count, duration, group_names, resource, target` | PL!S-sd1-022-SD |
+| 1 | `count, duration, per_unit, per_unit_count, per_unit_source, per_unit_type, resource, target` | PL!HS-sd1-020-SD |
 | 1 | `card_type, condition, count, duration, group_names, heart_colors, resource, target, target_count` | PL!HS-pb1-025-L |
-| 1 | `count, duration, multiple_targets, per_unit, per_unit_count, per_unit_type, resource` | LL-bp6-001-R＋ |
+| 1 | `count, duration, multiple_targets, per_unit, per_unit_count, per_unit_source, per_unit_type, resource` | LL-bp6-001-R＋ |
 | 1 | `card_type, cost_limit, cost_limit_operator, count, duration, group_names, resource, target, target_count` | PL!HS-cl1-010-CL |
 | 1 | `condition, count, duration, parenthetical, resource` | PL!SP-sd2-011-SD2 |
-| 1 | `card_type, condition, count, duration, exclude_self, group_names, resource, target, target_count` | PL!SP-sd2-020-SD2 |
 
 ### look_and_select (69 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 3 | `condition, group_names, look_action, select_action` | PL!S-bp6-004-R＋, PL!S-bp6-004-P, PL!S-bp6-004-P＋ +4 more |
 | 1 | `condition, group_names, select_action` | PL!-bp6-006-R＋, PL!-bp6-006-P, PL!-bp6-006-P＋ +1 more |
-| 1 | `look_action, original_value, select_action` | LL-bp4-001-R＋ |
+| 1 | `condition, group_names, heart_colors, look_action, select_action` | PL!S-bp6-004-R＋, PL!S-bp6-004-P, PL!S-bp6-004-P＋ +1 more |
+| 1 | `condition, group_names, look_action, select_action` | PL!-bp4-006-R, PL!-bp4-006-P |
+| 1 | `followup_action, look_action, original_value, select_action` | LL-bp4-001-R＋ |
 
 ### modify_cost (13 abilities)
 
@@ -274,7 +257,7 @@ These key combos have **zero** test coverage.
 |---|---|---|
 | 1 | `card_type, destination, location, operation, source, target, value` | PL!S-bp5-001-R＋, PL!S-bp5-001-P, PL!S-bp5-001-AR +1 more |
 | 1 | `card_type, count, destination, dynamic_count, operation, per_unit, per_unit_count, per_unit_type, source` | PL!-pb1-007-R, PL!-pb1-007-P＋ |
-| 1 | `card_type, condition, duration, operation, value` | PL!-bp4-008-R, PL!-bp4-008-P |
+| 1 | `card_type, condition, conditional, duration, operation, value` | PL!-bp4-008-R, PL!-bp4-008-P |
 | 1 | `exclude_self, location, operation, per_unit, per_unit_count, per_unit_type, value` | LL-bp2-001-R＋ |
 
 ### modify_required_hearts (15 abilities)
@@ -283,7 +266,7 @@ These key combos have **zero** test coverage.
 |---|---|---|
 | 1 | `condition, count, group_names, heart_colors, operation, per_unit, per_unit_count, per_unit_type, position, self_target` | PL!-bp5-020-L |
 | 1 | `condition, count, distinct, group_names, heart_colors, operation, self_target` | PL!HS-pb1-026-L |
-| 1 | `card_type, condition, count, duration, group_names, heart_colors, non_stackable, operation, original_count, original_operator, original_value, target` | PL!-bp6-022-L |
+| 1 | `card_type, condition, conditional, count, duration, group_names, heart_colors, non_stackable, operation, original_count, original_operator, original_value, target` | PL!-bp6-022-L |
 
 ### modify_required_hearts_global (3 abilities)
 
@@ -297,19 +280,17 @@ These key combos have **zero** test coverage.
 |---|---|---|
 | 1 | `activation_position, operation, position, value` | PL!-bp4-005-R＋, PL!-bp4-005-P, PL!-bp4-005-P＋ +1 more |
 | 1 | `activation_position, condition, group_names, operation, position, value` | PL!S-bp6-009-R＋, PL!S-bp6-009-P, PL!S-bp6-009-P＋ +1 more |
+| 1 | `condition, conditional, duration, operation, target, value` | PL!S-bp5-008-R, PL!S-bp5-008-P, PL!S-bp5-008-AR |
 | 1 | `condition, operation, value` | PL!SP-pb1-002-R, PL!SP-pb1-002-P＋ |
 | 1 | `condition, operation, position, self_target, value` | PL!HS-bp2-026-L, PL!HS-bp2-026-L＋ |
-| 1 | `activation_position, condition, duration, operation, value` | PL!-bp6-009-R, PL!-bp6-009-P |
+| 1 | `activation_position, condition, conditional, duration, operation, value` | PL!-bp6-009-R, PL!-bp6-009-P |
 | 1 | `condition, distinct, group_names, operation, self_target, value` | PL!SP-pb1-024-L |
 | 1 | `location, operation, per_unit, per_unit_count, per_unit_type, self_target, state, target, value` | PL!N-bp3-031-L |
-| 1 | `operation, per_unit, per_unit_count, per_unit_type, self_target, value` | PL!SP-bp5-025-L |
 
 ### move_cards (123 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 6 | `card_type, count, destination, source, state_change, target` | PL!SP-PR-004-PR, PL!SP-PR-006-PR, PL!SP-PR-013-PR +14 more |
-| 2 | `card_type, cost_limit, cost_limit_operator, count, destination, source, target` | PL!-bp4-005-R＋, PL!-bp4-005-P, PL!-bp4-005-P＋ +5 more |
 | 2 | `card_type, condition, count, destination, group_names, optional` | PL!S-bp6-002-R＋, PL!S-bp6-002-P, PL!S-bp6-002-P＋ +1 more |
 | 1 | `card_type, cost_limit, cost_limit_operator, count, destination, max, source, target` | PL!HS-bp2-002-R＋, PL!HS-bp2-002-P, PL!HS-bp2-002-P＋ +1 more |
 | 1 | `card_type, count, destination, multiple_targets, source, target` | PL!N-bp4-007-R＋, PL!N-bp4-007-P, PL!N-bp4-007-P＋ +1 more |
@@ -320,7 +301,6 @@ These key combos have **zero** test coverage.
 | 1 | `card_type, count, destination, max, placement_order, source, target` | PL!N-bp3-010-R, PL!N-bp3-010-P |
 | 1 | `card_type, condition, count, destination, dynamic_count, group_names, source, target` | PL!SP-bp4-006-R, PL!SP-bp4-006-P |
 | 1 | `card_type, condition, cost_limit, cost_limit_operator, count, destination, group_names, source, target` | PL!SP-bp4-007-R, PL!SP-bp4-007-P |
-| 1 | `card_type, count, destination, dynamic_count, group_names, parenthetical, source, target` | PL!HS-bp1-021-L |
 | 1 | `card_type, count, destination, dynamic_count, max, source, target` | PL!S-bp2-021-L |
 | 1 | `card_type, condition, count, destination, distinct, dynamic_count, source, target` | PL!SP-bp2-025-L |
 | 1 | `card_type, count, destination, optional, source, target` | PL!N-bp4-021-N |
@@ -328,9 +308,8 @@ These key combos have **zero** test coverage.
 | 1 | `all, card_type, destination, source, target` | LL-bp5-002-L |
 | 1 | `card_type, cost_limit, cost_limit_operator, count, destination, group_names, parenthetical, source, target` | PL!S-sd1-006-SD |
 | 1 | `card_type, condition, count, destination, group_names, optional, source, target` | PL!HS-pb1-027-L |
-| 1 | `card_type, condition, cost_limit, cost_limit_operator, count, destination, source, target` | PL!HS-bp6-025-L |
 | 1 | `card_type, cost_limit, cost_limit_operator, count, destination, dynamic_count, source, target` | PL!HS-bp6-032-L |
-| 1 | `card_type, cost_limit, cost_limit_operator, count, destination, dynamic_count, group_names, source, target` | PL!HS-cl1-009-CL |
+| 1 | `card_type, cost_limit_max, cost_limit_min, count, destination, dynamic_count, group_names, source, target` | PL!HS-cl1-009-CL |
 | 1 | `card_type, condition, cost_limit, cost_limit_operator, count, destination, dynamic_count, source, target` | PL!HS-cl1-012-CL |
 
 ### place_energy_under_member (4 abilities)
@@ -343,46 +322,37 @@ These key combos have **zero** test coverage.
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 2 | `card_type, optional, parenthetical` | PL!SP-bp4-008-R＋, PL!SP-bp4-008-P, PL!SP-bp4-008-P＋ +5 more |
-| 1 | `card_type, condition, exclude_position, group_names, parenthetical` | PL!-bp4-005-R＋, PL!-bp4-005-P, PL!-bp4-005-P＋ +1 more |
-| 1 | `card_type, condition, count, optional, target_member` | PL!HS-bp5-003-R＋, PL!HS-bp5-003-P, PL!HS-bp5-003-AR +1 more |
-| 1 | `card_type, group_names` | PL!S-bp5-111-R, PL!S-bp5-111-P＋, PL!S-bp5-222-R +1 more |
-| 1 | `card_type` | PL!SP-sd2-002-P, PL!SP-sd2-002-SD2 |
+| 2 | `card_type, optional, parenthetical, target` | PL!SP-bp4-008-R＋, PL!SP-bp4-008-P, PL!SP-bp4-008-P＋ +5 more |
+| 1 | `card_type, condition, exclude_position, group_names, parenthetical, target` | PL!-bp4-005-R＋, PL!-bp4-005-P, PL!-bp4-005-P＋ +1 more |
+| 1 | `card_type, group_names, target` | PL!S-bp5-111-R, PL!S-bp5-111-P＋, PL!S-bp5-222-R +1 more |
+| 1 | `card_type, target` | PL!SP-sd2-002-P, PL!SP-sd2-002-SD2 |
 | 1 | `card_type, condition, count, group_names, optional, target, target_member` | PL!-bp4-020-L |
 | 1 | `card_type, condition, group_names, multiple_targets, optional, parenthetical, target` | PL!SP-bp4-027-L |
 | 1 | `card_type, count, duration, target` | PL!S-bp5-022-L |
-| 1 | `card_type, condition, group_names, position` | PL!-bp6-020-L |
 
 ### restriction (8 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 1 | `card_type, condition, count, duration, restriction_type, target` | PL!S-pb1-022-L, PL!S-pb1-022-L＋ |
-| 1 | `card_type, duration, restriction_type, target` | PL!-pb1-009-R, PL!-pb1-009-P＋ |
 | 1 | `card_type, phase, restriction_type, target` | PL!HS-pb1-008-R, PL!HS-pb1-008-P＋ |
 | 1 | `card_type, count, restriction_type` | LL-bp2-001-R＋ |
 
-### sequential (172 abilities)
+### sequential (174 abilities)
 
 | # | Keys | Sample Card IDs |
 |---|---|---|
-| 5 | `actions, original_value` | PL!N-bp3-011-R, PL!N-bp3-011-P, PL!N-bp3-014-N +3 more |
-| 3 | `actions, conditional, group_names` | PL!N-bp4-010-R＋, PL!N-bp4-010-P, PL!N-bp4-010-P＋ +6 more |
-| 3 | `actions, duration` | PL!SP-PR-009-PR, PL!SP-PR-011-PR, PL!SP-PR-012-PR +3 more |
-| 3 | `actions, condition, conditional` | PL!N-bp4-026-L, PL!HS-bp6-017-N, PL!HS-bp6-018-N |
-| 2 | `actions, condition, count, duration, heart_colors` | PL!HS-bp5-002-R＋, PL!HS-bp5-002-P, PL!HS-bp5-002-AR +3 more |
-| 2 | `actions, group_names, parenthetical` | PL!N-bp3-003-R, PL!N-bp3-003-P, PL!HS-pb1-028-L |
+| 4 | `actions, heart_colors, original_value` | PL!N-bp3-014-N, PL!N-bp3-015-N, PL!N-pb1-034-N +1 more |
 | 2 | `actions, activation_position, conditional, group_names, position` | PL!-bp6-003-R＋, PL!-bp6-003-P, PL!-bp6-003-P＋ +1 more |
-| 1 | `actions, condition, exclude_self` | PL!HS-bp1-006-R＋, PL!HS-bp1-006-P, PL!HS-bp1-006-P＋ +1 more |
-| 1 | `actions, position` | PL!SP-bp4-008-R＋, PL!SP-bp4-008-P, PL!SP-bp4-008-P＋ +1 more |
-| 1 | `actions, all, group_names` | PL!S-bp5-005-R＋, PL!S-bp5-005-P, PL!S-bp5-005-AR +1 more |
+| 2 | `actions, condition, conditional` | PL!N-bp4-026-L, PL!HS-bp6-017-N |
+| 1 | `actions, activation_position, position` | PL!SP-bp4-008-R＋, PL!SP-bp4-008-P, PL!SP-bp4-008-P＋ +1 more |
+| 1 | `actions, exclude_self, group_names` | PL!N-bp3-002-R, PL!N-bp3-002-P |
 | 1 | `actions, target` | PL!N-bp4-002-R, PL!N-bp4-002-P |
-| 1 | `actions, conditional, exclude_self, group_names, trigger_condition, trigger_type` | PL!HS-pb1-001-R, PL!HS-pb1-001-P＋ |
 | 1 | `actions, count, destination, heart_colors, max, source, target` | PL!-bp6-005-R, PL!-bp6-005-P |
 | 1 | `actions, conditional, exclude_self, group_names` | PL!S-bp6-003-R, PL!S-bp6-003-P |
 | 1 | `actions, all, duration, group_names` | PL!SP-sd2-025-P, PL!SP-sd2-025-SD2 |
-| 1 | `actions, all` | PL!SP-bp5-024-L |
-| 1 | `actions, group_names, original_value` | PL!HS-pb1-029-L |
+| 1 | `actions, all, heart_colors` | PL!SP-bp5-024-L |
+| 1 | `actions, group_names, heart_colors, original_value` | PL!HS-pb1-029-L |
+| 1 | `actions, condition, conditional, heart_colors` | PL!HS-bp6-018-N |
 
 ## Untested Cost Key Combinations
 
@@ -390,7 +360,7 @@ These key combos have **zero** test coverage.
 
 | # | Keys |
 |---|---|
-| 9 | `card_type, self_cost, state_change` |
+| 1 | `card_type, count, group_names, optional, state_change` |
 
 ### choice_condition cost
 
@@ -413,7 +383,6 @@ These key combos have **zero** test coverage.
 | 2 | `card_type, count, destination, group_names, optional, source, zone` |
 | 1 | `any_number, characters, count, destination, optional, source, zone` |
 | 1 | `characters, count, destination, shuffle, source, target, zone` |
-| 1 | `destination, source, zone` |
 
 ### reveal cost
 
@@ -428,36 +397,36 @@ The 30 largest untested key combinations:
 
 | Rank | Count | Action | Keys |
 |---|---|---|---|
-| 1 | 6 | move_cards | `card_type, count, destination, source, state_change, target` |
-| 2 | 5 | sequential | `actions, original_value` |
-| 3 | 3 | look_and_select | `condition, group_names, look_action, select_action` |
-| 4 | 3 | sequential | `actions, conditional, group_names` |
-| 5 | 3 | sequential | `actions, duration` |
-| 6 | 3 | sequential | `actions, condition, conditional` |
-| 7 | 3 | gain_resource | `condition, count, duration, heart_colors, parenthetical, resource` |
-| 8 | 2 | move_cards | `card_type, cost_limit, cost_limit_operator, count, destination, source, target` |
-| 9 | 2 | move_cards | `card_type, condition, count, destination, group_names, optional` |
-| 10 | 2 | sequential | `actions, condition, count, duration, heart_colors` |
-| 11 | 2 | sequential | `actions, group_names, parenthetical` |
-| 12 | 2 | sequential | `actions, activation_position, conditional, group_names, position` |
-| 13 | 2 | gain_resource | `count, heart_colors, position, resource` |
-| 14 | 2 | gain_resource | `count, duration, per_unit, per_unit_count, per_unit_type, resource` |
-| 15 | 2 | gain_resource | `activation_position, all, card_type, condition, duration, group_names, position, resource, target` |
-| 16 | 2 | gain_resource | `card_type, count, duration, group_names, heart_colors, resource, target, target_count` |
-| 17 | 2 | gain_resource | `card_type, count, duration, group_names, position, resource, target` |
-| 18 | 2 | gain_resource | `card_type, count, duration, group_names, resource, target, target_count` |
-| 19 | 2 | gain_resource | `activation_position, condition, count, duration, parenthetical, position, resource` |
-| 20 | 2 | draw_card | `condition, count, destination, exclude_self, source` |
-| 21 | 2 | draw_card | `condition, count, destination, group_names, source` |
-| 22 | 2 | change_state | `blade_limit, blade_limit_operator, card_type, condition, count, original_value, state_change, target` |
-| 23 | 2 | change_state | `card_type, count, max, state_change, target` |
-| 24 | 2 | change_state | `card_type, condition, cost_limit, cost_limit_operator, count, state_change, target` |
-| 25 | 2 | modify_required_hearts_global | `condition, heart_colors, operation, target, value` |
-| 26 | 2 | position_change | `card_type, optional, parenthetical` |
-| 27 | 2 | place_energy_under_member | `card_type, cost_limit, cost_limit_operator, count, destination, energy_count, group_names, optional, source, target_member` |
-| 28 | 2 | choice | `options` |
-| 29 | 1 | move_cards | `card_type, cost_limit, cost_limit_operator, count, destination, max, source, target` |
-| 30 | 1 | move_cards | `card_type, count, destination, multiple_targets, source, target` |
+| 1 | 4 | sequential | `actions, heart_colors, original_value` |
+| 2 | 3 | gain_resource | `activation_position, count, heart_colors, position, resource` |
+| 3 | 3 | gain_resource | `condition, count, duration, heart_colors, parenthetical, resource` |
+| 4 | 2 | move_cards | `card_type, condition, count, destination, group_names, optional` |
+| 5 | 2 | sequential | `actions, activation_position, conditional, group_names, position` |
+| 6 | 2 | sequential | `actions, condition, conditional` |
+| 7 | 2 | gain_resource | `count, duration, per_unit, per_unit_count, per_unit_type, resource` |
+| 8 | 2 | gain_resource | `card_type, condition, count, duration, resource, target, target_count` |
+| 9 | 2 | gain_resource | `card_type, count, duration, group_names, position, resource, target` |
+| 10 | 2 | gain_resource | `activation_position, condition, count, duration, parenthetical, position, resource` |
+| 11 | 2 | draw_card | `condition, count, destination, exclude_self, source` |
+| 12 | 2 | draw_card | `condition, count, destination, group_names, source` |
+| 13 | 2 | change_state | `blade_limit, blade_limit_operator, card_type, condition, count, original_value, state_change, target` |
+| 14 | 2 | change_state | `card_type, count, max, state_change, target` |
+| 15 | 2 | change_state | `card_type, condition, cost_limit, cost_limit_operator, count, state_change, target` |
+| 16 | 2 | modify_required_hearts_global | `condition, heart_colors, operation, target, value` |
+| 17 | 2 | position_change | `card_type, optional, parenthetical, target` |
+| 18 | 2 | place_energy_under_member | `card_type, cost_limit, cost_limit_operator, count, destination, energy_count, group_names, optional, source, target_member` |
+| 19 | 2 | choice | `count, options` |
+| 20 | 2 | choice | `count, group_names, options` |
+| 21 | 1 | move_cards | `card_type, cost_limit, cost_limit_operator, count, destination, max, source, target` |
+| 22 | 1 | move_cards | `card_type, count, destination, multiple_targets, source, target` |
+| 23 | 1 | move_cards | `card_type, count, destination, multiple_targets, source, state_change, target` |
+| 24 | 1 | move_cards | `cost_limit, cost_limit_operator, count, destination, dynamic_count, or_card_types, source, target` |
+| 25 | 1 | move_cards | `card_type, count, destination, source` |
+| 26 | 1 | move_cards | `activation_condition_parsed, card_type, count, destination, optional, self_target, source` |
+| 27 | 1 | move_cards | `card_type, count, destination, max, placement_order, source, target` |
+| 28 | 1 | move_cards | `card_type, condition, count, destination, dynamic_count, group_names, source, target` |
+| 29 | 1 | move_cards | `card_type, condition, cost_limit, cost_limit_operator, count, destination, group_names, source, target` |
+| 30 | 1 | move_cards | `card_type, count, destination, dynamic_count, max, source, target` |
 
 ## All Existing Key Combinations (Schema Reference)
 
@@ -473,7 +442,7 @@ Every key combination that appears in the data, with test coverage %.
 
 | # | Tested % | Keys |
 |---|---|---|
-| 5 | 40% | `card_type, condition, count, state_change` |
+| 5 | 60% | `card_type, condition, count, state_change` |
 | 5 | 40% | `card_type, count, state_change` |
 | 4 | 25% | `card_type, cost_limit, cost_limit_operator, count, state_change, target` |
 | 3 | 67% | `card_type, condition, count, exclude_self, state_change` |
@@ -482,7 +451,7 @@ Every key combination that appears in the data, with test coverage %.
 | 2 | 0% | `card_type, count, max, state_change, target` |
 | 2 | 0% | `card_type, condition, cost_limit, cost_limit_operator, count, state_change, target` |
 | 1 | 100% | `card_type, cost_limit, cost_limit_operator, count, max, parenthetical, state_change, target` |
-| 1 | 0% | `card_type, count, position, state_change` |
+| 1 | 0% | `activation_position, card_type, count, position, state_change` |
 | 1 | 0% | `activation_position, all, blade_limit, blade_limit_operator, card_type, condition, original_value, position, state_change, target` |
 | 1 | 100% | `activation_position, all, card_type, group_names, position, state_change, target` |
 | 1 | 0% | `blade_limit, blade_limit_operator, card_type, count, original_value, parenthetical, state_change, target` |
@@ -491,41 +460,43 @@ Every key combination that appears in the data, with test coverage %.
 | 1 | 0% | `card_type, count, parenthetical, state_change` |
 | 1 | 0% | `blade_limit, blade_limit_operator, card_type, condition, count, group_names, original_value, state_change, target` |
 | 1 | 0% | `card_type, count, group_names, location, per_unit, per_unit_count, per_unit_type, state_change, target` |
-| 1 | 0% | `blade_limit, blade_limit_operator, card_type, count, original_value, state_change, target` |
-| 1 | 0% | `card_type, condition, cost_limit, cost_limit_operator, count, distinct, group_names, state_change, target` |
-| 1 | 0% | `card_type, count, group_names, max, state_change, target` |
+| 1 | 100% | `blade_limit, blade_limit_operator, card_type, count, original_value, state_change, target` |
+| 1 | 100% | `card_type, condition, cost_limit, cost_limit_operator, count, distinct, group_names, state_change, target` |
+| 1 | 100% | `card_type, count, group_names, max, state_change, target` |
 | 1 | 0% | `card_type, count, group_names, state_change` |
 | 1 | 100% | `card_type, count, state_change, target` |
 | 1 | 0% | `all, blade_limit, blade_limit_operator, card_type, original_value, state_change, target` |
 | 1 | 0% | `card_type, count, exclude_self, state_change, target` |
 | 1 | 0% | `card_type, condition, cost_limit, cost_limit_operator, count, position, position_compare, state_change, target` |
 | 1 | 0% | `card_type, count, max, state_change` |
-| 1 | 0% | `blade_limit, blade_limit_operator, card_type, count, group_names, original_value, state_change, target` |
+| 1 | 0% | `blade_limit, blade_limit_operator, card_type, count, exclude_group_names, group_names, original_value, state_change, target` |
 
-### choice (14 abilities)
+### choice (15 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 3 | 33% | `group_names, options` |
-| 2 | 0% | `options` |
-| 1 | 0% | `all, options` |
-| 1 | 100% | `exclude_self, group_names, options, parenthetical` |
-| 1 | 0% | `group_reference, options` |
+| 2 | 0% | `count, options` |
+| 2 | 0% | `count, group_names, options` |
+| 1 | 0% | `all, count, options` |
+| 1 | 100% | `count, exclude_self, group_names, options, parenthetical` |
+| 1 | 0% | `count, group_reference, options` |
 | 1 | 100% | `all, choice_maker, choice_type, options, parenthetical, question` |
 | 1 | 0% | `choice_maker, choice_type, options, question` |
-| 1 | 100% | `condition, count, group_names, optional, options` |
-| 1 | 0% | `condition, group_names, options, position` |
-| 1 | 0% | `condition, group_names, options` |
-| 1 | 0% | `condition, group_names, options, original_value` |
+| 1 | 100% | `condition, count, group_names, heart_colors, optional, options` |
+| 1 | 0% | `condition, count, group_names, options, position` |
+| 1 | 100% | `alternative_condition, alternative_count_type, choice_condition, choice_modifier, count, group_names, options` |
+| 1 | 0% | `condition, count, group_names, heart_colors, options` |
+| 1 | 0% | `condition, count, group_names, options, original_value` |
+| 1 | 100% | `count, group_names, heart_colors, options` |
 
-### conditional_alternative (8 abilities)
+### conditional_alternative (7 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 5 | 80% | `alternative_effect, condition, group_names, primary_effect` |
+| 4 | 75% | `alternative_effect, condition, group_names, primary_effect` |
 | 1 | 0% | `activation_condition_parsed, activation_position, alternative_effect, condition, group_names, parenthetical, position, primary_effect` |
 | 1 | 0% | `alternative_effect, condition, primary_effect` |
-| 1 | 0% | `alternative_effect, condition, group_names` |
+| 1 | 100% | `alternative_effect, condition, group_names` |
 
 ### conditional_on_optional (1 abilities)
 
@@ -539,49 +510,50 @@ Every key combination that appears in the data, with test coverage %.
 |---|---|---|
 | 3 | 33% | `followup_action, primary_effect, result_condition` |
 | 2 | 50% | `followup_action, group_names, primary_effect, result_condition` |
-| 1 | 100% | `all, followup_action, group_names, primary_effect` |
-| 1 | 0% | `followup_action, group_names, original_value, primary_effect, result_condition` |
+| 1 | 100% | `all, followup_action, group_names, primary_effect, result_condition` |
+| 1 | 0% | `followup_action, group_names, heart_colors, original_value, primary_effect, result_condition` |
 | 1 | 100% | `all, followup_action, primary_effect, result_condition` |
 | 1 | 0% | `all, followup_action, primary_effect, result_condition, shuffle` |
-| 1 | 0% | `all, followup_action, group_names, primary_effect, result_condition, shuffle` |
+| 1 | 100% | `all, followup_action, group_names, primary_effect, result_condition, shuffle` |
 
 ### draw_card (39 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 16 | 38% | `condition, count, destination, source` |
+| 15 | 40% | `condition, count, destination, source` |
 | 9 | 33% | `count, destination, source` |
 | 2 | 0% | `condition, count, destination, exclude_self, source` |
 | 2 | 0% | `condition, count, destination, group_names, source` |
 | 1 | 100% | `condition, count, destination, position, source` |
 | 1 | 100% | `condition, count, destination, exclude_self, group_names, source` |
 | 1 | 100% | `count, destination, per_unit, per_unit_count, per_unit_type, source, state` |
-| 1 | 100% | `activation_condition_parsed, card_type, count, destination, duration, group_names, source, target` |
+| 1 | 100% | `activation_condition_parsed, card_type, count, destination, duration, group_names, source, target, target_count` |
 | 1 | 0% | `condition, count, destination, original_value, source` |
 | 1 | 100% | `condition, count, destination, parenthetical, source` |
 | 1 | 100% | `count, destination, per_unit, per_unit_count, per_unit_type, source, target` |
 | 1 | 0% | `count, destination, parenthetical, source, trigger_condition, trigger_type` |
+| 1 | 0% | `condition, count, destination, heart_colors, source` |
 | 1 | 100% | `count, destination, source, trigger_condition, trigger_type` |
-| 1 | 0% | `activation_condition_parsed, count, destination, duration, source, target` |
+| 1 | 100% | `activation_condition_parsed, characters, count, destination, duration, source, target, target_count` |
 
 ### draw_until_count (3 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 2 | 50% | `condition, count, destination, source, target_count` |
-| 1 | 0% | `count, destination, source, target, target_count` |
+| 2 | 100% | `condition, count, destination, source, target_count` |
+| 1 | 100% | `count, destination, source, target, target_count` |
 
 ### gain_ability (10 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 4 | 50% | `ability_gain, condition, duration, gained_effect` |
-| 1 | 0% | `ability_gain, condition, gained_effect, group_names` |
-| 1 | 100% | `ability_gain, activation_condition_parsed, activation_position, card_type, duration, gained_effect, parenthetical` |
-| 1 | 0% | `ability_gain, card_type, condition, count, duration, gained_effect, group_names, max, target` |
-| 1 | 100% | `ability_gain, condition, duration, gained_effect, group_names` |
-| 1 | 0% | `ability_gain, duration, gained_effect, parenthetical` |
-| 1 | 100% | `ability_gain, duration, gained_effect` |
+| 4 | 75% | `ability_gain, condition, duration` |
+| 1 | 0% | `ability_gain, condition, group_names` |
+| 1 | 100% | `ability_gain, activation_condition_parsed, activation_position, card_type, duration, parenthetical` |
+| 1 | 0% | `ability_gain, card_type, condition, count, duration, group_names, max, target` |
+| 1 | 100% | `ability_gain, condition, duration, group_names` |
+| 1 | 0% | `ability_gain, duration, parenthetical` |
+| 1 | 100% | `ability_gain, duration` |
 
 ### gain_ability_from_source (1 abilities)
 
@@ -589,93 +561,95 @@ Every key combination that appears in the data, with test coverage %.
 |---|---|---|
 | 1 | 100% | `all, card_type, cost_limit, cost_limit_operator, group_names, source_location, trigger_filter` |
 
-### gain_resource (139 abilities)
+### gain_resource (137 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 31 | 35% | `condition, count, duration, heart_colors, resource` |
-| 14 | 29% | `condition, count, duration, resource` |
+| 21 | 33% | `condition, conditional, count, duration, heart_colors, resource` |
 | 10 | 40% | `count, duration, resource` |
+| 10 | 20% | `condition, conditional, count, duration, resource` |
+| 10 | 40% | `condition, count, duration, heart_colors, resource` |
 | 6 | 33% | `condition, count, resource` |
 | 5 | 20% | `count, duration, heart_colors, resource` |
-| 3 | 67% | `count, duration, per_unit, per_unit_count, per_unit_type, resource, target` |
+| 4 | 75% | `condition, count, duration, resource` |
+| 3 | 0% | `activation_position, count, heart_colors, position, resource` |
 | 3 | 0% | `condition, count, duration, heart_colors, parenthetical, resource` |
 | 3 | 67% | `condition, count, duration, filter_targets_by_heart_colors, heart_colors, resource` |
-| 2 | 0% | `count, heart_colors, position, resource` |
+| 2 | 100% | `count, duration, per_unit, per_unit_count, per_unit_type, resource, target` |
 | 2 | 0% | `count, duration, per_unit, per_unit_count, per_unit_type, resource` |
 | 2 | 50% | `activation_position, count, position, resource` |
-| 2 | 0% | `activation_position, all, card_type, condition, duration, group_names, position, resource, target` |
-| 2 | 0% | `card_type, count, duration, group_names, heart_colors, resource, target, target_count` |
+| 2 | 50% | `activation_position, all, card_type, condition, duration, group_names, position, resource, target` |
+| 2 | 100% | `card_type, count, duration, group_names, heart_colors, resource, target, target_count` |
+| 2 | 50% | `card_type, count, duration, group_names, resource, target` |
+| 2 | 0% | `card_type, condition, count, duration, resource, target, target_count` |
 | 2 | 0% | `card_type, count, duration, group_names, position, resource, target` |
-| 2 | 0% | `card_type, count, duration, group_names, resource, target, target_count` |
+| 2 | 50% | `card_type, count, duration, group_names, resource, target, target_count` |
 | 2 | 0% | `activation_position, condition, count, duration, parenthetical, position, resource` |
 | 1 | 0% | `card_type, condition, count, duration, heart_colors, resource, target_count` |
-| 1 | 100% | `card_type, count, duration, group_names, per_unit, per_unit_count, per_unit_type, resource` |
-| 1 | 0% | `card_type, count, duration, filter_targets_by_heart_colors, group_reference, heart_colors, resource, target_count` |
-| 1 | 0% | `condition, count, duration, dynamic_count, resource` |
-| 1 | 0% | `activation_position, count, heart_colors, position, resource` |
+| 1 | 100% | `card_type, count, duration, group_names, per_unit, per_unit_count, per_unit_source, per_unit_type, resource` |
+| 1 | 100% | `card_type, count, duration, filter_targets_by_heart_colors, group_reference, heart_colors, resource, target_count` |
+| 1 | 0% | `condition, conditional, count, duration, dynamic_count, resource` |
 | 1 | 0% | `cost_limit, cost_limit_operator, count, group_names, location, per_unit, per_unit_count, per_unit_type, resource, target` |
 | 1 | 0% | `condition, count, duration, filter_targets_by_heart_colors, group_reference, heart_colors, resource` |
 | 1 | 100% | `condition, count, position, resource` |
 | 1 | 100% | `count, duration, parenthetical, resource, trigger_type` |
 | 1 | 0% | `condition, count, filter_targets_by_heart_colors, heart_colors, position, resource` |
-| 1 | 100% | `count, exclude_self, group_names, location, per_unit, per_unit_count, per_unit_type, resource, target` |
+| 1 | 100% | `count, group_names, location, per_unit, per_unit_count, per_unit_type, resource, target` |
 | 1 | 100% | `count, location, per_unit, per_unit_count, per_unit_type, resource, state, target` |
 | 1 | 0% | `count, duration, location, per_unit, per_unit_count, per_unit_type, resource, target` |
 | 1 | 0% | `count, heart_colors, location, per_unit, per_unit_count, per_unit_type, resource, state, target` |
 | 1 | 0% | `card_type, count, duration, exclude_self, resource, target` |
 | 1 | 100% | `card_type, count, location, per_unit, per_unit_count, per_unit_type, resource` |
-| 1 | 0% | `count, exclude_self, group_names, heart_colors, location, per_unit, per_unit_count, per_unit_type, resource, target` |
-| 1 | 100% | `card_type, count, duration, heart_colors, location, max, per_unit, per_unit_count, per_unit_type, resource, self_target` |
+| 1 | 0% | `count, group_names, heart_colors, location, per_unit, per_unit_count, per_unit_type, resource, target` |
 | 1 | 0% | `activation_position, count, duration, position, resource, trigger_condition, trigger_type` |
-| 1 | 0% | `condition, count, duration, resource, sign` |
+| 1 | 0% | `condition, conditional, count, duration, resource, sign` |
 | 1 | 100% | `card_type, count, duration, exclude_self, filter_targets_by_heart_colors, heart_colors, resource, target, target_count` |
 | 1 | 100% | `count, location, per_unit, per_unit_count, per_unit_type, resource, target` |
-| 1 | 100% | `card_type, count, duration, exclude_self, group_names, resource, target` |
 | 1 | 100% | `card_type, condition, count, duration, resource, target` |
-| 1 | 0% | `card_type, condition, count, duration, resource, target, target_count` |
 | 1 | 0% | `count, duration, parenthetical, per_unit, per_unit_count, per_unit_type, resource` |
 | 1 | 100% | `card_type, count, duration, resource, target, target_count` |
 | 1 | 0% | `card_type, count, duration, exclude_self, heart_colors, resource, target, target_count` |
-| 1 | 0% | `card_type, condition, count, duration, exclude_self, resource, target, target_count` |
-| 1 | 0% | `card_type, condition, count, duration, group_names, position, resource, target` |
+| 1 | 0% | `card_type, condition, conditional, count, duration, group_names, position, resource, target` |
 | 1 | 0% | `card_type, condition, count, duration, group_names, resource, target, target_count` |
 | 1 | 0% | `count, duration, heart_colors, parenthetical, resource, trigger_condition, trigger_type` |
 | 1 | 0% | `count, duration, per_unit, per_unit_count, resource` |
 | 1 | 0% | `card_type, condition, count, duration, heart_colors, position, resource` |
 | 1 | 0% | `card_type, condition, count, duration, filter_targets_by_heart_colors, group_names, heart_colors, resource, target, target_count` |
-| 1 | 0% | `all, condition, count, duration, resource` |
+| 1 | 100% | `all, condition, count, duration, resource` |
 | 1 | 100% | `card_type, condition, count, duration, resource, trigger_condition, trigger_type` |
 | 1 | 0% | `activation_position, count, duration, position, resource` |
 | 1 | 0% | `card_type, count, duration, group_names, heart_colors, heart_selection, original_value, resource, target, target_count` |
 | 1 | 0% | `card_type, condition, count, duration, group_reference, position, resource, target` |
 | 1 | 0% | `card_type, count, duration, exclude_self, group_names, heart_colors, resource, target, target_count` |
+| 1 | 0% | `count, duration, per_unit, per_unit_count, per_unit_source, per_unit_type, resource, target` |
 | 1 | 100% | `count, duration, heart_colors, per_unit, per_unit_count, per_unit_type, resource, target` |
-| 1 | 0% | `card_type, count, duration, group_names, resource, target` |
 | 1 | 0% | `card_type, condition, count, duration, group_names, heart_colors, resource, target, target_count` |
-| 1 | 0% | `count, duration, multiple_targets, per_unit, per_unit_count, per_unit_type, resource` |
+| 1 | 0% | `count, duration, multiple_targets, per_unit, per_unit_count, per_unit_source, per_unit_type, resource` |
 | 1 | 0% | `card_type, cost_limit, cost_limit_operator, count, duration, group_names, resource, target, target_count` |
 | 1 | 0% | `condition, count, duration, parenthetical, resource` |
-| 1 | 0% | `card_type, condition, count, duration, exclude_self, group_names, resource, target, target_count` |
 
 ### look_and_select (69 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 32 | 34% | `look_action, select_action` |
-| 25 | 24% | `group_names, look_action, select_action` |
+| 25 | 48% | `look_action, select_action` |
+| 24 | 21% | `group_names, look_action, select_action` |
+| 7 | 14% | `heart_colors, look_action, select_action` |
 | 5 | 20% | `condition, look_action, select_action` |
-| 3 | 0% | `condition, group_names, look_action, select_action` |
 | 1 | 100% | `look_action, parenthetical, select_action` |
 | 1 | 0% | `condition, group_names, select_action` |
+| 1 | 0% | `condition, group_names, heart_colors, look_action, select_action` |
 | 1 | 100% | `condition, exclude_self, look_action, select_action` |
-| 1 | 0% | `look_action, original_value, select_action` |
+| 1 | 0% | `condition, group_names, look_action, select_action` |
+| 1 | 0% | `followup_action, look_action, original_value, select_action` |
+| 1 | 100% | `group_names, heart_colors, look_action, select_action` |
+| 1 | 100% | `condition, followup_action, group_names, heart_colors, look_action, select_action` |
 
 ### modify_cost (13 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 2 | 50% | `card_type, condition, duration, location, operation, value` |
+| 2 | 50% | `card_type, condition, conditional, duration, location, operation, value` |
 | 1 | 100% | `count, dynamic_count, operation, per_unit, per_unit_count, per_unit_location, per_unit_type` |
 | 1 | 0% | `card_type, destination, location, operation, source, target, value` |
 | 1 | 100% | `card_type, cost_limit, cost_limit_operator, destination, group_names, location, operation, source, target, value` |
@@ -683,24 +657,24 @@ Every key combination that appears in the data, with test coverage %.
 | 1 | 100% | `card_type, condition, operation, value` |
 | 1 | 0% | `card_type, count, destination, dynamic_count, operation, per_unit, per_unit_count, per_unit_type, source` |
 | 1 | 100% | `card_type, condition, group_names, location, operation, value` |
-| 1 | 0% | `card_type, condition, duration, operation, value` |
+| 1 | 0% | `card_type, condition, conditional, duration, operation, value` |
 | 1 | 0% | `exclude_self, location, operation, per_unit, per_unit_count, per_unit_type, value` |
 | 1 | 100% | `card_type, location, operation, per_unit, per_unit_count, per_unit_type, target, value` |
-| 1 | 100% | `card_type, condition, count, destination, duration, group_names, location, non_stackable, operation, original_count, original_operator, original_value, source, target, value` |
+| 1 | 100% | `card_type, condition, conditional, cost_limit, cost_limit_operator, count, destination, duration, group_names, location, non_stackable, operation, original_count, original_operator, original_value, source, target, value` |
 
 ### modify_required_hearts (15 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 4 | 25% | `condition, count, group_names, heart_colors, operation, self_target` |
+| 4 | 50% | `condition, count, group_names, heart_colors, operation, self_target` |
 | 3 | 67% | `condition, count, heart_colors, operation, self_target` |
 | 2 | 50% | `count, heart_colors, location, operation, per_unit, per_unit_count, per_unit_type, self_target, target` |
-| 1 | 100% | `condition, count, distinct, group_names, heart_colors, operation, parenthetical, self_target` |
+| 1 | 100% | `condition, count, distinct, group_names, heart_colors, operation, parenthetical, replace_all, self_target` |
 | 1 | 100% | `count, group_names, heart_colors, location, operation, per_unit, per_unit_count, per_unit_type, self_target, target, timing_condition` |
 | 1 | 0% | `condition, count, group_names, heart_colors, operation, per_unit, per_unit_count, per_unit_type, position, self_target` |
 | 1 | 100% | `count, group_names, heart_colors, location, operation, per_unit, per_unit_count, per_unit_type, self_target, target` |
 | 1 | 0% | `condition, count, distinct, group_names, heart_colors, operation, self_target` |
-| 1 | 0% | `card_type, condition, count, duration, group_names, heart_colors, non_stackable, operation, original_count, original_operator, original_value, target` |
+| 1 | 0% | `card_type, condition, conditional, count, duration, group_names, heart_colors, non_stackable, operation, original_count, original_operator, original_value, target` |
 
 ### modify_required_hearts_global (3 abilities)
 
@@ -713,27 +687,29 @@ Every key combination that appears in the data, with test coverage %.
 
 | # | Tested % | Keys |
 |---|---|---|
-| 17 | 53% | `condition, operation, self_target, value` |
-| 13 | 31% | `condition, group_names, operation, self_target, value` |
-| 4 | 25% | `condition, group_names, operation, position, self_target, value` |
+| 15 | 60% | `condition, operation, self_target, value` |
+| 9 | 44% | `condition, group_names, operation, self_target, value` |
+| 4 | 50% | `condition, group_names, operation, position, self_target, value` |
 | 4 | 75% | `condition, operation, parenthetical, self_target, value` |
-| 3 | 33% | `condition, duration, operation, value` |
+| 4 | 50% | `condition, group_names, heart_colors, operation, self_target, value` |
+| 3 | 33% | `condition, conditional, duration, operation, value` |
 | 2 | 100% | `condition, group_names, operation, parenthetical, self_target, value` |
+| 2 | 50% | `condition, heart_colors, operation, self_target, value` |
 | 1 | 0% | `activation_position, operation, position, value` |
 | 1 | 0% | `activation_position, condition, group_names, operation, position, value` |
 | 1 | 100% | `operation, value` |
-| 1 | 100% | `condition, duration, operation, target, value` |
+| 1 | 0% | `condition, conditional, duration, operation, target, value` |
 | 1 | 0% | `condition, operation, value` |
 | 1 | 0% | `condition, operation, position, self_target, value` |
-| 1 | 100% | `condition, duration, operation, parenthetical, value` |
-| 1 | 0% | `activation_position, condition, duration, operation, value` |
-| 1 | 100% | `group_names, location, operation, parenthetical, per_unit, per_unit_count, per_unit_type, self_target, target, value` |
+| 1 | 100% | `condition, conditional, duration, operation, parenthetical, value` |
+| 1 | 0% | `activation_position, condition, conditional, duration, operation, value` |
+| 1 | 100% | `group_names, heart_colors, location, operation, parenthetical, per_unit, per_unit_count, per_unit_type, self_target, target, value` |
 | 1 | 0% | `condition, distinct, group_names, operation, self_target, value` |
 | 1 | 100% | `distinct, group_names, location, operation, per_unit, per_unit_count, per_unit_type, self_target, target, value` |
 | 1 | 0% | `location, operation, per_unit, per_unit_count, per_unit_type, self_target, state, target, value` |
-| 1 | 100% | `card_type, condition, duration, operation, self_target, source, target, value` |
+| 1 | 100% | `card_type, condition, conditional, duration, operation, self_target, source, target, value` |
 | 1 | 100% | `condition, distinct, operation, self_target, value` |
-| 1 | 0% | `operation, per_unit, per_unit_count, per_unit_type, self_target, value` |
+| 1 | 100% | `operation, per_unit, per_unit_count, per_unit_type, self_target, value` |
 
 ### modify_yell_count (1 abilities)
 
@@ -745,20 +721,19 @@ Every key combination that appears in the data, with test coverage %.
 
 | # | Tested % | Keys |
 |---|---|---|
-| 19 | 26% | `card_type, count, destination, group_names, source, target` |
+| 18 | 28% | `card_type, count, destination, group_names, source, target` |
 | 12 | 58% | `card_type, count, destination, source, target` |
-| 8 | 38% | `card_type, cost_limit, cost_limit_operator, count, destination, group_names, source, target` |
-| 6 | 0% | `card_type, count, destination, source, state_change, target` |
+| 8 | 50% | `card_type, cost_limit, cost_limit_operator, count, destination, group_names, source, target` |
+| 7 | 57% | `card_type, condition, count, destination, group_names, source, target` |
+| 6 | 17% | `card_type, count, destination, source, state_change, target` |
 | 5 | 40% | `card_type, condition, count, destination, source, target` |
-| 5 | 40% | `card_type, condition, count, destination, group_names, source, target` |
+| 5 | 60% | `card_type, condition, count, destination, source, state_change, target` |
 | 4 | 75% | `card_type, count, destination, dynamic_count, group_names, source, target` |
-| 4 | 50% | `card_type, condition, count, destination, source, state_change, target` |
-| 4 | 25% | `card_type, cost_limit, cost_limit_operator, count, destination, quoted_text, source` |
+| 4 | 25% | `card_type, characters, cost_limit, cost_limit_operator, count, destination, quoted_text, source` |
 | 3 | 33% | `card_type, condition, count, destination, group_names, source, state_change, target` |
 | 3 | 67% | `card_type, count, destination, heart_colors, need_heart_color, need_heart_operator, need_heart_total, source, target` |
 | 2 | 50% | `card_type, count, destination, max, source, target` |
-| 2 | 100% | `card_type, condition, count, destination, exclude_self, group_names, source, target` |
-| 2 | 0% | `card_type, cost_limit, cost_limit_operator, count, destination, source, target` |
+| 2 | 50% | `card_type, cost_limit, cost_limit_operator, count, destination, source, target` |
 | 2 | 50% | `activation_condition_parsed, card_type, count, destination, group_names, source, target` |
 | 2 | 100% | `card_type, count, destination, group_names, parenthetical, source, target` |
 | 2 | 0% | `card_type, condition, count, destination, group_names, optional` |
@@ -770,6 +745,7 @@ Every key combination that appears in the data, with test coverage %.
 | 1 | 100% | `card_type, count, destination, name_constraint, name_constraint_source, source, target` |
 | 1 | 100% | `card_type, count, destination, dynamic_count, optional, source, target` |
 | 1 | 0% | `cost_limit, cost_limit_operator, count, destination, dynamic_count, or_card_types, source, target` |
+| 1 | 100% | `card_type, destination, dynamic_count, group_names, source, target` |
 | 1 | 100% | `card_type, condition, cost_limit, cost_limit_operator, count, destination, optional, source, target` |
 | 1 | 0% | `card_type, count, destination, source` |
 | 1 | 100% | `card_type, count, destination, placement_order, source, target` |
@@ -779,11 +755,10 @@ Every key combination that appears in the data, with test coverage %.
 | 1 | 100% | `card_type, cost_limit, cost_limit_operator, count, destination, multiple_targets, parenthetical, source, state_change, target` |
 | 1 | 0% | `card_type, condition, count, destination, dynamic_count, group_names, source, target` |
 | 1 | 0% | `card_type, condition, cost_limit, cost_limit_operator, count, destination, group_names, source, target` |
-| 1 | 100% | `card_type, condition, count, destination, exclude_self, source, state_change, target` |
 | 1 | 100% | `card_type, destination, dynamic_count, source` |
 | 1 | 100% | `card_type, condition, count, destination, dynamic_count, group_names, parenthetical, source, target` |
 | 1 | 100% | `card_type, condition, count, destination, parenthetical, source, state_change, target` |
-| 1 | 0% | `card_type, count, destination, dynamic_count, group_names, parenthetical, source, target` |
+| 1 | 100% | `card_type, count, destination, dynamic_count, group_names, parenthetical, source, target` |
 | 1 | 100% | `card_type, condition, count, destination, group_names, parenthetical, source, state_change, target` |
 | 1 | 100% | `card_type, cost_limit, cost_limit_operator, count, destination, group_names, optional, parenthetical, source` |
 | 1 | 0% | `card_type, count, destination, dynamic_count, max, source, target` |
@@ -796,9 +771,9 @@ Every key combination that appears in the data, with test coverage %.
 | 1 | 100% | `card_type, condition, count, destination, group_names, max, optional, placement_order, source, target` |
 | 1 | 0% | `card_type, cost_limit, cost_limit_operator, count, destination, group_names, parenthetical, source, target` |
 | 1 | 0% | `card_type, condition, count, destination, group_names, optional, source, target` |
-| 1 | 0% | `card_type, condition, cost_limit, cost_limit_operator, count, destination, source, target` |
+| 1 | 100% | `card_type, condition, cost_limit, cost_limit_operator, count, destination, source, target` |
 | 1 | 0% | `card_type, cost_limit, cost_limit_operator, count, destination, dynamic_count, source, target` |
-| 1 | 0% | `card_type, cost_limit, cost_limit_operator, count, destination, dynamic_count, group_names, source, target` |
+| 1 | 0% | `card_type, cost_limit_max, cost_limit_min, count, destination, dynamic_count, group_names, source, target` |
 | 1 | 0% | `card_type, condition, cost_limit, cost_limit_operator, count, destination, dynamic_count, source, target` |
 
 ### opponent_action (3 abilities)
@@ -827,80 +802,91 @@ Every key combination that appears in the data, with test coverage %.
 
 | # | Tested % | Keys |
 |---|---|---|
-| 2 | 0% | `card_type, optional, parenthetical` |
-| 1 | 0% | `card_type, condition, exclude_position, group_names, parenthetical` |
-| 1 | 0% | `card_type, condition, count, optional, target_member` |
-| 1 | 0% | `card_type, group_names` |
-| 1 | 100% | `card_type, parenthetical` |
-| 1 | 100% | `card_type, parenthetical, source_position, target` |
+| 2 | 0% | `card_type, optional, parenthetical, target` |
+| 1 | 0% | `card_type, condition, exclude_position, group_names, parenthetical, target` |
+| 1 | 100% | `card_type, condition, count, optional, target, target_member` |
+| 1 | 0% | `card_type, group_names, target` |
+| 1 | 100% | `card_type, parenthetical, target` |
+| 1 | 100% | `activation_position, card_type, parenthetical, source_position, target` |
 | 1 | 100% | `card_type, condition, group_names, multiple_targets, position, position_compare, target` |
 | 1 | 100% | `card_type, multiple_targets, optional, target` |
 | 1 | 100% | `card_type, condition, count, destination, group_names, position, target, target_member` |
-| 1 | 0% | `card_type` |
+| 1 | 0% | `card_type, target` |
 | 1 | 0% | `card_type, condition, count, group_names, optional, target, target_member` |
 | 1 | 0% | `card_type, condition, group_names, multiple_targets, optional, parenthetical, target` |
 | 1 | 0% | `card_type, count, duration, target` |
-| 1 | 0% | `card_type, condition, group_names, position` |
+| 1 | 100% | `card_type, condition, group_names, position, target` |
 
 ### restriction (8 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 1 | 100% | `card_type, count, group_names, restriction_type` |
+| 1 | 100% | `card_type, count, exclude_group_names, group_names, restriction_type` |
 | 1 | 100% | `card_type, count, restriction_type, target` |
 | 1 | 100% | `condition, count, exclude_self, restriction_type` |
 | 1 | 100% | `card_type, count, destination, restriction_type, self_target` |
-| 1 | 0% | `card_type, condition, count, duration, restriction_type, target` |
-| 1 | 0% | `card_type, duration, restriction_type, target` |
+| 1 | 100% | `card_type, condition, count, destination, duration, restriction_type, target` |
+| 1 | 100% | `card_type, duration, restriction_type, target` |
 | 1 | 0% | `card_type, phase, restriction_type, target` |
 | 1 | 0% | `card_type, count, restriction_type` |
 
-### sequential (172 abilities)
+### sequential (174 abilities)
 
 | # | Tested % | Keys |
 |---|---|---|
-| 55 | 44% | `actions` |
-| 21 | 24% | `actions, group_names` |
-| 17 | 12% | `actions, condition` |
+| 41 | 49% | `actions` |
+| 19 | 26% | `actions, group_names` |
+| 13 | 46% | `actions, heart_colors` |
+| 13 | 15% | `actions, condition` |
 | 9 | 44% | `actions, conditional` |
-| 7 | 14% | `actions, condition, group_names` |
-| 5 | 40% | `actions, condition, conditional, group_names` |
-| 5 | 0% | `actions, original_value` |
+| 5 | 60% | `actions, condition, conditional, group_names` |
+| 5 | 20% | `actions, condition, group_names` |
+| 4 | 25% | `actions, condition, heart_colors` |
 | 4 | 25% | `actions, parenthetical` |
-| 3 | 0% | `actions, conditional, group_names` |
-| 3 | 0% | `actions, duration` |
-| 3 | 33% | `actions, count, duration, heart_colors` |
-| 3 | 0% | `actions, condition, conditional` |
+| 4 | 0% | `actions, heart_colors, original_value` |
+| 3 | 67% | `actions, conditional, group_names` |
+| 3 | 33% | `actions, duration` |
+| 3 | 67% | `actions, count, duration, heart_colors` |
 | 2 | 100% | `actions, conditional, parenthetical` |
-| 2 | 0% | `actions, condition, count, duration, heart_colors` |
-| 2 | 100% | `actions, duration, group_names` |
-| 2 | 50% | `actions, exclude_self, group_names` |
-| 2 | 0% | `actions, group_names, parenthetical` |
+| 2 | 100% | `actions, group_names, heart_colors` |
+| 2 | 50% | `actions, condition, conditional, count, duration, heart_colors` |
+| 2 | 50% | `actions, group_names, parenthetical` |
 | 2 | 0% | `actions, activation_position, conditional, group_names, position` |
+| 2 | 50% | `actions, condition, group_names, heart_colors` |
 | 2 | 50% | `actions, all, condition` |
-| 1 | 0% | `actions, condition, exclude_self` |
+| 2 | 0% | `actions, condition, conditional` |
+| 1 | 100% | `actions, condition, exclude_self` |
 | 1 | 100% | `actions, activation_condition_parsed, activation_position, conditional, exclude_self, group_names, parenthetical` |
-| 1 | 100% | `actions, conditional, exclude_self` |
+| 1 | 100% | `actions, conditional, exclude_self, heart_colors` |
 | 1 | 100% | `actions, activation_position, condition, group_names, position` |
-| 1 | 0% | `actions, position` |
-| 1 | 0% | `actions, all, group_names` |
+| 1 | 0% | `actions, activation_position, position` |
+| 1 | 100% | `actions, all, group_names, heart_colors` |
+| 1 | 100% | `actions, activation_position` |
 | 1 | 100% | `actions, conditional, trigger_condition, trigger_type` |
+| 1 | 100% | `actions, duration, group_names, heart_colors` |
 | 1 | 100% | `actions, all, exclude_self` |
-| 1 | 100% | `actions, duration, original_value` |
+| 1 | 100% | `actions, duration, heart_colors, original_value` |
+| 1 | 0% | `actions, exclude_self, group_names` |
+| 1 | 100% | `actions, original_value` |
 | 1 | 100% | `actions, activation_position, all, exclude_self` |
 | 1 | 0% | `actions, target` |
 | 1 | 100% | `actions, activation_condition_parsed, activation_position, parenthetical, position` |
-| 1 | 0% | `actions, conditional, exclude_self, group_names, trigger_condition, trigger_type` |
+| 1 | 100% | `actions, conditional, exclude_self, group_names, trigger_condition, trigger_type` |
+| 1 | 100% | `actions, duration, heart_colors` |
 | 1 | 100% | `actions, count, duration, heart_colors, trigger_condition, trigger_type` |
-| 1 | 100% | `actions, conditional, exclude_self, group_names, parenthetical` |
+| 1 | 100% | `actions, conditional, exclude_self, group_names, heart_colors, parenthetical` |
 | 1 | 0% | `actions, count, destination, heart_colors, max, source, target` |
 | 1 | 0% | `actions, conditional, exclude_self, group_names` |
 | 1 | 0% | `actions, all, duration, group_names` |
-| 1 | 100% | `actions, character_effects, duration` |
+| 1 | 100% | `actions, character_effects, duration, heart_colors` |
 | 1 | 100% | `actions, distinct, group_names` |
-| 1 | 0% | `actions, all` |
-| 1 | 0% | `actions, group_names, original_value` |
-| 1 | 100% | `actions, distinct, duration, group_names` |
+| 1 | 100% | `actions, duration, group_names` |
+| 1 | 0% | `actions, all, heart_colors` |
+| 1 | 100% | `actions, exclude_self, group_names, heart_colors` |
+| 1 | 0% | `actions, group_names, heart_colors, original_value` |
+| 1 | 100% | `actions, distinct, duration, group_names, heart_colors` |
+| 1 | 0% | `actions, condition, conditional, heart_colors` |
+| 1 | 100% | `actions, condition, exclude_self, group_names` |
 
 ### set_blade_count (1 abilities)
 
@@ -933,11 +919,13 @@ Every key combination that appears in the data, with test coverage %.
 | # | Tested % | Keys |
 |---|---|---|
 | 11 | 36% | `card_type, optional, self_cost, state_change` |
-| 9 | 0% | `card_type, self_cost, state_change` |
-| 2 | 50% | `card_type, count, group_names, optional, state_change` |
+| 8 | 25% | `card_type, self_cost, state_change` |
 | 2 | 50% | `card_type, count, optional, state_change` |
-| 1 | 100% | `card_type, count, state_change` |
+| 1 | 0% | `card_type, count, group_names, optional, state_change` |
+| 1 | 100% | `card_type, count, position, state_change` |
 | 1 | 100% | `card_type, count, exclude_self, group_names, state_change` |
+| 1 | 100% | `card_type, position, self_cost, state_change` |
+| 1 | 100% | `card_type, count, group_names, optional, position, state_change` |
 
 ### choice_condition cost
 
@@ -958,10 +946,10 @@ Every key combination that appears in the data, with test coverage %.
 
 | # | Tested % | Keys |
 |---|---|---|
-| 67 | 31% | `count, destination, optional, source, zone` |
+| 67 | 43% | `count, destination, optional, source, zone` |
 | 16 | 38% | `count, destination, source, zone` |
-| 8 | 38% | `card_type, destination, self_cost, source, zone` |
-| 4 | 25% | `card_type, count, destination, optional, source, zone` |
+| 8 | 25% | `card_type, destination, self_cost, source, zone` |
+| 4 | 50% | `card_type, count, destination, optional, source, zone` |
 | 4 | 25% | `count, destination, group_names, optional, source, zone` |
 | 2 | 50% | `count, destination, optional, same_unit_name, source, zone` |
 | 2 | 0% | `any_number, characters, destination, optional, source, zone` |
@@ -972,14 +960,15 @@ Every key combination that appears in the data, with test coverage %.
 | 1 | 100% | `card_type, count, destination, exclude_characters, exclude_self, group_names, optional, source, zone` |
 | 1 | 0% | `any_number, characters, count, destination, optional, source, zone` |
 | 1 | 0% | `characters, count, destination, shuffle, source, target, zone` |
-| 1 | 0% | `destination, source, zone` |
+| 1 | 100% | `destination, source, zone` |
 
 ### pay_energy cost
 
 | # | Tested % | Keys |
 |---|---|---|
-| 41 | 46% | `count, energy, optional, zone` |
-| 16 | 38% | `count, energy, zone` |
+| 40 | 50% | `count, energy, optional, zone` |
+| 16 | 50% | `count, energy, zone` |
+| 1 | 100% | `any_number, count, energy, optional, zone` |
 
 ### reveal cost
 
@@ -996,12 +985,13 @@ Every key combination that appears in the data, with test coverage %.
 
 | # | Tested % | Keys |
 |---|---|---|
-| 18 | 50% | `costs` |
+| 16 | 44% | `costs` |
 | 9 | 22% | `costs, optional` |
+| 2 | 100% | `costs, position` |
 
 ### unknown cost
 
 | # | Tested % | Keys |
 |---|---|---|
-| 527 | 37% | `_(no keys)_` |
+| 527 | 45% | `_(no keys)_` |
 

@@ -301,9 +301,9 @@ impl<'a> ConditionContext<'a> {
         player.stage.stage.iter().any(|&id| {
             id != -1
                 && card_db.get_card(id).is_some_and(|c| {
-                    c.base_heart.as_ref().is_some_and(|bh| {
-                        bh.hearts.contains_key(&crate::card::HeartColor::Heart00)
-                    })
+                    c.base_heart
+                        .as_ref()
+                        .is_some_and(|bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
                 })
         })
     }
@@ -317,6 +317,13 @@ impl<'a> ConditionContext<'a> {
             Some(c) if !c.is_empty() => c,
             _ => return true,
         };
+        // heart00 is a wildcard — skip check since no card has it in base_heart
+        if cols
+            .iter()
+            .any(|cs| crate::zones::parse_heart_color(cs) == crate::card::HeartColor::Heart00)
+        {
+            return true;
+        }
         let card_db = &self.game_state.card_database;
         cols.iter().all(|cs| {
             player.stage.stage.iter().any(|&id| {
@@ -450,10 +457,7 @@ impl<'a> ConditionContext<'a> {
         condition: &Condition,
         player: &crate::player::Player,
     ) -> bool {
-        let is_distinct = condition
-            .distinct
-            .as_ref()
-            .is_some_and(|d| d.is_distinct());
+        let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct());
         if !is_distinct {
             return true;
         }
@@ -537,6 +541,15 @@ impl<'a> ConditionContext<'a> {
     }
 
     pub(crate) fn evaluate_location_condition(&self, condition: &Condition) -> bool {
+        // NOTE: negation is NOT handled here — the parser sets `negation: True` on
+        // conditions derived from natural-language negatives (e.g. "ない"), and the
+        // conditional_alternative normalized_steps() also emits a negated condition.
+        // Both cases rely on the caller (evaluate_comparison_condition or the
+        // sequential pipeline's can_activate_effect) having already checked the
+        // negation flag. Adding negation inside this function would DOUBLE-apply it.
+        // When the sequential pipeline needs to negate a location condition for
+        // conditional_alternative collapse, it should use a non-location
+        // condition type (e.g. a simple comparison on a step_result flag) instead.
         if let Some(ref locs) = condition.locations {
             if locs.len() >= 2 {
                 if condition.target.as_deref() == Some("both")
@@ -617,6 +630,27 @@ impl<'a> ConditionContext<'a> {
                 let self_count = self.get_count_for_target(condition, "self");
                 let opp_count = self.get_count_for_target(condition, "opponent");
                 return compare_counts(condition.operator.as_deref(), self_count, opp_count);
+            }
+            // reference_card equality: compare card names against previously selected card
+            if condition.reference_card.as_deref() == Some("previous_selected") {
+                let selected: &[i16] = self.selected_card_ids;
+                if let Some(&selected_id) = selected.last() {
+                    if let Some(selected_card) = card_db.get_card(selected_id) {
+                        let selected_name = &selected_card.name;
+                        let target_cards: Vec<i16> = util::zone_cards(player, location).to_vec();
+                        let matching = target_cards
+                            .iter()
+                            .filter(|&&cid| {
+                                card_db
+                                    .get_card(cid)
+                                    .is_some_and(|c| c.name == *selected_name)
+                            })
+                            .count() as u32;
+                        let required = condition.count.unwrap_or(1);
+                        return matching >= required;
+                    }
+                }
+                return false;
             }
         }
 
@@ -773,10 +807,7 @@ impl<'a> ConditionContext<'a> {
         }
         log::debug!("[MULTI] combined {} cards", combined.len());
 
-        let is_distinct = condition
-            .distinct
-            .as_ref()
-            .is_some_and(|d| d.is_distinct());
+        let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct());
         if is_distinct {
             let distinct_type = match condition.distinct.as_ref() {
                 Some(crate::core::card::DistinctInfo::String(s)) => s.as_str(),
@@ -824,7 +855,9 @@ impl<'a> ConditionContext<'a> {
                     });
                     log::debug!(
                         "[MULTI]   card={} type_pass={} group_pass={}",
-                        cid, passes_type, passes_group
+                        cid,
+                        passes_type,
+                        passes_group
                     );
                     if !passes_type || !passes_group {
                         continue;
@@ -838,20 +871,16 @@ impl<'a> ConditionContext<'a> {
                 let count = distinct_names.len() as u32;
                 log::debug!(
                     "[MULTI] distinct_names={} threshold={}",
-                    count, count_threshold
+                    count,
+                    count_threshold
                 );
                 compare_counts(operator, count, count_threshold)
             }
         } else {
-            let filter = util::filter_from_parts(
-                card_type_filter,
-                group_names.and_then(|g| g.first().map(|s| s.as_str())),
-                condition.cost_limit,
-                operator,
-                None,
-                None,
-                None,
-            );
+            let mut filter = condition.filter_subset();
+            filter.card_type = card_type_filter;
+            filter.group = group_names.and_then(|g| g.first().map(|s| s.as_str()));
+            filter.cost_operator = operator;
             let matching_count = util::count_matching(&combined, card_db, &filter, false);
             compare_counts(operator, matching_count, count_threshold)
         }
@@ -896,9 +925,7 @@ impl<'a> ConditionContext<'a> {
         }
         // When heart_colors are specified, check that the collective cards in the
         // target zone cover ALL required heart colors (e.g. yell-revealed cards).
-        let hc: &[String] = condition
-            .heart_colors.as_deref()
-            .unwrap_or(&[]);
+        let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
         if !hc.is_empty() {
             let target = condition.target.as_deref().unwrap_or("self");
             let player = self.resolve_condition_player(target);
@@ -982,9 +1009,7 @@ impl<'a> ConditionContext<'a> {
 
         let location = condition.location.as_deref().unwrap_or("");
         let group_names = condition.group_names.as_ref();
-        let hc: &[String] = condition
-            .heart_colors.as_deref()
-            .unwrap_or(&[]);
+        let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
 
         let count_filtered = |zone_source: &[i16], ct: &str| -> usize {
             self.count_cards_with_filters(
@@ -1027,16 +1052,18 @@ impl<'a> ConditionContext<'a> {
                         wants_blade_heart_prop && ((negate && has_bh) || (!negate && !has_bh));
                     log::debug!(
                         "[MFLT] cid={} type={} has_bh={} bh_reject={}",
-                        cid, type_ok, has_bh, bh_reject
+                        cid,
+                        type_ok,
+                        has_bh,
+                        bh_reject
                     );
                     if !type_ok || bh_reject {
                         return false;
                     }
                     if !hc.is_empty() && !util::card_matches_heart_colors(card_db, cid, hc) {
-            
                         return false;
                     }
-        
+
                     true
                 })
                 .count() as u32;
@@ -1351,9 +1378,10 @@ impl<'a> ConditionContext<'a> {
                         return false;
                     }
                     if condition.all_areas.unwrap_or(false)
-                        && player.stage.stage.iter().filter(|&&id| id != -1).count() != 3 {
-                            return false;
-                        }
+                        && player.stage.stage.iter().filter(|&&id| id != -1).count() != 3
+                    {
+                        return false;
+                    }
                     if let Some(ref groups) = condition.group_names {
                         if !groups.is_empty() {
                             let card_db = &self.game_state.card_database;
@@ -1415,7 +1443,8 @@ impl<'a> ConditionContext<'a> {
                     if let Some(ref chars) = condition.characters {
                         log::debug!(
                             "[APPEARANCE] checking characters: {:?} against stage_ids={:?}",
-                            chars, stage_ids
+                            chars,
+                            stage_ids
                         );
                         if chars.is_empty() {
                             return !stage_ids.is_empty();
@@ -1537,10 +1566,9 @@ impl<'a> ConditionContext<'a> {
         match filter {
             "no_ability" => !has_ability,
             "has_ability" => has_ability,
-            "no_ability_type"
-                if has_ability => {
-                    !self.card_has_matching_ability_type(condition, filter)
-                }
+            "no_ability_type" if has_ability => {
+                !self.card_has_matching_ability_type(condition, filter)
+            }
             _ => true,
         }
     }
@@ -1622,22 +1650,21 @@ impl<'a> ConditionContext<'a> {
                         match filter {
                             "no_ability" => !has_ability,
                             "has_ability" => has_ability,
-                            "no_ability_type"
-                                if has_ability => {
-                                    let excluded_triggers: Vec<&str> = condition
-                                        .ability_filter_triggers
+                            "no_ability_type" if has_ability => {
+                                let excluded_triggers: Vec<&str> = condition
+                                    .ability_filter_triggers
+                                    .as_ref()
+                                    .map(|t| t.iter().map(|s| s.as_str()).collect())
+                                    .unwrap_or_default();
+                                !c.abilities.iter().any(|a| {
+                                    a.triggers
                                         .as_ref()
-                                        .map(|t| t.iter().map(|s| s.as_str()).collect())
-                                        .unwrap_or_default();
-                                    !c.abilities.iter().any(|a| {
-                                        a.triggers
-                                            .as_ref()
-                                            .map(|t| {
-                                                excluded_triggers.iter().any(|et| t.starts_with(et))
-                                            })
-                                            .unwrap_or(false)
-                                    })
-                                }
+                                        .map(|t| {
+                                            excluded_triggers.iter().any(|et| t.starts_with(et))
+                                        })
+                                        .unwrap_or(false)
+                                })
+                            }
                             _ => true,
                         }
                     })
@@ -1819,7 +1846,8 @@ impl<'a> ConditionContext<'a> {
                         }) {
                             log::debug!(
                                 "[COUNT_EXCLUDE] excluding card {} (name={})",
-                                card_id, card.name
+                                card_id,
+                                card.name
                             );
                             return false;
                         }
@@ -2064,7 +2092,8 @@ impl<'a> ConditionContext<'a> {
             let count = player.energy_zone.cards.len() as u32;
             log::debug!(
                 "[GET_COUNT] resource_type=energy target={} → {}",
-                target, count
+                target,
+                count
             );
             return count;
         }
@@ -2091,18 +2120,9 @@ impl<'a> ConditionContext<'a> {
                 }
                 let card_db = &self.game_state.card_database;
                 let card_type_filter = condition.card_type.as_deref();
-                let filter = crate::ability::util::filter_from_parts(
-                    card_type_filter,
-                    condition
-                        .group_names
-                        .as_ref()
-                        .and_then(|g| g.first().map(|s| s.as_str())),
-                    condition.cost_limit,
-                    condition.operator.as_deref(),
-                    None,
-                    None,
-                    None,
-                );
+                let mut filter = condition.filter_subset();
+                filter.card_type = card_type_filter;
+                filter.cost_operator = condition.operator.as_deref();
                 count = crate::ability::util::count_matching(&combined, card_db, &filter, false);
             }
         }

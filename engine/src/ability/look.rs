@@ -1,6 +1,7 @@
 use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute, ExecutionContext, LookAndSelectStep};
+use super::util;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
@@ -334,7 +335,9 @@ impl AbilityResolver {
                 });
                 self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
                 // Store the options as JSON array in conditional_choice so the reveal can read the player's pick
-                if let Some(e) = gs.ability_queue.current_entry_mut() { e.conditional_choice = Some(serde_json::to_string(or_types).unwrap()); }
+                if let Some(e) = gs.ability_queue.current_entry_mut() {
+                    e.conditional_choice = Some(serde_json::to_string(or_types).unwrap());
+                }
                 return Ok(());
             }
         }
@@ -418,7 +421,8 @@ impl AbilityResolver {
         // Exclude previously selected cards if exclude_selected is true
         log::debug!(
             "[EXCLUDE_SEL] selected={:?} looked_at_before={:?}",
-            self.selected_cards, gs.looked_at_cards
+            self.selected_cards,
+            gs.looked_at_cards
         );
         if exclude_selected && !self.selected_cards.is_empty() {
             gs.looked_at_cards
@@ -496,12 +500,90 @@ impl AbilityResolver {
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
         Ok(())
     }
+    /// Select cards from `gs.looked_at_cards` matching this effect's filter
+    /// (card_type, characters, heart_colors, cost_limit, group_names, etc.).
+    /// Sets `pending_choice` so the caller yields and waits for a choice result.
+    /// This is the real implementation replacing the earlier stub — extracted
+    /// from the select-phase logic inside `execute_look_and_select` so it can
+    /// be used as an independent sequential step.
     pub fn execute_select_cards(
         &mut self,
-        _gs: &mut GameState,
+        gs: &mut GameState,
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         self.current_effect = Some(effect.clone());
+
+        let placement_order = effect.placement_order.as_deref();
+        let any_number = effect.any_number.unwrap_or(false);
+        let count = effect.count.unwrap_or(1) as usize;
+        let optional = effect.optional.unwrap_or(false);
+
+        let card_db = &gs.card_database;
+        let filter = util::CardFilter::from_effect(effect);
+        let has_filter = filter.card_type.is_some()
+            || !filter.heart_colors.is_empty()
+            || filter.cost_limit.is_some();
+        if has_filter {
+            let (matching, non_matching): (Vec<_>, Vec<_>) = gs
+                .looked_at_cards
+                .iter()
+                .partition(|&&card_id| filter.matches(card_db, card_id, false));
+            gs.looked_at_cards = matching;
+            let player = gs.resolve_target_player_mut("self");
+            for &card_id in &non_matching {
+                player.waitroom.add_card(card_id);
+            }
+        }
+
+        let available_count = gs.looked_at_cards.len();
+        let is_max = effect.max.unwrap_or(false);
+        let max_select = if any_number {
+            available_count
+        } else if is_max || optional {
+            std::cmp::min(count, available_count)
+        } else {
+            std::cmp::min(count, available_count)
+        };
+
+        let description = if available_count == 0 {
+            "No eligible cards found among looked-at cards".to_string()
+        } else if any_number {
+            format!(
+                "Select any number of cards from the {} looked-at cards (or skip) (placement_order: {})",
+                available_count, placement_order.unwrap_or("default")
+            )
+        } else if is_max || optional {
+            format!(
+                "Select up to {} card(s) from the {} looked-at cards (or skip) (placement_order: {})",
+                max_select, available_count, placement_order.unwrap_or("default")
+            )
+        } else {
+            format!(
+                "Select {} card(s) from the {} looked-at cards (placement_order: {})",
+                max_select,
+                available_count,
+                placement_order.unwrap_or("default")
+            )
+        };
+
+        let choice = Choice::select_cards(
+            Zone::LookedAt.to_str(),
+            max_select,
+            description.clone(),
+            optional || is_max || any_number || available_count == 0,
+        )
+        .card_type(effect.card_type.clone())
+        .cost_limit(effect.cost_limit, effect.cost_limit_operator.clone())
+        .group(effect.group_names.as_ref().and_then(|v| v.first().cloned()))
+        .characters(effect.characters.clone())
+        .build();
+        self.pending_choice = Some(choice);
+        self.execution_context = ExecutionContext::LookAndSelect {
+            step: LookAndSelectStep::Select {
+                count: max_select,
+                max_per_group: effect.per_group_count,
+            },
+        };
         Ok(())
     }
     pub fn execute_look_at(
@@ -529,13 +611,14 @@ impl AbilityResolver {
         // If deck has fewer cards than requested, the effect cannot execute.
         if (Zone::from_str(source) == Some(Zone::Deck)
             || Zone::from_str(source) == Some(Zone::DeckTop))
-            && player.main_deck.cards.len() < count as usize {
-                return Err(format!(
-                    "Not enough cards in deck: need {}, have {}",
-                    count,
-                    player.main_deck.cards.len()
-                ));
-            }
+            && player.main_deck.cards.len() < count as usize
+        {
+            return Err(format!(
+                "Not enough cards in deck: need {}, have {}",
+                count,
+                player.main_deck.cards.len()
+            ));
+        }
 
         let cards = match Zone::from_str(source) {
             Some(Zone::Deck) | Some(Zone::DeckTop) => {

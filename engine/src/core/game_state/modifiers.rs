@@ -246,29 +246,31 @@ impl GameState {
                                 if let Some(ref actions) = effect.compound.actions {
                                     for sub in actions {
                                         if let Some(
-                                                crate::ability::enums::ActionType::GainResource,
-                                            ) = crate::ability::enums::ActionType::from_str(
-                                            &sub.action,
-                                        ) { match sub.resource.as_deref().unwrap_or("") {
-                                            "blade" | "ブレード" => {
-                                                let n = sub
-                                                    .resource_icon_count
-                                                    .unwrap_or(sub.count.unwrap_or(1))
-                                                    as i32;
-                                                *exp_blade.entry(*card_id).or_insert(0) += n;
-                                            }
-                                            "heart" | "ハート" => {
-                                                let n = sub.count.unwrap_or(1) as i32;
-                                                for hc in &sub.heart_colors {
-                                                    *exp_heart
-                                                        .entry(*card_id)
-                                                        .or_default()
-                                                        .entry(hc.clone())
-                                                        .or_insert(0) += n;
+                                            crate::ability::enums::ActionType::GainResource,
+                                        ) =
+                                            crate::ability::enums::ActionType::from_str(&sub.action)
+                                        {
+                                            match sub.resource.as_deref().unwrap_or("") {
+                                                "blade" | "ブレード" => {
+                                                    let n = sub
+                                                        .resource_icon_count
+                                                        .unwrap_or(sub.count.unwrap_or(1))
+                                                        as i32;
+                                                    *exp_blade.entry(*card_id).or_insert(0) += n;
                                                 }
+                                                "heart" | "ハート" => {
+                                                    let n = sub.count.unwrap_or(1) as i32;
+                                                    for hc in &sub.heart_colors {
+                                                        *exp_heart
+                                                            .entry(*card_id)
+                                                            .or_default()
+                                                            .entry(hc.clone())
+                                                            .or_insert(0) += n;
+                                                    }
+                                                }
+                                                _ => {}
                                             }
-                                            _ => {}
-                                        } }
+                                        }
                                     }
                                 }
                             }
@@ -482,7 +484,8 @@ impl GameState {
                                 .collect();
                             log::debug!(
                                 "[COST_MOD_PER_UNIT_DEBUG] stage_ids={:?} group_name={:?}",
-                                stage_ids, group_name
+                                stage_ids,
+                                group_name
                             );
                             let matches = stage_ids
                                 .iter()
@@ -501,7 +504,9 @@ impl GameState {
                         };
                         log::debug!(
                             "[COST_MOD_PER_UNIT] cid={} count_zone={} count={}",
-                            cid, count_zone, count
+                            cid,
+                            count_zone,
+                            count
                         );
                         let per_unit_count = effect.per_unit_count.unwrap_or(1);
                         let exclude_self = effect.exclude_self.unwrap_or(false);
@@ -803,5 +808,106 @@ impl GameState {
 
     pub fn clear_gained_abilities_for_card(&mut self, card_id: i16) {
         self.gained_abilities.remove(&card_id);
+    }
+
+    /// Evaluate all constant (常時) `modify_required_hearts` abilities on cards
+    /// in the success_live_card_zone. Used by tests and by the live success flow
+    /// to apply ongoing heart requirement reductions (e.g. PL!-bp6-022-L).
+    /// Created as a focused scan because `recalculate_constants` only evaluates
+    /// stage-based constant abilities. This function:
+    ///   1. Scans all cards in the current player's success_live_card_zone
+    ///   2. For each card with a constant `modify_required_hearts` ability whose
+    ///      location_condition passes (self is in success_live_card_zone), executes
+    ///      the effect through the AbilityResolver to handle original_value filter,
+    ///      group_names filter, per_unit counting, etc.
+    pub fn evaluate_success_zone_heart_reductions(&mut self) {
+        use crate::ability::condition::ConditionContext;
+        use crate::ability::enums::ActionType;
+        use crate::ability::resolver::AbilityResolver;
+
+        // Clear all need_heart_modifiers first, then re-evaluate from current zone state.
+        // This ensures as_long_as semantics: when a card leaves the success zone, its
+        // constant modifier is not re-applied on the next evaluation.
+        self.mods.need_heart_modifiers.clear();
+
+        // Track non-stackable effects locally so they are reset each evaluation
+        let mut local_non_stackable: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+
+        // Process both players' success_live_card_zones
+        for player_idx in 0..2 {
+            let zone_cards = if player_idx == 0 {
+                self.player1.success_live_card_zone.cards.clone()
+            } else {
+                self.player2.success_live_card_zone.cards.clone()
+            };
+
+            for cid in &zone_cards {
+                let card = match self.card_database.get_card(*cid) {
+                    Some(c) => c.clone(),
+                    None => continue,
+                };
+                for ability in &card.abilities {
+                    let is_constant = ability
+                        .triggers
+                        .as_ref()
+                        .is_some_and(|t| t.contains(crate::triggers::CONSTANT));
+                    if !is_constant {
+                        continue;
+                    }
+                    let effect = match ability.effect.as_ref() {
+                        Some(e) => e.clone(),
+                        None => continue,
+                    };
+                    if ActionType::from_str(&effect.action)
+                        != Some(ActionType::ModifyRequiredHearts)
+                    {
+                        continue;
+                    }
+                    // Evaluate location condition
+                    let prev_activating = self.activating_card;
+                    self.activating_card = Some(*cid);
+                    let ctx = ConditionContext::new(self);
+                    let cond_met = effect
+                        .condition
+                        .as_ref()
+                        .is_none_or(|c| ctx.evaluate_condition(c));
+                    if !cond_met {
+                        self.activating_card = prev_activating;
+                        continue;
+                    }
+                    // Non-stackable check: skip if this effect was already applied
+                    // in this evaluation pass. Uses a local set so the check is
+                    // reset each time the function is called.
+                    if effect.non_stackable.unwrap_or(false) {
+                        let effect_key = format!("{}:{}", effect.action, effect.text);
+                        if local_non_stackable.contains(&effect_key) {
+                            self.activating_card = prev_activating;
+                            continue;
+                        }
+                        local_non_stackable.insert(effect_key);
+                    }
+
+                    // Execute the effect through the resolver
+                    let mut resolver = AbilityResolver::new(self.card_database.clone(), Some(*cid));
+                    let _ = resolver.execute_modify_required_hearts(
+                        self,
+                        effect.operation.as_deref().unwrap_or("decrease"),
+                        effect.value_or_count(0),
+                        &effect.heart_colors,
+                        effect.target_name(),
+                        effect.per_unit.unwrap_or(false),
+                        effect.per_unit_count.unwrap_or(1),
+                        effect.group_name(),
+                        effect.timing_condition.as_deref(),
+                        effect.location.as_deref(),
+                        effect.original_value,
+                        effect.original_count,
+                        effect.original_operator.as_deref(),
+                    );
+                    self.activating_card = prev_activating;
+                }
+            }
+        }
     }
 }

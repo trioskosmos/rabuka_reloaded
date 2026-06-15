@@ -212,10 +212,7 @@ impl<'a> ConditionContext<'a> {
                     }
                     let has_filter = condition.group_names.is_some()
                         || condition.card_type.is_some()
-                        || condition
-                            .characters
-                            .as_ref()
-                            .is_some_and(|c| !c.is_empty());
+                        || condition.characters.as_ref().is_some_and(|c| !c.is_empty());
                     let check_orientation = |cid: i16| -> bool {
                         self.game_state
                             .mods
@@ -237,9 +234,8 @@ impl<'a> ConditionContext<'a> {
                                 )
                         })
                     } else {
-                        self.activating_card_id.is_some_and(|cid| {
-                            stage_cards.contains(&cid) && check_orientation(cid)
-                        })
+                        self.activating_card_id
+                            .is_some_and(|cid| stage_cards.contains(&cid) && check_orientation(cid))
                     }
                 }
                 _ => true,
@@ -379,9 +375,10 @@ impl<'a> ConditionContext<'a> {
                     }
                 }
                 if condition.exclude_self.unwrap_or(false)
-                    && self.game_state.activating_card == Some(replaced_id) {
-                        return false;
-                    }
+                    && self.game_state.activating_card == Some(replaced_id)
+                {
+                    return false;
+                }
                 // group_names and cost_limit may describe the arriving member
                 // ("とバトンタッチ" pattern: "baton touch WITH a X member")
                 let check_id = replaced_id;
@@ -445,10 +442,7 @@ impl<'a> ConditionContext<'a> {
             "moves" => {
                 let area_ok = condition.self_effect_only.is_none_or(|_| {
                     self.game_state.last_area_move_card_id.is_some()
-                        && (self
-                            .game_state
-                            .last_area_move_by_player
-                            .as_ref() == Some(&player.id))
+                        && (self.game_state.last_area_move_by_player.as_ref() == Some(&player.id))
                 });
                 let energy_ok = condition
                     .energy_placed
@@ -544,7 +538,11 @@ impl<'a> ConditionContext<'a> {
                 };
                 log::debug!(
                     "[STATE_CHANGE_COND] card_id={} from={:?} to={:?} ori={:?} orientation_ok={}",
-                    card_id, from, to, ori, orientation_ok
+                    card_id,
+                    from,
+                    to,
+                    ori,
+                    orientation_ok
                 );
                 if !orientation_ok {
                     continue;
@@ -556,7 +554,9 @@ impl<'a> ConditionContext<'a> {
                         let op = condition.cost_limit_operator.as_deref().unwrap_or("<=");
                         log::debug!(
                             "[STATE_CHANGE_COND] cost_limit={} card_cost={} op={:?}",
-                            cl, card_cost, op
+                            cl,
+                            card_cost,
+                            op
                         );
                         match op {
                             "<=" => card_cost <= cl,
@@ -609,9 +609,52 @@ impl<'a> ConditionContext<'a> {
 
     pub(crate) fn evaluate_complex_condition(&self, condition: &Condition) -> bool {
         if let Some(ref cause) = condition.cause {
-            self.evaluate_condition(cause)
-        } else {
-            true
+            if !self.evaluate_condition(cause) {
+                return false;
+            }
         }
+        // Check the effect sub-condition if present.
+        if let Some(ref effect) = condition.effect {
+            // The effect stores a condition-like AbilityEffect. Evaluate it
+            // via evaluate_effect_condition which checks negated card presence.
+            if effect.compound.conditional_negation.unwrap_or(false) {
+                if let Some(card_type) = &effect.card_type {
+                    let loc = effect.location.as_deref().unwrap_or("hand");
+                    let zone = crate::ability::enums::Zone::from_str(loc);
+                    let target = effect.target_name();
+                    let player = self.resolve_condition_player(&target);
+                    let cards = util::zone_cards(player, loc);
+                    let matching = match zone {
+                        Some(z) if z == crate::ability::enums::Zone::RevealedCards => {
+                            self.game_state.revealed_cards.clone()
+                        }
+                        _ => cards.to_vec(),
+                    };
+                    let count = matching
+                        .iter()
+                        .filter(|&&cid| {
+                            self.game_state
+                                .card_database
+                                .get_card(cid)
+                                .is_some_and(|c| {
+                                    if card_type == "live_card" {
+                                        c.is_live()
+                                    } else if card_type == "member_card" {
+                                        c.is_member()
+                                    } else {
+                                        true
+                                    }
+                                })
+                        })
+                        .count() as u32;
+                    // Negation: passes only when NO matching cards exist
+                    if count > 0 {
+                        return false;
+                    }
+                    return true;
+                }
+            }
+        }
+        true
     }
 }

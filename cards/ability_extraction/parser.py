@@ -2,6 +2,7 @@
 
 import json
 import re
+import copy
 from typing import Dict, Any, Optional, Tuple, List, Union
 from parser_utils import (
     extract_count,
@@ -479,8 +480,11 @@ def split_condition_action(text: str) -> Tuple[str, str]:
     return "", text
 
 
-def parse_complex_condition(text: str) -> Dict[str, Any]:
+def parse_complex_condition(text: str) -> Optional[Dict[str, Any]]:
     """Parse complex conditions with cause-effect relationships (e.g., これにより)."""
+    # "かつこれにより" is an AND compound, not a complex cause-effect
+    if "かつこれにより" in text:
+        return None
     # Check for complex condition markers
     for marker in COMPLEX_CONDITION_MARKERS:
         if marker in text:
@@ -696,8 +700,8 @@ def _try_card_count(text):
             ):
                 result["exclude_self"] = True
                 result["card_type"] = "member_card"
-            # Detect negation in card count condition (ない場合 / いない場合)
-            if "ない" in text or "いない" in text:
+            # Detect negation in card count condition (ない場合 / いない場合 / がなく)
+            if "ない" in text or "いない" in text or re.search(r"がなく", text):
                 result["negation"] = True
             # Detect distinct cost constraint (コストがそれぞれ異なる)
             if "コストがそれぞれ異なる" in text:
@@ -776,11 +780,14 @@ def _try_card_count(text):
             # Extract heart_colors from text for heart icon patterns (e.g. 5種類以上)
             # Only if the condition text actually contains heart icons (not the effect part)
             # to avoid leaking effect heart icons into the condition filter.
+            # Skip for check_self conditions (they check a specific card's location,
+            # not collective heart presence on stage — heart_colors don't apply).
             if "{{heart_" in text:
                 hm = re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", text)
                 if hm:
                     colors = sorted(set(f"heart{m.zfill(2)}" for m in hm))
-                    result["heart_colors"] = colors
+                    if not result.get("check_self"):
+                        result["heart_colors"] = colors
             elif "heart_colors" in result:
                 del result["heart_colors"]
 
@@ -1582,14 +1589,25 @@ def _extract_generic_fields(condition, text):
             condition["comparison_type"] = "equality"
             condition["type"] = "comparison_condition"
 
-    # Negation (〜がない / 〜が〜ない / 〜いない / 〜を持たない)
+    # Negation (〜がない / 〜がなく / 〜が〜ない / 〜いない / 〜を持たない)
     if (
         re.search(r"がない", text)
+        or re.search(r"がなく", text)
         or re.search(r"が\d*ない", text)
         or "いない" in text
         or "を持たない" in text
     ):
         condition["negation"] = True
+
+    # Self-location check: "このカードが...にある" — condition checks if THIS SPECIFIC
+    # CARD is in the zone, not just "any card". Set check_self = True to distinguish
+    # from generic presence checks.
+    if "このカードが" in text and re.search(r"に(ある|いる)", text):
+        condition["check_self"] = True
+    # check_self conditions check a specific card's location — heart_colors on
+    # the condition is effect metadata leaked by the parser. Strip it here.
+    if condition.get("check_self") and "heart_colors" in condition:
+        del condition["heart_colors"]
 
     # Includes
     if "含む" in text and "その中に" in text:
@@ -2076,6 +2094,9 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         max_m = re.search(r"(\d+)(枚|回)までしか", text)
         if max_m:
             action["max_repeats"] = int(max_m.group(1))
+        # Issue 6: Detect timing constraint for gain_resource
+        if "このターンに登場" in text and a == "gain_resource":
+            action["timing_condition"] = "appeared_this_turn"
     if "original_value" not in action and ("元々持つ" in text or "元々" in text):
         action["original_value"] = True
     if "このカード" in text:
@@ -2235,6 +2256,12 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
         r"すべての|全ての|全部の|全て|全員|全体|カードをすべて", text
     ):
         action["all"] = True
+    if (
+        action.get("all")
+        and action.get("action") == "invalidate_ability"
+        and action.get("count") == 1
+    ):
+        action["all"] = False
     if action.get("all"):
         action.pop("count", None)
     if "それぞれ" in text or "ずつ" in text:
@@ -2461,16 +2488,17 @@ def parse_action(text: str) -> Dict[str, Any]:
     if per_unit_info is not None:
         action.update(per_unit_info)
 
-    # Extract effect constraints (最小/最大/未満にはならない/以上にはならない)
+    # Extract effect constraints (最小/最大/N未満にはならない/N以上にはならない)
+    constraint_text = normalize_fullwidth_digits(text)
     constraint_patterns = {
         "最小": ("min", r"最小(\d+)"),
         "最大": ("max", r"最大(\d+)"),
-        "未満にはならない": ("minimum_value", r"(\d+)未満にはならない"),
-        "以上にはならない": ("maximum_value", r"(\d+)以上にはならない"),
+        "未満にはならない": ("min", r"(\d+)未満にはならない"),
+        "以上にはならない": ("max", r"(\d+)以上にはならない"),
     }
     for keyword, (constraint_type, pattern) in constraint_patterns.items():
-        if keyword in text:
-            constraint_match = re.search(pattern, text)
+        if keyword in constraint_text:
+            constraint_match = re.search(pattern, constraint_text)
             if constraint_match:
                 action["effect_constraint"] = (
                     f"{constraint_type}:{constraint_match.group(1)}"
@@ -2599,7 +2627,10 @@ def parse_action(text: str) -> Dict[str, Any]:
         action["position_compare"] = positions_list[1]
 
     # Extract exclude_self for actions (e.g., "このメンバー以外の" or "「character name」以外")
-    if "このメンバー以外" in text or "ほかのメンバー" in text:
+    # Only for filtering actions, NOT for gain_resource/select (self-buffs)
+    if ("このメンバー以外" in text or "ほかのメンバー" in text) and action.get(
+        "action"
+    ) not in ("gain_resource", "select", "heart_selection"):
         action["exclude_self"] = True
     # Also check for specific character name exclusions like "「鬼塚冬毬」以外"
     if re.search(r"「.+」以外", text):
@@ -3499,6 +3530,19 @@ def _extract_basic_cost_fields(cost, text):
     if exclude_chars:
         cost["exclude_characters"] = exclude_chars
 
+    # Extract position restrictions (e.g., "センター", "左サイド")
+    if "position" not in cost:
+        matched = {pos for kw, pos in POSITION_KEYWORDS.items() if kw in text}
+        if "left_side" in matched and "right_side" in matched:
+            cost["position"] = "left_side"
+            cost["position_compare"] = "right_side"
+        elif len(matched) == 1:
+            cost["position"] = next(iter(matched))
+        elif len(matched) > 1:
+            positions = sorted(matched)
+            cost["position"] = positions[0]
+            cost["position_compare"] = positions[1]
+
 
 def parse_cost(text: str) -> Dict[str, Any]:
     """Parse a cost text."""
@@ -3574,6 +3618,11 @@ def parse_cost(text: str) -> Dict[str, Any]:
                     part = part.strip() + "し"
                 cost_parts.append(parse_cost(part.strip()))
             result = {"text": text, "type": "sequential_cost", "costs": cost_parts}
+            # Propagate position from parent cost extraction
+            if "position" in cost:
+                result["position"] = cost["position"]
+                if "position_compare" in cost:
+                    result["position_compare"] = cost["position_compare"]
             # Propagate optional to the outer sequential if any sub-cost is optional
             if any(cp.get("optional") for cp in cost_parts):
                 result["optional"] = True
@@ -4027,11 +4076,43 @@ def _try_conditional_alternative(text):
     }
     ct, at = split_condition_action(primary_text)
     if ct:
-        cond = parse_condition(ct)
-        if cond and cond.get("type") != "custom":
-            result["condition"] = cond
+        if "成功ライブカード置き場に置く" in ct:
+            result["condition"] = {
+                "type": "location_condition",
+                "location": "success_live_card_zone",
+                "card_type": "live_card",
+                "target_event": "placing_in_success_zone",
+                "text": ct,
+            }
+        else:
+            cond = parse_condition(ct)
+            if cond and cond.get("type") != "custom":
+                result["condition"] = cond
     if at:
+        # Check for secondary condition in action text (e.g. "2枚以上いる場合")
+        # This handles the "代わりに" (instead of) pattern where a stricter
+        # tiered condition qualifies the alternative effect.
+        secondary_m = re.search(r"(\d+)枚以上[いあ]る場合", at)
+        if secondary_m:
+            sec_text = secondary_m.group(0)
+            alt_cond = parse_condition(sec_text)
+            if alt_cond and alt_cond.get("type") != "custom":
+                # Inherit location/group/position context from the main condition
+                # since the secondary text ("2枚以上ある場合") omits the zone/group
+                if "condition" in result:
+                    for key in ("location", "group_names", "target", "position"):
+                        if key in result["condition"] and key not in alt_cond:
+                            alt_cond[key] = result["condition"][key]
+                result["alternative_condition"] = alt_cond
+            at = at.replace(sec_text, "").strip().strip("、").strip()
         result["primary_effect"] = parse_action(at)
+    # When an alternative_condition exists, the base "N枚" in the primary
+    # condition means "at least N" (not exactly N), since a stricter tier
+    # overrides it.  Change operator from "=" to ">=".
+    if "alternative_condition" in result and "condition" in result:
+        cond = result["condition"]
+        if cond.get("operator") == "=" and cond.get("type") == "card_count_condition":
+            cond["operator"] = ">="
     return result
 
 
@@ -5068,28 +5149,31 @@ def _try_choice(text):
     if not options:
         return None
 
-    # Conditional alternative in choice modifier: "代わりに" → conditional_alternative
+    # Conditional alternative in choice modifier: "代わりに"
+    # Emit a single choice with alternative_condition so the engine can
+    # pick count=1 vs any_number based on the condition, without duplicating
+    # the entire options list.
     if cond_mod and ALTERNATIVE_MARKER in cond_mod:
         alt_parts = cond_mod.split(ALTERNATIVE_MARKER, 1)
         if len(alt_parts) == 2:
             before = alt_parts[0].strip().rstrip("、。")
             after = alt_parts[1].strip().rstrip("。")
-            alt_effect = {"action": "choice", "options": options}
+            # Extract the actual condition part from the before text.
+            # The before text includes stuff like "1つを選ぶ。" prefix.
+            alt_cond = parse_condition(before)
+            if alt_cond.get("type") != "custom":
+                result["alternative_condition"] = alt_cond
+            # Count becomes 1 by default (pick exactly one).
+            # If the alternative is "1つ以上" (one or more), use any_number.
             if "以上" in after:
-                alt_effect["any_number"] = True
+                result["alternative_count_type"] = "any_number"
             else:
                 ac = extract_count(after)
                 if ac:
-                    alt_effect["count"] = ac
-            return {
-                "text": text,
-                "action": "conditional_alternative",
-                "condition": parse_condition(before),
-                "primary_effect": {"action": "choice", "count": 1, "options": options},
-                "alternative_effect": alt_effect,
-            }
+                    result["alternative_count"] = ac
 
     result["options"] = options
+    result["count"] = 1
     return result
 
 
@@ -5159,6 +5243,15 @@ def _try_period_conditional(text):
                 if ca:
                     actions.extend(ca)
                 else:
+                    # Issue 7: reference_card binding for select→conditional chain
+                    if (
+                        actions
+                        and actions[-1].get("action") == "select"
+                        and ("同じカード名" in full or "それと同じ" in full)
+                    ):
+                        c = ce.get("condition")
+                        if c and c.get("comparison_type") == "equality":
+                            c["reference_card"] = "previous_selected"
                     actions.append(ce)
     if len(actions) >= 2:
         return {"text": text, "action": "sequential", "actions": actions}
@@ -5232,6 +5325,14 @@ def _try_conditional(text):
         action["duration"] = dur
     result = {"text": text, "condition": cond}
 
+    # Baton touch "this baton touch placed" — use recently_moved source
+    if (
+        cond.get("baton_touch_trigger")
+        and action.get("action") == "move_cards"
+        and action.get("source") == "discard"
+    ):
+        action["source"] = "recently_moved"
+
     # Handle "条件Aの場合、または条件Bの場合、行動" — merge into OR condition
     if action.get("condition") and at.lstrip().startswith("または"):
         cond = {
@@ -5254,6 +5355,11 @@ def _try_conditional(text):
             result["text"] = action["text"]
     else:
         result.update(action)
+    # Issue 4: Strip exclude_self from the action result — it belongs on the
+    # condition only. This prevents the condition's "ほかのメンバー" filter
+    # from leaking into gain_resource/heart actions.
+    if result.get("action") in ("gain_resource", "heart_selection", "set_heart_type"):
+        result.pop("exclude_self", None)
 
     # Restore the outer condition — it must NOT be overwritten by timing phrases
     # or phantom conditions from the recursive parse_effect call.
@@ -5327,6 +5433,11 @@ def _try_baton_touch_effect(text):
     cond = parse_condition(cond_text)
     cond["type"] = "baton_touch"
     action = parse_action(action_text)
+    # Baton touch "this baton touch placed" — override source to recently_moved
+    # so the engine targets the specific card moved by the baton touch, not
+    # any matching card from the discard pile.
+    if cond.get("baton_touch_trigger") and action.get("source") == "discard":
+        action["source"] = "recently_moved"
     result = {"text": text, "condition": cond}
     result.update(action)
     return result
@@ -6135,6 +6246,61 @@ def parse_effect(text: str) -> Dict[str, Any]:
 # ============== POST-PROCESSING NORMALIZER ==============
 
 
+def _collapse_to_effect_steps(effect):
+    """Convert the 4 specialized compound action shapes into the unified
+    `effect_steps` form. The engine treats any effect with `effect_steps`
+    as a sequential pipeline. This is a destructive transformation — the
+    legacy fields (look_action/select_action/primary_effect/...) are
+    removed once converted.
+
+    Conversion rules:
+      look_and_select:        [look_action, select_action]
+      conditional_alternative:[alternative (with alt_condition if set), primary]
+      conditional_on_result:  [primary, followup (with result_condition if set)]
+      conditional_on_optional:[single "conditional_optional" step carrying
+                               optional_action + conditional_action]
+    """
+    if not effect or not isinstance(effect, dict):
+        return effect
+    action = effect.get("action")
+
+    if action == "look_and_select":
+        # look_and_select keeps its legacy compound form. The engine's
+        # `execute_look_and_select` handler still has the select_cards
+        # logic embedded (not yet split into a standalone step). The
+        # other 3 compound shapes below are pure dispatch reductions and
+        # DO collapse to effect_steps.
+        return effect
+
+    if action == "conditional_alternative":
+        # Keep the legacy form. The engine's `execute_conditional_alternative`
+        # handler has condition-evaluation logic that reads from
+        # `compound.alternative_effect` / `compound.primary_effect` directly,
+        # and the negated-condition approach didn't replicate the legacy
+        # behavior (location_condition doesn't honor the negation flag, and
+        # the "ask the player" path is not modeled). Until that is fixed,
+        # this shape stays legacy — same as look_and_select /
+        # conditional_on_result / conditional_on_optional.
+        return effect
+
+    if action == "conditional_on_result":
+        # conditional_on_result keeps its legacy compound form. The engine's
+        # `execute_conditional_on_result` handler has stateful resume logic
+        # (cost_was_paid gate, save_pending_sequential_actions for the
+        # followup) that is not yet replicated by the generic sequential
+        # pipeline. Until it is, this shape stays legacy.
+        return effect
+
+    if action == "conditional_on_optional":
+        # Keep the legacy form — the engine still has a dedicated handler
+        # for this, and the yes/no choice creation is non-trivial to inline
+        # as a step. The dispatcher in the engine only checks for
+        # `effect_steps` for the 4 other compound types, so this is safe.
+        return effect
+
+    return effect
+
+
 def _normalize_effect_tree(effect, original_text=None):
     """Post-processing pass to fix common parser artifacts:
     - Remove do_nothing actions between real actions
@@ -6193,7 +6359,16 @@ def _normalize_effect_tree(effect, original_text=None):
                         if f not in sub:
                             # Don't propagate exclude_self to self-targeting
                             # sub-actions — it's contradictory.
-                            if f == "exclude_self" and sub.get("target") == "self":
+                            if f == "exclude_self" and (
+                                sub.get("target") == "self"
+                                or sub.get("action")
+                                in (
+                                    "gain_resource",
+                                    "set_heart_type",
+                                    "heart_selection",
+                                    "modify_score",
+                                )
+                            ):
                                 continue
                             # Don't propagate group_names to energy change_state actions
                             if (
@@ -6261,7 +6436,9 @@ def _normalize_effect_tree(effect, original_text=None):
         d_ctx = d.get("text") or ctx_text or _full_text
         d_text = d.get("text") or ""
 
-        # Check parenthetical for activation position if not set
+        # Check activation position if not set — first from parenthetical notes,
+        # then from position icons ({{center.png}}, {{leftside.png}}, {{rightside.png}})
+        # in the original text (e.g. {{leftside.png|左サイド}} after a trigger).
         if "activation_position" not in d:
             parenthetical = d.get("parenthetical", [])
             for note in (
@@ -6272,6 +6449,15 @@ def _normalize_effect_tree(effect, original_text=None):
                     if pos:
                         d["activation_position"] = pos
                         break
+
+        if "activation_position" not in d:
+            raw = original_text or _full_text
+            if "{{center.png|センター}}" in raw:
+                d["activation_position"] = "center"
+            elif "{{leftside.png|左サイド}}" in raw:
+                d["activation_position"] = "left_side"
+            elif "{{rightside.png|右サイド}}" in raw:
+                d["activation_position"] = "right_side"
 
         # Propagate exclude_self from text context to sub-actions
         # Skip self-targeting gain_resource actions — having target="self" +
@@ -6285,7 +6471,15 @@ def _normalize_effect_tree(effect, original_text=None):
             and ("このメンバー以外" in d_ctx or "ほかの" in d_ctx or "他の" in d_ctx)
         ):
             is_position_change = d.get("action") == "position_change"
-            if is_position_change or d.get("target") != "self":
+            # Issue 4: gain_resource/heart actions always target self (the
+            # activating card gains the resource). Don't propagate exclude_self.
+            is_self_buff = d.get("action") in (
+                "gain_resource",
+                "set_heart_type",
+                "heart_selection",
+                "modify_score",
+            )
+            if (is_position_change or d.get("target") != "self") and not is_self_buff:
                 d["exclude_self"] = True
 
         # Propagate distinct from text context — use string form for serde compat
@@ -6372,6 +6566,22 @@ def _normalize_effect_tree(effect, original_text=None):
                     hc = ["heart00"]
             if hc:
                 d["heart_colors"] = hc
+        # For modify_required_hearts, set value = count of heart icons in text
+        # matching the effect's heart_colors. The count field is separately used
+        # for the score-threshold condition (original_count). value is the actual
+        # heart modification amount (e.g. 2 icons → -2 for decrease).
+        if d.get("action") == "modify_required_hearts" and "value" not in d:
+            search_val = d_text or ""
+            if not re.search(r"heart_\d+", search_val) and ctx_text:
+                search_val = ctx_text
+            target_colors = d.get("heart_colors", [])
+            icon_count = 0
+            for m in re.finditer(r"heart_(\d+)", search_val):
+                h = f"heart{m.group(1).zfill(2)}"
+                if not target_colors or h in target_colors:
+                    icon_count += 1
+            if icon_count > 0:
+                d["value"] = icon_count
 
         # Detect possession pattern (を持つ) in gain_resource heart effects:
         # when the text says "member POSSESSING heartXX", the heart_colors
@@ -6460,11 +6670,12 @@ def _normalize_effect_tree(effect, original_text=None):
                         cond["count"] = prev_count
                         cond["operator"] = "="
                         cond["source"] = "preceding_moved"
-                if ("それらの中に" in cond_text or "これにより" in cond_text) and prev_count is not None:
-                    if (
-                        cond.get("type") == "card_count_condition"
-                        and cond.get("source") in (None, "card", "discard")
-                    ):
+                if (
+                    "それらの中に" in cond_text or "これにより" in cond_text
+                ) and prev_count is not None:
+                    if cond.get("type") == "card_count_condition" and cond.get(
+                        "source"
+                    ) in (None, "card", "discard"):
                         cond["source"] = "preceding_moved"
                         cond.pop("location", None)
                 # Track the last preceding_moved condition so bare follow-up count
@@ -6566,17 +6777,20 @@ def _normalize_effect_tree(effect, original_text=None):
         if "same_unit_name" not in d and "同じユニット名" in (d.get("text", "") or ""):
             d["same_unit_name"] = True
 
-        # Propagate heart_colors from effect into condition for collective heart checks
+        # Propagate heart_colors from effect into condition for collective heart checks.
         # Only propagate when the condition's location is a zone that CAN have heart colors
         # (stage, hand — NOT energy_zone, discard, energy_deck, success_live_zone which store colorless game pieces).
         # Also skip card_count_condition (pure count check — heart colors don't apply).
+        # Skip check_self conditions (they check a specific card's location, not collective
+        # heart presence — heart_colors on the condition is effect metadata leakage).
         if "heart_colors" in d and "condition" in d:
             cond = d["condition"]
             if isinstance(cond, dict) and "heart_colors" not in cond:
                 cond_type = cond.get("type", "")
                 loc = cond.get("location", "")
                 if cond_type == "card_count_condition":
-                    # card_count_condition — heart colors don't apply
+                    pass
+                elif cond.get("check_self"):
                     pass
                 elif loc in ("stage", "hand", "live_card_zone", ""):
                     if cond_type == "or_condition":
@@ -6717,6 +6931,12 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         if isinstance(effect, dict) and "cost" in effect:
             ability["cost"] = effect.pop("cost")
         effect = _normalize_effect_tree(effect, triggerless_text)
+        # Collapse the 4 specialized compound shapes (look_and_select,
+        # conditional_alternative, conditional_on_result, conditional_on_optional)
+        # into the unified `effect_steps` form. The engine dispatches
+        # effect_steps to the sequential handler, so this eliminates
+        # per-shape code paths in the engine.
+        effect = _collapse_to_effect_steps(effect)
 
         # Apply activation_position from cost text to the effect
         if extra_pos_from_cost and "activation_position" not in effect:
@@ -6765,6 +6985,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         if triggerless:
             parsed = parse_ability(triggerless)
             if "effect" in parsed:
+                # Re-apply the collapse in case parse_ability's path missed it
+                # (e.g. when an effect is re-parsed into a different shape).
+                parsed["effect"] = _collapse_to_effect_steps(parsed["effect"])
                 ability["effect"] = parsed["effect"]
             if "cost" in parsed:
                 ability["cost"] = parsed["cost"]

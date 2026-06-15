@@ -1,5 +1,5 @@
 use super::resolver::AbilityResolver;
-use super::types::{AbilityTraceNode, Choice, ExecutionContext, ZoneSnapshot};
+use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
 use crate::ability::types::Command;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
@@ -26,12 +26,15 @@ impl AbilityResolver {
             .and_then(|cid| gs.card_database.get_card(cid))
             .map(|c| c.name.clone());
 
-         let seq_node = self.debug_trace.then(|| {
-             
+        let seq_node = self.debug_trace.then(|| {
             AbilityTraceNode::new(seq_label)
                 .with_card(card_name.clone())
                 .with_before(ZoneSnapshot::from_game_state(gs))
         });
+
+        // Clear step_results at the top of every sequential so previous
+        // ability's outputs never leak in.
+        self.step_state.clear();
 
         let cond_met = if conditional {
             let ctx = super::condition::ConditionContext::new(gs);
@@ -132,6 +135,41 @@ impl AbilityResolver {
                                 "[SEQ_LOOP] after execute: pending={:?}",
                                 self.pending_choice.is_some()
                             );
+                            // Record this step's output under its id (if any)
+                            // so downstream steps in the same sequential can
+                            // reference it via `ref: "<id>"`.
+                            if let Some(ref step_id) = action.id {
+                                let mut out = StepOutput::default();
+                                // Capture cards the step "produced": selected
+                                // cards, moved cards, or looked-at cards.
+                                // We take whichever is most relevant for the
+                                // action type. Heuristic ordering matches
+                                // what the cost handlers do: selected > moved
+                                // > looked_at.
+                                if !self.selected_cards.is_empty() {
+                                    out.cards.extend_from_slice(&self.selected_cards);
+                                } else if !self.moved_cards.is_empty() {
+                                    out.cards.extend_from_slice(&self.moved_cards);
+                                } else if !gs.looked_at_cards.is_empty() {
+                                    out.cards.extend_from_slice(&gs.looked_at_cards);
+                                } else if !gs.revealed_cards.is_empty() {
+                                    out.cards.extend_from_slice(&gs.revealed_cards);
+                                }
+                                if self.step_state.last_draw_count > 0 {
+                                    out.value = Some(self.step_state.last_draw_count as i32);
+                                }
+                                self.step_state
+                                    .step_results
+                                    .entry(step_id.clone())
+                                    .or_insert_with(StepOutput::default)
+                                    .merge(&out);
+                                log::debug!(
+                                    "[SEQ_LOOP] recorded step '{}' output: cards={:?} value={:?}",
+                                    step_id,
+                                    out.cards,
+                                    out.value
+                                );
+                            }
                             if self.pending_choice.is_some() {
                                 let current_was_optional = action.optional.unwrap_or(false);
                                 let remaining =
@@ -193,21 +231,42 @@ impl AbilityResolver {
         effect: &AbilityEffect,
     ) -> Result<(), String> {
         let has_primary = effect.compound.primary_effect.is_some();
-        let has_alternative = effect.compound.alternative_effect.is_some();
+        let has_alternative = effect.alternative_effect.is_some();
 
         if has_primary && has_alternative {
-            // Check if the condition can decide which path to take automatically,
-            // using either the compound's alternative_condition or the top-level effect.condition.
-            let condition = effect
+            let ctx = super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
+
+            // Tiered conditions: alternative_condition (stricter) checked first.
+            // If met → execute alternative_effect (replaces primary).
+            // Otherwise check the base condition — if met → execute primary_effect.
+            // If neither is met → do nothing.
+            if effect.compound.alternative_condition.is_some() && effect.condition.is_some() {
+                if let Some(ref alt_cond) = effect.compound.alternative_condition {
+                    if ctx.evaluate_condition(alt_cond) {
+                        if let Some(ref alt_effect) = effect.alternative_effect {
+                            return self.execute_effect(gs, alt_effect);
+                        }
+                    }
+                }
+                if let Some(ref cond) = effect.condition {
+                    if ctx.evaluate_condition(cond) {
+                        if let Some(ref primary_effect) = effect.compound.primary_effect {
+                            return self.execute_effect(gs, primary_effect);
+                        }
+                    }
+                }
+                return Ok(());
+            }
+
+            // Legacy: single condition decides between alternative (true) and primary (false).
+            let single_cond = effect
                 .compound
                 .alternative_condition
                 .as_ref()
                 .or(effect.condition.as_ref());
-            if let Some(cond) = condition {
-                let ctx =
-                    super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
+            if let Some(cond) = single_cond {
                 if ctx.evaluate_condition(cond) {
-                    if let Some(ref alt_effect) = effect.compound.alternative_effect {
+                    if let Some(ref alt_effect) = effect.alternative_effect {
                         return self.execute_effect(gs, alt_effect);
                     }
                 } else if let Some(ref primary_effect) = effect.compound.primary_effect {
@@ -224,7 +283,6 @@ impl AbilityResolver {
                 .map(|e| e.text.as_str())
                 .unwrap_or("Primary effect");
             let alternative_text = effect
-                .compound
                 .alternative_effect
                 .as_ref()
                 .map(|e| e.text.as_str())
@@ -246,7 +304,7 @@ impl AbilityResolver {
         if let Some(ref alt_condition) = effect.compound.alternative_condition {
             let ctx = super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
             if ctx.evaluate_condition(alt_condition) {
-                if let Some(ref alt_effect) = effect.compound.alternative_effect {
+                if let Some(ref alt_effect) = effect.alternative_effect {
                     return self.execute_effect(gs, alt_effect);
                 }
             }
@@ -255,7 +313,7 @@ impl AbilityResolver {
         // Handle the case where we have alternative_effect + top-level condition
         // but no primary_effect and no alternative_condition (e.g. replacement effects
         // like 錯覚CROSSROADS: "when this card would be placed in success zone, instead...")
-        if effect.compound.alternative_effect.is_some()
+        if effect.alternative_effect.is_some()
             && effect.compound.primary_effect.is_none()
             && effect.compound.alternative_condition.is_none()
         {
@@ -263,7 +321,7 @@ impl AbilityResolver {
                 let ctx =
                     super::condition::ConditionContext::with_moved_cards(gs, &self.moved_cards);
                 if ctx.evaluate_condition(cond) {
-                    if let Some(ref alt_effect) = effect.compound.alternative_effect {
+                    if let Some(ref alt_effect) = effect.alternative_effect {
                         return self.execute_effect(gs, alt_effect);
                     }
                 }
@@ -303,9 +361,10 @@ impl AbilityResolver {
         // If the ability has an optional cost and it was NOT paid (skipped),
         // the primary effect should not run. This fixes "may pay" patterns
         // where the effect is gated behind the optional cost.
-        let cost_was_paid = gs.ability_queue.current_entry().is_none_or(|e| {
-            e.optional_cost_was_paid || !e.cost_paid || e.ability.cost.is_none()
-        });
+        let cost_was_paid = gs
+            .ability_queue
+            .current_entry()
+            .is_none_or(|e| e.optional_cost_was_paid || !e.cost_paid || e.ability.cost.is_none());
         if !cost_was_paid {
             return Ok(());
         }
@@ -363,6 +422,14 @@ impl AbilityResolver {
                 .as_ref()
                 .map(|a| a.text.as_str())
                 .unwrap_or("Perform optional action");
+            // Store the full sub-effect so handle_conditional_optional can read
+            // optional_action, conditional_action, and conditional_negation even
+            // when entry_effect() returns a parent (e.g. sequential) effect.
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                if let Ok(json) = serde_json::to_string(&effect) {
+                    entry.conditional_choice = Some(json);
+                }
+            }
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "conditional_optional".to_string(),
                 description: format!("{}?", desc),

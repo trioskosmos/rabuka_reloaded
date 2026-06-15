@@ -419,55 +419,241 @@ fn default_empty_string() -> String {
     String::new()
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
-pub struct AbilityCost {
-    #[serde(default = "default_empty_string")]
-    pub text: String,
-    #[serde(rename = "type")]
-    pub cost_type: Option<String>,
-    pub source: Option<String>,
-    pub destination: Option<String>,
-    pub count: Option<u32>,
-    pub card_type: Option<String>,
-    pub target: Option<String>,
-    pub optional: Option<bool>,
-    pub energy: Option<u32>,
-    pub state_change: Option<String>,
-    pub position: Option<PositionInfo>,
-    #[serde(default)]
-    pub options: Option<Vec<AbilityCost>>,
-    #[serde(default)]
-    pub self_cost: Option<bool>,
-    #[serde(default)]
-    pub exclude_self: Option<bool>,
-    #[serde(default)]
-    pub same_unit_name: Option<bool>,
-    #[serde(default)]
-    pub costs: Option<Vec<AbilityCost>>,
-    #[serde(default)]
-    pub cost_limit: Option<u32>,
-    #[serde(default)]
-    pub cost_limit_operator: Option<String>,
-    #[serde(default)]
-    pub characters: Option<Vec<String>>,
-    #[serde(default)]
-    pub exclude_characters: Option<Vec<String>>,
-    #[serde(default)]
-    pub group_names: Option<Vec<String>>,
-    #[serde(default)]
-    pub placement_order: Option<String>,
-    #[serde(default)]
-    pub shuffle: Option<bool>,
-    /// Effect that fires instead when this optional cost is skipped ("unless you pay").
-    #[serde(default)]
-    pub alternative_effect: Option<Box<AbilityEffect>>,
-    #[serde(default)]
-    pub any_number: Option<bool>,
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AbilityCost(pub AbilityEffect);
+
+impl AbilityCost {
+    /// Borrow the inner effect.
+    pub fn as_effect(&self) -> &AbilityEffect {
+        &self.0
+    }
+
+    /// Consume the cost and return the inner effect.
+    pub fn into_effect(self) -> AbilityEffect {
+        self.0
+    }
+}
+
+impl From<AbilityCost> for AbilityEffect {
+    fn from(cost: AbilityCost) -> Self {
+        cost.0
+    }
+}
+
+impl From<AbilityEffect> for AbilityCost {
+    fn from(effect: AbilityEffect) -> Self {
+        AbilityCost(effect)
+    }
+}
+
+impl std::ops::Deref for AbilityCost {
+    type Target = AbilityEffect;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for AbilityCost {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl serde::Serialize for AbilityCost {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        // Serialize as the legacy cost JSON shape so any existing consumers
+        // (frontend, debug tooling) keep working. Map the few renames:
+        //   action        → "type"
+        //   energy_count  → "energy"
+        //   sub-effects via compound.actions → "options" (preferred) or "costs"
+        use serde::ser::SerializeMap;
+        let inner = &self.0;
+        let mut map = s.serialize_map(None)?;
+        map.serialize_entry("text", &inner.text)?;
+        if let Some(ref v) = inner.source {
+            map.serialize_entry("source", v)?;
+        }
+        if let Some(ref v) = inner.source {
+            // legacy duplicate key kept for compat
+            map.serialize_entry("zone", v)?;
+        }
+        if let Some(ref v) = inner.destination {
+            map.serialize_entry("destination", v)?;
+        }
+        if let Some(ref v) = inner.count {
+            map.serialize_entry("count", v)?;
+        }
+        if let Some(ref v) = inner.card_type {
+            map.serialize_entry("card_type", v)?;
+        }
+        if let Some(ref v) = inner.target {
+            map.serialize_entry("target", v)?;
+        }
+        if let Some(v) = inner.optional {
+            map.serialize_entry("optional", &v)?;
+        }
+        if let Some(ref v) = inner.energy_count {
+            map.serialize_entry("energy", v)?;
+        }
+        if let Some(ref v) = inner.state_change {
+            map.serialize_entry("state_change", v)?;
+        }
+        if let Some(ref v) = inner.position {
+            map.serialize_entry("position", v)?;
+        }
+        if let Some(ref v) = inner.self_cost {
+            map.serialize_entry("self_cost", v)?;
+        }
+        if let Some(v) = inner.exclude_self {
+            map.serialize_entry("exclude_self", &v)?;
+        }
+        if let Some(ref v) = inner.same_unit_name {
+            map.serialize_entry("same_unit_name", v)?;
+        }
+        if let Some(ref v) = inner.shuffle {
+            map.serialize_entry("shuffle", v)?;
+        }
+        if let Some(ref v) = inner.any_number {
+            map.serialize_entry("any_number", v)?;
+        }
+        if let Some(ref v) = inner.cost_limit {
+            map.serialize_entry("cost_limit", v)?;
+        }
+        if let Some(ref v) = inner.cost_limit_operator {
+            map.serialize_entry("cost_limit_operator", v)?;
+        }
+        if let Some(ref v) = inner.characters {
+            map.serialize_entry("characters", v)?;
+        }
+        if let Some(ref v) = inner.exclude_characters {
+            map.serialize_entry("exclude_characters", v)?;
+        }
+        if let Some(ref v) = inner.group_names {
+            map.serialize_entry("group_names", v)?;
+        }
+        if let Some(ref v) = inner.placement_order {
+            map.serialize_entry("placement_order", v)?;
+        }
+        if let Some(ref v) = inner.alternative_effect {
+            map.serialize_entry("alternative_effect", v)?;
+        }
+        if !inner.action.is_empty() {
+            map.serialize_entry("type", &inner.action)?;
+        }
+        // sub-costs: emit as both "options" and "costs" (legacy treated them
+        // as the same field)
+        if let Some(ref actions) = inner.compound.actions {
+            map.serialize_entry("options", actions)?;
+            map.serialize_entry("costs", actions)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for AbilityCost {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::MapAccess;
+        #[derive(Default)]
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = AbilityCost;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("an ability cost object (legacy or unified form)")
+            }
+            fn visit_map<M: MapAccess<'de>>(self, mut map: M) -> Result<AbilityCost, M::Error> {
+                let mut effect = AbilityEffect::default();
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "text" => effect.text = map.next_value()?,
+                        "type" | "action" | "cost_type" => {
+                            effect.action = map.next_value()?;
+                        }
+                        "source" | "zone" => {
+                            effect.source = map.next_value()?;
+                        }
+                        "destination" => effect.destination = map.next_value()?,
+                        "count" => effect.count = map.next_value()?,
+                        "card_type" => effect.card_type = map.next_value()?,
+                        "target" => effect.target = map.next_value()?,
+                        "optional" => effect.optional = map.next_value()?,
+                        "energy" | "energy_count" => {
+                            effect.energy_count = map.next_value()?;
+                        }
+                        "state_change" => effect.state_change = map.next_value()?,
+                        "position" => effect.position = map.next_value()?,
+                        "self_cost" => effect.self_cost = map.next_value()?,
+                        "exclude_self" => effect.exclude_self = map.next_value()?,
+                        "same_unit_name" => effect.same_unit_name = map.next_value()?,
+                        "shuffle" => effect.shuffle = map.next_value()?,
+                        "any_number" => effect.any_number = map.next_value()?,
+                        "cost_limit" => effect.cost_limit = map.next_value()?,
+                        "cost_limit_operator" => effect.cost_limit_operator = map.next_value()?,
+                        "characters" => effect.characters = map.next_value()?,
+                        "exclude_characters" => effect.exclude_characters = map.next_value()?,
+                        "group_names" => effect.group_names = map.next_value()?,
+                        "placement_order" => effect.placement_order = map.next_value()?,
+                        "alternative_effect" => {
+                            effect.alternative_effect = map.next_value()?;
+                        }
+                        "options" | "costs" => {
+                            // Sub-costs become sub-effects in compound.actions.
+                            // Deserialize as AbilityCost so the rename mappings
+                            // (type→action, energy→energy_count) are applied.
+                            let sub: Vec<AbilityCost> = map.next_value()?;
+                            effect.compound.actions =
+                                Some(sub.into_iter().map(AbilityCost::into_effect).collect());
+                        }
+                        // Ignore unknown legacy cost fields rather than failing
+                        // — the parser has been adding fields over time.
+                        _ => {
+                            let _: serde::de::IgnoredAny = map.next_value()?;
+                        }
+                    }
+                }
+
+                Ok(AbilityCost(effect))
+            }
+        }
+        d.deserialize_map(Visitor)
+    }
+}
+
+impl AbilityCost {
+    /// Build a `CardFilter` containing the same 7 base filter fields that
+    /// `AbilityEffect::filter_subset` exposes. Mirrors that method so cost
+    /// handlers can use the same consolidation pattern as effect handlers.
+    pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
+        crate::ability::util::CardFilter {
+            card_type: self.card_type.as_deref(),
+            group: self
+                .group_names
+                .as_ref()
+                .and_then(|v| v.first())
+                .map(|s| s.as_str()),
+            cost_limit: self.cost_limit,
+            cost_operator: self.cost_limit_operator.as_deref(),
+            characters: self.characters.as_ref(),
+            exclude_characters: self.exclude_characters.as_ref(),
+            exclude_self: if self.exclude_self.unwrap_or(false) {
+                Some(-1)
+            } else {
+                None
+            },
+            ..Default::default()
+        }
+    }
 }
 
 /// Grouped sub-effect fields used by compound action handlers
 /// (Sequential, ConditionalAlternative, ConditionalOnResult, ConditionalOnOptional, LookAndSelect).
 /// Flattened into AbilityEffect via `#[serde(flatten)]` for JSON backward compat.
+///
+/// The 4 specialized compound shapes (look_and_select, conditional_alternative,
+/// conditional_on_result, conditional_on_optional) are all normalized into the
+/// unified `effect_steps` form by the engine on dispatch. The legacy fields
+/// (look_action/select_action/primary_effect/...) are kept here for backward
+/// compatibility with previously-generated `abilities.json` files; new
+/// parsers should emit only `effect_steps`.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct CompoundBranch {
     #[serde(default)]
@@ -480,8 +666,6 @@ pub struct CompoundBranch {
     pub primary_effect: Option<Box<AbilityEffect>>,
     #[serde(default)]
     pub alternative_condition: Option<Condition>,
-    #[serde(default)]
-    pub alternative_effect: Option<Box<AbilityEffect>>,
     #[serde(default)]
     pub result_condition: Option<Condition>,
     #[serde(default)]
@@ -524,6 +708,20 @@ pub struct AbilityEffect {
     /// Flat fields in JSON are collected here via `#[serde(flatten)]`.
     #[serde(flatten)]
     pub compound: CompoundBranch,
+    /// Cost-only: "this is a same-unit cost" (used by pay_cost handlers).
+    /// Carried on AbilityEffect because AbilityCost is now a newtype around
+    /// AbilityEffect — there is no separate type to put it on.
+    #[serde(default)]
+    pub same_unit_name: Option<bool>,
+    /// Cost-only: shuffle the zone after paying.
+    #[serde(default)]
+    pub shuffle: Option<bool>,
+    /// Effect that fires instead when this optional cost is skipped
+    /// ("unless you pay"). Lives on AbilityEffect so both cost-as-effect
+    /// and effect-as-effect contexts can carry it. The `alias` accepts
+    /// the old `compound.alternative_effect` key from pre-unification JSON.
+    #[serde(default, alias = "alternative_effect_legacy")]
+    pub alternative_effect: Option<Box<AbilityEffect>>,
     pub operation: Option<String>,
     pub value: Option<u32>,
     /// Heart colors specification.
@@ -571,6 +769,8 @@ pub struct AbilityEffect {
     pub cost_total_operator: Option<String>,
     #[serde(default)]
     pub any_number: Option<bool>,
+    #[serde(default)]
+    pub alternative_count_type: Option<String>,
     #[serde(default)]
     pub discard_remaining: Option<bool>,
     /// Required hearts sum filter (e.g. "total need_heart ≥ 8")
@@ -678,8 +878,6 @@ pub struct AbilityEffect {
     #[serde(default)]
     pub location: Option<String>,
     #[serde(default)]
-    pub source_location: Option<String>,
-    #[serde(default)]
     pub trigger_filter: Option<Vec<String>>,
     #[serde(default)]
     pub multiple_targets: Option<bool>,
@@ -741,6 +939,39 @@ pub struct AbilityEffect {
     /// Used by followup actions that reference "これにより公開したカードのコスト以下".
     #[serde(default)]
     pub cost_from_revealed: Option<bool>,
+    /// Step identifier. When this effect runs inside a `sequential` and has
+    /// an `id`, its outputs (selected card ids, revealed card ids, etc.) are
+    /// stored under this key in the resolver's `step_results` map, and later
+    /// steps in the same sequential can reference them via `ref: "<id>"`.
+    #[serde(default)]
+    pub id: Option<String>,
+    /// Cross-step card reference. When set on a field like `source`,
+    /// `destination`, or a filter, the engine resolves it against
+    /// `step_results[<ref>].cards` and substitutes the referenced card ids
+    /// (e.g. as the `source` zone of a `move_cards`, or as the card names
+    /// to filter by). This replaces the implicit global-state handoffs
+    /// (`gs.revealed_cards`, `gs.recently_moved_cards`) with explicit links.
+    #[serde(default)]
+    pub r#ref: Option<String>,
+    /// Cross-step value reference. When set on a field like `value` or
+    /// `count`, the engine resolves it against `step_results[<ref>].value`.
+    /// Optional offset for patterns like "selected card's score - 1".
+    #[serde(default)]
+    pub ref_value: Option<String>,
+    /// Offset to add to `ref_value` after resolution. Defaults to 0.
+    #[serde(default)]
+    pub ref_offset: Option<i32>,
+    /// Unified sub-effect steps. When this is `Some`, the 4 specialized
+    /// compound shapes (look_and_select, conditional_alternative,
+    /// conditional_on_result, conditional_on_optional) all reduce to a
+    /// single `actions` list of `AbilityEffect`s, each with an optional
+    /// per-step `condition` and an `id` for cross-step references. This is
+    /// the consolidation target; new parsers should emit only this field
+    /// for compound effects. The legacy `look_action`/`select_action`/
+    /// `primary_effect`/`alternative_effect`/... fields are still parsed
+    /// for backward compat but should not be emitted alongside.
+    #[serde(default)]
+    pub effect_steps: Option<Vec<AbilityEffect>>,
 }
 
 impl AbilityEffect {
@@ -752,6 +983,32 @@ impl AbilityEffect {
     /// Returns the source zone string with a static default.
     pub fn source_or(&self, default: &'static str) -> &str {
         self.source.as_deref().unwrap_or(default)
+    }
+
+    /// Build a `CardFilter` containing the 7 base filter fields (card_type,
+    /// group, cost_limit, cost_operator, characters, exclude_characters,
+    /// exclude_self) that effect handlers most commonly need. This is the
+    /// subset of `CardFilter::from_effect` that matches the field set
+    /// `filter_from_parts` exposes — handlers that need the full filter
+    /// (heart_colors, distinct, exclude_cards, etc.) should call
+    /// `CardFilter::from_effect` instead. Handlers that need to override
+    /// individual fields can mutate the returned `CardFilter` directly or
+    /// use the builder methods (`.card_type_opt`, `.group_opt`, etc.).
+    pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
+        crate::ability::util::CardFilter {
+            card_type: self.card_type.as_deref(),
+            group: self.group_name(),
+            cost_limit: self.cost_limit,
+            cost_operator: self.cost_limit_operator.as_deref(),
+            characters: self.characters.as_ref(),
+            exclude_characters: self.exclude_characters.as_ref(),
+            exclude_self: if self.exclude_self.unwrap_or(false) {
+                Some(-1)
+            } else {
+                None
+            },
+            ..Default::default()
+        }
     }
 
     /// Returns the count with a caller-provided default.
@@ -789,6 +1046,115 @@ impl AbilityEffect {
     /// Consolidates the many `effect.value.or(effect.count)` patterns in dispatch.
     pub fn value_or_count(&self, default: u32) -> u32 {
         self.value.or(self.count).unwrap_or(default)
+    }
+
+    /// Like `value_or_count`, but if a `ref_value` is set, resolves against
+    /// the supplied step_results to a value the referenced step produced
+    /// (plus any `ref_offset`). Falls back to `value_or_count(default)` when
+    /// the reference is absent or unresolvable. This is the type-safe
+    /// replacement for the implicit dynamic_count / cost_reference lookups
+    /// that currently live in handlers like `execute_modify_cost` and
+    /// `execute_draw_wrapper`.
+    pub fn value_or_count_resolved(
+        &self,
+        step_results: &std::collections::HashMap<String, crate::ability::types::StepOutput>,
+        default: u32,
+    ) -> i32 {
+        if let Some(ref id) = self.ref_value {
+            if let Some(out) = step_results.get(id) {
+                if let Some(v) = out.value {
+                    return v + self.ref_offset.unwrap_or(0);
+                }
+            }
+        }
+        self.value.or(self.count).unwrap_or(default) as i32
+    }
+
+    /// Returns the normalized sub-effect steps for this effect, preferring
+    /// the unified `effect_steps` form when present and otherwise building
+    /// the steps list from the legacy compound fields
+    /// (`look_action`/`select_action`/etc.). This is the consolidation point
+    /// for the 4 specialized compound shapes — once the parser emits only
+    /// `effect_steps`, the legacy branches in this function become dead code
+    /// and can be removed.
+    pub fn normalized_steps(&self) -> Vec<AbilityEffect> {
+        if let Some(ref steps) = self.effect_steps {
+            return steps.clone();
+        }
+        match self.action.as_str() {
+            "sequential" => self.compound.actions.clone().unwrap_or_default(),
+            "look_and_select" => {
+                let mut out = Vec::new();
+                if let Some(ref la) = self.compound.look_action {
+                    out.push((**la).clone());
+                }
+                if let Some(ref sa) = self.compound.select_action {
+                    out.push((**sa).clone());
+                }
+                // Followup action must be a step in the sequential pipeline
+                // so it runs after the selection completes — the legacy
+                // handler saved it as a pending_command manually, but the
+                // sequential pipeline expects it as an effect_steps entry.
+                if let Some(ref fu) = self.compound.followup_action {
+                    out.push((**fu).clone());
+                }
+                out
+            }
+            "conditional_alternative" => {
+                let mut out = Vec::new();
+                let mut primary = self.compound.primary_effect.clone().map(|b| *b);
+                let mut alternative = self.alternative_effect.clone().map(|b| *b);
+                let condition = self.compound.alternative_condition.clone();
+                if let Some(mut alt) = alternative.take() {
+                    if let Some(cond) = condition {
+                        // Per-step condition: run alternative if cond met,
+                        // else fall through to primary.
+                        alt.condition = Some(cond);
+                    }
+                    out.push(alt);
+                }
+                if let Some(pri) = primary.take() {
+                    out.push(pri);
+                }
+                out
+            }
+            "conditional_on_result" => {
+                let mut out = Vec::new();
+                if let Some(ref pri) = self.compound.primary_effect {
+                    out.push((**pri).clone());
+                }
+                if let Some(ref follow) = self.compound.followup_action {
+                    let mut f = (**follow).clone();
+                    if let Some(rc) = self.compound.result_condition.clone() {
+                        f.condition = Some(rc);
+                    }
+                    out.push(f);
+                }
+                out
+            }
+            "conditional_on_optional" => {
+                // Optional yes/no choice between optional_action and
+                // conditional_action. The legacy handler creates a
+                // SelectTarget("conditional_optional") choice and dispatches
+                // based on the answer. We model that as a single step with
+                // a special action name that the engine still routes to the
+                // existing execute_conditional_on_optional handler, but
+                // accessed through the unified sequential pipeline.
+                let mut step = AbilityEffect::default();
+                step.action = "conditional_optional".to_string();
+                if let Some(ref oa) = self.compound.optional_action {
+                    step.text = oa.text.clone();
+                }
+                // Reuse the existing compound fields via direct dispatch
+                // in the engine. We embed the legacy handler's needed
+                // inputs into a single step that the engine recognizes.
+                step.compound.optional_action = self.compound.optional_action.clone();
+                step.compound.conditional_action = self.compound.conditional_action.clone();
+                step.compound.conditional_negation = self.compound.conditional_negation;
+                vec![step]
+            }
+            _ => Vec::new(),
+        }
     }
 }
 
@@ -965,6 +1331,35 @@ pub struct Condition {
     /// not the absolute current value. Used for surplus heart loss tracking.
     #[serde(default)]
     pub delta: Option<bool>,
+    /// reference_card: "previous_selected" — compare card names against the
+    /// card selected by the preceding select action. Used for "同じカード名"
+    /// (same card name) conditions.
+    #[serde(default)]
+    pub reference_card: Option<String>,
+}
+
+impl Condition {
+    /// Build a `CardFilter` containing the 7 base filter fields, mirroring
+    /// `AbilityEffect::filter_subset` and `AbilityCost::filter_subset`.
+    /// Note: Condition uses `operator` where AbilityEffect uses
+    /// `cost_limit_operator`; the mapping is direct since both are
+    /// comparison operators for the cost filter.
+    pub fn filter_subset(&self) -> crate::ability::util::CardFilter<'_> {
+        crate::ability::util::CardFilter {
+            card_type: self.card_type.as_deref(),
+            group: self
+                .group_names
+                .as_ref()
+                .and_then(|v| v.first())
+                .map(|s| s.as_str()),
+            cost_limit: self.cost_limit,
+            cost_operator: self.operator.as_deref(),
+            characters: self.characters.as_ref(),
+            exclude_characters: self.exclude_characters.as_ref(),
+            exclude_self: None,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1060,43 +1455,41 @@ impl Card {
     }
 
     pub fn satisfies_heart_requirement(&self, provided_hearts: &BaseHeart) -> bool {
-        // Rule 8.2.8: Check if provided hearts satisfy card's need_heart requirement
-        // Heart00 (index 0) is wildcard and can substitute for any heart01-heart06
         if let Some(ref need_heart) = self.need_heart {
-            let mut wildcard_remaining = *provided_hearts
-                .hearts
-                .get(&HeartColor::Heart00)
-                .unwrap_or(&0) as i32;
-            let mut remaining = provided_hearts.hearts.clone();
-
-            for (color, &needed_amount) in &need_heart.hearts {
-                if *color == HeartColor::Heart00 {
-                    let leftover_sum: i32 = remaining
-                        .iter()
-                        .filter(|(c, _)| **c != HeartColor::Heart00)
-                        .map(|(_, v)| *v as i32)
-                        .sum();
-                    if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
-                        return false;
-                    }
-                } else {
-                    let provided = *remaining.get(color).unwrap_or(&0) as i32;
-                    if provided + wildcard_remaining < needed_amount as i32 {
-                        return false;
-                    }
-                    let shortfall = (needed_amount as i32 - provided).max(0);
-                    wildcard_remaining -= shortfall;
-                    let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
-                    if let Some(rem) = remaining.get_mut(color) {
-                        *rem -= consumed;
-                    }
-                }
-            }
-            true
+            check_heart_requirement(need_heart, provided_hearts)
         } else {
             true
         }
     }
+}
+
+pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
+    let mut wildcard_remaining = *provided.hearts.get(&HeartColor::Heart00).unwrap_or(&0) as i32;
+    let mut remaining = provided.hearts.clone();
+    for (color, &needed_amount) in &need.hearts {
+        if *color == HeartColor::Heart00 {
+            let leftover_sum: i32 = remaining
+                .iter()
+                .filter(|(c, _)| **c != HeartColor::Heart00)
+                .map(|(_, v)| *v as i32)
+                .sum();
+            if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
+                return false;
+            }
+        } else {
+            let provided_val = *remaining.get(color).unwrap_or(&0) as i32;
+            if provided_val + wildcard_remaining < needed_amount as i32 {
+                return false;
+            }
+            let shortfall = (needed_amount as i32 - provided_val).max(0);
+            wildcard_remaining -= shortfall;
+            let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
+            if let Some(rem) = remaining.get_mut(color) {
+                *rem -= consumed;
+            }
+        }
+    }
+    true
 }
 
 impl std::fmt::Display for HeartColor {

@@ -5,6 +5,7 @@ use super::super::util;
 use crate::card::AbilityEffect;
 use crate::card::PositionInfo;
 use crate::game_state::GameState;
+use std::collections::HashSet;
 
 impl AbilityResolver {
     pub(crate) fn execute_reveal_effect(
@@ -344,6 +345,35 @@ impl AbilityResolver {
                 && !is_self_target
                 && effect.exclude_self.is_none());
 
+        if resource == "surplus_heart" {
+            if sign == Some("negative") && is_all {
+                if target == "opponent" {
+                    gs.opponent_live_surplus_count = 0;
+                } else {
+                    gs.self_live_surplus_count = 0;
+                }
+            }
+            if is_temporary {
+                let desc = format!(
+                    "{} all surplus hearts",
+                    if sign == Some("negative") {
+                        "Lose"
+                    } else {
+                        "Gain"
+                    }
+                );
+                util::push_temporary_effect(
+                    gs,
+                    &format!("gain_{}", resource),
+                    duration.as_deref(),
+                    &target,
+                    &desc,
+                    None,
+                );
+            }
+            return Ok(());
+        }
+
         // For per_unit gain_resource, skip heart_colors selection and use
         // the previously selected heart from conditional_choice (set by a
         // preceding select action). Multiple heart_colors would create a
@@ -406,19 +436,13 @@ impl AbilityResolver {
                     .filter(|&id| id != -1)
                     .collect()
             };
-            let mut prelim_filter = util::filter_from_parts(
-                effect.card_type.as_deref(),
-                effect.group_name(),
-                None,
-                None,
-                effect.characters.as_ref(),
-                None,
-                exclude_self_id,
-            );
+            let mut prelim_filter = effect.filter_subset();
+            prelim_filter.exclude_self = exclude_self_id;
             if effect.filter_targets_by_heart_colors.unwrap_or(false)
-                && !effect.heart_colors.is_empty() {
-                    prelim_filter.heart_colors = &effect.heart_colors;
-                }
+                && !effect.heart_colors.is_empty()
+            {
+                prelim_filter.heart_colors = &effect.heart_colors;
+            }
             let mut candidates = util::matching_ids_filtered(
                 &stage_ids,
                 &card_db,
@@ -483,18 +507,24 @@ impl AbilityResolver {
 
         let orientation_modifiers = gs.mods.orientation_modifiers.clone();
         let last_energy = gs.mods.last_cost_energy_count;
+        // Issue 6: Pre-compute appeared-this-turn set before mutable borrow
+        let appeared_ids: std::collections::HashSet<i16> =
+            if effect.timing_condition.as_deref() == Some("appeared_this_turn") {
+                let p = gs.active_player();
+                p.stage
+                    .stage
+                    .iter()
+                    .filter(|&&cid| cid != -1 && gs.has_card_appeared_this_turn(cid))
+                    .copied()
+                    .collect()
+            } else {
+                std::collections::HashSet::new()
+            };
         let (blade_targets, heart_targets, heart_color_str, final_count) = {
             let player = gs.resolve_target_player_mut(&target);
 
-            let filter = util::filter_from_parts(
-                effect.card_type.as_deref(),
-                effect.group_name(),
-                None,
-                None,
-                effect.characters.as_ref(),
-                None,
-                exclude_self_id,
-            );
+            let mut filter = effect.filter_subset();
+            filter.exclude_self = exclude_self_id;
 
             let final_count = if per_unit {
                 // If the effect has an explicit location, use that as the count zone
@@ -613,6 +643,10 @@ impl AbilityResolver {
                     }
                 }
             }
+            // Issue 6: Filter by timing_condition (e.g. "appeared_this_turn")
+            if !appeared_ids.is_empty() {
+                blade_targets.retain(|&cid| appeared_ids.contains(&cid));
+            }
 
             let heart_color_inner = single_fixed_heart
                 .clone()
@@ -620,24 +654,22 @@ impl AbilityResolver {
             let mut heart_targets: Vec<i16> = if use_raw {
                 all_selected.clone()
             } else if resource == "heart" || resource == "ハート" {
-                util::matching_ids_filtered(
+                let mut h = util::matching_ids_filtered(
                     util::zone_cards(player, Zone::Stage.to_str()),
                     &card_db,
                     &filter,
                     true,
-                    tc,
-                    if resource == "heart" || resource == "ハート" {
-                        dn
-                    } else {
-                        None
-                    },
+                    if is_self_target { None } else { tc },
+                    dn,
                     exclude,
-                )
+                );
+                if !appeared_ids.is_empty() {
+                    h.retain(|&cid| appeared_ids.contains(&cid));
+                }
+                h
             } else {
                 vec![]
             };
-
-            // Filter heart targets by position if specified.
             if let Some(ref pos) = effect.position {
                 if let Some(p) = pos.get_position() {
                     if let Some(stage_idx) = util::stage_position_index(p) {
@@ -650,11 +682,12 @@ impl AbilityResolver {
             // Apply heart_colors as a target filter when the effect
             // specifies that targets must already possess the heart color.
             if effect.filter_targets_by_heart_colors.unwrap_or(false)
-                && !effect.heart_colors.is_empty() {
-                    heart_targets.retain(|&id| {
-                        util::card_matches_heart_colors(&card_db, id, &effect.heart_colors)
-                    });
-                }
+                && !effect.heart_colors.is_empty()
+            {
+                heart_targets.retain(|&id| {
+                    util::card_matches_heart_colors(&card_db, id, &effect.heart_colors)
+                });
+            }
 
             (blade_targets, heart_targets, heart_color_inner, final_count)
         };
@@ -899,14 +932,14 @@ impl AbilityResolver {
         }
 
         // Store effect_data for blade cleanup.
-        if is_temporary && effect_data.is_none()
-            && (resource == "blade" || resource == "ブレード") {
-                let cards_json: Vec<serde_json::Value> = blade_targets_save
-                    .iter()
-                    .map(|&cid| serde_json::json!({"card_id": cid, "amount": final_count}))
-                    .collect();
-                effect_data = Some(serde_json::Value::Array(cards_json.clone()));
-            }
+        if is_temporary && effect_data.is_none() && (resource == "blade" || resource == "ブレード")
+        {
+            let cards_json: Vec<serde_json::Value> = blade_targets_save
+                .iter()
+                .map(|&cid| serde_json::json!({"card_id": cid, "amount": final_count}))
+                .collect();
+            effect_data = Some(serde_json::Value::Array(cards_json.clone()));
+        }
 
         let pp = self.player_prefix(gs);
         let act_name = gs

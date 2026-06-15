@@ -2,7 +2,7 @@
 /// Every line shows WHAT is being checked, WHAT the expected value is,
 /// and WHAT the actual game state value is — all in one self-contained line.
 use crate::ability::enums::ConditionType;
-use crate::card::{Ability, AbilityCost, AbilityEffect, Condition};
+use crate::card::{Ability, AbilityEffect, Condition};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
@@ -63,6 +63,7 @@ impl AbDebug {
         }
         let pad = "  ".repeat(self.indent);
         let log_entry = format!("[AB]{pad}{tag} {msg}");
+        eprintln!("{}", log_entry);
         log::debug!("{}", log_entry);
         if let Ok(mut buffer) = ABILITY_LOG_BUFFER.lock() {
             buffer.push(log_entry);
@@ -191,12 +192,16 @@ impl AbDebug {
         self.p("COND", format_args!("{:20} {}", ct_label, detail));
     }
 
-    pub fn cost_pay(&mut self, cost: &AbilityCost, ok: bool) {
-        let ct = cost.cost_type.as_deref().unwrap_or("custom");
+    pub fn cost_pay(&mut self, cost: &AbilityEffect, ok: bool) {
+        let ct = if cost.action.is_empty() {
+            "custom"
+        } else {
+            cost.action.as_str()
+        };
         let msg = match ct {
             "pay_energy" => format!(
                 "pay {} E{}",
-                cost.energy.unwrap_or(1),
+                cost.energy_count.unwrap_or(1),
                 if cost.optional.unwrap_or(false) {
                     " (optional)"
                 } else {
@@ -217,7 +222,7 @@ impl AbDebug {
             ),
             "sequential_cost" => format!(
                 "compound ({} sub-costs)",
-                cost.costs.as_ref().map(|c| c.len()).unwrap_or(0)
+                cost.compound.actions.as_ref().map(|c| c.len()).unwrap_or(0)
             ),
             "reveal" => format!(
                 "reveal {} from {}",
@@ -245,9 +250,11 @@ impl AbDebug {
             "draw_card" => format!(
                 "draw {} card(s){}",
                 effect.count.unwrap_or(1),
-                if effect
-                    .optional
-                    .unwrap_or(false) { " (optional)" } else { "" }
+                if effect.optional.unwrap_or(false) {
+                    " (optional)"
+                } else {
+                    ""
+                }
             ),
             "move_cards" => format!(
                 "move {} from {} → {} (type: {})",
@@ -280,17 +287,21 @@ impl AbDebug {
                 effect.count.unwrap_or(1),
                 effect.card_type.as_deref().unwrap_or("card"),
                 effect.source.as_deref().unwrap_or("?"),
-                if effect
-                    .optional
-                    .unwrap_or(false) { " (optional)" } else { "" }
+                if effect.optional.unwrap_or(false) {
+                    " (optional)"
+                } else {
+                    ""
+                }
             ),
             "look_and_select" => "look + select from deck".to_string(),
             "pay_energy" => format!(
                 "pay {} E{}",
                 effect.count.unwrap_or(1),
-                if effect
-                    .optional
-                    .unwrap_or(false) { " (optional)" } else { "" }
+                if effect.optional.unwrap_or(false) {
+                    " (optional)"
+                } else {
+                    ""
+                }
             ),
             "reveal" => format!("reveal {}", effect.source.as_deref().unwrap_or("?")),
             "position_change" => "position change".to_string(),
@@ -309,12 +320,16 @@ impl AbDebug {
         }
     }
 
-    pub fn print_cost(&mut self, cost: &AbilityCost, prefix: &str) {
-        let ct = cost.cost_type.as_deref().unwrap_or("?");
+    pub fn print_cost(&mut self, cost: &AbilityEffect, prefix: &str) {
+        let ct = if cost.action.is_empty() {
+            "?"
+        } else {
+            cost.action.as_str()
+        };
         let msg = match ct {
             "pay_energy" => format!(
                 "pay {} E{}",
-                cost.energy.unwrap_or(1),
+                cost.energy_count.unwrap_or(1),
                 if cost.optional.unwrap_or(false) {
                     " (optional)"
                 } else {
@@ -336,7 +351,7 @@ impl AbDebug {
             ),
             "sequential_cost" => format!(
                 "compound ({} sub-costs)",
-                cost.costs.as_ref().map(|c| c.len()).unwrap_or(0)
+                cost.compound.actions.as_ref().map(|c| c.len()).unwrap_or(0)
             ),
             "choice_condition" => "choice between costs".to_string(),
             _ => ct.to_string(),

@@ -48,46 +48,61 @@ impl AbilityResolver {
         gs: &mut GameState,
         ability_text: &str,
         target_trigger: Option<&str>,
-        _count: Option<u32>,
+        count: Option<u32>,
         source_card: Option<&str>,
     ) {
-        if let Some(card_id) = source_card.and_then(|sc| match sc {
+        let card_id = source_card.and_then(|sc| match sc {
             "cost_card" => gs
                 .recently_moved_cards
                 .as_ref()
                 .and_then(|cards| cards.last().copied()),
+            "previous_selected" => self.selected_cards.last().copied(),
             _ => None,
-        }) {
+        });
+        if let Some(cid) = card_id {
             let trigger = target_trigger.map(|t| t.to_string());
-            let card_name = gs.card_database.get_card(card_id).map(|c| {
-                let ab = c.abilities.clone();
-                let name = c.name.clone();
-                (ab, name)
-            });
-            if let Some((abilities, cn)) = card_name {
+            let card_data = gs
+                .card_database
+                .get_card(cid)
+                .map(|c| (c.abilities.clone(), c.name.clone()));
+            if let Some((abilities, cn)) = card_data {
                 if let Some(ref trig) = trigger {
-                    for ability in &abilities {
-                        let ability_trigger = ability
-                            .triggers
-                            .as_ref()
-                            .and_then(|t| t.split('/').next())
-                            .unwrap_or("");
-                        if ability_trigger == trig {
-                            if let Some(ref effect) = ability.effect {
-                                let _ = self.execute_effect(gs, effect);
-                            }
-                            let pp = self.player_prefix(gs);
-                            gs.rule_log.push(format!(
-                                "{} {}: activated {} ability from {}",
-                                pp,
-                                gs.activating_card
-                                    .map(|c| self.card_name(c))
-                                    .unwrap_or_default(),
-                                trig,
-                                cn
-                            ));
-                            return;
+                    let matching: Vec<&crate::card::Ability> = abilities
+                        .iter()
+                        .filter(|a| {
+                            let at = a
+                                .triggers
+                                .as_ref()
+                                .and_then(|t| t.split('/').next())
+                                .unwrap_or("");
+                            at == trig
+                        })
+                        .collect();
+                    let selected = if matching.len() > 1 && count.unwrap_or(1) == 1 {
+                        // Multiple abilities match the trigger; use the first one.
+                        // (A full implementation would prompt the player, but for
+                        // engine purposes, picking the first matching ability is
+                        // sufficient since abilities of the same trigger on a card
+                        // are typically ordered by priority.)
+                        matching.first()
+                    } else {
+                        matching.first()
+                    };
+                    if let Some(ability) = selected {
+                        if let Some(ref effect) = ability.effect {
+                            let _ = self.execute_effect(gs, effect);
                         }
+                        let pp = self.player_prefix(gs);
+                        gs.rule_log.push(format!(
+                            "{} {}: activated {} ability from {}",
+                            pp,
+                            gs.activating_card
+                                .map(|c| self.card_name(c))
+                                .unwrap_or_default(),
+                            trig,
+                            cn
+                        ));
+                        return;
                     }
                 }
             }
@@ -181,7 +196,8 @@ impl AbilityResolver {
                     gs.mods.add_score_modifier(card_id, val);
                     log::debug!(
                         "[GAINED_ABILITY] Applied +{} score modifier to card {}",
-                        val, card_id
+                        val,
+                        card_id
                     );
                 }
             }

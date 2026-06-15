@@ -493,20 +493,10 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     _ => &game_state.player1,
                 };
                 match Zone::from_str(zone.as_str()) {
-                    Some(Zone::Hand) => player
-                        .hand
-                        .cards
-                        .iter()
-                        .copied()
-                        .enumerate()
-                        .collect(),
-                    Some(Zone::Discard) | Some(Zone::Waitroom) => player
-                        .waitroom
-                        .cards
-                        .iter()
-                        .copied()
-                        .enumerate()
-                        .collect(),
+                    Some(Zone::Hand) => player.hand.cards.iter().copied().enumerate().collect(),
+                    Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                        player.waitroom.cards.iter().copied().enumerate().collect()
+                    }
                     Some(Zone::Stage) => player
                         .stage
                         .stage
@@ -531,11 +521,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     Some(Zone::RevealedCards) => {
                         let cheer = game_state.cheer_revealed_cards();
                         if !cheer.is_empty() {
-                            cheer
-                                .iter()
-                                .copied()
-                                .enumerate()
-                                .collect()
+                            cheer.iter().copied().enumerate().collect()
                         } else {
                             game_state
                                 .revealed_cards
@@ -1086,7 +1072,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 } else {
                     ability.full_text.clone()
                 };
-                let ability_cost = ability.cost.as_ref().and_then(|c| c.energy).unwrap_or(0);
+                let ability_cost = ability
+                    .cost
+                    .as_ref()
+                    .and_then(|c| c.energy_count)
+                    .unwrap_or(0);
                 let trigger_info = ability
                     .triggers
                     .as_ref()
@@ -1157,7 +1147,11 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                 } else {
                     ability.full_text.clone()
                 };
-                let ability_cost = ability.cost.as_ref().and_then(|c| c.energy).unwrap_or(0);
+                let ability_cost = ability
+                    .cost
+                    .as_ref()
+                    .and_then(|c| c.energy_count)
+                    .unwrap_or(0);
 
                 actions.push(make_action_params(
                     ActionType::UseAbility,

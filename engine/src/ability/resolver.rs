@@ -1,6 +1,9 @@
 use super::debug::AbDebug;
 use super::enums::Zone;
-use super::types::{AbilityTraceNode, Choice, EffectPipeline, ExecutionContext, EffectSpawnContext, ZoneSnapshot};
+use super::types::{
+    AbilityTraceNode, Choice, EffectPipeline, EffectSpawnContext, ExecutionContext, StepState,
+    ZoneSnapshot,
+};
 use super::util;
 use crate::card::{Ability, AbilityCost, AbilityEffect, CardDatabase, Keyword};
 use crate::game_state::{GameState, Phase};
@@ -17,8 +20,6 @@ pub struct AbilityResolver {
     pub execution_context: ExecutionContext,
     pub current_effect: Option<AbilityEffect>,
     pub is_reveal_cost: bool,
-    pub last_draw_count: u32,
-    pub looked_at_total_count: usize,
     pub selected_cards: Vec<i16>,
     pub selected_area: Option<String>,
     pub moved_cards: Vec<i16>,
@@ -27,6 +28,9 @@ pub struct AbilityResolver {
     pub pending_stage_cards: Vec<(i16, String)>,
     pub debug_trace: bool,
     pub pipeline: EffectPipeline,
+    /// Cross-step data flow machinery — see `StepState` for the per-step
+    /// output map, last-draw-count, and looked-at-total-count fields.
+    pub step_state: StepState,
 }
 
 impl AbilityResolver {
@@ -40,8 +44,6 @@ impl AbilityResolver {
             execution_context: ExecutionContext::None,
             current_effect: None,
             is_reveal_cost: false,
-            last_draw_count: 0,
-            looked_at_total_count: 0,
             selected_cards: Vec::new(),
             selected_area: None,
             moved_cards: Vec::new(),
@@ -49,9 +51,8 @@ impl AbilityResolver {
             sub_choice_created: false,
             pending_stage_cards: Vec::new(),
             debug_trace: false,
-            pipeline: {
-                EffectPipeline::new()
-            },
+            pipeline: { EffectPipeline::new() },
+            step_state: StepState::new(),
         }
     }
 
@@ -495,10 +496,11 @@ impl AbilityResolver {
             // be met in the current game state (after cost payment). This prevents
             // effects like "choice" from being shown when the condition fails.
             if (effect.condition.is_some() || effect.activation_condition_parsed.is_some())
-                && !self.can_activate_effect(gs, effect) {
-                    dbg.p("RESULT", "effect condition not met — skipped");
-                    return Ok(());
-                }
+                && !self.can_activate_effect(gs, effect)
+            {
+                dbg.p("RESULT", "effect condition not met — skipped");
+                return Ok(());
+            }
             if let Err(e) = self.execute_effect(gs, effect) {
                 dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
                 return Err(e);
@@ -640,37 +642,38 @@ impl AbilityResolver {
     fn apply_modify_cost_to_ability_cost(
         &self,
         gs: &mut GameState,
-        cost: &AbilityCost,
+        cost: &AbilityEffect,
         ability: &Ability,
-    ) -> AbilityCost {
+    ) -> AbilityEffect {
         let mut cost = cost.clone();
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = util::find_modify_cost(effect, None, None) {
                 if mod_cost.operation.as_deref() == Some("subtract")
                     && mod_cost.per_unit.unwrap_or(false)
-                        && mod_cost.per_unit_type.as_deref() == Some("group_name") {
-                            // Count distinct group names on self's stage
-                            let player = gs.resolve_target_player("self");
-                            let card_db = &gs.card_database;
-                            let mut groups = std::collections::HashSet::new();
-                            for &cid in &player.stage.stage {
-                                if cid == -1 {
-                                    continue;
-                                }
-                                if let Some(card) = card_db.get_card(cid) {
-                                    if let Some(ref unit) = card.unit {
-                                        groups.insert(unit.clone());
-                                    }
-                                }
-                            }
-                            let per_unit_count = mod_cost.per_unit_count.unwrap_or(1);
-                            let reduction = (groups.len() as u32 / per_unit_count)
-                                * mod_cost.count.unwrap_or(1);
-                            if cost.cost_type.as_deref() == Some("pay_energy") {
-                                let new_energy = cost.energy.unwrap_or(0).saturating_sub(reduction);
-                                cost.energy = Some(new_energy);
+                    && mod_cost.per_unit_type.as_deref() == Some("group_name")
+                {
+                    // Count distinct group names on self's stage
+                    let player = gs.resolve_target_player("self");
+                    let card_db = &gs.card_database;
+                    let mut groups = std::collections::HashSet::new();
+                    for &cid in &player.stage.stage {
+                        if cid == -1 {
+                            continue;
+                        }
+                        if let Some(card) = card_db.get_card(cid) {
+                            if let Some(ref unit) = card.unit {
+                                groups.insert(unit.clone());
                             }
                         }
+                    }
+                    let per_unit_count = mod_cost.per_unit_count.unwrap_or(1);
+                    let reduction =
+                        (groups.len() as u32 / per_unit_count) * mod_cost.count.unwrap_or(1);
+                    if cost.action == "pay_energy" {
+                        let new_energy = cost.energy_count.unwrap_or(0).saturating_sub(reduction);
+                        cost.energy_count = Some(new_energy);
+                    }
+                }
             }
         }
         cost

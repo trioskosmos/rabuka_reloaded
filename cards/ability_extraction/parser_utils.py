@@ -127,6 +127,16 @@ def extract_dynamic_count(text):
             source = count_match.group(1).strip()
             return {"type": "dynamic_count", "reference": source, "mode": "max"}
 
+    if "と同じ枚数" in text or "と同じ数" in text:
+        # Pattern: "Xと同じ枚数/数" - count equals X
+        # e.g. "これにより控え室に置いたカードと同じ枚数" → count = previously moved cards
+        result = {
+            "type": "dynamic_count",
+            "reference": "previous_moved_cards",
+            "mode": "equals",
+        }
+        return result
+
     if "その枚数に" in text and "を足した枚数" in text:
         # Pattern: "その枚数にNを足した枚数" - count based on the previous moved/discarded cards plus N
         count_match = re.search(r"その枚数に(\d+)を足した(?:枚数|数)", text)
@@ -148,7 +158,12 @@ def extract_dynamic_count(text):
             # Check for calculation pattern like "スコアに2を足した数"
             calc_match = re.search(r"(.+?)に(\d+)を足した", source)
             if calc_match:
-                result["base_reference"] = calc_match.group(1).strip()
+                calc_base = calc_match.group(1).strip()
+                # Only use total_live_score for "合計スコア" patterns (Issue 8 on 穂乃果)
+                if "合計スコア" in calc_base:
+                    result["reference"] = "total_live_score"
+                else:
+                    result["reference"] = calc_base
                 result["calculation"] = "add"
                 result["calculation_value"] = int(calc_match.group(2))
             return result

@@ -15,3 +15,4 @@ nul
 .kilo/
 .opencode/
 .ruff_cache/
+\n# Ignore Spaces/deployment artifacts\nweb_ui/dist/\nroot_files/\npoll_data/\n
