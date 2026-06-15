@@ -45,11 +45,11 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        None,
+        Some(vec![0, 1]),
         Some(MemberArea::Center),
         Some(true),
     )
-    .expect("play with baton touch");
+    .expect("play with double baton via card_indices");
 
     // After baton touch + debut: draw 2 cards (auto).
     // If multiple matching cards in discard, a card selection choice appears.
@@ -311,11 +311,11 @@ fn sumire_double_baton_to_left_does_not_activate_debut() {
         &mut game.state,
         &ActionType::PlayMemberToStage,
         Some(sumire),
-        None,
+        Some(vec![0, 1]),
         Some(MemberArea::LeftSide),
         Some(true),
     )
-    .expect("play with baton touch");
+    .expect("play with double baton via card_indices");
 
     while game.has_pending_choice() {
         game.select_indices(&[0]);
@@ -369,4 +369,321 @@ fn sumire_no_liella_on_stage_plays_normally() {
         game.state.player1.stage.stage.contains(&sumire),
         "Sumire placed on stage normally"
     );
+}
+
+/// Single baton (area button with baton toggle) should NOT auto-promote to double.
+/// With 2+ members on stage, only 1 replacement occurs, ab#1 does NOT trigger.
+#[test]
+fn sumire_single_baton_stays_single_no_auto_promote() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let sumire = game.id("PL!SP-bp4-004-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let liella1 = game.id("PL!SP-bp1-004-R");
+    let liella2 = game.id("PL!SP-bp1-005-R");
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(sumire);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.stage.stage = [liella1, liella2, -1];
+    game.give_energy(20);
+
+    advance_to_turn2(&mut game);
+
+    // Use regular area button path (no card_indices) — single baton only
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::PlayMemberToStage,
+        Some(sumire),
+        None,
+        Some(MemberArea::Center),
+        Some(true),
+    )
+    .expect("play with single baton");
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // Only 1 baton touch — no auto-promotion
+    assert_eq!(
+        game.state.baton_touch_count, 1,
+        "Single baton stays single — 1 baton touch, not 2"
+    );
+
+    // ab#1 requires min_baton_touch_count=2, so no draw
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "Only filler in hand — no draw from ab#1"
+    );
+
+    // Only center was replaced
+    let in_waitroom = &game.state.player1.waitroom.cards;
+    let liella_in_waitroom = [liella1, liella2]
+        .iter()
+        .filter(|&&id| in_waitroom.contains(&id))
+        .count();
+    assert_eq!(
+        liella_in_waitroom, 1,
+        "Only 1 member replaced (center), left stays"
+    );
+
+    // Left still occupied
+    assert_eq!(
+        game.state.player1.stage.stage[0],
+        liella1,
+        "Left still has liella1"
+    );
+}
+
+/// Helper that mimics the web server's action type parsing path.
+/// This is the exact code path the button click goes through:
+///   1. UI sends action_type as a string (e.g. "play_member_to_stage")
+///   2. Web server parses it via FromStr
+///   3. If parsing fails, defaults to Pass (skips turn)
+///   4. Otherwise executes the action
+fn execute_action_via_string_parsing(
+    game: &mut TestGame,
+    action_type_str: &str,
+    card_id: Option<i16>,
+    card_indices: Option<Vec<usize>>,
+    stage_area: Option<MemberArea>,
+    use_baton_touch: Option<bool>,
+) -> Result<(), String> {
+    // Same parsing logic as web_server.rs execute_action handler
+    let action_type = action_type_str
+        .parse::<ActionType>()
+        .unwrap_or(ActionType::Pass);
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &action_type,
+        card_id,
+        card_indices,
+        stage_area,
+        use_baton_touch,
+    )
+}
+
+/// Verify the string-parsing path works for the correct snake_case format
+/// that the fixed button now sends.
+#[test]
+fn sumire_action_type_string_parsing_play_member_to_stage() {
+    let parsed: Result<ActionType, String> = "play_member_to_stage".parse();
+    assert_eq!(
+        parsed.expect("snake_case should parse"),
+        ActionType::PlayMemberToStage
+    );
+
+    let parsed: Result<ActionType, String> = "PlayMemberToStage".parse();
+    assert!(
+        parsed.is_err(),
+        "PascalCase should fail to parse"
+    );
+
+    // This is what the web server does on parse failure — defaults to Pass
+    let fallback = "PlayMemberToStage"
+        .parse::<ActionType>()
+        .unwrap_or(ActionType::Pass);
+    assert_eq!(
+        fallback,
+        ActionType::Pass,
+        "Failed parse falls back to Pass → turn skips"
+    );
+}
+
+/// Full integration test that exercises the button path end-to-end:
+/// the action_type string goes through the same parsing logic as the web server.
+#[test]
+fn sumire_double_baton_integration_via_string_path() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let sumire = game.id("PL!SP-bp4-004-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let liella1 = game.id("PL!SP-bp1-004-R");
+    let liella2 = game.id("PL!SP-bp1-005-R");
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(sumire);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.stage.stage = [liella1, liella2, -1];
+    game.give_energy(20);
+
+    advance_to_turn2(&mut game);
+
+    // This is what the fixed double baton button sends:
+    // action_type = "play_member_to_stage" (snake_case)
+    // card_indices = [0, 1] (replace left & center)
+    // stage_area = "center" (place Sumire in center)
+    // use_baton_touch = true
+    execute_action_via_string_parsing(
+        &mut game,
+        "play_member_to_stage",
+        Some(sumire),
+        Some(vec![0, 1]),
+        Some(MemberArea::Center),
+        Some(true),
+    )
+    .expect("double baton via string-parsed action_type should succeed");
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert_eq!(
+        game.state.baton_touch_count, 2,
+        "2 baton touches via button integration path"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], sumire,
+        "Sumire occupies Center"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        3,
+        "Hand: filler + 2 draws from ab#1"
+    );
+}
+
+/// Explicit double baton via card_indices parameter (UI double-baton button path).
+#[test]
+fn sumire_explicit_double_baton_via_card_indices() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let sumire = game.id("PL!SP-bp4-004-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let liella1 = game.id("PL!SP-bp1-004-R");
+    let liella2 = game.id("PL!SP-bp1-005-R");
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(sumire);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.stage.stage = [liella1, liella2, -1];
+    game.give_energy(20);
+
+    let energy_before = game.state.player1.energy_zone.active_count();
+    advance_to_turn2(&mut game);
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::PlayMemberToStage,
+        Some(sumire),
+        Some(vec![0, 1]),
+        Some(MemberArea::Center),
+        Some(true),
+    )
+    .expect("explicit double baton via card_indices");
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert_eq!(game.state.baton_touch_count, 2, "2 baton touches");
+    assert_eq!(
+        game.state.baton_touch_arriving_card_id,
+        Some(sumire),
+        "baton_touch_arriving_card_id set"
+    );
+
+    let on_stage = game.state.player1.stage.stage;
+    assert_eq!(on_stage[0], liella2, "Left has deployed liella2 (cost 2 <= 4)");
+    assert_eq!(on_stage[1], sumire, "Center has Sumire");
+    assert_eq!(on_stage[2], -1, "Right empty");
+
+    assert!(game.state.player1.waitroom.cards.contains(&liella1),
+        "liella1 in waitroom (cost 15 > 4)");
+    assert!(!game.state.player1.waitroom.cards.contains(&liella2),
+        "liella2 deployed back to stage");
+
+    assert_eq!(game.state.player1.hand.cards.len(), 3, "Hand: filler + 2 draws");
+
+    let expected_cost = 5u32;
+    let energy_after = game.state.player1.energy_zone.active_count();
+    assert_eq!(
+        energy_after,
+        energy_before.saturating_sub(expected_cost as usize),
+        "Energy: paid {}, remaining {}",
+        expected_cost,
+        energy_after
+    );
+}
+
+/// Explicit double baton to non-Center position should NOT trigger ab#1.
+#[test]
+fn sumire_explicit_double_baton_to_left_no_debut() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let sumire = game.id("PL!SP-bp4-004-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD");
+    let liella1 = game.id("PL!SP-bp1-004-R");
+    let liella2 = game.id("PL!SP-bp1-005-R");
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(sumire);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.stage.stage = [liella1, liella2, -1];
+    game.give_energy(20);
+
+    let energy_before = game.state.player1.energy_zone.active_count();
+    advance_to_turn2(&mut game);
+
+    TurnEngine::execute_main_phase_action(
+        &mut game.state,
+        &ActionType::PlayMemberToStage,
+        Some(sumire),
+        Some(vec![0, 1]),
+        Some(MemberArea::LeftSide),
+        Some(true),
+    )
+    .expect("explicit double baton to Left");
+
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert_eq!(game.state.baton_touch_count, 2, "2 baton touches");
+
+    assert_eq!(game.state.player1.hand.cards.len(), 1, "No draw: center required");
+
+    let expected_cost = 5u32;
+    let energy_after = game.state.player1.energy_zone.active_count();
+    assert_eq!(
+        energy_after,
+        energy_before.saturating_sub(expected_cost as usize),
+        "Energy: paid {}, remaining {}",
+        expected_cost,
+        energy_after
+    );
+
+    assert_eq!(game.state.player1.stage.stage[0], sumire, "Sumire at Left");
+    assert_eq!(game.state.player1.stage.stage[1], -1, "Center empty");
+    assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
 }

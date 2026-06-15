@@ -339,6 +339,145 @@ fn wakana_bp2_008_use_limit_blocks_second_activation() {
 }
 
 // ====================================================================
+// PL!SP-bp5-013-N (唐 可可) — 登場: look 5, select SunnyPassion member OR
+//   Liella! member with blade heart, discard rest
+// ====================================================================
+// Full text:
+//   手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。
+//   その中から『SunnyPassion』のメンバーカードかブレードハートを持つ
+//   『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+// ====================================================================
+
+/// SunnyPassion member (no blade heart needed) should be selectable.
+#[test]
+fn keke_look_select_sunny_passion_member() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let keke = game.id("PL!SP-bp5-013-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    // SunnyPassion member (unit=SunnyPassion, no blade_heart)
+    let sunny = game.id("PL!SP-bp5-111-R");
+
+    game.state.player1.hand.cards.push(keke);
+    game.state.player1.hand.cards.push(filler);
+    // Deck top 5: [sunny, filler, filler, filler, filler]
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(sunny);
+    for _ in 0..4 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    while game.state.player1.main_deck.cards.len() < 40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(4);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(keke, MemberArea::Center);
+
+    // Pay optional cost: discard 1 from hand (filler)
+    if game.has_pending_choice() {
+        game.select_indices(&[0]); // discard index 0 (the filler)
+    }
+
+    // The choice should now be to select 1 from the matching looked-at cards.
+    if game.has_pending_choice() {
+        // Select the first visible card (should be Sunny)
+        game.select_indices(&[0]);
+    }
+
+    // Sunny should now be in hand
+    assert!(
+        game.state.player1.hand.cards.contains(&sunny),
+        "SunnyPassion member should be added to hand"
+    );
+}
+
+/// Liella! member WITHOUT blade heart should NOT be selectable.
+#[test]
+fn keke_look_select_liella_no_blade_heart_excluded() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let keke = game.id("PL!SP-bp5-013-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    // Liella! member (series=スーパースター) without blade_heart
+    let liella_no_bh = game.id("PL!SP-bp1-013-PR");
+
+    game.state.player1.hand.cards.push(keke);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(liella_no_bh);
+    for _ in 0..4 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    while game.state.player1.main_deck.cards.len() < 40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(4);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(keke, MemberArea::Center);
+
+    // Drain all choices: optional cost (pay), then look+filter, then any remaining prompts
+    while game.has_pending_choice() {
+        // Pay optional cost: first prompt is Yes/No, second is select card to discard
+        game.select_indices(&[0]);
+    }
+
+    // After all choices resolved, liella_no_bh should have been discarded
+    // since it's Liella! but lacks blade_heart.
+    assert!(!game.has_pending_choice(), "All choices should be resolved");
+    assert!(
+        !game.state.player1.hand.cards.contains(&liella_no_bh),
+        "Liella member without blade heart should NOT be in hand"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&liella_no_bh),
+        "Liella member without blade heart should be in waitroom"
+    );
+}
+
+/// Liella! member WITH blade heart should be selectable.
+#[test]
+fn keke_look_select_liella_with_blade_heart() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let keke = game.id("PL!SP-bp5-013-N");
+    let filler = game.id("PL!-sd1-010-SD");
+    // Liella! member (series=スーパースター) WITH blade_heart
+    let liella_bh = game.id("PL!SP-pb1-001-PR");
+
+    game.state.player1.hand.cards.push(keke);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.main_deck.cards.push(liella_bh);
+    for _ in 0..4 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    while game.state.player1.main_deck.cards.len() < 40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    game.give_energy(4);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.play_to_stage(keke, MemberArea::Center);
+
+    // Pay optional cost
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // Liella member with blade heart should be selectable
+    if game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    assert!(
+        game.state.player1.hand.cards.contains(&liella_bh),
+        "Liella member with blade heart should be added to hand"
+    );
+}
+
+// ====================================================================
 // PL!SP-pb1-003-R (嵐 千砂都) — 登場 trigger: rotation
 // ====================================================================
 // Text:

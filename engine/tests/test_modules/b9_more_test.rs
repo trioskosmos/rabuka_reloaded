@@ -111,13 +111,577 @@ fn mijuku_dreamer_live_success_timing() {
     assert!(!c.abilities.is_empty());
 }
 
-/// PL!SP-bp1-024-L (Tiny Stars) Q36: LiveSuccess timing.
+use rabuka_engine::card::HeartColor;
+
+fn fill_decks(game: &mut TestGame, filler: i16) {
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+}
+
+fn trigger_live_start(game: &mut TestGame, card_id: i16) {
+    let card = game.db.get_card(card_id).unwrap();
+    let ab = card
+        .abilities
+        .iter()
+        .find(|a| a.triggers.as_deref() == Some("ライブ開始時"))
+        .cloned()
+        .unwrap();
+    let pid = game.state.player1.id.clone();
+    game.state.trigger_auto_ability(
+        format!("{}_{}", card.card_no, ab.full_text),
+        rabuka_engine::core::types::AbilityTrigger::LiveStart,
+        pid.clone(),
+        Some(card.card_no.clone()),
+        Some(card_id),
+        None,
+    );
+    game.state.activating_card = Some(card_id);
+    game.state.process_pending_auto_abilities(&pid);
+}
+
+/// PL!SP-bp1-024-L (Tiny Stars) ab#0: LiveStart — basic case, 1 Kanon + 1 Keke.
+/// No choices needed; verify both characters get correct blade+heart.
 #[test]
-fn tiny_stars_live_success_timing() {
+fn tiny_stars_basic() {
     let db = load_real_database();
-    let card = db.get_card_id("PL!SP-bp1-024-L").expect("Card exists");
-    let c = db.get_card(card).expect("Tiny Stars card should exist");
-    assert!(!c.abilities.is_empty());
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let kanon = game.id("PL!SP-sd1-001-SD");
+    let keke = game.id("PL!SP-sd1-002-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [kanon, keke, -1];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    assert!(
+        !game.has_pending_choice(),
+        "Basic case (1 each): no choice expected"
+    );
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon),
+        1,
+        "Kanon should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon, HeartColor::Heart05),
+        1,
+        "Kanon should have +1 heart05"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(keke),
+        1,
+        "Keke should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(keke, HeartColor::Heart01),
+        1,
+        "Keke should have +1 heart01"
+    );
+}
+
+/// 2 Kanon + 1 Keke on stage: player must select which Kanon gets the bonus.
+#[test]
+fn tiny_stars_duplicate_kanon() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let kanon1 = game.id("PL!SP-sd1-001-SD");
+    let kanon2 = game.new_id("PL!SP-sd1-001-SD");
+    let keke = game.id("PL!SP-sd1-002-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [kanon1, kanon2, keke];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    assert!(
+        game.has_pending_choice(),
+        "Duplicate kanon: should prompt to select one"
+    );
+
+    // Select the first kanon (index 0 in the prompt)
+    game.select_indices(&[0]);
+
+    // Verify no more pending choices (keke auto-selected if only 1)
+    if game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectHeartColor") | Some("SelectHeartType") => {
+                panic!("Unexpected heart color choice - should be fixed")
+            }
+            _ => {
+                game.select_indices(&[0]);
+            }
+        }
+    }
+
+    assert!(
+        !game.has_pending_choice(),
+        "After selecting kanon, no more choices expected"
+    );
+
+    let chosen_blade = game.state.mods.get_blade_modifier(kanon1);
+    let chosen_heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon1, HeartColor::Heart05);
+    let other_blade = game.state.mods.get_blade_modifier(kanon2);
+    let other_heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon2, HeartColor::Heart05);
+
+    assert_eq!(
+        chosen_blade, 1,
+        "Selected kanon should have +1 blade, got {}",
+        chosen_blade
+    );
+    assert_eq!(
+        chosen_heart, 1,
+        "Selected kanon should have +1 heart05, got {}",
+        chosen_heart
+    );
+    assert_eq!(
+        other_blade, 0,
+        "Unselected kanon should have 0 blade, got {}",
+        other_blade
+    );
+    assert_eq!(
+        other_heart, 0,
+        "Unselected kanon should have 0 heart05, got {}",
+        other_heart
+    );
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(keke),
+        1,
+        "Keke should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(keke, HeartColor::Heart01),
+        1,
+        "Keke should have +1 heart01"
+    );
+}
+
+/// 1 Kanon + 2 Keke on stage: player must select which Keke gets the bonus.
+#[test]
+fn tiny_stars_duplicate_keke() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let kanon = game.id("PL!SP-sd1-001-SD");
+    let keke1 = game.id("PL!SP-sd1-002-SD");
+    let keke2 = game.new_id("PL!SP-sd1-002-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [kanon, keke1, keke2];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    // Kanon has only 1 candidate, should be handled automatically.
+    // Keke has 2 candidates → should prompt.
+    assert!(
+        game.has_pending_choice(),
+        "Duplicate keke: should prompt to select one"
+    );
+
+    // Select the first keke (index 0 in the prompt)
+    game.select_indices(&[0]);
+
+    // Verify no more pending choices
+    if game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectHeartColor") | Some("SelectHeartType") => {
+                panic!("Unexpected heart color choice - should be fixed")
+            }
+            _ => {
+                game.select_indices(&[0]);
+            }
+        }
+    }
+
+    assert!(
+        !game.has_pending_choice(),
+        "After selecting keke, no more choices expected"
+    );
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon),
+        1,
+        "Kanon should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon, HeartColor::Heart05),
+        1,
+        "Kanon should have +1 heart05"
+    );
+
+    let chosen_blade = game.state.mods.get_blade_modifier(keke1);
+    let chosen_heart = game
+        .state
+        .mods
+        .get_heart_modifier(keke1, HeartColor::Heart01);
+    let other_blade = game.state.mods.get_blade_modifier(keke2);
+    let other_heart = game
+        .state
+        .mods
+        .get_heart_modifier(keke2, HeartColor::Heart01);
+
+    assert_eq!(
+        chosen_blade, 1,
+        "Selected keke should have +1 blade, got {}",
+        chosen_blade
+    );
+    assert_eq!(
+        chosen_heart, 1,
+        "Selected keke should have +1 heart01, got {}",
+        chosen_heart
+    );
+    assert_eq!(
+        other_blade, 0,
+        "Unselected keke should have 0 blade, got {}",
+        other_blade
+    );
+    assert_eq!(
+        other_heart, 0,
+        "Unselected keke should have 0 heart01, got {}",
+        other_heart
+    );
+}
+
+/// 1 Kanon only, 0 Keke on stage: only kanon gets blade+heart05.
+#[test]
+fn tiny_stars_kanon_only() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let kanon = game.id("PL!SP-sd1-001-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [kanon, -1, -1];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    assert!(
+        !game.has_pending_choice(),
+        "1 kanon only: no choice expected"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon),
+        1,
+        "Kanon should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon, HeartColor::Heart05),
+        1,
+        "Kanon should have +1 heart05"
+    );
+}
+
+/// 0 Kanon, 1 Keke on stage: only keke gets blade+heart01.
+#[test]
+fn tiny_stars_keke_only() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let keke = game.id("PL!SP-sd1-002-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [keke, -1, -1];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    assert!(
+        !game.has_pending_choice(),
+        "1 keke only: no choice expected"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(keke),
+        1,
+        "Keke should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(keke, HeartColor::Heart01),
+        1,
+        "Keke should have +1 heart01"
+    );
+}
+
+/// 0 Kanon, 0 Keke on stage: no resources should be granted.
+#[test]
+fn tiny_stars_none() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [-1, -1, -1];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    assert!(
+        !game.has_pending_choice(),
+        "Empty stage: no choice expected"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(tiny_stars),
+        0,
+        "No blade should be granted"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(tiny_stars, HeartColor::Heart05),
+        0,
+        "No heart05 should be granted"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(tiny_stars, HeartColor::Heart01),
+        0,
+        "No heart01 should be granted"
+    );
+}
+
+/// 2 Kanon, 0 Keke on stage: select index[1] (second kanon).
+#[test]
+fn tiny_stars_duplicate_kanon_select_second() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let kanon1 = game.id("PL!SP-sd1-001-SD");
+    let kanon2 = game.new_id("PL!SP-sd1-001-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [kanon1, kanon2, -1];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    assert!(
+        game.has_pending_choice(),
+        "2 kanon: should prompt to select one"
+    );
+
+    // Select the SECOND kanon (index 1)
+    game.select_indices(&[1]);
+
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectHeartColor") | Some("SelectHeartType") => {
+                panic!("Unexpected heart color choice")
+            }
+            _ => {
+                game.select_indices(&[0]);
+            }
+        }
+    }
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon1),
+        0,
+        "Unselected kanon should have 0 blade"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon2),
+        1,
+        "Selected kanon should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon2, HeartColor::Heart05),
+        1,
+        "Selected kanon should have +1 heart05"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon1, HeartColor::Heart05),
+        0,
+        "Unselected kanon should have 0 heart05"
+    );
+}
+
+/// 2 Kanon + 1 Keke, select the SECOND kanon from the prompt.
+#[test]
+fn tiny_stars_duplicate_kanon_with_keke_select_second() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let kanon1 = game.id("PL!SP-sd1-001-SD");
+    let kanon2 = game.new_id("PL!SP-sd1-001-SD");
+    let keke = game.id("PL!SP-sd1-002-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [kanon1, kanon2, keke];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    assert!(
+        game.has_pending_choice(),
+        "Duplicate kanon + keke: should prompt to select kanon"
+    );
+
+    // Select the second kanon (index 1)
+    game.select_indices(&[1]);
+
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectHeartColor") | Some("SelectHeartType") => {
+                panic!("Unexpected heart color choice")
+            }
+            _ => {
+                game.select_indices(&[0]);
+            }
+        }
+    }
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon2),
+        1,
+        "Selected kanon should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon2, HeartColor::Heart05),
+        1,
+        "Selected kanon should have +1 heart05"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon1),
+        0,
+        "Unselected kanon should have 0 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon1, HeartColor::Heart05),
+        0,
+        "Unselected kanon should have 0 heart05"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(keke),
+        1,
+        "Keke should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(keke, HeartColor::Heart01),
+        1,
+        "Keke should have +1 heart01"
+    );
+}
+
+/// 1 Kanon + 2 Keke, select the SECOND keke from the prompt.
+#[test]
+fn tiny_stars_duplicate_keke_select_second() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let tiny_stars = game.id("PL!SP-bp1-024-L");
+    let kanon = game.id("PL!SP-sd1-001-SD");
+    let keke1 = game.id("PL!SP-sd1-002-SD");
+    let keke2 = game.new_id("PL!SP-sd1-002-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [kanon, keke1, keke2];
+    fill_decks(&mut game, filler);
+    game.give_energy(5);
+
+    trigger_live_start(&mut game, tiny_stars);
+
+    // Kanon has 1 candidate → no choice. Keke has 2 → prompt.
+    assert!(
+        game.has_pending_choice(),
+        "Duplicate keke: should prompt to select one"
+    );
+
+    // Select the SECOND keke (index 1)
+    game.select_indices(&[1]);
+
+    while game.has_pending_choice() {
+        match game.pending_choice_type().as_deref() {
+            Some("SelectHeartColor") | Some("SelectHeartType") => {
+                panic!("Unexpected heart color choice")
+            }
+            _ => {
+                game.select_indices(&[0]);
+            }
+        }
+    }
+
+    assert_eq!(
+        game.state.mods.get_blade_modifier(kanon),
+        1,
+        "Kanon should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon, HeartColor::Heart05),
+        1,
+        "Kanon should have +1 heart05"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(keke2),
+        1,
+        "Selected keke should have +1 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(keke2, HeartColor::Heart01),
+        1,
+        "Selected keke should have +1 heart01"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(keke1),
+        0,
+        "Unselected keke should have 0 blade"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(keke1, HeartColor::Heart01),
+        0,
+        "Unselected keke should have 0 heart01"
+    );
 }
 
 /// PL!S-pb1-003-R (松浦果南) Q36: LiveSuccess timing.

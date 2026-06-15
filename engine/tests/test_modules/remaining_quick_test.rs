@@ -70,8 +70,8 @@ fn eternalize_q204_two_niko_hearts_reduced() {
             .get(&HeartColor::Heart00)
             .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
         assert!(
-            h00_val <= -3,
-            "Q204: heart00 reduced by at least 3 (got {})",
+            h00_val == -3,
+            "Q204: heart00 reduced by exactly 3 (got {})",
             h00_val
         );
     }
@@ -231,4 +231,58 @@ fn cara_tesoro_q203_live_start_fires() {
 
     let mod_val = game.state.mods.get_score_modifier(cara);
     assert_eq!(mod_val, 0, "Q203: Score modifier evaluated to 0");
+}
+
+/// Q218: Chika (PL!S-bp5-001-R+) ab#1 permanent reduces cost by 1 for no-ability
+/// member cards, and this applies even when playing via baton touch.
+#[test]
+fn chika_q218_no_ability_cost_reduced() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let chika = game.id("PL!S-bp5-001-R\u{ff0b}");
+    let filler = game.id("PL!-sd1-010-SD"); // no abilities, cost 4
+
+    // Get base costs
+    let chika_cost = game.db.get_card(chika).unwrap().cost.unwrap_or(0) as usize;
+    let filler_cost = game.db.get_card(filler).unwrap().cost.unwrap_or(0) as usize;
+    assert_eq!(
+        filler_cost, 4,
+        "Filler has cost 4 for meaningful reduction test"
+    );
+
+    // Play Chika to stage with excess energy, then play filler
+    game.state.player1.hand.cards.push(chika);
+    game.state.player1.stage.stage = [-1, -1, -1];
+    game.give_energy(chika_cost + filler_cost + 5);
+    game.play_to_stage(chika, rabuka_engine::zones::MemberArea::Center);
+
+    // Drain any debut choices
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // Now play filler (no abilities, cost 4). Chika's permanent should reduce cost by 1.
+    let energy_before = game.state.player1.energy_zone.active_energy_count;
+    game.state.player1.hand.cards.push(filler);
+    game.play_to_stage(filler, rabuka_engine::zones::MemberArea::LeftSide);
+    let energy_after = game.state.player1.energy_zone.active_energy_count;
+
+    // Cost reduced from 4 to 3 by Chika's permanent
+    let expected_consumed = filler_cost as i32 - 1; // 3
+    let actual_consumed = energy_before as i32 - energy_after as i32;
+    assert_eq!(
+        actual_consumed, expected_consumed,
+        "Q218: Filler cost reduced from {} to {} by Chika's permanent (consumed {})",
+        filler_cost, expected_consumed, actual_consumed
+    );
+    // Verify stage positions
+    assert_eq!(
+        game.state.player1.stage.stage[0], filler,
+        "Q218: Filler on LeftSide"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], chika,
+        "Q218: Chika at Center"
+    );
 }

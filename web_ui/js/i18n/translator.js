@@ -7,6 +7,7 @@ import { NAME_MAP } from './names.js';
 import { TriggerType, Opcodes as EffectType } from '../generated_constants.js';
 
 let translations = {};
+let abilityTranslations = {};
 let currentLanguage = 'jp';
 
 /**
@@ -24,6 +25,17 @@ export async function loadTranslations(lang = 'jp') {
         if (!response.ok) throw new Error(`Failed to load ${lang} translations`);
         const data = await response.json();
         translations[lang] = data;
+
+        if (lang === 'en') {
+            try {
+                const abResponse = await fetch(`./js/i18n/ability_translations.json`);
+                if (abResponse.ok) {
+                    abilityTranslations = await abResponse.json();
+                }
+            } catch (e) {
+                console.error('Ability translation load error:', e);
+            }
+        }
 
         // Backward compatibility globals
         if (typeof window !== 'undefined') {
@@ -57,9 +69,35 @@ if (typeof window !== 'undefined') {
  * @param {Object} params
  * @returns {string}
  */
+const UI_FALLBACKS = {
+    'choose_sign': 'Pick your move',
+    'rps_rock': 'Rock',
+    'rps_paper': 'Paper',
+    'rps_scissors': 'Scissors',
+    'system': 'System',
+    'mulligan': 'Mulligan',
+    'turn': 'Turn',
+    'phase': 'Phase',
+    'settings': 'Settings',
+    'close': 'Close',
+    'confirm_formation': 'Confirm Formation',
+    'act_ability': 'Activate Ability',
+    'event_play': 'Play',
+    'undo': 'Undo',
+    'redo': 'Redo',
+    'exit': 'Exit',
+    'skip': 'Skip',
+    'select': 'Select',
+    'player1': 'P1',
+    'player2': 'P2',
+    'my_board': 'My Board',
+    'opponent': 'Opponent',
+};
+
 export function t(key, params = {}) {
-    const langData = translations[currentLanguage] || translations.jp || {};
-    let text = (langData.ui && langData.ui[key]) ? langData.ui[key] : key;
+    if (!key) return '';
+    const langData = translations[currentLanguage] || translations.jp || translations.en || {};
+    let text = (langData.ui && langData.ui[key]) ? langData.ui[key] : UI_FALLBACKS[key] || key;
 
     for (const [k, v] of Object.entries(params)) {
         text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
@@ -286,6 +324,9 @@ class OpcodeParser {
 
 export function translateAbility(rawText, lang = 'jp') {
     if (!rawText) return '';
+    if (lang === 'en' && abilityTranslations[rawText]) {
+        return abilityTranslations[rawText];
+    }
     const tData = translations[lang] || translations.jp;
     if (!tData || Object.keys(tData).length === 0) return rawText;
 

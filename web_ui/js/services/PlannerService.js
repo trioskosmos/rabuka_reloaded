@@ -18,7 +18,7 @@ export const PlannerService = {
 
     shouldAutoFetchPlanner: () => {
         const state = State.data;
-        if (!state || (!State.roomCode && !State.gameHasStarted) || State.offlineMode || State.replayMode || State.hotseatMode) {
+        if (!state || (!State.roomCode && !State.gameHasStarted) || State.offlineMode || State.replayMode) {
             return false;
         }
 

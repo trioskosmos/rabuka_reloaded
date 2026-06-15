@@ -29,19 +29,38 @@ impl AbilityResolver {
             let optional = select_action.optional.unwrap_or(false);
 
             let card_db = &gs.card_database;
-            let filter = super::util::CardFilter::from_effect(select_action);
-            let has_filter = filter.card_type.is_some()
-                || !filter.heart_colors.is_empty()
-                || filter.cost_limit.is_some();
-            if has_filter {
-                let (matching, non_matching): (Vec<_>, Vec<_>) = gs
-                    .looked_at_cards
-                    .iter()
-                    .partition(|&&card_id| filter.matches(card_db, card_id, false));
-                gs.looked_at_cards = matching;
-                let player = gs.resolve_target_player_mut("self");
-                for &card_id in &non_matching {
-                    player.waitroom.add_card(card_id);
+            // Support OR filter via options — card matches if ANY option matches
+            if let Some(opts) = &select_action.options {
+                if !opts.is_empty() {
+                    let (matching, non_matching): (Vec<_>, Vec<_>) =
+                        gs.looked_at_cards.iter().partition(|&&card_id| {
+                            opts.iter().any(|opt| {
+                                let f = super::util::CardFilter::from_effect(opt);
+                                f.matches(card_db, card_id, false)
+                            })
+                        });
+                    gs.looked_at_cards = matching;
+                    let player = gs.resolve_target_player_mut("self");
+                    for &card_id in &non_matching {
+                        player.waitroom.add_card(card_id);
+                    }
+                }
+            } else {
+                let filter = super::util::CardFilter::from_effect(select_action);
+                let has_filter = filter.card_type.is_some()
+                    || !filter.heart_colors.is_empty()
+                    || filter.cost_limit.is_some()
+                    || filter.ability_filter.is_some();
+                if has_filter {
+                    let (matching, non_matching): (Vec<_>, Vec<_>) = gs
+                        .looked_at_cards
+                        .iter()
+                        .partition(|&&card_id| filter.matches(card_db, card_id, false));
+                    gs.looked_at_cards = matching;
+                    let player = gs.resolve_target_player_mut("self");
+                    for &card_id in &non_matching {
+                        player.waitroom.add_card(card_id);
+                    }
                 }
             }
 
@@ -519,19 +538,37 @@ impl AbilityResolver {
         let optional = effect.optional.unwrap_or(false);
 
         let card_db = &gs.card_database;
-        let filter = util::CardFilter::from_effect(effect);
-        let has_filter = filter.card_type.is_some()
-            || !filter.heart_colors.is_empty()
-            || filter.cost_limit.is_some();
-        if has_filter {
-            let (matching, non_matching): (Vec<_>, Vec<_>) = gs
-                .looked_at_cards
-                .iter()
-                .partition(|&&card_id| filter.matches(card_db, card_id, false));
-            gs.looked_at_cards = matching;
-            let player = gs.resolve_target_player_mut("self");
-            for &card_id in &non_matching {
-                player.waitroom.add_card(card_id);
+        // Support OR filter via options — card matches if ANY option matches
+        if let Some(opts) = &effect.options {
+            if !opts.is_empty() {
+                let (matching, non_matching): (Vec<_>, Vec<_>) =
+                    gs.looked_at_cards.iter().partition(|&&card_id| {
+                        opts.iter().any(|opt| {
+                            let f = util::CardFilter::from_effect(opt);
+                            f.matches(card_db, card_id, false)
+                        })
+                    });
+                gs.looked_at_cards = matching;
+                let player = gs.resolve_target_player_mut("self");
+                for &card_id in &non_matching {
+                    player.waitroom.add_card(card_id);
+                }
+            }
+        } else {
+            let filter = util::CardFilter::from_effect(effect);
+            let has_filter = filter.card_type.is_some()
+                || !filter.heart_colors.is_empty()
+                || filter.cost_limit.is_some();
+            if has_filter {
+                let (matching, non_matching): (Vec<_>, Vec<_>) = gs
+                    .looked_at_cards
+                    .iter()
+                    .partition(|&&card_id| filter.matches(card_db, card_id, false));
+                gs.looked_at_cards = matching;
+                let player = gs.resolve_target_player_mut("self");
+                for &card_id in &non_matching {
+                    player.waitroom.add_card(card_id);
+                }
             }
         }
 
@@ -620,39 +657,100 @@ impl AbilityResolver {
             ));
         }
 
-        let cards = match Zone::from_str(source) {
+        let fetch_all = effect.all.unwrap_or(false);
+        let cards: Vec<i16> = match Zone::from_str(source) {
             Some(Zone::Deck) | Some(Zone::DeckTop) => {
                 player.main_deck.draw_multiple(count as usize)
             }
-            Some(Zone::Hand) => player
-                .hand
-                .cards
-                .iter()
-                .take(count as usize)
-                .copied()
-                .collect(),
-            Some(Zone::Discard) | Some(Zone::Waitroom) => player
-                .waitroom
-                .cards
-                .iter()
-                .take(count as usize)
-                .copied()
-                .collect(),
-            Some(Zone::Stage) => player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .take(count as usize)
-                .copied()
-                .collect(),
-            Some(Zone::Energy) | Some(Zone::EnergyZone) => player
-                .energy_zone
-                .cards
-                .iter()
-                .take(count as usize)
-                .copied()
-                .collect(),
+            Some(Zone::Hand) => {
+                if fetch_all {
+                    player.hand.cards.iter().copied().collect::<Vec<_>>()
+                } else {
+                    player
+                        .hand
+                        .cards
+                        .iter()
+                        .take(count as usize)
+                        .copied()
+                        .collect()
+                }
+            }
+            Some(Zone::Discard) | Some(Zone::Waitroom) => {
+                if fetch_all {
+                    player.waitroom.cards.iter().copied().collect::<Vec<_>>()
+                } else {
+                    player
+                        .waitroom
+                        .cards
+                        .iter()
+                        .take(count as usize)
+                        .copied()
+                        .collect()
+                }
+            }
+            Some(Zone::Stage) => {
+                let sc: Vec<i16> = player
+                    .stage
+                    .stage
+                    .iter()
+                    .filter(|&&id| id != -1)
+                    .copied()
+                    .collect();
+                if fetch_all {
+                    sc
+                } else {
+                    sc.into_iter().take(count as usize).collect()
+                }
+            }
+            Some(Zone::Energy) | Some(Zone::EnergyZone) => {
+                if fetch_all {
+                    player.energy_zone.cards.iter().copied().collect::<Vec<_>>()
+                } else {
+                    player
+                        .energy_zone
+                        .cards
+                        .iter()
+                        .take(count as usize)
+                        .copied()
+                        .collect()
+                }
+            }
+            Some(Zone::LiveCardZone) => {
+                if fetch_all {
+                    player
+                        .live_card_zone
+                        .cards
+                        .iter()
+                        .copied()
+                        .collect::<Vec<_>>()
+                } else {
+                    player
+                        .live_card_zone
+                        .cards
+                        .iter()
+                        .take(count as usize)
+                        .copied()
+                        .collect()
+                }
+            }
+            Some(Zone::SuccessLiveZone) => {
+                if fetch_all {
+                    player
+                        .success_live_card_zone
+                        .cards
+                        .iter()
+                        .copied()
+                        .collect::<Vec<_>>()
+                } else {
+                    player
+                        .success_live_card_zone
+                        .cards
+                        .iter()
+                        .take(count as usize)
+                        .copied()
+                        .collect()
+                }
+            }
             _ => vec![],
         };
 

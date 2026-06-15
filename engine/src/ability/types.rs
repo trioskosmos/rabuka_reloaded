@@ -356,6 +356,10 @@ impl Choice {
                 original_blade_limit: None,
                 original_blade_operator: None,
                 exclude_cards: None,
+                ability_filter: None,
+                ability_filter_triggers: None,
+                or_ability_filters: None,
+                card_property: None,
             },
             _ => crate::ability::util::CardFilter::default(),
         }

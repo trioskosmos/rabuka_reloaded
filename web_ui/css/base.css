@@ -50,7 +50,7 @@
     --font-size-xxl: clamp(1.6rem, 1.4rem + 1vw, 2.2rem);
 
     /* --- Sizing - Responsive Card System --- */
-    --card-h: clamp(120px, 25vh, 260px);
+    --card-h: clamp(120px, 25dvh, 260px);
     --card-w: calc(var(--card-h) * (512 / 720));
     --card-h-mini: calc(var(--card-h) * 0.6);
     --card-w-mini: calc(var(--card-w) * 0.6);
@@ -120,7 +120,7 @@ body {
     background: var(--bg-primary);
     color: var(--text);
     overflow: hidden;
-    height: 100vh;
+    height: 100dvh;
 }
 
 /* Scrollbars */
@@ -164,10 +164,3 @@ body {
 /* All component selectors are implicitly scoped by HTML structure hierarchy,
    which is fine since the app uses semantic class names and explicit
    descendant selectors. No additional prefixing needed. */
-
-@import './cards.css';
-@import './components.css';
-@import './modals.css';
-@import './performance.css';
-@import './log_styles.css';
-@import './deck_validation.css';

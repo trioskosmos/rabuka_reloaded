@@ -472,3 +472,161 @@ fn test_success_live_zone_per_unit_heart() {
         );
     }
 }
+
+/// Test Honoka activation ability (`PL!-bp6-010-N`):
+/// "起動: このメンバーをステージから控え室に置く：相手のステージにいるコスト4以下のメンバー1人をウェイトにする"
+/// Verifies self_cost (move to waitroom) + change_state choice with filtered_indices.
+#[test]
+fn test_honoka_change_state_with_valid_targets() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db.clone());
+
+    let honoka = g.id("PL!-bp6-010-N");
+    let target1 = g.id("PL!-sd1-010-SD"); // cost 4
+    let target2 = g.id("PL!-sd1-013-SD"); // cost 4
+
+    // Opponent has 2 valid targets (cost ≤ 4)
+    g.state.player2.stage.set_area(MemberArea::Center, target1);
+    g.state.player2.stage.set_area(MemberArea::LeftSide, target2);
+
+    // Player1 has Honoka on stage + enough energy
+    g.state.player1.hand.cards.push(honoka);
+    g.give_energy(10);
+    g.play_to_stage(honoka, MemberArea::RightSide);
+
+    // Activate Honoka's ability
+    g.activate_ability(honoka);
+
+    // Self-cost should have moved Honoka to waitroom
+    let p1_right = g.state.player1.stage.get_area(MemberArea::RightSide);
+    assert_eq!(p1_right, None, "Honoka should have left stage (self_cost)");
+    assert!(
+        g.state.player1.waitroom.cards.contains(&honoka),
+        "Honoka should be in waitroom"
+    );
+
+    // Effect: change_state choice with 2 valid targets, count=1
+    assert!(
+        g.has_pending_choice(),
+        "Should prompt for change_state target selection"
+    );
+
+    // Select target1 at Center (index 1: LeftSide=0, Center=1, RightSide=2)
+    g.select_indices(&[1]);
+
+    // Verify target1 is still on stage but in wait state
+    let p2_center = g.state.player2.stage.get_area(MemberArea::Center);
+    assert_eq!(p2_center, Some(target1), "Target should remain on stage");
+
+    let target1_ori = g.state.mods.get_orientation_modifier(target1);
+    assert_eq!(
+        target1_ori.map(|s| s.as_str()),
+        Some("wait"),
+        "Target should be in wait state"
+    );
+
+    // Verify target2 is unchanged
+    let target2_ori = g.state.mods.get_orientation_modifier(target2);
+    assert_eq!(
+        target2_ori, None,
+        "Unselected target should have no orientation modifier"
+    );
+}
+
+/// Test Dia debut ability (`PL!S-bp5-004-R`) option 0 with valid Aqours targets:
+/// "登場: 以下から1つを選ぶ。
+///  ・自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、ブレードを得る。"
+/// Verifies gain_resource with target_count + filtered_indices creates a SelectCard choice.
+#[test]
+fn test_dia_gain_resource_choice() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db.clone());
+
+    let dia = g.id("PL!S-bp5-004-R");
+    let aqours1 = g.id("PL!S-sd1-002-SD"); // Riko, unit=GuiltyKiss, series=サンシャイン→Aqours
+    let aqours2 = g.id("PL!S-sd1-003-SD"); // Kanan, unit=AZALEA, series=サンシャイン→Aqours
+
+    // Put 2 Aqours members on player1 stage
+    g.state.player1.stage.set_area(MemberArea::Center, aqours1);
+    g.state.player1.stage.set_area(MemberArea::LeftSide, aqours2);
+
+    // Put Dia in hand
+    g.state.player1.hand.cards.push(dia);
+    g.give_energy(5); // Dia costs 2
+
+    // Play Dia to stage (triggers debut)
+    g.play_to_stage(dia, MemberArea::RightSide);
+
+    // Debut: choice with 2 options
+    assert!(
+        g.has_pending_choice(),
+        "Dia debut should show choice with 2 options"
+    );
+
+    // Select option 0: Aqours blade
+    g.select_option(0);
+
+    // With 2 valid targets (aqours1, aqours2) and target_count=1,
+    // should create a SelectCard sub-choice
+    assert!(
+        g.has_pending_choice(),
+        "Should prompt for Aqours member selection"
+    );
+
+    // Select aqours1 at Center (index 1: LeftSide=0, Center=1, RightSide=2)
+    g.select_indices(&[1]);
+
+    // Verify aqours1 got blade modifier
+    let aqours1_blade = g.state.mods.get_blade_modifier(aqours1);
+    assert!(
+        aqours1_blade > 0,
+        "Selected Aqours member should have blade modifier (got {})",
+        aqours1_blade
+    );
+
+    // Verify aqours2 did NOT get blade modifier
+    let aqours2_blade = g.state.mods.get_blade_modifier(aqours2);
+    assert_eq!(
+        aqours2_blade, 0,
+        "Unselected Aqours member should NOT have blade modifier"
+    );
+}
+
+/// Test Dia debut ability option 0 with NO valid targets (only Dia herself on stage).
+/// Should end silently without creating a further selection choice.
+#[test]
+fn test_dia_gain_resource_no_targets() {
+    let db = load_real_database();
+    let mut g = TestGame::new(db.clone());
+
+    let dia = g.id("PL!S-bp5-004-R");
+
+    // Only Dia on stage (no other Aqours members)
+    g.state.player1.hand.cards.push(dia);
+    g.give_energy(5);
+
+    g.play_to_stage(dia, MemberArea::Center);
+
+    // Debut: choice with 2 options
+    assert!(
+        g.has_pending_choice(),
+        "Dia debut should show choice with 2 options"
+    );
+
+    // Select option 0: Aqours blade
+    g.select_option(0);
+
+    // No valid targets (only Dia, excluded by exclude_self)
+    // Should end silently without a further choice
+    assert!(
+        !g.has_pending_choice(),
+        "Should NOT prompt for target selection when no valid targets"
+    );
+
+    // Verify Dia herself does NOT have blade modifier (excluded by exclude_self)
+    let dia_blade = g.state.mods.get_blade_modifier(dia);
+    assert_eq!(
+        dia_blade, 0,
+        "Dia should not receive blade (excluded by exclude_self)"
+    );
+}

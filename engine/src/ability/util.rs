@@ -28,6 +28,39 @@ pub fn find_modify_cost<'a>(
     None
 }
 
+fn play_cost_reduction_matches(
+    effect: &crate::card::AbilityEffect,
+    card_id: i16,
+    card: &crate::card::Card,
+    card_db: &CardDatabase,
+) -> bool {
+    let group_matches = effect
+        .group_names
+        .as_ref()
+        .and_then(|gn| {
+            gn.first()
+                .map(|g| card_matches_group_str(card_db, card_id, Some(g)))
+        })
+        .unwrap_or(true);
+    if !group_matches {
+        return false;
+    }
+    if let Some(limit) = effect.cost_limit {
+        if card.cost != Some(limit) {
+            return false;
+        }
+    }
+    if !cost_threshold_met(card, effect) {
+        return false;
+    }
+    if let Some(ref ct) = effect.card_type {
+        if ct != "member_card" && ct != "card" && ct != "member" {
+            return false;
+        }
+    }
+    true
+}
+
 pub fn calculate_play_cost_reduction(
     stage: &crate::core::zones::Stage,
     success_live_cards: &[i16],
@@ -44,6 +77,9 @@ pub fn calculate_play_cost_reduction(
     for ability in &card.abilities {
         if let Some(ref effect) = ability.effect {
             if let Some(mod_cost) = find_modify_cost(effect, Some("subtract"), Some("hand")) {
+                if !play_cost_reduction_matches(mod_cost, card_id, card, card_db) {
+                    continue;
+                }
                 if mod_cost.per_unit.unwrap_or(false) {
                     let per_unit = mod_cost.per_unit_count.unwrap_or(1) as usize;
                     cost_reduction = (hand_count.saturating_sub(1) * per_unit) as u32;
@@ -168,10 +204,9 @@ fn cost_threshold_met(card: &crate::card::Card, effect: &crate::card::AbilityEff
                 return false;
             }
         }
-        (Some(threshold), None)
-            if card.cost != Some(threshold) => {
-                return false;
-            }
+        (Some(threshold), None) if card.cost != Some(threshold) => {
+            return false;
+        }
         _ => {}
     }
     true
@@ -266,7 +301,11 @@ fn debug_group_match(card_db: &CardDatabase, card_id: i16, group_name: Option<&s
     };
     log::debug!(
         "[GROUP_MATCH] card={}[{}] group={:?} result={} {}",
-        card_name, card_id, group_name, result, checks
+        card_name,
+        card_id,
+        group_name,
+        result,
+        checks
     );
 }
 
@@ -295,10 +334,10 @@ pub fn card_matches_group_str(
                 || c.group == g
                 // Check name fragments for multi-name cards (e.g. "にこ" in "矢澤にこ")
                 || card_db.get_card_names(card_id).iter().any(|n| n.contains(&gn) || ((n.contains('\u{FF01}') || n.contains('\u{00B5}')) && norm(n).contains(&gn)))
-                // For multi-series cards (containing \n), don't match individual series
-                // Multi-name cards' individuals each have their own series but the card
-                // as a whole should not match group conditions (Q212)
-                || (!c.series.contains('\n') && card_series_matches_group(&c.series, &gn))
+                // Multi-name cards (e.g. 渡辺曜&鬼塚夏美&大沢瑠璃乃) should match
+                // group names through any of their constituent series (Q105).
+                // Example: LL-bp2-001-R+ matches "Aqours" via ラブライブ！サンシャイン!!
+                || card_series_matches_group(&c.series, &gn)
                 // Constant `set_card_identity` ("treated as") abilities give the
                 // card additional group memberships in all zones. Examples:
                 //   AURORA FLOWER (PL!HS-bp5-018-L) is "スリーズブーケ" /
@@ -321,18 +360,23 @@ pub fn card_matches_group_str(
 }
 
 fn card_series_matches_group(series: &str, group: &str) -> bool {
+    if group == "μ's" {
+        // For μ's, check each series line individually to handle multi-series
+        // joint cards (e.g. LL-bp3-001-R+ 園田海未&津島善子&天王寺璃奈 whose
+        // series includes a bare "ラブライブ！" line among other group lines).
+        return series.split('\n').any(|line| {
+            line.contains("ラブライブ！")
+                && !line.contains("サンシャイン")
+                && !line.contains("虹ヶ咲")
+                && !line.contains("スーパースター")
+                && !line.contains("蓮ノ空")
+        });
+    }
     match group {
         "Aqours" => series.contains("サンシャイン"),
         "虹ヶ咲" => series.contains("虹ヶ咲"),
         "Liella!" => series.contains("スーパースター"),
         "蓮ノ空" => series.contains("蓮ノ空"),
-        "μ's" => {
-            series.contains("ラブライブ！")
-                && !series.contains("サンシャイン")
-                && !series.contains("虹ヶ咲")
-                && !series.contains("スーパースター")
-                && !series.contains("蓮ノ空")
-        }
         _ => false,
     }
 }
@@ -462,6 +506,14 @@ pub struct CardFilter<'a> {
     pub original_blade_operator: Option<&'a str>,
     /// Card IDs to exclude from matching (e.g. previously selected by a prior sequential action)
     pub exclude_cards: Option<&'a [i16]>,
+    /// Ability filter: "no_ability" / "has_ability" / "no_ability_type"
+    pub ability_filter: Option<&'a str>,
+    /// Trigger types to check when ability_filter is "no_ability_type"
+    pub ability_filter_triggers: Option<&'a [String]>,
+    /// OR'd ability filter branches — card passes if ANY branch matches.
+    pub or_ability_filters: Option<&'a [crate::card::AbilityFilterBranch]>,
+    /// Card property filter (e.g. "has_blade_heart")
+    pub card_property: Option<&'a str>,
 }
 
 impl<'a> CardFilter<'a> {
@@ -567,10 +619,9 @@ impl<'a> CardFilter<'a> {
                 return false;
             }
         }
-        if !self.heart_colors.is_empty()
-            && !card_matches_heart_colors(db, id, self.heart_colors) {
-                return false;
-            }
+        if !self.heart_colors.is_empty() && !card_matches_heart_colors(db, id, self.heart_colors) {
+            return false;
+        }
         if let Some(need_total) = self.need_heart_total {
             if let Some(color_str) = self.need_heart_color {
                 // Per-color check (e.g. heart06 >= 3)
@@ -615,6 +666,120 @@ impl<'a> CardFilter<'a> {
             if let Some(op) = self.cost_total_operator {
                 let card_cost = db.get_card(id).and_then(|c| c.cost).unwrap_or(99);
                 if !compare_counts(Some(op), card_cost, ct) {
+                    return false;
+                }
+            }
+        }
+        // ability_filter: filter by presence/absence of abilities or trigger types
+        if let Some(af) = self.ability_filter {
+            if let Some(card) = db.get_card(id) {
+                let has_ability = !card.abilities.is_empty();
+                match af {
+                    "no_ability" => {
+                        if has_ability {
+                            return false;
+                        }
+                    }
+                    "has_ability" => {
+                        if !has_ability {
+                            return false;
+                        }
+                    }
+                    "no_ability_type" => {
+                        if let Some(excluded) = self.ability_filter_triggers {
+                            if !excluded.is_empty() {
+                                // Card passes only if it has NO ability matching any excluded trigger
+                                if card.abilities.iter().any(|a| {
+                                    a.triggers.as_ref().is_some_and(|t| {
+                                        excluded.iter().any(|et| t.starts_with(et.as_str()))
+                                    })
+                                }) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    "has_ability_type" => {
+                        if let Some(included) = self.ability_filter_triggers {
+                            if !included.is_empty() {
+                                // Card passes if it has ANY ability matching included triggers
+                                if !card.abilities.iter().any(|a| {
+                                    a.triggers.as_ref().is_some_and(|t| {
+                                        included.iter().any(|it| t.starts_with(it.as_str()))
+                                    })
+                                }) {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        // or_ability_filters: card passes if ANY branch matches.
+        // When present, the single ability_filter above (if any) is ignored
+        // — the OR branches define the complete filter.
+        if let Some(branches) = self.or_ability_filters {
+            if !branches.is_empty() {
+                if let Some(card) = db.get_card(id) {
+                    let passes_or = branches.iter().any(|branch| {
+                        let af = branch.ability_filter.as_deref().unwrap_or("");
+                        let has_ability = !card.abilities.is_empty();
+                        match af {
+                            "no_ability" => !has_ability,
+                            "has_ability" => has_ability,
+                            "no_ability_type" => {
+                                if let Some(excluded) = &branch.ability_filter_triggers {
+                                    if !excluded.is_empty() {
+                                        // Card passes if it has NO ability matching excluded triggers
+                                        !card.abilities.iter().any(|a| {
+                                            a.triggers.as_ref().is_some_and(|t| {
+                                                excluded.iter().any(|et| t.starts_with(et))
+                                            })
+                                        })
+                                    } else {
+                                        has_ability
+                                    }
+                                } else {
+                                    has_ability
+                                }
+                            }
+                            "has_ability_type" => {
+                                if let Some(included) = &branch.ability_filter_triggers {
+                                    if !included.is_empty() {
+                                        // Card passes if it has ANY ability matching included triggers
+                                        card.abilities.iter().any(|a| {
+                                            a.triggers.as_ref().is_some_and(|t| {
+                                                included.iter().any(|it| t.starts_with(it))
+                                            })
+                                        })
+                                    } else {
+                                        has_ability
+                                    }
+                                } else {
+                                    has_ability
+                                }
+                            }
+                            _ => true,
+                        }
+                    });
+                    if !passes_or {
+                        return false;
+                    }
+                }
+            }
+        }
+        // card_property filter (e.g. "has_blade_heart")
+        if let Some(prop) = self.card_property {
+            match prop {
+                "has_blade_heart" => {
+                    if !db.get_card(id).is_some_and(|c| c.has_blade_heart()) {
+                        return false;
+                    }
+                }
+                _ => {
+                    // Unknown property — reject since we can't verify it
                     return false;
                 }
             }
@@ -672,6 +837,10 @@ impl<'a> CardFilter<'a> {
             original_blade_limit: effect.blade_limit,
             original_blade_operator: effect.blade_limit_operator.as_deref(),
             exclude_cards: None,
+            ability_filter: effect.ability_filter.as_deref(),
+            ability_filter_triggers: effect.ability_filter_triggers.as_ref().map(|v| &**v),
+            or_ability_filters: effect.or_ability_filters.as_ref().map(|v| &**v),
+            card_property: effect.card_property.as_deref(),
         }
     }
 
@@ -708,6 +877,10 @@ impl<'a> CardFilter<'a> {
                 original_blade_limit: None,
                 original_blade_operator: None,
                 exclude_cards: None,
+                ability_filter: None,
+                ability_filter_triggers: None,
+                or_ability_filters: None,
+                card_property: None,
             },
             _ => CardFilter::default(),
         }
@@ -715,9 +888,8 @@ impl<'a> CardFilter<'a> {
 }
 
 fn card_matches_name_fragments(db: &CardDatabase, id: i16, fragments: &[String]) -> bool {
-    db.get_card(id).is_some_and(|card| {
-        fragments.iter().all(|f| card.name.contains(f.as_str()))
-    })
+    db.get_card(id)
+        .is_some_and(|card| fragments.iter().all(|f| card.name.contains(f.as_str())))
 }
 
 // ============== FILTER CONSTRUCTION HELPERS ==============
@@ -818,6 +990,22 @@ pub fn matching_ids_filtered(
     let mut results = matching_ids(cards, db, &filter, skip_empty);
     if let Some(d) = distinct {
         results = apply_distinct_filter(&results, Some(d), db);
+        // After distinct dedup, also exclude results whose names match any
+        // excluded card's name (e.g. "different name from that member").
+        if let Some(ids) = exclude_ids {
+            if !ids.is_empty() {
+                let excluded_names: std::collections::HashSet<String> = ids
+                    .iter()
+                    .filter_map(|id| db.get_card(*id).map(|c| c.name.clone()))
+                    .collect();
+                if !excluded_names.is_empty() {
+                    results.retain(|id| {
+                        db.get_card(*id)
+                            .map_or(true, |c| !excluded_names.contains(&c.name))
+                    });
+                }
+            }
+        }
     }
     if let Some(tc) = target_count {
         results.truncate(tc as usize);

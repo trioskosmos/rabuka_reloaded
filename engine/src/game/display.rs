@@ -20,6 +20,8 @@ pub struct CardDisplay {
     pub id: i16,
     pub ability_text: Option<String>,
     #[serde(default)]
+    pub hidden: bool,
+    #[serde(default)]
     pub bonus_blade: i32,
     #[serde(default)]
     pub bonus_hearts: Vec<i32>,
@@ -111,6 +113,10 @@ pub struct GameStateDisplay {
     pub game_over: bool,
     #[serde(default)]
     pub winner: Option<String>,
+    #[serde(default)]
+    pub waiting_for_opponent: bool,
+    #[serde(default)]
+    pub mode: String,
 }
 
 pub fn card_to_display(
@@ -135,6 +141,7 @@ pub fn card_to_display(
                         crate::card::HeartColor::BAll => "b_all",
                         crate::card::HeartColor::Draw => "draw",
                         crate::card::HeartColor::Score => "score",
+                        crate::card::HeartColor::All => "all",
                     };
                     (color_str.to_string(), *count)
                 })
@@ -159,6 +166,7 @@ pub fn card_to_display(
             bonus_score: 0,
             bonus_cost: 0,
             heart_transform: None,
+            hidden: false,
         }
     })
 }
@@ -189,12 +197,13 @@ pub fn card_to_display_full(
                         crate::card::HeartColor::BAll => "b_all",
                         crate::card::HeartColor::Draw => "draw",
                         crate::card::HeartColor::Score => "score",
+                        crate::card::HeartColor::All => "all",
                     };
                     (color_str.to_string(), *count)
                 })
                 .collect()
         });
-        let mut bonus_hearts = vec![0i32; 7];
+        let mut bonus_hearts = vec![0i32; 8];
         for (color, &val) in heart_modifiers {
             let idx = match color {
                 crate::card::HeartColor::Heart00 => 0,
@@ -204,9 +213,10 @@ pub fn card_to_display_full(
                 crate::card::HeartColor::Heart04 => 4,
                 crate::card::HeartColor::Heart05 => 5,
                 crate::card::HeartColor::Heart06 => 6,
+                crate::card::HeartColor::All => 7,
                 _ => continue,
             };
-            bonus_hearts[idx] = val;
+            bonus_hearts[idx] += val;
         }
         let transform_str = heart_transform.map(|hc| {
             let s = match hc {
@@ -217,6 +227,7 @@ pub fn card_to_display_full(
                 crate::card::HeartColor::Heart04 => "heart04",
                 crate::card::HeartColor::Heart05 => "heart05",
                 crate::card::HeartColor::Heart06 => "heart06",
+                crate::card::HeartColor::All => "all",
                 _ => "heart00",
             };
             s.to_string()
@@ -240,6 +251,7 @@ pub fn card_to_display_full(
             bonus_score: score_modifier,
             bonus_cost: cost_modifier,
             heart_transform: transform_str,
+            hidden: false,
         }
     })
 }
@@ -383,7 +395,7 @@ pub fn player_to_display(
     let waitroom_display = zone_to_display(&player.waitroom.cards, card_db);
 
     // Calculate total hearts including modifiers (7 elements: heart00-heart06)
-    let mut total_hearts = vec![0u32; 7];
+    let mut total_hearts = vec![0u32; 8];
 
     // Add base hearts from stage cards
     for &card_id in &player.stage.stage {
@@ -399,6 +411,7 @@ pub fn player_to_display(
                             crate::card::HeartColor::Heart04 => 4,
                             crate::card::HeartColor::Heart05 => 5,
                             crate::card::HeartColor::Heart06 => 6,
+                            crate::card::HeartColor::All => 7,
                             _ => continue,
                         };
                         total_hearts[index] += count;
@@ -421,6 +434,8 @@ pub fn player_to_display(
                         crate::card::HeartColor::Heart04 => 4,
                         crate::card::HeartColor::Heart05 => 5,
                         crate::card::HeartColor::Heart06 => 6,
+                            crate::card::HeartColor::All => 7,
+
                         _ => continue,
                     };
                     total_hearts[index] = (total_hearts[index] as i32 + modifier).max(0) as u32;
@@ -473,7 +488,7 @@ pub fn player_to_display(
             || player.success_live_card_zone.cards.contains(&cid)
         {
             if let Some(card) = card_db.get_card(cid) {
-                let mut arr = vec![0i32; 7];
+                let mut arr = vec![0i32; 8];
                 for (color, &val) in colors {
                     let idx = match color {
                         crate::card::HeartColor::Heart00 => 0,
@@ -754,6 +769,8 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         performance_results: perf_results,
         performance_history: perf_history,
         game_over: game_state.game_ended,
+        waiting_for_opponent: false,
+        mode: String::new(),
         winner: match game_state.game_result {
             crate::types::GameResult::FirstAttackerWins => {
                 Some(game_state.first_attacker().id.clone())

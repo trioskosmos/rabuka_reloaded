@@ -29,7 +29,13 @@ impl AbilityResolver {
         let state_change = state_change.to_string();
         let target = target.to_string();
         let card_type_filter = card_type.map(|s| s.to_string());
-        let group_filter = group_name.map(|s| s.to_string());
+        // When targeting opponent, group_names is trigger-level metadata
+        // (from the wrapper's condition), not an effect filter.
+        let group_filter = if target == "opponent" {
+            None
+        } else {
+            group_name.map(|s| s.to_string())
+        };
 
         if optional {
             // Only offer the optional choice if there's at least one valid target.
@@ -196,6 +202,11 @@ impl AbilityResolver {
                         // Only members currently in active state (no wait modifier).
                         let ori = gs.mods.get_orientation_modifier(*card_id);
                         ori.is_none_or(|o| o != "wait")
+                    } else if state_change == "wait" {
+                        // For "wait" state change, exclude cards already in wait state
+                        // so previously waited targets don't remain selectable.
+                        let ori = gs.mods.get_orientation_modifier(*card_id);
+                        ori.is_none_or(|o| o != "wait")
                     } else {
                         true
                     };
@@ -206,6 +217,22 @@ impl AbilityResolver {
             }
 
             if candidates.is_empty() {
+                let has_energy_in_text =
+                    effect.text.contains("エネルギー") || effect.text.contains("energy");
+                if has_energy_in_text {
+                    if let Err(e) = self.execute_energy_state_change(
+                        gs,
+                        effect,
+                        &state_change,
+                        &target,
+                        count,
+                        max,
+                        Some("energy_card"),
+                        None,
+                    ) {
+                        log::debug!("Failed to change energy state: {}", e);
+                    }
+                }
                 return Ok(());
             }
 
@@ -337,6 +364,23 @@ impl AbilityResolver {
             gs.trigger_auto_abilities_for_player(&p1);
             gs.trigger_auto_abilities_for_player(&p2);
 
+            let has_energy_in_text =
+                effect.text.contains("エネルギー") || effect.text.contains("energy");
+            if has_energy_in_text {
+                if let Err(e) = self.execute_energy_state_change(
+                    gs,
+                    effect,
+                    &state_change,
+                    &target,
+                    count,
+                    max,
+                    Some("energy_card"),
+                    None,
+                ) {
+                    log::debug!("Failed to change energy state: {}", e);
+                }
+            }
+
             return Ok(());
         }
 
@@ -398,8 +442,15 @@ impl AbilityResolver {
             let player = gs.resolve_target_player_mut(target);
 
             let mut filter = effect.filter_subset();
+            if card_type_filter == Some("energy_card") {
+                filter.group = None;
+                filter.characters = None;
+                filter.cost_limit = None;
+                filter.cost_operator = None;
+            } else {
+                filter.group = group_filter;
+            }
             filter.card_type = card_type_filter;
-            filter.group = group_filter;
             filter.exclude_self = exclude_self_id;
             let valid_indices =
                 util::matching_indices(&player.energy_zone.cards, &card_db, &filter, false);
@@ -421,6 +472,17 @@ impl AbilityResolver {
                     capped
                 );
                 capped
+            } else if count == 0 {
+                let val = match state_change {
+                    "active" | "アクティブ" => player
+                        .energy_zone
+                        .cards
+                        .len()
+                        .saturating_sub(player.energy_zone.active_energy_count),
+                    _ => player.energy_zone.active_energy_count,
+                };
+                log::debug!("[ENERGY] count=0 (all): effective={}", val);
+                val as u32
             } else {
                 log::debug!("[ENERGY] max=false: count={} effectve={}", count, count);
                 count
@@ -478,6 +540,11 @@ impl AbilityResolver {
             let player = gs.resolve_target_player(target);
             let mut result = Vec::new();
             let mut active_count = 0u32;
+            let group_filter_for_active = if card_type_filter == Some("energy_card") {
+                None
+            } else {
+                group_filter
+            };
             for i in 0..player.energy_zone.cards.len() {
                 if active_count >= deactivate_count {
                     break;
@@ -485,7 +552,7 @@ impl AbilityResolver {
                 if let Some(&card_id) = player.energy_zone.cards.get(i) {
                     let matches_type = card_type_filter
                         .is_none_or(|ct| util::card_matches_type(&card_db, card_id, Some(ct)));
-                    let matches_grp = group_filter
+                    let matches_grp = group_filter_for_active
                         .is_none_or(|gf| util::card_matches_group_str(&card_db, card_id, Some(gf)));
                     if matches_type && matches_grp {
                         result.push(card_id);
@@ -627,8 +694,15 @@ impl AbilityResolver {
         gs.rule_log
             .push(format!("{} {}: ハート種類を{}に設定", pp, act_name, ht));
         let heart_type = heart_type.unwrap_or("heart00");
-        // Target only the activating card (このメンバー = this member)
-        let card_id = gs.activating_card.unwrap_or(-1);
+        // Use selected_target from self.selected_cards if available (member-targeting
+        // abilities like PL!HS-bp5-021-L), otherwise fall back to activating_card
+        // (self-targeting abilities like Kanan PL!S-pb1-003-R).
+        let card_id = self
+            .selected_cards
+            .first()
+            .copied()
+            .or(gs.activating_card)
+            .unwrap_or(-1);
         if card_id == -1 {
             return;
         }

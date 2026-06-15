@@ -52,8 +52,10 @@ function hasActiveEffects(state, p0, p1) {
 
 export const ViewState = {
     buildRenderModel(state, uiState, validTargets) {
-        const perspectivePlayer = uiState.hotseatMode && state.active_player !== undefined
-            ? state.active_player
+        const activePlayerNum = state.active_player === 'player2' || state.active_player === '1' || state.active_player === 1 ? 1 : 0;
+        const gameMode = state.mode || State.data?.mode;
+        const perspectivePlayer = gameMode !== 'pvp' && state.active_player !== undefined
+            ? activePlayerNum
             : uiState.perspectivePlayer;
 
         // Rust backend format: state.player1, state.player2

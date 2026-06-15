@@ -76,24 +76,22 @@ export const InteractionAdapter = {
                 }
             }
 
-            // Live zone actions
+            // Live zone actions — check both players, use the one with cards
             if (actionType.includes('Live') || actionType.includes('Performance')) {
-                const liveCards = state.player1 ? state.player1.live_zone.cards : [];
-                if (liveCards.length > 0) {
-                    liveCards.forEach((_, idx) => {
-                        valid.myLive[idx] = action;
-                    });
-                }
+                const pLive = state.player1?.live_zone?.cards?.length ? state.player1.live_zone.cards :
+                             state.player2?.live_zone?.cards?.length ? state.player2.live_zone.cards : [];
+                pLive.forEach((_, idx) => {
+                    valid.myLive[idx] = action;
+                });
             }
 
-            // Energy zone actions
+            // Energy zone actions — check both players
             if (actionType.includes('Energy') || actionType.includes('Activate')) {
-                const energyCards = state.player1 ? state.player1.energy.cards : [];
-                if (energyCards.length > 0) {
-                    energyCards.forEach((_, idx) => {
-                        valid.myEnergy[idx] = action;
-                    });
-                }
+                const pEnergy = state.player1?.energy?.cards?.length ? state.player1.energy.cards :
+                               state.player2?.energy?.cards?.length ? state.player2.energy.cards : [];
+                pEnergy.forEach((_, idx) => {
+                    valid.myEnergy[idx] = action;
+                });
             }
         });
 

@@ -215,3 +215,199 @@ fn performance_pipeline_fail_when_hearts_insufficient() {
         "No winner when both players have no cards in zone (8.4.3.1)"
     );
 }
+
+// ── Heart00 (Any) passes check: multiple cards competing ───────────
+// Two live cards each needing Heart00=4 but only 4 total hearts available.
+// The pre-check passes (global pool seems sufficient) but per-card
+// allocation leaves the second card short. The passes check MUST fail
+// the second card (old bug: it only checked indices 1-6, never index 0).
+
+#[test]
+fn heart00_passes_check_fails_when_insufficient() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live_a = game.id("PL!N-sd1-025-SD"); // needs heart0=4 (any 4 hearts)
+    let live_b = game.new_id("PL!N-sd1-025-SD"); // same card, different copy
+    let member = game.id("PL!-sd1-008-SD"); // heart01=1, heart03=1, blade=0 (no yell)
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.hand.cards.clear();
+    game.state.player1.waitroom.cards.clear();
+    game.state.player1.success_live_card_zone.cards.clear();
+    game.state.player1.energy_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    game.state.player2.hand.cards.clear();
+    game.state.player2.waitroom.cards.clear();
+    game.state.player2.success_live_card_zone.cards.clear();
+    game.state.player2.energy_deck.cards.clear();
+
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(member);
+        game.state.player2.main_deck.cards.push(member);
+    }
+
+    // Stage: 2 members providing 4 total specific hearts
+    // Pool: heart01=2, heart03=2 (4 specific hearts, no yell since blade=0)
+    game.state.player1.stage.stage = [member, member, -1];
+
+    // Put 2 live cards in hand
+    game.state.player1.hand.cards.push(live_a);
+    game.state.player1.hand.cards.push(live_b);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live_a);
+    game.set_live_card(live_b);
+    game.pass();
+    game.pass();
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    game.pass();
+    game.pass();
+
+    let perf = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|s| s.player_id == "p1")
+        .expect("P1 should have a performance snapshot");
+
+    // Second live card should fail — its Heart00 requirement can't be met
+    // after the first card consumed all 4 hearts.
+    let second = perf.lives.get(1).expect("Second live card");
+    assert!(
+        !second.passed,
+        "Second live card should FAIL: Heart00=4 needed but only {} hearts available after first card",
+        perf.total_hearts.iter().sum::<u32>()
+    );
+
+    // First card should pass (it gets all 4 hearts)
+    let first = perf.lives.get(0).expect("First live card");
+    assert!(
+        first.passed,
+        "First live card should PASS: it consumes all available hearts"
+    );
+}
+
+// ── Heart00 passes check: sufficient hearts → passes ─────────────
+// Single live card needing Heart00=4 with 4+ hearts available.
+
+#[test]
+fn heart00_passes_check_succeeds_when_sufficient() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live = game.id("PL!N-sd1-025-SD"); // needs heart0=4
+    let member = game.id("PL!-sd1-008-SD"); // heart01=1, heart03=1
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.hand.cards.clear();
+    game.state.player1.waitroom.cards.clear();
+    game.state.player1.success_live_card_zone.cards.clear();
+    game.state.player1.energy_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    game.state.player2.hand.cards.clear();
+    game.state.player2.waitroom.cards.clear();
+    game.state.player2.success_live_card_zone.cards.clear();
+    game.state.player2.energy_deck.cards.clear();
+
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(member);
+        game.state.player2.main_deck.cards.push(member);
+    }
+
+    // Stage: 2 members providing 4 hearts → meets Heart00=4
+    game.state.player1.stage.stage = [member, member, -1];
+
+    game.state.player1.hand.cards.push(live);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    game.pass();
+    game.pass();
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    game.pass();
+    game.pass();
+
+    let perf = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|s| s.player_id == "p1")
+        .expect("P1 should have a performance snapshot");
+
+    assert!(
+        perf.lives.iter().any(|l| l.passed),
+        "Live card should PASS with sufficient hearts"
+    );
+    assert!(
+        perf.total_score > 0,
+        "Score should be > 0 when live passes"
+    );
+}
+
+// ── base_score is stored correctly in snapshot ──────────────────
+// Verify that base_score is set and differs from score only
+// when modifiers are applied.
+
+#[test]
+fn live_card_base_score_stored_correctly() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let live = game.id("PL!N-sd1-025-SD"); // score=1, needs heart0=4
+    let member = game.id("PL!-sd1-008-SD");
+
+    game.state.player1.main_deck.cards.clear();
+    game.state.player1.hand.cards.clear();
+    game.state.player1.waitroom.cards.clear();
+    game.state.player1.success_live_card_zone.cards.clear();
+    game.state.player1.energy_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    game.state.player2.hand.cards.clear();
+    game.state.player2.waitroom.cards.clear();
+    game.state.player2.success_live_card_zone.cards.clear();
+    game.state.player2.energy_deck.cards.clear();
+
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(member);
+        game.state.player2.main_deck.cards.push(member);
+    }
+
+    game.state.player1.stage.stage = [member, member, -1];
+    game.state.player1.hand.cards.push(live);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    game.pass();
+    game.pass();
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    game.pass();
+    game.pass();
+    game.pass();
+
+    let perf = game
+        .state
+        .performance_snapshots
+        .iter()
+        .find(|s| s.player_id == "p1")
+        .expect("P1 should have a performance snapshot");
+
+    for (i, l) in perf.lives.iter().enumerate() {
+        assert_eq!(
+            l.base_score, 1,
+            "live[{}] base_score should be 1 (card's raw score)", i
+        );
+        assert!(
+            l.score >= l.base_score,
+            "live[{}] score ({}) should be >= base_score ({})", i, l.score, l.base_score
+        );
+    }
+}

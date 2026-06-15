@@ -13,8 +13,7 @@ import { DebugModal } from './modals/DebugModal.js';
 
 export const Modals = {
     deckPresets: [],
-    setupMode: 'sandbox',
-    pvpJoinPid: 1,
+    pvpJoinPid: null,
 
     // --- Core Deck/Setup/Settings ---
     openDeckModal: () => DeckSetupModal.openDeckModal(),
@@ -36,8 +35,7 @@ export const Modals = {
     submitPvPDeck: () => GameSetupModal.submitPvPDeck(),
     onDeckSelectChange: (pid, val) => GameSetupModal.onDeckSelectChange(pid, val),
 
-    openSettingsModal: () => SettingsModal.openSettingsModal(),
-    closeSettingsModal: () => SettingsModal.closeSettingsModal(),
+
     updateBoardScale: (val) => SettingsModal.updateBoardScale(val),
     toggleLang: () => SettingsModal.toggleLang(),
     toggleFriendlyAbilities: () => SettingsModal.toggleFriendlyAbilities(),

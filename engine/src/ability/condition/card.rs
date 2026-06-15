@@ -295,18 +295,49 @@ impl<'a> ConditionContext<'a> {
         &self,
         condition: &Condition,
         player: &crate::player::Player,
+        location: &str,
     ) -> bool {
         if condition.heart_type.as_deref() != Some("all") {
             return true;
         }
+        if Zone::from_str(location) != Some(Zone::Stage) {
+            return true;
+        }
         let card_db = &self.game_state.card_database;
+        let mods = &self.game_state.mods;
         player.stage.stage.iter().any(|&id| {
-            id != -1
-                && card_db.get_card(id).is_some_and(|c| {
-                    c.base_heart
-                        .as_ref()
-                        .is_some_and(|bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
-                })
+            if id == -1 {
+                return false;
+            }
+            // Check base_heart for Heart00 (wildcard base — rare but valid)
+            if card_db.get_card(id).is_some_and(|c| {
+                c.base_heart
+                    .as_ref()
+                    .is_some_and(|bh| bh.hearts.contains_key(&crate::card::HeartColor::Heart00))
+            }) {
+                return true;
+            }
+            // Check heart_modifiers for HeartColor::All
+            if mods
+                .heart_modifiers
+                .get(&id)
+                .and_then(|m| m.get(&crate::card::HeartColor::All))
+                .map_or(false, |e| e.total() > 0)
+            {
+                return true;
+            }
+            // Check constant_heart_bonuses for "all" key
+            if mods
+                .constant_heart_bonuses
+                .get(&id)
+                .and_then(|cols| cols.get("all"))
+                .copied()
+                .unwrap_or(0)
+                > 0
+            {
+                return true;
+            }
+            false
         })
     }
 
@@ -314,6 +345,7 @@ impl<'a> ConditionContext<'a> {
         &self,
         condition: &Condition,
         player: &crate::player::Player,
+        location: &str,
     ) -> bool {
         let cols = match &condition.heart_colors {
             Some(c) if !c.is_empty() => c,
@@ -324,6 +356,12 @@ impl<'a> ConditionContext<'a> {
             .iter()
             .any(|cs| crate::zones::parse_heart_color(cs) == crate::card::HeartColor::Heart00)
         {
+            return true;
+        }
+        // This check (heart colors present in base_heart) only applies to the stage.
+        // Non-stage zones like live_card_zone use need_heart; check_aggregate_total
+        // handles those separately with proper zone awareness.
+        if Zone::from_str(location) != Some(Zone::Stage) {
             return true;
         }
         let card_db = &self.game_state.card_database;
@@ -430,9 +468,122 @@ impl<'a> ConditionContext<'a> {
         player: &crate::player::Player,
         location: &str,
     ) -> Option<bool> {
-        if condition.aggregate.as_deref() == Some("total")
-            && Zone::from_str(location) == Some(Zone::Stage)
-        {
+        if condition.aggregate.as_deref() != Some("total") {
+            return None;
+        }
+        let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
+        if !hc.is_empty() {
+            let card_db = &self.game_state.card_database;
+            let card_type = condition.card_type.as_deref().unwrap_or("");
+            let group_name: Option<&str> = condition
+                .group_names
+                .as_ref()
+                .and_then(|gn| gn.first().map(|s| s.as_str()));
+            match Zone::from_str(location) {
+                Some(Zone::Stage) => {
+                    let total_heart: u32 = player
+                        .stage
+                        .stage
+                        .iter()
+                        .filter(|&&cid| cid != -1)
+                        .filter(|&&cid| {
+                            card_type.is_empty()
+                                || util::card_matches_type(card_db, cid, Some(card_type))
+                        })
+                        .filter(|&&cid| {
+                            group_name.is_none()
+                                || util::card_matches_group_str(card_db, cid, group_name)
+                        })
+                        .filter_map(|&cid| card_db.get_card(cid))
+                        .map(|card| {
+                            card.base_heart
+                                .as_ref()
+                                .map(|bh| {
+                                    hc.iter()
+                                        .map(|color_str| {
+                                            let color = crate::zones::parse_heart_color(color_str);
+                                            bh.hearts.get(&color).copied().unwrap_or(0) as u32
+                                        })
+                                        .sum::<u32>()
+                                })
+                                .unwrap_or(0)
+                        })
+                        .sum();
+                    Some(compare_counts(
+                        condition.operator.as_deref(),
+                        total_heart,
+                        condition.count.unwrap_or(0),
+                    ))
+                }
+                Some(Zone::LiveCardZone) | Some(Zone::SuccessLiveZone) => {
+                    let mut cards: Vec<i16> = player.live_card_zone.cards.to_vec();
+                    cards.extend(player.success_live_card_zone.cards.iter().copied());
+                    // If an operator is set (e.g. >=), sum all heart colors and compare
+                    if let Some(op) = condition.operator.as_deref() {
+                        let total_need: u32 = cards
+                            .iter()
+                            .filter(|&&cid| {
+                                card_type.is_empty()
+                                    || util::card_matches_type(card_db, cid, Some(card_type))
+                            })
+                            .filter(|&&cid| {
+                                group_name.is_none()
+                                    || util::card_matches_group_str(card_db, cid, group_name)
+                            })
+                            .filter_map(|&cid| card_db.get_card(cid))
+                            .map(|card| {
+                                card.need_heart
+                                    .as_ref()
+                                    .map(|nh| {
+                                        hc.iter()
+                                            .map(|color_str| {
+                                                let color =
+                                                    crate::zones::parse_heart_color(color_str);
+                                                nh.hearts.get(&color).copied().unwrap_or(0) as u32
+                                            })
+                                            .sum::<u32>()
+                                    })
+                                    .unwrap_or(0)
+                            })
+                            .sum();
+                        Some(compare_counts(
+                            Some(op),
+                            total_need,
+                            condition.count.unwrap_or(0),
+                        ))
+                    } else {
+                        // No operator: check each color individually across all cards
+                        let threshold = condition.count.unwrap_or(1) as u32;
+                        let all_ok = hc.iter().all(|color_str| {
+                            let color = crate::zones::parse_heart_color(color_str);
+                            let total: u32 = cards
+                                .iter()
+                                .filter(|&&cid| {
+                                    card_type.is_empty()
+                                        || util::card_matches_type(card_db, cid, Some(card_type))
+                                })
+                                .filter(|&&cid| {
+                                    group_name.is_none()
+                                        || util::card_matches_group_str(card_db, cid, group_name)
+                                })
+                                .filter_map(|&cid| card_db.get_card(cid))
+                                .map(|card| {
+                                    card.need_heart
+                                        .as_ref()
+                                        .map(|nh| {
+                                            nh.hearts.get(&color).copied().unwrap_or(0) as u32
+                                        })
+                                        .unwrap_or(0)
+                                })
+                                .sum();
+                            total >= threshold
+                        });
+                        Some(all_ok)
+                    }
+                }
+                _ => None,
+            }
+        } else if Zone::from_str(location) == Some(Zone::Stage) {
             let bm_flat: std::collections::HashMap<i16, i32> = self
                 .game_state
                 .mods
@@ -458,6 +609,7 @@ impl<'a> ConditionContext<'a> {
         &self,
         condition: &Condition,
         player: &crate::player::Player,
+        location: &str,
     ) -> bool {
         let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct());
         if !is_distinct {
@@ -465,39 +617,88 @@ impl<'a> ConditionContext<'a> {
         }
         let card_db = &self.game_state.card_database;
 
+        let group = condition
+            .group_names
+            .as_ref()
+            .and_then(|g| g.first().map(|s| s.as_str()));
+        let mut cards: Vec<i16> = match Zone::from_str(location) {
+            Some(Zone::Stage) => player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect(),
+            Some(Zone::Hand) => player.hand.cards.to_vec(),
+            Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
+            Some(Zone::Energy) => player.energy_zone.cards.to_vec(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
+            Some(Zone::SuccessLiveZone) => player.success_live_card_zone.cards.to_vec(),
+            Some(Zone::RevealedCards) => self.game_state.revealed_cards.clone(),
+            _ => return true,
+        };
+        // If a group filter is specified, only check distinctness within that group
+        if let Some(g) = group {
+            cards.retain(|&cid| util::card_matches_group_str(card_db, cid, Some(g)));
+        }
+
         let distinct_type = match condition.distinct.as_ref() {
             Some(crate::core::card::DistinctInfo::String(s)) => s.as_str(),
             _ => "card_name",
         };
+        let distinct_only = condition.count.map(|c| c as usize);
 
-        if distinct_type == "cost" {
-            let mut seen_costs: std::collections::HashSet<u32> = std::collections::HashSet::new();
-            for &cid in player.stage.stage.iter().filter(|&&id| id != -1) {
-                if let Some(card) = card_db.get_card(cid) {
-                    let cost = card.cost.unwrap_or(0);
-                    let modified_cost =
-                        (cost as i32 + self.game_state.mods.get_cost_modifier(cid)).max(0) as u32;
-                    if !seen_costs.insert(modified_cost) {
-                        return false;
+        let pass = match distinct_type {
+            "cost" => {
+                let mut seen_costs: std::collections::HashSet<u32> =
+                    std::collections::HashSet::new();
+                for &cid in cards.iter() {
+                    if let Some(card) = card_db.get_card(cid) {
+                        let cost = card.cost.unwrap_or(0);
+                        let modified_cost = (cost as i32
+                            + self.game_state.mods.get_cost_modifier(cid))
+                        .max(0) as u32;
+                        seen_costs.insert(modified_cost);
                     }
                 }
-            }
-        } else {
-            let mut seen_names: std::collections::HashSet<String> =
-                std::collections::HashSet::new();
-            for &cid in player.stage.stage.iter().filter(|&&id| id != -1) {
-                let names = card_db.get_card_names(cid);
-                if names.is_empty() {
-                    continue;
+                if let Some(n) = distinct_only {
+                    seen_costs.len() >= n
+                } else {
+                    seen_costs.len() == cards.len()
                 }
-                for name in names {
-                    if !seen_names.insert(name) {
-                        return false;
+            }
+            "group_name" => {
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                for &cid in cards.iter() {
+                    if let Some(card) = card_db.get_card(cid) {
+                        if let Some(ref unit) = card.unit {
+                            seen.insert(unit.clone());
+                        }
                     }
                 }
+                if let Some(n) = distinct_only {
+                    seen.len() >= n
+                } else {
+                    seen.len() == cards.len()
+                }
             }
-        }
-        true
+            _ => {
+                let mut seen_names: std::collections::HashSet<String> =
+                    std::collections::HashSet::new();
+                for &cid in cards.iter() {
+                    let names = card_db.get_card_names(cid);
+                    for name in names {
+                        seen_names.insert(name);
+                    }
+                }
+                if let Some(n) = distinct_only {
+                    seen_names.len() >= n
+                } else {
+                    seen_names.len() == cards.len()
+                }
+            }
+        };
+        pass
     }
 
     pub(crate) fn check_no_excess_heart(
@@ -587,10 +788,10 @@ impl<'a> ConditionContext<'a> {
         let is_both = target == "both";
         let player = self.resolve_condition_player(target);
 
-        if !self.check_heart_type_all(condition, player) {
+        if !self.check_heart_type_all(condition, player, location) {
             return false;
         }
-        if !self.check_heart_colors(condition, player) {
+        if !self.check_heart_colors(condition, player, location) {
             return false;
         }
         if !self.check_has_blade_heart(condition, player, location) {
@@ -602,7 +803,7 @@ impl<'a> ConditionContext<'a> {
         if let Some(res) = self.check_aggregate_total(condition, player, location) {
             return res;
         }
-        if !self.check_distinct_names(condition, player) {
+        if !self.check_distinct_names(condition, player, location) {
             return false;
         }
         if !self.check_no_excess_heart(condition, player, target) {
@@ -777,6 +978,7 @@ impl<'a> ConditionContext<'a> {
             HeartColor::Heart05,
             HeartColor::Heart06,
             HeartColor::Heart00,
+            HeartColor::All,
         ] {
             let modifier = self.game_state.mods.get_heart_modifier(card_id, color);
             if modifier > 0 {
@@ -815,68 +1017,85 @@ impl<'a> ConditionContext<'a> {
                 Some(crate::core::card::DistinctInfo::String(s)) => s.as_str(),
                 _ => "card_name",
             };
-            if distinct_type == "cost" {
-                let mut distinct_costs: std::collections::HashSet<u32> =
-                    std::collections::HashSet::new();
-                for &cid in &combined {
-                    if cid == -1 {
-                        continue;
+            match distinct_type {
+                "cost" => {
+                    let mut distinct_costs: std::collections::HashSet<u32> =
+                        std::collections::HashSet::new();
+                    for &cid in &combined {
+                        if cid == -1 {
+                            continue;
+                        }
+                        let passes_type = card_type_filter
+                            .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
+                        let passes_group = group_names.is_none_or(|gn| {
+                            gn.iter().any(|g| {
+                                util::card_matches_group_str(card_db, cid, Some(g.as_str()))
+                            })
+                        });
+                        if !passes_type || !passes_group {
+                            continue;
+                        }
+                        if let Some(card) = card_db.get_card(cid) {
+                            let cost = card.cost.unwrap_or(0);
+                            let modified_cost = (cost as i32
+                                + self.game_state.mods.get_cost_modifier(cid))
+                            .max(0) as u32;
+                            distinct_costs.insert(modified_cost);
+                        }
                     }
-                    let passes_type = card_type_filter
-                        .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
-                    let passes_group = group_names.is_none_or(|gn| {
-                        gn.iter()
-                            .any(|g| util::card_matches_group_str(card_db, cid, Some(g.as_str())))
-                    });
-                    if !passes_type || !passes_group {
-                        continue;
-                    }
-                    if let Some(card) = card_db.get_card(cid) {
-                        let cost = card.cost.unwrap_or(0);
-                        let modified_cost = (cost as i32
-                            + self.game_state.mods.get_cost_modifier(cid))
-                        .max(0) as u32;
-                        distinct_costs.insert(modified_cost);
-                    }
+                    let count = distinct_costs.len() as u32;
+                    compare_counts(operator, count, count_threshold)
                 }
-                let count = distinct_costs.len() as u32;
-                compare_counts(operator, count, count_threshold)
-            } else {
-                let mut distinct_names: std::collections::HashSet<String> =
-                    std::collections::HashSet::new();
-                for &cid in &combined {
-                    if cid == -1 {
-                        log::debug!("[MULTI]   skipping -1");
-                        continue;
+                "group_name" => {
+                    let mut distinct_groups: std::collections::HashSet<String> =
+                        std::collections::HashSet::new();
+                    for &cid in &combined {
+                        if cid == -1 {
+                            continue;
+                        }
+                        let passes_type = card_type_filter
+                            .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
+                        let passes_group = group_names.is_none_or(|gn| {
+                            gn.iter().any(|g| {
+                                util::card_matches_group_str(card_db, cid, Some(g.as_str()))
+                            })
+                        });
+                        if !passes_type || !passes_group {
+                            continue;
+                        }
+                        if let Some(card) = card_db.get_card(cid) {
+                            if let Some(ref unit) = card.unit {
+                                distinct_groups.insert(unit.clone());
+                            }
+                        }
                     }
-                    let passes_type = card_type_filter
-                        .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
-                    let passes_group = group_names.is_none_or(|gn| {
-                        gn.iter()
-                            .any(|g| util::card_matches_group_str(card_db, cid, Some(g.as_str())))
-                    });
-                    log::debug!(
-                        "[MULTI]   card={} type_pass={} group_pass={}",
-                        cid,
-                        passes_type,
-                        passes_group
-                    );
-                    if !passes_type || !passes_group {
-                        continue;
-                    }
-                    let names = card_db.get_card_names(cid);
-                    for name in &names {
-                        log::debug!("[MULTI]   name='{}'", name);
-                        distinct_names.insert(name.clone());
-                    }
+                    let count = distinct_groups.len() as u32;
+                    compare_counts(operator, count, count_threshold)
                 }
-                let count = distinct_names.len() as u32;
-                log::debug!(
-                    "[MULTI] distinct_names={} threshold={}",
-                    count,
-                    count_threshold
-                );
-                compare_counts(operator, count, count_threshold)
+                _ => {
+                    let mut distinct_names: std::collections::HashSet<String> =
+                        std::collections::HashSet::new();
+                    for &cid in &combined {
+                        if cid == -1 {
+                            continue;
+                        }
+                        let passes_type = card_type_filter
+                            .is_none_or(|f| util::card_matches_type(card_db, cid, Some(f)));
+                        let passes_group = group_names.is_none_or(|gn| {
+                            gn.iter().any(|g| {
+                                util::card_matches_group_str(card_db, cid, Some(g.as_str()))
+                            })
+                        });
+                        if !passes_type || !passes_group {
+                            continue;
+                        }
+                        for name in card_db.get_card_names(cid) {
+                            distinct_names.insert(name);
+                        }
+                    }
+                    let count = distinct_names.len() as u32;
+                    compare_counts(operator, count, count_threshold)
+                }
             }
         } else {
             let mut filter = condition.filter_subset();
@@ -911,6 +1130,11 @@ impl<'a> ConditionContext<'a> {
 
     pub(crate) fn evaluate_group_condition(&self, condition: &Condition) -> bool {
         if condition.all_members.unwrap_or(false) {
+            // all_members is a stage-only concept; skip for other zones
+            let location = condition.location.as_deref().unwrap_or("");
+            if Zone::from_str(location) != Some(Zone::Stage) {
+                return false;
+            }
             let target = condition.target.as_deref().unwrap_or("self");
             let player = self.resolve_condition_player(target);
             let group_name = condition
@@ -1013,18 +1237,33 @@ impl<'a> ConditionContext<'a> {
         let group_names = condition.group_names.as_ref();
         let hc: &[String] = condition.heart_colors.as_deref().unwrap_or(&[]);
 
+        // Early-out for aggregate total (sum heart colors, not count cards)
+        if let Some(res) = self.check_aggregate_total(condition, player, location) {
+            return res;
+        }
+
         let count_filtered = |zone_source: &[i16], ct: &str| -> usize {
-            self.count_cards_with_filters(
-                zone_source,
-                Some(ct),
-                group_names.map(|gn| gn.as_slice()),
-                hc,
-                condition.cost_limit,
-                condition.cost_limit_operator.as_deref(),
-                None,
-                false,
-                condition,
-            ) as usize
+            let is_distinct = condition.distinct.as_ref().is_some_and(|d| d.is_distinct());
+            if is_distinct {
+                self.count_distinct_in_cards(
+                    zone_source,
+                    condition,
+                    Some(ct).filter(|c| !c.is_empty()),
+                    group_names.map(|gn| gn.as_slice()),
+                ) as usize
+            } else {
+                self.count_cards_with_filters(
+                    zone_source,
+                    Some(ct),
+                    group_names.map(|gn| gn.as_slice()),
+                    hc,
+                    condition.cost_limit,
+                    condition.cost_limit_operator.as_deref(),
+                    None,
+                    false,
+                    condition,
+                ) as usize
+            }
         };
 
         if condition.source.as_deref() == Some("preceding_moved")
@@ -1034,13 +1273,24 @@ impl<'a> ConditionContext<'a> {
             let negate = condition.negation.unwrap_or(false);
             let wants_blade_heart_prop =
                 condition.card_property.as_deref() == Some("has_blade_heart");
+            // Fallback to GameState.recently_moved_cards when the resolver's
+            // moved_cards is empty (e.g. auto-triggered abilities that fire
+            // without a preceding cost payment or effect step).
+            let moved_source: Vec<i16> = if self.moved_cards.is_empty() {
+                self.game_state
+                    .recently_moved_cards
+                    .clone()
+                    .unwrap_or_default()
+            } else {
+                self.moved_cards.to_vec()
+            };
             log::debug!(
-                "[MOVED_DEBUG] moved_cards={:?} iter_count={}",
+                "[MOVED_DEBUG] moved_cards={:?} recently_moved={:?} using={:?}",
                 self.moved_cards,
-                self.moved_cards.len()
+                self.game_state.recently_moved_cards,
+                moved_source
             );
-            let actual = self
-                .moved_cards
+            let actual = moved_source
                 .iter()
                 .filter(|&&cid| {
                     if cid == -1 {
@@ -1110,13 +1360,8 @@ impl<'a> ConditionContext<'a> {
                     |d| matches!(d, crate::core::card::DistinctInfo::String(s) if s == "cost"),
                 );
                 if is_distinct_cost {
-                    // Count the number of distinct modified costs among matching stage members.
-                    // The condition "コストがそれぞれ異なるメンバーが3人以上" means:
-                    // there are >= 3 members all with unique costs from each other.
-                    // Equivalent: # of distinct cost values >= count AND == total matching members.
                     let mut distinct_costs: std::collections::HashSet<u32> =
                         std::collections::HashSet::new();
-                    let mut total_matching = 0u32;
                     for &cid in &stage_cards {
                         if cid == -1 {
                             continue;
@@ -1130,17 +1375,8 @@ impl<'a> ConditionContext<'a> {
                         let modified = (base as i32 + self.game_state.mods.get_cost_modifier(cid))
                             .max(0) as u32;
                         distinct_costs.insert(modified);
-                        total_matching += 1;
                     }
-                    // Costs are "all different" only if every card has a unique cost
-                    // (i.e., distinct count == total count). We then compare that
-                    // distinct count to the threshold.
-                    if distinct_costs.len() as u32 == total_matching {
-                        distinct_costs.len()
-                    } else {
-                        // Duplicate costs exist — the group is not "all distinct"
-                        0
-                    }
+                    distinct_costs.len()
                 } else if condition.unit.as_deref() == Some("types") {
                     let required_colors: Vec<crate::card::HeartColor> = hc
                         .iter()
@@ -1562,6 +1798,31 @@ impl<'a> ConditionContext<'a> {
         let player = self.game_state.resolve_target_player(target);
         let filter = condition.ability_filter.as_deref().unwrap_or("no_ability");
 
+        let location = condition
+            .location
+            .as_deref()
+            .unwrap_or(Zone::Stage.to_str());
+        let card_ids: Vec<i16> = match Zone::from_str(location) {
+            Some(Zone::Stage) => player
+                .stage
+                .stage
+                .iter()
+                .filter(|&&id| id != -1)
+                .copied()
+                .collect(),
+            Some(Zone::Hand) => player.hand.cards.to_vec(),
+            Some(Zone::Discard) | Some(Zone::Waitroom) => player.waitroom.cards.to_vec(),
+            Some(Zone::Energy) => player.energy_zone.cards.to_vec(),
+            Some(Zone::LiveCardZone) => player.live_card_zone.cards.to_vec(),
+            _ => {
+                if let Some(card_id) = self.game_state.activating_card {
+                    vec![card_id]
+                } else {
+                    return true;
+                }
+            }
+        };
+
         let has_ability = if let Some(card_id) = self.game_state.activating_card {
             if let Some(card) = card_db.get_card(card_id) {
                 !card.abilities.is_empty()
@@ -1569,17 +1830,10 @@ impl<'a> ConditionContext<'a> {
                 false
             }
         } else {
-            let stage_cards: Vec<i16> = player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .copied()
-                .collect();
-            if stage_cards.is_empty() {
+            if card_ids.is_empty() {
                 return false;
             }
-            stage_cards.iter().any(|&id| {
+            card_ids.iter().any(|&id| {
                 card_db
                     .get_card(id)
                     .map(|c| !c.abilities.is_empty())
@@ -1817,6 +2071,68 @@ impl<'a> ConditionContext<'a> {
         count
     }
 
+    /// Count distinct names/costs/groups among cards matching the condition's filters.
+    pub(crate) fn count_distinct_in_cards(
+        &self,
+        cards: &[i16],
+        condition: &Condition,
+        card_type: Option<&str>,
+        group_names: Option<&[String]>,
+    ) -> u32 {
+        let card_db = &self.game_state.card_database;
+        // Collect matching cards first
+        let matching: Vec<i16> = cards
+            .iter()
+            .filter(|&&cid| {
+                cid != -1
+                    && card_type.is_none_or(|ct| util::card_matches_type(card_db, cid, Some(ct)))
+                    && group_names.is_none_or(|gn| {
+                        gn.iter()
+                            .any(|g| util::card_matches_group_str(card_db, cid, Some(g.as_str())))
+                    })
+            })
+            .copied()
+            .collect();
+        let distinct_type = match condition.distinct.as_ref() {
+            Some(crate::core::card::DistinctInfo::String(s)) => s.as_str(),
+            _ => "card_name",
+        };
+        match distinct_type {
+            "cost" => {
+                let mut seen: std::collections::HashSet<u32> = std::collections::HashSet::new();
+                for &cid in &matching {
+                    if let Some(card) = card_db.get_card(cid) {
+                        let cost = card.cost.unwrap_or(0);
+                        let modified = (cost as i32 + self.game_state.mods.get_cost_modifier(cid))
+                            .max(0) as u32;
+                        seen.insert(modified);
+                    }
+                }
+                seen.len() as u32
+            }
+            "group_name" => {
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                for &cid in &matching {
+                    if let Some(card) = card_db.get_card(cid) {
+                        if let Some(ref unit) = card.unit {
+                            seen.insert(unit.clone());
+                        }
+                    }
+                }
+                seen.len() as u32
+            }
+            _ => {
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                for &cid in &matching {
+                    for name in card_db.get_card_names(cid) {
+                        seen.insert(name);
+                    }
+                }
+                seen.len() as u32
+            }
+        }
+    }
+
     pub(crate) fn sum_group_hearts_in_stage(
         &self,
         player: &crate::player::Player,
@@ -1945,7 +2261,9 @@ impl<'a> ConditionContext<'a> {
             return self.get_count_for_target(condition, target);
         }
         if comparison_type == Some("cost") {
-            if condition.location.is_none() {
+            if condition.location.is_none()
+                || condition.location.as_deref() == Some("revealed_cards")
+            {
                 return self
                     .game_state
                     .revealed_cost_cards
@@ -2162,7 +2480,49 @@ impl<'a> ConditionContext<'a> {
         let is_aggregate = condition.aggregate.as_deref() == Some("total");
 
         if is_aggregate {
-            return self.sum_group_hearts_in_stage(player, group_name);
+            let location = condition.location.as_deref().unwrap_or("");
+            let ct = condition.card_type.as_deref();
+            return match Zone::from_str(location) {
+                Some(Zone::Stage) => self.sum_group_hearts_in_stage(player, group_name),
+                Some(Zone::LiveCardZone) => {
+                    let card_db = &self.game_state.card_database;
+                    player
+                        .live_card_zone
+                        .cards
+                        .iter()
+                        .filter(|&&cid| cid != -1)
+                        .filter(|&&cid| ct.is_none() || util::card_matches_type(card_db, cid, ct))
+                        .filter(|&&cid| {
+                            group_name.is_none()
+                                || util::card_matches_group_str(card_db, cid, group_name)
+                        })
+                        .filter_map(|&cid| card_db.get_card(cid))
+                        .map(|card| {
+                            card.need_heart
+                                .as_ref()
+                                .map(|nh| nh.hearts.values().copied().sum::<u32>())
+                                .unwrap_or(0)
+                        })
+                        .sum()
+                }
+                Some(Zone::SuccessLiveZone) => {
+                    let card_db = &self.game_state.card_database;
+                    player
+                        .success_live_card_zone
+                        .cards
+                        .iter()
+                        .filter(|&&cid| cid != -1)
+                        .filter(|&&cid| ct.is_none() || util::card_matches_type(card_db, cid, ct))
+                        .filter(|&&cid| {
+                            group_name.is_none()
+                                || util::card_matches_group_str(card_db, cid, group_name)
+                        })
+                        .filter_map(|&cid| card_db.get_card(cid))
+                        .map(|card| card.score.unwrap_or(0) as u32)
+                        .sum()
+                }
+                _ => 0,
+            };
         }
 
         let ct = condition.card_type.as_deref();
@@ -2175,12 +2535,8 @@ impl<'a> ConditionContext<'a> {
                 let mut total = 0u32;
                 for loc in locs {
                     let cards = crate::ability::util::zone_cards(player, loc.as_str());
-                    total += self.count_group_cards_in_cards(
-                        cards,
-                        group_filter.map(|v| &**v),
-                        ct,
-                        exc,
-                    );
+                    total +=
+                        self.count_group_cards_in_cards(cards, group_filter.map(|v| &**v), ct, exc);
                 }
                 return total;
             }

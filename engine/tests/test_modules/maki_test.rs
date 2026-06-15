@@ -20,13 +20,15 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
     let mut game = TestGame::new(db);
 
     let maki = game.id("PL!-pb1-015-R");
-    // Opponent member with cost ≤4 that will be waited by Ab#0
+    // Opponent members with cost ≤4 that will be waited by Ab#0
     let cheap_opp = game.id("PL!SP-sd1-019-SD"); // cost 2
+    let cheap_opp2 = game.id("PL!-sd1-011-SD");  // cost 4, BiBi member
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.hand.cards.push(maki);
     game.state.player1.hand.cards.push(filler);
     game.state.player2.stage.stage[0] = cheap_opp;
+    game.state.player2.stage.stage[1] = cheap_opp2;
     game.give_energy(11);
 
     for _ in 0..10 {
@@ -48,6 +50,12 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
     assert!(
         game.has_pending_choice(),
         "Opponent should have a choice to wait a member"
+    );
+    let entry = game.state.ability_queue.current_entry();
+    assert_eq!(
+        entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "Wait-member choice should be routed to opponent"
     );
     game.select_indices(&[0]);
     // Consume any remaining choices

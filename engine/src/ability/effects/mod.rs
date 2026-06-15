@@ -46,8 +46,13 @@ impl AbilityResolver {
             gs.non_stackable_effects.insert(effect_key);
         }
 
-        if effect.action_by.as_deref() == Some("opponent") || effect.action == "opponent_action" {
+        // Legacy opponent_action wrapper (pre-parser-flatten). Flat effects
+        // carry target="opponent" directly and dispatch via ActionType.
+        if effect.action == "opponent_action" {
             if let Some(ref opponent_action) = effect.opponent_action {
+                // G3: tag spawn context so choices created for this
+                // opponent action are routed to the opponent player.
+                self.spawn_context.target = Some("opponent".to_string());
                 let mut modified = opponent_action.clone();
                 if modified.target.is_none() || modified.target.as_deref() == Some("self") {
                     modified.target = Some("opponent".to_string());
@@ -63,6 +68,12 @@ impl AbilityResolver {
         // Empty action with opponent_action means it was entirely handled by opponent
         if action_str.is_empty() && effect.action_by.is_some() {
             return Ok(());
+        }
+
+        // G3: for non-empty actions with action_by: opponent, tag spawn context
+        // so choices created inside are routed to the opponent player.
+        if effect.action_by.as_deref() == Some("opponent") {
+            self.spawn_context.target = Some("opponent".to_string());
         }
 
         let replacement_indices: Vec<usize> = gs
@@ -130,8 +141,10 @@ impl AbilityResolver {
 
         // Convert string action to typed enum for stronger dispatch
         let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
-        eprintln!("[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}", 
-            action_type, effect.effect_steps.is_some(), effect.compound.actions.is_some());
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!("[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}", 
+                action_type, effect.effect_steps.is_some(), effect.compound.actions.is_some());
+        }
 
         // Sequential and LookAndSelect both route through the generic
         // sequential pipeline when they carry `effect_steps`. LookAndSelect
@@ -177,7 +190,16 @@ impl AbilityResolver {
                 );
                 Ok(())
             }
-            ActionType::DiscardCard | ActionType::MoveCards => self.execute_move_cards(gs, effect),
+            ActionType::DiscardCard => self.execute_move_cards(gs, effect),
+            ActionType::MoveCards => {
+                if effect.multiple_targets.unwrap_or(false)
+                    && effect.target.as_deref() == Some("deck")
+                {
+                    self.execute_move_cards_both(gs, effect)
+                } else {
+                    self.execute_move_cards(gs, effect)
+                }
+            }
             ActionType::GainResource => self.execute_gain_resource(gs, effect),
             ActionType::ChangeState => {
                 let change_cost_limit = if effect.cost_from_revealed.unwrap_or(false) {
@@ -274,15 +296,104 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::SetHeartType => {
-                self.execute_set_heart_type(
-                    gs,
-                    effect
-                        .heart_type
-                        .as_deref()
-                        .or(effect.heart_colors.first().map(|s| s.as_str())),
-                    effect.target_name(),
-                    effect.count_or(1) as i32,
+                let is_self_target = effect.self_target.unwrap_or(false);
+                let needs_target = !is_self_target && (
+                    effect.heart_selection.unwrap_or(false) ||
+                    effect.group_names.is_some() ||
+                    effect.card_type.as_deref() == Some("member_card")
                 );
+                let heart_type = effect
+                    .heart_type
+                    .as_deref()
+                    .or(effect.heart_colors.first().map(|s| s.as_str()));
+
+                if is_self_target || !needs_target {
+                    // Self-target (e.g. Kanan PL!S-pb1-003-R): apply to activating_card.
+                    // Also fallback for member-card abilities without group/selection signals.
+                    self.execute_set_heart_type(
+                        gs,
+                        heart_type,
+                        effect.target_name(),
+                        effect.count_or(1) as i32,
+                    );
+                } else if self.selected_cards.is_empty() {
+                    // Need target selection: find eligible stage members
+                    let target = effect.target_name();
+                    let stage_ids: Vec<i16> = {
+                        let p = gs.resolve_target_player(target);
+                        p.stage.stage.iter().copied().filter(|&id| id != -1).collect()
+                    };
+                    let card_db = self.card_db();
+                    let filter = effect.filter_subset();
+                    let candidates = util::matching_ids_filtered(
+                        &stage_ids,
+                        &card_db,
+                        &filter,
+                        true,
+                        None,
+                        None,
+                        None,
+                    );
+                    if candidates.is_empty() {
+                        // No eligible targets — no-op
+                        return Ok(());
+                    }
+                    let tc = effect.target_count.unwrap_or(1) as usize;
+                    if candidates.len() <= tc {
+                        // Auto-select: push to selected_cards and apply
+                        for &cid in &candidates {
+                            if !self.selected_cards.contains(&cid) {
+                                self.selected_cards.push(cid);
+                            }
+                        }
+                        self.execute_set_heart_type(
+                            gs,
+                            heart_type,
+                            effect.target_name(),
+                            effect.count_or(1) as i32,
+                        );
+                    } else {
+                        // Multiple eligible: create SelectCard choice
+                        let stage_snapshot: Vec<i16> = {
+                            let p = gs.resolve_target_player(target);
+                            p.stage.stage.to_vec()
+                        };
+                        let filtered_indices: Vec<usize> = candidates
+                            .iter()
+                            .filter_map(|&cid| stage_snapshot.iter().position(|&s| s == cid))
+                            .collect();
+                        let mut saved = effect.clone();
+                        saved.target_count = None;
+                        let mut pending = gs.ability_queue.take_pending_commands();
+                        pending.insert(0, crate::ability::types::Command::Effect(saved));
+                        gs.ability_queue.set_pending_commands(pending);
+                        self.pending_choice = Some(
+                            crate::ability::types::Choice::select_cards(
+                                Zone::Stage.to_str().to_string(),
+                                tc,
+                                format!("Select {} member(s) for heart type conversion", tc),
+                                false,
+                            )
+                            .card_type(effect.card_type.clone())
+                            .group(effect.group_name().map(|s| s.to_string()))
+                            .characters(effect.characters.clone())
+                            .filtered_indices(Some(filtered_indices))
+                            .target_player_id(Some(target.to_string()))
+                            .is_select_action(true)
+                            .build(),
+                        );
+                        self.sub_choice_created = true;
+                        return Ok(());
+                    }
+                } else {
+                    // Already have selected target from previous choice resolution
+                    self.execute_set_heart_type(
+                        gs,
+                        heart_type,
+                        effect.target_name(),
+                        effect.count_or(1) as i32,
+                    );
+                }
                 Ok(())
             }
             ActionType::ActivateAbility => {
@@ -333,14 +444,88 @@ impl AbilityResolver {
                 Ok(())
             }
             ActionType::PlaceEnergyUnderMember => {
-                self.execute_place_energy_under_member(
-                    gs,
-                    effect.energy_count.unwrap_or(1),
-                    effect.target_name(),
-                    effect.position.as_ref(),
-                    effect.optional.unwrap_or(false),
-                    effect.source.as_deref(),
-                );
+                // Resolve dynamic_count if present
+                let actual_count = if let Some(ref dc) = effect.dynamic_count {
+                    self.resolve_dynamic_count(gs, dc)
+                } else {
+                    effect.energy_count.unwrap_or(1)
+                };
+                // Special case: source="under_member" + destination="energy_zone" means
+                // count from under member, but move from energy_deck → energy_zone (wait).
+                // e.g. PL!N-bp5-012-R+ LiveSuccess: place (under_count + 1) from deck.
+                if effect.source.as_deref() == Some("under_member")
+                    && effect.destination.as_deref() == Some("energy_zone")
+                {
+                    let player = gs.resolve_target_player_mut(effect.target_name());
+                    for _ in 0..actual_count {
+                        if let Some(energy) = player.energy_deck.draw() {
+                            player.energy_zone.cards.push(energy);
+                            // Don't increment active_energy_count — wait state
+                        } else {
+                            break;
+                        }
+                    }
+                } else if effect.source.as_deref() == Some("under_member")
+                    && effect.destination.as_deref() == Some("empty_area")
+                {
+                    // Deploy from under_member to empty_area (e.g. PL!-bp6-003-R+ LiveSuccess)
+                    // Only offer choice if there's an empty stage slot.
+                    let player = gs.resolve_target_player(effect.target_name());
+                    let has_empty_slot = (0..3).any(|i| player.stage.stage[i] == -1);
+                    if !has_empty_slot {
+                        return Ok(());
+                    }
+                    let pos = gs.activating_card.and_then(|c| {
+                        player.stage.stage.iter().position(|&id| id == c)
+                    }).unwrap_or(1);
+                    let area = match pos {
+                        0 => crate::zones::MemberArea::LeftSide,
+                        1 => crate::zones::MemberArea::Center,
+                        _ => crate::zones::MemberArea::RightSide,
+                    };
+                    let under_cards = player.stage.get_under_cards(area);
+                    if under_cards.is_empty() {
+                        return Ok(());
+                    }
+                    let target_str = effect.target_name().to_string();
+                    let mut b = Choice::select_cards(
+                        Zone::UnderMember.to_str(),
+                        actual_count as usize,
+                        "Select a member card to deploy from under this member",
+                        effect.optional.unwrap_or(false),
+                    )
+                    .card_type(effect.card_type.clone())
+                    .target_player_id(Some(target_str));
+                    if let Some(ref groups) = effect.group_names {
+                        if let Some(first) = groups.first() {
+                            b = b.group(Some(first.clone()));
+                        }
+                    }
+                    b = b.cost_limit(effect.cost_limit, effect.cost_limit_operator.clone());
+                    self.pending_choice = Some(b.build());
+                    self.execution_context = super::types::ExecutionContext::SingleEffect { effect_index: 0 };
+                } else if effect.source.as_deref() == Some("under_member")
+                    && effect.destination.as_deref() == Some("energy_deck")
+                {
+                    // Awakening Promise case: move from under_member → energy_deck
+                    self.execute_place_energy_under_member(
+                        gs,
+                        actual_count,
+                        effect.target_name(),
+                        effect.position.as_ref(),
+                        effect.optional.unwrap_or(false),
+                        effect.source.as_deref(),
+                    );
+                } else {
+                    self.execute_place_energy_under_member(
+                        gs,
+                        actual_count,
+                        effect.target_name(),
+                        effect.position.as_ref(),
+                        effect.optional.unwrap_or(false),
+                        effect.source.as_deref(),
+                    );
+                }
                 Ok(())
             }
             ActionType::ActivationCost => {
@@ -364,8 +549,7 @@ impl AbilityResolver {
 
             ActionType::Choice => self.execute_choice(gs, effect),
             ActionType::PayEnergy => {
-                self.execute_pay_energy(gs, effect.count_or(0), effect.target_name());
-                Ok(())
+                self.execute_pay_energy(gs, effect.count_or(0), effect.target_name())
             }
             ActionType::SetCardIdentity => self.execute_set_card_identity_effect(gs, effect),
             ActionType::RepeatProcedure => {
@@ -528,22 +712,6 @@ impl AbilityResolver {
                     effect.count_or(1)
                 };
                 self.execute_perform_yell(gs, count, effect.target_name());
-                Ok(())
-            }
-            ActionType::Look => {
-                log::warn!("Unimplemented action: Look ('{}')", action_str);
-                Ok(())
-            }
-            ActionType::RevealEffect => {
-                log::warn!("Unimplemented action: RevealEffect ('{}')", action_str);
-                Ok(())
-            }
-            ActionType::Rotation => {
-                log::warn!("Unimplemented action: Rotation ('{}')", action_str);
-                Ok(())
-            }
-            _ => {
-                log::debug!("Unknown effect action: '{}'", action_str);
                 Ok(())
             }
         }

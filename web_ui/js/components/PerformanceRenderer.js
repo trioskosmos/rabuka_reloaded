@@ -10,9 +10,13 @@ import * as i18n from '../i18n/index.js';
 import { Tooltips } from '../ui_tooltips.js';
 import { TextEnricher } from '../utils/TextEnricher.js';
 
-const HEART_LABELS = ['Any', 'Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple'];
+const HEART_LABELS = ['Any', 'Pink', 'Red', 'Yellow', 'Green', 'Blue', 'Purple', 'All'];
 
-const HEART_ICONS = HEART_LABELS.map((_, index) => `img/texticon/heart_0${index}.png`);
+const HEART_ICONS = [
+    'img/texticon/heart_00.png', 'img/texticon/heart_01.png', 'img/texticon/heart_02.png',
+    'img/texticon/heart_03.png', 'img/texticon/heart_04.png', 'img/texticon/heart_05.png',
+    'img/texticon/heart_06.png', 'img/texticon/icon_all.png'
+];
 
 function tr(key, params) {
     return i18n.t(key, params);
@@ -44,6 +48,12 @@ function sumPassedLiveScores(lives) {
     return lives
         .filter((live) => live && live.passed)
         .reduce((total, live) => total + (live.score || 0), 0);
+}
+
+function sumPassedBaseScores(lives) {
+    return lives
+        .filter((live) => live && live.passed)
+        .reduce((total, live) => total + (live.base_score || 0), 0);
 }
 
 function getDisplayResults(results) {
@@ -158,9 +168,10 @@ function renderHeartsCompact(hearts) {
 
     return `<div class="hearts-compact">${hearts.map((count, index) => {
         if (!count) return '';
+        const iconSrc = HEART_ICONS[index];
         return `
             <div class="heart-tag ${index === 0 ? 'color-any' : `color-${index}`}" title="${escapeHtml(HEART_LABELS[index])}">
-                <img src="${HEART_ICONS[index]}" class="heart-mini-icon" alt="${escapeHtml(HEART_LABELS[index])}">
+                <img src="${iconSrc}" class="heart-mini-icon" alt="${escapeHtml(HEART_LABELS[index])}">
                 <span>${count}</span>
             </div>
         `;
@@ -196,55 +207,102 @@ function renderHeartProgress(filled, required) {
     return html;
 }
 
-function renderSuccessEquation(have, need, spare) {
-    const needValues = need;
-    const haveValues = have;
-    const spareValues = spare || [0, 0, 0, 0, 0, 0, 0];
-    const totalHave = sumHearts(haveValues);
-    const totalNeed = sumHearts(needValues);
-    const totalSpare = sumHearts(spareValues);
+function renderAggregateHeartSummary(result) {
+    const lives = result?.lives || [];
+    if (lives.length === 0) return '';
 
-    const success = totalHave >= totalNeed;
+    const totalHearts = result.total_hearts || [0,0,0,0,0,0,0,0];
+    const totalAvailable = sumHearts(totalHearts);
 
-    // Build per-color deficit info
-    const deficitLines = [];
-    for (let color = 1; color < 7; color += 1) {
-        const needed = needValues[color] || 0;
-        const filled = haveValues[color] || 0;
-        if (needed > filled) {
-            deficitLines.push(`${needed - filled} more ${HEART_LABELS[color]}`);
+    // Sum required and filled across ALL live cards (shared pool)
+    const totalRequired = [0,0,0,0,0,0,0,0];
+    const totalFilled = [0,0,0,0,0,0,0,0];
+    for (const live of lives) {
+        const req = live.required || [0,0,0,0,0,0,0,0];
+        const fill = live.filled || [0,0,0,0,0,0,0,0];
+        for (let i = 0; i < 7; i++) {
+            totalRequired[i] += req[i];
+            totalFilled[i] += fill[i];
         }
     }
 
-    // Check if wildcards were used (filled has hearts but need has different totals per color)
-    let wildcardUsed = 0;
-    for (let color = 1; color < 7; color += 1) {
-        const needed = needValues[color] || 0;
-        const filled = haveValues[color] || 0;
-        // Wildcards fill the gap when filled > what colored hearts could provide
-        // We can't perfectly separate colored vs wildcard in the filled array,
-        // but if filled matches needed exactly, wildcards were likely used for deficits
-    }
+    const totalReqSum = sumHearts(totalRequired);
+    const totalFilledSum = sumHearts(totalFilled);
+    const surplus = totalAvailable - totalFilledSum;
+
+    // Step 1: colored hearts (1-6) fill colored requirements
+    const coloredAvail = sumHearts(totalHearts.slice(1, 7));
+    const coloredReq = sumHearts(totalRequired.slice(1, 7));
+    const coloredFilled = sumHearts(totalFilled.slice(1, 7));
+    const coloredDeficit = Math.max(0, coloredReq - coloredFilled);
+
+    // Step 2: wild (heart00) covers remaining colored deficits
+    const wildAvail = totalHearts[0] || 0;
+    const wildForDeficit = Math.min(wildAvail, coloredDeficit);
+    const wildRemaining = wildAvail - wildForDeficit;
+
+    // Step 3: remaining colored + wild fill wild requirement (required[0])
+    const coloredRemaining = coloredAvail - coloredFilled;
+    const wildReq = totalRequired[0] || 0;
+    const availableForWildReq = coloredRemaining + wildRemaining;
+
+    // Check how the engine judges: wildcard(0) fills colored deficits first,
+    // then remaining covers heart00 requirement
+    const h00Filled = Math.min(availableForWildReq, wildReq);
+    const h00Deficit = Math.max(0, wildReq - h00Filled);
+
+    const allPassed = lives.every(l => l.passed);
 
     return `
-        <div class="perf-match-summary ${success ? 'success' : 'failure'}">
-            <div class="perf-math-sum">
-                <div class="perf-math-operand">
-                    <div class="perf-eyebrow">Required</div>
-                    <div class="perf-math-value">${totalNeed}</div>
+        <div class="perf-agg-summary ${allPassed ? 'success' : 'failure'}">
+            <div class="perf-agg-header">
+                <img src="img/texticon/icon_heart.png" class="heart-mini-icon" alt="">
+                Heart Allocation (shared pool across ${lives.length} live card${lives.length > 1 ? 's' : ''})
+            </div>
+            <div class="perf-agg-table">
+                <div class="perf-agg-row">
+                    <span class="perf-agg-label">Available</span>
+                    ${renderHeartsCompact(totalHearts)}
+                    <span class="perf-agg-sum">${totalAvailable}</span>
                 </div>
-                <div class="perf-math-operator"> vs </div>
-                <div class="perf-math-operand">
-                    <div class="perf-eyebrow">Filled</div>
-                    <div class="perf-math-value">${totalHave}</div>
+                <div class="perf-agg-row">
+                    <span class="perf-agg-label">Required (total)</span>
+                    ${renderHeartsCompact(totalRequired)}
+                    <span class="perf-agg-sum">${totalReqSum}</span>
                 </div>
-                <div class="perf-math-operator"> = </div>
-                <div class="perf-math-result">
-                    <div class="perf-math-value">${success ? '✓ PASS' : '✗ FAIL'}</div>
+                <div class="perf-agg-row allocated">
+                    <span class="perf-agg-label">Allocated</span>
+                    ${renderHeartsCompact(totalFilled)}
+                    <span class="perf-agg-sum">${totalFilledSum}</span>
+                </div>
+                <div class="perf-agg-divider"></div>
+                ${coloredReq > 0 ? `
+                <div class="perf-agg-step">
+                    <span class="perf-agg-marker">①</span>
+                    <span>Colored hearts → colored requirements</span>
+                    <span class="perf-agg-step-stat">${coloredFilled}/${coloredReq} filled</span>
+                </div>
+                ` : ''}
+                ${coloredDeficit > 0 ? `
+                <div class="perf-agg-step">
+                    <span class="perf-agg-marker">②</span>
+                    <span>Wild (Any) covers colored deficit</span>
+                    <span class="perf-agg-step-stat">${wildForDeficit} used</span>
+                </div>
+                ` : ''}
+                ${wildReq > 0 ? `
+                <div class="perf-agg-step">
+                    <span class="perf-agg-marker">③</span>
+                    <span>Remaining hearts fill Any requirement</span>
+                    <span class="perf-agg-step-stat">${h00Filled}/${wildReq} filled${h00Deficit > 0 ? `, <span class="perf-agg-fail">${h00Deficit} short</span>` : ''}</span>
+                </div>
+                ` : ''}
+                <div class="perf-agg-divider"></div>
+                <div class="perf-agg-row surplus ${surplus > 0 ? 'positive' : 'zero'}">
+                    <span class="perf-agg-label">Surplus</span>
+                    <span class="perf-agg-surplus-value">${surplus > 0 ? '+' : ''}${surplus}</span>
                 </div>
             </div>
-            ${deficitLines.length > 0 ? `<div class="perf-wildcard-info" style="color:var(--accent-pink);">Shortfall: ${deficitLines.join(', ')}</div>` : ''}
-            ${totalSpare > 0 ? `<div class="perf-wildcard-info">${totalSpare} hearts remaining in pool</div>` : ''}
         </div>
     `;
 }
@@ -275,11 +333,13 @@ function renderPerfSteps(result) {
 
     const H = ['h00','h01','h02','h03','h04','h05','h06'];
     const fmtH = (arr) => arr ? H.map((h,i) => arr[i] > 0 ? `${h}:${arr[i]}` : null).filter(Boolean).join(' ') : 'none';
-    const fmtHShort = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="img/texticon/heart_0${i}.png" class="heart-mini-icon">${v}` : '').join('') : '';
+    const fmtHShortReq = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="${i === 0 ? 'img/texticon/heart_00.png' : `img/texticon/heart_0${i}.png`}" class="heart-mini-icon">${v}` : '').join('') : '';
+    const fmtHShortSrc = (arr) => arr ? arr.map((v,i) => v > 0 ? `<img src="img/texticon/heart_0${i}.png" class="heart-mini-icon">${v}` : '').join('') : '';
 
     const totalBlades = (result.member_contributions || []).reduce((s, m) => s + m.base_blades + m.bonus_blades, 0);
     const passedLives = (result.lives || []).filter(l => l.passed).length;
     const baseLiveScore = (result.lives || []).reduce((s, l) => l.passed ? s + l.score : s, 0);
+    const baseRawScore = (result.lives || []).reduce((s, l) => l.passed ? s + (l.base_score || 0) : s, 0);
 
     return `
         <section class="perf-steps-all">
@@ -300,7 +360,7 @@ function renderPerfSteps(result) {
                             <div class="perf-step-live-card">
                                 ${imgSrc ? `<div class="perf-live-art-wrapper md"><img src="${imgSrc}"></div>` : ''}
                                 <div class="perf-step-live-info">
-                                    <div>Require: ${fmtHShort(live.required)}</div>
+                                    <div>Require: ${fmtHShortReq(live.required)}</div>
                                     <div>Score: ${live.score}</div>
                                 </div>
                             </div>
@@ -334,7 +394,7 @@ function renderPerfSteps(result) {
                                 <div class="perf-step-member">
                                     ${imgSrc ? `<img src="${imgSrc}" class="perf-step-member-img">` : ''}
                                     <div>Blade: ${m.base_blades}${m.bonus_blades > 0 ? '+' + m.bonus_blades : ''}</div>
-                                    <div>${fmtHShort(m.base_hearts)}</div>
+                                    <div>${fmtHShortSrc(m.base_hearts)}</div>
                                 </div>
                             `;
                         }).join('')}
@@ -348,9 +408,9 @@ function renderPerfSteps(result) {
                 <summary class="perf-step-summary">4. Stage Hearts — ${fmtH(result.total_hearts)}</summary>
                 <div class="perf-step-body">
                     <div class="perf-step-hearts-row">
-                        ${result.total_hearts ? H.map((h,i) =>
-                            result.total_hearts[i] > 0
-                                ? `<span class="perf-step-heart-cell"><img src="img/texticon/heart_0${i}.png" class="heart-mini-icon"> ${result.total_hearts[i]}</span>`
+                          ${result.total_hearts ? H.map((h,i) =>
+                              result.total_hearts[i] > 0
+                                 ? `<span class="perf-step-heart-cell"><img src="img/texticon/heart_0${i}.png" class="heart-mini-icon"> ${result.total_hearts[i]}</span>`
                                 : ''
                         ).join('') : ''}
                     </div>
@@ -369,7 +429,7 @@ function renderPerfSteps(result) {
                             return `
                                 <div class="perf-step-yell-card">
                                     ${imgSrc ? `<img src="${imgSrc}" class="perf-step-card-img-sm">` : ''}
-                                    <div>♥ ${fmtHShort(y.blade_hearts)}</div>
+                                    <div>♥ ${fmtHShortSrc(y.blade_hearts)}</div>
                                     <div>♪${y.note_icons} ⎋${y.draw_icons}</div>
                                 </div>
                             `;
@@ -416,7 +476,7 @@ function renderPerfSteps(result) {
                                     <span>Slot ${i}: <b>${live.passed ? '✓ PASS' : '✗ FAIL'}</b> score +${live.score}</span>
                                 </div>
                                 <div class="perf-step-judge-detail">
-                                    need ${fmtHShort(live.required)} / filled ${fmtHShort(live.filled)} / spare ${fmtHShort(live.spare)}
+                                    need ${fmtHShortReq(live.required)} / filled ${fmtHShortSrc(live.filled)} / spare ${fmtHShortSrc(live.spare)}
                                 </div>
                                 ${failedReason.map(a => `<div class="perf-step-fail-reason">${a.desc}</div>`).join('')}
                             </div>
@@ -433,11 +493,11 @@ function renderPerfSteps(result) {
                     <div class="perf-step-result-row">
                         <div class="perf-step-result-item">
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
-                            Base live score: ${baseLiveScore}
+                            Base live score: ${baseRawScore}
                         </div>
                         <div class="perf-step-result-item">
                             <img src="img/texticon/icon_score.png" class="heart-mini-icon">
-                            Triggered bonuses: ${(result.lives || []).reduce((s, l) => l.passed ? s + (l.score) : s, 0) - baseLiveScore > 0 ? '+' : ''}${(result.lives || []).reduce((s, l) => l.passed ? s + (l.score) : s, 0) - baseLiveScore}
+                            Triggered bonuses: ${baseLiveScore - baseRawScore > 0 ? '+' : ''}${baseLiveScore - baseRawScore}
                         </div>
                         <div class="perf-step-result-item total">
                             Total: <b>${result.total_score || 0}</b>
@@ -484,23 +544,8 @@ function renderComparisonBanner(displayResults) {
 
 function renderTotalSection(result) {
     if (!result) return '';
-    const members = result.member_contributions || [];
-    const yellCards = result.yell_cards || [];
 
-    const stageHearts = [0,0,0,0,0,0,0];
-    members.forEach(m => {
-        const base = m.base_hearts || [0,0,0,0,0,0,0];
-        const bonus = m.bonus_hearts || [0,0,0,0,0,0,0];
-        for (let i = 0; i < 7; i++) stageHearts[i] += (base[i] || 0) + (bonus[i] || 0);
-    });
-
-    const yellHearts = [0,0,0,0,0,0,0];
-    yellCards.forEach(c => {
-        const bh = c.blade_hearts || [0,0,0,0,0,0,0];
-        for (let i = 0; i < 7; i++) yellHearts[i] += bh[i];
-    });
-
-    const totalHearts = stageHearts.map((v, i) => v + yellHearts[i]);
+    const totalHearts = result.total_hearts || [0,0,0,0,0,0,0,0];
 
     return `
         <section class="perf-section-card">
@@ -510,19 +555,8 @@ function renderTotalSection(result) {
                 </div>
             </div>
             <div class="perf-total-breakdown">
-                <div class="perf-breakdown-row">
-                    <span class="perf-mini-heading">Stage totals</span>
-                    ${renderHeartsCompact(stageHearts)}
-                    <span class="perf-breakdown-sum">${sumHearts(stageHearts)}</span>
-                </div>
-                <div class="perf-breakdown-row">
-                    <span class="perf-mini-heading">Yell totals</span>
-                    ${renderHeartsCompact(yellHearts)}
-                    <span class="perf-breakdown-sum">${sumHearts(yellHearts)}</span>
-                </div>
-                <div class="perf-breakdown-divider"></div>
                 <div class="perf-breakdown-row grand">
-                    <span class="perf-mini-heading">Grand total</span>
+                    <span class="perf-mini-heading">Stage + Yell</span>
                     ${renderHeartsCompact(totalHearts)}
                     <span class="perf-breakdown-sum">${sumHearts(totalHearts)}</span>
                 </div>
@@ -555,18 +589,19 @@ function renderLiveCards(result) {
             </div>
             <div class="perf-live-grid">
                 ${lives.map((live, index) => {
-                    const required = live?.required || [0,0,0,0,0,0,0];
-                    const filled = live?.filled || [0,0,0,0,0,0,0];
-                    const spare = live?.spare || [0,0,0,0,0,0,0];
+                    const cd = live.card_no ? State.resolveCardData(live.card_no) : null;
+                    const required = live?.required || [0,0,0,0,0,0,0,0];
+                    const filled = live?.filled || [0,0,0,0,0,0,0,0];
+                    const spare = live?.spare || [0,0,0,0,0,0,0,0];
                     const adjustments = live.adjustments;
                     return `
                         <article class="perf-live-card ${live?.passed ? 'success' : 'failure'}">
                             <div class="perf-live-card-head">
                                 <div class="perf-card-id-badge">Live ${index + 1}</div>
                                 <div class="perf-live-card-title">
-                                    ${(() => { const cd = live.card_no ? State.resolveCardData(live.card_no) : null; return cd?.img ? `<div class="perf-live-art-wrapper lg"><img src="${fixImg(cd.img)}" alt="${escapeHtml(live.name || 'Live')}"></div>` : ''; })()}
+                                    ${cd?.img ? `<div class="perf-live-art-wrapper lg"><img src="${fixImg(cd.img)}" alt="${escapeHtml(cd?.name || 'Live')}"></div>` : ''}
                                     <div>
-                                        <h4>${escapeHtml(live?.name || 'Live')}</h4>
+                                        <h4>${escapeHtml(cd?.name || 'Live')}</h4>
                                         <div class="perf-live-card-meta">Score ${live?.score || 0}</div>
                                     </div>
                                 </div>
@@ -590,19 +625,6 @@ function renderLiveCards(result) {
                                 </div>
                             </div>
                             ${required[0] > 0 ? `<div class="perf-heart-legend" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;"><img src="img/texticon/heart_00.png" class="heart-mini-icon" style="width:12px;height:12px;"> Any hearts fill deficits of any color</div>` : ''}
-                            ${renderSuccessEquation(filled, required, spare)}
-                            ${!live?.passed ? `
-                                <div class="perf-live-fail-reason">
-                                    Not enough hearts: needed ${HEART_LABELS.map((l,i)=>{
-                                        const n = required[i]||0;
-                                        return n ? `<b>${n} ${l}</b>` : '';
-                                    }).filter(Boolean).join(', ')}
-                                    ${filled.some(f=>f>0) ? `, had ${HEART_LABELS.map((l,i)=>{
-                                        const f = filled[i]||0;
-                                        return f ? `${f} ${l}` : '';
-                                    }).filter(Boolean).join(', ')}` : ''}
-                                </div>
-                            ` : ''}
                             ${adjustments && adjustments.length > 0 ? `
                                 <div class="perf-pill-list">
                                     ${adjustments.map((adj) => {
@@ -668,7 +690,7 @@ function renderAllocationSection(result) {
                                             <span class="perf-route-source-meta">${row?.source_type === 'yell' ? 'Yell card' : `Stage slot ${Number(row?.source_slot ?? -1) + 1}`}</span>
                                         </div>
                                         <div class="perf-route-payment">
-                                            <img src="${HEART_ICONS[row?.wildcard ? 0 : (row?.color ?? 0)]}" class="heart-mini-icon" alt="">
+                                            <img src="${row?.color === 7 ? 'img/texticon/icon_all.png' : (row?.wildcard ? 'img/texticon/heart_00.png' : HEART_ICONS[row?.color ?? 0])}" class="heart-mini-icon" alt="">
                                             <strong>${row?.amount || 0}</strong>
                                             ${row?.is_bonus ? '<span class="perf-badge bonus">bonus</span>' : '<span class="perf-badge base">printed</span>'}
                                             ${row?.wildcard ? '<span class="perf-badge wildcard">wildcard</span>' : ''}
@@ -713,8 +735,8 @@ function renderContributionSection(result) {
             </div>
             <div class="perf-contrib-grid">
                 ${members.map((member) => {
-                    const base = member.base_hearts || [0,0,0,0,0,0,0];
-                    const bonus = member.bonus_hearts || [0,0,0,0,0,0,0];
+                    const base = member.base_hearts || [0,0,0,0,0,0,0,0];
+                    const bonus = member.bonus_hearts || [0,0,0,0,0,0,0,0];
                     const total = base.map((v, i) => v + (bonus[i] || 0));
                     const totalBlade = (member.base_blades || 0) + (member.bonus_blades || 0);
                     const heartBonuses = member.ability_heart_bonuses || [];
@@ -837,16 +859,16 @@ function renderYellSection(result) {
     }
 
     // Aggregate per-color total across all yell cards
-    const totalYellHearts = [0,0,0,0,0,0,0];
+    const totalYellHearts = [0,0,0,0,0,0,0,0];
     yellCards.forEach(c => {
-        const bh = c.blade_hearts || [0,0,0,0,0,0,0];
+        const bh = c.blade_hearts || [0,0,0,0,0,0,0,0];
         for (let i = 0; i < 7; i++) totalYellHearts[i] += bh[i];
     });
 
     // Per-color source: count how many yell cards contribute to each color
-    const perColorCount = [0,0,0,0,0,0,0];
+    const perColorCount = [0,0,0,0,0,0,0,0];
     yellCards.forEach(c => {
-        const bh = c.blade_hearts || [0,0,0,0,0,0,0];
+        const bh = c.blade_hearts || [0,0,0,0,0,0,0,0];
         for (let i = 1; i < 7; i++) {
             if (bh[i] > 0) perColorCount[i]++;
         }
@@ -883,23 +905,7 @@ function renderYellSection(result) {
                     `;
                 }).join('') : ''}
             </div>
-            ${perColorCount.some(c => c > 0) ? `
-            <div class="perf-yell-source-breakdown">
-                <div class="perf-mini-heading" style="margin-bottom: 4px;">Per-color source</div>
-                <div class="perf-chip-list">
-                    ${HEART_LABELS.map((label, i) => {
-                        if (i === 0 || perColorCount[i] === 0) return '';
-                        const total = totalYellHearts[i] || 0;
-                        return `
-                            <div class="perf-source-chip yell">
-                                <img src="${HEART_ICONS[i]}" class="heart-mini-icon" alt="">
-                                <span>${total} (from ${perColorCount[i]} yell card${perColorCount[i] > 1 ? 's' : ''})</span>
-                            </div>
-                        `;
-                    }).join('')}
-                </div>
-            </div>
-            ` : ''}
+
             ${heartSources.length > 0 ? `
             <div class="perf-source-lists">
                 <div>
@@ -987,18 +993,32 @@ function renderEffectsSection(result) {
 
 function renderPlayerPanel(playerId, result) {
     if (!result) return '';
-    const lives = result.lives;
+    const lives = result.lives || [];
     const passedLives = countPassedLives(lives);
     const totalLives = lives.length;
+    
+    const isSuccess = result.success;
+
     const totalHearts = sumHearts(result.total_hearts);
     const baseLiveScore = sumPassedLiveScores(lives);
-    const outcome = getOutcomeLabel(playerId, result);
+    
+    let outcome = 'Failed performance';
+    if (isSuccess) {
+        const winsKey = playerId === 0 ? 'p0_wins' : 'p1_wins';
+        const otherWinsKey = playerId === 0 ? 'p1_wins' : 'p0_wins';
+        const selfWins = !!result[winsKey];
+        const otherWins = !!result[otherWinsKey];
+        if (selfWins && otherWins) outcome = 'Comparative tie';
+        else if (selfWins) outcome = 'Won live result';
+        else if (otherWins) outcome = 'Lost live result';
+        else outcome = 'Passed performance';
+    }
+
     const members = result?.member_contributions || [];
     const totalBlades = members.reduce((s, m) => s + (m.base_blades || 0) + (m.bonus_blades || 0), 0);
-    const cheerMult = totalBlades > 0 ? (result.yell_count / totalBlades).toFixed(1) : '1.0';
 
     return `
-        <article class="perf-panel ${result?.success ? 'success' : 'failure'}">
+        <article class="perf-panel ${isSuccess ? 'success' : 'failure'}">
             <header class="perf-panel-header">
                 <div class="perf-panel-header-main">
                     <div class="perf-eyebrow">${escapeHtml(getPlayerName(playerId))}</div>
@@ -1006,7 +1026,7 @@ function renderPlayerPanel(playerId, result) {
                     <div class="perf-panel-subtitle">Judge score ${result?.total_score || 0} with ${passedLives}/${totalLives} live cards passing.</div>
                 </div>
                 <div class="perf-panel-statuses">
-                    <div class="perf-status-pill ${result?.success ? 'success' : 'failure'}">${result?.success ? 'PASS' : 'FAIL'}</div>
+                    <div class="perf-status-pill ${isSuccess ? 'success' : 'failure'}">${isSuccess ? 'PASS' : 'FAIL'}</div>
                     <div class="perf-outcome-pill">${escapeHtml(outcome)}</div>
                 </div>
             </header>
@@ -1026,20 +1046,24 @@ function renderPlayerPanel(playerId, result) {
                     </div>
                     ${renderTextMetric('Lives Passed', `${passedLives} / ${totalLives}`)}
                     ${renderIconMetric('img/texticon/icon_score.png', 'Live Pts', String(baseLiveScore), 'score')}
-                    ${renderIconMetric('', 'Notes', `${result?.note_icons || 0}♪`, 'notes')}
+                    ${renderIconMetric('img/texticon/icon_score.png', 'Notes', `${result?.note_icons || 0}♪`, 'notes')}
                     ${renderIconMetric('img/texticon/icon_blade.png', 'Stage Blades', String(totalBlades), 'blades')}
-                    ${renderTextMetric('Cheer Mult', `${cheerMult}x`)}
                     ${renderIconMetric('img/texticon/icon_blade.png', 'Yell Count', String(result?.yell_count || 0), 'yells')}
                 </div>
             </section>
 
             <div class="perf-panel-body-grid">
-                ${renderContributionSection(result)}
-                ${renderYellSection(result)}
-                ${renderTotalSection(result)}
-                ${renderLiveCards(result)}
-                ${renderAllocationSection(result)}
-                ${renderEffectsSection(result)}
+                <div class="perf-column left">
+                    ${renderAggregateHeartSummary(result)}
+                    ${renderTotalSection(result)}
+                    ${renderYellSection(result)}
+                    ${renderAllocationSection(result)}
+                    ${renderEffectsSection(result)}
+                </div>
+                <div class="perf-column right">
+                    ${renderContributionSection(result)}
+                    ${renderLiveCards(result)}
+                </div>
             </div>
         </article>
     `;
@@ -1077,7 +1101,7 @@ export const PerformanceRenderer = {
                 const cardData = mc.card_no ? State.resolveCardData(mc.card_no) : null;
                 const imgSrc = cardData ? fixImg(cardData.img) : null;
                 const name = cardData?.name || mc.source || 'Member';
-                const heartHtml = renderHeartsCompact(mc.total_hearts || mc.base_hearts || []);
+                const heartHtml = renderHeartsCompact(mc.base_hearts || []);
                 memberHtml += `
                     <div class="perf-guide-member">
                         ${imgSrc ? `<img src="${imgSrc}" class="perf-guide-member-img" alt="${escapeHtml(name)}">` : ''}
@@ -1234,5 +1258,5 @@ export const PerformanceRenderer = {
     renderHeartsGrid,
     renderHeartsCompact,
     renderBladesCompact,
-    renderSuccessEquation,
+    renderAggregateHeartSummary,
 };

@@ -9,10 +9,10 @@ nul
 *.log
 *.json
 !cards/*.json
-!web_ui/package.json
-!web_ui/package-lock.json
-!web_ui/vite.config.js
 .kilo/
 .opencode/
 .ruff_cache/
-\n# Ignore Spaces/deployment artifacts\nweb_ui/dist/\nroot_files/\npoll_data/\n
+web_ui/dist/
+root_files/
+poll_data/
+

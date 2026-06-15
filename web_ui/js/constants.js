@@ -1,8 +1,8 @@
 export const Phase = {
     ROCK_PAPER_SCISSORS: "RockPaperScissors",
     CHOOSE_FIRST_ATTACKER: "ChooseFirstAttacker",
-    MULLIGAN_P1: "MulliganP1Turn",
-    MULLIGAN_P2: "MulliganP2Turn",
+    MULLIGAN_P1: "MulliganFirstAttacker",
+    MULLIGAN_P2: "MulliganSecondAttacker",
     MULLIGAN: "Mulligan",
     ACTIVE: "Active",
     ENERGY: "Energy",
@@ -18,7 +18,9 @@ export const Phase = {
 export const isMulliganPhase = (phase) => {
     if (!phase) return false;
     const lower = String(phase).toLowerCase();
-    return lower === "mulligan" || lower === "mulliganp1turn" || lower === "mulliganp2turn";
+    return lower === "mulligan" ||
+        lower === "mulliganp1turn" || lower === "mulliganp2turn" ||
+        lower === "mulliganfirstattacker" || lower === "mulligansecondattacker";
 };
 
 const isStaticHost = window.location.hostname.includes('github.io') ||

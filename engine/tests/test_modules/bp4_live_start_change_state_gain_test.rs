@@ -12,7 +12,6 @@
 ///
 /// Covers: gain_resource + change_state (0% coverage)
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 /// Pay cost (wait), verify blade gain on group member
 #[test]

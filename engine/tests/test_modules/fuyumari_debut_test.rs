@@ -48,6 +48,11 @@ fn fuyumari_q118_opponent_picks_first_card() {
         game.has_pending_choice(),
         "Should have opponent select choice"
     );
+    assert_eq!(
+        game.state.ability_queue.current_entry().as_ref().and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "Opponent-select choice should be routed to opponent"
+    );
     game.select_option(0);
 
     // Step 3: Opponent's chosen card (live_a, index 0 of selected_cards) goes to hand
@@ -95,6 +100,12 @@ fn fuyumari_q118_opponent_picks_second_card() {
     assert!(
         game.has_pending_choice(),
         "Should have opponent select choice"
+    );
+    let entry = game.state.ability_queue.current_entry();
+    assert_eq!(
+        entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "Opponent-select choice should be routed to opponent"
     );
     game.select_option(1);
 

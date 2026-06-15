@@ -4,7 +4,7 @@ import { DragDrop } from './ui_drag_drop.js';
 import { Modals } from './ui_modals.js';
 import { Rendering } from './ui_rendering.js';
 import { Replay } from './replay_system.js';
-import { closeSidebar, toggleSidebar, switchBoard } from './layout.js';
+import { closeSidebar, toggleLogSidebar, toggleActionsSidebar, switchBoard } from './layout.js';
 import { loadTranslations } from './i18n/index.js';
 import { DOMUtils } from './utils/DOMUtils.js';
 import { ModalManager } from './utils/ModalManager.js';
@@ -76,7 +76,8 @@ function syncRoomDisplay() {
 }
 
 const actionHandlers = {
-    'toggle-sidebar': toggleSidebar,
+    'toggle-log-sidebar': toggleLogSidebar,
+    'toggle-actions-sidebar': toggleActionsSidebar,
     'close-sidebar': closeSidebar,
     'save-state': Modals.saveState,
     'load-state': Modals.loadState,
@@ -84,8 +85,7 @@ const actionHandlers = {
     'redo': Modals.redo,
     'open-debug-modal': Modals.openDebugModal,
     'open-report-modal': Modals.openReportModal,
-    'open-settings-modal': Modals.openSettingsModal,
-    'close-settings-modal': Modals.closeSettingsModal,
+
     'leave-room': Network.leaveRoom,
     'click-target': ({ targetId }) => document.getElementById(targetId)?.click(),
     'open-paste-replay-modal': Replay.openPasteReplayModal,
@@ -119,16 +119,13 @@ const actionHandlers = {
     'submit-deck': Modals.submitDeck,
     'load-test-deck': Modals.loadTestDeck,
     'load-random-deck': Modals.loadRandomDeck,
-    'toggle-hotseat': () => window.Actions.toggleHotseat(),
+
     'toggle-perspective': () => window.Actions.togglePerspective(),
-    'toggle-live-watch': () => window.Actions.toggleLiveWatch(),
-    'toggle-friendly-abilities': Modals.toggleFriendlyAbilities,
     'toggle-lang': Modals.toggleLang,
-    'toggle-replay-mode': Replay.toggleReplayMode,
-    'toggle-debug-mode': Modals.toggleDebugMode,
     'close-setup-modal': Modals.closeSetupModal,
     'submit-game-setup': Modals.submitGameSetup,
     'open-setup-modal': ({ value }) => Modals.openSetupModal(value),
+    'create-room': () => Network.createRoom('pvp'),
     'join-room': () => Network.joinRoom(document.getElementById('room-code-input')?.value || ''),
     'start-offline': () => { console.warn('Offline mode removed. Use Rust backend via Express proxy.'); },
     'force-reset': () => window.App.forceReset(),
@@ -175,6 +172,19 @@ const actionHandlers = {
     'cheat-reshuffle': ({ player }) => {
         window.Actions.execCode(`player_idx=${player}; reshuffle_deck`);
     },
+    'cheat-negative-energy': ({ player }) => {
+        window.Actions.execCode(`player_idx=${player}; negative_energy`);
+    },
+    'cheat-to-success': ({ player }) => {
+        const cardId = document.getElementById('cheat-util-id')?.value || '';
+        if (!cardId) { alert('Enter a card ID'); return; }
+        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; to_success`);
+    },
+    'cheat-to-discard': ({ player }) => {
+        const cardId = document.getElementById('cheat-util-id')?.value || '';
+        if (!cardId) { alert('Enter a card ID'); return; }
+        window.Actions.execCode(`player_idx=${player}; card_no=${cardId}; to_discard`);
+    },
 };
 
 function handleDelegatedClick(event) {
@@ -220,6 +230,12 @@ export const AppController = {
             return false;
         };
 
+        // Show lobby immediately so the user has something to interact with
+        // while slower async init (card DB, translations, health checks) completes.
+        if (!State.replayMode) {
+            Modals.openLobby();
+        }
+
         await loadTranslations(State.currentLang);
         await State.loadStaticCardDatabase();
         await loadTranslations(State.currentLang);
@@ -234,16 +250,23 @@ export const AppController = {
             isTabActive = !document.hidden;
         });
 
+        // Clear card selection when clicking outside cards
+        document.addEventListener('click', (e) => {
+            if (window.selectedAction && !e.target.closest('.card, .member-slot, .member-area')) {
+                window.selectedAction = null;
+                document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+                if (window.highlightActionBtn) window.highlightActionBtn(null, false);
+            }
+        });
+
         // Custom events for log entry clicks
         document.addEventListener('opencode:show-performance', (e) => {
-            import('./modals/PerformanceModal.js').then(mod => {
-                const { turn } = e.detail;
-                if (turn > 0 && State.performanceHistory && State.performanceHistory[turn]) {
-                    mod.PerformanceModal.showPerformanceForTurn(turn);
-                } else {
-                    mod.PerformanceModal.showLastPerformance();
-                }
-            });
+            const { turn } = e.detail;
+            if (turn > 0 && State.performanceHistory && State.performanceHistory[turn]) {
+                Modals.showPerformanceForTurn(turn);
+            } else {
+                Modals.showLastPerformance();
+            }
         });
         document.addEventListener('opencode:show-log-detail', (e) => {
             LogDetailModal.open(e.detail.entryType, e.detail.body, e.detail.groupId);
@@ -258,9 +281,6 @@ export const AppController = {
         syncRoomDisplay();
         await Network.checkSystemStatus();
 
-        if (!State.replayMode) {
-            Modals.openLobby();
-        }
         DragDrop.init();
         LogDetailModal.init();
 
@@ -271,8 +291,40 @@ export const AppController = {
             window.addEventListener('beforeunload', () => {
                 clearInterval(healthCheckInterval);
                 healthCheckInterval = null;
+                // Use sendBeacon to notify server on tab close (works during unload)
+                if (State.roomCode && State.sessionToken) {
+                    const payload = JSON.stringify({
+                        room_id: State.roomCode,
+                        session_id: State.sessionToken
+                    });
+                    navigator.sendBeacon('api/rooms/leave', payload);
+                }
             });
         }
+
+        // PVP state polling — fallback when SSE is delayed or drops
+        const existingPoll = window._pvpPollInterval;
+        if (existingPoll) clearInterval(existingPoll);
+        window._pvpPollInterval = window.setInterval(() => {
+            if (isTabActive && State.roomCode && State.sessionToken && !State.replayMode) {
+                Network.fetchState();
+            }
+        }, 3000);
+
+        // Global handler for when the other player leaves the room
+        window._roomClosedHandled = false;
+        window.handleRoomClosed = () => {
+            if (window._roomClosedHandled) return;
+            window._roomClosedHandled = true;
+            if (window._pvpPollInterval) {
+                clearInterval(window._pvpPollInterval);
+                window._pvpPollInterval = null;
+            }
+            alert('Opponent has left the game. Returning to lobby.');
+            if (window.Network?.leaveRoom) {
+                window.Network.leaveRoom();
+            }
+        };
 
         const savedScale = localStorage.getItem('lovelive_board_scale');
         if (savedScale) Modals.updateBoardScale(savedScale);

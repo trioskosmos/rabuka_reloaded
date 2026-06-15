@@ -33,6 +33,7 @@ pub mod dream_with_you_test;
 pub mod duplicate_id_mulligan_test;
 pub mod e2e_basic_game_test;
 pub mod edelnote_test;
+pub mod empty_energy_deck_test;
 pub mod eli_bp4_test;
 pub mod eli_sequential_cost_test;
 pub mod eli_test;
@@ -45,6 +46,7 @@ pub mod fuyumari_debut_test;
 pub mod fuyumari_test;
 pub mod gameplay_test;
 pub mod hanamaru_test;
+
 pub mod hanamusubi_test;
 pub mod hanano_test;
 pub mod hanayo_bp6_test;
@@ -90,6 +92,7 @@ pub mod mifune_test;
 pub mod miracle_stay_tune_test;
 pub mod miracle_wave_test;
 pub mod mirai_ticket_test;
+pub mod movement_condition_test;
 pub mod miyashita_ai_bp3_test;
 pub mod miyashita_ai_pb1_test;
 pub mod miyashita_ai_pr_test;
@@ -117,6 +120,8 @@ pub mod qa_new_tests246;
 pub mod qa_new_tests252;
 pub mod qa_new_tests255;
 pub mod qa_new_tests256;
+pub mod qa_remaining_tests2;
+
 pub mod remaining_quick_test;
 pub mod ren_bp4_test;
 pub mod ren_test;
@@ -129,6 +134,7 @@ pub mod rurino_test;
 pub mod sayaka_test;
 pub mod score_condition_integration_test;
 pub mod setsuna_bp5_test;
+pub mod setsuna_pb1_heart_constant_test;
 pub mod setsuna_pb1_test;
 pub mod setsuna_test;
 pub mod shizuku_pb1_test;
@@ -175,6 +181,15 @@ pub mod yoshiko_test;
 pub mod you_debut_test;
 pub mod zero_tested_action_types_test;
 
+// PVP room / web server integration tests
+pub mod pvp_room_test;
+
+// Playthrough of coverage-gap test cards
+pub mod untested_abilities_playthrough_test;
+
+// Unique / edge-case ability tests
+pub mod unique_abilities_test;
+
 // New test files for coverage gaps
 pub mod bp4_live_start_change_state_gain_test;
 pub mod chika_center_cost_test;
@@ -186,3 +201,16 @@ pub mod sp_bp5_choice_energy_test;
 pub mod sp_bp5_leftside_cost_test;
 pub mod stellar_phoenix_test;
 pub mod target_selection_test;
+pub mod parser_fixes_e2e_test;
+pub mod pl_bp5_012_test;
+pub mod pl_bp6_003_test;
+pub mod ll_bp1_001_test;
+pub mod pl_s_bp5_010_test;
+pub mod pl_bp6_006_test;
+pub mod bp6_004_002_audit_test;
+pub mod cards_6_thru_13_test;
+
+// New test files for parser/engine fix coverage
+pub mod nozomi_bp4_aggregate_test;
+pub mod kanon_bp5_constant_test;
+

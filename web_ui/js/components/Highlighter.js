@@ -15,13 +15,13 @@ export const Highlighter = {
         const selectors = [
             '.highlight-source', '.highlight-target', '.highlight-target-opp',
             '.valid-drop-target', '.drop-hover', '.highlight-hover',
-            '.hover-highlight', '.selected', '.mulligan-selected'
+            '.hover-highlight', '.selected'
         ];
         document.querySelectorAll(selectors.join(', ')).forEach(el => {
             el.classList.remove(
                 'highlight-source', 'highlight-target', 'highlight-target-opp',
                 'valid-drop-target', 'drop-hover', 'highlight-hover',
-                'hover-highlight', 'selected', 'mulligan-selected'
+                'hover-highlight', 'selected'
             );
         });
     },
@@ -37,7 +37,9 @@ export const Highlighter = {
         Highlighter.clearHighlights();
 
         const perspectivePlayer = State.perspectivePlayer;
-        const actingPlayer = state.current_player ?? state.active_player ?? 0;
+        // Normalize actingPlayer: server sends "player1"/"player2" (string), but perspectivePlayer is 0/1 (number)
+        const rawActive = state.current_player ?? state.active_player;
+        const actingPlayer = rawActive === 'player2' || rawActive === '1' || rawActive === 1 ? 1 : 0;
         const selfPrefix = (actingPlayer === perspectivePlayer ? 'my' : 'opp');
         const oppPrefix = (actingPlayer === perspectivePlayer ? 'opp' : 'my');
 
@@ -238,7 +240,8 @@ export const Highlighter = {
 
         let found = false;
         const perspectivePlayer = State.perspectivePlayer;
-        const activePlayer = state.current_player ?? state.active_player ?? 0;
+        const rawActive = state.current_player ?? state.active_player;
+        const activePlayer = rawActive === 'player2' || rawActive === '1' || rawActive === 1 ? 1 : 0;
         const selfPrefix = (activePlayer === perspectivePlayer ? 'my' : 'opp');
 
         // Support both params and parameters field names

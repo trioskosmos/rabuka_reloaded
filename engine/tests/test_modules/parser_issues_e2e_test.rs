@@ -425,6 +425,75 @@ fn issue6_natsumi_low_energy_no_blade() {
     );
 }
 
+#[test]
+fn issue6_natsumi_blade_expires_after_live_victory_determination() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let natsumi = game.id("PL!SP-sd2-020-SD2");
+    let other_liella = game.id("PL!SP-sd1-001-SD");
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [other_liella, natsumi, filler];
+    game.state.player1.hand.cards.push(live);
+    game.give_energy(7);
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+    // Blade granted at LiveStart with duration=live_end
+    assert_eq!(
+        game.state.mods.get_blade_modifier(natsumi),
+        1,
+        "6d: Natsumi must have 1 blade during performance"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(other_liella),
+        1,
+        "6d: other Liella! must have 1 blade during performance"
+    );
+
+    // Advance through remaining live phases
+    game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance (P1 performs)
+    game.pass(); // SecondAttackerPerformance → LiveVictoryDetermination (P2 performs, sets phase to LVD)
+    // Blade should persist through LiveVictoryDetermination
+    assert_eq!(
+        game.state.mods.get_blade_modifier(natsumi),
+        1,
+        "6d: blade must persist through LiveVictoryDetermination"
+    );
+
+    // The phase is now LiveVictoryDetermination but execute_live_victory_determination
+    // runs only on the *next* advance_phase call. Pass to invoke it.
+    // This triggers the live card's LiveSuccess ability ("look 3, select from deck").
+    game.pass();
+
+    // Handle the LookAndSelect pending choice from LiveSuccess
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Pass again: LiveVictoryDetermination → Active, which runs
+    // check_expired_effects and cleans up live_end-temporary effects.
+    game.pass();
+    // duration=live_end effects cleared after LiveVictoryDetermination
+    assert_eq!(
+        game.state.mods.get_blade_modifier(natsumi),
+        0,
+        "6d: Natsumi's blade must expire after LiveVictoryDetermination (duration=live_end)"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(other_liella),
+        0,
+        "6d: other Liella!'s blade must also expire after LiveVictoryDetermination"
+    );
+}
+
 // ====================================================================
 // Issue 7: PL!SP-sd2-023-SD2 (始まりは君の空)
 // ====================================================================
@@ -491,7 +560,7 @@ fn issue7_hajimari_no_success_live_no_effect() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let live_card = game.id("PL!SP-sd2-023-SD2");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.hand.cards.push(live_card);
     fill_decks(&mut game);
@@ -509,6 +578,91 @@ fn issue7_hajimari_no_success_live_no_effect() {
         0,
         "7b: no score when condition fails"
     );
+}
+
+#[test]
+fn issue7_hajimari_set_modifier_replaces_not_adds() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live_card = game.id("PL!SP-sd2-023-SD2");
+    let past_live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.success_live_card_zone.cards.push(past_live);
+    game.state.player1.success_live_card_zone.cards.push(filler);
+    game.state.player1.hand.cards.push(live_card);
+    fill_decks(&mut game);
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live_card);
+    advance_to_live_start(&mut game);
+
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    // Verify set modifiers are correct type (set not additive)
+    if let Some(color_mods) = game.state.mods.need_heart_modifiers.get(&live_card) {
+        for (hc, expected) in [
+            (HeartColor::Heart02, 3),
+            (HeartColor::Heart03, 3),
+            (HeartColor::Heart06, 3),
+            (HeartColor::Heart00, 3),
+        ] {
+            let entry = color_mods.get(&hc).unwrap_or_else(|| panic!("missing {:?}", hc));
+            assert_eq!(entry.set, expected, "set modifier for {:?}", hc);
+            assert_eq!(entry.additive, 0, "additive should be 0 for {:?}", hc);
+        }
+    } else {
+        panic!("need_heart_modifiers missing for live_card");
+    }
+
+    // Colors not in the set should be absent (0 when queried)
+    for hc in &[
+        HeartColor::Heart01,
+        HeartColor::Heart04,
+        HeartColor::Heart05,
+    ] {
+        assert_eq!(
+            game.state.mods.get_need_heart_modifier(live_card, *hc),
+            0,
+            "non-set color {:?} should be 0",
+            hc
+        );
+    }
+
+    // Compute effective need_heart the same way should_trigger_live_success does
+    let card = game.db.get_card(live_card).unwrap();
+    let base = card.need_heart.as_ref().unwrap();
+    // Base need_heart is {heart03:1, heart00:2}
+    assert_eq!(*base.hearts.get(&HeartColor::Heart03).unwrap_or(&0), 1);
+    assert_eq!(*base.hearts.get(&HeartColor::Heart00).unwrap_or(&0), 2);
+    assert_eq!(*base.hearts.get(&HeartColor::Heart02).unwrap_or(&0), 0);
+    assert_eq!(*base.hearts.get(&HeartColor::Heart06).unwrap_or(&0), 0);
+
+    // Effective need with set modifier should replace base entirely:
+    // {heart02:3, heart03:3, heart06:3, heart00:3} — base {heart03:1, heart00:2} is dropped
+    let has_set = game.state.mods.need_heart_modifiers.get(&live_card)
+        .is_some_and(|m| m.values().any(|e| e.set != 0));
+    assert!(has_set, "set modifier should exist");
+    let effective = {
+        let mut hearts = std::collections::HashMap::new();
+        if let Some(color_mods) = game.state.mods.need_heart_modifiers.get(&live_card) {
+            for (color, me) in color_mods {
+                if me.set != 0 {
+                    hearts.insert(*color, me.set as u32);
+                }
+            }
+        }
+        rabuka_engine::card::BaseHeart { hearts }
+    };
+    assert_eq!(effective.hearts.len(), 4,
+        "effective need should have exactly 4 colors, got {:?}", effective.hearts);
+    assert_eq!(effective.hearts[&HeartColor::Heart02], 3);
+    assert_eq!(effective.hearts[&HeartColor::Heart03], 3);
+    assert_eq!(effective.hearts[&HeartColor::Heart06], 3);
+    assert_eq!(effective.hearts[&HeartColor::Heart00], 3);
+    // heart00 overwritten to 3 (was 2 in base, but set replaces entirely)
 }
 
 // ====================================================================
@@ -612,7 +766,7 @@ fn issue10_dream_with_you_no_blade_no_score() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let dream = game.id("PL!N-sd1-028-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.hand.cards.push(dream);
     fill_decks(&mut game);
@@ -933,7 +1087,7 @@ fn issue16_hanamaru_all_cost_higher_than_opponent_gains_blade() {
     let mut game = TestGame::new(db);
     let hanamaru = game.id("PL!S-bp5-016-N");
     let live = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     // Self stage: Hanamaru (cost=9)
     game.state.player1.stage.stage = [hanamaru, -1, -1];
@@ -971,7 +1125,7 @@ fn issue16_hanamaru_opponent_higher_cost_no_blade() {
     let mut game = TestGame::new(db);
     let hanamaru = game.id("PL!S-bp5-016-N");
     let live = game.id("PL!-sd1-019-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     // Self stage: Hanamaru (cost=9)
     game.state.player1.stage.stage = [hanamaru, -1, -1];

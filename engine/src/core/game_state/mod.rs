@@ -115,6 +115,9 @@ pub struct GameState {
     pub pending_success_replacement_card_id: Option<i16>,
     /// Player ID of the player making the success zone replacement choice.
     pub pending_success_replacement_player_id: Option<String>,
+    /// Transient: set by web_server for PVP RPS routing so the action handler
+    /// knows which player sent the request (0=P1, 1=P2).
+    pub pending_rps_player_id: Option<i32>,
 }
 
 impl GameState {
@@ -240,6 +243,7 @@ impl GameState {
             last_ability_trace: None,
             pending_success_replacement_card_id: None,
             pending_success_replacement_player_id: None,
+            pending_rps_player_id: None,
         };
         debug_assert!(
             state.phase_invariant(),
@@ -540,6 +544,54 @@ impl GameState {
                 heart_color,
                 amount,
             });
+    }
+
+    /// Print a human-readable execution trace of the last resolved ability.
+    pub fn dump_last_trace(&self) {
+        if let Some(ref trace) = self.last_ability_trace {
+            println!("\n=== LAST RESOLVED ABILITY TRACE ===");
+            if let Some(ref card) = trace.card {
+                println!("Card: {}", card);
+            }
+            println!("Ability: {}", trace.label);
+            Self::print_trace_node(trace, 0);
+            println!("====================================\n");
+        } else {
+            println!("\n[No ability trace recorded]\n");
+        }
+    }
+
+    fn print_trace_node(node: &crate::ability::types::AbilityTraceNode, indent: usize) {
+        let pad = "  ".repeat(indent);
+        let card_str = node.card.as_deref().map(|c| format!(" [{}]", c)).unwrap_or_default();
+        println!("{}- {}{}", pad, node.label, card_str);
+        if let (Some(ref b), Some(ref a)) = (&node.before, &node.after) {
+            let mut changes = Vec::new();
+            if b.hand_count != a.hand_count {
+                changes.push(format!("Hand: {} -> {}", b.hand_count, a.hand_count));
+            }
+            if b.stage_count != a.stage_count {
+                changes.push(format!("Stage: {} -> {}", b.stage_count, a.stage_count));
+            }
+            if b.waitroom_count != a.waitroom_count {
+                changes.push(format!("Discard: {} -> {}", b.waitroom_count, a.waitroom_count));
+            }
+            if b.energy_count != a.energy_count {
+                changes.push(format!("Energy: {} -> {}", b.energy_count, a.energy_count));
+            }
+            if b.active_energy_count != a.active_energy_count {
+                changes.push(format!("Active Energy: {} -> {}", b.active_energy_count, a.active_energy_count));
+            }
+            if b.deck_count != a.deck_count {
+                changes.push(format!("Deck: {} -> {}", b.deck_count, a.deck_count));
+            }
+            if !changes.is_empty() {
+                println!("{}  Deltas: {}", pad, changes.join(", "));
+            }
+        }
+        for child in &node.children {
+            Self::print_trace_node(child, indent + 1);
+        }
     }
 }
 

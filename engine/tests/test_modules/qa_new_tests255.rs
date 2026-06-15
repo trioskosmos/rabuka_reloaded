@@ -19,7 +19,7 @@ fn q255_dancing_stars_live_success_after_position_change() {
 
     let dancing_stars = game.id("PL!-bp6-020-L");
     let honoka = game.id("PL!-bp6-001-R\u{ff0b}"); // μ's, has Live Start & Live Success
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
 
     // Stage: Honoka in center
     game.state.player1.stage.stage = [-1, honoka, -1];

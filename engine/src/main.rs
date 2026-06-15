@@ -46,7 +46,13 @@ fn main() {
                 initialize_game();
             }
             "web-server" => {
-                run_web_server();
+                let ngrok_flag = args.iter().any(|a| a == "--ngrok");
+                let ngrok_token = if ngrok_flag {
+                    std::env::var("NGROK_AUTHTOKEN").ok()
+                } else {
+                    None
+                };
+                run_web_server(ngrok_token);
             }
             _ => {
                 log::debug!("Unknown command: {}", args[1]);
@@ -176,6 +182,7 @@ fn output_actions() {
                     use_baton_touch: p.use_baton_touch,
                     card_name: p.card_name,
                     card_no: p.card_no,
+                    ability_index: p.ability_index,
                     base_cost: p.base_cost,
                     final_cost: p.final_cost,
                     double_baton_pairs: p.double_baton_pairs.map(|pairs| {
@@ -253,13 +260,15 @@ fn choose_deck(deck_lists: &[deck_parser::DeckList], player_name: &str) -> deck_
     deck_lists[0].clone()
 }
 
-fn run_web_server() {
+fn run_web_server(ngrok_authtoken: Option<String>) {
     println!("Web server starting on http://127.0.0.1:8080");
     match tokio::runtime::Runtime::new() {
-        Ok(runtime) => match runtime.block_on(web_server::run_web_server()) {
-            Ok(_) => println!("Server shutdown gracefully"),
-            Err(e) => log::debug!("Server error: {}", e),
-        },
+        Ok(runtime) => {
+            match runtime.block_on(web_server::run_web_server_with_ngrok(ngrok_authtoken)) {
+                Ok(_) => println!("Server shutdown gracefully"),
+                Err(e) => log::debug!("Server error: {}", e),
+            }
+        }
         Err(e) => log::debug!("Failed to create runtime: {}", e),
     }
 }

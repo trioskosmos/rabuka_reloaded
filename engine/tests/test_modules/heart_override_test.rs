@@ -67,6 +67,8 @@ fn kanan_livestart_converts_all_hearts_to_heart04() {
     let after = game.state.player1.calculate_stage_hearts(
         &game.state.card_database,
         &game.state.mods.heart_color_multiplier,
+        &Default::default(),
+        &Default::default(),
     );
     // The filler (PL!-sd1-010-SD) has its own hearts too, so after.hearts.len() > 1
     assert_eq!(
@@ -78,7 +80,12 @@ fn kanan_livestart_converts_all_hearts_to_heart04() {
         after.hearts.values().sum::<u32>(),
         game.state
             .player1
-            .calculate_stage_hearts(&game.state.card_database, &Default::default(),)
+            .calculate_stage_hearts(
+                &game.state.card_database,
+                &Default::default(),
+                &Default::default(),
+                &Default::default(),
+            )
             .hearts
             .values()
             .sum::<u32>(),

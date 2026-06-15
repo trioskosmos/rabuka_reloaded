@@ -110,6 +110,7 @@ pub struct ActionParameters {
     // Card grouping information for improved UI
     pub card_name: Option<String>,
     pub card_no: Option<String>,
+    pub ability_index: Option<usize>, // Which ability on the card (for use_ability actions)
     pub base_cost: Option<u32>,
     pub final_cost: Option<u32>,
     pub available_areas: Option<Vec<AreaInfo>>,
@@ -169,6 +170,7 @@ fn make_params() -> ActionParameters {
         use_baton_touch: None,
         card_name: None,
         card_no: None,
+        ability_index: None,
         base_cost: None,
         final_cost: None,
         available_areas: None,
@@ -235,45 +237,44 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
             }
             if target == "position|destination" {
                 let is_source = description == "Choose which member to move";
+                // Extract source position from description e.g. "(currently at Center)"
+                let from_pos = if is_source {
+                    None
+                } else {
+                    description
+                        .rsplit_once("currently at ")
+                        .and_then(|(_, after)| after.split(')').next())
+                        .map(|s| s.trim().to_lowercase())
+                };
                 let default_positions = vec!["left".into(), "center".into(), "right".into()];
                 let positions = options.as_deref().unwrap_or(&default_positions);
                 let mut actions: Vec<Action> = positions
                     .iter()
                     .map(|pos| {
                         let idx = crate::ability::util::stage_position_index(pos);
-                        let (label, stage_area, card_id) = match idx {
-                            Some(0) => (
-                                if is_source {
-                                    "Select Left"
-                                } else {
-                                    "Move to Left"
-                                },
-                                "left".to_string(),
-                                0,
-                            ),
-                            Some(1) => (
-                                if is_source {
-                                    "Select Center"
-                                } else {
-                                    "Move to Center"
-                                },
-                                "center".to_string(),
-                                1,
-                            ),
-                            Some(2) => (
-                                if is_source {
-                                    "Select Right"
-                                } else {
-                                    "Move to Right"
-                                },
-                                "right".to_string(),
-                                2,
-                            ),
-                            _ => ("Move", pos.clone(), -1),
+                        let (stage_area, card_id) = match idx {
+                            Some(0) => ("left".to_string(), 0),
+                            Some(1) => ("center".to_string(), 1),
+                            Some(2) => ("right".to_string(), 2),
+                            _ => (pos.clone(), -1),
+                        };
+                        let capitalize = |s: &str| -> String {
+                            let mut c = s.chars();
+                            match c.next() {
+                                None => String::new(),
+                                Some(f) => f.to_uppercase().to_string() + c.as_str(),
+                            }
+                        };
+                        let label = if is_source {
+                            format!("Select {}", capitalize(&stage_area))
+                        } else if let Some(ref src) = from_pos {
+                            format!("{} → {}", capitalize(src), capitalize(&stage_area))
+                        } else {
+                            format!("Move to {}", capitalize(&stage_area))
                         };
                         make_action_params(
                             ActionType::ChoicePosition,
-                            label,
+                            &label,
                             ActionParameters {
                                 card_id: Some(card_id),
                                 stage_area: Some(stage_area),
@@ -535,12 +536,17 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 }
             };
             // Apply filtered_indices: exclude already-selected or ineligible cards
+            let fi_for_mapping = filtered_indices.clone();
             let card_ids: Vec<(usize, i16)> = match filtered_indices {
-                Some(fi) if !fi.is_empty() => card_ids
-                    .into_iter()
-                    .filter(|(idx, _)| !fi.contains(idx))
-                    .collect(),
-                _ => card_ids,
+                Some(fi) if !fi.is_empty() => {
+                    let valid_positions: Vec<usize> = fi.clone();
+                    card_ids
+                        .into_iter()
+                        .filter(|(idx, _)| valid_positions.contains(idx))
+                        .collect()
+                }
+                Some(_) => Vec::new(),
+                None => card_ids,
             };
 
             if !card_ids.is_empty() {
@@ -605,13 +611,21 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .get_card(*card_id)
                         .map(|c| c.card_no.clone())
                         .unwrap_or_default();
+                    // Map stage position to index within filtered_indices
+                    let fi_index = match &fi_for_mapping {
+                        Some(fi) if !fi.is_empty() => fi
+                            .iter()
+                            .position(|&x| x == *zone_index)
+                            .unwrap_or(*zone_index),
+                        _ => *zone_index,
+                    };
                     actions.push(make_action_params(
                         ActionType::ChoiceSelect,
                         &format!("{} ({})", card_name, zone_index),
                         ActionParameters {
                             card_id: Some(*card_id),
                             card_index: Some(*zone_index),
-                            card_indices: Some(vec![*zone_index]),
+                            card_indices: Some(vec![fi_index]),
                             card_name: Some(card_name.to_string()),
                             card_no: Some(real_card_no.clone()),
                             ..make_params()
@@ -1094,6 +1108,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         stage_area: Some(area_name.to_string()),
                         card_name: Some(card.name.clone()),
                         card_no: Some(card.card_no.clone()),
+                        ability_index: Some(ability_index),
                         base_cost: Some(ability_cost),
                         final_cost: Some(ability_cost),
                         ..make_params()
@@ -1163,6 +1178,7 @@ fn generate_main_phase_actions(game_state: &GameState) -> Vec<Action> {
                         card_id: Some(card_id),
                         card_name: Some(card.name.clone()),
                         card_no: Some(card.card_no.clone()),
+                        ability_index: Some(ability_index),
                         base_cost: Some(ability_cost),
                         final_cost: Some(ability_cost),
                         ..make_params()

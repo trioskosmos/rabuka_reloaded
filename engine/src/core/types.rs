@@ -113,7 +113,7 @@ pub struct LivePerformanceData {
     pub revealed_ids: Vec<i16>,
     pub member_contributions: Vec<MemberContribution>,
     pub yell_cards: Vec<YellCardResult>,
-    pub total_hearts: [u32; 7],
+    pub total_hearts: [u32; 8],
     pub allocations: Vec<Allocation>,
     pub heart_sources: Vec<HeartSource>,
     pub blade_sources: Vec<BladeSource>,
@@ -130,7 +130,7 @@ pub struct PerformanceSnapshot {
     pub lives: Vec<LiveCardResult>,
     pub member_contributions: Vec<MemberContribution>,
     pub yell_cards: Vec<YellCardResult>,
-    pub total_hearts: [u32; 7],
+    pub total_hearts: [u32; 8],
     pub total_score: u32,
     pub success: bool,
     pub note_icons: u32,
@@ -145,9 +145,10 @@ pub struct PerformanceSnapshot {
 pub struct LiveCardResult {
     pub passed: bool,
     pub score: u32,
-    pub spare: [u32; 7],
-    pub required: [u32; 7],
-    pub filled: [u32; 7],
+    pub base_score: u32,
+    pub spare: [u32; 8],
+    pub required: [u32; 8],
+    pub filled: [u32; 8],
     pub adjustments: Vec<Adjustment>,
     pub card_id: i16,
     pub card_no: String,
@@ -157,8 +158,8 @@ pub struct LiveCardResult {
 pub struct MemberContribution {
     pub source_id: i16,
     pub slot: usize,
-    pub base_hearts: [u32; 7],
-    pub bonus_hearts: [u32; 7],
+    pub base_hearts: [u32; 8],
+    pub bonus_hearts: [u32; 8],
     pub base_blades: u32,
     pub bonus_blades: u32,
     pub base_notes: u32,
@@ -173,7 +174,7 @@ pub struct MemberContribution {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct YellCardResult {
     pub card_id: i16,
-    pub blade_hearts: [u32; 7],
+    pub blade_hearts: [u32; 8],
     pub note_icons: u32,
     pub draw_icons: u32,
     pub card_no: String,
@@ -193,7 +194,7 @@ pub struct Breakdown {
 pub struct HeartSource {
     pub source_type: String,
     pub source: String,
-    pub value: [u32; 7],
+    pub value: [u32; 8],
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

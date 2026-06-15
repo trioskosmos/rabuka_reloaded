@@ -14,7 +14,7 @@ import { Tooltips } from './ui_tooltips.js';
 import { DragDrop } from './ui_drag_drop.js';
 import { Modals } from './ui_modals.js';
 import { Replay } from './replay_system.js';
-import { toggleSidebar, switchBoard } from './layout.js';
+import { switchBoard } from './layout.js';
 import { ModalManager } from './utils/ModalManager.js';
 import { DOMUtils } from './utils/DOMUtils.js';
 import { DOM_IDS } from './constants_dom.js';
@@ -34,7 +34,6 @@ export function initializeGlobals(controller = {}) {
     // UI Object (for layout/board switching)
     // ============================================================
     window.UI = {
-        toggleSidebar,
         switchBoard,
         showPerformanceForTurn: Modals.showPerformanceForTurn,
         showLastPerformance: Modals.showLastPerformance,
@@ -80,8 +79,6 @@ export function initializeGlobals(controller = {}) {
     window.Actions = {
         sendAction: (actionId, target = null) => Network.sendAction(actionId, target),
         doAction: (actionId, target = null) => Network.sendAction(actionId, target),
-        toggleHotseat: () => { State.updateUiConfig({ hotseat_mode: !State.hotseatMode }); window.render(); },
-        toggleLiveWatch: () => { State.isLiveWatchOn = !State.isLiveWatchOn; controller.restartPolling?.(); window.render(); },
         togglePerspective: () => { State.updateUiConfig({ perspective_player: 1 - State.perspectivePlayer }); window.render(); },
         setPerspective: (id) => {
             const pid = parseInt(id, 10);
@@ -113,8 +110,6 @@ export function initializeGlobals(controller = {}) {
 
     window.sendAction = (action) => window.Actions.sendAction(action);
     window.doAction = (action) => window.Actions.sendAction(action);
-    window.toggleHotseat = window.Actions.toggleHotseat;
-    window.toggleLiveWatch = window.Actions.toggleLiveWatch;
     window.togglePerspective = window.Actions.togglePerspective;
     window.setPerspective = window.Actions.setPerspective;
     window.leaveRoom = window.Actions.leaveRoom;

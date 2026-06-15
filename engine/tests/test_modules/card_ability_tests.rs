@@ -805,7 +805,7 @@ fn suki_high_blade_gains_score() {
         .score_modifiers
         .get(&suki_id)
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
-    assert!(score >= 1, "Bonus given for blade 1+6=7 (got {})", score);
+    assert_eq!(score, 1, "Bonus given for blade 1+6=7 (got {})", score);
 }
 
 /// Two Aqours members, both low blade → pick first → no bonus.

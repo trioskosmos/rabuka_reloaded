@@ -7,9 +7,12 @@ import { DOM_IDS } from '../constants_dom.js';
 import { fixImg } from '../constants.js';
 import { resolveCardImagePath } from '../components/CardRenderer.js';
 
-const HEART_ICONS = ['heart00', 'heart01', 'heart02', 'heart03', 'heart04', 'heart05', 'heart06'];
+const HEART_ICONS = ['heart00', 'heart01', 'heart02', 'heart03', 'heart04', 'heart05', 'heart06', 'all'];
 
 function hIcon(index) {
+    if (index === 7 || isNaN(index) || index >= HEART_ICONS.length) {
+        return '<img src="img/texticon/icon_all.png" class="heart-mini-icon" alt="">';
+    }
     return `<img src="img/texticon/heart_0${index}.png" class="heart-mini-icon" alt="">`;
 }
 
@@ -66,16 +69,16 @@ export const LogDetailModal = {
 
     _getTypeLabel: (entryType) => {
         const labels = {
-            'score': 'パフォーマンス',
-            'effect': 'エフェクト詳細',
-            'heart_effect': 'ハート/ブレード効果',
-            'ability_effect': '能力効果',
-            'performance': 'パフォーマンス',
-            'action': 'アクション',
-            'phase': 'フェーズ',
-            'generic': 'ログ詳細',
+            'score': i18n.t('event_score'),
+            'effect': i18n.t('event_effect'),
+            'heart_effect': i18n.t('event_heart'),
+            'ability_effect': i18n.t('event_effect'),
+            'performance': i18n.t('event_performance'),
+            'action': i18n.t('event_play'),
+            'phase': i18n.t('event_phase'),
+            'generic': i18n.t('rule_log'),
         };
-        return labels[entryType] || 'ログ詳細';
+        return labels[entryType] || i18n.t('rule_log');
     },
 
     _buildContextCards: (body) => {

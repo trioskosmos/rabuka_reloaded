@@ -49,10 +49,11 @@ const stateInternal = {
     get selectedTurn() { return uiConfig().selected_turn ?? -1; },
     get selectedPerfTurn() { return uiConfig().selected_perf_turn ?? -1; },
     get perspectivePlayer() { return uiConfig().perspective_player ?? 0; },
-    get hotseatMode() { return uiConfig().hotseat_mode || false; },
-    get replayMode() { return uiConfig().replay_mode || false; },
+        get replayMode()
+ { return uiConfig().replay_mode || false; },
 
     // Purely rendering state (not in Rust)
+    _localPerspective: undefined,
     selectedHandIdx: -1,
     showingFullLog: false,
     lastPerformanceTurn: -1,
@@ -89,6 +90,11 @@ const stateInternal = {
         if (!State.data.ui_config) State.data.ui_config = {};
         Object.assign(State.data.ui_config, changes);
 
+        // Track perspective locally so it survives server round-trips (server value is global)
+        if (changes.perspective_player !== undefined) {
+            State._localPerspective = changes.perspective_player;
+        }
+
         try {
             const res = await fetch('api/ui/config', {
                 method: 'POST',
@@ -98,6 +104,10 @@ const stateInternal = {
             const data = await res.json();
             if (data.success && data.ui_config && State.data) {
                 State.data.ui_config = data.ui_config;
+                // Re-apply local perspective after server overwrite
+                if (State._localPerspective !== undefined) {
+                    State.data.ui_config.perspective_player = State._localPerspective;
+                }
             }
             return data;
         } catch (e) {
@@ -143,6 +153,11 @@ const stateInternal = {
 
         State.rawData = JSON.parse(JSON.stringify(newData));
         State.data = newData;
+        // Preserve local perspective — server's ui_config is global and shared across sessions
+        if (newData.ui_config && State._localPerspective !== undefined) {
+            State.data.ui_config = State.data.ui_config || {};
+            State.data.ui_config.perspective_player = State._localPerspective;
+        }
         State.rebuildCardIndex();
         State.emit('change-detected');
 

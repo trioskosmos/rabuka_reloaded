@@ -228,8 +228,22 @@ fn rurino_bp5_live_start_gains_heart_from_discarded_group() {
     );
     game.select_option(1); // pay
 
-    // The effect auto-selects the only eligible member and applies heart01.
-    // Verify heart01 modifier was applied to Rurino (same group as discarded card)
+    // After cost is paid, prompts to select 1 member to receive heart01.
+    // Only Rurino matches the discarded card's group, so auto-selects.
+    while game.has_pending_choice() {
+        let ct = game.pending_choice_type().unwrap_or_default();
+        match ct.as_str() {
+            "SelectCard" => {
+                game.select_indices(&[0]);
+            }
+            "SelectTarget" => {
+                game.select_option(0);
+            }
+            _ => break,
+        }
+    }
+
+    // Verify heart01 modifier was applied to Rurino
     assert!(
         game.state.mods.heart_modifiers.contains_key(&rurino),
         "Rurino should have a heart modifier"

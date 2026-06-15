@@ -37,6 +37,8 @@ pub enum HeartColor {
     Draw, // Special heart type for drawing cards
     #[serde(rename = "score")]
     Score, // Special heart type for score bonus
+    #[serde(rename = "all")]
+    All, // All-heart (icon_all.png) — can be treated as any one color during performance check
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -678,6 +680,14 @@ pub struct CompoundBranch {
     pub conditional_negation: Option<bool>,
 }
 
+/// One branch of an OR'd ability filter. At least one branch must match
+/// for the card to pass.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct AbilityFilterBranch {
+    pub ability_filter: Option<String>,
+    pub ability_filter_triggers: Option<Vec<String>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
 pub struct AbilityEffect {
     #[serde(default = "default_empty_string")]
@@ -869,6 +879,9 @@ pub struct AbilityEffect {
     pub character_effects: Option<Vec<serde_json::Value>>,
     #[serde(default)]
     pub group_names: Option<Vec<String>>,
+    /// Card property filter (e.g. "has_blade_heart")
+    #[serde(default)]
+    pub card_property: Option<String>,
     #[serde(default)]
     pub exclude_group_names: Option<Vec<String>>,
     #[serde(default)]
@@ -972,6 +985,18 @@ pub struct AbilityEffect {
     /// for backward compat but should not be emitted alongside.
     #[serde(default)]
     pub effect_steps: Option<Vec<AbilityEffect>>,
+    /// ability_filter: "no_ability" / "has_ability" / "no_ability_type"
+    /// Filters cards by presence or absence of abilities / trigger types.
+    #[serde(default)]
+    pub ability_filter: Option<String>,
+    /// Trigger types excluded when ability_filter is "no_ability_type"
+    #[serde(default)]
+    pub ability_filter_triggers: Option<Vec<String>>,
+    /// OR'd ability filter branches. When present, a card passes if ANY
+    /// branch matches (replaces the single ability_filter check).
+    /// Used for patterns like "no ability OR has 常時 ability".
+    #[serde(default)]
+    pub or_ability_filters: Option<Vec<AbilityFilterBranch>>,
 }
 
 impl AbilityEffect {
@@ -1150,6 +1175,7 @@ impl AbilityEffect {
                 // inputs into a single step that the engine recognizes.
                 step.compound.optional_action = self.compound.optional_action.clone();
                 step.compound.conditional_action = self.compound.conditional_action.clone();
+                step.compound.conditional_negation = self.compound.conditional_negation;
                 step.compound.conditional_negation = self.compound.conditional_negation;
                 vec![step]
             }
@@ -1411,7 +1437,7 @@ impl Card {
     }
 
     pub fn has_blade_heart(&self) -> bool {
-        self.blade_heart.is_some() || self.blade > 0
+        self.blade_heart.is_some()
     }
 
     /// Check if a given need_heart is satisfied by provided hearts.
@@ -1421,10 +1447,13 @@ impl Card {
         if need.hearts.is_empty() {
             return true;
         }
+        // Both Heart00 (wildcard) and HeartColor::All (all-heart) act as
+        // flexible supply that can fill any specific-color deficit.
         let mut wildcard_remaining = *provided_hearts
             .hearts
             .get(&HeartColor::Heart00)
-            .unwrap_or(&0) as i32;
+            .unwrap_or(&0) as i32
+            + *provided_hearts.hearts.get(&HeartColor::All).unwrap_or(&0) as i32;
         // Track remaining hearts per color. As specific colors are fulfilled,
         // the used hearts are deducted from this map so that the heart0 check
         // sees only hearts that have NOT already been allocated.
@@ -1435,7 +1464,7 @@ impl Card {
                 // (not yet consumed by heart01–heart06 requirements)
                 let leftover_sum: i32 = remaining
                     .iter()
-                    .filter(|(c, _)| **c != HeartColor::Heart00)
+                    .filter(|(c, _)| **c != HeartColor::Heart00 && **c != HeartColor::All)
                     .map(|(_, v)| *v as i32)
                     .sum();
                 if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
@@ -1467,13 +1496,14 @@ impl Card {
 }
 
 pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
-    let mut wildcard_remaining = *provided.hearts.get(&HeartColor::Heart00).unwrap_or(&0) as i32;
+    let mut wildcard_remaining = *provided.hearts.get(&HeartColor::Heart00).unwrap_or(&0) as i32
+        + *provided.hearts.get(&HeartColor::All).unwrap_or(&0) as i32;
     let mut remaining = provided.hearts.clone();
     for (color, &needed_amount) in &need.hearts {
         if *color == HeartColor::Heart00 {
             let leftover_sum: i32 = remaining
                 .iter()
-                .filter(|(c, _)| **c != HeartColor::Heart00)
+                .filter(|(c, _)| **c != HeartColor::Heart00 && **c != HeartColor::All)
                 .map(|(_, v)| *v as i32)
                 .sum();
             if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
@@ -1508,6 +1538,7 @@ impl std::fmt::Display for HeartColor {
             HeartColor::BAll => write!(f, "b_all"),
             HeartColor::Draw => write!(f, "draw"),
             HeartColor::Score => write!(f, "score"),
+            HeartColor::All => write!(f, "all"),
         }
     }
 }
@@ -1523,11 +1554,12 @@ impl HeartColor {
             HeartColor::Heart04 => 4,
             HeartColor::Heart05 => 5,
             HeartColor::Heart06 => 6,
+            HeartColor::All => 7,
             _ => 0,
         }
     }
 
-    /// Reconstruct a HeartColor from an index (0-6). Panics for out-of-range.
+    /// Reconstruct a HeartColor from an index (0-7).
     pub fn from_index(i: usize) -> Self {
         match i {
             0 => HeartColor::Heart00,
@@ -1537,6 +1569,7 @@ impl HeartColor {
             4 => HeartColor::Heart04,
             5 => HeartColor::Heart05,
             6 => HeartColor::Heart06,
+            7 => HeartColor::All,
             _ => HeartColor::Heart00,
         }
     }
@@ -1554,6 +1587,7 @@ impl HeartColor {
             HeartColor::BAll => "b_all",
             HeartColor::Draw => "draw",
             HeartColor::Score => "score",
+            HeartColor::All => "all",
         }
     }
 }
@@ -1572,6 +1606,7 @@ impl std::str::FromStr for HeartColor {
             "b_all" => HeartColor::BAll,
             "draw" => HeartColor::Draw,
             "score" => HeartColor::Score,
+            "all" => HeartColor::All,
             _ if s.starts_with("b_") => {
                 HeartColor::from_str(&s[2..]).unwrap_or(HeartColor::Heart00)
             }

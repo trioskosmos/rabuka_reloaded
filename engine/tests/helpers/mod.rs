@@ -264,10 +264,106 @@ impl TestGame {
         self.state.has_pending_choice()
     }
 
+    /// Return the pending choice for inspection, panics if none.
+    pub fn get_pending_choice(&self) -> &Choice {
+        self.state.get_pending_choice().expect("No pending choice")
+    }
+
+    /// Assert the pending choice is a SelectCard matching the given criteria.
+    pub fn assert_select_card(
+        &self,
+        expected_zone: &str,
+        expected_count: usize,
+        expected_allow_skip: bool,
+    ) {
+        let choice = self.get_pending_choice();
+        match choice {
+            Choice::SelectCard {
+                zone,
+                count,
+                allow_skip,
+                ..
+            } => {
+                assert_eq!(zone, expected_zone, "SelectCard zone mismatch");
+                assert_eq!(*count, expected_count, "SelectCard count mismatch");
+                assert_eq!(
+                    *allow_skip, expected_allow_skip,
+                    "SelectCard allow_skip mismatch"
+                );
+            }
+            _ => panic!("Expected SelectCard, got {:?}", choice),
+        }
+    }
+
+    /// Assert the pending choice is a SelectTarget for conditional_optional.
+    pub fn assert_conditional_optional(&self, expected_opts: &[&str]) {
+        let choice = self.get_pending_choice();
+        match choice {
+            Choice::SelectTarget {
+                target, options, ..
+            } => {
+                assert_eq!(
+                    target, "conditional_optional",
+                    "Expected conditional_optional target"
+                );
+                if let Some(ref opts) = options {
+                    assert_eq!(opts.len(), expected_opts.len(), "Option count mismatch");
+                    for (i, expected) in expected_opts.iter().enumerate() {
+                        assert_eq!(&opts[i], expected, "Option {} mismatch", i);
+                    }
+                }
+            }
+            _ => panic!(
+                "Expected SelectTarget(conditional_optional), got {:?}",
+                choice
+            ),
+        }
+    }
+
+    /// Print the current ability queue state to stderr (for test debug).
+    pub fn dump_queue(&self) {
+        let state_str = self.state.ability_queue.dump_state();
+        eprintln!("[QUEUE_DUMP]\n{}", state_str);
+    }
+
     /// Select cards by waitroom/hand indices (for SelectCard choices).
     pub fn select_indices(&mut self, indices: &[usize]) {
         TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
             .expect("select_indices failed");
+    }
+
+    /// Find a card in the waitroom by ID and select it using the filtered-relative
+    /// index (position within filtered_indices), which is exactly what the frontend
+    /// sends. This correctly simulates the real-game selection protocol.
+    /// Panics if the card isn't found or isn't in filtered_indices.
+    pub fn select_waitroom_card_filtered(&mut self, card_id: i16) {
+        let pending = self.get_pending_choice().clone();
+        let (fi, zone) = match &pending {
+            Choice::SelectCard { filtered_indices: Some(fi), zone, .. } => (fi.clone(), zone.clone()),
+            _ => panic!(
+                "select_waitroom_card_filtered: expected SelectCard with filtered_indices, got {:?}",
+                pending
+            ),
+        };
+        if zone != "discard" && zone != "waitroom" {
+            panic!(
+                "select_waitroom_card_filtered: expected discard zone, got '{}'",
+                zone
+            );
+        }
+        let pos = self
+            .state
+            .player1
+            .waitroom
+            .cards
+            .iter()
+            .position(|&c| c == card_id)
+            .expect("Card not found in waitroom");
+        let filtered_idx = fi
+            .iter()
+            .position(|&p| p == pos)
+            .unwrap_or_else(|| panic!("Card not in filtered_indices: pos={} fi={:?}", pos, fi));
+        self.select_indices(&[filtered_idx]);
     }
 
     /// Try to select indices, returning the error instead of panicking.
@@ -275,10 +371,127 @@ impl TestGame {
         TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
     }
 
+    /// Select one index at a time for any-number choices (e.g. reveal any number).
+    /// If the pending choice is any-number (count=0, allow_skip=true), feeds each
+    /// index individually, waiting for re-prompts between picks, then sends an
+    /// empty selection to finalize.  For fixed-count choices it falls back to
+    /// the regular multi-index select_indices.
+    pub fn select_indices_sequential(&mut self, indices: &[usize]) {
+        if indices.is_empty() {
+            self.select_indices(indices);
+            return;
+        }
+        // Check if the pending choice is any-number
+        let is_any_number = self.state.get_pending_choice().is_some_and(|c| {
+            matches!(
+                c,
+                rabuka_engine::ability::types::Choice::SelectCard {
+                    count: 0,
+                    allow_skip: true,
+                    ..
+                }
+            )
+        });
+        if !is_any_number {
+            // Fixed-count: send all at once (same as regular select_indices)
+            self.select_indices(indices);
+            return;
+        }
+        // Any-number: feed one at a time, handling re-prompts
+        for (i, &idx) in indices.iter().enumerate() {
+            TurnEngine::resume_with_choice(&mut self.state, None, Some(vec![idx])).unwrap_or_else(
+                |e| panic!("select_indices_sequential failed at index {}: {}", i, e),
+            );
+            // Expect a re-prompt after each selection except the last
+            // (when all cards are taken, the engine auto-finalizes).
+            if i + 1 < indices.len() {
+                assert!(
+                    self.state.has_pending_choice(),
+                    "Expected re-prompt after selecting index {} of {}",
+                    i + 1,
+                    indices.len()
+                );
+            }
+        }
+        // If a re-prompt is still pending after the last pick, skip to finalize
+        // (this happens when the hand has more cards than were selected).
+        if self.state.has_pending_choice() {
+            let still_any = self.state.get_pending_choice().is_some_and(|c| {
+                matches!(
+                    c,
+                    rabuka_engine::ability::types::Choice::SelectCard {
+                        count: 0,
+                        allow_skip: true,
+                        ..
+                    }
+                )
+            });
+            if still_any {
+                TurnEngine::resume_with_choice(&mut self.state, None, Some(vec![]))
+                    .expect("select_indices_sequential skip failed");
+            }
+        }
+    }
+
     /// Select a choice option by index (for SelectTarget choices like answers, alternatives).
     pub fn select_option(&mut self, option_index: i16) {
         TurnEngine::resume_with_choice(&mut self.state, Some(option_index), None)
             .expect("select_option failed");
+    }
+
+    /// Generate the list of legal actions the frontend would show for the current
+    /// pending choice.  For `position|destination` targets, filters to only
+    /// `ChoicePosition` actions (the actual position buttons the user sees).
+    pub fn generated_actions(&self) -> Vec<rabuka_engine::game_setup::Action> {
+        let pending = self.get_pending_choice();
+        let all = rabuka_engine::game_setup::generate_possible_actions(&self.state);
+        match pending {
+            rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
+                if target == "position|destination" =>
+            {
+                all.into_iter()
+                    .filter(|a| {
+                        a.action_type == rabuka_engine::game_setup::ActionType::ChoicePosition
+                    })
+                    .collect()
+            }
+            _ => all,
+        }
+    }
+
+    /// Select the Nth generated action (simulates clicking the Nth button the
+    /// frontend would show).  Panics with the list of labels if out of range.
+    pub fn select_generated(&mut self, nth: usize) {
+        let pending = self.get_pending_choice().clone();
+        let all = rabuka_engine::game_setup::generate_possible_actions(&self.state);
+        let matching: Vec<&rabuka_engine::game_setup::Action> = match &pending {
+            rabuka_engine::ability::types::Choice::SelectTarget { target, .. }
+                if target == "position|destination" =>
+            {
+                all.iter()
+                    .filter(|a| {
+                        a.action_type == rabuka_engine::game_setup::ActionType::ChoicePosition
+                    })
+                    .collect()
+            }
+            _ => all.iter().collect(),
+        };
+        assert!(
+            nth < matching.len(),
+            "select_generated({}): only {} generated actions",
+            nth,
+            matching.len(),
+        );
+        let action = matching[nth];
+        TurnEngine::resume_with_choice(
+            &mut self.state,
+            action.parameters.as_ref().and_then(|p| p.card_id),
+            action
+                .parameters
+                .as_ref()
+                .and_then(|p| p.card_indices.clone()),
+        )
+        .expect("select_generated failed");
     }
 
     /// Drain all auto-ability choice prompts, selecting the first option each time.

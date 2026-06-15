@@ -3,7 +3,7 @@ use super::enums::Zone;
 use super::resolver::AbilityResolver;
 use super::types::{Choice, ChoiceRoute};
 use super::util;
-use crate::card::{AbilityCost, AbilityEffect};
+use crate::card::AbilityEffect;
 use crate::game_state::GameState;
 
 fn get_change_state_candidates(
@@ -210,6 +210,10 @@ impl AbilityResolver {
 
                     if is_optional && matching_indices.is_empty() {
                         log::debug!("  └─ skip (optional/any_number, no eligible cards in hand)");
+                        if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                            entry.cost_paid = true;
+                            entry.optional_cost_result = Some(false);
+                        }
                         return Ok(());
                     } else if !matching_indices.is_empty() {
                         let desc = if is_any_number {
@@ -464,7 +468,7 @@ impl AbilityResolver {
                         // No energy to pay — treat as skip
                         if let Some(entry) = gs.ability_queue.current_entry_mut() {
                             entry.cost_paid = true;
-                            entry.optional_cost_was_paid = false;
+                            entry.optional_cost_result = Some(false);
                         }
                         return Ok(());
                     }
@@ -653,7 +657,7 @@ impl AbilityResolver {
                     .as_ref()
                     .and_then(|c| c.alternative_effect.clone());
                 entry.effect_started = false;
-                entry.optional_cost_was_paid = false;
+                entry.optional_cost_result = Some(false);
                 if let Some(alt_effect) = alt {
                     entry.pending_commands =
                         vec![crate::ability::types::Command::Effect(*alt_effect)];
@@ -669,7 +673,7 @@ impl AbilityResolver {
         self.pending_choice = None;
         if let Some(entry) = gs.ability_queue.current_entry_mut() {
             entry.cost_paid = true;
-            entry.optional_cost_was_paid = true;
+            entry.optional_cost_result = Some(true);
         }
         let is_pay = true;
         if is_pay {

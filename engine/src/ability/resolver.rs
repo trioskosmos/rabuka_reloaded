@@ -5,7 +5,7 @@ use super::types::{
     ZoneSnapshot,
 };
 use super::util;
-use crate::card::{Ability, AbilityCost, AbilityEffect, CardDatabase, Keyword};
+use crate::card::{Ability, AbilityEffect, CardDatabase, Keyword};
 use crate::game_state::{GameState, Phase};
 use crate::zones::MemberArea;
 use std::sync::Arc;
@@ -25,6 +25,11 @@ pub struct AbilityResolver {
     pub moved_cards: Vec<i16>,
     pub spawn_context: EffectSpawnContext,
     pub sub_choice_created: bool,
+    /// Snapshot of `selected_cards.len()` taken when a choice is created
+    /// by a distinct/target_count action. Used by the saved action to exclude
+    /// cards selected BEFORE the choice, without excluding the card selected
+    /// BY the choice.
+    pub selected_count_at_save: Option<usize>,
     pub pending_stage_cards: Vec<(i16, String)>,
     pub debug_trace: bool,
     pub pipeline: EffectPipeline,
@@ -49,6 +54,7 @@ impl AbilityResolver {
             moved_cards: Vec::new(),
             spawn_context: EffectSpawnContext::default(),
             sub_choice_created: false,
+            selected_count_at_save: None,
             pending_stage_cards: Vec::new(),
             debug_trace: false,
             pipeline: { EffectPipeline::new() },
@@ -425,10 +431,16 @@ impl AbilityResolver {
             }
         }
 
-        // Record use_limit early only if the effect's conditions can be met.
+        // Record use_limit early only if the effect's conditions can be met
+        // AND it's not a conditional_on_optional (the optional cost hasn't been
+        // decided yet — record after the choice if the player pays).
         // This prevents consuming use_limit on premature triggers (e.g. auto
         // abilities queued eagerly before their trigger condition is satisfied).
-        if !cost_already_paid && self.pending_choice.is_none() {
+        let is_conditional_optional = ability
+            .effect
+            .as_ref()
+            .is_some_and(|e| e.action == "conditional_on_optional");
+        if !cost_already_paid && self.pending_choice.is_none() && !is_conditional_optional {
             if let Some(ref key) = ability_key {
                 if ability.use_limit.is_some() {
                     let can_activate = ability
@@ -436,7 +448,6 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        log::debug!("[USE_LIMIT] inserting key={}", key);
                         gs.turn_limited_abilities_used.insert(key.clone());
                     }
                 }
@@ -491,6 +502,26 @@ impl AbilityResolver {
             }
         }
 
+        // When an optional cost with a character filter was skipped (no eligible cards),
+        // the primary effect should not run. This handles "may discard X named cards: gain Y"
+        // patterns (e.g. LL-bp1-001-R+) where the colon gates the effect.
+        let cost_was_skipped = gs
+            .ability_queue
+            .current_entry()
+            .is_some_and(|e| e.optional_cost_result == Some(false));
+        let cost_has_characters = ability
+            .cost
+            .as_ref()
+            .and_then(|c| c.characters.as_ref())
+            .is_some_and(|v| !v.is_empty());
+        if cost_was_skipped && cost_has_characters {
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.effect_started = true;
+            }
+            dbg.p("RESULT", "optional cost skipped — effect not executed");
+            return Ok(());
+        }
+
         if let Some(ref effect) = ability.effect {
             // Check the effect's condition BEFORE executing. The condition must
             // be met in the current game state (after cost payment). This prevents
@@ -498,6 +529,18 @@ impl AbilityResolver {
             if (effect.condition.is_some() || effect.activation_condition_parsed.is_some())
                 && !self.can_activate_effect(gs, effect)
             {
+                // For 起動 (activation) abilities, the player deliberately paid the
+                // cost, so the attempt counts toward the turn limit even when the
+                // effect's condition isn't met.  AUTO-triggered abilities preserve
+                // their use_limit for when the board state actually satisfies the
+                // condition.
+                if ability.use_limit.is_some()
+                    && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
+                {
+                    if let Some(ref key) = ability_key {
+                        gs.turn_limited_abilities_used.insert(key.clone());
+                    }
+                }
                 dbg.p("RESULT", "effect condition not met — skipped");
                 return Ok(());
             }
@@ -515,9 +558,16 @@ impl AbilityResolver {
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                     }
+                    // Don't record use_limit yet when the pending choice is a
+                    // conditional_optional (may pay) — the player hasn't decided
+                    // yet. Record after the choice resolves if they actually paid.
+                    let skip_use_limit = matches!(
+                        self.pending_choice,
+                        Some(Choice::SelectTarget { ref target, .. })
+                            if target == "conditional_optional"
+                    );
                     if let Some(ref key) = ability_key {
-                        if ability.use_limit.is_some() {
-                            log::debug!("[USE_LIMIT] inserting key={}", key);
+                        if ability.use_limit.is_some() && !skip_use_limit {
                             gs.turn_limited_abilities_used.insert(key.clone());
                         }
                     }
@@ -549,7 +599,6 @@ impl AbilityResolver {
                         .as_ref()
                         .is_none_or(|e| self.can_activate_effect(gs, e));
                     if can_activate {
-                        log::debug!("[USE_LIMIT] inserting key={}", key);
                         gs.turn_limited_abilities_used.insert(key.clone());
                     }
                 }

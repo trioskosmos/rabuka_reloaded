@@ -104,6 +104,7 @@ impl AbilityResolver {
         can_skip: bool,
         effect: &AbilityEffect,
         filter: &util::CardFilter,
+        filtered_indices: Option<Vec<usize>>,
     ) {
         let description = if effect.any_number.unwrap_or(false) {
             format!(
@@ -123,6 +124,7 @@ impl AbilityResolver {
                 .target_player_id(Some(
                     effect.target.clone().unwrap_or_else(|| "self".to_string()),
                 ))
+                .filtered_indices(filtered_indices)
                 .build(),
         );
         self.execution_context = ExecutionContext::SingleEffect { effect_index: 0 };
@@ -228,6 +230,7 @@ impl AbilityResolver {
         activating_card_id: Option<i16>,
     ) -> Result<Option<Vec<i16>>, String> {
         let cards = util::zone_card_ids(player, zone_name);
+        let filtered_indices = util::matching_indices(&cards, card_db, filter, false);
         match util::resolve_selection(
             &cards,
             card_db,
@@ -247,7 +250,14 @@ impl AbilityResolver {
                     Ok(Some(taken))
                 } else {
                     // Per-count optional: prompt so the user can choose which/skip.
-                    self.prompt_card_selection(zone_name, indices.len(), can_skip, effect, filter);
+                    self.prompt_card_selection(
+                        zone_name,
+                        indices.len(),
+                        can_skip,
+                        effect,
+                        filter,
+                        Some(filtered_indices),
+                    );
                     Ok(None)
                 }
             }
@@ -256,7 +266,14 @@ impl AbilityResolver {
                 Ok(Some(taken))
             }
             util::SelectionOutcome::Prompt => {
-                self.prompt_card_selection(zone_name, count, can_skip, effect, filter);
+                self.prompt_card_selection(
+                    zone_name,
+                    count,
+                    can_skip,
+                    effect,
+                    filter,
+                    Some(filtered_indices),
+                );
                 Ok(None)
             }
             util::SelectionOutcome::Skip => Ok(Some(vec![])),
@@ -349,7 +366,57 @@ impl AbilityResolver {
             return Ok(cards);
         }
 
-        // Handle "those_cards" alias for discard/waitroom
+        // Handle "those_cards" alias: resolve to the trigger_moved_cards stored
+        // in the ability queue entry (the cards that triggered the each_time
+        // ability), not the full discard pile (Q221).
+        if source_str == "those_cards" {
+            if let Some(trigger_cards) = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.trigger_moved_cards.clone())
+            {
+                if !trigger_cards.is_empty() {
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                    {
+                        eprintln!(
+                            "[THOSE_CARDS] trigger_cards={:?} count={}",
+                            trigger_cards, count
+                        );
+                    }
+                    let mut found: Vec<i16> = Vec::new();
+                    for &cid in &trigger_cards {
+                        if found.len() >= count as usize {
+                            break;
+                        }
+                        if card_type_filter
+                            .map_or(true, |ct| util::card_matches_type(card_db, cid, Some(ct)))
+                            && group_name.map_or(true, |gn| {
+                                util::card_matches_group_str(card_db, cid, Some(gn))
+                            })
+                        {
+                            found.push(cid);
+                        }
+                    }
+                    if !found.is_empty() {
+                        // Remove from source zone (discard) so the caller's
+                        // place_card_in_zone doesn't duplicate it.
+                        let player = if use_p2 {
+                            &mut gs.player2
+                        } else {
+                            &mut gs.player1
+                        };
+                        for &cid in &found {
+                            if let Some(pos) = player.waitroom.cards.iter().position(|&c| c == cid)
+                            {
+                                player.waitroom.cards.remove(pos);
+                            }
+                        }
+                        return Ok(found);
+                    }
+                }
+            }
+        }
         let effective_source = if source_str == "those_cards" {
             Zone::Discard.to_str()
         } else {
@@ -474,12 +541,16 @@ impl AbilityResolver {
                                 cost_total,
                                 cost_total_operator,
                             );
+                            let stage_indices: Vec<usize> = (0..player.stage.stage.len())
+                                .filter(|&i| filter.matches(card_db, player.stage.stage[i], true))
+                                .collect();
                             self.prompt_card_selection(
                                 Zone::Stage.to_str(),
                                 count,
                                 false,
                                 effect,
                                 &filter,
+                                Some(stage_indices),
                             );
                             Ok(vec![])
                         }
@@ -649,6 +720,7 @@ impl AbilityResolver {
                             false,
                             effect,
                             &filter,
+                            None,
                         );
                         Ok(vec![])
                     }
@@ -682,12 +754,16 @@ impl AbilityResolver {
                         None,
                         None,
                     );
+                    let matching: Vec<usize> = (0..gs.revealed_cards.len())
+                        .filter(|&i| filter.matches(&gs.card_database, gs.revealed_cards[i], false))
+                        .collect();
                     self.prompt_card_selection(
                         Zone::RevealedCards.to_str(),
                         count,
                         false,
                         effect,
                         &filter,
+                        Some(matching),
                     );
                     Ok(vec![])
                 } else {
@@ -1156,49 +1232,18 @@ impl AbilityResolver {
 
                 gs.mods.clear_all_for_card(card_id);
                 gs.record_card_movement(card_id);
-                gs.record_card_appearance(card_id);
                 if state_change.as_deref() == Some("wait") {
                     gs.mods.add_orientation_modifier(card_id, "wait");
                 }
-                // Trigger debut abilities for cards placed via move_cards (Q170)
-                let player_id = match target.as_str() {
-                    "self" => gs.active_player().id.clone(),
-                    _ => {
-                        let active = gs.active_player().id.clone();
-                        if gs.player1.id == active {
-                            gs.player2.id.clone()
-                        } else {
-                            gs.player1.id.clone()
-                        }
-                    }
-                };
-                let card_no = gs
-                    .card_database
-                    .get_card(card_id)
-                    .map(|c| c.card_no.clone())
-                    .unwrap_or_default();
-                if !card_no.is_empty() {
-                    if player_id == gs.player1.id {
-                        gs.player1.debut_count_this_turn += 1;
-                    } else if player_id == gs.player2.id {
-                        gs.player2.debut_count_this_turn += 1;
-                    }
-                    gs.trigger_auto_ability(
-                        format!("{}_debut_{}", card_no, card_id),
-                        crate::core::types::AbilityTrigger::Debut,
-                        player_id,
-                        Some(card_no),
-                        Some(card_id),
-                    );
-                }
+                self.fire_debut_side_effects(gs, card_id, &target);
             }
             _ => {}
         }
         self.pending_choice = None;
         self.execution_context = ExecutionContext::None;
-        self.resume_pending_commands(gs)?;
-        // Place remaining cards deferred by multi-card stage selection.
-        // Each remaining card gets its own position choice.
+        // Place remaining cards deferred by multi-card stage selection
+        // BEFORE resuming pending commands, so deferred cards get their
+        // position choices before the re-prompt (if any).
         if !self.pending_stage_cards.is_empty() {
             let remaining = std::mem::take(&mut self.pending_stage_cards);
             for (cid, tgt) in remaining.clone() {
@@ -1243,14 +1288,18 @@ impl AbilityResolver {
                     return Ok(());
                 } else if empty_slots.len() == 1 {
                     let slot = empty_slots[0];
+                    let lock_area =
+                        self.spawn_context.source.as_deref() != Some(Zone::Stage.to_str());
                     p.stage.stage[slot] = cid;
-                    if self.spawn_context.source.as_deref() != Some(Zone::Stage.to_str()) {
+                    if lock_area {
                         p.areas_locked_this_turn.insert(match slot {
                             0 => crate::zones::MemberArea::LeftSide,
                             1 => crate::zones::MemberArea::Center,
                             _ => crate::zones::MemberArea::RightSide,
                         });
                     }
+                    let _ = p;
+                    self.fire_debut_side_effects(gs, cid, &tgt);
                 } else {
                     continue;
                 }
@@ -1258,6 +1307,7 @@ impl AbilityResolver {
                 gs.record_card_movement(cid);
             }
         }
+        self.resume_pending_commands(gs)?;
         Ok(())
     }
 
@@ -1303,7 +1353,7 @@ impl AbilityResolver {
             || Zone::from_str(destination) == Some(Zone::Waitroom)
             || Zone::from_str(destination) == Some(Zone::DeckBottom)
         {
-            self.moved_cards = moved_cards.to_vec();
+            self.moved_cards.extend(moved_cards);
             gs.recently_moved_cards = Some(moved_cards.to_vec());
             gs.recently_moved_from_zone = Some(source.to_string());
         }
@@ -1322,55 +1372,15 @@ impl AbilityResolver {
                 .map(|e| e.player_id.clone());
         }
 
-        // When cards are placed directly on stage (single free slot — no position-choice
-        // dialog was shown), the MoveCardsPosition execution-context path is skipped.
-        // We must fire 登場 (debut) triggers here instead, or they will be silently lost.
+        // Debut side effects for cards placed directly on stage (single free slot,
+        // no position-choice dialog). Each card goes through the unified
+        // fire_debut_side_effects which handles record_appearance, debut_count,
+        // card's own debut ability, AND cascading "when ally debuts" triggers.
         if Zone::from_str(destination) == Some(Zone::Stage) && !moved_cards.is_empty() {
-            // Determine the owning player_id from the `target` hint ("self"/"opponent").
-            let active_id = gs.active_player().id.clone();
-            let player_id = match target.unwrap_or("self") {
-                "opponent" => {
-                    if gs.player1.id == active_id {
-                        gs.player2.id.clone()
-                    } else {
-                        gs.player1.id.clone()
-                    }
-                }
-                _ => active_id,
-            };
-
+            let tgt = target.unwrap_or("self");
             for &card_id in moved_cards {
-                gs.record_card_appearance(card_id);
-
-                let card_no = gs
-                    .card_database
-                    .get_card(card_id)
-                    .map(|c| c.card_no.clone())
-                    .unwrap_or_default();
-
-                if card_no.is_empty() {
-                    continue;
-                }
-
-                if player_id == gs.player1.id {
-                    gs.player1.debut_count_this_turn += 1;
-                } else if player_id == gs.player2.id {
-                    gs.player2.debut_count_this_turn += 1;
-                }
-
-                gs.trigger_auto_ability(
-                    format!("{}_debut_{}", card_no, card_id),
-                    crate::core::types::AbilityTrigger::Debut,
-                    player_id.clone(),
-                    Some(card_no),
-                    Some(card_id),
-                );
+                self.fire_debut_side_effects(gs, card_id, tgt);
             }
-
-            // Also let other stage members' auto abilities fire (e.g. a member that
-            // watches for any ally appearing on stage).
-            gs.trigger_auto_abilities_for_player(&player_id);
-            gs.process_pending_auto_abilities(&player_id);
         }
     }
 
@@ -1481,7 +1491,59 @@ impl AbilityResolver {
         Ok(cards_to_move.iter().map(|&(_, cid)| cid).collect())
     }
 
-    /// Execute card movement from a zone: pre-validate filters, move cards to destination, track side effects.
+    /// Fire all side effects for a card placed on stage: record appearance,
+    /// increment debut count, fire the card's own debut ability, then cascade
+    /// to "when ally debuts" triggers for other stage members.
+    /// This is the single canonical function for debut processing — every
+    /// code path that places a card on stage must call this.
+    fn fire_debut_side_effects(&self, gs: &mut GameState, card_id: i16, target: &str) {
+        let player_id = match target {
+            "self" => gs.active_player().id.clone(),
+            _ => {
+                let active = gs.active_player().id.clone();
+                if gs.player1.id == active {
+                    gs.player2.id.clone()
+                } else {
+                    gs.player1.id.clone()
+                }
+            }
+        };
+
+        gs.record_card_appearance(card_id);
+
+        let card = gs.card_database.get_card(card_id).cloned();
+        if let Some(card) = card {
+            let card_no = card.card_no.clone();
+
+            if player_id == gs.player1.id {
+                gs.player1.debut_count_this_turn += 1;
+            } else if player_id == gs.player2.id {
+                gs.player2.debut_count_this_turn += 1;
+            }
+
+            for ability in &card.abilities {
+                if GameState::ability_matches_trigger(
+                    ability,
+                    &crate::core::types::AbilityTrigger::Debut,
+                ) {
+                    let ability_id = format!("{}_{}", card_no, ability.full_text);
+                    gs.trigger_auto_ability(
+                        ability_id,
+                        crate::core::types::AbilityTrigger::Debut,
+                        player_id.clone(),
+                        Some(card_no.clone()),
+                        Some(card_id),
+                        None,
+                    );
+                }
+            }
+        }
+
+        // Cascade to other stage members that watch for ally debuts.
+        gs.trigger_auto_abilities_for_player(&player_id);
+        gs.process_pending_auto_abilities(&player_id);
+    }
+
     fn execute_stage_placement_choices(
         &mut self,
         gs: &mut GameState,
@@ -1527,6 +1589,7 @@ impl AbilityResolver {
                 }
                 Ok(false) => {
                     moved.push(card_id);
+                    self.fire_debut_side_effects(gs, card_id, &target);
                 }
                 Err(_) => {
                     let player = gs.resolve_target_player_mut(target);
@@ -1618,7 +1681,12 @@ impl AbilityResolver {
             } else {
                 Zone::Discard.to_str()
             });
-        eprintln!("[EXEC_SEL_DEST] zone={:?} destination={:?} dest={}", zone_enum, destination, dest);
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!(
+                "[EXEC_SEL_DEST] zone={:?} destination={:?} dest={}",
+                zone_enum, destination, dest
+            );
+        }
         let mut moved = Vec::new();
         match zone_enum {
             Some(Zone::Hand) | Some(Zone::Discard) | Some(Zone::Deck) => {
@@ -1811,6 +1879,16 @@ impl AbilityResolver {
             _ => return Err(format!("Unknown zone: {}", zone)),
         }
 
+        for cid in &moved {
+            gs.mods.clear_all_for_card(*cid);
+            if !self.selected_cards.contains(cid) {
+                self.selected_cards.push(*cid);
+            }
+            if !self.moved_cards.contains(cid) {
+                self.moved_cards.push(*cid);
+            }
+        }
+
         let state_change = gs
             .ability_queue
             .current_entry()
@@ -1821,16 +1899,6 @@ impl AbilityResolver {
                 for &cid in &moved {
                     gs.mods.add_orientation_modifier(cid, "wait");
                 }
-            }
-        }
-
-        for cid in &moved {
-            gs.mods.clear_all_for_card(*cid);
-            if !self.selected_cards.contains(cid) {
-                self.selected_cards.push(*cid);
-            }
-            if !self.moved_cards.contains(cid) {
-                self.moved_cards.push(*cid);
             }
         }
 
@@ -2034,9 +2102,12 @@ impl AbilityResolver {
         } else {
             Zone::DeckBottom.to_str()
         };
-        for card_id in remaining_cards {
+        for &card_id in &remaining_cards {
             util::place_card_in_zone(player, card_id, dest_zone, None, false, 1);
         }
+        // Track the discarded cards so each_time watchers (e.g. Hazuki Ren ab#1)
+        // can react to them as a single batch discard event.
+        self.finalize_card_movement(gs, &remaining_cards, dest_zone, "deck_top", &None, None);
 
         Ok(())
     }

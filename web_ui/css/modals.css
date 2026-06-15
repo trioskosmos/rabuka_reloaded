@@ -44,6 +44,7 @@
 .modal-body {
     max-height: 70vh;
     overflow-y: auto;
+    overflow-x: hidden;
     padding-right: 5px;
 }
 
@@ -116,8 +117,25 @@
 .performance-modal-content {
     width: 95vw;
     max-width: 1400px;
-    height: 92vh;
-    max-height: 92vh;
+    height: auto;
+    max-height: 90vh;
+}
+
+.performance-modal-content .modal-body {
+    padding: 8px 12px;
+    overflow-x: auto;
+}
+
+@media (max-width: 768px) {
+    .performance-modal-content {
+        width: 100vw;
+        max-height: 100dvh;
+        border-radius: 0;
+    }
+    .performance-modal-content .modal-body {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
 }
 
 @keyframes modal-enter {
@@ -176,6 +194,13 @@
 
 .lobby-btn:hover { background: var(--accent-blue); }
 
+.convert-status {
+    font-size: 0.75rem;
+    margin-top: 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
 .lobby-divider {
     text-align: center;
     margin: var(--space-xl) 0;
@@ -199,6 +224,13 @@
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: var(--space-md);
+}
+
+.discard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: var(--space-md);
+    padding: 10px;
 }
 
 
@@ -328,10 +360,10 @@
 }
 
 .perf-step-summary {
-    padding: 6px 10px;
+    padding: 3px 8px;
     cursor: pointer;
     font-weight: 600;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     background: rgba(255,255,255,0.03);
     user-select: none;
 }
@@ -341,10 +373,10 @@
 }
 
 .perf-step-body {
-    padding: 6px 10px 8px;
+    padding: 4px 8px 6px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
 }
 
 .perf-step-live-card,

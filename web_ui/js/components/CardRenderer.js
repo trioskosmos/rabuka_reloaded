@@ -9,7 +9,6 @@ import { DOM_IDS } from '../constants_dom.js';
 export const ImageLoader = {
     loadedImages: new Set(),
     failedImages: new Map(), // src -> retry count
-    maxRetries: 2,
     observer: null,
 
     init() {
@@ -27,10 +26,13 @@ export const ImageLoader = {
         }
     },
 
-    _doLoad(img, src) {
+    _doLoad(img, src, isRetry = false) {
         // Clear previous handlers to avoid duplicates
         img.onload = null;
         img.onerror = null;
+
+        const delays = [200, 500, 1000, 3000, 10000];
+        const maxRetries = delays.length;
 
         img.onload = () => {
             this.loadedImages.add(src);
@@ -40,18 +42,22 @@ export const ImageLoader = {
 
         img.onerror = () => {
             const retries = this.failedImages.get(src) || 0;
-            if (retries < this.maxRetries) {
+            if (retries < maxRetries) {
                 this.failedImages.set(src, retries + 1);
-                // Retry with a small delay to avoid flooding
-                setTimeout(() => this._doLoad(img, src), 100 * (retries + 1));
+                img.style.opacity = '0.5';
+                setTimeout(() => {
+                    img.dispatchEvent(new CustomEvent('imageRetrying'));
+                    this._doLoad(img, src, true);
+                }, delays[retries]);
             } else {
                 console.warn('[ImageLoader] Failed to load image after retries:', src);
                 img.style.opacity = '0.3';
+                img.dispatchEvent(new CustomEvent('imagePermanentFailure'));
             }
         };
 
-        // Force reload by adding cache-busting on retry
-        const loadSrc = (this.failedImages.get(src) || 0) > 0
+        // Always use cache-busting on retries and re-renders
+        const loadSrc = (isRetry || this.failedImages.has(src))
             ? src + (src.includes('?') ? '&' : '?') + '_retry=' + Date.now()
             : src;
         img.src = loadSrc;
@@ -63,9 +69,10 @@ export const ImageLoader = {
      */
     retryImage(img, src) {
         if (!src || this.loadedImages.has(src)) return;
-        this.failedImages.delete(src);
-        img.style.opacity = '';
-        this._doLoad(img, src);
+        this.failedImages.set(src, 0);
+        img.style.opacity = '0.5';
+        img.dispatchEvent(new CustomEvent('imageRetrying'));
+        this._doLoad(img, src, true);
     },
 
     loadImage(img, src) {
@@ -100,7 +107,9 @@ export const ImageLoader = {
 // Consistent image path resolution across all card displays
 export function resolveCardImagePath(cardNo) {
     if (!cardNo) return '';
-    
+    // Bail early for placeholder/invalid card numbers
+    if (cardNo === '-1' || cardNo === -1 || cardNo === '-2' || cardNo === -2) return '';
+
     // 1. Direct mapping lookup
     const mapped = State.cardImageMapping?.[cardNo];
     if (mapped) return fixImgPath(mapped);
@@ -199,12 +208,16 @@ export const CardRenderer = {
                 resolvedCard = { ...card, ...indexed };
             }
         }
-
         // Rust backend format: card_no, name, card_type, orientation
-        // Support both hidden field and card_no === -2/-1 for hidden cards
-        const isHidden = resolvedCard.hidden || resolvedCard.is_hidden || resolvedCard.card_no === -2 || resolvedCard.card_no === -1;
-        // Engine sends card_type as string enum; static database uses `type`
-        const isLive = resolvedCard.card_type === 'Live' || resolvedCard.card_type === 'ライブ' || resolvedCard.type === 'ライブ';
+        // Support both hidden field and card_no === -2/-1 (number or string) for hidden cards
+        const isHidden = resolvedCard.hidden || resolvedCard.is_hidden || 
+                         resolvedCard.card_no === -2 || resolvedCard.card_no === -1 ||
+                         resolvedCard.card_no === "-2" || resolvedCard.card_no === "-1";
+        // Engine sends card_type as string enum; static database uses `type`.
+        // Check case-insensitively and also check card_no prefix as fallback.
+        const rawCardType = (resolvedCard.card_type || resolvedCard.type || '').toLowerCase();
+        const isLive = rawCardType === 'live' || rawCardType === 'ライブ' ||
+            (typeof resolvedCard.card_no === 'string' && resolvedCard.card_no.startsWith('live'));
 
         // 1. Determine CSS Classes
         const classNames = ['card'];
@@ -223,8 +236,8 @@ export const CardRenderer = {
             containerId.includes('selection')
         ));
         // All cards are physically portrait images, but live cards are printed in landscape,
-        // so they need rotation to be displayed in a landscape container.
-        const nativeLandscape = false;
+        // so they do not need additional rotation to fill a landscape container.
+        const nativeLandscape = isLive;
 
         if (targetLandscape) {
             classNames.push('orientation-landscape');
@@ -400,65 +413,135 @@ export const CardRenderer = {
             return;
         }
 
-        const existingChildren = Array.from(el.children);
         const cardCount = cards.length;
 
         if (filter) {
             DOMUtils.clear(containerId);
-        } else {
-            // Synchronize children count
-            while (el.children.length > cardCount) {
-                el.removeChild(el.lastChild);
-            }
         }
 
-        cards.forEach((card, idx) => {
-            if (filter && !filter(card, idx)) return;
+        // Phase 1: Build a key→element map from the live DOM for identity tracking
+        const keyToEl = new Map();
+        for (let i = 0; i < el.children.length; i++) {
+            const child = el.children[i];
+            const k = child.dataset.cardKey;
+            if (k) keyToEl.set(k, child);
+        }
+
+        // Track which keys we still see so we can remove stale nodes
+        const seenKeys = new Set();
+        let insertBefore = null;
+
+        // Phase 2: Update or create for each card position
+        for (let idx = 0; idx < cardCount; idx++) {
+            const card = cards[idx];
+            if (filter && !filter(card, idx)) continue;
+
+            // Compute a stable card identity key
+            let cardKey;
+            if (card === null) {
+                cardKey = `null_${idx}`;
+            } else if (card.id !== undefined && card.id >= 0) {
+                cardKey = `${card.card_no}_${card.id}`;
+            } else if (card.card_no && card.card_no !== '-1' && card.card_no !== -1) {
+                cardKey = card.card_no;
+            } else {
+                cardKey = `anon_${idx}`;
+            }
+            seenKeys.add(cardKey);
 
             const isSelected = selectedIndices.includes(idx);
             const action = validActionMap[idx];
             const isValid = action !== undefined;
-            const existingChild = filter ? null : existingChildren[idx];
+
+            // Check if we already have a DOM element for this card (by key)
+            let existingChild = keyToEl.get(cardKey);
+            if (existingChild && el.children[idx] !== existingChild) {
+                // Card exists but at wrong position — move it
+                const ref = el.children[idx] || null;
+                el.insertBefore(existingChild, ref);
+            }
+
+            // Get or use the element currently at this position
+            const childAtPos = el.children[idx] || null;
 
             if (card === null) {
-                if (existingChild && existingChild.classList.contains('placeholder')) {
-                    existingChild.style.visibility = 'hidden';
+                if (childAtPos && childAtPos.classList.contains('placeholder')) {
+                    childAtPos.style.visibility = 'hidden';
                 } else {
                     const placeholder = document.createElement('div');
                     placeholder.className = 'card placeholder' + (mini ? ' card-mini' : '');
                     placeholder.style.visibility = 'hidden';
-                    if (existingChild) el.replaceChild(placeholder, existingChild);
+                    if (childAtPos) el.replaceChild(placeholder, childAtPos);
                     else el.appendChild(placeholder);
                 }
-                return;
+                continue;
             }
-
-            const viewModel = CardRenderer.getCardViewModel(card, {
-                isSelected,
-                isValid,
-                mini,
-                containerId,
-                actionId: action?.index
-            });
 
             const onClick = clickable && (isValid || !hasGlobalSelection) ? (act) => {
-                if (isValid && window.doAction) {
-                    window.doAction(action);
-                } else if (window.playCard) {
-                    window.playCard(idx);
+                if (!isValid) return;
+                if (action.action_type === 'select_mulligan') {
+                    const handIdx = action.parameters?.card_index ?? action.parameters?.card_indices?.[0];
+                    if (handIdx !== undefined) {
+                        if (State.localMulliganSelection.has(handIdx)) {
+                            State.localMulliganSelection.delete(handIdx);
+                        } else {
+                            State.localMulliganSelection.add(handIdx);
+                        }
+                        const cardEl = document.getElementById(`${containerId}-card-${handIdx}`);
+                        if (cardEl) cardEl.classList.toggle('mulligan-selected');
+                    }
+                    return;
                 }
+                if (action.action_type === 'set_live_card') {
+                    if (window.doAction) window.doAction(action);
+                    return;
+                }
+                if (window.selectedAction?.index === action.index) {
+                    window.selectedAction = null;
+                    document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+                    if (window.highlightActionBtn) window.highlightActionBtn(null, false);
+                    return;
+                }
+                document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+                window.selectedAction = action;
+                document.querySelector(`[data-action-id="${action.index}"]`)?.classList.add('selected');
+                if (window.highlightActionBtn) window.highlightActionBtn(action.index, true);
             } : null;
 
+            const viewModel = CardRenderer.getCardViewModel(card, {
+                isSelected, isValid, mini, containerId, actionId: action?.index
+            });
+
             if (existingChild && !existingChild.classList.contains('placeholder')) {
+                // Card was found by key — update in place
                 CardRenderer.updateCardDOM(existingChild, viewModel, card, onClick);
                 existingChild.id = `${containerId}-card-${idx}`;
+                existingChild.dataset.cardKey = cardKey;
             } else {
+                // New card — create DOM with enter animation
                 const cardEl = CardRenderer.createCardDOM(viewModel, card, onClick);
                 cardEl.id = `${containerId}-card-${idx}`;
-                if (existingChild) el.replaceChild(cardEl, existingChild);
+                cardEl.dataset.cardKey = cardKey;
+                cardEl.classList.add('card-enter');
+                if (childAtPos) el.replaceChild(cardEl, childAtPos);
                 else el.appendChild(cardEl);
+                // Kick off enter animation on next frame
+                requestAnimationFrame(() => requestAnimationFrame(() => {
+                    cardEl.classList.remove('card-enter');
+                }));
             }
-        });
+        }
+
+        // Phase 3: Remove stale DOM elements (cards no longer in the list)
+        for (let i = el.children.length - 1; i >= cardCount; i--) {
+            const exiting = el.children[i];
+            if (exiting && exiting.dataset.cardKey && !seenKeys.has(exiting.dataset.cardKey)) {
+                exiting.classList.add('card-exit');
+                setTimeout(() => { if (exiting.parentNode) exiting.remove(); }, 150);
+            } else {
+                el.removeChild(el.lastChild);
+            }
+        }
     },
 
     renderStage: (containerId, stage, underCards = [[], [], []], clickable, validActionMap = {}, hasGlobalSelection = false) => {
@@ -571,8 +654,16 @@ export const CardRenderer = {
 
             if (clickable && (isValid || !hasGlobalSelection)) {
                 const clickHandler = () => {
-                    if (isValid && window.doAction) {
-                        window.doAction(action);
+                    if (isValid) {
+                        if (window.selectedAction && window.selectedAction.card_index !== undefined) {
+                            if (action.card_index === window.selectedAction.card_index && window.doAction) {
+                                window.doAction(action);
+                                window.selectedAction = null;
+                                document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+                            }
+                        } else if (window.doAction) {
+                            window.doAction(action);
+                        }
                     } else if (window.onStageSlotClick) {
                         window.onStageSlotClick(i);
                     }
@@ -638,25 +729,30 @@ export const CardRenderer = {
             slot.id = `${containerId}-slot-${i}`;
 
             if (card && card.card_no) {
-                const fixedPath = viewModel?.imgPath || resolveCardImagePath(card.card_no);
-                const existingImg = slot.querySelector('img');
-                const existingInner = slot.querySelector('.live-card-inner');
+                const isCardHidden = viewModel?.isHidden;
+                if (!isCardHidden) {
+                    const fixedPath = viewModel?.imgPath || resolveCardImagePath(card.card_no);
+                    const existingImg = slot.querySelector('img');
+                    const existingInner = slot.querySelector('.live-card-inner');
 
-                if (existingInner && existingImg) {
-                    if (existingImg.src !== fixedPath) {
-                        ImageLoader.loadImage(existingImg, fixedPath);
+                    if (existingInner && existingImg) {
+                        if (existingImg.src !== fixedPath) {
+                            ImageLoader.loadImage(existingImg, fixedPath);
+                        }
+                    } else {
+                        const img = document.createElement('img');
+                        img.draggable = false;
+                        ImageLoader.loadImage(img, fixedPath);
+
+                        const inner = document.createElement('div');
+                        inner.className = 'live-card-inner';
+                        inner.appendChild(img);
+
+                        slot.innerHTML = '';
+                        slot.appendChild(inner);
                     }
                 } else {
-                    const img = document.createElement('img');
-                    img.draggable = false;
-                    ImageLoader.loadImage(img, fixedPath);
-
-                    const inner = document.createElement('div');
-                    inner.className = 'live-card-inner';
-                    inner.appendChild(img);
-
                     slot.innerHTML = '';
-                    slot.appendChild(inner);
                 }
                 
                 const rawText = Tooltips.getEffectiveRawText(card);
@@ -708,7 +804,11 @@ export const CardRenderer = {
             for (let i = 0; i < showCount; i++) {
                 const card = discard[discard.length - 1 - i];
                 const div = document.createElement('div');
-                div.className = 'card card-mini';
+                const dbCard = card.card_no ? State.resolveCardData(card.card_no) : null;
+                const combined = dbCard ? { ...card, ...dbCard } : card;
+                const rawType = (combined.card_type || combined.type || '').toLowerCase();
+                const isLiveCard = rawType === 'live' || rawType === 'ライブ';
+                div.className = 'card card-mini' + (isLiveCard ? ' type-live orientation-landscape rotate-img-90' : '');
                 const img = document.createElement('img');
                 img.draggable = false;
                 ImageLoader.loadImage(img, resolveCardImagePath(card.card_no));
@@ -754,9 +854,8 @@ export const CardRenderer = {
         const content = DOMUtils.getElement(DOM_IDS.LOOKED_CARDS_CONTENT);
         if (!panel || !content) return;
 
-        // Selection cards are handled by ChoiceView in the action area — skip them here
-        const hasChoice = state.pending_choice?.zone || state.pending_choice?.selection_cards?.length > 0;
-        const pendingSelectionCards = hasChoice ? [] : (state.pending_choice?.selection_cards || []);
+        // Include pending choice selection cards here (modal is hidden, so show them in sidebar panel)
+        const pendingSelectionCards = state.pending_choice?.selection_cards || [];
         let cards = overrideCards || (pendingSelectionCards.length > 0 ? pendingSelectionCards : (state.looked_cards || []));
 
         // When a choice is active, filter to only cards with a matching legal action
@@ -854,7 +953,7 @@ export const CardRenderer = {
             bonuses.push({ type: 'bonus-blade', value: card.bonus_blade, icon: 'icon_blade.png' });
         }
 
-        const heartIcons = ['heart_00.png','heart_01.png','heart_02.png','heart_03.png','heart_04.png','heart_05.png','heart_06.png'];
+        const heartIcons = ['heart_00.png','heart_01.png','heart_02.png','heart_03.png','heart_04.png','heart_05.png','heart_06.png','icon_all.png'];
         if (card.bonus_hearts && Array.isArray(card.bonus_hearts)) {
             card.bonus_hearts.forEach((val, idx) => {
                 if (val && val !== 0 && idx < heartIcons.length) {

@@ -159,7 +159,11 @@ export const ActionListView = {
                 header.className = 'action-group-header';
                 const energyIcon = `<img src="img/texticon/icon_energy.png" style="height:14px; vertical-align:middle; margin-left: 5px;">`;
                 const displayCost = firstA.parameters?.base_cost ?? 0;
-                const cleanName = firstA.parameters?.card_name ?? firstA.description ?? "Unknown";
+                let cleanName = firstA.parameters?.card_name ?? firstA.description ?? "Unknown";
+                if (State.currentLang === 'en' && firstA.parameters?.card_id !== undefined) {
+                    const card = Tooltips.findCardById(firstA.parameters.card_id);
+                    if (card) cleanName = i18n.translateCard(card).name;
+                }
                 header.innerHTML = `<span class="truncate-name" style="max-width: 180px;">${cleanName}</span> <span class="header-base-cost">${energyIcon}${displayCost}</span>`;
                 groupDiv.appendChild(header);
 
@@ -169,7 +173,7 @@ export const ActionListView = {
                     const areasDiv = document.createElement('div');
                     areasDiv.className = 'action-group-buttons grid-3';
                     
-                    const areaLabels = { 'left': 'Left', 'center': 'Center', 'right': 'Right' };
+                    const areaLabels = { 'left': i18n.t('area_left'), 'center': i18n.t('area_center'), 'right': i18n.t('area_right') };
                     
                     // Always render 3 slots (left, center, right)
                     const areaOrder = ['left', 'center', 'right'];
@@ -251,7 +255,7 @@ export const ActionListView = {
                                         card_no: firstA.parameters?.card_no,
                                     };
                                     btn.onclick = () => {
-                                        if (window.doAction) window.doAction({ action_type: 'PlayMemberToStage', parameters: dbActionParams });
+                                        if (window.doAction) window.doAction({ action_type: 'play_member_to_stage', parameters: dbActionParams });
                                     };
                                     row.appendChild(btn);
                                 } else {

@@ -7,21 +7,21 @@ use crate::types::{
 };
 use std::collections::HashMap;
 
-const EMPTY_H7: [u32; 7] = [0u32; 7];
+const EMPTY_H8: [u32; 8] = [0u32; 8];
 
 impl super::TurnEngine {
     fn score_delta_since(
         current: &HashMap<i16, i32>,
         snapshot: &HashMap<i16, i32>,
         zone_cards: &[i16],
-    ) -> u32 {
+    ) -> i32 {
         let mut total = 0i32;
         for &cid in zone_cards {
             let cur = current.get(&cid).copied().unwrap_or(0);
             let prev = snapshot.get(&cid).copied().unwrap_or(0);
-            total += (cur - prev).max(0);
+            total += cur - prev;
         }
-        total as u32
+        total
     }
 
     pub fn execute_live_victory_determination(game_state: &mut GameState) {
@@ -34,12 +34,18 @@ impl super::TurnEngine {
         let p2_mult = &game_state.mods.heart_color_multiplier.clone();
         // Include yell blade hearts in stage_hearts so should_trigger_live_success
         // checks against the same total hearts the performance used.
-        let mut p1_stage = game_state
-            .player1
-            .calculate_stage_hearts(&game_state.card_database, p1_mult);
-        let mut p2_stage = game_state
-            .player2
-            .calculate_stage_hearts(&game_state.card_database, p2_mult);
+        let mut p1_stage = game_state.player1.calculate_stage_hearts(
+            &game_state.card_database,
+            p1_mult,
+            &game_state.mods.heart_override,
+            &game_state.mods.heart_modifiers,
+        );
+        let mut p2_stage = game_state.player2.calculate_stage_hearts(
+            &game_state.card_database,
+            p2_mult,
+            &game_state.mods.heart_override,
+            &game_state.mods.heart_modifiers,
+        );
         for snap in &game_state.performance_snapshots {
             let target = if snap.player_id == game_state.player1.id {
                 &mut p1_stage
@@ -79,11 +85,11 @@ impl super::TurnEngine {
             .iter()
             .map(|(&k, e)| (k, e.total()))
             .collect();
-        let p1_extra;
-        let p2_extra;
+        let p1_extra: u32;
+        let p2_extra: u32;
         if game_state.live_success_triggered_this_turn {
-            p1_extra = 0;
-            p2_extra = 0;
+            p1_extra = 0u32;
+            p2_extra = 0u32;
         } else {
             game_state.live_success_triggered_this_turn = true;
 
@@ -138,7 +144,8 @@ impl super::TurnEngine {
                 &score_cur,
                 &pre_score_flat,
                 &game_state.player1.live_card_zone.cards,
-            );
+            )
+            .max(0) as u32;
 
             Self::trigger_live_success_abilities(game_state, &player2_id);
             game_state.process_pending_auto_abilities(&player2_id);
@@ -165,7 +172,8 @@ impl super::TurnEngine {
                 &score_cur2,
                 &pre_score_flat,
                 &game_state.player2.live_card_zone.cards,
-            );
+            )
+            .max(0) as u32;
         }
 
         // Process any remaining auto-abilities that were queued but not yet resolved
@@ -226,7 +234,7 @@ impl super::TurnEngine {
 
         // Finalize snapshots for both players
         for snap in game_state.performance_snapshots.iter_mut() {
-            let player = if snap.player_id == player1_id {
+            let _player = if snap.player_id == player1_id {
                 &game_state.player1
             } else {
                 &game_state.player2
@@ -241,14 +249,14 @@ impl super::TurnEngine {
                     snap.lives[i].card_id = lc_id;
                     snap.lives[i].card_no = card.card_no.clone();
                     if let Some(ref nh) = card.need_heart {
-                        let mut filled = EMPTY_H7;
+                        let mut filled = EMPTY_H8;
                         // Build filled array from heart allocations targeting this live
                         for alloc in &snap.breakdown.allocations {
                             if alloc.target_idx == i {
                                 filled[alloc.color] += alloc.amount;
                             }
                         }
-                        let mut required_arr = EMPTY_H7;
+                        let mut required_arr = EMPTY_H8;
                         // Build effective need_heart with set/additive logic
                         let has_set = game_state
                             .mods
@@ -283,17 +291,33 @@ impl super::TurnEngine {
                         }
                         // Determine passed by comparing filled vs required (not vs total pool).
                         // heart00 (index 0) is a wildcard that fills deficits in any color.
+                        // The Heart00 requirement (required_arr[0]) must also be met.
+                        // Phase 3 allocates leftover colored hearts and Heart00 wildcards
+                        // to fill required_arr[0]; those show up in filled[1..6] (colored)
+                        // and filled[0] (Heart00 wildcard).
                         let passed = {
-                            let wildcard = filled[0];
+                            let mut wildcard = filled[0];
                             let mut ok = true;
-                            for idx in 1..7 {
-                                if filled[idx] < required_arr[idx] {
-                                    let deficit = required_arr[idx] - filled[idx];
-                                    if wildcard >= deficit {
-                                        // wildcard covers this deficit
-                                    } else {
-                                        ok = false;
-                                        break;
+                            // Check if the Heart00 requirement itself is satisfied.
+                            // Any filled colored hearts (1-6) that were allocated by Phase 3
+                            // count toward the Heart00 requirement, so we subtract them.
+                            if required_arr[0] > 0 {
+                                let h00_satisfied: u32 = filled[1..7].iter().sum();
+                                if h00_satisfied + wildcard < required_arr[0] {
+                                    ok = false;
+                                }
+                            }
+                            // Use remaining wildcard to cover deficits in specific colors
+                            if ok {
+                                for idx in 1..7 {
+                                    if filled[idx] < required_arr[idx] {
+                                        let deficit = required_arr[idx] - filled[idx];
+                                        if wildcard >= deficit {
+                                            wildcard -= deficit;
+                                        } else {
+                                            ok = false;
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -372,7 +396,7 @@ impl super::TurnEngine {
             // minus all allocations up to and including this card.
             // This correctly shows how many hearts remain in the pool after each card
             // consumes its share from the shared pool.
-            let mut cumulative_used = EMPTY_H7;
+            let mut cumulative_used = EMPTY_H8;
             for i in 0..snap.lives.len() {
                 // Accumulate allocations for this live card
                 for alloc in &snap.breakdown.allocations {
@@ -381,7 +405,7 @@ impl super::TurnEngine {
                     }
                 }
                 // spare = total_hearts - cumulative_used (what remains after this card)
-                let mut spare = EMPTY_H7;
+                let mut spare = EMPTY_H8;
                 for idx in 0..7 {
                     spare[idx] = snap.total_hearts[idx].saturating_sub(cumulative_used[idx]);
                 }
@@ -830,7 +854,7 @@ impl super::TurnEngine {
                 revealed_ids: Vec::new(),
                 member_contributions: Vec::new(),
                 yell_cards: Vec::new(),
-                total_hearts: [0; 7],
+                total_hearts: [0; 8],
                 allocations: Vec::new(),
                 heart_sources: Vec::new(),
                 blade_sources: Vec::new(),
@@ -847,7 +871,7 @@ impl super::TurnEngine {
                 revealed_ids: Vec::new(),
                 member_contributions: Vec::new(),
                 yell_cards: Vec::new(),
-                total_hearts: [0; 7],
+                total_hearts: [0; 8],
                 allocations: Vec::new(),
                 heart_sources: Vec::new(),
                 blade_sources: Vec::new(),
@@ -868,8 +892,8 @@ impl super::TurnEngine {
             if cid == -1 {
                 continue;
             }
-            let mut base_h = EMPTY_H7;
-            let mut bonus_h = EMPTY_H7;
+            let mut base_h = EMPTY_H8;
+            let mut bonus_h = EMPTY_H8;
             let mut base_blades = 0u32;
             let mut draw_icons = 0u32;
             let ability_heart_bonuses = Vec::new();
@@ -880,7 +904,7 @@ impl super::TurnEngine {
                 if let Some(ref bh) = card.base_heart {
                     for (color, count) in &bh.hearts {
                         let idx = color.index();
-                        if idx < 7 {
+                        if idx < 8 {
                             base_h[idx] += count;
                         }
                     }
@@ -900,7 +924,7 @@ impl super::TurnEngine {
             if let Some(mods) = heart_modifiers.get(&cid) {
                 for (color, delta) in mods {
                     let idx = color.index();
-                    if idx < 7 && *delta > 0 {
+                    if idx < 8 && *delta > 0 {
                         bonus_h[idx] += *delta as u32;
                     }
                 }
@@ -909,15 +933,15 @@ impl super::TurnEngine {
             // Apply heart_color_multiplier (set_heart_type): transform all hearts to one color
             if let Some(override_color) = heart_color_multiplier.get(&cid) {
                 let total: u32 = base_h.iter().sum();
-                base_h = EMPTY_H7;
+                base_h = EMPTY_H8;
                 base_h[override_color.index()] = total;
             }
 
             // Check for heart override
             if let Some(&(override_color, override_count)) = heart_override.get(&cid) {
-                base_h = EMPTY_H7;
+                base_h = EMPTY_H8;
                 let idx = override_color.index();
-                if idx < 7 {
+                if idx < 8 {
                     base_h[idx] = override_count;
                 }
             }
@@ -990,14 +1014,14 @@ impl super::TurnEngine {
         let mut heart_sources: Vec<HeartSource> = Vec::new();
         let mut blade_sources: Vec<BladeSource> = Vec::new();
         let mut allocations: Vec<Allocation> = Vec::new();
-        let mut total_hearts_arr = EMPTY_H7;
+        let mut total_hearts_arr = EMPTY_H8;
 
         // Stage hearts source
         let stage_heart_str = "Stage (base)".to_string();
-        let mut stage_heart_arr = EMPTY_H7;
+        let mut stage_heart_arr = EMPTY_H8;
         for (color, count) in &owned_hearts.hearts {
             let idx = color.index();
-            if idx < 7 {
+            if idx < 8 {
                 stage_heart_arr[idx] += count;
             }
         }
@@ -1008,7 +1032,7 @@ impl super::TurnEngine {
         });
         for (color, count) in &owned_hearts.hearts {
             let idx = color.index();
-            if idx < 7 {
+            if idx < 8 {
                 total_hearts_arr[idx] += count;
             }
         }
@@ -1022,7 +1046,7 @@ impl super::TurnEngine {
 
         for card_id in &resolution_zone.cards {
             if let Some(card) = card_db.get_card(*card_id) {
-                let mut bh_arr = EMPTY_H7;
+                let mut bh_arr = EMPTY_H8;
                 let mut note_icons = 0u32;
                 let mut draw_icons = 0u32;
 
@@ -1035,7 +1059,6 @@ impl super::TurnEngine {
                             total_hearts_arr[0] += count;
                         } else if effective_color == HeartColor::Draw {
                             draw_icons += count;
-                            // Process draw effects immediately
                             for _ in 0..*count {
                                 if let Some(new_card) = player.main_deck.draw() {
                                     player.hand.add_card(new_card);
@@ -1046,16 +1069,30 @@ impl super::TurnEngine {
                             cheer_icon_count += count;
                         } else {
                             let idx = effective_color.index();
-                            if idx < 7 {
+                            if idx < 8 {
                                 *owned_hearts.hearts.entry(effective_color).or_insert(0) += count;
                                 bh_arr[idx] += count;
                                 total_hearts_arr[idx] += count;
                             }
-                            // Regular hearts do NOT add to score (Rule 8.4.2 — only ♪ icons count)
                         }
                     }
-                } else {
-                    // No blade_heart — no hearts from this yell card
+                }
+
+                // Also process special_heart on yell cards (e.g. draw-from-エール)
+                if let Some(ref sh) = card.special_heart {
+                    for (color, count) in &sh.hearts {
+                        if *color == HeartColor::Draw {
+                            draw_icons += count;
+                            for _ in 0..*count {
+                                if let Some(new_card) = player.main_deck.draw() {
+                                    player.hand.add_card(new_card);
+                                }
+                            }
+                        } else if *color == HeartColor::Score {
+                            note_icons += count;
+                            cheer_icon_count += count;
+                        }
+                    }
                 }
 
                 yell_cards.push(YellCardResult {
@@ -1072,7 +1109,7 @@ impl super::TurnEngine {
         }
 
         // Yell heart source
-        let mut yell_heart_arr = EMPTY_H7;
+        let mut yell_heart_arr = EMPTY_H8;
         for yc in &yell_cards {
             for i in 0..7 {
                 yell_heart_arr[i] += yc.blade_hearts[i];
@@ -1416,9 +1453,10 @@ pub fn build_snapshot(
         lives.push(crate::types::LiveCardResult {
             passed: false,
             score,
-            spare: EMPTY_H7,
-            required: EMPTY_H7,
-            filled: EMPTY_H7,
+            base_score: score,
+            spare: EMPTY_H8,
+            required: EMPTY_H8,
+            filled: EMPTY_H8,
             adjustments: Vec::new(),
             card_id: lc_id,
             card_no,
@@ -1503,7 +1541,7 @@ fn fmt_player_id(id: &str) -> String {
     }
 }
 
-fn fmt_hearts(arr: &[u32; 7]) -> String {
+fn fmt_hearts(arr: &[u32; 8]) -> String {
     arr.iter()
         .enumerate()
         .filter(|(_, &v)| v > 0)
@@ -1518,7 +1556,7 @@ fn fmt_hearts(arr: &[u32; 7]) -> String {
         .join(" ")
 }
 
-fn fmt_heart_vec(arr: &[u32; 7]) -> String {
+fn fmt_heart_vec(arr: &[u32; 8]) -> String {
     arr.iter()
         .enumerate()
         .map(|(i, v)| {
@@ -1544,7 +1582,7 @@ pub fn snapshot_to_rule_log(
 
     // ── Stage members ──
     let mut _stage_total_blades = 0u32;
-    let mut stage_total_hearts = [0u32; 7];
+    let mut stage_total_hearts = [0u32; 8];
     for mc in &snap.member_contributions {
         let name = card_name_by_no(card_db, &mc.card_no);
         let total_blade = mc.base_blades + mc.bonus_blades;
@@ -1583,7 +1621,7 @@ pub fn snapshot_to_rule_log(
     }
 
     // ── Yell cards ──
-    let mut yell_total_hearts = [0u32; 7];
+    let mut yell_total_hearts = [0u32; 8];
     if snap.yell_count > 0 {
         lines.push(format!("  Yell ({} cards):", snap.yell_count));
         for yc in &snap.yell_cards {

@@ -3,6 +3,7 @@ import { log } from '../logger.js';
 import { ModalManager } from '../utils/ModalManager.js';
 import { DOMUtils } from '../utils/DOMUtils.js';
 import { DOM_IDS } from '../constants_dom.js';
+import { SSEClient } from './SSEClient.js';
 
 export const RoomManager = {
     // Session Management
@@ -91,9 +92,17 @@ export const RoomManager = {
                 if (networkFacade?.fetchState) await networkFacade.fetchState();
                 if (networkFacade?.triggerRoomUpdate) networkFacade.triggerRoomUpdate();
 
-                if (mode === 'pvp' && networkFacade?.fetchState) {
-                    setTimeout(() => networkFacade.fetchState(), 1000);
+                if (mode === 'pvp') {
+                    // Open deck selection for host
+                    if (window.Modals?.openDeckSelectionForPvP) {
+                        window.Modals.openDeckSelectionForPvP(0);
+                    }
+                    if (networkFacade?.fetchState) {
+                        setTimeout(() => networkFacade.fetchState(), 1000);
+                    }
                 }
+
+                RoomManager.connectSSE();
             } else {
                 alert('Failed to create room: ' + data.error);
             }
@@ -108,8 +117,8 @@ export const RoomManager = {
             const input = DOMUtils.getElement(DOM_IDS.ROOM_CODE_INPUT);
             if (input) code = input.value.toUpperCase();
         }
-        if (!code || code.length !== 4) {
-            alert('Please enter a 4-letter room code.');
+        if (!code || code.length < 3 || code.length > 6) {
+            alert('Please enter a valid room code (4 letters).');
             return;
         }
         
@@ -134,36 +143,11 @@ export const RoomManager = {
                     RoomManager.saveSession(code, data.session);
                 }
 
-                if (window.Modals?.fetchAndPopulateDecks && (!window.Modals.deckPresets || window.Modals.deckPresets.length === 0)) {
+                // Open deck selection for joiner
+                const joinerPid = data.session?.player_id !== undefined ? data.session.player_id : 1;
+                if (window.Modals?.openDeckSelectionForPvP) {
                     await window.Modals.fetchAndPopulateDecks();
-                }
-                if (window.Modals?.deckPresets?.length) {
-                    window.Modals.populateDeckSelect('pjoin-deck-select', window.Modals.deckPresets);
-                }
-
-                // Submit joiner deck if selected
-                if (window.Modals?.getDeckConfig) {
-                    const config = window.Modals.getDeckConfig('join');
-
-                    if (config && (config.type !== 'random' || config.id)) {
-                        try {
-                            const resolved = await window.Modals.resolveDeck(config);
-                            if (resolved) {
-                                await fetch('api/set_deck', {
-                                    method: 'POST',
-                                    headers: networkFacade.getHeaders(),
-                                    body: JSON.stringify({
-                                        player: data.session?.player_id !== undefined ? data.session.player_id : 1,
-                                        deck: resolved.main,
-                                        energy_deck: resolved.energy
-                                    })
-                                });
-                                log("[Lobby] Joiner deck submitted successfully.");
-                            }
-                        } catch (deckError) {
-                            console.error("Failed to set joiner deck", deckError);
-                        }
-                    }
+                    window.Modals.openDeckSelectionForPvP(joinerPid);
                 }
             }
         } catch (e) {
@@ -175,6 +159,16 @@ export const RoomManager = {
 
         if (networkFacade?.triggerRoomUpdate) networkFacade.triggerRoomUpdate();
         if (networkFacade?.fetchState) await networkFacade.fetchState();
+
+        RoomManager.connectSSE();
+    },
+
+    connectSSE: () => {
+        if (!State.roomCode) return;
+        SSEClient.connect(State.roomCode, () => {
+            const network = window.Network || null;
+            if (network?.fetchState) network.fetchState();
+        });
     },
 
     leaveRoom: async (networkFacade) => {
@@ -184,12 +178,26 @@ export const RoomManager = {
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Session-Token': State.sessionToken || ''
-                }
+                },
+                body: JSON.stringify({
+                    room_id: State.roomCode,
+                    session_id: State.sessionToken
+                })
             });
         } catch (e) {
             console.warn('Failed to notify server of leaving room:', e);
         }
 
+        SSEClient.disconnect();
+        // Clear polling intervals
+        if (window._pvpPollInterval) {
+            clearInterval(window._pvpPollInterval);
+            window._pvpPollInterval = null;
+        }
+        if (window._gameplayPollInterval) {
+            clearInterval(window._gameplayPollInterval);
+            window._gameplayPollInterval = null;
+        }
         State.resetForNewGame();
         State.roomCode = null;
         State.sessionToken = null;

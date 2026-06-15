@@ -53,10 +53,15 @@ pub struct AbilityQueueEntry {
     pub conditional_choice: Option<String>,
     /// Whether the effect has started executing (prevents re-processing)
     pub effect_started: bool,
-    /// Whether the optional cost was actually paid (not skipped)
-    pub optional_cost_was_paid: bool,
+    /// Result of the optional cost evaluation.
+    /// None = not evaluated, Some(true) = paid, Some(false) = skipped.
+    pub optional_cost_result: Option<bool>,
     /// Player who must make the pending choice (if different from activating player)
     pub choice_player_id: Option<String>,
+    /// Card IDs that triggered this each_time auto ability (snapshot of
+    /// recently_moved_cards at enqueue time). Used by source:"those_cards"
+    /// to resolve to only the trigger cards, not the full discard pile.
+    pub trigger_moved_cards: Option<Vec<i16>>,
     /// Deferred sequential sub-effects interrupted by a player choice.
     /// When a sequential ability is processing actions [A, B, C] and B pauses for a
     /// choice, the remaining actions [C, ...] are stored here and resumed in
@@ -176,8 +181,48 @@ impl AbilityQueue {
         match &mut self.state {
             QueueState::PayingCost { entry_index }
             | QueueState::ExecutingEffect { entry_index } => {
+                let idx = *entry_index;
+                // G1/G3: route choice to opponent when spawn context says opponent
+                let opponent_id: Option<String> = self.entries.get(idx).and_then(|entry| {
+                    if entry.choice_player_id.is_some() {
+                        return None;
+                    }
+                    let is_opponent_choice = match &choice {
+                        crate::ability::types::Choice::SelectCard {
+                            target_player_id: Some(tpid),
+                            ..
+                        } if tpid == "opponent" => true,
+                        _ => false,
+                    };
+                    if !is_opponent_choice {
+                        return None;
+                    }
+                    let is_spawn_opponent = entry
+                        .resolver
+                        .as_ref()
+                        .and_then(|r| r.spawn_context.target.as_deref())
+                        == Some("opponent");
+                    if !is_spawn_opponent {
+                        return None;
+                    }
+                    let opp = if entry.player_id == "p1" { "p2" } else { "p1" };
+                    Some(opp.to_string())
+                });
+                if let Some(pid) = opponent_id {
+                    if let Some(entry) = self.entries.get_mut(idx) {
+                        entry.choice_player_id = Some(pid);
+                    }
+                }
+                // Universal default: every paused choice gets a choice_player_id
+                if let Some(entry) = self.entries.get(idx) {
+                    if entry.choice_player_id.is_none() {
+                        if let Some(entry) = self.entries.get_mut(idx) {
+                            entry.choice_player_id = Some(entry.player_id.clone());
+                        }
+                    }
+                }
                 self.state = QueueState::WaitingForChoice {
-                    entry_index: *entry_index,
+                    entry_index: idx,
                     choice: choice_clone,
                 };
             }
@@ -207,10 +252,11 @@ impl AbilityQueue {
                     choice_card_no: None,
                     conditional_choice: None,
                     effect_started: false,
-                    optional_cost_was_paid: false,
+                    optional_cost_result: None,
                     choice_player_id: None,
                     pending_commands: Vec::new(),
                     resolver: None,
+                    trigger_moved_cards: None,
                 };
                 self.entries.push(dummy_entry);
                 self.state = QueueState::WaitingForChoice {
@@ -381,6 +427,32 @@ impl AbilityQueue {
         self.current_entry()
             .and_then(|e| e.resolver.as_ref())
             .is_some()
+    }
+
+    /// Dump the current queue state as a multi-line string (for test debug).
+    pub fn dump_state(&self) -> String {
+        let mut s = String::new();
+        s.push_str(&format!("state={:?}", self.state));
+        s.push('\n');
+        s.push_str(&format!("current_index={}", self.current_index));
+        s.push('\n');
+        s.push_str(&format!("entries={}", self.entries.len()));
+        s.push('\n');
+        for (i, entry) in self.entries.iter().enumerate() {
+            s.push_str(&format!(
+                "  [{}] card={} ab#{} player={} completed={} cost_paid={} effect_started={} optional_cost_result={:?} pending_commands={}\n",
+                i,
+                entry.card_no,
+                entry.ability_index,
+                entry.player_id,
+                entry.completed,
+                entry.cost_paid,
+                entry.effect_started,
+                entry.optional_cost_result,
+                entry.pending_commands.len(),
+            ));
+        }
+        s
     }
 }
 

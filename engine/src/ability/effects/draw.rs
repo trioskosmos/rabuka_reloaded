@@ -141,6 +141,19 @@ impl AbilityResolver {
                 let player = gs.resolve_target_player(target);
                 player.stage.stage.iter().filter(|&&c| c != -1).count() as u32
             }
+            Some("energy_cards_under_this_member") => {
+                let player = gs.resolve_target_player("self");
+                let activating_id = gs.activating_card;
+                let pos = activating_id
+                    .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
+                    .unwrap_or(1);
+                let area = match pos {
+                    0 => crate::zones::MemberArea::LeftSide,
+                    1 => crate::zones::MemberArea::Center,
+                    _ => crate::zones::MemberArea::RightSide,
+                };
+                player.stage.get_under_cards(area).len() as u32
+            }
             _ => match dc.count_type.as_str() {
                 "revealed_cards" => get_revealed_count(gs),
                 _ => 0,
@@ -531,10 +544,10 @@ impl AbilityResolver {
         if heart_colors.is_empty() && !heart_selection && effect.heart_type.is_none() {
             return Ok(None);
         }
-        let colors: Vec<String> = if !heart_colors.is_empty() {
-            heart_colors.to_vec()
-        } else if let Some(ref ht) = effect.heart_type {
+        let colors: Vec<String> = if let Some(ref ht) = effect.heart_type {
             vec![ht.clone()]
+        } else if !heart_colors.is_empty() {
+            heart_colors.to_vec()
         } else {
             vec![
                 "heart01".into(),

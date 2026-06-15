@@ -23,12 +23,21 @@ fn position_change_three_members_all_move() {
     game.play_to_stage(chii, rabuka_engine::zones::MemberArea::RightSide);
 
     // All 3 positions occupied → 3 sequential choices
+    // Verify the frontend would show all 3 position buttons
     assert!(game.has_pending_choice(), "First choice");
-    game.select_option(1); // a → Center (swap with b)
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 3, "Should have 3 position options");
+    game.select_generated(1); // a → Center (swap with b)
+
     assert!(game.has_pending_choice(), "Second choice");
-    game.select_option(2); // → Right
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 3, "Should have 3 position options");
+    game.select_generated(2); // → Right
+
     assert!(game.has_pending_choice(), "Third choice");
-    game.select_option(0); // → Left
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 3, "Should have 3 position options");
+    game.select_generated(0); // → Left
 
     assert!(!game.has_pending_choice());
     assert_ne!(game.state.player1.stage.stage[0], -1);
@@ -91,6 +100,8 @@ fn position_change_one_member() {
 }
 
 /// Play 慈 alone on empty stage → only 1 member → 1 choice.
+/// Options should show left, center, right (empty slots are valid destinations).
+/// This test has NO group_names filter, so empty slots are valid.
 #[test]
 fn position_change_no_other_members() {
     let db = load_real_database();
@@ -105,7 +116,44 @@ fn position_change_no_other_members() {
     game.play_to_stage(chii, rabuka_engine::zones::MemberArea::Center);
 
     assert!(game.has_pending_choice(), "Choice for 慈");
-    game.select_option(0); // move to Left
+    // chii is the only member at center. All 3 positions are valid destinations
+    // (empty slots included). Source card's position (center) is not excluded
+    // when exclude_self=false.
+    let actions = game.generated_actions();
+    assert_eq!(
+        actions.len(),
+        3,
+        "Should show 3 position options (left, center, right)"
+    );
+    // Verify the stage areas of all 3 options
+    assert_eq!(
+        actions[0]
+            .parameters
+            .as_ref()
+            .unwrap()
+            .stage_area
+            .as_deref(),
+        Some("left")
+    );
+    assert_eq!(
+        actions[1]
+            .parameters
+            .as_ref()
+            .unwrap()
+            .stage_area
+            .as_deref(),
+        Some("center")
+    );
+    assert_eq!(
+        actions[2]
+            .parameters
+            .as_ref()
+            .unwrap()
+            .stage_area
+            .as_deref(),
+        Some("right")
+    );
+    game.select_generated(0); // move to Left
 
     assert!(!game.has_pending_choice());
     assert_eq!(game.state.player1.stage.stage[0], chii);
@@ -131,13 +179,19 @@ fn position_change_with_swap() {
         game.has_pending_choice(),
         "First: move a (L) → Right, swaps chii to Left"
     );
-    game.select_option(2);
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 3);
+    game.select_generated(2); // Move to Right (swap a with chii)
 
     assert!(game.has_pending_choice(), "Second choice");
-    game.select_option(0);
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 3);
+    game.select_generated(0); // Move to Left
 
     assert!(game.has_pending_choice(), "Third choice");
-    game.select_option(1);
+    let actions = game.generated_actions();
+    assert_eq!(actions.len(), 3);
+    game.select_generated(1); // Move to Center
 
     assert!(!game.has_pending_choice());
     assert_ne!(game.state.player1.stage.stage[0], -1);
@@ -248,6 +302,10 @@ fn position_change_filters_by_group_names() {
         .collect();
 
     // Should have exactly 1 position option (Center, the only valid destination)
+    // Left slot has member_other (non-group) → excluded. Right slot was where
+    // himeno played but exclude_self excludes her own position. Center has
+    // member_same (みらくらぱーく！) → valid. Empty slots are excluded here
+    // because this is a single position change (not multiple_targets).
     assert_eq!(
         position_actions.len(),
         1,
@@ -327,6 +385,17 @@ fn position_change_group_names_excludes_self() {
         2,
         "Left and Right should be offered, Center (self) should be excluded"
     );
+    // Verify specific position labels
+    let offered: Vec<&str> = position_actions
+        .iter()
+        .filter_map(|a| a.parameters.as_ref()?.stage_area.as_deref())
+        .collect();
+    assert!(offered.contains(&"left"), "Left should be offered");
+    assert!(offered.contains(&"right"), "Right should be offered");
+    assert!(
+        !offered.contains(&"center"),
+        "Center (self) should be excluded"
+    );
 }
 
 /// No matching group members → position change should be skipped silently.
@@ -373,8 +442,12 @@ fn position_change_skip_when_no_valid_destinations() {
         .push(game.id("PL!-sd1-010-SD"));
     game.pass(); // LiveCardSetP2 -> FirstAttackerPerformance
 
-    // No valid destinations → position change should be skipped
-    // No position choice should appear
+    // No valid destinations → position change should be skipped silently.
+    // This is the expected behavior for single position changes (no multiple_targets):
+    // empty slots are excluded because the effect says "move to ANOTHER member's
+    // area", not "move to any area". Left has non-group → excluded, Center is
+    // empty → excluded (non-formation change), Right is self → excluded.
+    // Total=0 valid destinations → no choice presented.
     let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
     let position_actions: Vec<_> = actions
         .iter()
@@ -405,14 +478,112 @@ fn position_change_tracks_card_movement() {
     game.play_to_stage(chii, rabuka_engine::zones::MemberArea::RightSide);
 
     assert!(game.has_pending_choice());
-    game.select_option(1); // a → Center (swap with b)
+    game.select_generated(1); // a → Center (swap with b)
 
     assert!(game.has_pending_choice());
-    game.select_option(0); // → Left
+    game.select_generated(0); // → Left
 
     assert!(game.has_pending_choice());
-    game.select_option(2); // → Right
+    game.select_generated(2); // → Right
 
     let moved = &game.state.cards_moved_this_turn;
     assert!(!moved.is_empty(), "At least one card should have moved");
+}
+
+/// Formation change (multiple_targets=true) with group_names and empty slots.
+///
+/// Card: PL!SP-bp4-027-L (Chance Day, Chance Way!) ab#0
+/// ライブ成功時: 自分のステージにいるメンバーが『Liella!』のみの場合、
+/// 自分のステージにいるメンバーをフォーメーションチェンジしてもよい。
+///   action: position_change, multiple_targets: true, optional: true,
+///            group_names: ["Liella!"]
+///
+/// Before the fix, empty slots were excluded when group_names was set,
+/// so with 1 Liella! member in center and empty left/right, only center
+/// would be offered (no-op). After the fix, all 3 positions should be
+/// offered because this is a formation change (multiple_targets=true).
+#[test]
+fn formation_change_with_group_names_and_empty_slots() {
+    use rabuka_engine::card::HeartColor;
+    use rabuka_engine::turn::TurnEngine;
+    use std::collections::HashMap;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let chance_day = game.id("PL!SP-bp4-027-L");
+    let liella_member = game.id("PL!SP-bp1-014-N"); // 唐 可可, Liella!
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Fill decks
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    // 1 Liella! member in center, left and right empty
+    game.state.player1.stage.stage = [-1, liella_member, -1];
+
+    // Put Chance Day in live card zone
+    game.state.player1.live_card_zone.cards.push(chance_day);
+
+    // Set stage hearts to satisfy Chance Day's need_heart: heart02=1, heart0=2
+    let mut heart_map = HashMap::new();
+    heart_map.insert(HeartColor::Heart02, 1);
+    heart_map.insert(HeartColor::Heart00, 2);
+    let hearts = rabuka_engine::card::BaseHeart { hearts: heart_map };
+    game.state.player1.stage_hearts = Some(hearts);
+
+    let player_id = game.state.player1.id.clone();
+
+    // Set phase for LiveVictoryDetermination (required by should_trigger_live_success)
+    game.state.current_phase = rabuka_engine::game_state::Phase::LiveVictoryDetermination;
+
+    // Trigger live success abilities — this fires Chance Day's ability.
+    // The group_condition checks ALL members on stage are Liella! (true:
+    // the only member is 唐 可可 from Liella!). Then the position_change
+    // effect fires with multiple_targets=true and group_names=["Liella!"].
+    game.state.live_success_triggered_this_turn = false;
+    TurnEngine::trigger_live_success_abilities(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+
+    // Should have a position change choice now
+    assert!(
+        game.has_pending_choice(),
+        "Position change choice should be presented"
+    );
+
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let position_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == rabuka_engine::game_setup::ActionType::ChoicePosition)
+        .collect();
+
+    // After the fix: all 3 positions should be valid destinations even though
+    // group_names=["Liella!"] is set, because this is a formation change
+    // (multiple_targets=true). Empty slots are valid destinations for
+    // formation changes — you can move the Liella! member to any area.
+    assert_eq!(
+        position_actions.len(),
+        3,
+        "All 3 positions should be offered as destinations for formation change with group_names"
+    );
+
+    // Verify all position labels
+    let offered: Vec<&str> = position_actions
+        .iter()
+        .filter_map(|a| a.parameters.as_ref()?.stage_area.as_deref())
+        .collect();
+    assert!(
+        offered.contains(&"left"),
+        "Left should be offered (empty slot)"
+    );
+    assert!(
+        offered.contains(&"center"),
+        "Center should be offered (Liella! member)"
+    );
+    assert!(
+        offered.contains(&"right"),
+        "Right should be offered (empty slot)"
+    );
 }

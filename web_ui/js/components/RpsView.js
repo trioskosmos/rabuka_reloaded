@@ -27,24 +27,15 @@ export const RpsView = {
         ];
 
         signs.forEach((sign, idx) => {
-            // Rust engine sends snake_case action_type (e.g., "rock_choice")
-            const legalAction = state.legal_actions && state.legal_actions.find(a => 
+            const found = state.legal_actions && state.legal_actions.find(a => 
                 a.action_type === sign.actionType || a.action_type === sign.snakeType
             );
-            const hasAction = !!legalAction;
-            
-            // Debug: log what we're checking against
-            console.log('RPS sign:', sign.actionType, 'Legal actions:', state.legal_actions, 'Found:', hasAction);
-            const a = legalAction || { action_type: sign.actionType, description: sign.name, index: idx };
-            // Ensure the action has an index for execution
-            if (legalAction && legalAction.index === undefined) {
-                const actionIndex = state.legal_actions.indexOf(legalAction);
-                legalAction.index = actionIndex;
+            const a = found || { action_type: sign.snakeType, description: sign.name, index: idx };
+            if (found && found.index === undefined && state.legal_actions) {
+                found.index = state.legal_actions.indexOf(found);
             }
             const btn = ActionButtons.createActionButton(a, false, 'rps-btn', state);
             btn.style.width = '120px';
-            btn.style.opacity = hasAction ? '1' : '0.4';
-            btn.style.pointerEvents = hasAction ? 'auto' : 'none';
             btnContainer.appendChild(btn);
         });
 

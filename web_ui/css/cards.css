@@ -52,9 +52,7 @@
     box-shadow: 0 0 10px rgba(233, 30, 99, 0.3);
 }
 
-.card.type-live img {
-    object-fit: contain;
-}
+
 
 .card.card-back {
     background: linear-gradient(135deg, #4a3a2a, #2a1a1a);
@@ -65,8 +63,11 @@
 .card.orientation-landscape {
     width: var(--card-h) !important;
     height: var(--card-w) !important;
+    aspect-ratio: 720 / 512;
     overflow: visible !important; /* Ensure content like shadows or rotated images aren't clipped */
 }
+
+
 
 .card.card-mini.orientation-landscape {
     width: var(--card-h-mini) !important;
@@ -78,20 +79,9 @@
     height: var(--card-w-compact) !important;
 }
 
-/* Ensure landscape orientation box (not rotated) has enough height */
-.orientation-landscape {
-    min-height: var(--card-w) !important; 
-}
 
-/* Fix: Allow hand-group to show landscape cards that extend beyond container */
-.hand-group:has(.card.orientation-landscape) {
-    overflow: visible !important;
-}
 
-/* Fallback for browsers without :has() support - ensure hand can show landscape cards */
-.hand-row {
-    overflow: visible !important;
-}
+
 
 /* Image-level rotation logic */
 .card.rotate-img-90 img {
@@ -101,7 +91,7 @@
     /* Native portrait dimensions - these remain same so after 90deg rotation they fit landscape container */
     width: var(--card-w) !important;
     height: var(--card-h) !important;
-    transform: translate(-50%, -50%) rotate(-90deg) !important;
+    transform: translate(-50%, -50%) rotate(90deg) !important;
     object-fit: cover;
 }
 
@@ -136,37 +126,51 @@
 
 
 /* --- Hand Row Refined --- */
-.hand-row {
-    height: auto;
-    min-height: calc(max(var(--card-h), var(--card-w)) + 12px);
-    overflow: visible;
-    display: flex;
-    align-items: center;
-    padding-bottom: 4px; /* Space for potential scrollbar */
-}
-
 .hand-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     width: 100%;
     height: 100%;
-    position: relative;
-    overflow: hidden; /* Contain the scrollable area */
+}
+
+.hand {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+}
+
+.hand-row {
+    flex: 0 0 calc(10dvh + 2px);
+    display: flex;
+    align-items: center;
 }
 
 .hand-row .card {
-    transition: transform 0.1s ease-out;
+    transition: transform 0.12s ease-out, opacity 0.12s ease-out;
     flex-shrink: 0;
-    margin-right: 0; 
+    margin-right: 0;
     z-index: 1;
+    height: 100%;
+    max-height: var(--card-h);
+    width: auto;
+    aspect-ratio: 512 / 720;
+    box-sizing: border-box;
 }
 
-/* Fix: Landscape cards (type-live) must allow image to extend beyond card container
-   Problem: .card has overflow: hidden which clips landscape image on left/right edges
-   Root cause: Landscape image (720/512) in portrait container (512/720) gets clipped
-   Solution: Handled by global .orientation-landscape overflow: visible */
+.hand-row .card.card-enter {
+    opacity: 0;
+    transform: scale(0.92);
+}
 
+.hand-row .card.card-exit {
+    opacity: 0;
+    transform: scale(0.92);
+    pointer-events: none;
+}
 
 .hand-row .card:hover,
 .hand-row .card.hover-highlight {
@@ -187,18 +191,6 @@
     font-weight: bold;
     flex-shrink: 0;
     box-shadow: 0 0 5px rgba(0,0,0,0.5);
-}
-
-.hand {
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    height: calc(var(--card-h) + 20px); /* Extra height for hover growth + scrollbar space */
-    padding: 10px;
-    overflow-x: auto;
-    overflow-y: hidden; /* We handle vertical growth via height padding */
-    scrollbar-gutter: stable;
-    width: 100%;
 }
 
 /* Custom Premium Scrollbar for Hand */
@@ -278,6 +270,10 @@
     filter: grayscale(1) !important;
     opacity: 0.7 !important;
     transform: translateY(-2px) scale(1.02) !important;
+    transition: filter 0.15s ease, opacity 0.15s ease;
+}
+.card.mulligan-selected img {
+    filter: grayscale(1) !important;
 }
 
 /* Pink: Source / Initiator */
@@ -302,7 +298,7 @@
     background: rgba(0, 0, 0, 0.2);
     border-top: 1px solid var(--border);
     border-bottom: 1px solid var(--border);
-    margin-bottom: var(--space-xs);
+    margin-bottom: 2px;
 }
 
 .energy-area-container {
@@ -317,6 +313,30 @@
 .energy-area-container.horizontal {
     flex-direction: row;
     overflow-x: auto;
+}
+
+.card-area.stage {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    gap: 4px;
+    flex: 1;
+}
+
+.card-area.stage::-webkit-scrollbar {
+    height: 6px;
+}
+.card-area.stage::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 10px;
+}
+.card-area.stage::-webkit-scrollbar-thumb {
+    background: linear-gradient(to right, var(--accent-blue), var(--accent-purple));
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.card-area.stage::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to right, var(--accent-blue-bright), var(--accent-pink));
 }
 
 .card-area.energy {
@@ -458,8 +478,7 @@
     justify-content: center;
     position: relative;
     padding: var(--space-xxs);
-    min-width: 0;
-    flex: 1;
+    flex: 0 0 var(--card-w);
     height: 100%;
 }
 
@@ -649,20 +668,20 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 0; /* Tighten */
+    gap: 0;
     background: rgba(255, 255, 255, 0.02);
     border-radius: var(--radius-md);
-    padding: 0; /* Removed padding */
+    padding: 0;
     min-width: 0;
     height: 100%;
 }
 
 .utility-column-right {
-    width: 140px;
+    width: 90px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     background: rgba(0, 0, 0, 0.2);
     padding: 0;
     border-radius: var(--radius-md);
@@ -762,11 +781,6 @@
     justify-content: center;
     margin-bottom: var(--space-xs);
 }
-
-.mobile-action-bar {
-    display: none; /* Hidden by default, JS/Media Queries show it */
-}
-
 
 .action-list {
     width: 100%;

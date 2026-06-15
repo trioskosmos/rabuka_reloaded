@@ -106,54 +106,89 @@ impl<'a> ConditionContext<'a> {
                         }
                     } else if let Some(ref loc) = condition.location {
                         zones.push(loc.as_str());
+                    } else if condition.heart_colors.is_some() {
+                        // If checking heart colors but no zone specified, default to live_card_zone
+                        zones.push("live_card_zone");
                     }
                     zones
                 };
-                let has_success_or_live_zone = zones_to_check.iter().any(|z| {
-                    *z == "success_live_card_zone" || *z == "live_card_zone"
-                });
+                let has_success_or_live_zone = zones_to_check
+                    .iter()
+                    .any(|z| *z == "success_live_card_zone" || *z == "live_card_zone");
                 if has_success_or_live_zone {
                     let target = condition.target.as_deref().unwrap_or("self");
                     let player = self.resolve_condition_player(target);
                     let mut found_match = false;
                     'zone_loop: for zone_name in &zones_to_check {
                         let cards: Vec<i16> = match *zone_name {
-                            "success_live_card_zone" => {
-                                player.success_live_card_zone.cards.iter().copied().collect()
-                            }
+                            "success_live_card_zone" => player
+                                .success_live_card_zone
+                                .cards
+                                .iter()
+                                .copied()
+                                .collect(),
                             "live_card_zone" => player.live_card_zone.cards.to_vec(),
                             _ => continue,
                         };
-                        eprintln!("[TEMP_DIAG] checking zone={} {} cards={:?}",
-                            zone_name, cards.len(), cards);
+                        if crate::ability::debug::ABILITY_DEBUG
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                        {
+                            eprintln!(
+                                "[TEMP_DIAG] checking zone={} {} cards={:?}",
+                                zone_name,
+                                cards.len(),
+                                cards
+                            );
+                        }
                         for &cid in &cards {
                             if let Some(card) = self.game_state.card_database.get_card(cid) {
-                                let group_ok = condition.group_names.as_ref().map_or(true, |groups| {
-                                    groups.iter().any(|g| {
-                                        crate::ability::util::card_matches_group_str(
-                                            &self.game_state.card_database,
-                                            cid,
-                                            Some(g),
-                                        )
-                                    })
-                                });
-                                eprintln!("[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
-                                    cid, card.name, group_ok, card.need_heart);
-                                if !group_ok { continue; }
+                                let group_ok =
+                                    condition.group_names.as_ref().map_or(true, |groups| {
+                                        groups.iter().any(|g| {
+                                            crate::ability::util::card_matches_group_str(
+                                                &self.game_state.card_database,
+                                                cid,
+                                                Some(g),
+                                            )
+                                        })
+                                    });
+                                if crate::ability::debug::ABILITY_DEBUG
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                {
+                                    eprintln!(
+                                        "[TEMP_DIAG]   card={} name={} group_ok={} nh={:?}",
+                                        cid, card.name, group_ok, card.need_heart
+                                    );
+                                }
+                                if !group_ok {
+                                    continue;
+                                }
                                 if let Some(ref hc_list) = condition.heart_colors {
                                     if let Some(ref nh) = card.need_heart {
-                                        let target_count = condition.count.unwrap_or(1);
-                                        let heart_ok = hc_list.iter().any(|color_str| {
+                                        // Check if ALL specified heart colors meet the count threshold
+                                        let threshold = condition.count.unwrap_or(1) as u32;
+                                        let all_hearts_present = hc_list.iter().all(|color_str| {
                                             let color = crate::card::parse_heart_color(color_str);
-                                            nh.hearts.get(&color).copied().unwrap_or(0) == target_count
+                                            nh.hearts.get(&color).copied().unwrap_or(0) >= threshold
                                         });
-                                        eprintln!("[TEMP_DIAG]   heart_ok={} target_count={}", heart_ok, target_count);
-                                        if heart_ok {
+                                        if crate::ability::debug::ABILITY_DEBUG
+                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                        {
+                                            eprintln!(
+                                                "[TEMP_DIAG]   all_hearts_present={}",
+                                                all_hearts_present
+                                            );
+                                        }
+                                        if all_hearts_present {
                                             found_match = true;
                                             break 'zone_loop;
                                         }
                                     } else {
-                                        eprintln!("[TEMP_DIAG]   no need_heart on card");
+                                        if crate::ability::debug::ABILITY_DEBUG
+                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                        {
+                                            eprintln!("[TEMP_DIAG]   no need_heart on card");
+                                        }
                                     }
                                 } else {
                                     found_match = true;
@@ -163,10 +198,18 @@ impl<'a> ConditionContext<'a> {
                         }
                     }
                     if !found_match {
-                        eprintln!("[TEMP_DIAG] CONDITION FAILED: no matching card in zones");
+                        if crate::ability::debug::ABILITY_DEBUG
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                        {
+                            eprintln!("[TEMP_DIAG] CONDITION FAILED: no matching card in zones");
+                        }
                         return false;
                     }
-                    eprintln!("[TEMP_DIAG] CONDITION PASSED");
+                    if crate::ability::debug::ABILITY_DEBUG
+                        .load(std::sync::atomic::Ordering::Relaxed)
+                    {
+                        eprintln!("[TEMP_DIAG] CONDITION PASSED");
+                    }
                 }
                 true
             }
@@ -347,13 +390,10 @@ impl<'a> ConditionContext<'a> {
                             let is_position_change =
                                 self.game_state.position_change_occurred_this_turn;
                             if condition.text.contains("登場") {
-                                let on_stage = self.activating_card_id.is_some_and(|cid| {
-                                    let p = self.resolve_condition_player(
-                                        condition.target.as_deref().unwrap_or("self"),
-                                    );
-                                    p.stage.stage.contains(&cid)
+                                let has_appeared = self.activating_card_id.is_some_and(|cid| {
+                                    self.game_state.has_card_appeared_this_turn(cid)
                                 });
-                                on_stage && card_moved
+                                has_appeared || (is_position_change && card_moved)
                             } else {
                                 is_position_change && card_moved
                             }
@@ -366,13 +406,10 @@ impl<'a> ConditionContext<'a> {
                     }
                     let is_position_change = self.game_state.position_change_occurred_this_turn;
                     if condition.text.contains("登場") {
-                        let on_stage = self.activating_card_id.is_some_and(|cid| {
-                            let p = self.resolve_condition_player(
-                                condition.target.as_deref().unwrap_or("self"),
-                            );
-                            p.stage.stage.contains(&cid)
-                        });
-                        on_stage && card_moved
+                        let has_appeared = self
+                            .activating_card_id
+                            .is_some_and(|cid| self.game_state.has_card_appeared_this_turn(cid));
+                        has_appeared || (is_position_change && card_moved)
                     } else {
                         is_position_change && card_moved
                     }

@@ -128,7 +128,7 @@ export const Rendering = {
         const validTargets = Rendering.get_valid_targets(state);
         const viewState = ViewState.buildRenderModel(state, State, validTargets);
 
-        if (State.hotseatMode && State.perspectivePlayer !== viewState.perspectivePlayer) {
+        if (State.data?.mode !== 'pvp' && State.perspectivePlayer !== viewState.perspectivePlayer) {
             State.updateUiConfig({ perspective_player: viewState.perspectivePlayer });
         }
 
@@ -143,18 +143,16 @@ export const Rendering = {
 
         Rendering.renderMulliganReturn(viewState);
 
+        // Always render both hands through CardRenderer. When opponent cards
+        // are hidden, CardRenderer.getCardViewModel handles per-card hiding
+        // via the `hidden` flag → card-back class. The old `innerHTML = ''`
+        // approach caused DOM destruction and prevented smooth updates.
         if (viewState.isMulligan) {
-            // Unselected cards in Hand - Rust backend: hand is { cards: [...] }
             Rendering.renderCards('my-hand', p0.hand.cards, true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection, viewState.handFilter);
-            Rendering.renderCards('opp-hand', p1.hand.cards, false, false);
-            
-            // Selected cards shown at bottom of deck during mulligan (visual representation)
-            // Do not show in "Confirmed Cards" panel during mulligan
         } else {
             Rendering.renderCards('my-hand', p0.hand.cards, true, false, viewState.selectedIndices, validTargets.myHand, validTargets.hasSelection);
-            Rendering.renderCards('opp-hand', p1.hand.cards, false, false);
-            Rendering.renderLookedCards(validTargets.selection);
         }
+        Rendering.renderCards('opp-hand', p1.hand.cards, false, false);
         Rendering.renderSelectionModal(viewState.selectionModal);
         Rendering.renderRuleLog();
         Rendering.renderActiveEffects(state);
@@ -165,8 +163,20 @@ export const Rendering = {
             Rendering.renderActions();
         }
 
+        // Update board toggle labels based on perspective
+        const selfLabel = viewState.perspectivePlayer === 0 ? 'P1' : 'P2';
+        const oppLabel = viewState.perspectivePlayer === 0 ? 'P2' : 'P1';
+        const ui = i18n.getCurrentTranslations()?.ui || {};
+        const playerBtn = document.getElementById('btn-show-player');
+        const oppBtn = document.getElementById('btn-show-opponent');
+        if (playerBtn) playerBtn.textContent = `${ui.my_board || 'My Board'} (${selfLabel})`;
+        if (oppBtn) oppBtn.textContent = `${ui.opponent || 'Opponent'} (${oppLabel})`;
+
         Tooltips.highlightPendingSource();
-        Rendering.updateSettingsButtons(viewState.perspectivePlayer);
+
+        // Update language button label
+        const langBtn = document.getElementById('lang-btn');
+        if (langBtn) langBtn.textContent = State.currentLang === 'jp' ? 'English' : 'Japanese';
     },
 
     getPhaseKey: (phase) => {
@@ -253,8 +263,9 @@ export const Rendering = {
         const filteredCards = validPairs.map(p => p.card);
         const filteredActions = validPairs.map(p => p.action);
 
-        const useSidebarCards = filteredCards.length > 0 && window.innerWidth > 768;
-        if (!modalState.isVisible || useSidebarCards) {
+        // Always hide the selection modal — pending choice cards are shown in sidebar's looked cards panel
+        // (accessible via mobile toggle buttons on narrow screens)
+        if (!modalState.isVisible || filteredCards.length > 0) {
             panel.style.display = DISPLAY_VALUES.NONE;
             return;
         }
@@ -285,6 +296,7 @@ export const Rendering = {
 
     renderActions: () => {
         ActionMenu.renderActions();
+        ActionMenu.updateMobileActionBadge();
     },
 
     renderPerformanceGuide: () => PerformanceRenderer.renderPerformanceGuide(Rendering.renderHeartProgress),
@@ -304,40 +316,6 @@ export const Rendering = {
 
     renderHeartsCompact: (hearts) => PerformanceRenderer.renderHeartsCompact(hearts),
     renderBladesCompact: (blades) => PerformanceRenderer.renderBladesCompact(blades),
-
-    updateSettingsButtons: (perspectivePlayer = State.perspectivePlayer) => {
-        const liveWatchBtn = document.getElementById('live-watch-btn');
-        if (liveWatchBtn) {
-            const label = i18n.t('live_watch');
-            const stateLabel = State.isLiveWatchOn ? i18n.t('on') : i18n.t('off');
-            liveWatchBtn.textContent = `${label}: ${stateLabel}`;
-        }
-
-        const hotseatBtn = document.getElementById('pvp-btn');
-        if (hotseatBtn) {
-            const label = i18n.t('shared_screen');
-            const stateLabel = State.hotseatMode ? i18n.t('on') : i18n.t('off');
-            hotseatBtn.textContent = `${label}: ${stateLabel}`;
-        }
-
-        const perspectiveBtn = document.getElementById('switch-btn');
-        if (perspectiveBtn) {
-            const label = i18n.t('view_persp');
-            perspectiveBtn.textContent = `${label}: P${perspectivePlayer + 1}`;
-        }
-
-        const friendlyBtn = document.getElementById('friendly-abilities-btn');
-        if (friendlyBtn) {
-            const label = i18n.t('friendly_abilities');
-            const stateLabel = State.showFriendlyAbilities ? i18n.t('on') : i18n.t('off');
-            friendlyBtn.textContent = `${label}: ${stateLabel}`;
-        }
-
-        const langBtn = document.getElementById('lang-btn');
-        if (langBtn) {
-            langBtn.textContent = State.currentLang === 'jp' ? 'English' : '日本語';
-        }
-    },
 
     showPerfTab: (tab) => PerformanceRenderer.showPerfTab(tab),
 

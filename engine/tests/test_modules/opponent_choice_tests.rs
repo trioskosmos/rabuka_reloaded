@@ -16,7 +16,23 @@ use rabuka_engine::zones::MemberArea;
 //   そうしなかった場合、ライブ終了時まで、ブレード+4を得る。
 // ====================================================================
 
-/// Opponent discards from hand → choose "Pay" on conditional → no blade gained.
+/// Verifies optional_cost_result on the queue entry.
+/// After full resolution the entry may be gone; skip the check in that case.
+fn assert_optional_cost_state(game: &TestGame, expected_paid: bool) {
+    if let Some(entry) = game.state.ability_queue.current_entry() {
+        if entry.completed { return; }
+        assert_eq!(entry.optional_cost_result, Some(expected_paid), "optional_cost_result mismatch");
+    }
+}
+
+/// Helper: activate Yoshiko and verify the initial discard prompt.
+/// `card_id` must be the same copy placed on stage.
+fn setup_yoshiko(game: &mut TestGame, card_id: i16) {
+    game.activate_ability(card_id);
+    game.assert_select_card("hand", 1, true);
+}
+
+/// Opponent discards from hand → skip conditional → no blade gained.
 #[test]
 fn yoshiko_pb1_opponent_discards_skips_blade() {
     let db = load_real_database();
@@ -31,23 +47,13 @@ fn yoshiko_pb1_opponent_discards_skips_blade() {
     game.state.player2.hand.cards.push(p2_card);
     game.give_energy(1);
 
-    game.activate_ability(yoshiko);
+    setup_yoshiko(&mut game, yoshiko);
 
-    // Step 1: Opponent optional discard — discard card at index 0
-    assert!(
-        game.has_pending_choice(),
-        "Opponent should have discard choice"
-    );
+    // Opponent discards their only card
     game.select_indices(&[0]);
 
-    // Step 2: conditional_on_optional creates SelectTarget — choose "Pay" (option 1)
-    //   chose_yes=true + conditional_negation=true → optional_action(do_nothing) → no blade
-    assert!(
-        game.has_pending_choice(),
-        "Should have conditional_optional choice"
-    );
-    game.select_option(1);
-
+    // conditional_on_optional auto-resolves: chose_yes=true + negation=true → do_nothing → no blade
+    assert_optional_cost_state(&game, true);
     assert!(!game.has_pending_choice(), "No pending choices remaining");
     assert_eq!(
         game.state.mods.get_blade_modifier(yoshiko),
@@ -60,7 +66,7 @@ fn yoshiko_pb1_opponent_discards_skips_blade() {
     );
 }
 
-/// Opponent skips discard → choose "Skip" on conditional → blade +4 gained.
+/// Opponent skips discard → conditional_action fires → blade +4 gained.
 #[test]
 fn yoshiko_pb1_opponent_skips_gains_blade() {
     let db = load_real_database();
@@ -75,23 +81,13 @@ fn yoshiko_pb1_opponent_skips_gains_blade() {
     game.state.player2.hand.cards.push(p2_card);
     game.give_energy(1);
 
-    game.activate_ability(yoshiko);
+    setup_yoshiko(&mut game, yoshiko);
 
-    // Step 1: Opponent optional discard — skip with empty indices
-    assert!(
-        game.has_pending_choice(),
-        "Opponent should have discard choice"
-    );
+    // Opponent skips (empty indices)
     game.select_indices(&[]);
 
-    // Step 2: conditional_on_optional creates SelectTarget — choose "Skip" (option 0)
-    //   chose_yes=false + conditional_negation=true → conditional_action fires → blade +4
-    assert!(
-        game.has_pending_choice(),
-        "Should have conditional_optional choice"
-    );
-    game.select_option(0);
-
+    // conditional_on_optional auto-resolves: chose_yes=false + negation=true → gain blade 4
+    assert_optional_cost_state(&game, false);
     assert!(!game.has_pending_choice(), "No pending choices remaining");
     assert_eq!(
         game.state.mods.get_blade_modifier(yoshiko),
@@ -104,7 +100,7 @@ fn yoshiko_pb1_opponent_skips_gains_blade() {
     );
 }
 
-/// Edge: Opponent has no cards in hand → cannot discard → conditional fires.
+/// Edge: Opponent has no cards in hand → auto-skips → blade gained.
 #[test]
 fn yoshiko_pb1_opponent_empty_hand_auto_skips() {
     let db = load_real_database();
@@ -119,14 +115,11 @@ fn yoshiko_pb1_opponent_empty_hand_auto_skips() {
 
     game.activate_ability(yoshiko);
 
-    // Opponent has no cards in hand — opponent_action may auto-complete or
-    // present an empty choice. Either way, handle it.
+    // Opponent has 0 cards — the move_cards auto-skips (no SelectCard).
+    // conditional_on_optional presents Skip/Pay because optional_cost_evaluated
+    // was never set. Choose "Skip" (option 0) → blade +4.
     if game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    // conditional_on_optional — choose "Skip" → blade +4
-    if game.has_pending_choice() {
+        game.assert_conditional_optional(&["Skip", "Pay"]);
         game.select_option(0);
     }
 
@@ -135,6 +128,104 @@ fn yoshiko_pb1_opponent_empty_hand_auto_skips() {
         game.state.mods.get_blade_modifier(yoshiko),
         4,
         "Yoshiko should gain blade when opponent has empty hand"
+    );
+}
+
+/// Opponent with 3 cards in hand, chooses to skip — hits the Prompt branch (cards > count).
+#[test]
+fn yoshiko_pb1_opponent_multi_card_skips_gains_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let yoshiko = game.id("PL!S-pb1-006-R");
+    let live_card = game.id("PL!-sd1-019-SD");
+
+    game.state.player1.stage.stage[1] = yoshiko;
+    game.state.player1.hand.cards.push(live_card);
+    // Opponent has 3 cards — classify_selection returns Prompt (len=3 > count=1)
+    for _ in 0..3 {
+        game.state.player2.hand.cards.push(game.id("PL!-sd1-010-SD"));
+    }
+    game.give_energy(1);
+
+    setup_yoshiko(&mut game, yoshiko);
+
+    // Opponent's discard choice should be routed to opponent
+    let entry = game.state.ability_queue.current_entry().expect("Queue should have entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p2"),
+        "Discard choice should be routed to opponent"
+    );
+
+    // Opponent skips despite having cards
+    game.select_indices(&[]);
+
+    assert_optional_cost_state(&game, false);
+    assert!(!game.has_pending_choice(), "No pending choices remaining");
+    assert_eq!(
+        game.state.mods.get_blade_modifier(yoshiko),
+        4,
+        "Yoshiko should gain blade when opponent skips (multi-card)"
+    );
+    assert_eq!(
+        game.state.player2.hand.cards.len(),
+        3,
+        "Opponent's hand should be intact"
+    );
+    assert_eq!(
+        game.state.player2.waitroom.cards.len(),
+        0,
+        "Opponent's waitroom should be empty"
+    );
+}
+
+/// Opponent with 3 cards in hand, chooses to discard one.
+#[test]
+fn yoshiko_pb1_opponent_multi_card_discards_skips_blade() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let yoshiko = game.id("PL!S-pb1-006-R");
+    let live_card = game.id("PL!-sd1-019-SD");
+    let p2_cards: Vec<i16> = (0..3).map(|_| game.id("PL!-sd1-010-SD")).collect();
+
+    game.state.player1.stage.stage[1] = yoshiko;
+    game.state.player1.hand.cards.push(live_card);
+    for &c in &p2_cards {
+        game.state.player2.hand.cards.push(c);
+    }
+    game.give_energy(1);
+
+    setup_yoshiko(&mut game, yoshiko);
+
+    // Opponent's discard choice should be routed to opponent
+    let entry = game.state.ability_queue.current_entry().expect("Queue should have entry");
+    assert_eq!(
+        entry.choice_player_id.as_deref(),
+        Some("p2"),
+        "Discard choice should be routed to opponent"
+    );
+
+    // Discard the first card
+    game.select_indices(&[0]);
+
+    assert_optional_cost_state(&game, true);
+    assert!(!game.has_pending_choice(), "No pending choices remaining");
+    assert_eq!(
+        game.state.mods.get_blade_modifier(yoshiko),
+        0,
+        "Yoshiko should NOT gain blade when opponent discards"
+    );
+    assert_eq!(
+        game.state.player2.hand.cards.len(),
+        2,
+        "Opponent should have 2 cards remaining"
+    );
+    assert_eq!(
+        game.state.player2.waitroom.cards.len(),
+        1,
+        "Opponent should have 1 card in waitroom"
     );
 }
 
@@ -154,13 +245,14 @@ fn serasu_edelnote_appear_triggers_opponent_wait() {
 
     let serasu = game.id("PL!HS-bp6-007-R"); // the auto-trigger source
     let edelnote_member = game.id("PL!HS-PR-022-PR"); // EdelNote member, cost 4
-    let p2_member = game.id("PL!-sd1-010-SD");
+    let p2_member_a = game.id("PL!-sd1-010-SD");
+    let p2_member_b = game.id("PL!-sd1-013-SD");
     let filler = game.id("PL!-sd1-013-SD");
 
     // Serasu already on stage
     game.state.player1.stage.stage[1] = serasu;
-    // Opponent has an active member
-    game.state.player2.stage.stage[0] = p2_member;
+    // Opponent has 2 active members → forces a choice (2 > count=1)
+    game.state.player2.stage.stage = [p2_member_a, p2_member_b, -1];
     // EdelNote member in hand to play
     game.add_to_hand(edelnote_member);
     game.add_to_hand(filler);
@@ -170,20 +262,27 @@ fn serasu_edelnote_appear_triggers_opponent_wait() {
     game.play_to_stage(edelnote_member, MemberArea::LeftSide);
 
     // Auto ability fires: opponent chooses which of their members to wait
-    // (with only 1 target, it may auto-resolve)
+    assert!(game.has_pending_choice(), "Opponent should have a choice with 2 active members");
+    let entry = game.state.ability_queue.current_entry();
+    assert_eq!(
+        entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "Wait-member choice should be routed to opponent"
+    );
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
 
-    // Verify: opponent's member is in wait state
+    // Verify: one of opponent's members is in wait state
     assert!(
-        game.state.player2.stage.stage.contains(&p2_member),
+        game.state.player2.stage.stage.contains(&p2_member_a)
+            || game.state.player2.stage.stage.contains(&p2_member_b),
         "Opponent member should stay on stage"
     );
     assert_eq!(
-        game.state.mods.get_orientation_modifier(p2_member),
+        game.state.mods.get_orientation_modifier(p2_member_a),
         Some(&"wait".to_string()),
-        "Opponent member should be in wait state"
+        "p2_member_a should be in wait state (first member was waited)"
     );
 }
 
@@ -318,7 +417,7 @@ fn kowareyasuki_opponent_loses_2plus_hearts_gets_score_bonus() {
     // condition evaluation finds ≥2 surplus hearts for the score bonus.
     for snap in &mut game.state.performance_snapshots {
         if snap.player_id == "p2" {
-            snap.total_hearts = [0, 3, 0, 0, 0, 0, 0]; // Heart01 = 3 surplus
+            snap.total_hearts = [0, 3, 0, 0, 0, 0, 0, 0]; // Heart01 = 3 surplus
         }
     }
 

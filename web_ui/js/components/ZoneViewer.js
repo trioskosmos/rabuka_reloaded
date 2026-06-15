@@ -115,7 +115,10 @@ export const ZoneViewer = {
     _createCardElement: (card, isMini = false) => {
         if (!card) return document.createElement('div');
         const div = document.createElement('div');
-        div.className = isMini ? 'card card-mini' : 'card';
+        const rawType = (card.card_type || card.type || '').toLowerCase();
+        const isLiveCard = rawType === 'live' || rawType === 'ライブ' ||
+            (typeof card.card_no === 'string' && card.card_no.startsWith('live'));
+        div.className = (isMini ? 'card card-mini' : 'card') + (isLiveCard ? ' type-live orientation-landscape' : '');
         
         // Resolve card data if card_no is present but no image path
         let imgPath = '';

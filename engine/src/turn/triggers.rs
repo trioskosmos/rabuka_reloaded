@@ -103,6 +103,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(stage_card_id),
+                None,
             );
         }
     }
@@ -196,6 +197,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(cid),
+                None,
             );
         }
     }
@@ -285,6 +287,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 explicit_card_id,
+                None,
             );
         }
     }
@@ -382,6 +385,7 @@ impl super::TurnEngine {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(source_card_id),
+                None,
             );
         }
     }

@@ -625,7 +625,8 @@ fn distortion_same_name_catchu_condition_not_met() {
 fn distortion_q103_two_triggers_only_one_plus_1() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let distortion = game.id("PL!SP-pb1-023-L");
+    let distortion1 = game.id("PL!SP-pb1-023-L");
+    let distortion2 = game.id("PL!SP-pb1-023-L");
     let filler = game.id("PL!-sd1-010-SD");
     let catchu_a = game.id("PL!SP-sd1-001-SD");
     let catchu_b = game.id("PL!SP-sd1-004-SD");
@@ -636,8 +637,8 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
     for _ in 0..10 {
         game.state.player2.main_deck.cards.push(filler);
     }
-    game.state.player1.hand.cards.push(distortion);
-    game.state.player1.hand.cards.push(distortion);
+    game.state.player1.hand.cards.push(distortion1);
+    game.state.player1.hand.cards.push(distortion2);
     game.state.player1.hand.cards.push(filler);
     game.state.player1.stage.stage[0] = catchu_a;
     game.state.player1.stage.stage[2] = catchu_b;
@@ -646,8 +647,8 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
         game.state.player1.energy_zone.cards.push(energy_id);
     }
     assert_energy(&game, 0, 7);
-    game.set_live_card(distortion);
-    game.set_live_card(distortion);
+    game.set_live_card(distortion1);
+    game.set_live_card(distortion2);
     advance_to_live_start(&mut game);
     game.drain_auto_ability_choices();
     assert!(!game.has_pending_choice());
@@ -660,12 +661,98 @@ fn distortion_q103_two_triggers_only_one_plus_1() {
         .iter()
         .map(|&cid| game.state.mods.get_score_modifier(cid))
         .sum();
-    // Q103 answer: +1 total. Current engine gives +4 because both duplicate
-    // cards share the same database ID, so "このカード" scoping can't distinguish them.
-    // This test validates the behavior as-is; Q103's +1 requires per-card ID tracking.
+    // Q103: only the second trigger sees all energy active → +1 on that card
     assert_eq!(
-        total_score, 4,
-        "Q103: +4 with duplicate IDs (needs per-card ID fix for correct +1)"
+        total_score, 1,
+        "Q103: only the second trigger's card gets +1"
+    );
+}
+
+// ── 2 same-name + 1 different-name CatChu! → condition met ──────────
+
+#[test]
+fn distortion_two_same_one_diff_catchu_condition_met() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let distortion = game.id("PL!SP-pb1-023-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let catchu_same_a = game.id("PL!SP-sd1-001-SD");
+    let catchu_same_b = game.id("PL!SP-sd1-001-SD");
+    let catchu_diff = game.id("PL!SP-sd1-004-SD");
+    let energy_id = game.id("LL-E-001-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(distortion);
+    game.state.player1.hand.cards.push(filler);
+    // 2 same-name (kanon) + 1 different-name (keke)
+    game.state.player1.stage.stage[0] = catchu_same_a;
+    game.state.player1.stage.stage[1] = catchu_same_b;
+    game.state.player1.stage.stage[2] = catchu_diff;
+    advance_to_live_card_set_p1(&mut game);
+    for _ in 0..4 {
+        game.state.player1.energy_zone.cards.push(energy_id);
+    }
+    assert_energy(&game, 0, 4);
+    game.set_live_card(distortion);
+    advance_to_live_start(&mut game);
+    assert!(!game.has_pending_choice());
+    // 2 distinct CatChu! names → condition met → 4 wait activated
+    assert_eq!(
+        game.state.player1.energy_zone.active_energy_count, 4,
+        "All 4 wait energy activated — distinct condition met (Kanon + Keke)"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_score_modifier(game.state.player1.live_card_zone.cards[0]),
+        1,
+        "All active → score +1"
+    );
+}
+
+// ── Same-name CatChu! only + all-active energy → only +1 (Q97 path) ───
+
+#[test]
+fn distortion_same_name_catchu_all_active_score_plus_1() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let distortion = game.id("PL!SP-pb1-023-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let catchu_a = game.id("PL!SP-sd1-001-SD");
+    let catchu_b = game.id("PL!SP-sd1-001-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+    game.state.player1.hand.cards.push(distortion);
+    game.state.player1.hand.cards.push(filler);
+    // Same-name CatChu! on stage (both Kanon)
+    game.state.player1.stage.stage[0] = catchu_a;
+    game.state.player1.stage.stage[2] = catchu_b;
+    // All energy already active (no wait)
+    game.give_energy(4);
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(distortion);
+    advance_to_live_start(&mut game);
+    assert!(!game.has_pending_choice());
+    // Distinct condition fails (only 1 unique name) → no energy activation
+    assert_eq!(
+        game.state.player1.energy_zone.active_energy_count, 4,
+        "No wait energy added — distinct condition not met"
+    );
+    // But all energy active → score +1 (Q97 logic)
+    assert_eq!(
+        game.state
+            .mods
+            .get_score_modifier(game.state.player1.live_card_zone.cards[0]),
+        1,
+        "All active → score +1 even with same-name CatChu!"
     );
 }
 
@@ -838,11 +925,19 @@ fn nico_q168_both_appear_from_discard() {
     // P1 stage: [nico, -, -] → 2 empty slots → MoveCardsPosition prompt (SelectPosition).
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
 
-    // P1 chooses position for their appeared member
+    // P1 gets position choice for their own member — choice_player_id stays None (self)
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P1 should get position choice"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's own position choice should have choice_player_id=p1"
     );
     game.select_option(1); // center
 
@@ -851,6 +946,14 @@ fn nico_q168_both_appear_from_discard() {
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 should get position choice"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(2); // right
 
@@ -952,6 +1055,95 @@ fn nico_q168_no_suitable_card_skips() {
     );
 }
 
+// ── Sync path: P1 has no matching cards → opponent gets choice ────
+
+#[test]
+fn nico_sync_path_opponent_gets_choice_when_self_has_none() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nico = game.id("PL!-pb1-018-R");
+    let cheap_a = game.id("PL!SP-sd1-019-SD");
+    let cheap_b = game.id("PL!SP-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // P1 has NO matching cards in discard (only filler)
+    game.state.player1.hand.cards.push(nico);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(filler);
+    // P2 has 2 eligible cards → should get SelectCard prompt
+    game.state.player2.waitroom.cards.push(cheap_a);
+    game.state.player2.waitroom.cards.push(cheap_b);
+
+    game.give_energy(7);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // P1 has 0 matching cards → no choice created for self
+    // Sync path: opponent effect runs directly (handle_both_targets sync path)
+    // Before the fix, spawn_context.target stayed "self" → choice went to P1.
+    // After the fix, spawn_context.target = "opponent" → choice goes to P2.
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "P2 gets SelectCard prompt (P1 had no valid cards)"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's SelectCard should have choice_player_id=p2 (sync path)"
+    );
+
+    // Verify the selection shows P2's discard cards, not P1's
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let select_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == rabuka_engine::game_setup::ActionType::ChoiceSelect)
+        .collect();
+    assert_eq!(
+        select_actions.len(),
+        2,
+        "P2 should see 2 selectable cards from their discard"
+    );
+
+    game.select_indices(&[0]); // P2 selects cheap_a
+
+    // P2 then gets position choice for placing on their stage
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 gets position choice after selecting card"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
+    );
+    game.select_option(0); // P2: left
+
+    assert!(!game.has_pending_choice(), "No more prompts");
+
+    // P1 stage unchanged: Nico at left
+    assert_eq!(game.state.player1.stage.stage[0], nico);
+    assert_eq!(game.state.player1.stage.stage[1], -1);
+    assert_eq!(game.state.player1.stage.stage[2], -1);
+
+    // P2's card on stage
+    assert!(game.state.player2.stage.stage.contains(&cheap_a));
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_a),
+        Some(&"wait".to_string())
+    );
+
+    // cheap_b still in P2 discard (was not selected)
+    assert!(game.state.player2.waitroom.cards.contains(&cheap_b));
+}
+
 // ── Q170: Turn player's debut resolves first ───────────────────────
 
 #[test]
@@ -983,6 +1175,14 @@ fn nico_q170_turn_player_appears_first() {
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 gets position choice after P1"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(2); // P2: right
 
@@ -1033,11 +1233,27 @@ fn nico_q181_area_freed_after_card_leaves() {
         Some("SelectPosition".to_string()),
         "P1 position choice"
     );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's position choice should have choice_player_id=p1"
+    );
     game.select_option(1); // P1: center
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 position choice"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(2); // P2: right
 
@@ -1082,11 +1298,18 @@ fn nico_requires_empty_area() {
     game.give_energy(7);
     game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
 
-    game.dbg_all();
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 gets position choice (P1 had no room)"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(2); // P2: right
 
@@ -1139,11 +1362,27 @@ fn nico_cost_filter_only_shows_eligible() {
         Some("SelectPosition".to_string()),
         "P1 position choice"
     );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's own position choice should have choice_player_id=p1"
+    );
     game.select_option(1); // P1: center
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 position choice"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(2); // P2: right
 
@@ -1161,6 +1400,22 @@ fn nico_cost_filter_only_shows_eligible() {
     assert_eq!(
         game.state.mods.get_orientation_modifier(cheap),
         Some(&"wait".to_string())
+    );
+
+    // P2's card also in wait state
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(
+            *game
+                .state
+                .player2
+                .stage
+                .stage
+                .iter()
+                .find(|&&id| id != -1)
+                .unwrap()
+        ),
+        Some(&"wait".to_string()),
+        "P2's card wait state"
     );
 
     // Expensive card still in discard
@@ -1194,11 +1449,27 @@ fn nico_q169_appeared_card_occupies_area() {
         Some("SelectPosition".to_string()),
         "P1 position choice"
     );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's own position choice should have choice_player_id=p1"
+    );
     game.select_option(1); // P1: center
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 position choice"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(2); // P2: right
 
@@ -1249,6 +1520,14 @@ fn nico_prompt_path_two_eligible_in_discard() {
         Some("SelectCard".to_string()),
         "P1 gets SelectCard prompt (2 eligible in discard)"
     );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's SelectCard should have choice_player_id=p1"
+    );
     game.select_indices(&[0]); // select cheap_a
 
     // P1's card needs a position choice (multiple empty slots)
@@ -1259,11 +1538,19 @@ fn nico_prompt_path_two_eligible_in_discard() {
     );
     game.select_option(1); // P1: center
 
-    // Then P2's effect runs with MoveCardsPosition
+    // Then P2's effect runs with MoveCardsPosition (P2 has 1 card → exact → position)
     assert_eq!(
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 gets their position choice"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(2); // P2: right
 
@@ -1298,6 +1585,140 @@ fn nico_prompt_path_two_eligible_in_discard() {
     assert!(
         !game.state.player2.hand.cards.contains(&cheap_a),
         "P2's card NOT in hand"
+    );
+
+    // Both cards placed are in wait state
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_a),
+        Some(&"wait".to_string()),
+        "P1's card wait state"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(
+            *game
+                .state
+                .player2
+                .stage
+                .stage
+                .iter()
+                .find(|&&id| id != -1)
+                .unwrap()
+        ),
+        Some(&"wait".to_string()),
+        "P2's card wait state"
+    );
+}
+
+// ── Prompt path + direct placement: 2+ eligible cards, 1 empty slot ──
+// Ensures wait state is preserved when cards are placed directly
+// (no position-choice to re-apply wait after clear_all_for_card).
+
+#[test]
+fn nico_prompt_path_direct_placement_wait_state() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nico = game.id("PL!-pb1-018-R");
+    let cheap_a = game.id("PL!SP-sd1-019-SD"); // cost 2, member
+    let cheap_b = game.id("PL!SP-sd1-020-SD"); // cost 2, member
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // P1 has 2 eligible cards in discard → SelectCard prompt
+    game.state.player1.hand.cards.push(nico);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(cheap_a);
+    game.state.player1.waitroom.cards.push(cheap_b);
+    // P2 has 1 eligible card → Exact
+    game.state.player2.waitroom.cards.push(cheap_b);
+
+    game.give_energy(7);
+    // P1 stage: [nico, filler, -] → only 1 empty slot (right) → direct placement
+    // First play Nico to center
+    game.state.player1.stage.stage = [filler, -1, filler];
+    game.play_to_stage(nico, rabuka_engine::zones::MemberArea::Center);
+    // Now [filler, nico, filler] — full — then play_to_stage makes [filler, nico, -]
+    // Actually, let's set up properly before playing Nico:
+    // Reset: fresh game for precise setup
+    let db2 = load_real_database();
+    let mut game2 = TestGame::new(db2);
+    let nico2 = game2.id("PL!-pb1-018-R");
+    let cheap_a2 = game2.id("PL!SP-sd1-019-SD");
+    let cheap_b2 = game2.id("PL!SP-sd1-020-SD");
+
+    game2.state.player1.hand.cards.push(nico2);
+    game2.state.player1.waitroom.cards.push(cheap_a2);
+    game2.state.player1.waitroom.cards.push(cheap_b2);
+    game2.state.player2.waitroom.cards.push(cheap_b2);
+    game2.give_energy(7);
+    // Stage: [filler, filler, -] → 1 empty slot (right) for P1's own card
+    let filler2 = game2.id("PL!-sd1-010-SD");
+    game2.state.player1.stage.stage = [filler2, filler2, -1];
+    game2.play_to_stage(nico2, rabuka_engine::zones::MemberArea::Center);
+    // After playing Nico: [filler2, nico2, -] → 1 empty slot for the effect
+
+    // P1: 2 eligible cards in discard → SelectCard prompt
+    assert_eq!(
+        game2.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "P1 gets SelectCard prompt (2 eligible in discard)"
+    );
+    assert_eq!(
+        game2
+            .state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's SelectCard should have choice_player_id=p1"
+    );
+    game2.select_indices(&[0]); // select cheap_a2
+
+    // P1 has only 1 empty slot on stage → direct placement (no position choice)
+    // P2 also has 1 eligible card → Exact → P2 stage empty → MoveCardsPosition
+    assert_eq!(
+        game2.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 gets position choice (P1 placed directly)"
+    );
+    assert_eq!(
+        game2
+            .state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
+    );
+    game2.select_option(0); // P2: left
+
+    assert!(!game2.has_pending_choice(), "No more prompts");
+
+    // P1's card placed directly at right (only empty slot)
+    assert_eq!(
+        game2.state.player1.stage.stage[2], cheap_a2,
+        "P1's card appeared at right (only empty slot)"
+    );
+    // P2's card on left
+    assert_eq!(
+        game2.state.player2.stage.stage[0], cheap_b2,
+        "P2's card on left"
+    );
+
+    // BOTH must be in wait state
+    assert_eq!(
+        game2.state.mods.get_orientation_modifier(cheap_a2),
+        Some(&"wait".to_string()),
+        "P1's card wait state (direct placement via Prompt path)"
+    );
+    assert_eq!(
+        game2.state.mods.get_orientation_modifier(cheap_b2),
+        Some(&"wait".to_string()),
+        "P2's card wait state"
+    );
+
+    // cheap_b2 still in P1 discard (was not selected)
+    assert!(
+        game2.state.player1.waitroom.cards.contains(&cheap_b2),
+        "cheap_b2 remains in P1 discard"
     );
 }
 
@@ -1338,6 +1759,14 @@ fn nico_full_stage_then_prompt_path() {
         Some("SelectCard".to_string()),
         "P1 SelectCard prompt"
     );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's SelectCard should have choice_player_id=p1"
+    );
     game.select_indices(&[0]); // select cheap_a
 
     // After selection, P1 tries to place on stage but stage is full
@@ -1350,6 +1779,14 @@ fn nico_full_stage_then_prompt_path() {
         game.pending_choice_type(),
         Some("SelectPosition".to_string()),
         "P2 position choice (P1's effect failed, P2's succeeds)"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
     );
     game.select_option(0); // P2: left
 
@@ -1366,6 +1803,96 @@ fn nico_full_stage_then_prompt_path() {
     assert!(
         game.state.player2.stage.stage.contains(&cheap_a),
         "P2's card appeared"
+    );
+}
+
+// ── Q170: Placed cards' 登場 abilities actually fire ─────────────────
+// Both players place a cost ≤2 member that itself has a 登場 ability.
+// Verify each placed card's debut ability fires and is enqueued.
+
+#[test]
+fn nico_q170_placed_cards_debut_abilities_fire() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nico = game.id("PL!-pb1-018-R");
+    let keke_p1 = game.id("PL!SP-bp2-002-P"); // cost 2, 登場: look top 3, add cost 11+
+    let keke_p2 = game.new_id("PL!SP-bp2-002-P"); // different copy for P2
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.hand.cards.push(nico);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(keke_p1);
+    game.state.player2.waitroom.cards.push(keke_p2);
+
+    // Fill decks so Keke's look_at (top 3) succeeds
+    for _ in 0..5 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.give_energy(7);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // P1: turn player gets position choice first
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P1 gets position choice first"
+    );
+    game.select_option(1); // P1: center
+
+    // P2 gets their position choice
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 gets position choice"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's position choice should have choice_player_id=p2"
+    );
+    game.select_option(2); // P2: right
+
+    // After both placements, the placed Kekes' 登場 abilities should be queued.
+    // P1's Keke fires first (turn player priority) → creates a look_and_select choice.
+    assert!(
+        game.has_pending_choice(),
+        "Placed Kekes' debut abilities should fire and create a pending choice"
+    );
+
+    // Verify debut_count reflects all 3 登場 events
+    assert_eq!(
+        game.state.player1.debut_count_this_turn, 2,
+        "P1: Nico + placed Keke = 2 debuts"
+    );
+    assert_eq!(
+        game.state.player2.debut_count_this_turn, 1,
+        "P2: placed Keke = 1 debut"
+    );
+
+    // Verify both Kekes are on stage in wait state
+    assert_eq!(
+        game.state.player1.stage.stage[1], keke_p1,
+        "P1 Keke at center"
+    );
+    assert_eq!(
+        game.state.player2.stage.stage[2], keke_p2,
+        "P2 Keke at right"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(keke_p1),
+        Some(&"wait".to_string()),
+        "P1 Keke wait state"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(keke_p2),
+        Some(&"wait".to_string()),
+        "P2 Keke wait state"
     );
 }
 
@@ -1654,20 +2181,23 @@ fn lovepeace_q150_self_hearts_greater_than_opponent_score_plus_1() {
 
     // Set stage hearts directly to include member + yell blade hearts.
     // P1: 13 member hearts + add 7 yell blade hearts (heart03) to satisfy OH's 15 need.
-    let mut p1_hearts = game
-        .state
-        .player1
-        .calculate_stage_hearts(&game.state.card_database, &std::collections::HashMap::new());
+    let mut p1_hearts = game.state.player1.calculate_stage_hearts(
+        &game.state.card_database,
+        &std::collections::HashMap::new(),
+        &Default::default(),
+        &Default::default(),
+    );
     *p1_hearts
         .hearts
         .entry(rabuka_engine::card::HeartColor::Heart03)
         .or_insert(0) += 7;
     game.state.player1.stage_hearts = Some(p1_hearts);
-    game.state.player2.stage_hearts = Some(
-        game.state
-            .player2
-            .calculate_stage_hearts(&game.state.card_database, &std::collections::HashMap::new()),
-    );
+    game.state.player2.stage_hearts = Some(game.state.player2.calculate_stage_hearts(
+        &game.state.card_database,
+        &std::collections::HashMap::new(),
+        &Default::default(),
+        &Default::default(),
+    ));
 
     // Trigger live_success for P1 (this fires ab#1 which compares stage hearts)
     // P1 has 20 hearts > P2 has 2 hearts → should grant +1 score

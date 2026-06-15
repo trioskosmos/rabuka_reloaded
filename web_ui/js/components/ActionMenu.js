@@ -22,9 +22,18 @@ export const ActionMenu = {
         const actionsDiv = DOMUtils.getElement(DOM_IDS.CONTAINER_ACTIONS);
         if (!actionsDiv) return;
 
-        // 1. RPS Phase
+        // 1. RPS Phase — render before waiting gate so both players can choose
         if (state.phase === Phase.ROCK_PAPER_SCISSORS) {
             RpsView.render(state, perspectivePlayer, actionsDiv);
+            return;
+        }
+
+        // 0. PVP: Waiting for opponent (flag set by server via pvp_player_can_act)
+        if (state.waiting_for_opponent) {
+            const waitDiv = document.createElement('div');
+            waitDiv.className = 'waiting-opponent';
+            waitDiv.innerHTML = `<div style="font-weight:bold; color:#ffcc00; padding:20px; text-align:center; border:2px solid #ffcc00; border-radius:12px; background:rgba(255,204,0,0.08);">⏳ Waiting for opponent's turn...</div>`;
+            actionsDiv.appendChild(waitDiv);
             return;
         }
 
@@ -44,6 +53,24 @@ export const ActionMenu = {
 
         // 4. Action List
         ActionListView.render(state, perspectivePlayer, actionsDiv);
+    },
+
+    updateMobileActionBadge: () => {
+        const btn = DOMUtils.getElement(DOM_IDS.MOBILE_TOGGLE_ACTIONS);
+        if (!btn) return;
+        const state = State.data;
+        const count = state?.legal_actions?.length || 0;
+        let badge = btn.querySelector('.action-badge');
+        if (count > 0) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'action-badge';
+                btn.appendChild(badge);
+            }
+            badge.textContent = count;
+        } else {
+            if (badge) badge.remove();
+        }
     },
 
     renderGameOver: (state) => {

@@ -56,6 +56,12 @@ fn nico_bp4_multi_opponent_choice() {
         game.has_pending_choice(),
         "Opponent must choose which member to wait with 2+ eligible"
     );
+    let entry = game.state.ability_queue.current_entry();
+    assert_eq!(
+        entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "Wait-member choice should be routed to opponent"
+    );
 
     // Opponent selects p2_member_b (index 1)
     game.select_indices(&[1]);

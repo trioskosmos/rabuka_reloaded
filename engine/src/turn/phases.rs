@@ -70,7 +70,6 @@ impl super::TurnEngine {
                 }
                 Phase::Energy => {
                     game_state.recalculate_constants();
-                    Self::check_timing(game_state);
                     let _drawn_card = game_state.active_player_mut().draw_energy();
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::Draw;
@@ -318,13 +317,18 @@ impl super::TurnEngine {
         Ok(())
     }
 
-    pub(crate) fn handle_mulligan_confirmation(game_state: &mut GameState) -> Result<(), String> {
+    pub(crate) fn handle_mulligan_confirmation(
+        game_state: &mut GameState,
+        card_indices: Option<Vec<usize>>,
+    ) -> Result<(), String> {
         let next_phase = match game_state.current_phase {
             Phase::MulliganFirstAttacker => Phase::MulliganSecondAttacker,
             Phase::MulliganSecondAttacker => Phase::Active,
             _ => return Ok(()),
         };
-        let mulligan_indices: Vec<usize> = game_state.mulligan_selected_indices.clone();
+        // Use provided indices (from PVP/local selection) or fallback to server state
+        let mulligan_indices =
+            card_indices.unwrap_or_else(|| game_state.mulligan_selected_indices.clone());
         let mulligan_count = mulligan_indices.len();
         let player = game_state.active_player_mut();
         for &idx in mulligan_indices.iter().rev() {
@@ -453,18 +457,47 @@ impl super::TurnEngine {
             .unwrap_or_default();
         let player_id = player.id.clone();
 
-        // Check if this card has play_baton_touch with count > 1 (double baton touch)
-        let has_double_baton = double_baton_areas.is_some()
-            || card_db.get_card(card_id).is_some_and(|c| {
-                c.abilities.iter().any(|a| {
-                    a.effect.as_ref().is_some_and(|ef| {
-                        ef.action == "play_baton_touch" && ef.count.unwrap_or(1) > 1
-                    })
-                })
-            });
-
-        // If double baton with explicit areas, replace ALL specified members BEFORE placing the card
+        // If double baton with explicit areas (card_indices from UI), replace ALL specified members
+        // BEFORE placing the card. Single baton via the area buttons stays single — the
+        // constant ability (play_baton_touch, count>1) is offered as separate gold buttons.
         if let Some(db_areas) = double_baton_areas {
+            // Calculate cost before modifying state
+            let card_entry = card_db.get_card(card_id);
+            let card_cost = card_entry.and_then(|c| c.cost).unwrap_or(0);
+            let replaced_costs: Vec<u32> = {
+                let player = game_state.active_player();
+                db_areas
+                    .iter()
+                    .filter_map(|&area| {
+                        player
+                            .stage
+                            .get_area(area)
+                            .and_then(|cid| card_db.get_card(cid))
+                            .and_then(|c| c.cost)
+                    })
+                    .collect()
+            };
+            let combined_reduction: u32 = replaced_costs.iter().sum();
+            let hand_count = game_state.active_player().hand.cards.len();
+            let stage = &game_state.active_player().stage;
+            let success_zone = &game_state.active_player().success_live_card_zone.cards;
+            let cost_reduction = crate::ability::util::calculate_play_cost_reduction(
+                stage,
+                success_zone,
+                hand_count,
+                card_id,
+                &card_db,
+            );
+            let final_cost = card_cost
+                .saturating_sub(cost_reduction)
+                .saturating_sub(combined_reduction);
+            if final_cost > 0 {
+                let player = game_state.active_player_mut();
+                if player.energy_zone.active_count() < final_cost as usize {
+                    return Err("Not enough energy to play this card".to_string());
+                }
+                player.energy_zone.pay_energy(final_cost as usize)?;
+            }
             // Replace both specified members first
             let double_replaced_ids: Vec<i16> = {
                 let player = game_state.active_player_mut();
@@ -505,10 +538,7 @@ impl super::TurnEngine {
             game_state.record_card_appearance(card_id);
             game_state.baton_touch_arriving_card_id = Some(card_id);
 
-            Self::trigger_debut_abilities(
-                game_state, &player_id, &card_no, 0,    // cost_paid
-                true, // baton_touch_used
-            );
+            Self::trigger_debut_abilities(game_state, &player_id, &card_no, final_cost, true);
             Self::trigger_auto_abilities_for_player(game_state, &player_id);
             for &replaced_id in &double_replaced_ids {
                 Self::trigger_discard_auto_abilities(game_state, &player_id, replaced_id);
@@ -553,49 +583,6 @@ impl super::TurnEngine {
             if let Some(replaced_id) = replaced_member_id {
                 game_state.recently_moved_cards = Some(vec![replaced_id]);
                 game_state.recently_moved_from_zone = Some("stage".to_string());
-            }
-            if has_double_baton {
-                let second_area = {
-                    let player = game_state.active_player();
-                    let areas = [
-                        crate::zones::MemberArea::LeftSide,
-                        crate::zones::MemberArea::Center,
-                        crate::zones::MemberArea::RightSide,
-                    ];
-                    areas
-                        .iter()
-                        .find(|&&a| {
-                            a != area
-                                && !player.areas_locked_this_turn.contains(&a)
-                                && player.stage.get_area(a).is_some()
-                        })
-                        .copied()
-                };
-                // Track the second vacated area for empty_area deployment
-                let other_vacated = second_area.map(|a| a as usize);
-                if let Some(area2) = second_area {
-                    let existing_card_id = {
-                        let player = game_state.active_player();
-                        player.stage.get_area(area2)
-                    };
-                    if let Some(eid) = existing_card_id {
-                        let player = game_state.active_player_mut();
-                        let _ = player
-                            .remove_member_from_stage_with_recycling(area2 as usize, &card_db);
-                        player.waitroom.cards.push(eid);
-                        // Also include second baton-touch replacement in recently_moved tracking
-                        if let Some(ref mut rmc) = game_state.recently_moved_cards {
-                            rmc.push(eid);
-                        } else {
-                            game_state.recently_moved_cards = Some(vec![eid]);
-                            game_state.recently_moved_from_zone = Some("stage".to_string());
-                        }
-                    }
-                    game_state.record_baton_touch();
-                    game_state.baton_touch_replaced_member_id =
-                        Some(replaced_member_id.unwrap_or(-1));
-                }
-                game_state.last_vacated_stage_area = other_vacated;
             }
         }
 
@@ -654,6 +641,7 @@ impl super::TurnEngine {
                         player_id.clone(),
                         Some(card_no),
                         Some(bt_card_id),
+                        None,
                     );
                 }
             }
@@ -710,6 +698,7 @@ impl super::TurnEngine {
                 player_id.to_string(),
                 Some(card_no),
                 Some(card_id),
+                None,
             );
         }
     }

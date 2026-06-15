@@ -22,12 +22,43 @@ function setBoardVisibility(showPlayerBoard) {
     DOMUtils.addClass(DOM_IDS.BTN_SHOW_OPPONENT, CSS_CLASSES.ACTIVE);
 }
 
-function updateMobileSidebarToggleState(isOpen) {
-    const btn = DOMUtils.getElement(DOM_IDS.MOBILE_SIDEBAR_TOGGLE);
+function updateMobileSidebarToggleState(side, isOpen) {
+    const id = side === 'left' ? DOM_IDS.MOBILE_TOGGLE_LOG : DOM_IDS.MOBILE_TOGGLE_ACTIONS;
+    const btn = DOMUtils.getElement(id);
     setSidebarButtonState(btn, isOpen);
 }
 
 let mobileSidebarOverlayHandler = null;
+
+function isAnySidebarOpen() {
+    return document.querySelectorAll('.sidebar.active').length > 0;
+}
+
+function refreshOverlay() {
+    const open = isAnySidebarOpen();
+    document.body.classList.toggle(CSS_CLASSES.SIDEBAR_OPEN, open);
+}
+
+function setupOverlayListener() {
+    if (mobileSidebarOverlayHandler) return;
+    mobileSidebarOverlayHandler = (e) => {
+        if (e.target === document.body || e.target.closest('.main-content')) {
+            closeSidebar();
+        }
+    };
+    setTimeout(() => {
+        if (mobileSidebarOverlayHandler) {
+            document.addEventListener('mousedown', mobileSidebarOverlayHandler);
+        }
+    }, 10);
+}
+
+function teardownOverlayListener() {
+    if (mobileSidebarOverlayHandler) {
+        document.removeEventListener('mousedown', mobileSidebarOverlayHandler);
+        mobileSidebarOverlayHandler = null;
+    }
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Pre-load static card database
@@ -127,60 +158,41 @@ document.addEventListener('DOMContentLoaded', () => {
 /**
  * Mobile Sidebar Logic
  */
-export function toggleSidebar() {
-    const sidebars = document.querySelectorAll('.sidebar');
-    const btn = DOMUtils.getElement(DOM_IDS.MOBILE_SIDEBAR_TOGGLE);
-    if (!sidebars.length || !btn) return;
+function toggleOneSidebar(side) {
+    const sidebar = document.querySelector(`.sidebar-${side}`);
+    const isOpen = sidebar && sidebar.classList.contains('active');
 
-    const shouldOpen = !Array.from(sidebars).some(s => s.classList.contains('active'));
-    sidebars.forEach(s => s.classList.toggle('active', shouldOpen));
+    if (sidebar) {
+        sidebar.classList.toggle('active');
+    }
 
-    document.body.classList.toggle(CSS_CLASSES.SIDEBAR_OPEN, shouldOpen);
-    setSidebarButtonState(btn, shouldOpen);
+    updateMobileSidebarToggleState(side === 'left' ? 'left' : 'right', !isOpen);
+    refreshOverlay();
 
-    // If opening, add one-time listener to close on overlay click
-    if (shouldOpen) {
-        mobileSidebarOverlayHandler = (e) => {
-            // If clicking specifically on the ::after overlay (which is targetable via 'body' since it's a pseudo-element)
-            // or if clicking the main-content while sidebar is open
-            if (e.target === document.body || e.target.closest('.main-content')) {
-                closeSidebar();
-                document.removeEventListener('mousedown', mobileSidebarOverlayHandler);
-                mobileSidebarOverlayHandler = null;
-            }
-        };
-        // Use a timeout to avoid immediate trigger from the same click
-        setTimeout(() => {
-            if (mobileSidebarOverlayHandler) {
-                document.addEventListener('mousedown', mobileSidebarOverlayHandler);
-            }
-        }, 10);
-    } else if (mobileSidebarOverlayHandler) {
-        document.removeEventListener('mousedown', mobileSidebarOverlayHandler);
-        mobileSidebarOverlayHandler = null;
+    if (!isOpen) {
+        setupOverlayListener();
+    } else if (!isAnySidebarOpen()) {
+        teardownOverlayListener();
     }
 }
 
+export function toggleLogSidebar() {
+    toggleOneSidebar('left');
+}
+
+export function toggleActionsSidebar() {
+    toggleOneSidebar('right');
+}
+
 /**
- * Explicitly closes the mobile sidebars.
+ * Explicitly closes all mobile sidebars.
  */
 export function closeSidebar() {
-    const sidebars = document.querySelectorAll('.sidebar.active');
-    if (!sidebars.length) {
-        if (mobileSidebarOverlayHandler) {
-            document.removeEventListener('mousedown', mobileSidebarOverlayHandler);
-            mobileSidebarOverlayHandler = null;
-        }
-        return;
-    }
-
-    sidebars.forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.sidebar.active').forEach(s => s.classList.remove('active'));
     document.body.classList.remove(CSS_CLASSES.SIDEBAR_OPEN);
-    updateMobileSidebarToggleState(false);
-    if (mobileSidebarOverlayHandler) {
-        document.removeEventListener('mousedown', mobileSidebarOverlayHandler);
-        mobileSidebarOverlayHandler = null;
-    }
+    updateMobileSidebarToggleState('left', false);
+    updateMobileSidebarToggleState('right', false);
+    teardownOverlayListener();
 }
 
 /**

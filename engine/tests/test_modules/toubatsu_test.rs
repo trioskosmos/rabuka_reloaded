@@ -43,6 +43,12 @@ fn toubatsu_q118_2_distinct_live_cards_works() {
     // After selection, the opponent chooses 1 → it goes to opponent's hand
     // Handle opponent choice if present
     if game.has_pending_choice() {
+        let entry = game.state.ability_queue.current_entry();
+        assert_eq!(
+            entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),
+            Some("p2"),
+            "Opponent-select choice should be routed to opponent"
+        );
         game.select_indices(&[0]); // opponent selects first card (index in selected_cards)
     }
 

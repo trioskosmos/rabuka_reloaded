@@ -1,4 +1,5 @@
 use crate::helpers::*;
+use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
 
 fn advance_to_live_card_set_p1(game: &mut TestGame) {
     for _ in 0..5 {
@@ -89,4 +90,161 @@ fn triple_no_matching_zero_blades() {
         .get(&triple)
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(blade, 0, "No matching → 0 blades, got {}", blade);
+}
+
+#[test]
+fn triple_discard_two_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let stage = game.id("LL-bp2-001-R+");
+    let hand1 = game.new_id("LL-bp2-001-R+");
+    let hand2 = game.new_id("LL-bp2-001-R+");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = stage;
+    game.give_energy(15);
+    game.state.player1.hand.cards.push(hand1);
+    game.state.player1.hand.cards.push(hand2);
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    assert!(game.has_pending_choice(), "Optional cost should appear");
+    game.select_indices(&[0]);
+
+    assert!(game.has_pending_choice(), "Should re-prompt for any_number");
+    game.select_indices(&[0]);
+
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let blade = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage)
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
+}
+
+/// Verify generated actions at each re-prompt step for any_number cost with
+/// characters filter. Before the fix, the re-prompt's filtered_indices
+/// contained EXCLUDED (non-matching) indices, so the frontend saw zero
+/// selectable cards and only "Skip" remained.
+#[test]
+fn triple_discard_re_prompt_shows_correct_actions() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let stage = game.id("LL-bp2-001-R+");
+    let hand1 = game.new_id("LL-bp2-001-R+");
+    let hand2 = game.new_id("LL-bp2-001-R+");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = stage;
+    game.give_energy(15);
+    // Hand: [hand1(match), hand2(match), live, filler]
+    game.state.player1.hand.cards.push(hand1);
+    game.state.player1.hand.cards.push(hand2);
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    let fill = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(fill);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(fill);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    // --- Step 1: Initial cost choice ---
+    assert!(game.has_pending_choice(), "Optional cost should appear");
+    let actions = generate_possible_actions(&game.state);
+    let select_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == ActionType::ChoiceSelect)
+        .collect();
+    // 4 cards in hand: 2 matching copies + live + filler. The characters
+    // filter (card_matches_characters) is already applied by the action
+    // generator, so only the 2 joint card copies appear as selectable.
+    assert_eq!(
+        select_actions.len(),
+        2,
+        "Only 2 matching cards should be selectable initially"
+    );
+
+    // Select hand1 (index 0)
+    game.select_indices(&[0]);
+
+    // --- Step 2: Re-prompt after first discard ---
+    // Hand now: [hand2, live, filler] at indices [0, 1, 2]
+    // After fix: filtered_indices=[0] (hand2, the only matching card remaining)
+    // Before fix: filtered_indices=[1,2] (live+filler, excluded → zero selectable)
+    assert!(
+        game.has_pending_choice(),
+        "Re-prompt should appear after first discard"
+    );
+    let actions = generate_possible_actions(&game.state);
+    let select_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == ActionType::ChoiceSelect)
+        .collect();
+    let skip_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == ActionType::ChoiceSkip)
+        .collect();
+    // Only hand2 matches characters; live and filler should be excluded
+    assert_eq!(
+        select_actions.len(),
+        1,
+        "Only 1 matching card should be selectable in re-prompt"
+    );
+    assert_eq!(skip_actions.len(), 1, "Skip should be available");
+    // Verify the selectable card is hand2 (card_index should match its hand position)
+    assert_eq!(
+        select_actions[0]
+            .parameters
+            .as_ref()
+            .and_then(|p| p.card_index),
+        Some(0),
+        "hand2 should be at index 0 in the re-prompt hand"
+    );
+
+    // Select hand2 (index 0 in current hand)
+    game.select_indices(&[0]);
+
+    // --- Step 3: All matching cards exhausted — code finalizes directly ---
+    // No re-prompt because count(2) == selected(2). The effect continues.
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let blade = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage)
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
 }

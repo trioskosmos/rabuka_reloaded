@@ -52,16 +52,27 @@ fn kanon_invalidate_liella_live_start() {
     }
     game.state.process_pending_auto_abilities("p1");
 
-    // Kanon should now be on stage
-    assert!(
-        game.state.player1.stage.stage.contains(&kanon),
-        "Kanon on stage"
+    // Kanon played to Center via baton touch
+    assert_eq!(
+        game.state.player1.stage.stage[1], kanon,
+        "Kanon occupies Center after baton touch"
     );
-
-    // The followup should have added a Liella! card from waitroom to hand
+    // The invalidate follow-up recovered the replaced target from waitroom to hand
+    // Baton touch moved target→waitroom, then followup moved target→hand
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "Hand: kanon played from hand (0) → recovery adds 1 = 1"
+    );
     assert!(
-        game.state.player1.hand.cards.len() >= 1,
-        "Hand has at least 1 card"
+        game.state.player1.hand.cards.contains(&target),
+        "Target card recovered from waitroom to hand by invalidate followup"
+    );
+    // No blade/heart modifiers should remain on the invalidated target
+    assert_eq!(
+        game.state.mods.get_blade_modifier(target),
+        0,
+        "Target's blade modifiers nullified"
     );
 }
 

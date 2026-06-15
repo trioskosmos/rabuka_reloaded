@@ -1,15 +1,16 @@
 @echo off
-echo Building Rabuka Web UI...
-cd /d "%~dp0web_ui"
-call npm run build
-if %errorlevel% neq 0 (
-    echo Frontend build failed!
-    pause
-    exit /b 1
-)
+setlocal enabledelayedexpansion
+
+REM Try to add Windows firewall rule for LAN access (may prompt UAC)
+echo Adding firewall rule for port 8080...
+powershell -NoProfile -Command "Start-Process netsh -Verb RunAs -ArgumentList 'advfirewall firewall add rule name=RabukaGameServer dir=in protocol=tcp localport=8080 action=allow' -WindowStyle Hidden" >nul 2>&1
 
 echo Starting Rust Backend on http://127.0.0.1:8080...
 cd /d "%~dp0engine"
+
+REM If --ngrok specified, save its auth token argument
+if "%1"=="--ngrok" set NGROK_AUTHTOKEN=%2
+
 start /b cargo run --release --bin rabuka_engine web-server
 
 echo Waiting for Rust backend to be ready...
@@ -21,4 +22,6 @@ if %errorlevel% neq 0 (
 )
 echo Rust backend is ready!
 echo Game UI: http://127.0.0.1:8080
+echo.
+echo Share the cloudflared URL (printed above) to play over the internet.
 pause

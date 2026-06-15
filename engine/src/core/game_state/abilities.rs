@@ -54,11 +54,12 @@ impl GameState {
     fn build_ability_queue_entry(
         &self,
         card_no: String,
-        player_id: String,
-        ability: crate::card::Ability,
         ability_index: usize,
+        ability: crate::card::Ability,
         card_id: Option<i16>,
-        trigger_type: crate::game_state::AbilityTrigger,
+        player_id: String,
+        trigger_type: AbilityTrigger,
+        trigger_moved_cards: Option<Vec<i16>>,
     ) -> crate::ability_queue::AbilityQueueEntry {
         use crate::ability_queue::{AbilityId, AbilityQueueEntry};
 
@@ -77,10 +78,11 @@ impl GameState {
             choice_card_no: None,
             conditional_choice: None,
             effect_started: false,
-            optional_cost_was_paid: false,
+            optional_cost_result: None,
             choice_player_id: None,
             pending_commands: Vec::new(),
             resolver: None,
+            trigger_moved_cards,
         }
     }
 
@@ -148,6 +150,12 @@ impl GameState {
                 if card_id == -1 {
                     continue;
                 }
+                // Skip the card currently activating to prevent self-re-triggering
+                // (e.g. "自動 このメンバーが登場か、エリアを移動したとき" re-firing
+                // after its own wait-state effect triggers auto-ability re-scan).
+                if self.activating_card.is_some_and(|act_id| act_id == card_id) {
+                    continue;
+                }
                 if let Some(card) = self.card_database.get_card(card_id) {
                     for ability in &card.abilities {
                         if ability
@@ -158,6 +166,16 @@ impl GameState {
                             // Guard: skip discard-location abilities when the card
                             // is on stage (prevents premature triggering).
                             if let Some(ref effect) = ability.effect {
+                                if crate::ability::debug::ABILITY_DEBUG
+                                    .load(std::sync::atomic::Ordering::Relaxed)
+                                {
+                                    eprintln!(
+                                        "[TAS] scanning trigger={:?} has_trigger_cond={} cond={}",
+                                        ability.triggers,
+                                        effect.trigger_condition.is_some(),
+                                        effect.condition.is_some()
+                                    );
+                                }
                                 if let Some(ref condition) = effect.condition {
                                     if Zone::from_str(condition.location.as_deref().unwrap_or(""))
                                         == Some(Zone::Discard)
@@ -176,7 +194,16 @@ impl GameState {
                                 if let Some(ref trigger_cond) = effect.trigger_condition {
                                     let ctx =
                                         crate::ability::condition::ConditionContext::new(self);
-                                    if !ctx.evaluate_condition(trigger_cond) {
+                                    let passes = ctx.evaluate_condition(trigger_cond);
+                                    if crate::ability::debug::ABILITY_DEBUG
+                                        .load(std::sync::atomic::Ordering::Relaxed)
+                                    {
+                                        eprintln!(
+                                            "[TRIGGER_COND] card={} cond_type={:?} source={:?} passes={}",
+                                            card.name, trigger_cond.condition_type, trigger_cond.source, passes
+                                        );
+                                    }
+                                    if !passes {
                                         continue;
                                     }
                                 }
@@ -219,6 +246,7 @@ impl GameState {
                 }
             }
         }
+        let moved = self.recently_moved_cards.clone();
         for (ability_id, card_no, stage_card_id) in abilities_to_trigger {
             self.trigger_auto_ability(
                 ability_id,
@@ -226,6 +254,7 @@ impl GameState {
                 player_id_clone.clone(),
                 Some(card_no),
                 Some(stage_card_id),
+                moved.clone(),
             );
         }
     }
@@ -237,6 +266,7 @@ impl GameState {
         player_id: String,
         source_card_id: Option<String>,
         explicit_card_id: Option<i16>,
+        trigger_moved_cards: Option<Vec<i16>>,
     ) {
         if let Some(ref card_no) = source_card_id {
             let (card, card_id) = if let Some(cid) = explicit_card_id {
@@ -251,14 +281,21 @@ impl GameState {
                     {
                         let entry = self.build_ability_queue_entry(
                             card_no.clone(),
-                            player_id,
-                            ability.clone(),
                             ability_index,
+                            ability.clone(),
                             card_id,
+                            player_id.clone(),
                             trigger_type,
+                            trigger_moved_cards.clone(),
                         );
-                        eprintln!("[QUEUE_DIAG] enqueue player={} card_no={}",
-                            entry.player_id, entry.card_no);
+                        if crate::ability::debug::ABILITY_DEBUG
+                            .load(std::sync::atomic::Ordering::Relaxed)
+                        {
+                            eprintln!(
+                                "[QUEUE_DIAG] enqueue player={} card_no={}",
+                                entry.player_id, entry.card_no
+                            );
+                        }
                         self.ability_queue.enqueue(entry);
                         break;
                     }
@@ -338,8 +375,15 @@ impl GameState {
     /// Internal: Process all standby abilities for a single player.
     /// Stops early if an ability creates a pending choice.
     fn process_player_abilities(&mut self, player_id: &str) {
-        eprintln!("[QUEUE_DIAG] process_player_abilities player={} queue_len={}",
-            player_id, self.ability_queue.len());
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!(
+                "[QUEUE_DIAG] process_player_abilities player={} queue_len={}",
+                player_id,
+                self.ability_queue.len()
+            );
+        }
+        let mut reprocess_counts: std::collections::HashMap<(i16, usize), u32> =
+            std::collections::HashMap::new();
         loop {
             if !self.ability_queue.is_idle() {
                 break;
@@ -352,7 +396,9 @@ impl GameState {
                 })
                 .collect();
 
-            eprintln!("[QUEUE_DIAG] available_indices={:?}", available_indices);
+            if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                eprintln!("[QUEUE_DIAG] available_indices={:?}", available_indices);
+            }
 
             if available_indices.is_empty() {
                 break;
@@ -394,11 +440,51 @@ impl GameState {
             if !self.ability_queue.start_next() {
                 break;
             }
+
+            // Infinite loop guard: track how many times the same ability is processed
+            if let Some(entry) = self.ability_queue.current_entry() {
+                let key = (entry.card_id.unwrap_or(-1), entry.ability_index);
+                let count = reprocess_counts.entry(key).or_insert(0);
+                *count += 1;
+                if *count > 5 {
+                    let card_name = entry
+                        .card_id
+                        .and_then(|id| self.card_database.get_card(id))
+                        .map(|c| c.name.clone())
+                        .unwrap_or_default();
+                    log::error!(
+                        "[PCA_INFINITE_LOOP] card={} ({}) ability=\"{}\" processed {} times",
+                        card_name,
+                        entry.card_no,
+                        entry.ability.full_text,
+                        *count
+                    );
+                    eprintln!(
+                        "[PCA_INFINITE_LOOP] card={} ({}) ability=\"{}\" processed {} times",
+                        card_name, entry.card_no, entry.ability.full_text, *count
+                    );
+                    break;
+                }
+            }
+
+            self.process_current_ability();
             self.recently_moved_cards = None;
             self.recently_moved_from_zone = None;
-            self.process_current_ability();
             if self.has_pending_choice() {
                 break;
+            }
+        }
+        // After loop, scan for watchers triggered by batch discards from
+        // look_and_select or similar (callers that finalize_card_movement
+        // after the loop already exited, via moved_snapshot in actions.rs).
+        if self.recently_moved_cards.is_some() && self.current_phase == crate::types::Phase::Main {
+            self.trigger_auto_abilities_for_player(player_id);
+            self.recently_moved_cards = None;
+            self.recently_moved_from_zone = None;
+            // Re-enter the loop to process any abilities just enqueued
+            // by the watcher scan (e.g. Hazuki Ren each_time after discard).
+            if !self.has_pending_choice() {
+                self.process_player_abilities(player_id);
             }
         }
     }
@@ -469,11 +555,16 @@ impl GameState {
                 player_id.to_string(),
                 Some(card_no),
                 Some(moved_id),
+                None,
             );
         }
     }
 
     pub(crate) fn process_current_ability(&mut self) {
+        eprintln!(
+            "[PCA_ENTER] has_resolver={}",
+            self.ability_queue.has_resolver()
+        );
         let (card_id, ability, ability_index, cost_already_paid) = {
             let entry = match self.ability_queue.current_entry() {
                 Some(e) => e,
@@ -497,7 +588,14 @@ impl GameState {
             // Don't reset moved_cards/selected_cards — the effect may need
             // them for cost_reference (e.g. previous_moved_card) or conditions.
             r.selected_cards.clear();
+            // G1/G3: preserve spawn_context.target across resolver re-use.
+            // When resume_pending_commands sets spawn_context.target via the
+            // G3 fix and then process_current_ability is called again, the
+            // target must survive the reset so the G1 check can route the
+            // pending choice to the opponent player.
+            let saved_target = r.spawn_context.target.clone();
             r.spawn_context = crate::ability::types::EffectSpawnContext::default();
+            r.spawn_context.target = saved_target;
             r.pending_stage_cards = Vec::new();
             r.execution_context = crate::ability::types::ExecutionContext::None;
             r
@@ -505,15 +603,26 @@ impl GameState {
             crate::ability::resolver::AbilityResolver::new(self.card_database.clone(), card_id)
         };
 
+        resolver.debug_trace =
+            crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed);
+
+        eprintln!("[PCA] resolve_ability start");
         match resolver.resolve_ability(self, &ability, card_id, ability_index) {
-            Ok(()) => {}
+            Ok(()) => {
+                eprintln!("[PCA] resolve_ability OK");
+            }
             Err(e) => {
+                eprintln!("[PCA] resolve_ability FAILED: {}", e);
                 log::debug!("Failed to resolve ability: {}", e);
                 self.ability_queue.complete_current();
                 self.clear_effect_tracking();
                 return;
             }
         }
+        eprintln!(
+            "[PCA] after resolve: pending={}",
+            resolver.pending_choice.is_some()
+        );
 
         // Sync resolver state to GameState before the resolver may be dropped.
         // The condition system and other subsystems read GameState directly.
@@ -539,13 +648,69 @@ impl GameState {
                 }
             }
 
+            // G1/G3: if the resolver was executing for opponent (handle_both_targets,
+            // execute_move_cards_both, or opponent_action wrapper), route the choice
+            // to the opponent player.
+            let targets_opponent = match c {
+                crate::ability::types::Choice::SelectCard {
+                    target_player_id: Some(tpid),
+                    ..
+                } if tpid == "opponent"
+                    && resolver.spawn_context.target.as_deref() == Some("opponent") =>
+                {
+                    true
+                }
+                crate::ability::types::Choice::SelectPosition { .. }
+                    if matches!(
+                        resolver.execution_context,
+                        crate::ability::types::ExecutionContext::MoveCardsPosition { ref target, .. }
+                        if target == "opponent"
+                    ) =>
+                {
+                    true
+                }
+                _ => false,
+            };
+            eprintln!(
+                "[PCA_G1] targets={} spawn={:?}",
+                targets_opponent, resolver.spawn_context.target
+            );
+            if let Some(entry) = self.ability_queue.current_entry_mut() {
+                if targets_opponent {
+                    let current = entry.player_id.clone();
+                    let opponent_id = if current == "p1" { "p2" } else { "p1" };
+                    entry.choice_player_id = Some(opponent_id.to_string());
+                    eprintln!("[PCA_G1] SET choice_player_id={}", opponent_id);
+                }
+            }
+
             let choice = c.clone();
             resolver.store_pending_choice(self);
             self.ability_queue.set_resolver(resolver);
             self.ability_queue.pause_for_choice(choice);
         } else {
+            // Capture player_id BEFORE complete_current() resets the queue.
+            let current_pid = self
+                .ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone())
+                .unwrap_or_default();
+
             self.ability_queue.complete_current();
             self.activating_card = None;
+            // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
+            // recently_moved_cards so their preceding_moved conditions pass.
+            if self.recently_moved_cards.is_some()
+                && self.current_phase == crate::types::Phase::Main
+            {
+                if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                    eprintln!(
+                        "[PCA_TRIGGER] scanning stage watchers pid={} moved={:?}",
+                        current_pid, self.recently_moved_cards
+                    );
+                }
+                self.trigger_auto_abilities_for_player(&current_pid);
+            }
             self.clear_effect_tracking();
             let master_id = self.ability_master_id();
             if let Some(pid) = master_id {
@@ -599,6 +764,13 @@ impl GameState {
             .and_then(|e| e.conditional_choice.clone())
     }
 
+    /// If the pending choice is routed to a specific player (PVP), return their player_id.
+    pub fn get_pending_choice_player_id(&self) -> Option<String> {
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_ref().cloned())
+    }
+
     /// Inject card and ability identity into the pending_choice JSON so the frontend
     /// can display which card+ability is responsible for the current choice prompt.
     /// Get the serialized JSON for the frontend from the ability queue's waiting choice.
@@ -638,12 +810,16 @@ impl GameState {
                         );
                     }
                 }
-                if let Some(ref pid) = entry.choice_player_id {
-                    obj.insert(
-                        "choice_player_id".into(),
-                        serde_json::Value::String(pid.clone()),
-                    );
-                }
+                let raw_pid = entry.choice_player_id.as_ref().unwrap_or(&entry.player_id);
+                let normalized = match raw_pid.as_str() {
+                    "player1" => "p1",
+                    "player2" => "p2",
+                    _ => raw_pid.as_str(),
+                };
+                obj.insert(
+                    "choice_player_id".into(),
+                    serde_json::Value::String(normalized.to_string()),
+                );
                 // Inject selection_cards for SelectCard choices so the frontend can render options.
                 if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
                     if let crate::ability::types::Choice::SelectCard {
@@ -723,8 +899,14 @@ impl GameState {
                             })
                             .collect();
                         let sel: Vec<serde_json::Value> = filtered.iter().map(|&cid| {
-                            let card = self.card_database.get_card(cid);
-                            serde_json::json!({"id": cid, "card_no": card.map(|c| c.card_no.clone()).unwrap_or_default(), "name": card.map(|c| c.name.clone()).unwrap_or_default()})
+                            let card_ref = self.card_database.get_card(cid);
+                            let card_type_val = card_ref.map(|c| serde_json::to_value(&c.card_type).unwrap_or_default());
+                            serde_json::json!({
+                                "id": cid,
+                                "card_no": card_ref.map(|c| c.card_no.clone()).unwrap_or_default(),
+                                "name": card_ref.map(|c| c.name.clone()).unwrap_or_default(),
+                                "type": card_type_val.unwrap_or_default()
+                            })
                         }).collect();
                         obj.insert("selection_cards".into(), serde_json::Value::Array(sel));
                     }
@@ -930,7 +1112,12 @@ impl GameState {
         // yell blade hearts, matching the total the performance heart check used.
         // Fallback uses heart_color_multiplier from mods to include blade cheering.
         let stage_hearts = player.stage_hearts.clone().unwrap_or_else(|| {
-            player.calculate_stage_hearts(&self.card_database, &self.mods.heart_color_multiplier)
+            player.calculate_stage_hearts(
+                &self.card_database,
+                &self.mods.heart_color_multiplier,
+                &self.mods.heart_override,
+                &self.mods.heart_modifiers,
+            )
         });
         for card_id in &player.live_card_zone.cards {
             if let Some(card) = self.card_database.get_card(*card_id) {

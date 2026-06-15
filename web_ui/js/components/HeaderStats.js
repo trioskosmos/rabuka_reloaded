@@ -54,12 +54,23 @@ export const HeaderStats = {
     render: (state, p0, p1, getPhaseKey) => {
         if (!HeaderStats.cache.turn) HeaderStats.init();
 
+        // Update player labels based on perspective
+        const perspective = State.perspectivePlayer;
+        const selfLabel = perspective === 0 ? 'P1' : 'P2';
+        const oppLabel = perspective === 0 ? 'P2' : 'P1';
+        const p1LabelEls = document.querySelectorAll('[data-i18n="player1"]');
+        const p2LabelEls = document.querySelectorAll('[data-i18n="player2"]');
+        p1LabelEls.forEach(el => el.textContent = selfLabel);
+        p2LabelEls.forEach(el => el.textContent = oppLabel);
+
         const phaseKey = getPhaseKey(state.phase);
         
         if (HeaderStats.cache.turn) HeaderStats.cache.turn.textContent = state.turn || 1;
         if (HeaderStats.cache.phase) HeaderStats.cache.phase.textContent = i18n.t(phaseKey);
         if (HeaderStats.cache.activePlayer) {
-            HeaderStats.cache.activePlayer.textContent = state.active_player || 'P1';
+            const ap = state.active_player;
+            const apLabel = ap === 'player1' || ap === '0' ? 'P1' : ap === 'player2' || ap === '1' ? 'P2' : ap || 'P1';
+            HeaderStats.cache.activePlayer.textContent = apLabel;
         }
         if (HeaderStats.cache.frameCounter) {
             HeaderStats.cache.frameCounter.textContent = state._frameCounter ?? 0;

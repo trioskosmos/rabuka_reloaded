@@ -20,6 +20,7 @@ fn trigger_riko_auto(game: &mut TestGame) {
         "player1".to_string(),
         Some("PL!S-bp6-002-R\u{ff0b}".to_string()),
         None,
+        None,
     );
     game.state.process_pending_auto_abilities("player1");
 }
@@ -34,6 +35,8 @@ fn setup_riko_and_filler(game: &mut TestGame, cards_in_waitroom: &[i16]) -> i16 
     for &cid in cards_in_waitroom {
         game.state.player1.waitroom.add_card(cid);
     }
+    // Simulate engine tracking: these cards were just moved from live_card_zone
+    game.state.recently_moved_cards = Some(cards_in_waitroom.to_vec());
     game.state.current_phase = rabuka_engine::game_state::Phase::Main;
     riko
 }
@@ -56,8 +59,15 @@ fn test_q252_basic_trigger() {
     game.select_option(0); // top
 
     assert!(!game.has_pending_choice(), "No remaining choices");
-    assert_eq!(game.state.player1.main_deck.cards.first(), Some(&live), "Live card on top of deck");
-    assert!(!game.state.player1.waitroom.cards.contains(&live), "Live card removed from waitroom");
+    assert_eq!(
+        game.state.player1.main_deck.cards.first(),
+        Some(&live),
+        "Live card on top of deck"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&live),
+        "Live card removed from waitroom"
+    );
 }
 
 /// Non-Aqours live card → condition fails → no trigger.
@@ -69,7 +79,10 @@ fn test_q252_non_aqours_no_trigger() {
     let _ = setup_riko_and_filler(&mut game, &[live]);
     trigger_riko_auto(&mut game);
 
-    assert!(!game.has_pending_choice(), "Non-Aqours live should NOT trigger Riko's auto");
+    assert!(
+        !game.has_pending_choice(),
+        "Non-Aqours live should NOT trigger Riko's auto"
+    );
 }
 
 /// Q252 main: 2 Aqours live cards in waitroom → choose 1 → pick top.
@@ -82,7 +95,7 @@ fn test_q252_two_cards_choose_one() {
     let _ = setup_riko_and_filler(&mut game, &[live1, live2]);
     trigger_riko_auto(&mut game);
 
-    // Choice 1: choose 1 of 2 cards
+    // Choice 1: choose 1 of 2 recently moved cards
     assert!(game.has_pending_choice(), "Prompt: choose 1 of 2 cards");
     game.select_indices(&[0]); // pick live1
 
@@ -91,9 +104,19 @@ fn test_q252_two_cards_choose_one() {
     game.select_option(0); // top
 
     assert!(!game.has_pending_choice(), "No remaining choices");
-    assert_eq!(game.state.player1.main_deck.cards.first(), Some(&live1), "live1 on top of deck");
-    assert!(game.state.player1.waitroom.cards.contains(&live2), "live2 stays in waitroom");
-    assert!(!game.state.player1.waitroom.cards.contains(&live1), "live1 removed from waitroom");
+    assert_eq!(
+        game.state.player1.main_deck.cards.first(),
+        Some(&live1),
+        "live1 on top of deck"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live2),
+        "live2 stays in waitroom"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&live1),
+        "live1 removed from waitroom"
+    );
 }
 
 /// Q252: 3 cards, pick the middle one → bottom.
@@ -116,10 +139,23 @@ fn test_q252_three_cards_choose_one() {
     game.select_option(1); // bottom
 
     assert!(!game.has_pending_choice(), "No remaining choices");
-    assert_eq!(game.state.player1.main_deck.cards.last(), Some(&live2), "live2 on bottom of deck");
-    assert!(game.state.player1.waitroom.cards.contains(&live1), "live1 stays in waitroom");
-    assert!(game.state.player1.waitroom.cards.contains(&live3), "live3 stays in waitroom");
-    assert!(!game.state.player1.waitroom.cards.contains(&live2), "live2 removed from waitroom");
+    assert_eq!(
+        game.state.player1.main_deck.cards.last(),
+        Some(&live2),
+        "live2 on bottom of deck"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live1),
+        "live1 stays in waitroom"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live3),
+        "live3 stays in waitroom"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&live2),
+        "live2 removed from waitroom"
+    );
 }
 
 /// Use limit: 1/turn — second trigger does nothing.
@@ -140,8 +176,12 @@ fn test_q252_use_limit() {
 
     // Second trigger — blocked by use_limit=1
     game.state.player1.waitroom.add_card(live2);
+    game.state.recently_moved_cards = Some(vec![live2]);
     trigger_riko_auto(&mut game);
-    assert!(!game.has_pending_choice(), "Second trigger blocked by use_limit");
+    assert!(
+        !game.has_pending_choice(),
+        "Second trigger blocked by use_limit"
+    );
 }
 
 /// Test: choose 1 of 2, NOT the first.
@@ -160,6 +200,13 @@ fn test_q252_pick_second_card() {
     game.select_option(1); // bottom
 
     assert!(!game.has_pending_choice(), "No remaining choices");
-    assert_eq!(game.state.player1.main_deck.cards.last(), Some(&live2), "live2 on bottom");
-    assert!(game.state.player1.waitroom.cards.contains(&live1), "live1 stays in waitroom");
+    assert_eq!(
+        game.state.player1.main_deck.cards.last(),
+        Some(&live2),
+        "live2 on bottom"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live1),
+        "live1 stays in waitroom"
+    );
 }

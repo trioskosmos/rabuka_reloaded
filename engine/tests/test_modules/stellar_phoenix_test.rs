@@ -35,7 +35,7 @@ fn process_abilities(game: &mut TestGame) {
 fn both_in_live_zone_both_trigger() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let (member, phoenix, stellar) = setup_both_in_live_zone(&mut game);
+    let (member, phoenix, _stellar) = setup_both_in_live_zone(&mut game);
     process_abilities(&mut game);
     let phoenix_score = game.state.mods.get_score_modifier(phoenix);
     assert_eq!(phoenix_score, 1, "PHOENIX: +1 score from Stellar Stream's heart01=4");
@@ -47,7 +47,7 @@ fn both_in_live_zone_both_trigger() {
 fn phoenix_in_success_zone() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let (member, phoenix, stellar) = {
+    let (member, phoenix, _stellar) = {
         let member = game.id("PL!N-PR-003-PR");
         let phoenix = game.id("PL!N-pb1-038-L");
         let stellar = game.id("PL!N-pb1-039-L");
@@ -77,7 +77,7 @@ fn phoenix_in_success_zone() {
 fn stellar_stream_in_success_zone() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let (member, phoenix, stellar) = {
+    let (member, phoenix, _stellar) = {
         let member = game.id("PL!N-PR-003-PR");
         let phoenix = game.id("PL!N-pb1-038-L");
         let stellar = game.id("PL!N-pb1-039-L");

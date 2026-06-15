@@ -52,15 +52,28 @@ impl super::TurnEngine {
                     crate::game_setup::ActionType::ScissorsChoice => 2,
                     _ => unreachable!(),
                 };
-                if game_state.player1_rps_choice.is_none() {
-                    Self::handle_rps_choice_p1(game_state, choice_value)
+                // PVP: route by player_id from session
+                if let Some(pid) = game_state.pending_rps_player_id {
+                    let r = if pid == 0 {
+                        Self::handle_rps_choice_p1(game_state, choice_value)
+                    } else {
+                        Self::handle_rps_choice_p2(game_state, choice_value)
+                    };
+                    game_state.pending_rps_player_id = None;
+                    r
                 } else {
-                    Self::handle_rps_choice_p2(game_state, choice_value)
+                    // Sandbox / no player context: sequential (P1 then P2)
+                    if game_state.player1_rps_choice.is_none() {
+                        Self::handle_rps_choice_p1(game_state, choice_value)
+                    } else {
+                        Self::handle_rps_choice_p2(game_state, choice_value)
+                    }
                 }
             }
             crate::game_setup::ActionType::ChooseFirstAttacker => {
-                game_state.player1.is_first_attacker = true;
-                game_state.player2.is_first_attacker = false;
+                let p1_first = game_state.rps_winner != Some(2);
+                game_state.player1.is_first_attacker = p1_first;
+                game_state.player2.is_first_attacker = !p1_first;
                 for _ in 0..6 {
                     game_state.player1.draw_card();
                     game_state.player2.draw_card();
@@ -70,8 +83,9 @@ impl super::TurnEngine {
                 Ok(())
             }
             crate::game_setup::ActionType::ChooseSecondAttacker => {
-                game_state.player1.is_first_attacker = false;
-                game_state.player2.is_first_attacker = true;
+                let p1_first = game_state.rps_winner == Some(2);
+                game_state.player1.is_first_attacker = p1_first;
+                game_state.player2.is_first_attacker = !p1_first;
                 for _ in 0..6 {
                     game_state.player1.draw_card();
                     game_state.player2.draw_card();
@@ -84,7 +98,7 @@ impl super::TurnEngine {
                 Self::handle_mulligan_selection(game_state, card_id, card_indices)
             }
             crate::game_setup::ActionType::ConfirmMulligan => {
-                Self::handle_mulligan_confirmation(game_state)
+                Self::handle_mulligan_confirmation(game_state, card_indices.clone())
             }
             crate::game_setup::ActionType::SkipMulligan => Self::handle_mulligan_skip(game_state),
             crate::game_setup::ActionType::PlayMemberToStage => Self::handle_play_member_to_stage(
@@ -211,6 +225,7 @@ impl super::TurnEngine {
             player_id.clone(),
             Some(card.card_no.clone()),
             Some(card_id),
+            None,
         );
         game_state.process_pending_auto_abilities(&player_id);
         game_state.rule_log.push(format!(
@@ -368,15 +383,14 @@ impl super::TurnEngine {
                                 }
                             }
                         }
-                        // For deck_top_or_bottom (position|destination with deck_ options),
-                        // return the option text instead of the raw index.
+                        // For position|destination choices, look up the option text in the
+                        // options array by index.  The options array contains the actual
+                        // position names (e.g. "left", "center", "right") that the handler
+                        // expects, not raw numeric indices.
                         if target == "position|destination" {
                             if let Some(ref opts) = options {
                                 if let Some(id) = card_id {
-                                    if id >= 0 && (id as usize) < opts.len()
-                                        && opts.len() == 2
-                                        && opts[0] == Zone::DeckTop.to_str()
-                                    {
+                                    if id >= 0 && (id as usize) < opts.len() {
                                         return Ok(
                                             crate::ability::types::ChoiceResult::TargetSelected {
                                                 target: opts[id as usize].clone(),
@@ -503,12 +517,14 @@ impl super::TurnEngine {
 
         // Take the persistent resolver from the queue entry
         let mut resolver = match game_state.ability_queue.take_resolver() {
-            Some(r) => {
+            Some(mut r) => {
+                let selected = r.selected_cards.clone();
                 log::debug!(
                     "[RWC] took resolver: moved_cards={:?} selected={:?}",
                     r.moved_cards,
-                    r.selected_cards
+                    selected
                 );
+                r.sub_choice_created = false;
                 r
             }
             None => {
@@ -534,6 +550,39 @@ impl super::TurnEngine {
         if resolver.pending_choice.is_some() {
             // Sub-choice created — store resolver back on entry and pause queue
             let sub_choice = resolver.pending_choice.clone().unwrap();
+            // G1/G3: route pending choice to opponent if it targets opponent
+            let targets_opponent = match &sub_choice {
+                crate::ability::types::Choice::SelectCard {
+                    target_player_id: Some(tpid),
+                    ..
+                } if tpid == "opponent"
+                    && resolver.spawn_context.target.as_deref() == Some("opponent") =>
+                {
+                    true
+                }
+                crate::ability::types::Choice::SelectPosition { .. }
+                    if matches!(
+                        resolver.execution_context,
+                        crate::ability::types::ExecutionContext::MoveCardsPosition { ref target, .. }
+                        if target == "opponent"
+                    ) =>
+                {
+                    true
+                }
+                _ => false,
+            };
+            eprintln!(
+                "[RWC_G1] tpid_opp={} spawn={:?} choice={:?}",
+                targets_opponent, resolver.spawn_context.target, &sub_choice
+            );
+            if let Some(entry) = game_state.ability_queue.current_entry_mut() {
+                if targets_opponent {
+                    let current = entry.player_id.clone();
+                    let opponent_id = if current == "p1" { "p2" } else { "p1" };
+                    entry.choice_player_id = Some(opponent_id.to_string());
+                    eprintln!("[RWC_G1] SET choice_player_id={}", opponent_id);
+                }
+            }
             resolver.store_pending_choice(game_state);
             game_state.ability_queue.set_resolver(resolver);
             game_state.ability_queue.pause_for_choice(sub_choice);
@@ -557,7 +606,7 @@ impl super::TurnEngine {
 
             let optional_skipped = game_state.ability_queue.current_entry().is_some_and(|e| {
                 e.cost_paid
-                    && !e.optional_cost_was_paid
+                    && e.optional_cost_result == Some(false)
                     && e.choice_card_no == Some(ChoiceRoute::OptionalCost)
             });
             // Re-check pending commands — they may have been cleared by the choice
@@ -570,6 +619,13 @@ impl super::TurnEngine {
                 && had_pending_sequential
                 && !game_state.ability_queue.has_pending_commands();
             let effect_ready = cost_was_paid && !had_pending_sequential && !effect_started;
+            eprintln!("[RWC_BRANCH] cost_was_paid={} effect_started={} had_pending={} optional_skipped={} pending_cleared={} effect_ready={}",
+                cost_was_paid, effect_started, had_pending_sequential,
+                game_state.ability_queue.current_entry().is_some_and(|e| {
+                    e.cost_paid && e.optional_cost_result == Some(false)
+                        && e.choice_card_no == Some(crate::ability::types::ChoiceRoute::OptionalCost)
+                }),
+                pending_cleared, effect_ready);
 
             if optional_skipped || pending_cleared {
                 log::debug!(
@@ -583,6 +639,7 @@ impl super::TurnEngine {
                 game_state.process_pending_auto_abilities(&player_id);
             } else if effect_ready {
                 log::debug!("RWC: calling process_current_ability");
+                eprintln!("[RWC_EFFECT_READY] storing resolver and calling PCA");
                 // Store resolver back on entry so process_current_ability can reuse it
                 // (the resolver carries cost-phase state like revealed_cost_cards).
                 game_state.ability_queue.set_resolver(resolver);
@@ -618,15 +675,31 @@ impl super::TurnEngine {
                         }
                     }
                 }
+                // Save recently_moved_cards before clear_effect_tracking
+                // erases them (they were set by look_and_select discard_remaining
+                // or similar batch discards during this ability's resolution).
+                let moved_snapshot = game_state.recently_moved_cards.clone();
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
+                if moved_snapshot.is_some() && game_state.current_phase == crate::types::Phase::Main
+                {
+                    // Temporarily restore so the trigger scan can see them
+                    game_state.recently_moved_cards = moved_snapshot;
+                }
                 let player_id = game_state.active_player().id.clone();
                 game_state.process_pending_auto_abilities(&player_id);
+                game_state.recently_moved_cards = None;
             } else {
+                let moved_snapshot = game_state.recently_moved_cards.clone();
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
+                if moved_snapshot.is_some() && game_state.current_phase == crate::types::Phase::Main
+                {
+                    game_state.recently_moved_cards = moved_snapshot;
+                }
                 let player_id = game_state.active_player().id.clone();
                 game_state.process_pending_auto_abilities(&player_id);
+                game_state.recently_moved_cards = None;
             }
         }
         Ok(())

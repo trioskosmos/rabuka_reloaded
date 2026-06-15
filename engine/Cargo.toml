@@ -31,6 +31,9 @@ actix-files = "0.6"
 tokio = { version = "1.35", features = ["full"] }
 smallvec = "1.11"
 uuid = { version = "1.6", features = ["v4", "serde"] }
+local-ip-address = "0.6"
+tokio-stream = "0.1"
+bytes = "1"
 
 [dev-dependencies]
 criterion = "0.5"
@@ -46,32 +49,4 @@ name = "rabuka_engine"
 path = "src/main.rs"
 test = false
 
-[[bin]]
-name = "run_qa_tests"
-path = "src/run_qa_tests.rs"
-test = false
 
-[[bin]]
-name = "test_failing"
-path = "src/bin/test_failing.rs"
-test = false
-
-[[bin]]
-name = "check_abilities"
-path = "src/bin/check_abilities.rs"
-test = false
-
-[[bin]]
-name = "test_all_abilities"
-path = "src/bin/test_all_abilities.rs"
-test = false
-
-[[bin]]
-name = "verify_abilities"
-path = "src/bin/verify_abilities.rs"
-test = false
-
-[[bin]]
-name = "dump_coverage"
-path = "src/bin/dump_coverage.rs"
-test = false

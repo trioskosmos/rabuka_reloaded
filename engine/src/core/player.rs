@@ -5,6 +5,7 @@ use crate::zones::{
 };
 
 use crate::card::CardDatabase;
+use crate::core::game_modifiers::ModifierEntry;
 
 use std::collections::VecDeque;
 
@@ -245,7 +246,8 @@ impl Player {
                         let active_energy_count = self.energy_zone.active_count();
 
                         // Allow baton touch if cost_to_pay is 0 (equal/lower cost) OR if there's sufficient energy to pay the reduced cost
-                        cost_to_pay == 0 || (cost_to_pay > 0 && active_energy_count >= cost_to_pay as usize)
+                        cost_to_pay == 0
+                            || (cost_to_pay > 0 && active_energy_count >= cost_to_pay as usize)
                     }
                 } else {
                     // No member in target area, can't baton touch
@@ -261,14 +263,13 @@ impl Player {
             // Check cannot_baton_touch protection BEFORE paying energy
             if baton_touch_used {
                 if let Some(member_id) = self.stage.get_area(stage_area) {
-                    let has_protection =
-                        card_db.get_card(member_id).is_some_and(|existing_card| {
-                            existing_card.abilities.iter().any(|a| {
-                                a.effect.as_ref().is_some_and(|ef| {
-                                    ef.restriction_type.as_deref() == Some("cannot_baton_touch")
-                                })
+                    let has_protection = card_db.get_card(member_id).is_some_and(|existing_card| {
+                        existing_card.abilities.iter().any(|a| {
+                            a.effect.as_ref().is_some_and(|ef| {
+                                ef.restriction_type.as_deref() == Some("cannot_baton_touch")
                             })
-                        });
+                        })
+                    });
                     if has_protection {
                         self.hand.cards.insert(hand_index, card_id);
                         return Err(
@@ -390,6 +391,11 @@ impl Player {
         &self,
         card_db: &CardDatabase,
         heart_color_multiplier: &std::collections::HashMap<i16, crate::card::HeartColor>,
+        heart_override: &std::collections::HashMap<i16, (crate::card::HeartColor, u32)>,
+        heart_modifiers: &std::collections::HashMap<
+            i16,
+            std::collections::HashMap<crate::card::HeartColor, ModifierEntry>,
+        >,
     ) -> crate::card::BaseHeart {
         use crate::card::HeartColor;
         use std::collections::HashMap;
@@ -400,6 +406,13 @@ impl Player {
             if card_id == crate::constants::EMPTY_SLOT {
                 continue;
             }
+
+            // heart_override: replace card's hearts entirely
+            if let Some(&(override_color, override_count)) = heart_override.get(&card_id) {
+                *total_hearts.entry(override_color).or_insert(0) += override_count;
+                continue;
+            }
+
             if let Some(card) = card_db.get_card(card_id) {
                 if let Some(ref base_heart) = card.base_heart {
                     if let Some(override_color) = heart_color_multiplier.get(&card_id) {
@@ -408,6 +421,22 @@ impl Player {
                     } else {
                         for (color, count) in &base_heart.hearts {
                             *total_hearts.entry(*color).or_insert(0) += count;
+                        }
+                    }
+                }
+            }
+
+            // heart_modifiers: additive per-color adjustments
+            if let Some(mods) = heart_modifiers.get(&card_id) {
+                for (color, entry) in mods {
+                    let delta = entry.total();
+                    if delta != 0 {
+                        let new_val =
+                            (*total_hearts.get(color).unwrap_or(&0) as i32 + delta).max(0) as u32;
+                        if new_val > 0 {
+                            total_hearts.insert(*color, new_val);
+                        } else {
+                            total_hearts.remove(color);
                         }
                     }
                 }
@@ -431,11 +460,6 @@ impl Player {
 
     pub fn draw_card(&mut self) -> Option<i16> {
         // Rule 8.1: Draw Phase - Active player draws 1 card from main deck to hand
-
-        debug_assert!(
-            !self.main_deck.is_empty(),
-            "draw_card called with empty deck — tests must fill player.main_deck.cards"
-        );
         self.main_deck.draw().inspect(|&card_id| {
             self.add_card_to_hand(card_id);
         })

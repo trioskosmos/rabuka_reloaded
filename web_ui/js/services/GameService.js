@@ -40,6 +40,36 @@ export const GameService = {
         return null;
     },
 
+    startGameplayPolling: () => {
+        if (window._gameplayPollInterval) return;
+        let lastVersion = -1;
+        window._gameplayPollInterval = setInterval(async () => {
+            if (!State.gameHasStarted || !State.roomCode) {
+                clearInterval(window._gameplayPollInterval);
+                window._gameplayPollInterval = null;
+                return;
+            }
+            try {
+                const network = window.Network || null;
+                const headers = network?.getHeaders ? network.getHeaders() : {};
+                const res = await fetch('api/game-state/version', { headers });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (data.version !== undefined && data.version !== lastVersion) {
+                    lastVersion = data.version;
+                    await GameService.fetchState(network);
+                }
+            } catch (_) {}
+        }, 500);
+    },
+
+    stopGameplayPolling: () => {
+        if (window._gameplayPollInterval) {
+            clearInterval(window._gameplayPollInterval);
+            window._gameplayPollInterval = null;
+        }
+    },
+
     fetchState: async (networkFacade) => {
         try {
             if (State.replayMode) return;
@@ -51,6 +81,20 @@ export const GameService = {
             }
 
             const data = await res.json();
+
+            // Room was closed (opponent left) — redirect to lobby
+            if (data.room_closed) {
+                if (window.handleRoomClosed) {
+                    window.handleRoomClosed();
+                }
+                return;
+            }
+
+            // Room not ready yet (opponent hasn't submitted deck) — keep current state
+            if (data.room_not_ready) {
+                return;
+            }
+
             if (data.legal_actions) {
                 data.legal_actions = data.legal_actions.map((action, index) => ({
                     ...action,
@@ -58,8 +102,19 @@ export const GameService = {
                 }));
             }
 
+            // If setup modal is still open (e.g., first player getting state via SSE), dismiss it
+            const setupModal = document.getElementById(DOM_IDS.MODAL_SETUP);
+            if (setupModal && setupModal.style.display !== 'none') {
+                const roomModal = document.getElementById(DOM_IDS.MODAL_ROOM);
+                if (roomModal) roomModal.style.display = 'none';
+                setupModal.style.display = 'none';
+            }
+
             updateStateData(data);
             State.gameHasStarted = true;
+
+            // Start gameplay polling as fallback for unreliable SSE (Cloudflared, proxies)
+            GameService.startGameplayPolling();
 
         } catch (e) {
             console.error("Game state fetch error:", e);
@@ -74,6 +129,12 @@ export const GameService = {
 
         console.log('DEBUG: Frontend sending action:', action.action_type);
 
+        // For mulligan confirm, inject the locally-selected indices into card_indices
+        let extraCardIndices = action.parameters?.card_indices;
+        if (action.action_type === 'confirm_mulligan' || action.action_type === 'ConfirmMulligan') {
+            extraCardIndices = Array.from(State.localMulliganSelection);
+        }
+
         try {
             // Simple state machine: send action, get new state and actions
             const headers = networkFacade?.getHeaders ? networkFacade.getHeaders() : { 'Content-Type': 'application/json' };
@@ -85,7 +146,7 @@ export const GameService = {
                     action_type: action.action_type,
                     card_id: action.parameters?.card_id,
                     card_index: action.parameters?.card_index,
-                    card_indices: action.parameters?.card_indices,
+                    card_indices: extraCardIndices,
                     card_no: action.parameters?.card_no,
                     stage_area: action.parameters?.stage_area,
                     use_baton_touch: action.parameters?.use_baton_touch

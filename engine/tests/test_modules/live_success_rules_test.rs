@@ -74,10 +74,16 @@ fn both_players_live_score_compared() {
     }
     // One more pass to finalize LiveVictoryDetermination (move winner to success zone)
     game.pass();
-    assert!(
-        game.state.player1.success_live_card_zone.cards.len() > 0
-            || game.state.player2.success_live_card_zone.cards.len() > 0,
-        "Both players' live cards processed through score comparison (8.4.3.3)"
+    let p1_success = game.state.player1.success_live_card_zone.cards.len();
+    let p2_success = game.state.player2.success_live_card_zone.cards.len();
+    // Exactly one player wins (identical live cards, same score → P1 wins as first attacker)
+    assert_eq!(
+        p1_success, 1,
+        "P1 (first attacker) wins with score-1 live; P1 success zone has 1 card"
+    );
+    assert_eq!(
+        p2_success, 0,
+        "P2 loses: success zone should be empty (P2 live card stays in live zone)"
     );
 }
 

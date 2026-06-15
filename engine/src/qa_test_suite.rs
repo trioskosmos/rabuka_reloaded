@@ -92,7 +92,13 @@ fn test_q23_member_card_to_stage_procedure() {
     let initial_hand_count = game_state.player1.hand.cards.len();
     let initial_energy_active = game_state.player1.energy_zone.active_count();
 
-    let _stage_member_id = game_state.player1.stage.stage.iter().find(|&&id| id != -1).unwrap();
+    let _stage_member_id = game_state
+        .player1
+        .stage
+        .stage
+        .iter()
+        .find(|&&id| id != -1)
+        .unwrap();
 
     let actions = game_setup::generate_possible_actions(&game_state);
     println!(
@@ -205,7 +211,13 @@ fn test_q24_baton_touch_procedure() {
     let initial_waitroom_count = game_state.player1.waitroom.cards.len();
     let initial_hand_count = game_state.player1.hand.cards.len();
     let initial_energy_active = game_state.player1.energy_zone.active_count();
-    let _touched_member = game_state.player1.stage.stage.iter().find(|&&id| id != -1).copied();
+    let _touched_member = game_state
+        .player1
+        .stage
+        .stage
+        .iter()
+        .find(|&&id| id != -1)
+        .copied();
 
     println!(
         "After turn 1 - hand: {:?}, energy: {}",
@@ -2100,6 +2112,7 @@ fn test_ability_live_success_draw_then_discard() {
         "player1".to_string(),
         Some(member_card.card_no.clone()),
         Some(member_id),
+        None,
     );
 
     println!(
@@ -2306,17 +2319,10 @@ fn test_baton_touch_discard_ability_skipped_low_cost() {
     let low_cost_card = cards
         .iter()
         .find(|c| {
-            c.is_member()
-                && c.card_no != "PL!HS-sd1-001-SD"
-                && c.cost.is_some_and(|c| c < 10)
-                && {
-                    let cid = get_card_id(c, &card_database);
-                    crate::ability::util::card_matches_group_str(
-                        &card_database,
-                        cid,
-                        Some("蓮ノ空"),
-                    )
-                }
+            c.is_member() && c.card_no != "PL!HS-sd1-001-SD" && c.cost.is_some_and(|c| c < 10) && {
+                let cid = get_card_id(c, &card_database);
+                crate::ability::util::card_matches_group_str(&card_database, cid, Some("蓮ノ空"))
+            }
         })
         .expect("Should find a low-cost 蓮ノ空 member");
     let low_cost_id = get_card_id(low_cost_card, &card_database);

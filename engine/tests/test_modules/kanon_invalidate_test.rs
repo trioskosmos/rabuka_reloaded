@@ -28,10 +28,23 @@ fn kanon_q106_debut_recover_from_discard() {
     game.state.player1.stage.stage[0] = other_liella;
     game.play_to_stage(kanon, rabuka_engine::zones::MemberArea::Center);
 
-    let recovered = game.state.player1.hand.cards.contains(&liella);
-    assert!(recovered, "card should have been recovered from discard");
     assert!(
-        game.state.player1.stage.stage.contains(&kanon),
-        "Kanon should be on stage after debut"
+        game.state.player1.hand.cards.contains(&liella),
+        "Liella card recovered from waitroom to hand"
+    );
+    assert_eq!(
+        game.state.player1.stage.stage[1], kanon,
+        "Kanon occupies Center after debut"
+    );
+    // Verify other_liella is still on stage (was not replaced)
+    assert_eq!(
+        game.state.player1.stage.stage[0], other_liella,
+        "Other Liella member remains on LeftSide"
+    );
+    // Verify hand count: started with kanon+filler=2, played kanon→1, recovered liella→2
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        2,
+        "Hand: 2→play kanon(1)→recover liella(2)"
     );
 }

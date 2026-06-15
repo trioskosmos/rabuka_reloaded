@@ -106,7 +106,7 @@ fn issue6_you_timed_heart_zero_for_setup_members() {
     let mut game = TestGame::new(db);
     let you = game.id("PL!S-bp5-005-R\u{ff0b}");
     let fresh = game.id("PL!-sd1-010-SD");
-    let filler = game.id("PL!-sd1-010-SD");
+    let _filler = game.id("PL!-sd1-010-SD");
     let live = game.id("PL!-sd1-019-SD");
 
     game.state.player1.stage.stage = [fresh, you, -1];

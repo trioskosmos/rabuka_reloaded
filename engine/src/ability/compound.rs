@@ -1,8 +1,10 @@
 use super::resolver::AbilityResolver;
 use super::types::{AbilityTraceNode, Choice, ExecutionContext, StepOutput, ZoneSnapshot};
+use crate::ability::debug::ABILITY_DEBUG;
 use crate::ability::types::Command;
 use crate::card::AbilityEffect;
 use crate::game_state::GameState;
+use std::sync::atomic::Ordering;
 
 impl AbilityResolver {
     pub fn execute_sequential_effect(
@@ -12,9 +14,11 @@ impl AbilityResolver {
         conditional: bool,
         is_further: bool,
     ) -> Result<(), String> {
-        eprintln!("[SEQ_ENTRY] execute_sequential_effect: action={} conditional={} is_further={} actions={}",
-            effect.action, conditional, is_further, 
-            effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0));
+        if ABILITY_DEBUG.load(Ordering::Relaxed) {
+            eprintln!("[SEQ_ENTRY] execute_sequential_effect: action={} conditional={} is_further={} actions={}",
+                effect.action, conditional, is_further, 
+                effect.compound.actions.as_ref().map(|a| a.len()).unwrap_or(0));
+        }
         // Trace sequential compound effect
         let seq_label = if conditional {
             "sequential_conditional".to_string()
@@ -78,8 +82,14 @@ impl AbilityResolver {
                 self.activating_card_id
             );
             for _repeat in 0..repeat_max {
+                let repeats_remaining = repeat_max.saturating_sub(_repeat + 1);
                 for (i, action) in repeat_actions.iter().enumerate() {
-                    eprintln!("[SEQ_TRACE] _repeat={} i={} action={}", _repeat, i, action.action);
+                    if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        eprintln!(
+                            "[SEQ_TRACE] _repeat={} i={} action={}",
+                            _repeat, i, action.action
+                        );
+                    }
                     log::debug!(
                         "[ABILITY]  >> sub-action[{}]: action={} has_condition={} card_id={:?}",
                         i,
@@ -133,9 +143,22 @@ impl AbilityResolver {
                         }
                     }
 
+                    // G3: before executing an opponent-action sub-action, tag the spawn
+                    // context so that any choice created inside is routed to the opponent.
+                    if action.action == "opponent_action"
+                        || action.action_by.as_deref() == Some("opponent")
+                    {
+                        self.spawn_context.target = Some("opponent".to_string());
+                    }
+
                     match self.execute_effect(gs, &action_to_execute) {
                         Ok(_) => {
-                            eprintln!("[SEQ_TRACE] after execute: pending={:?}", self.pending_choice.is_some());
+                            if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                                eprintln!(
+                                    "[SEQ_TRACE] after execute: pending={:?}",
+                                    self.pending_choice.is_some()
+                                );
+                            }
                             log::debug!(
                                 "[SEQ_LOOP] after execute: pending={:?}",
                                 self.pending_choice.is_some()
@@ -177,17 +200,25 @@ impl AbilityResolver {
                             }
                             if self.pending_choice.is_some() {
                                 let current_was_optional = action.optional.unwrap_or(false);
-                                let remaining =
-                                    if current_was_optional && i + 1 < repeat_actions.len() {
-                                        let mut actions: Vec<AbilityEffect> =
-                                            repeat_actions[i..].to_vec();
-                                        if !actions.is_empty() {
-                                            actions[0].optional = None;
-                                        }
-                                        actions
-                                    } else {
-                                        repeat_actions[i + 1..].to_vec()
-                                    };
+                                let is_opponent_action = action.action == "opponent_action"
+                                    || action.action_by.as_deref() == Some("opponent");
+                                let mut remaining = if current_was_optional
+                                    && i + 1 < repeat_actions.len()
+                                    && !is_opponent_action
+                                {
+                                    let mut actions: Vec<AbilityEffect> =
+                                        repeat_actions[i..].to_vec();
+                                    if !actions.is_empty() {
+                                        actions[0].optional = None;
+                                    }
+                                    actions
+                                } else {
+                                    repeat_actions[i + 1..].to_vec()
+                                };
+                                // Preserve remaining repeats in the pending state
+                                for _ in 0..repeats_remaining {
+                                    remaining.extend_from_slice(repeat_actions);
+                                }
                                 save_remaining(gs, remaining);
                                 return Ok(());
                             } else if action.optional.unwrap_or(false)
@@ -200,7 +231,11 @@ impl AbilityResolver {
                         }
                         Err(e) if e.contains("Pending choice required") => {
                             let current_was_optional = action.optional.unwrap_or(false);
-                            let remaining = if current_was_optional && i + 1 < repeat_actions.len()
+                            let is_opponent_action = action.action == "opponent_action"
+                                || action.action_by.as_deref() == Some("opponent");
+                            let mut remaining = if current_was_optional
+                                && i + 1 < repeat_actions.len()
+                                && !is_opponent_action
                             {
                                 let mut actions: Vec<AbilityEffect> = repeat_actions[i..].to_vec();
                                 if !actions.is_empty() {
@@ -210,6 +245,10 @@ impl AbilityResolver {
                             } else {
                                 repeat_actions[i + 1..].to_vec()
                             };
+                            // Preserve remaining repeats in the pending state
+                            for _ in 0..repeats_remaining {
+                                remaining.extend_from_slice(repeat_actions);
+                            }
                             save_remaining(gs, remaining);
                             return Ok(());
                         }
@@ -366,10 +405,9 @@ impl AbilityResolver {
         // If the ability has an optional cost and it was NOT paid (skipped),
         // the primary effect should not run. This fixes "may pay" patterns
         // where the effect is gated behind the optional cost.
-        let cost_was_paid = gs
-            .ability_queue
-            .current_entry()
-            .is_none_or(|e| e.optional_cost_was_paid || !e.cost_paid || e.ability.cost.is_none());
+        let cost_was_paid = gs.ability_queue.current_entry().is_none_or(|e| {
+            e.optional_cost_result == Some(true) || e.cost_paid || e.ability.cost.is_none()
+        });
         if !cost_was_paid {
             return Ok(());
         }
@@ -422,14 +460,59 @@ impl AbilityResolver {
         let conditional_action = effect.compound.conditional_action.as_ref();
         let is_negation = effect.compound.conditional_negation.unwrap_or(false);
 
+        // Q92: if the optional action requires energy and player can't afford it,
+        // skip the choice and execute the conditional action directly
+        if let (Some(opt), Some(cond)) = (optional_action, conditional_action) {
+            if opt.action == "pay_energy" {
+                let need = opt.energy_count.unwrap_or(0) as usize;
+                if need > 0 {
+                    let player =
+                        gs.resolve_target_player_mut(opt.target.as_deref().unwrap_or("self"));
+                    if (player.energy_zone.active_energy_count as usize) < need {
+                        let cmd = if is_negation {
+                            Command::Effect(*cond.clone())
+                        } else {
+                            Command::Effect(effect.clone())
+                        };
+                        gs.ability_queue.set_pending_commands(vec![cmd]);
+                        return self.resume_pending_commands(gs);
+                    }
+                }
+            }
+        }
+
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!(
+                "[COND_OPT] opt={:?} cond={:?}",
+                optional_action.is_some(),
+                conditional_action.is_some()
+            );
+        }
         if optional_action.is_some() && conditional_action.is_some() {
-            let desc = optional_action
-                .as_ref()
-                .map(|a| a.text.as_str())
-                .unwrap_or("Perform optional action");
-            // Store the full sub-effect so handle_conditional_optional can read
-            // optional_action, conditional_action, and conditional_negation even
-            // when entry_effect() returns a parent (e.g. sequential) effect.
+            let result = gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.optional_cost_result);
+            if let Some(cost_was_paid) = result {
+                let chose_yes = cost_was_paid;
+                let effect = effect.clone();
+                let cmd = match (chose_yes, is_negation) {
+                    (true, true) => effect.compound.optional_action.map(|a| Command::Effect(*a)),
+                    (true, false) => effect
+                        .compound
+                        .conditional_action
+                        .map(|a| Command::Effect(*a)),
+                    (false, true) => effect
+                        .compound
+                        .conditional_action
+                        .map(|a| Command::Effect(*a)),
+                    (false, false) => None,
+                };
+                if let Some(cmd) = cmd {
+                    gs.ability_queue.set_pending_commands(vec![cmd]);
+                }
+                return self.resume_pending_commands(gs);
+            }
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 if let Ok(json) = serde_json::to_string(&effect) {
                     entry.conditional_choice = Some(json);
@@ -437,10 +520,13 @@ impl AbilityResolver {
             }
             self.pending_choice = Some(Choice::SelectTarget {
                 target: "conditional_optional".to_string(),
-                description: format!("{}?", desc),
+                description: String::new(),
                 allow_skip: true,
                 options: Some(vec!["Skip".to_string(), "Pay".to_string()]),
             });
+            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                entry.choice_card_no = Some(crate::ability::types::ChoiceRoute::OptionalCost);
+            }
             return Ok(());
         }
 

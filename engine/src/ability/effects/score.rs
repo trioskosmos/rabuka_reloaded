@@ -22,8 +22,10 @@ impl AbilityResolver {
         self_target: bool,
         heart_colors: &[String],
     ) -> Result<(), String> {
-        eprintln!("[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}", 
-            value, target, operation, effect.condition.is_some());
+        if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+            eprintln!("[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}", 
+                value, target, operation, effect.condition.is_some());
+        }
         let operation = operation.to_string();
         let target = target.to_string();
         let duration = duration.map(|s| s.to_string());
@@ -294,19 +296,9 @@ impl AbilityResolver {
         } else {
             heart_colors.to_vec()
         };
-        // For "set" with multiple colors, the parser sometimes emits total count (issue7:
-        // 12 hearts ÷ 4 colors = 3 each) and sometimes per-color count (hareruya_q64:
-        // 2 each for 3 colors). Heuristic: if value is a multiple of colors.len() AND
-        // exceeds the color count, it's total budget to distribute; otherwise per-color.
-        let per_color_value = if operation == "set"
-            && colors.len() > 1
-            && value > colors.len() as u32
-            && value.is_multiple_of(colors.len() as u32)
-        {
-            value / colors.len() as u32
-        } else {
-            value
-        };
+        // value is now always per-color count (parser fix: per-color, not total).
+        // Each listed color gets the same per-color value.
+        let per_color_value = value;
         for hc in &colors {
             let color = crate::zones::parse_heart_color(hc);
             gs.rule_log.push(format!(

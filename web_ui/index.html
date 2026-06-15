@@ -32,8 +32,12 @@
         </div>
     </div>
 
-    <button id="mobile-sidebar-toggle" data-action="toggle-sidebar">
-        <span class="icon">Menu</span>
+    <button id="mobile-toggle-log" data-action="toggle-log-sidebar" class="mobile-toggle-btn">
+        <span class="icon">📋</span>
+        <span class="label">LOG</span>
+    </button>
+    <button id="mobile-toggle-actions" data-action="toggle-actions-sidebar" class="mobile-toggle-btn">
+        <span class="icon">☰</span>
         <span class="label">ACTIONS</span>
     </button>
     
@@ -46,13 +50,13 @@
 
             <div class="stat-group">
                 <span class="stat" title="Connection"><span class="stat-icon"></span> <strong id="header-debug-info"
-                        class="debug-badge">Sandbox</strong></span>
+                        class="debug-badge" data-i18n="sandbox">Sandbox</strong></span>
                 <span id="room-display" class="stat" title="Room Code" style="display: none;">
-                    <span class="stat-icon"></span> <span>Room</span> <strong id="room-code-header">----</strong>
+                    <span class="stat-icon"></span> <span data-i18n="room">Room</span> <strong id="room-code-header">----</strong>
                 </span>
                 <span class="stat" title="System Status" style="display: none;"><span class="stat-icon"></span> <strong
-                        id="system-status-badge" class="debug-badge">Checking...</strong></span>
-                <span class="stat" title="Frame"><span class="stat-icon">#</span> <strong
+                        id="system-status-badge" class="debug-badge" data-i18n="checking">Checking...</strong></span>
+                <span class="stat"><span class="stat-icon">#</span> <strong
                         id="frame-counter">0</strong></span>
             </div>
 
@@ -109,19 +113,11 @@
             </div>
 
             <div class="controls">
-                <button id="save-state-btn" class="btn btn-secondary btn-sm" data-action="save-state"
-                    title="Save Board State to JSON File">Save</button>
-                <button id="load-state-btn" class="btn btn-secondary btn-sm" data-action="load-state"
-                    title="Load Board State String">Load</button>
-                <button id="undo-btn" class="btn btn-secondary btn-sm" data-action="rewind" title="Undo last action">Undo</button>
-                <button id="redo-btn" class="btn btn-secondary btn-sm" data-action="redo" title="Redo last undo">Redo</button>
-                <button id="debug-modal-btn" class="btn btn-secondary btn-sm" data-action="open-debug-modal"
-                    title="Debug / State Editor">Debug</button>
-                <button id="report-btn-header" class="btn btn-primary btn-sm" data-action="open-report-modal" data-i18n="report"
-                    title="Report Issue">報告</button>
-                <button class="btn btn-accent-gray btn-sm" data-action="open-settings-modal" title="Settings"
-                        data-i18n="settings">設定</button>
-                <button id="exit-room-btn" class="btn btn-accent-red btn-sm" data-action="leave-room" title="Exit Room">Exit</button>
+                <button id="undo-btn" class="btn btn-secondary btn-sm" data-action="rewind" data-i18n="undo">Undo</button>
+                <button id="redo-btn" class="btn btn-secondary btn-sm" data-action="redo" data-i18n="redo">Redo</button>
+                <button id="lang-btn" class="btn btn-sm" data-action="toggle-lang"
+                        style="border:1px solid #aaa;">English</button>
+                <button id="exit-room-btn" class="btn btn-accent-red btn-sm" data-action="leave-room" data-i18n="exit">Exit</button>
             </div>
         </div>
 
@@ -191,11 +187,6 @@
 
             <!-- OPPONENT SECTION -->
             <div class="player-section opponent" id="board-opponent" style="display: none;">
-                <div class="player-label">
-                    <span data-i18n="opponent_player">対戦相手 <span id="opp-agent-name" class="player-subtext">(Player
-                            2)</span></span>
-                    <span class="score-badge" id="opp-score">0 <span data-i18n="live_unit">ライブ</span></span>
-                </div>
                 <div class="board-inner">
                     <!-- TOP: Live Zone (Full Width) -->
                     <div class="live-group-row">
@@ -250,11 +241,6 @@
 
             <!-- PLAYER SECTION -->
             <div class="player-section" id="board-player">
-                <div class="player-label">
-                    <span data-i18n="you_player">あなた <span id="my-agent-name" class="player-subtext">(Player
-                            1)</span></span>
-                    <span class="score-badge" id="my-score">0 <span data-i18n="live_unit">ライブ</span></span>
-                </div>
                 <div class="board-inner">
                     <!-- TOP: Live Zone (Full Width) -->
                     <div class="live-group-row">
@@ -315,7 +301,7 @@
         <div class="sidebar sidebar-right" id="sidebar-right">
             <div class="sidebar-section">
                 <div class="sidebar-section-header">
-                    <h3>アクション</h3>
+                    <h3 data-i18n="actions">アクション</h3>
                     <button class="sidebar-close-btn" data-action="close-sidebar" aria-label="Close action panel">×</button>
                 </div>
                 <div class="performance-check-container">
@@ -341,7 +327,7 @@
 
             <div class="sidebar-section">
                 <div class="sidebar-section-header">
-                    <h3>Cheats</h3>
+                    <h3 data-i18n="cheats">Cheats</h3>
                 </div>
                 <div class="cheat-container">
                     <!-- Energy -->
@@ -385,6 +371,20 @@
                         <button class="btn btn-accent-pink btn-sm" data-action="cheat-add-live" data-player="0">P1</button>
                         <button class="btn btn-accent-pink btn-sm" data-action="cheat-add-live" data-player="1">P2</button>
                     </div>
+                    <!-- Negative Energy / Discard / Success -->
+                    <div class="cheat-row">
+                        <label>Neg Energy:</label>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-negative-energy" data-player="0">P1</button>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-negative-energy" data-player="1">P2</button>
+                    </div>
+                    <div class="cheat-row">
+                        <label>Card Utils:</label>
+                        <input type="text" id="cheat-util-id" placeholder="PL!S-PR-026-PR" class="cheat-input-text">
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-to-success" data-player="0">Success</button>
+                        <button class="btn btn-accent-pink btn-sm" data-action="cheat-to-success" data-player="1">P2</button>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-to-discard" data-player="0">Discard</button>
+                        <button class="btn btn-accent-red btn-sm" data-action="cheat-to-discard" data-player="1">P2</button>
+                    </div>
                     <!-- Force Win -->
                     <div class="cheat-row">
                         <label>Force Win (P1):</label>
@@ -402,64 +402,7 @@
         </div>
     </div>
 
-    <!-- Settings Modal -->
-    <div id="settings-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span class="modal-title"><span data-i18n="settings">設定</span></span>
-                <button class="close-btn" data-action="close-settings-modal">&times;</button>
-            </div>
-            <div class="modal-body settings-grid">
-                <div class="settings-group">
-                    <label>Main Actions</label>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <button class="btn" data-action="fetch-state" title="Update State"><span class="btn-text"
-                                data-i18n="update">更新</span></button>
-                        <button class="btn btn-primary" data-action="reset-game" title="Reset Game"><span class="btn-text"
-                                data-i18n="reset">リセット</span></button>
-                    </div>
-                </div>
 
-                <div class="settings-group">
-                    <label>Game Controls</label>
-                    <button class="btn btn-accent-purple" data-action="navigate" data-href="/deck_builder.html"
-                        data-i18n="deck_creator">🛠
-                        デッキ作成</button>
-                    <button class="btn btn-accent-blue" data-action="open-deck-modal" data-i18n="set_deck">🎴
-                        デッキ設定</button>
-                    <button id="pvp-btn" class="btn btn-accent-gray" data-action="toggle-hotseat">Shared Screen:
-                        OFF</button>
-                    <button id="switch-btn" class="btn btn-accent-blue" data-action="toggle-perspective">Switch View
-                        (P1/P2)</button>
-                </div>
-
-                <div class="settings-group">
-                    <label>View & Support</label>
-                    <div style="margin-bottom: 5px;">
-                        <label style="font-size: 0.75rem; color: #aaa;">Board Zoom: <span
-                                id="zoom-value">1.0</span>x</label>
-                        <input type="range" id="zoom-slider" min="0.5" max="2.5" step="0.05" value="1.0"
-                            class="zoom-slider-input" oninput="updateBoardScale(this.value)">
-                    </div>
-                    <button id="live-watch-btn" class="btn btn-accent-pink" data-action="toggle-live-watch"
-                        data-i18n="live_watch">ライブ監視: OFF</button>
-                    <button id="friendly-abilities-btn" class="btn btn-accent-green" data-action="toggle-friendly-abilities"
-                        data-i18n="friendly_abilities">読みやすい能力テキスト: ON</button>
-                    <button id="lang-btn" class="btn" data-action="toggle-lang"
-                        style="border:1px solid #aaa;">English</button>
-                    <button class="btn" data-action="open-help-modal"
-                        style="border:1px solid var(--accent-gold); color:var(--accent-gold);">ヘルプ</button>
-                </div>
-
-                <div class="settings-group">
-                    <label>Tools</label>
-                    <button class="btn" data-action="toggle-replay-mode" data-i18n="replay_mode">リプレイモード Toggle</button>
-                    <button id="debug-mode-btn" class="btn" data-action="toggle-debug-mode"
-                        style="border: 1px solid var(--accent-blue); margin-top: 8px;">Toggle Bytecode Logging</button>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Performance Result Modal -->
     <div id="performance-modal" class="modal-overlay" style="display: none;">
@@ -471,13 +414,13 @@
             <div class="modal-body">
                 <div class="modal-tabs">
                     <button id="tab-btn-result" class="tab-btn active" data-action="show-performance-tab" data-value="result">
-                        <span data-t="perf_result">結果概要</span>
+                        <span data-i18n="perf_result">結果概要</span>
                     </button>
                     <button id="tab-btn-engine" class="tab-btn" data-action="show-performance-tab" data-value="engine">
-                        <span data-t="engine_mechanics">詳細解説</span>
+                        <span data-i18n="engine_mechanics">詳細解説</span>
                     </button>
                     <button id="tab-btn-history" class="tab-btn" data-action="show-performance-tab" data-value="history">
-                        <span data-t="turn_history">ターン履歴</span>
+                        <span data-i18n="turn_history">ターン履歴</span>
                     </button>
                 </div>
                 <div id="perf-tab-result" class="perf-tab-content">
@@ -506,7 +449,7 @@
     <div id="selection-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content selection-modal-content">
             <div class="modal-header">
-                <div class="modal-title" id="selection-title">カード選択</div>
+                <div class="modal-title" id="selection-title" data-i18n="sel_title">Select a Card</div>
                 <button class="close-btn" data-action="close-selection-modal">✕</button>
             </div>
             <div id="selection-description" class="modal-description"></div>
@@ -653,7 +596,7 @@
     </div>
 
 
-    <!-- Game Setup Modal -->
+    <!-- Game Setup Modal / Deck Selection -->
     <div id="setup-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content setup-modal-content highlight-hover">
             <div class="modal-header">
@@ -661,33 +604,24 @@
                 <button class="close-btn" data-action="close-setup-modal">×</button>
             </div>
             <div class="modal-body">
-                <div id="setup-mode-display" class="setup-mode-badge">
-                    Mode: Sandbox
-                </div>
-
-                <div class="setting-item" style="margin-bottom: 15px;">
-                    <label>Card Set:</label>
-                    <select id="card-set-select" class="form-select highlight-hover">
-                        <option value="compiled">Standard (Compiled)</option>
-                        <option value="vanilla">Vanilla (Base Set)</option>
-                    </select>
-                </div>
+                <div id="setup-room-code" style="margin-bottom: 12px; padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.03); font-size: 0.85rem; text-align: center; display: none;"></div>
 
                 <div class="setup-grid">
                     <!-- Player 0 -->
                     <div id="setup-p0-col" class="setup-column">
-                        <h4 style="color: var(--accent-blue);">Player 1 (You)</h4>
+                        <h4 style="color: var(--accent-blue);">Player 1</h4>
                         <div class="setting-item">
-                            <label>Select Deck:</label>
+                            <label>Deck</label>
                             <select id="p0-deck-select" class="form-select highlight-hover"
                                 onchange="onDeckSelectChange(0, this.value)">
-                                <option value="random">🎲 Random Deck</option>
-                                <option value="paste">📋 Paste Deck List...</option>
+                                <option value="random">Random</option>
+                                <option value="paste">Paste Deck List...</option>
                             </select>
                         </div>
                         <div id="p0-paste-area" class="setup-paste-container" style="display:none;">
-                            <textarea id="p0-deck-paste" class="report-textarea"
-                                placeholder="Paste deck list here..."></textarea>
+                            <textarea id="p0-deck-paste" class="report-textarea deck-paste-input"
+                                placeholder="Paste deck list or decklog HTML here..."></textarea>
+                            <div id="p0-convert-status" class="convert-status"></div>
                         </div>
                         <div id="p0-deck-preview" class="preview-text"></div>
                     </div>
@@ -696,16 +630,17 @@
                     <div id="setup-p1-col" class="setup-column">
                         <h4 style="color: var(--accent-pink);">Player 2</h4>
                         <div class="setting-item">
-                            <label>Select Deck:</label>
+                            <label>Deck</label>
                             <select id="p1-deck-select" class="form-select highlight-hover"
                                 onchange="onDeckSelectChange(1, this.value)">
-                                <option value="paste">📋 Paste Deck List...</option>
-                                <option value="random">🎲 Random Deck</option>
+                                <option value="paste">Paste Deck List...</option>
+                                <option value="random">Random</option>
                             </select>
                         </div>
                         <div id="p1-paste-area" class="setup-paste-container" style="display:none;">
-                            <textarea id="p1-deck-paste" class="report-textarea"
-                                placeholder="Paste deck list here..."></textarea>
+                            <textarea id="p1-deck-paste" class="report-textarea deck-paste-input"
+                                placeholder="Paste deck list or decklog HTML here..."></textarea>
+                            <div id="p1-convert-status" class="convert-status"></div>
                         </div>
                         <div id="p1-deck-preview" class="preview-text"></div>
                     </div>
@@ -714,63 +649,30 @@
 
             <div class="setup-footer-actions">
                 <button class="btn btn-primary" data-action="submit-game-setup">Start Game</button>
-                <a href="deck_converter.html" target="_blank" class="btn btn-accent">Deck Converter</a>
             </div>
         </div>
     </div>
-    </div>
 
-    <!-- Room Identification Modal -->
+    <!-- Room Identification Modal / Lobby -->
     <div id="room-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content room-modal-content">
             <div class="modal-header">
-                <span class="modal-title">RabukaSim Lobby</span>
-
+                <span class="modal-title">RabukaSim</span>
+                <button class="close-btn" data-action="close-modal">×</button>
             </div>
             <div class="modal-body lobby-body">
-                <div id="room-waiting-hint" style="margin-bottom: 12px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: rgba(255,255,255,0.03); color: var(--text-muted, #aaa); font-size: 0.9rem;">
-                    Join a private room or create a new one.
-                </div>
                 <div class="lobby-actions">
-                    <button class="btn btn-primary lobby-btn" data-action="open-setup-modal" data-value="sandbox">Sandbox (vs AI)</button>
-                    <button class="btn btn-accent lobby-btn" data-action="open-setup-modal" data-value="pvp">PvP (Manual)</button>
+                    <button class="btn btn-primary lobby-btn" data-action="open-setup-modal" data-value="sandbox">Sandbox</button>
+                    <button class="btn btn-accent-green lobby-btn" data-action="create-room" style="background: #27ae60; border-color: #2ecc71;">PVP</button>
                 </div>
-
-                <div class="lobby-divider">OR</div>
-
-                <div class="lobby-join-section">
-                    <div class="setting-item">
-                        <label>Join Private Room:</label>
-                        <input type="text" id="room-code-input" class="form-input" placeholder="ABCD" maxlength="4"
-                            oninput="this.value = this.value.toUpperCase()">
+                <div class="lobby-join-section" style="margin-top: 16px;">
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="room-code-input" class="form-input" placeholder="ROOM CODE" maxlength="6"
+                            oninput="this.value = this.value.toUpperCase()" style="flex: 1;">
+                        <button class="btn btn-primary join-btn" data-action="join-room">Join</button>
                     </div>
-
-                    <div class="setting-item">
-                        <label>Select Your Deck:</label>
-                        <select id="pjoin-deck-select" class="form-select" onchange="onDeckSelectChange('join')">
-                            <option value="random">🎲 Random Deck</option>
-                            <option value="paste">📋 Paste Deck List...</option>
-                        </select>
-                    </div>
-
-                    <div id="pjoin-paste-area" class="setup-paste-container" style="display:none;">
-                        <textarea id="pjoin-deck-paste" class="report-textarea"
-                            placeholder="Paste deck list here..."></textarea>
-                    </div>
-
-                    <button class="btn btn-primary join-btn" data-action="join-room" style="width: 100%; margin-top: 10px;">Join
-                        Room</button>
                 </div>
-
-                <div class="lobby-offline">
-                    <button class="btn offline-btn" data-action="start-offline">Start Offline (WASM)</button>
-                </div>
-                <div
-                    style="margin-top: 15px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; justify-content: center;">
-                    <button class="btn" data-action="force-reset"
-                        style="font-size: 0.8rem; background: #444; color: #aaa; border: 1px solid #555;">Clear Local
-                        Data & Cache</button>
-                </div>
+                <div id="room-waiting-hint" style="margin-top: 12px; padding: 6px 10px; border-radius: 6px; color: var(--text-muted, #aaa); font-size: 0.85rem; text-align: center;"></div>
             </div>
         </div>
     </div>
@@ -855,7 +757,7 @@
 
     <script type="module">
         import { initialize } from './js/main.js';
-        initialize();
+        initialize().catch(e => console.error('Init failed:', e));
     </script>
 </body>
 

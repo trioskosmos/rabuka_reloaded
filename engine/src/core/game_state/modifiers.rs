@@ -154,12 +154,20 @@ impl GameState {
                                         } else {
                                             effect.count.unwrap_or(1) as i32
                                         };
-                                        for hc in &effect.heart_colors {
+                                        if effect.heart_type.as_deref() == Some("all") {
                                             *exp_heart
                                                 .entry(*card_id)
                                                 .or_default()
-                                                .entry(hc.clone())
+                                                .entry("heart00".to_string())
                                                 .or_insert(0) += n;
+                                        } else {
+                                            for hc in &effect.heart_colors {
+                                                *exp_heart
+                                                    .entry(*card_id)
+                                                    .or_default()
+                                                    .entry(hc.clone())
+                                                    .or_insert(0) += n;
+                                            }
                                         }
                                     }
                                     _ => {}
@@ -176,6 +184,13 @@ impl GameState {
                             Some(crate::ability::enums::ActionType::Restriction) => {
                                 if let Some(ref rt) = effect.restriction_type {
                                     exp_prohibition.push(format!("const_restriction:{}:", rt));
+                                    if rt == "cannot_activate" || rt == "cannot_activate_by_effect" {
+                                        let tgt = effect.target.as_deref().unwrap_or("self");
+                                        let resolved = self.resolve_target_player(tgt).id.clone();
+                                        if !self.cannot_activate_members.contains(&resolved) {
+                                            self.cannot_activate_members.push(resolved);
+                                        }
+                                    }
                                 }
                             }
                             Some(crate::ability::enums::ActionType::GainAbility) => {
@@ -185,17 +200,12 @@ impl GameState {
                                         .as_deref()
                                         .is_some_and(|t| t.contains("ALL"))
                                 {
-                                    let all_colors = [
-                                        "heart01", "heart02", "heart03", "heart04", "heart05",
-                                        "heart06",
-                                    ];
-                                    for hc in &all_colors {
-                                        *exp_heart
-                                            .entry(*card_id)
-                                            .or_default()
-                                            .entry(hc.to_string())
-                                            .or_insert(0) += 1i32;
-                                    }
+                                    // All-heart: store as single "all" entry (HeartColor::All)
+                                    *exp_heart
+                                        .entry(*card_id)
+                                        .or_default()
+                                        .entry("all".to_string())
+                                        .or_insert(0) += 1i32;
                                 } else if let Some(gain_text) = effect.ability_gain.as_deref() {
                                     if let Some(val) = gain_text.split('+').nth(1).and_then(|s| {
                                         s.chars()

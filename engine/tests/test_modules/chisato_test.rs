@@ -52,7 +52,9 @@ fn chisato_cost_hits_threshold_condition_passes() {
 
     game.activate_ability(chisato);
     assert!(game.has_pending_choice(), "Should have reveal choice");
-    game.try_select_indices(&[0, 1, 2, 3, 4]).unwrap();
+
+    // Sequential selection matching frontend single-select behaviour.
+    game.select_indices_sequential(&[0, 0, 0, 0, 0]);
 
     // After the ability resolves, verify cards were revealed (in hand, revealed)
     // and the condition passed (ability ran to completion)
@@ -72,6 +74,18 @@ fn chisato_cost_hits_threshold_condition_passes() {
         5,
         "Revealed cost cards should be tracked for condition evaluation"
     );
+    // Score modifier should be +1 (condition passed: 20 ∈ {10,20,30,40,50})
+    assert_eq!(
+        game.state.mods.get_score_modifier(chisato),
+        1,
+        "Score should be +1 when threshold is met"
+    );
+    // use_limit should be consumed (key: chisato_id_0_turn_number)
+    let key = format!("{}_{}_{}", chisato, 0, game.state.turn_number);
+    assert!(
+        game.state.turn_limited_abilities_used.contains(&key),
+        "use_limit should be consumed after successful activation"
+    );
 }
 
 /// Revealing cards that DON'T sum to a threshold fails the condition
@@ -90,7 +104,9 @@ fn chisato_cost_misses_threshold_condition_fails() {
 
     game.activate_ability(chisato);
     assert!(game.has_pending_choice(), "Should have reveal choice");
-    game.try_select_indices(&[0, 1]).unwrap();
+
+    // Sequential selection matching frontend single-select behaviour.
+    game.select_indices_sequential(&[0, 0]);
 
     // Cards should still be in hand (reveal doesn't discard)
     assert_eq!(
@@ -98,7 +114,19 @@ fn chisato_cost_misses_threshold_condition_fails() {
         2,
         "Revealed cards should stay in hand"
     );
-    // But condition failed, so no effect was applied
+    // Condition failed → no score modifier applied
+    assert_eq!(
+        game.state.mods.get_score_modifier(chisato),
+        0,
+        "Score should remain 0 when threshold is not met"
+    );
+    // use_limit IS consumed for 起動 abilities even when condition fails
+    // (the player paid the cost, the attempt counts toward the turn limit)
+    let key = format!("{}_{}_{}", chisato, 0, game.state.turn_number);
+    assert!(
+        game.state.turn_limited_abilities_used.contains(&key),
+        "use_limit should be consumed for 起動 even when condition fails"
+    );
     // No pending choice should remain
     assert!(
         !game.has_pending_choice(),
@@ -157,7 +185,16 @@ fn chisato_q78_ability_lost_on_leave() {
 
     game.activate_ability(chisato);
     assert!(game.has_pending_choice(), "Should have reveal choice");
-    game.try_select_indices(&[0, 1, 2, 3, 4]).unwrap();
+
+    // Sequential selection matching frontend single-select behaviour.
+    game.select_indices_sequential(&[0, 0, 0, 0, 0]);
+
+    // Verify the +1 score was applied (threshold 20 was met)
+    assert_eq!(
+        game.state.mods.get_score_modifier(chisato),
+        1,
+        "Q78: Score should be +1 before leaving stage"
+    );
 
     // Now move Chisato to waitroom (simulating leaving stage)
     game.state.player1.stage.stage[1] = -1;

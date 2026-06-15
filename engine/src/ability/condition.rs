@@ -1,5 +1,6 @@
 use super::debug::AbDebug;
 use crate::ability::enums::ConditionType;
+use crate::ability::enums::Zone;
 use crate::card::Condition;
 
 pub(crate) fn comparison_default_count(condition: &Condition) -> u32 {
@@ -93,6 +94,19 @@ impl<'a> ConditionContext<'a> {
 
 impl<'a> ConditionContext<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
+        // Handle aggregate total with heart_colors — runs before type dispatch
+        if condition.aggregate.as_deref() == Some("total")
+            && condition.heart_colors.as_ref().is_some_and(|c| !c.is_empty())
+            && Zone::from_str(condition.location.as_deref().unwrap_or("")) != Some(Zone::Stage)
+        {
+            let location = condition.location.as_deref().unwrap_or("");
+            let target = condition.target.as_deref().unwrap_or("self");
+            let player = self.resolve_condition_player(target);
+            if let Some(result) = self.check_aggregate_total(condition, player, location) {
+                return result;
+            }
+        }
+
         let mut dbg = AbDebug::new();
         let ct = condition.condition_type;
         let result = match ct {

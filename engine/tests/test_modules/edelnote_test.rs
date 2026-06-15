@@ -153,6 +153,15 @@ fn edelnote_no_members() {
     while game.has_pending_choice() {
         game.select_indices(&[0]);
     }
+    // No EdelNote members → no modifiers should be applied
+    assert!(
+        game.state.mods.blade_modifiers.is_empty(),
+        "No blade modifiers with 0 EdelNote members"
+    );
+    assert!(
+        game.state.mods.heart_modifiers.is_empty(),
+        "No heart modifiers with 0 EdelNote members"
+    );
 }
 
 /// 3 EdelNote members (2 same name, 1 different):
@@ -221,9 +230,137 @@ fn edelnote_three_members_two_same_name() {
         "Exactly 1 member gets heart06 (target_count=1)"
     );
     assert_eq!(
-        both_count, 0,
-        "No member gets both resources (distinct=card_name)"
+        got_heart[2], 0,
+        "edel3 (same name as edel1) should have 0 heart06"
     );
-    assert_eq!(got_blade[2], 0, "Third (duplicate name) gets no blades");
-    assert_eq!(got_heart[2], 0, "Third (duplicate name) gets no heart06");
+}
+
+/// 2 EdelNote members with the SAME name: blade picks 1, heart finds no
+/// different-name member → no heart06.
+#[test]
+fn edelnote_two_same_name() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let edelied = game.id("PL!HS-pb1-030-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let same1 = game.id("PL!HS-PR-022-PR");
+    let same2 = game.id("PL!HS-PR-032-PR");
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.live_card_zone.cards.push(edelied);
+    game.state.player1.stage.stage = [same1, same2, -1];
+    game.state.player1.is_first_attacker = true;
+    game.state.player2.is_first_attacker = false;
+
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    let b1 = game.state.mods.get_blade_modifier(same1);
+    let b2 = game.state.mods.get_blade_modifier(same2);
+    let h1 = game
+        .state
+        .mods
+        .get_heart_modifier(same1, rabuka_engine::card::HeartColor::Heart06);
+    let h2 = game
+        .state
+        .mods
+        .get_heart_modifier(same2, rabuka_engine::card::HeartColor::Heart06);
+
+    assert_eq!(b1 + b2, 2, "Exactly 1 member gets +2 blades (1+0 or 0+1)");
+    assert_eq!(h1, 0, "Same-name only: no heart06 (no different name)");
+    assert_eq!(h2, 0, "Same-name only: no heart06 (no different name)");
+    // One of them should have +2 blades, the other 0
+    assert!(
+        (b1 == 2 && b2 == 0) || (b1 == 0 && b2 == 2),
+        "Exactly 1 member gets +2 blades"
+    );
+}
+
+/// 3 EdelNote members (2 same, 1 different): name-based exclusion ensures
+/// the heart step only offers candidates with names DIFFERENT from the
+/// blade-selected card (i.e. the same-name 3rd member is excluded).
+#[test]
+fn edelnote_name_based_exclusion() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let edelied = game.id("PL!HS-pb1-030-L");
+    let filler = game.id("PL!-sd1-010-SD");
+    let edel1 = game.id("PL!HS-PR-022-PR");
+    let edel2 = game.id("PL!HS-PR-023-PR");
+    let edel3 = game.id("PL!HS-PR-032-PR");
+
+    game.state.player1.main_deck.cards.clear();
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    game.state.player1.live_card_zone.cards.push(edelied);
+    game.state.player1.stage.stage = [edel1, edel2, edel3];
+    game.state.player1.is_first_attacker = true;
+    game.state.player2.is_first_attacker = false;
+
+    advance_to_live_start(&mut game);
+
+    // Blade step: picks the first candidate (edel1 = セラス 柳田).
+    // Heart should only offer edel2 (桂城 泉, only different name).
+    assert!(
+        game.has_pending_choice(),
+        "3 members: should prompt to select blade target"
+    );
+    game.select_indices(&[0]);
+    while game.has_pending_choice() {
+        game.select_indices(&[0]);
+    }
+
+    // edel1 got blades, edel2 got heart, edel3 (same name) gets nothing
+    assert_eq!(
+        game.state.mods.get_blade_modifier(edel1),
+        2,
+        "edel1 (selected for blade) should have +2 blades"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(edel2),
+        0,
+        "edel2 should have 0 blades"
+    );
+    assert_eq!(
+        game.state.mods.get_blade_modifier(edel3),
+        0,
+        "edel3 should have 0 blades"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(edel1, rabuka_engine::card::HeartColor::Heart06,),
+        0,
+        "edel1 (same name as blade recipient) should have 0 heart06"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(edel2, rabuka_engine::card::HeartColor::Heart06,),
+        2,
+        "edel2 (only different name) should have +2 heart06"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(edel3, rabuka_engine::card::HeartColor::Heart06,),
+        0,
+        "edel3 (same name as edel1) should have 0 heart06"
+    );
 }
