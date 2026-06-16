@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T05:20:20.420448",
+  "generated_at": "2026-06-17T05:38:18.945706",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4374,74 +4374,69 @@
       },
       "effect": {
         "text": "カードを3枚引き、手札を2枚控え室に置く。これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、このメンバーをアクティブにする。2枚ある場合、さらにライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "action": "conditional_on_result",
-        "activation_position": "left_side",
-        "primary_effect": {
-          "text": "カードを3枚引き、手札を2枚控え室に置く",
-          "action": "sequential",
-          "actions": [
-            {
-              "text": "カードを3枚引き",
-              "count": 3,
-              "action": "draw_card",
-              "source": "deck",
-              "destination": "hand",
-              "activation_position": "left_side"
-            },
-            {
-              "text": "手札を2枚控え室に置く",
-              "source": "hand",
-              "destination": "discard",
-              "count": 2,
-              "action": "move_cards",
-              "card_type": "card",
-              "activation_position": "left_side"
-            }
-          ],
-          "activation_position": "left_side"
-        },
-        "result_condition": {
-          "type": "card_count_condition",
-          "count": 1,
-          "operator": ">=",
-          "text": "これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合",
-          "negation": true,
-          "card_type": "member_card",
-          "source": "preceding_moved",
-          "card_property": "has_blade_heart"
-        },
-        "followup_action": {
-          "text": "このメンバーをアクティブにする。2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-          "action": "sequential",
-          "actions": [
-            {
-              "text": "このメンバーをアクティブにする",
-              "state_change": "active",
-              "card_type": "member_card",
-              "action": "change_state",
-              "count": 1,
-              "activation_position": "left_side"
-            },
-            {
-              "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-              "condition": {
-                "type": "card_count_condition",
-                "count": 2,
-                "operator": "=",
-                "text": "2枚ある場合",
-                "source": "preceding_moved",
-                "card_type": "member_card",
-                "negation": true
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "カードを3枚引き、手札を2枚控え室に置く",
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "カードを3枚引き",
+                "count": 3,
+                "action": "draw_card",
+                "source": "deck",
+                "destination": "hand",
+                "activation_position": "left_side"
               },
-              "action": "gain_resource",
-              "resource": "blade",
+              {
+                "text": "手札を2枚控え室に置く",
+                "source": "hand",
+                "destination": "discard",
+                "count": 2,
+                "action": "move_cards",
+                "card_type": "card",
+                "activation_position": "left_side"
+              }
+            ],
+            "activation_position": "left_side"
+          },
+          {
+            "text": "これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、このメンバーをアクティブにする",
+            "condition": {
+              "type": "card_count_condition",
+              "count": 1,
+              "operator": ">=",
+              "text": "これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合",
+              "negation": true,
+              "card_type": "member_card",
+              "source": "preceding_moved",
+              "card_property": "has_blade_heart"
+            },
+            "state_change": "active",
+            "card_type": "member_card",
+            "action": "change_state",
+            "count": 1,
+            "activation_position": "left_side"
+          },
+          {
+            "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+            "condition": {
+              "type": "card_count_condition",
               "count": 2,
-              "duration": "live_end",
-              "activation_position": "left_side"
-            }
-          ],
-          "activation_position": "left_side"
-        }
+              "operator": "=",
+              "text": "2枚ある場合",
+              "source": "preceding_moved",
+              "card_type": "member_card",
+              "negation": true
+            },
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 2,
+            "duration": "live_end",
+            "activation_position": "left_side"
+          }
+        ],
+        "activation_position": "left_side"
       }
     },
     {
@@ -6112,29 +6107,31 @@
       },
       "effect": {
         "text": "{{icon_blade.png|ブレード}}を得る。これによりライブカードを控え室に置いた場合、さらにカードを1枚引く",
-        "action": "conditional_on_result",
-        "duration": "live_end",
-        "primary_effect": {
-          "text": "{{icon_blade.png|ブレード}}を得る",
-          "action": "gain_resource",
-          "resource": "blade",
-          "count": 1,
-          "duration": "live_end"
-        },
-        "result_condition": {
-          "text": "これによりライブカードを控え室に置いた場合",
-          "card_type": "live_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved"
-        },
-        "followup_action": {
-          "text": "カードを1枚引く",
-          "count": 1,
-          "action": "draw_card",
-          "source": "deck",
-          "destination": "hand",
-          "duration": "live_end"
-        }
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{icon_blade.png|ブレード}}を得る",
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "duration": "live_end"
+          },
+          {
+            "text": "これによりライブカードを控え室に置いた場合、カードを1枚引く",
+            "condition": {
+              "text": "これによりライブカードを控え室に置いた場合",
+              "location": "discard",
+              "card_type": "live_card",
+              "type": "location_condition"
+            },
+            "count": 1,
+            "action": "draw_card",
+            "source": "deck",
+            "destination": "hand",
+            "duration": "live_end"
+          }
+        ],
+        "duration": "live_end"
       }
     },
     {
@@ -7520,62 +7517,52 @@
       "cost": null,
       "effect": {
         "text": "自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。自分はこの手順をさらに4回まで繰り返してもよい",
-        "action": "conditional_on_result",
-        "primary_effect": {
-          "text": "自分のデッキの一番上のカードを控え室に置いてもよい",
-          "action": "sequential",
-          "actions": [
-            {
-              "text": "自分のデッキの一番上のカードを控え室に置いてもよい",
-              "source": "deck_top",
-              "count": 1,
-              "destination": "discard",
-              "target": "self",
-              "optional": true,
-              "action": "move_cards",
-              "card_type": "card"
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "自分のデッキの一番上のカードを控え室に置いてもよい",
+            "source": "deck_top",
+            "count": 1,
+            "destination": "discard",
+            "target": "self",
+            "optional": true,
+            "action": "move_cards",
+            "card_type": "card"
+          },
+          {
+            "text": "そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
+            "action": "sequential",
+            "actions": [
+              {
+                "text": "{{icon_blade.png|ブレード}}を得る",
+                "duration": "live_end",
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": 1
+              }
+            ],
+            "conditional": true
+          },
+          {
+            "text": "これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする",
+            "condition": {
+              "text": "これにより控え室に置いたカードがライブカードの場合",
+              "card_type": "live_card",
+              "type": "card_count_condition",
+              "source": "preceding_moved"
             },
-            {
-              "text": "そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
-              "action": "sequential",
-              "actions": [
-                {
-                  "text": "{{icon_blade.png|ブレード}}を得る",
-                  "duration": "live_end",
-                  "action": "gain_resource",
-                  "resource": "blade",
-                  "count": 1
-                }
-              ],
-              "conditional": true
-            }
-          ]
-        },
-        "result_condition": {
-          "text": "これにより控え室に置いたカードがライブカードの場合",
-          "card_type": "live_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved"
-        },
-        "followup_action": {
-          "text": "このメンバーをウェイトにする。自分はこの手順を4回まで繰り返してもよい",
-          "action": "sequential",
-          "actions": [
-            {
-              "text": "このメンバーをウェイトにする",
-              "state_change": "wait",
-              "card_type": "member_card",
-              "action": "change_state",
-              "count": 1
-            },
-            {
-              "text": "自分はこの手順を4回まで繰り返してもよい",
-              "optional": true,
-              "action": "repeat_procedure",
-              "max_repeats": 4
-            }
-          ]
-        }
+            "state_change": "wait",
+            "card_type": "member_card",
+            "action": "change_state",
+            "count": 1
+          },
+          {
+            "text": "自分はこの手順を4回まで繰り返してもよい",
+            "optional": true,
+            "action": "repeat_procedure",
+            "max_repeats": 4
+          }
+        ]
       }
     },
     {
@@ -13873,7 +13860,8 @@
             "heart05",
             "heart06"
           ],
-          "count": 1
+          "count": 1,
+          "location": "live_card_zone"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -16709,28 +16697,30 @@
       },
       "effect": {
         "text": "{{icon_blade.png|ブレード}}を得る。これにより「百生吟子」のメンバーカードを控え室に置いた場合、さらに{{icon_blade.png|ブレード}}を得る",
-        "action": "conditional_on_result",
-        "duration": "live_end",
-        "primary_effect": {
-          "text": "{{icon_blade.png|ブレード}}を得る",
-          "action": "gain_resource",
-          "resource": "blade",
-          "count": 1,
-          "duration": "live_end"
-        },
-        "result_condition": {
-          "text": "これにより「百生吟子」のメンバーカードを控え室に置いた場合",
-          "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved"
-        },
-        "followup_action": {
-          "text": "{{icon_blade.png|ブレード}}を得る",
-          "action": "gain_resource",
-          "resource": "blade",
-          "count": 1,
-          "duration": "live_end"
-        }
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{icon_blade.png|ブレード}}を得る",
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "duration": "live_end"
+          },
+          {
+            "text": "これにより「百生吟子」のメンバーカードを控え室に置いた場合、{{icon_blade.png|ブレード}}を得る",
+            "condition": {
+              "text": "これにより「百生吟子」のメンバーカードを控え室に置いた場合",
+              "location": "discard",
+              "card_type": "member_card",
+              "type": "location_condition"
+            },
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "duration": "live_end"
+          }
+        ],
+        "duration": "live_end"
       }
     },
     {
@@ -20437,8 +20427,7 @@
                 "type": "opponent_live_success",
                 "no_excess_heart": true
               },
-              "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
-              "location": "stage"
+              "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合"
             }
           ],
           "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_05.png|heart05}}が合計4個以上あり、このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
@@ -21267,8 +21256,7 @@
               "operator": ">=",
               "temporal": "this_turn",
               "temporal_scope": "this_turn",
-              "type": "comparison_condition",
-              "location": "stage"
+              "type": "comparison_condition"
             },
             {
               "text": "自分のステージに『虹ヶ咲』のメンバーがいる場合",
@@ -24929,19 +24917,13 @@
             "action": "sequential",
             "actions": [
               {
-                "text": "このターン中にエリアを移動しているすべてのメンバーは",
-                "card_type": "member_card",
-                "action": "position_change",
-                "all": true,
-                "duration": "live_end"
-              },
-              {
                 "text": "選んだハートを1つ得る",
                 "count": 1,
                 "action": "gain_resource",
                 "resource": "heart",
                 "duration": "live_end",
-                "all": true
+                "all": true,
+                "timing_condition": "moved_this_turn"
               }
             ],
             "duration": "live_end",
@@ -28165,7 +28147,6 @@
       "effect": {
         "text": "相手は余剰ハートをすべて失う。これにより相手が余剰ハートを2つ以上失っている場合、このカードのスコアを+1する",
         "action": "sequential",
-        "duration": "live_end",
         "actions": [
           {
             "text": "相手は余剰ハートをすべて失う。",
@@ -28178,14 +28159,22 @@
             "duration": "live_end"
           },
           {
-            "text": "このカードのスコアを+1する",
+            "text": "これにより相手が余剰ハートを2つ以上失っている場合、このカードのスコアを+1する",
+            "condition": {
+              "text": "これにより相手が余剰ハートを2つ以上失っている場合",
+              "resource_type": "surplus_heart",
+              "count": 2,
+              "operator": ">=",
+              "type": "comparison_condition"
+            },
             "action": "modify_score",
             "value": 1,
             "operation": "add",
             "self_target": true,
             "duration": "live_end"
           }
-        ]
+        ],
+        "duration": "live_end"
       }
     },
     {

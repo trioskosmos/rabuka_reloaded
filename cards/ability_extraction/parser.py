@@ -7174,7 +7174,51 @@ def _normalize_effect_tree(effect, original_text=None):
 
         return d
 
-    return _walk(effect, original_text)
+    effect = _walk(effect, original_text)
+
+    # Collapse position_change + gain_resource into gain_resource with timing_condition
+    def _collapse_position_changes(node, parent=None):
+        if isinstance(node, dict):
+            if node.get("action") == "sequential":
+                acts = node.get("actions", [])
+                collapsed = []
+                skip_next = False
+                for i, act in enumerate(acts):
+                    if skip_next:
+                        skip_next = False
+                        continue
+                    if isinstance(act, dict) and act.get("action") == "position_change":
+                        # Look ahead for a matching gain_resource
+                        if (
+                            i + 1 < len(acts)
+                            and isinstance(acts[i + 1], dict)
+                            and acts[i + 1].get("action") == "gain_resource"
+                        ):
+                            gr = dict(acts[i + 1])
+                            gr["timing_condition"] = "moved_this_turn"
+                            collapsed.append(gr)
+                            skip_next = True
+                            continue
+                    # After collapsing position_change+gain_resource, if the nested
+                    # sequential has only actions left, flatten into parent
+                    if isinstance(act, dict) and act.get("action") == "sequential":
+                        sub_acts = act.get("actions", [])
+                        # Check if this sequential was produced by position_change collapse
+                        # by looking for timing_condition on the first sub-action
+                        if len(sub_acts) == 1 and sub_acts[0].get("timing_condition"):
+                            collapsed.append(sub_acts[0])
+                            continue
+                    collapsed.append(act)
+                node["actions"] = collapsed
+            for v in node.values():
+                _collapse_position_changes(v)
+        elif isinstance(node, list):
+            for item in node:
+                _collapse_position_changes(item)
+        return node
+
+    effect = _collapse_position_changes(effect)
+    return effect
 
 
 def _strip_parenthetical(text):
@@ -7652,19 +7696,48 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if pe["text"].endswith("。"):
                 pe["text"] = pe["text"].rstrip("。")
 
-        # ---- A1: Structural transforms (keep) ----
+            # ---- A1: Structural transforms (keep) ----
 
-        # C: conditional_on_result — N-action sequential with これにより condition
-        if eff.get("action") == "sequential" and "これにより" in t:
-            acts = eff.get("actions", [])
+            # C: conditional_on_result — N-action sequential with これにより condition
+            # Also handles simple これにより resource conditions (keeps sequential, just attaches condition)
+            if eff.get("action") == "sequential" and "これにより" in t:
+                acts = eff.get("actions", [])
             result_idx = -1
             for i, act in enumerate(acts):
                 if isinstance(act, dict):
                     c1 = act.get("condition")
-                    if isinstance(c1, dict) and "これにより" in (
-                        c1.get("text", "") or ""
-                    ):
+                    cond_text = c1.get("text", "") if isinstance(c1, dict) else ""
+                    if "これにより" in cond_text:
                         result_idx = i
+                        break
+                    # Also check the action's own text for これにより+場合 pattern
+                    act_text = act.get("text", "") or ""
+                    m = re.match(r"^(これにより.+?場合)[、，]?\s*", act_text)
+                    if m:
+                        result_idx = i
+                        break
+            # If no action has a parsed これにより condition, extract from action texts
+            if result_idx < 0:
+                for i, act in enumerate(acts):
+                    if not isinstance(act, dict):
+                        continue
+                    act_text = act.get("text", "") or ""
+                    m = re.match(r"^(これにより.+?場合)[、，]?\s*(.*)$", act_text)
+                    if m:
+                        cond_text = m.group(1)
+                        action_text = m.group(2)
+                        cond_dict = {"text": cond_text, "type": "comparison_condition"}
+                        count_m = re.search(r"(\d+)", cond_text)
+                        if count_m:
+                            cond_dict["count"] = int(count_m.group(1))
+                        cond_dict["operator"] = ">="
+                        if "余剰ハート" in cond_text:
+                            cond_dict["resource_type"] = "surplus_heart"
+                        # For simple resource conditions, keep sequential structure
+                        # and just attach the condition (don't convert to conditional_on_result)
+                        if cond_dict.get("resource_type"):
+                            act["condition"] = cond_dict
+                            act["text"] = action_text
                         break
             if 0 < result_idx < len(acts):
                 primary_acts = acts[:result_idx]
@@ -7698,6 +7771,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         result_cond["count"] = 1
                 if "source" not in result_cond:
                     result_cond["source"] = "preceding_moved"
+                _cp = result_cond.get("card_property")
                 followup_acts = []
                 first_fa = dict(result_act)
                 full_text_r = first_fa.get("text", "")
@@ -7726,6 +7800,21 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         "action": "sequential",
                         "actions": followup_acts,
                     }
+                # Propagate card_property from result_cond to subsequent conditions
+                # that are continuations of the same preceding_moved check
+                if _cp:
+                    _seen_first = False
+                    for _fa in followup_acts:
+                        _fc = _fa.get("condition", {})
+                        if (
+                            isinstance(_fc, dict)
+                            and _fc.get("source") == "preceding_moved"
+                        ):
+                            if not _seen_first:
+                                _seen_first = True
+                            elif "card_property" not in _fc:
+                                _fc["card_property"] = _cp
+
                 if eff.get("activation_position") and not followup.get(
                     "activation_position"
                 ):
@@ -7849,11 +7938,20 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if action in (
                 "gain_resource",
                 "change_state",
-                "draw_card",
                 "move_cards",
                 "select",
             ):
                 if not node.get("duration") and ctx.get("duration"):
+                    node["duration"] = ctx["duration"]
+            # draw_card: only inherit duration if context has it and action type
+            # is not a setup step (drawing itself is instantaneous)
+            if (
+                action == "draw_card"
+                and not node.get("duration")
+                and ctx.get("duration")
+            ):
+                act_text = node.get("text", "") or ""
+                if "得る" in act_text or "を得る" in act_text or "得られる" in act_text:
                     node["duration"] = ctx["duration"]
                 if not node.get("target") and ctx.get("target"):
                     node["target"] = ctx["target"]
@@ -7894,24 +7992,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 for sub in node["conditions"]:
                     if isinstance(sub, dict):
                         if new_ctx.get("location") and not sub.get("location"):
-                            sub["location"] = new_ctx["location"]
+                            if not sub.get("temporal") and not sub.get("resource_type"):
+                                sub["location"] = new_ctx["location"]
                         _propagate_context(sub, new_ctx)
-
-            # Fallback: infer duration for sequential sub-actions from ability text
-            # when the parser lost duration during sequential creation.
-            if (
-                action == "sequential"
-                and not new_ctx.get("duration")
-                and t
-                and any(
-                    isinstance(act, dict)
-                    and act.get("action")
-                    in ("gain_resource", "move_cards", "change_state", "modify_score")
-                    for act in node.get("actions", [])
-                )
-            ):
-                if "ライブ終了時まで" in t:
-                    new_ctx["duration"] = "live_end"
 
             for ck in (
                 "condition",
@@ -7967,17 +8050,16 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 if nc.get("ability_filter") and not nc.get("card_type"):
                     nc["card_type"] = "member_card"
 
-            # temporal_condition location — for aggregate conditions
+            # temporal_condition location — for aggregate conditions about live card
+            # required hearts (all 6 heart colors, not per-color totals)
             nc = node.get("condition")
             if isinstance(nc, dict) and nc.get("type") == "temporal_condition":
                 ct = nc.get("text", "") or ""
                 if nc.get("aggregate") == "total" and "必要ハート" in ct:
-                    if (
-                        "成功" not in ct
-                        and not nc.get("location")
-                        and not nc.get("temporal")
-                    ):
-                        nc["location"] = "live_card_zone"
+                    if "成功" not in ct and not nc.get("location"):
+                        hc = nc.get("heart_colors") or []
+                        if len(hc) >= 6 or "{{icon_all.png" in ct:
+                            nc["location"] = "live_card_zone"
 
         _propagate_context(eff)
 
