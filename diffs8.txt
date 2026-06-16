@@ -1,0 +1,83 @@
+=== #1 ===
+TEXT: {{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{heart_06.png|heart06}}のうち、1つを選ぶ。ライブ終了時まで、自分のステージにいる、このターン中にエリアを移動しているすべてのメンバーは、選んだハートを1つ得る。
+
+  .actions[1].card_type: gen=_MISSING_ ref=member_card
+  .actions[1].target: gen=_MISSING_ ref=self
+
+=== #2 ===
+TEXT: {{leftside.png|左サイド}}このメンバーをウェイトにする：カードを3枚引き、手札を2枚控え室に置く。これにより控え室に置いたカードの中にブレードハートを持たないメンバーカードが1枚以上ある場合、このメンバーをアクティブにする。2枚ある場合、さらにライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+
+  .followup_action.actions[1].condition.card_property: gen=_MISSING_ ref=has_blade_heart
+
+=== #3 ===
+TEXT: ライブ終了時まで、相手は余剰ハートをすべて失う。これにより相手が余剰ハートを2つ以上失っている場合、このカードのスコアを＋１する。
+
+  .actions[1].condition: gen=_MISSING_ ref={'resource_type': 'surplus_heart', 'count': 2, 'op
+
+=== #4 ===
+TEXT: ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。
+
+  .actions[0].action: gen=gain_resource ref=sequential
+  .actions[0].actions: gen=_MISSING_ ref=[{'action': 'gain_resource', 'resource': 'blade', 
+  .actions[0].card_type: gen=member_card ref=_MISSING_
+  .actions[0].characters: gen=['澁谷かのん'] ref=_MISSING_
+  .actions[0].count: gen=1 ref=_MISSING_
+  .actions[0].resource: gen=blade ref=_MISSING_
+  .actions[0].target: gen=self ref=_MISSING_
+  .actions[1].action: gen=gain_resource ref=sequential
+  .actions[1].actions: gen=_MISSING_ ref=[{'action': 'gain_resource', 'resource': 'blade', 
+  .actions[1].card_type: gen=member_card ref=_MISSING_
+  .actions[1].characters: gen=['澁谷かのん'] ref=_MISSING_
+  .actions[1].count: gen=1 ref=_MISSING_
+  .actions[1].heart_color: gen=heart05 ref=_MISSING_
+  .actions[1].heart_colors: gen=['heart05', 'heart01'] ref=_MISSING_
+  .actions[1].resource: gen=heart ref=_MISSING_
+  .actions[1].target: gen=self ref=_MISSING_
+  .actions[2]: gen={'action': 'gain_resource', 'resource': 'blade', ' ref=_MISSING_
+  .actions[3]: gen={'action': 'gain_resource', 'resource': 'heart', ' ref=_MISSING_
+
+=== #5 ===
+TEXT: 手札を1枚控え室に置いてもよい：ライブ終了時まで、このメンバーのコストを＋６する。その後、自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、さらにライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る。
+
+  .actions[1].actions[0].action: gen=gain_resource ref=sequential
+  .actions[1].actions[0].actions: gen=_MISSING_ ref=[{'action': 'gain_resource', 'resource': 'blade', 
+  .actions[1].actions[0].condition: gen=_MISSING_ ref={'target': 'both', 'location': 'stage', 'card_type
+  .actions[1].actions[0].count: gen=1 ref=_MISSING_
+  .actions[1].actions[0].group_names: gen=_MISSING_ ref=['蓮ノ空']
+  .actions[1].actions[0].resource: gen=blade ref=_MISSING_
+  .actions[1].actions[1]: gen={'action': 'gain_resource', 'resource': 'heart', ' ref=_MISSING_
+  .actions[1].condition: gen={'target': 'both', 'location': 'stage', 'card_type ref=_MISSING_
+
+=== #6 ===
+TEXT: 手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『SunnyPassion』のメンバーカードかブレードハートを持つ『Liella!』のメンバーカードを1枚公開して手札に加えてもよい。残りを控え室に置く。
+
+  .optional: gen=True ref=_MISSING_
+
+=== #7 ===
+TEXT: 自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く。これにより自分と相手のカードが合計20枚以上デッキの下に置かれた場合、自分の控え室からライブカードを1枚手札に加え、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。
+
+  .followup_action.action: gen=move_cards ref=sequential
+  .followup_action.actions: gen=_MISSING_ ref=[{'source': 'discard', 'count': 1, 'card_type': 'l
+  .followup_action.card_type: gen=live_card ref=_MISSING_
+  .followup_action.count: gen=1 ref=_MISSING_
+  .followup_action.destination: gen=hand ref=_MISSING_
+  .followup_action.duration: gen=live_end ref=_MISSING_
+  .followup_action.source: gen=discard ref=_MISSING_
+  .followup_action.target: gen=self ref=_MISSING_
+  .primary_effect.action: gen=move_cards ref=sequential
+  .primary_effect.actions: gen=_MISSING_ ref=[{'source': 'discard', 'card_type': 'member_card',
+  .primary_effect.card_type: gen=member_card ref=_MISSING_
+  .primary_effect.destination: gen=deck_bottom ref=_MISSING_
+  .primary_effect.multiple_targets: gen=True ref=_MISSING_
+  .primary_effect.source: gen=discard ref=_MISSING_
+  .primary_effect.target: gen=deck ref=_MISSING_
+
+=== #8 ===
+TEXT: 自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。自分はこの手順をさらに4回まで繰り返してもよい。
+
+  .action: gen=conditional_on_result ref=sequential
+  .actions: gen=_MISSING_ ref=[{'action': 'conditional_on_result', 'primary_effe
+  .followup_action: gen={'action': 'sequential', 'actions': [{'state_chang ref=_MISSING_
+  .primary_effect: gen={'action': 'sequential', 'actions': [{'source': 'd ref=_MISSING_
+  .result_condition: gen={'card_type': 'live_card', 'type': 'card_count_con ref=_MISSING_
+

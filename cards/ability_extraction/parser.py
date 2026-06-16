@@ -4694,8 +4694,101 @@ def _enrich_from_text(d, text):
         if "以下" in text and "cost_limit_operator" not in d:
             d["cost_limit_operator"] = "<="
 
+    # Extract ability filters (e.g. "{{live_start.png|ライブ開始時}}能力を持たない")
+    if "能力を持たない" in text or "能力も持たない" in text:
+        trig_match = re.search(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力", text)
+        if trig_match:
+            d["ability_filter"] = "no_ability_type"
+            d["ability_filter_triggers"] = [trig_match.group(2)]
+        elif "能力も" in text:
+            d["ability_filter"] = "no_ability_type"
+            triggers = re.findall(r"\{\{([^}]+?)\.png\|([^}]+?)\}\}能力も", text)
+            if triggers:
+                d["ability_filter_triggers"] = [t[1] for t in triggers]
+        else:
+            d["ability_filter"] = "no_ability"
+
+
+def _apply_or_select_criteria(result, select_text):
+    m = re.search(
+        r"([^か。：\n]+)か([^か。：\n]+)(?=を(?:1枚|\d+枚|好きな枚数|すべて|公開|手札|デッキ|控え室|戻す))",
+        select_text,
+    )
+    if not m:
+        return
+    part1, part2 = m.group(1).strip(), m.group(2).strip()
+
+    # Clean up part1 and part2 (remove leading context fragments)
+    for prefix in (
+        "その中から",
+        "自分のステージにいる",
+        "自分の手札にある",
+        "控え室にある",
+    ):
+        if part1.startswith(prefix):
+            part1 = part1[len(prefix) :].strip()
+
+    parts = [part1, part2]
+    parsed_parts = []
+    has_ability_filter = False
+
+    for p in parts:
+        p_dict = {}
+        gns = extract_group_names(p)
+        if gns:
+            p_dict["group_names"] = gns
+        ct = extract_card_type(p)
+        if ct:
+            p_dict["card_type"] = ct
+        if "ブレードハートを持つ" in p:
+            p_dict["card_property"] = "has_blade_heart"
+        elif "ブレードハートを持たない" in p:
+            p_dict["card_property"] = "has_blade_heart"
+            p_dict["negation"] = True
+
+        if "能力を持たない" in p or "能力も持たない" in p:
+            p_dict["ability_filter"] = "no_ability"
+            has_ability_filter = True
+        elif "能力を持つ" in p:
+            p_dict["ability_filter"] = "has_ability_type"
+            has_ability_filter = True
+            trig_list = re.findall(r"【([^】]+)】", p)
+            if not trig_list:
+                trig_list = re.findall(r"\{\{[^|]+\|([^}]+)\}\}", p)
+            if trig_list:
+                p_dict["ability_filter_triggers"] = trig_list
+
+        parsed_parts.append(p_dict)
+
+    if has_ability_filter:
+        or_filters = []
+        for p_dict in parsed_parts:
+            f = {}
+            if "ability_filter" in p_dict:
+                f["ability_filter"] = p_dict["ability_filter"]
+            if "ability_filter_triggers" in p_dict:
+                f["ability_filter_triggers"] = p_dict["ability_filter_triggers"]
+            or_filters.append(f)
+        result["or_ability_filters"] = or_filters
+    else:
+        # Only add options when parts have meaningful discriminating criteria
+        # (group_names or card_property). Differences only in card_type are already
+        # captured in or_card_types and don't need a separate options list.
+        meaningful = any(
+            "group_names" in p or "card_property" in p for p in parsed_parts
+        )
+        if meaningful:
+            result["options"] = parsed_parts
+
 
 def _build_look_select_actions(select_text):
+    res = _build_look_select_actions_inner(select_text)
+    if isinstance(res, dict):
+        _apply_or_select_criteria(res, select_text)
+    return res
+
+
+def _build_look_select_actions_inner(select_text):
     """Build the select_action for その中から patterns."""
     result = {"action": "select_cards", "discard_remaining": True}
 
@@ -4814,6 +4907,8 @@ def _try_look_and_select(text):
                             "source": cond_location,
                             "target": "self",
                         }
+                        if cond_location == "live_card_zone":
+                            result["look_action"]["all"] = True
         if "look_action" not in result and at:
             look_text = at
             la = parse_action(look_text)
@@ -4826,11 +4921,15 @@ def _try_look_and_select(text):
         # "...戻す。N以上の場合、さらに..."  — the conditional after the period
         # becomes a separate followup action (not part of the select filter).
         cond_followup = None
-        cond_split = re.search(r"[。](?:\s*)(\d+以上の場合、)", select_text)
+        cond_split = re.search(
+            r"[。](?:\s*)(?:(\d+以上の場合、)|(そうした場合、))", select_text
+        )
         if cond_split:
             cond_start = cond_split.start()
             cond_followup = select_text[cond_start + 1 :].strip()  # skip period
             select_text = select_text[:cond_start].strip()
+            if cond_followup.startswith("そうした場合、"):
+                cond_followup = cond_followup[len("そうした場合、") :].strip()
         # Split on その後 — the clause after その後 becomes a followup action
         # executed after the look_and_select completes.
         sonogo_parts = re.split(r"[。、]?\s*その後[、。]?\s*", select_text, maxsplit=1)
@@ -7198,6 +7297,9 @@ def _normalize_effect_tree(effect, original_text=None):
                         ):
                             gr = dict(acts[i + 1])
                             gr["timing_condition"] = "moved_this_turn"
+                            for f in ("card_type", "target", "all"):
+                                if act.get(f) and not gr.get(f):
+                                    gr[f] = act[f]
                             collapsed.append(gr)
                             skip_next = True
                             continue
@@ -7205,7 +7307,7 @@ def _normalize_effect_tree(effect, original_text=None):
                         sub_acts = act.get("actions", [])
                         if len(sub_acts) == 1:
                             item = dict(sub_acts[0])
-                            for f in ("duration", "all"):
+                            for f in ("duration", "all", "card_type", "target"):
                                 if act.get(f) and not item.get(f):
                                     item[f] = act[f]
                             collapsed.append(item)
@@ -7737,95 +7839,98 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                             act["condition"] = cond_dict
                             act["text"] = action_text
                         break
-                if result_idx >= 0:
-                    if result_idx > 0:
-                        primary_acts = acts[:result_idx]
-                        if len(primary_acts) == 1:
-                            primary = dict(primary_acts[0])
-                            if "text" not in primary:
-                                primary["text"] = primary_acts[0].get("text", t)
-                        else:
-                            primary = {
-                                "text": primary_acts[0].get("text", t),
-                                "action": "sequential",
-                                "actions": [dict(a) for a in primary_acts],
-                            }
+            if result_idx >= 0:
+                if result_idx > 0:
+                    primary_acts = acts[:result_idx]
+                    if len(primary_acts) == 1:
+                        primary = dict(primary_acts[0])
+                        if "text" not in primary:
+                            primary["text"] = primary_acts[0].get("text", t)
                     else:
-                        # result_idx == 0 — no primary actions
-                        primary = {"action": "do_nothing"}
-                    result_act = acts[result_idx]
-                    c1 = result_act.get("condition", {})
-                    result_cond = dict(c1)
-                    if c1.get("type") == "location_condition":
-                        result_cond["type"] = "card_count_condition"
-                        result_cond.pop("locations", None)
-                        result_cond["source"] = "preceding_moved"
-                    result_cond.pop("location", None)
-                    rct = result_cond.get("text", "")
-                    if (
-                        "ブレードハートを持たない" in rct
-                        or "ブレードハートがない" in rct
-                    ):
-                        result_cond["card_property"] = "has_blade_heart"
-                    if re.search(r"\d+枚以上", rct) or re.search(r"以上", rct):
-                        if "operator" not in result_cond:
-                            result_cond["operator"] = ">="
-                        if "count" not in result_cond:
-                            result_cond["count"] = 1
-                    if "source" not in result_cond:
-                        result_cond["source"] = "preceding_moved"
-                    _cp = result_cond.get("card_property")
-                    followup_acts = []
-                    first_fa = dict(result_act)
-                    full_text_r = first_fa.get("text", "")
-                    rct2 = rct
-                    if rct2 and full_text_r.startswith(rct2):
-                        action_text = full_text_r[len(rct2) :].lstrip("、").lstrip("。")
-                        first_fa["text"] = action_text
-                    first_fa.pop("condition", None)
-                    followup_acts.append(first_fa)
-                    remaining = acts[result_idx + 1 :]
-                    if remaining:
-                        for rem in remaining:
-                            followup_acts.append(dict(rem))
-                    if len(followup_acts) == 1:
-                        followup = followup_acts[0]
-                    else:
-                        combined_text = followup_acts[0].get("text", "")
-                        for fa in followup_acts[1:]:
-                            ft = fa.get("text", "")
-                            if ft:
-                                combined_text = (
-                                    (combined_text.rstrip("。").rstrip("、"))
-                                    + "。"
-                                    + ft
-                                )
-                        followup = {
-                            "text": combined_text,
+                        primary = {
+                            "text": primary_acts[0].get("text", t),
                             "action": "sequential",
-                            "actions": followup_acts,
+                            "actions": [dict(a) for a in primary_acts],
                         }
+                else:
+                    # result_idx == 0 — no primary actions
+                    primary = {"action": "do_nothing"}
+                result_act = acts[result_idx]
+                c1 = result_act.get("condition", {})
+                result_cond = dict(c1)
+                if c1.get("type") == "location_condition":
+                    result_cond["type"] = "card_count_condition"
+                    result_cond.pop("locations", None)
+                    result_cond["source"] = "preceding_moved"
+                result_cond.pop("location", None)
+                rct = result_cond.get("text", "")
+                if "ブレードハートを持たない" in rct or "ブレードハートがない" in rct:
+                    result_cond["card_property"] = "has_blade_heart"
+                if re.search(r"\d+枚以上", rct) or re.search(r"以上", rct):
+                    if "operator" not in result_cond:
+                        result_cond["operator"] = ">="
+                    if "count" not in result_cond:
+                        result_cond["count"] = 1
+                if "source" not in result_cond:
+                    result_cond["source"] = "preceding_moved"
+                _cp = result_cond.get("card_property")
+                followup_acts = []
+                first_fa = dict(result_act)
+                full_text_r = first_fa.get("text", "")
+                rct2 = rct
+                if rct2 and full_text_r.startswith(rct2):
+                    action_text = full_text_r[len(rct2) :].lstrip("、").lstrip("。")
+                    idx = t.find(rct2)
+                    if idx >= 0 and t[idx + len(rct2) :].lstrip("、，").startswith(
+                        "さらに"
+                    ):
+                        if not action_text.startswith("さらに"):
+                            action_text = "さらに" + action_text
+                    first_fa["text"] = action_text
+                first_fa.pop("condition", None)
+                followup_acts.append(first_fa)
+                remaining = acts[result_idx + 1 :]
+                if remaining:
+                    for rem in remaining:
+                        followup_acts.append(dict(rem))
+                if len(followup_acts) == 1:
+                    followup = followup_acts[0]
+                else:
+                    combined_text = followup_acts[0].get("text", "")
+                    for fa in followup_acts[1:]:
+                        ft = fa.get("text", "")
+                        if ft:
+                            combined_text = (
+                                (combined_text.rstrip("。").rstrip("、")) + "。" + ft
+                            )
+                    followup = {
+                        "text": combined_text,
+                        "action": "sequential",
+                        "actions": followup_acts,
+                    }
                     if _cp:
                         _seen_first = False
                         for _fa in followup_acts:
                             _fc = _fa.get("condition", {})
-                            if (
-                                isinstance(_fc, dict)
-                                and _fc.get("source") == "preceding_moved"
+                            # source: preceding_moved is set by _propagate_context (post-Section-C)
+                            # so we use negation+card_type as proxy for a preceding_moved condition
+                            if isinstance(_fc, dict) and (
+                                _fc.get("source") == "preceding_moved"
+                                or _fc.get("negation") is not None
                             ):
                                 if not _seen_first:
                                     _seen_first = True
                                 elif "card_property" not in _fc:
                                     _fc["card_property"] = _cp
-                    if eff.get("activation_position") and not followup.get(
-                        "activation_position"
-                    ):
-                        followup["activation_position"] = eff["activation_position"]
-                    eff["action"] = "conditional_on_result"
-                    eff["primary_effect"] = primary
-                    eff["result_condition"] = result_cond
-                    eff["followup_action"] = followup
-                    eff.pop("actions", None)
+                if eff.get("activation_position") and not followup.get(
+                    "activation_position"
+                ):
+                    followup["activation_position"] = eff["activation_position"]
+                eff["action"] = "conditional_on_result"
+                eff["primary_effect"] = primary
+                eff["result_condition"] = result_cond
+                eff["followup_action"] = followup
+                eff.pop("actions", None)
 
         # D1: Remove optional_action from each_time with appearance trigger
         if (
