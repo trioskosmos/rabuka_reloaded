@@ -4308,16 +4308,16 @@ def _try_character_specific(text):
                 }
             )
     if effects:
-        # Expand character effects into individual gain_resource actions
-        actions = []
+        # Build gain_resource actions per character, then group by character
+        per_char_actions = []
         for eff in effects:
+            char_acts = []
             resources_text = eff["resources"]
-            # Detect heart and blade resources from icons
             heart_m = re.search(r"heart_(\d+)", resources_text)
             blade_count = resources_text.count("icon_blade.png")
             heart_color = f"heart{heart_m.group(1)}" if heart_m else None
             if blade_count > 0:
-                actions.append(
+                char_acts.append(
                     {
                         "action": "gain_resource",
                         "resource": "blade",
@@ -4325,10 +4325,11 @@ def _try_character_specific(text):
                         "characters": [eff["character"]],
                         "target": "self",
                         "card_type": "member_card",
+                        "target_count": eff["count"],
                     }
                 )
             if heart_color:
-                actions.append(
+                char_acts.append(
                     {
                         "action": "gain_resource",
                         "resource": "heart",
@@ -4337,12 +4338,20 @@ def _try_character_specific(text):
                         "characters": [eff["character"]],
                         "target": "self",
                         "card_type": "member_card",
+                        "target_count": eff["count"],
                     }
                 )
-        if len(actions) == 1:
-            result = actions[0]
+            if len(char_acts) == 1:
+                per_char_actions.append(char_acts[0])
+            else:
+                per_char_actions.append({"action": "sequential", "actions": char_acts})
+        if len(per_char_actions) == 1:
+            result = per_char_actions[0]
         else:
-            result = {"action": "sequential", "actions": actions}
+            result = {
+                "action": "sequential",
+                "actions": per_char_actions,
+            }
         result["text"] = text
         result["character_effects"] = effects
         return result
@@ -6967,8 +6976,11 @@ def _normalize_effect_tree(effect, original_text=None):
             else:
                 # Check own text first, then parent context
                 search_text = d_text or ""
+                # Actions with explicit heart_color (e.g. from character_effects)
+                # should not inherit aggregate heart_colors from parent context
                 if not re.search(r"heart_\d+", search_text) and ctx_text:
-                    search_text = ctx_text
+                    if not d.get("heart_color"):
+                        search_text = ctx_text
             hc = list(
                 dict.fromkeys(
                     f"heart{m.zfill(2)}"
@@ -7890,9 +7902,15 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 first_fa.pop("condition", None)
                 followup_acts.append(first_fa)
                 remaining = acts[result_idx + 1 :]
+                _repeat_procedure = None
                 if remaining:
                     for rem in remaining:
-                        followup_acts.append(dict(rem))
+                        if isinstance(rem, dict) and rem.get("action") in (
+                            "repeat_procedure",
+                        ):
+                            _repeat_procedure = dict(rem)
+                        else:
+                            followup_acts.append(dict(rem))
                 if len(followup_acts) == 1:
                     followup = followup_acts[0]
                 else:
@@ -7921,11 +7939,28 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     "activation_position"
                 ):
                     followup["activation_position"] = eff["activation_position"]
-                eff["action"] = "conditional_on_result"
-                eff["primary_effect"] = primary
-                eff["result_condition"] = result_cond
-                eff["followup_action"] = followup
-                eff.pop("actions", None)
+                if _repeat_procedure:
+                    # Wrap COR + repeat_procedure in a sequential
+                    _cor = {
+                        "action": "conditional_on_result",
+                        "primary_effect": primary,
+                        "result_condition": result_cond,
+                        "followup_action": followup,
+                    }
+                    # Merge any text from the original condition
+                    _cor_txt = eff.get("text", "")
+                    if _cor_txt:
+                        _cor["text"] = _cor_txt
+                    eff["action"] = "sequential"
+                    eff["actions"] = [_cor, _repeat_procedure]
+                    for k in ("primary_effect", "result_condition", "followup_action"):
+                        eff.pop(k, None)
+                else:
+                    eff["action"] = "conditional_on_result"
+                    eff["primary_effect"] = primary
+                    eff["result_condition"] = result_cond
+                    eff["followup_action"] = followup
+                    eff.pop("actions", None)
 
         # D1: Remove optional_action from each_time with appearance trigger
         if (

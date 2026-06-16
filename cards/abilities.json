@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T06:46:17.125428",
+  "generated_at": "2026-06-17T06:54:51.501553",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7527,55 +7527,55 @@
       "cost": null,
       "effect": {
         "text": "自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。自分はこの手順をさらに4回まで繰り返してもよい",
-        "action": "conditional_on_result",
-        "primary_effect": {
-          "text": "自分のデッキの一番上のカードを控え室に置いてもよい",
-          "action": "sequential",
-          "actions": [
-            {
+        "action": "sequential",
+        "actions": [
+          {
+            "action": "conditional_on_result",
+            "primary_effect": {
               "text": "自分のデッキの一番上のカードを控え室に置いてもよい",
-              "source": "deck_top",
-              "count": 1,
-              "destination": "discard",
-              "target": "self",
-              "optional": true,
-              "action": "move_cards",
-              "card_type": "card"
+              "action": "sequential",
+              "actions": [
+                {
+                  "text": "自分のデッキの一番上のカードを控え室に置いてもよい",
+                  "source": "deck_top",
+                  "count": 1,
+                  "destination": "discard",
+                  "target": "self",
+                  "optional": true,
+                  "action": "move_cards",
+                  "card_type": "card"
+                },
+                {
+                  "text": "{{icon_blade.png|ブレード}}を得る",
+                  "duration": "live_end",
+                  "action": "gain_resource",
+                  "resource": "blade",
+                  "count": 1
+                }
+              ]
             },
-            {
-              "text": "{{icon_blade.png|ブレード}}を得る",
-              "duration": "live_end",
-              "action": "gain_resource",
-              "resource": "blade",
-              "count": 1
-            }
-          ]
-        },
-        "result_condition": {
-          "text": "これにより控え室に置いたカードがライブカードの場合",
-          "card_type": "live_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved"
-        },
-        "followup_action": {
-          "text": "このメンバーをウェイトにする。自分はこの手順を4回まで繰り返してもよい",
-          "action": "sequential",
-          "actions": [
-            {
+            "result_condition": {
+              "text": "これにより控え室に置いたカードがライブカードの場合",
+              "card_type": "live_card",
+              "type": "card_count_condition",
+              "source": "preceding_moved"
+            },
+            "followup_action": {
               "text": "このメンバーをウェイトにする",
               "state_change": "wait",
               "card_type": "member_card",
               "action": "change_state",
               "count": 1
             },
-            {
-              "text": "自分はこの手順を4回まで繰り返してもよい",
-              "optional": true,
-              "action": "repeat_procedure",
-              "max_repeats": 4
-            }
-          ]
-        }
+            "text": "自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする。自分はこの手順をさらに4回まで繰り返してもよい"
+          },
+          {
+            "text": "自分はこの手順を4回まで繰り返してもよい",
+            "optional": true,
+            "action": "repeat_procedure",
+            "max_repeats": 4
+          }
+        ]
       }
     },
     {
@@ -18321,62 +18321,72 @@
         "action": "sequential",
         "actions": [
           {
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 1,
-            "characters": [
-              "澁谷かのん"
+            "action": "sequential",
+            "actions": [
+              {
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": 1,
+                "characters": [
+                  "澁谷かのん"
+                ],
+                "target": "self",
+                "card_type": "member_card",
+                "target_count": 1,
+                "duration": "live_end",
+                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+              },
+              {
+                "action": "gain_resource",
+                "resource": "heart",
+                "heart_color": "heart05",
+                "count": 1,
+                "characters": [
+                  "澁谷かのん"
+                ],
+                "target": "self",
+                "card_type": "member_card",
+                "target_count": 1,
+                "duration": "live_end",
+                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+              }
             ],
-            "target": "self",
-            "card_type": "member_card",
             "duration": "live_end",
             "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
           },
           {
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_color": "heart05",
-            "count": 1,
-            "characters": [
-              "澁谷かのん"
+            "action": "sequential",
+            "actions": [
+              {
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": 1,
+                "characters": [
+                  "唐可可"
+                ],
+                "target": "self",
+                "card_type": "member_card",
+                "target_count": 1,
+                "duration": "live_end",
+                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+              },
+              {
+                "action": "gain_resource",
+                "resource": "heart",
+                "heart_color": "heart01",
+                "count": 1,
+                "characters": [
+                  "唐可可"
+                ],
+                "target": "self",
+                "card_type": "member_card",
+                "target_count": 1,
+                "duration": "live_end",
+                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+              }
             ],
-            "target": "self",
-            "card_type": "member_card",
-            "duration": "live_end",
-            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
-            "heart_colors": [
-              "heart05",
-              "heart01"
-            ]
-          },
-          {
-            "action": "gain_resource",
-            "resource": "blade",
-            "count": 1,
-            "characters": [
-              "唐可可"
-            ],
-            "target": "self",
-            "card_type": "member_card",
             "duration": "live_end",
             "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
-          },
-          {
-            "action": "gain_resource",
-            "resource": "heart",
-            "heart_color": "heart01",
-            "count": 1,
-            "characters": [
-              "唐可可"
-            ],
-            "target": "self",
-            "card_type": "member_card",
-            "duration": "live_end",
-            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
-            "heart_colors": [
-              "heart05",
-              "heart01"
-            ]
           }
         ],
         "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
