@@ -1,0 +1,25 @@
+ 7686: indent=  4 chars='    ' |     for ability in data["unique_abilities"]:
+ 7687: indent=  8 chars='        ' |         eff = ability.get("effect")
+ 7688: indent=  8 chars='        ' |         if not isinstance(eff, dict):
+ 7689: indent= 12 chars='            ' |             continue
+ 7690: indent=  8 chars='        ' |         t = ability.get("triggerless_text", "")
+ 7691: indent=  8 chars='        ' |         cond = eff.get("condition", {})
+ 7692: indent=  1 chars='\n' | 
+ 7693: indent=  8 chars='        ' |         # ---- A: Strip trailing period from primary_effect text ----
+ 7694: indent=  8 chars='        ' |         pe = eff.get("primary_effect")
+ 7695: indent=  8 chars='        ' |         if isinstance(pe, dict) and isinstance(pe.get("text"), str):
+ 7696: indent= 12 chars='            ' |             if pe["text"].endswith("。"):
+ 7697: indent= 16 chars='                ' |                 pe["text"] = pe["text"].rstrip("。")
+ 7698: indent=  1 chars='\n' | 
+ 7699: indent= 12 chars='            ' |             # ---- A1: Structural transforms (keep) ----
+ 7700: indent=  1 chars='\n' | 
+ 7701: indent= 12 chars='            ' |             # C: conditional_on_result — N-action sequential with これによ
+ 7702: indent= 12 chars='            ' |             if eff.get("action") == "sequential" and "これにより" in t:
+ 7703: indent= 16 chars='                ' |                 print(f"  [DEBUG] Section C ENTERED: text={t[:40]}", f
+ 7704: indent= 16 chars='                ' |                 acts = eff.get("actions", [])
+ 7705: indent= 16 chars='                ' |                 result_idx = -1
+ 7706: indent= 16 chars='                ' |                 for i, act in enumerate(acts):
+ 7707: indent= 20 chars='                    ' |                     if isinstance(act, dict):
+ 7708: indent= 24 chars='                        ' |                         c1 = act.get("condition")
+ 7709: indent= 24 chars='                        ' |                         cond_text = c1.get("text", "") if isinstance(c
+ 7710: indent= 24 chars='                        ' |                         if "これにより" in cond_text:

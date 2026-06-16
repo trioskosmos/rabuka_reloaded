@@ -1,0 +1,7 @@
+ 7699: indent= 12 |             # ---- A1: Structural transforms (keep) ----
+ 7700: indent=  1 | 
+ 7701: indent= 12 |             # C: conditional_on_result — N-action sequential with これによ
+ 7702: indent= 12 |             if eff.get("action") == "sequential" and "これにより" in t:
+ 7703: indent= 16 |                 print(f"  [DEBUG] Section C ENTERED: text={t[:40]}", f
+ 7704: indent= 16 |                 acts = eff.get("actions", [])
+ 7705: indent= 16 |                 result_idx = -1

@@ -1,0 +1,350 @@
+ 7701: indent=  8 |         # C: conditional_on_result — N-action sequential with これにより condition
+ 7702: indent=  8 |         if eff.get("action") == "sequential" and "これにより" in t:
+ 7703: indent= 12 |             acts = eff.get("actions", [])
+ 7704: indent= 12 |             result_idx = -1
+ 7705: indent= 12 |             for i, act in enumerate(acts):
+ 7706: indent= 16 |                 if isinstance(act, dict):
+ 7707: indent= 20 |                     c1 = act.get("condition")
+ 7708: indent= 20 |                     cond_text = c1.get("text", "") if isinstance(c1, dict) else 
+ 7709: indent= 20 |                     if "これにより" in cond_text:
+ 7710: indent= 24 |                         result_idx = i
+ 7711: indent= 24 |                         break
+ 7712: indent= 20 |                     act_text = act.get("text", "") or ""
+ 7713: indent= 20 |                     m = re.match(r"^(これにより.+?場合)[、，]?\s*", act_text)
+ 7714: indent= 20 |                     if m:
+ 7715: indent= 24 |                         result_idx = i
+ 7716: indent= 24 |                         break
+ 7717: indent= 12 |             if result_idx < 0:
+ 7718: indent= 16 |                 for i, act in enumerate(acts):
+ 7719: indent= 20 |                     if not isinstance(act, dict):
+ 7720: indent= 24 |                         continue
+ 7721: indent= 20 |                     act_text = act.get("text", "") or ""
+ 7722: indent= 20 |                     m = re.match(r"^(これにより.+?場合)[、，]?\s*(.*)$", act_text)
+ 7723: indent= 20 |                     if m:
+ 7724: indent= 24 |                         cond_text = m.group(1)
+ 7725: indent= 24 |                         action_text = m.group(2)
+ 7726: indent= 24 |                         cond_dict = {
+ 7727: indent= 28 |                             "text": cond_text,
+ 7728: indent= 28 |                             "type": "comparison_condition",
+ 7729: indent= 24 |                         }
+ 7730: indent= 24 |                         count_m = re.search(r"(\d+)", cond_text)
+ 7731: indent= 24 |                         if count_m:
+ 7732: indent= 28 |                             cond_dict["count"] = int(count_m.group(1))
+ 7733: indent= 24 |                         cond_dict["operator"] = ">="
+ 7734: indent= 24 |                         if "余剰ハート" in cond_text:
+ 7735: indent= 28 |                             cond_dict["resource_type"] = "surplus_heart"
+ 7736: indent= 24 |                         if cond_dict.get("resource_type"):
+ 7737: indent= 28 |                             act["condition"] = cond_dict
+ 7738: indent= 28 |                             act["text"] = action_text
+ 7739: indent= 24 |                         break
+ 7740: indent= 12 |             if 0 < result_idx < len(acts):
+ 7741: indent= 16 |                 print(
+ 7742: indent= 20 |                     f"  [DEBUG] Section C firing: idx={result_idx}, len={len(act
+ 7743: indent= 20 |                     flush=True,
+ 7744: indent= 16 |                 )
+ 7745: indent= 16 |                 primary_acts = acts[:result_idx]
+ 7746: indent= 12 |             if len(primary_acts) == 1:
+ 7747: indent= 16 |                 primary = dict(primary_acts[0])
+ 7748: indent= 16 |                 if "text" not in primary:
+ 7749: indent= 20 |                     primary["text"] = primary_acts[0].get("text", t)
+ 7750: indent= 12 |             else:
+ 7751: indent= 16 |                 primary = {
+ 7752: indent= 20 |                     "text": primary_acts[0].get("text", t),
+ 7753: indent= 20 |                     "action": "sequential",
+ 7754: indent= 20 |                     "actions": [dict(a) for a in primary_acts],
+ 7755: indent= 16 |                 }
+ 7756: indent= 12 |             result_act = acts[result_idx]
+ 7757: indent= 12 |             c1 = result_act.get("condition", {})
+ 7758: indent= 12 |             result_cond = dict(c1)
+ 7759: indent= 12 |             if c1.get("type") == "location_condition":
+ 7760: indent= 16 |                 result_cond["type"] = "card_count_condition"
+ 7761: indent= 16 |                 result_cond.pop("locations", None)
+ 7762: indent= 16 |                 result_cond["source"] = "preceding_moved"
+ 7763: indent= 12 |             result_cond.pop("location", None)
+ 7764: indent= 12 |             rct = result_cond.get("text", "")
+ 7765: indent= 12 |             if "ブレードハートを持たない" in rct or "ブレードハートがない" in rct:
+ 7766: indent= 16 |                 result_cond["card_property"] = "has_blade_heart"
+ 7767: indent= 12 |             # Only add default count/operator when the condition text has an
+ 7768: indent= 12 |             # explicit threshold; action-success patterns should not get default
+ 7769: indent= 12 |             if re.search(r"\d+枚以上", rct) or re.search(r"以上", rct):
+ 7770: indent= 16 |                 if "operator" not in result_cond:
+ 7771: indent= 20 |                     result_cond["operator"] = ">="
+ 7772: indent= 16 |                 if "count" not in result_cond:
+ 7773: indent= 20 |                     result_cond["count"] = 1
+ 7774: indent= 12 |             if "source" not in result_cond:
+ 7775: indent= 16 |                 result_cond["source"] = "preceding_moved"
+ 7776: indent= 12 |             _cp = result_cond.get("card_property")
+ 7777: indent= 12 |             followup_acts = []
+ 7778: indent= 12 |             first_fa = dict(result_act)
+ 7779: indent= 12 |             full_text_r = first_fa.get("text", "")
+ 7780: indent= 12 |             rct2 = rct
+ 7781: indent= 12 |             if rct2 and full_text_r.startswith(rct2):
+ 7782: indent= 16 |                 action_text = full_text_r[len(rct2) :].lstrip("、").lstrip("。")
+ 7783: indent= 16 |                 first_fa["text"] = action_text
+ 7784: indent= 12 |             first_fa.pop("condition", None)
+ 7785: indent= 12 |             followup_acts.append(first_fa)
+ 7786: indent= 12 |             remaining = acts[result_idx + 1 :]
+ 7787: indent= 12 |             if remaining:
+ 7788: indent= 16 |                 for rem in remaining:
+ 7789: indent= 20 |                     followup_acts.append(dict(rem))
+ 7790: indent= 12 |             if len(followup_acts) == 1:
+ 7791: indent= 16 |                 followup = followup_acts[0]
+ 7792: indent= 12 |             else:
+ 7793: indent= 16 |                 combined_text = followup_acts[0].get("text", "")
+ 7794: indent= 16 |                 for fa in followup_acts[1:]:
+ 7795: indent= 20 |                     ft = fa.get("text", "")
+ 7796: indent= 20 |                     if ft:
+ 7797: indent= 24 |                         combined_text = (
+ 7798: indent= 28 |                             (combined_text.rstrip("。").rstrip("、")) + "。" + ft
+ 7799: indent= 24 |                         )
+ 7800: indent= 16 |                 followup = {
+ 7801: indent= 20 |                     "text": combined_text,
+ 7802: indent= 20 |                     "action": "sequential",
+ 7803: indent= 20 |                     "actions": followup_acts,
+ 7804: indent= 16 |                 }
+ 7805: indent= 12 |             # Propagate card_property from result_cond to subsequent conditions
+ 7806: indent= 12 |             # that are continuations of the same preceding_moved check
+ 7807: indent= 12 |             if _cp:
+ 7808: indent= 16 |                 _seen_first = False
+ 7809: indent= 16 |                 for _fa in followup_acts:
+ 7810: indent= 20 |                     _fc = _fa.get("condition", {})
+ 7811: indent= 20 |                     if isinstance(_fc, dict) and _fc.get("source") == "preceding
+ 7812: indent= 24 |                         if not _seen_first:
+ 7813: indent= 28 |                             _seen_first = True
+ 7814: indent= 24 |                         elif "card_property" not in _fc:
+ 7815: indent= 28 |                             _fc["card_property"] = _cp
+ 7816: indent=  1 | 
+ 7817: indent= 12 |             if eff.get("activation_position") and not followup.get(
+ 7818: indent= 16 |                 "activation_position"
+ 7819: indent= 12 |             ):
+ 7820: indent= 16 |                 followup["activation_position"] = eff["activation_position"]
+ 7821: indent= 12 |             eff["action"] = "conditional_on_result"
+ 7822: indent= 12 |             eff["primary_effect"] = primary
+ 7823: indent= 12 |             eff["result_condition"] = result_cond
+ 7824: indent= 12 |             eff["followup_action"] = followup
+ 7825: indent= 12 |             eff.pop("actions", None)
+ 7826: indent=  1 | 
+ 7827: indent=  8 |         # D1: Remove optional_action from each_time with appearance trigger
+ 7828: indent=  8 |         if (
+ 7829: indent= 12 |             eff.get("action") == "conditional_on_optional"
+ 7830: indent= 12 |             and eff.get("trigger_type") == "each_time"
+ 7831: indent=  8 |         ):
+ 7832: indent= 12 |             tc = eff.get("trigger_condition", {})
+ 7833: indent= 12 |             if isinstance(tc, dict) and tc.get("type") == "appearance_condition"
+ 7834: indent= 16 |                 eff.pop("optional_action", None)
+ 7835: indent=  1 | 
+ 7836: indent=  8 |         # E0: Fix DOLLCHESTRA-type primary_effect — split select+modify_cost int
+ 7837: indent=  8 |         if eff.get("action") in ("conditional_on_result", "conditional_alternati
+ 7838: indent= 12 |             pe = eff.get("primary_effect")
+ 7839: indent= 12 |             if (
+ 7840: indent= 16 |                 isinstance(pe, dict)
+ 7841: indent= 16 |                 and pe.get("action") == "select"
+ 7842: indent= 16 |                 and pe.get("original_value") is True
+ 7843: indent= 12 |             ):
+ 7844: indent= 16 |                 pe_text = pe.get("text") or ""
+ 7845: indent= 16 |                 parts = pe_text.split("。")
+ 7846: indent= 16 |                 if len(parts) >= 2:
+ 7847: indent= 20 |                     text_select = parts[0]
+ 7848: indent= 20 |                     text_cost = "。".join(parts[1:]).lstrip("。")
+ 7849: indent= 20 |                     pe["action"] = "sequential"
+ 7850: indent= 20 |                     pe["actions"] = [
+ 7851: indent= 24 |                         {
+ 7852: indent= 28 |                             "text": text_select,
+ 7853: indent= 28 |                             "source": pe.get("source"),
+ 7854: indent= 28 |                             "count": pe.get("count", 1),
+ 7855: indent= 28 |                             "card_type": pe.get("card_type"),
+ 7856: indent= 28 |                             "target": pe.get("target"),
+ 7857: indent= 28 |                             "group_names": pe.get("group_names"),
+ 7858: indent= 28 |                             "action": "select",
+ 7859: indent= 24 |                         },
+ 7860: indent= 24 |                         {
+ 7861: indent= 28 |                             "text": text_cost,
+ 7862: indent= 28 |                             "duration": "live_end",
+ 7863: indent= 28 |                             "card_type": pe.get("card_type"),
+ 7864: indent= 28 |                             "action": "modify_cost",
+ 7865: indent= 28 |                             "group_names": pe.get("group_names"),
+ 7866: indent= 28 |                             "original_value": True,
+ 7867: indent= 24 |                         },
+ 7868: indent= 20 |                     ]
+ 7869: indent= 20 |                     for k in ("source", "count", "duration", "card_type", "targe
+ 7870: indent= 24 |                         pe.pop(k, None)
+ 7871: indent=  1 | 
+ 7872: indent=  8 |         # E: Revert over-eager conditional_on_result to sequential (surplus_hear
+ 7873: indent=  8 |         if eff.get("action") == "conditional_on_result":
+ 7874: indent= 12 |             pe = eff.get("primary_effect", {})
+ 7875: indent= 12 |             if isinstance(pe, dict) and pe.get("resource") == "surplus_heart":
+ 7876: indent= 16 |                 actions = [pe]
+ 7877: indent= 16 |                 fa = eff.get("followup_action")
+ 7878: indent= 16 |                 if isinstance(fa, dict):
+ 7879: indent= 20 |                     actions.append(fa)
+ 7880: indent= 16 |                 if actions:
+ 7881: indent= 20 |                     eff["action"] = "sequential"
+ 7882: indent= 20 |                     eff["actions"] = actions
+ 7883: indent= 20 |                     eff.pop("primary_effect", None)
+ 7884: indent= 20 |                     eff.pop("result_condition", None)
+ 7885: indent= 20 |                     eff.pop("followup_action", None)
+ 7886: indent=  1 | 
+ 7887: indent=  8 |         # ---- B: Scoped context propagation (inherits specific fields) ----
+ 7888: indent=  1 | 
+ 7889: indent=  8 |         def _propagate_context(node, ctx=None):
+ 7890: indent= 12 |             if not isinstance(node, dict):
+ 7891: indent= 16 |                 return
+ 7892: indent= 12 |             if ctx is None:
+ 7893: indent= 16 |                 ctx = {}
+ 7894: indent=  1 | 
+ 7895: indent= 12 |             action = node.get("action")
+ 7896: indent= 12 |             ct = node.get("condition_type") or node.get("type")
+ 7897: indent=  1 | 
+ 7898: indent= 12 |             # Apply operator inference for condition-type nodes
+ 7899: indent= 12 |             if ct in ("comparison_condition", "card_count_condition"):
+ 7900: indent= 16 |                 _text = node.get("text", "")
+ 7901: indent= 16 |                 if node.get("count") and not node.get("comparison_target"):
+ 7902: indent= 20 |                     if "以上" in _text:
+ 7903: indent= 24 |                         node["operator"] = ">="
+ 7904: indent= 20 |                     elif "以下" in _text:
+ 7905: indent= 24 |                         node["operator"] = "<="
+ 7906: indent= 20 |                     elif "operator" not in node:
+ 7907: indent= 24 |                         node["operator"] = "="
+ 7908: indent= 16 |                 if "operator" not in node:
+ 7909: indent= 20 |                     if node.get("values"):
+ 7910: indent= 24 |                         node["operator"] = "in"
+ 7911: indent= 20 |                     elif node.get("comparison_target"):
+ 7912: indent= 24 |                         if "高い" in _text or "多い" in _text or "大きい" in _text:
+ 7913: indent= 28 |                             node["operator"] = ">"
+ 7914: indent= 24 |                         elif "低い" in _text or "少ない" in _text or "小さい" in _text:
+ 7915: indent= 28 |                             node["operator"] = "<"
+ 7916: indent= 16 |                 # Infer count from cost_limit for score-based comparisons
+ 7917: indent= 16 |                 if (
+ 7918: indent= 20 |                     ct == "comparison_condition"
+ 7919: indent= 20 |                     and "count" not in node
+ 7920: indent= 20 |                     and node.get("cost_limit") is not None
+ 7921: indent= 20 |                     and node.get("comparison_type") != "cost"
+ 7922: indent= 16 |                 ):
+ 7923: indent= 20 |                     node["count"] = node["cost_limit"]
+ 7924: indent=  1 | 
+ 7925: indent= 12 |             # Inherit location into conditions
+ 7926: indent= 12 |             if isinstance(node.get("condition"), dict):
+ 7927: indent= 16 |                 nc = node["condition"]
+ 7928: indent= 16 |                 if nc.get("type") in ("comparison_condition", "card_count_condit
+ 7929: indent= 20 |                     if not nc.get("location") and ctx.get("location"):
+ 7930: indent= 24 |                         nc["location"] = ctx["location"]
+ 7931: indent= 20 |                     if not nc.get("target") and ctx.get("target"):
+ 7932: indent= 24 |                         nc["target"] = ctx["target"]
+ 7933: indent= 20 |                     if not nc.get("card_type") and ctx.get("card_type"):
+ 7934: indent= 24 |                         nc["card_type"] = ctx["card_type"]
+ 7935: indent=  1 | 
+ 7936: indent= 12 |             # Inherit duration into action-type dicts
+ 7937: indent= 12 |             if action in (
+ 7938: indent= 16 |                 "gain_resource",
+ 7939: indent= 16 |                 "change_state",
+ 7940: indent= 16 |                 "move_cards",
+ 7941: indent= 16 |                 "select",
+ 7942: indent= 12 |             ):
+ 7943: indent= 16 |                 if not node.get("duration") and ctx.get("duration"):
+ 7944: indent= 20 |                     node["duration"] = ctx["duration"]
+ 7945: indent= 12 |             # draw_card: only inherit duration if context has it and action type
+ 7946: indent= 12 |             # is not a setup step (drawing itself is instantaneous)
+ 7947: indent= 12 |             if (
+ 7948: indent= 16 |                 action == "draw_card"
+ 7949: indent= 16 |                 and not node.get("duration")
+ 7950: indent= 16 |                 and ctx.get("duration")
+ 7951: indent= 12 |             ):
+ 7952: indent= 16 |                 act_text = node.get("text", "") or ""
+ 7953: indent= 16 |                 if "得る" in act_text or "を得る" in act_text or "得られる" in act_text:
+ 7954: indent= 20 |                     node["duration"] = ctx["duration"]
+ 7955: indent= 16 |                 if not node.get("target") and ctx.get("target"):
+ 7956: indent= 20 |                     node["target"] = ctx["target"]
+ 7957: indent= 16 |                 if not node.get("all") and ctx.get("all"):
+ 7958: indent= 20 |                     ap = node.get("activation_position") or ctx.get(
+ 7959: indent= 24 |                         "activation_position"
+ 7960: indent= 20 |                     )
+ 7961: indent= 20 |                     if ap not in ("center", "left_side"):
+ 7962: indent= 24 |                         if action == "move_cards" and ctx.get("source") == node.
+ 7963: indent= 28 |                             "source"
+ 7964: indent= 24 |                         ):
+ 7965: indent= 28 |                             pass
+ 7966: indent= 24 |                         elif node.get("count"):
+ 7967: indent= 28 |                             pass
+ 7968: indent= 24 |                         else:
+ 7969: indent= 28 |                             node["all"] = ctx.get("all")
+ 7970: indent=  1 | 
+ 7971: indent= 12 |             # Inherit timing_condition into gain_resource actions
+ 7972: indent= 12 |             if action == "gain_resource":
+ 7973: indent= 16 |                 if not node.get("timing_condition") and ctx.get("timing_conditio
+ 7974: indent= 20 |                     node["timing_condition"] = ctx["timing_condition"]
+ 7975: indent=  1 | 
+ 7976: indent= 12 |             # Build context for children
+ 7977: indent= 12 |             new_ctx = dict(ctx)
+ 7978: indent= 12 |             for f in (
+ 7979: indent= 16 |                 "location",
+ 7980: indent= 16 |                 "target",
+ 7981: indent= 16 |                 "card_type",
+ 7982: indent= 16 |                 "duration",
+ 7983: indent= 16 |                 "timing_condition",
+ 7984: indent= 16 |                 "all",
+ 7985: indent= 12 |             ):
+ 7986: indent= 16 |                 if f in node:
+ 7987: indent= 20 |                     new_ctx[f] = node[f]
+ 7988: indent=  1 | 
+ 7989: indent= 12 |             # Inherit location into compound sub-conditions (from compound's own
+ 7990: indent= 12 |             if node.get("type") == "compound" and "conditions" in node:
+ 7991: indent= 16 |                 for sub in node["conditions"]:
+ 7992: indent= 20 |                     if isinstance(sub, dict):
+ 7993: indent= 24 |                         if new_ctx.get("location") and not sub.get("location"):
+ 7994: indent= 28 |                             if not sub.get("temporal") and not sub.get("resource
+ 7995: indent= 32 |                                 sub["location"] = new_ctx["location"]
+ 7996: indent= 24 |                         _propagate_context(sub, new_ctx)
+ 7997: indent=  1 | 
+ 7998: indent= 12 |             # Restore duration for sequential sub-actions when the parser lost i
+ 7999: indent= 12 |             # during sequential creation (e.g., "と" split targets).
+ 8000: indent= 12 |             if action == "sequential" and not new_ctx.get("duration") and t:
+ 8001: indent= 16 |                 if "ライブ終了時まで" in t:
+ 8002: indent= 20 |                     for act in node.get("actions", []):
+ 8003: indent= 24 |                         if isinstance(act, dict) and act.get("action") in (
+ 8004: indent= 28 |                             "gain_resource",
+ 8005: indent= 28 |                             "change_state",
+ 8006: indent= 28 |                             "move_cards",
+ 8007: indent= 24 |                         ):
+ 8008: indent= 28 |                             if act.get("duration") is None and "得る" in (
+ 8009: indent= 32 |                                 act.get("text", "") or ""
+ 8010: indent= 28 |                             ):
+ 8011: indent= 32 |                                 act["duration"] = "live_end"
+ 8012: indent=  1 | 
+ 8013: indent= 12 |             for ck in (
+ 8014: indent= 16 |                 "condition",
+ 8015: indent= 16 |                 "primary_effect",
+ 8016: indent= 16 |                 "followup_action",
+ 8017: indent= 16 |                 "optional_action",
+ 8018: indent= 16 |                 "conditional_action",
+ 8019: indent= 16 |                 "alternative_effect",
+ 8020: indent= 12 |             ):
+ 8021: indent= 16 |                 ch = node.get(ck)
+ 8022: indent= 16 |                 if isinstance(ch, dict):
+ 8023: indent= 20 |                     _propagate_context(ch, new_ctx)
+ 8024: indent=  1 | 
+ 8025: indent= 12 |             for ak in ("actions",):
+ 8026: indent= 16 |                 arr = node.get(ak, [])
+ 8027: indent= 16 |                 if isinstance(arr, list):
+ 8028: indent= 20 |                     for item in arr:
+ 8029: indent= 24 |                         _propagate_context(item, new_ctx)
+ 8030: indent=  1 | 
+ 8031: indent= 12 |             # heart_type:all for gain_resource actions
+ 8032: indent= 12 |             if action == "gain_resource" and node.get("resource") == "heart":
+ 8033: indent= 16 |                 if "{{icon_all.png|ハート}}" in (node.get("text", "") or t or ""):
+ 8034: indent= 20 |                     if not node.get("heart_type") and not node.get("heart_colors
+ 8035: indent= 24 |                         node["heart_type"] = "all"
+ 8036: indent=  1 | 
+ 8037: indent= 12 |             # blade_heart card_property and heart_colors cleanup for card_count_
+ 8038: indent= 12 |             nc = node.get("condition")
+ 8039: indent= 12 |             if isinstance(nc, dict) and nc.get("type") == "card_count_condition"
+ 8040: indent= 16 |                 nct = nc.get("text", "")
+ 8041: indent= 16 |                 if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
+ 8042: indent= 20 |                     if not nc.get("card_property"):
+ 8043: indent= 24 |                         nc["card_property"] = "has_blade_heart"
+ 8044: indent= 16 |                 # Strip heart_colors from preceding_moved conditions that have a
+ 8045: indent= 16 |                 # specific location — the move already filtered by heart color.
+ 8046: indent= 16 |                 if (
+ 8047: indent= 20 |                     nc.get("source") == "preceding_moved"
+ 8048: indent= 20 |                     and nc.get("location")
+ 8049: indent= 20 |                     and nc.get("heart_colors")
+ 8050: indent= 16 |                 ):

@@ -7698,134 +7698,131 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
             # ---- A1: Structural transforms (keep) ----
 
-        # C: conditional_on_result — N-action sequential with これにより condition
-        if eff.get("action") == "sequential" and "これにより" in t:
-            acts = eff.get("actions", [])
-            result_idx = -1
-            for i, act in enumerate(acts):
-                if isinstance(act, dict):
-                    c1 = act.get("condition")
-                    cond_text = c1.get("text", "") if isinstance(c1, dict) else ""
-                    if "これにより" in cond_text:
-                        result_idx = i
-                        break
-                    act_text = act.get("text", "") or ""
-                    m = re.match(r"^(これにより.+?場合)[、，]?\s*", act_text)
-                    if m:
-                        result_idx = i
-                        break
-            if result_idx < 0:
+            # C: conditional_on_result — N-action sequential with これにより condition
+            if eff.get("action") == "sequential" and "これにより" in t:
+                acts = eff.get("actions", [])
+                result_idx = -1
                 for i, act in enumerate(acts):
-                    if not isinstance(act, dict):
-                        continue
-                    act_text = act.get("text", "") or ""
-                    m = re.match(r"^(これにより.+?場合)[、，]?\s*(.*)$", act_text)
-                    if m:
-                        cond_text = m.group(1)
-                        action_text = m.group(2)
-                        cond_dict = {
-                            "text": cond_text,
-                            "type": "comparison_condition",
-                        }
-                        count_m = re.search(r"(\d+)", cond_text)
-                        if count_m:
-                            cond_dict["count"] = int(count_m.group(1))
-                        cond_dict["operator"] = ">="
-                        if "余剰ハート" in cond_text:
-                            cond_dict["resource_type"] = "surplus_heart"
-                        if cond_dict.get("resource_type"):
-                            act["condition"] = cond_dict
-                            act["text"] = action_text
-                        break
-                if result_idx >= 0:
-                    if result_idx > 0:
-                        primary_acts = acts[:result_idx]
-                        if len(primary_acts) == 1:
-                            primary = dict(primary_acts[0])
-                            if "text" not in primary:
-                                primary["text"] = primary_acts[0].get("text", t)
-                        else:
-                            primary = {
-                                "text": primary_acts[0].get("text", t),
-                                "action": "sequential",
-                                "actions": [dict(a) for a in primary_acts],
+                    if isinstance(act, dict):
+                        c1 = act.get("condition")
+                        cond_text = c1.get("text", "") if isinstance(c1, dict) else ""
+                        if "これにより" in cond_text:
+                            result_idx = i
+                            break
+                        act_text = act.get("text", "") or ""
+                        m = re.match(r"^(これにより.+?場合)[、，]?\s*", act_text)
+                        if m:
+                            result_idx = i
+                            break
+                if result_idx < 0:
+                    for i, act in enumerate(acts):
+                        if not isinstance(act, dict):
+                            continue
+                        act_text = act.get("text", "") or ""
+                        m = re.match(r"^(これにより.+?場合)[、，]?\s*(.*)$", act_text)
+                        if m:
+                            cond_text = m.group(1)
+                            action_text = m.group(2)
+                            cond_dict = {
+                                "text": cond_text,
+                                "type": "comparison_condition",
                             }
-                    else:
-                        # result_idx == 0 — no primary actions
-                        primary = {"action": "do_nothing"}
-                    result_act = acts[result_idx]
-                    c1 = result_act.get("condition", {})
-                    result_cond = dict(c1)
-                    if c1.get("type") == "location_condition":
-                        result_cond["type"] = "card_count_condition"
-                        result_cond.pop("locations", None)
-                        result_cond["source"] = "preceding_moved"
-                    result_cond.pop("location", None)
-                    rct = result_cond.get("text", "")
-                    if (
-                        "ブレードハートを持たない" in rct
-                        or "ブレードハートがない" in rct
-                    ):
-                        result_cond["card_property"] = "has_blade_heart"
-                    if re.search(r"\d+枚以上", rct) or re.search(r"以上", rct):
-                        if "operator" not in result_cond:
-                            result_cond["operator"] = ">="
-                        if "count" not in result_cond:
-                            result_cond["count"] = 1
-                    if "source" not in result_cond:
-                        result_cond["source"] = "preceding_moved"
-                    _cp = result_cond.get("card_property")
-                    followup_acts = []
-                    first_fa = dict(result_act)
-                    full_text_r = first_fa.get("text", "")
-                    rct2 = rct
-                    if rct2 and full_text_r.startswith(rct2):
-                        action_text = full_text_r[len(rct2) :].lstrip("、").lstrip("。")
-                        first_fa["text"] = action_text
-                    first_fa.pop("condition", None)
-                    followup_acts.append(first_fa)
-                    remaining = acts[result_idx + 1 :]
-                    if remaining:
-                        for rem in remaining:
-                            followup_acts.append(dict(rem))
-                    if len(followup_acts) == 1:
-                        followup = followup_acts[0]
-                    else:
-                        combined_text = followup_acts[0].get("text", "")
-                        for fa in followup_acts[1:]:
-                            ft = fa.get("text", "")
-                            if ft:
-                                combined_text = (
-                                    (combined_text.rstrip("。").rstrip("、"))
-                                    + "。"
-                                    + ft
-                                )
-                        followup = {
-                            "text": combined_text,
-                            "action": "sequential",
-                            "actions": followup_acts,
-                        }
-                    if _cp:
-                        _seen_first = False
-                        for _fa in followup_acts:
-                            _fc = _fa.get("condition", {})
-                            if (
-                                isinstance(_fc, dict)
-                                and _fc.get("source") == "preceding_moved"
-                            ):
-                                if not _seen_first:
-                                    _seen_first = True
-                                elif "card_property" not in _fc:
-                                    _fc["card_property"] = _cp
-                    if eff.get("activation_position") and not followup.get(
-                        "activation_position"
-                    ):
-                        followup["activation_position"] = eff["activation_position"]
-                    eff["action"] = "conditional_on_result"
-                    eff["primary_effect"] = primary
-                    eff["result_condition"] = result_cond
-                    eff["followup_action"] = followup
-                    eff.pop("actions", None)
+                            count_m = re.search(r"(\d+)", cond_text)
+                            if count_m:
+                                cond_dict["count"] = int(count_m.group(1))
+                            cond_dict["operator"] = ">="
+                            if "余剰ハート" in cond_text:
+                                cond_dict["resource_type"] = "surplus_heart"
+                            if cond_dict.get("resource_type"):
+                                act["condition"] = cond_dict
+                                act["text"] = action_text
+                            break
+                print(f"  [DEBUG] Section C: result_idx={result_idx}, len={len(acts)}, action={eff.get('action')}", flush=True)
+                if 0 < result_idx < len(acts):
+                    primary_acts = acts[:result_idx]
+                if len(primary_acts) == 1:
+                    primary = dict(primary_acts[0])
+                    if "text" not in primary:
+                        primary["text"] = primary_acts[0].get("text", t)
+                else:
+                    primary = {
+                        "text": primary_acts[0].get("text", t),
+                        "action": "sequential",
+                        "actions": [dict(a) for a in primary_acts],
+                    }
+                result_act = acts[result_idx]
+                c1 = result_act.get("condition", {})
+                result_cond = dict(c1)
+                if c1.get("type") == "location_condition":
+                    result_cond["type"] = "card_count_condition"
+                    result_cond.pop("locations", None)
+                    result_cond["source"] = "preceding_moved"
+                result_cond.pop("location", None)
+                rct = result_cond.get("text", "")
+                if "ブレードハートを持たない" in rct or "ブレードハートがない" in rct:
+                    result_cond["card_property"] = "has_blade_heart"
+                # Only add default count/operator when the condition text has an
+                # explicit threshold; action-success patterns should not get defaults.
+                if re.search(r"\d+枚以上", rct) or re.search(r"以上", rct):
+                    if "operator" not in result_cond:
+                        result_cond["operator"] = ">="
+                    if "count" not in result_cond:
+                        result_cond["count"] = 1
+                if "source" not in result_cond:
+                    result_cond["source"] = "preceding_moved"
+                _cp = result_cond.get("card_property")
+                followup_acts = []
+                first_fa = dict(result_act)
+                full_text_r = first_fa.get("text", "")
+                rct2 = rct
+                if rct2 and full_text_r.startswith(rct2):
+                    action_text = full_text_r[len(rct2) :].lstrip("、").lstrip("。")
+                    first_fa["text"] = action_text
+                first_fa.pop("condition", None)
+                followup_acts.append(first_fa)
+                remaining = acts[result_idx + 1 :]
+                if remaining:
+                    for rem in remaining:
+                        followup_acts.append(dict(rem))
+                if len(followup_acts) == 1:
+                    followup = followup_acts[0]
+                else:
+                    combined_text = followup_acts[0].get("text", "")
+                    for fa in followup_acts[1:]:
+                        ft = fa.get("text", "")
+                        if ft:
+                            combined_text = (
+                                (combined_text.rstrip("。").rstrip("、")) + "。" + ft
+                            )
+                    followup = {
+                        "text": combined_text,
+                        "action": "sequential",
+                        "actions": followup_acts,
+                    }
+                # Propagate card_property from result_cond to subsequent conditions
+                # that are continuations of the same preceding_moved check
+                if _cp:
+                    _seen_first = False
+                    for _fa in followup_acts:
+                        _fc = _fa.get("condition", {})
+                        if (
+                            isinstance(_fc, dict)
+                            and _fc.get("source") == "preceding_moved"
+                        ):
+                            if not _seen_first:
+                                _seen_first = True
+                            elif "card_property" not in _fc:
+                                _fc["card_property"] = _cp
+
+                if eff.get("activation_position") and not followup.get(
+                    "activation_position"
+                ):
+                    followup["activation_position"] = eff["activation_position"]
+                eff["action"] = "conditional_on_result"
+                eff["primary_effect"] = primary
+                eff["result_condition"] = result_cond
+                eff["followup_action"] = followup
+                eff.pop("actions", None)
 
         # D1: Remove optional_action from each_time with appearance trigger
         if (

@@ -1,0 +1,9 @@
+ 7745: indent=20 |                     primary_acts = acts[:result_idx]
+ 7746: indent=20 |                     if len(primary_acts) == 1:
+ 7747: indent=24 |                         primary = dict(primary_acts[0])
+ 7748: indent=24 |                         if "text" not in primary:
+ 7749: indent=28 |                             primary["text"] = primary_acts[0].get("text", t)
+ 7751: indent=24 |                         primary = {
+ 7752: indent=28 |                             "text": primary_acts[0].get("text", t),
+ 7754: indent=28 |                             "actions": [dict(a) for a in primary_acts],
+ 7822: indent=12 |             eff["primary_effect"] = primary
