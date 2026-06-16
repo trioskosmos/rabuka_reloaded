@@ -2,7 +2,7 @@
 """
 Extract card abilities from cards.json.
 Splits abilities by newline, extracts triggers, groups by text.
-Reuses parsed cost/effect from the existing working abilities.json for consistency.
+Does NOT parse cost/effect — parser.py's process_abilities does that.
 """
 
 import json
@@ -26,7 +26,6 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
         "icon_b_all",
         "icon_score",
     ]
-    position_icon_patterns = ["center", "left", "right"]
     use_limit_patterns = ["turn", "ターン"]
 
     triggers = []
@@ -60,10 +59,6 @@ def extract_trigger(text: str) -> tuple[list, int | None, str]:
             break
 
         if any(cost_pattern in icon_file for cost_pattern in cost_icon_patterns):
-            pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
-            continue
-
-        if triggers and any(p in icon_file for p in position_icon_patterns):
             pos = match_start + len(f"{{{{{icon_file}|{icon_text}}}}}")
             continue
 
@@ -179,34 +174,9 @@ def extract_abilities_from_card(card_id: str, card: dict) -> list:
     return abilities
 
 
-def extract_all_abilities(cards_file: Path, working_file: Path) -> dict:
+def extract_all_abilities(cards_file: Path) -> dict:
     with open(cards_file, encoding="utf-8") as f:
         cards = json.load(f)
-
-    working_data = {}
-    if working_file.exists():
-        try:
-            with open(working_file, encoding="utf-8") as f:
-                wd = json.load(f)
-            for u in wd.get("unique_abilities", []):
-                working_data[u["full_text"]] = u
-        except Exception:
-            pass
-    if not working_data:
-        import subprocess
-
-        try:
-            r = subprocess.run(
-                ["git", "show", "HEAD:cards/abilities.json"],
-                capture_output=True,
-                timeout=10,
-            )
-            if r.returncode == 0:
-                wd = json.loads(r.stdout)
-                for u in wd.get("unique_abilities", []):
-                    working_data[u["full_text"]] = u
-        except Exception:
-            pass
 
     all_abilities = []
     ability_groups = defaultdict(list)
@@ -229,41 +199,17 @@ def extract_all_abilities(cards_file: Path, working_file: Path) -> dict:
     for full_text, card_examples in ability_groups.items():
         sample = next(a for a in all_abilities if a["full_text"] == full_text)
 
-        is_null = sample.get("is_null", False)
-
-        if full_text in working_data:
-            wu = working_data[full_text]
-            entry = {
-                "full_text": full_text,
-                "triggerless_text": sample["triggerless_text"],
-                "card_count": len(card_examples),
-                "cards": card_examples,
-                "triggers": ", ".join(sample["triggers"])
-                if sample["triggers"]
-                else wu.get("triggers"),
-                "use_limit": wu.get("use_limit"),
-                "is_null": wu.get("is_null", is_null),
-                "cost": wu.get("cost"),
-                "effect": wu.get("effect"),
-            }
-        else:
-            try:
-                print(f"WARNING: New ability not in working file: {full_text[:60]}...")
-            except UnicodeEncodeError:
-                print("WARNING: New ability not in working file (non-ASCII text)")
-            entry = {
-                "full_text": full_text,
-                "triggerless_text": sample["triggerless_text"],
-                "card_count": len(card_examples),
-                "cards": card_examples,
-                "triggers": ", ".join(sample["triggers"])
-                if sample["triggers"]
-                else None,
-                "use_limit": sample["use_limit"],
-                "is_null": is_null,
-                "cost": None,
-                "effect": None,
-            }
+        entry = {
+            "full_text": full_text,
+            "triggerless_text": sample["triggerless_text"],
+            "card_count": len(card_examples),
+            "cards": card_examples,
+            "triggers": ", ".join(sample["triggers"]) if sample["triggers"] else None,
+            "use_limit": sample["use_limit"],
+            "is_null": sample.get("is_null", False),
+            "cost": None,
+            "effect": None,
+        }
 
         unique_abilities.append(entry)
 
@@ -289,16 +235,21 @@ def extract_all_abilities(cards_file: Path, working_file: Path) -> dict:
 def main():
     cards_file = Path(__file__).parent.parent / "cards.json"
     output_file = Path(__file__).parent.parent / "abilities.json"
-    working_file = output_file
 
     print(f"Extracting abilities from {cards_file}...")
-    result = extract_all_abilities(cards_file, working_file)
+    result = extract_all_abilities(cards_file)
 
     print(
         f"Found {result['statistics']['total_abilities']} abilities across "
         f"{result['statistics']['cards_with_abilities']} cards"
     )
     print(f"Unique abilities: {result['statistics']['unique_abilities']}")
+
+    # Parse null effects via parser.py's process_abilities
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from parser import process_abilities
+
+    result = process_abilities(result)
 
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(result, f, ensure_ascii=False, indent=2)
