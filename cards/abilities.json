@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T06:22:07.694448",
+  "generated_at": "2026-06-17T06:46:17.125428",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4431,7 +4431,8 @@
                 "text": "2枚ある場合",
                 "source": "preceding_moved",
                 "card_type": "member_card",
-                "negation": true
+                "negation": true,
+                "card_property": "has_blade_heart"
               },
               "action": "gain_resource",
               "resource": "blade",
@@ -24956,7 +24957,8 @@
             "duration": "live_end",
             "all": true,
             "timing_condition": "moved_this_turn",
-            "card_type": "member_card"
+            "card_type": "member_card",
+            "target": "self"
           }
         ],
         "all": true,

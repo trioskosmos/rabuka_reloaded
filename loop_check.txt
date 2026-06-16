@@ -1,0 +1,60 @@
+ 6516:                                 "gain_resource",
+ 6517:                                 "modify_score",
+ 6518:                                 "change_state",
+ 6519:                                 "set_blade_count",
+ 6520:                             )
+ 6521:                         ):
+ 6522:                             sub["duration"] = dur
+ 6523:             # Handle choice and conditional_on_result results with early return
+ 6524:             dur = result.get("duration")
+ 6525:             if result.get("action") == "choice":
+ 6526:                 for opt in result.get("options", []):
+ 6527:                     if (
+ 6528:                         dur
+ 6529:                         and "duration" not in opt
+ 6530:                         and opt.get("action")
+ 6531:                         in (
+ 6532:                             "gain_resource",
+ 6533:                             "modify_score",
+ 6534:                             "change_state",
+ 6535:                             "set_blade_count",
+ 6536:                         )
+ 6537:                     ):
+ 6538:                         opt["duration"] = dur
+ 6539:                 _propagate_optional(result)
+ 6540:                 return result
+ 6541:             if result.get("action") == "conditional_on_result":
+ 6542:                 import sys as _s
+ 6543: 
+ 6544:                 _s.stderr.write(
+ 6545:                     f"  [TRACE] COR RETURN: hn={hn} text_has_surplus={'余剰ハート' in text}\n"
+ 6546:                 )
+ 6547:                 for key in ("primary_effect", "followup_action"):
+ 6548:                     sub = result.get(key)
+ 6549:                     if sub and dur and "duration" not in sub:
+ 6550:                         sub["duration"] = dur
+ 6551:                 _propagate_optional(result)
+ 6552:                 return result
+ 6553:             # For all other handlers, use the result as the effect directly
+ 6554:             # (do NOT run parse_action on the full text — that would leak
+ 6555:             #  card_type/target/etc from the condition into the effect)
+ 6556:             effect = result
+ 6557:             _merge_parenthetical(effect, parenthetical)
+ 6558:             if extra_activation_cond and "activation_condition_parsed" not in effect:
+ 6559:                 effect["activation_condition_parsed"] = extra_activation_cond
+ 6560:             if extra_activation_pos and "activation_position" not in effect:
+ 6561:                 effect["activation_position"] = extra_activation_pos
+ 6562:             _propagate_optional(effect)
+ 6563:             return effect
+ 6564: 
+ 6565:     # No handler matched: fallback to parse_action
+ 6566:     effect.pop("_rest", None)
+ 6567:     fallback_text = text
+ 6568: 
+ 6569:     action = parse_action(fallback_text)
+ 6570:     effect.update(action)
+ 6571: 
+ 6572:     _merge_parenthetical(effect, parenthetical)
+ 6573:     if extra_activation_cond and "activation_condition_parsed" not in effect:
+ 6574:         effect["activation_condition_parsed"] = extra_activation_cond
+ 6575:     if extra_activation_pos and "activation_position" not in effect:

@@ -6540,8 +6540,6 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 _propagate_optional(result)
                 return result
             # For all other handlers, use the result as the effect directly
-            # (do NOT run parse_action on the full text — that would leak
-            #  card_type/target/etc from the condition into the effect)
             effect = result
             _merge_parenthetical(effect, parenthetical)
             if extra_activation_cond and "activation_condition_parsed" not in effect:
@@ -7297,8 +7295,10 @@ def _normalize_effect_tree(effect, original_text=None):
                         ):
                             gr = dict(acts[i + 1])
                             gr["timing_condition"] = "moved_this_turn"
-                            for f in ("card_type", "target", "all"):
-                                if act.get(f) and not gr.get(f):
+                            for f in ("card_type", "all", "target"):
+                                if f == "target" and not gr.get("target"):
+                                    gr["target"] = "self"
+                                elif act.get(f) and not gr.get(f):
                                     gr[f] = act[f]
                             collapsed.append(gr)
                             skip_next = True
@@ -7909,18 +7909,13 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         "actions": followup_acts,
                     }
                     if _cp:
-                        _seen_first = False
                         for _fa in followup_acts:
                             _fc = _fa.get("condition", {})
-                            # source: preceding_moved is set by _propagate_context (post-Section-C)
-                            # so we use negation+card_type as proxy for a preceding_moved condition
-                            if isinstance(_fc, dict) and (
-                                _fc.get("source") == "preceding_moved"
-                                or _fc.get("negation") is not None
-                            ):
-                                if not _seen_first:
-                                    _seen_first = True
-                                elif "card_property" not in _fc:
+                            if isinstance(_fc, dict) and "card_property" not in _fc:
+                                if (
+                                    _fc.get("source") == "preceding_moved"
+                                    or _fc.get("negation") is not None
+                                ):
                                     _fc["card_property"] = _cp
                 if eff.get("activation_position") and not followup.get(
                     "activation_position"
