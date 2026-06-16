@@ -147,6 +147,19 @@ impl AbilityResolver {
                         cond.activation_position = Some(act_pos.clone());
                     }
                 }
+                // For appearance conditions, merge group_names from the effect
+                // level so the condition evaluates which group appeared.
+                if cond.condition_type
+                    == Some(crate::ability::enums::ConditionType::AppearanceCondition)
+                    && (cond.group_names.is_none()
+                        || cond.group_names.as_ref().is_some_and(|v| v.is_empty()))
+                {
+                    if let Some(ref gns) = effect.group_names {
+                        if !gns.is_empty() {
+                            cond.group_names = Some(gns.clone());
+                        }
+                    }
+                }
                 if !ctx.evaluate_condition(&cond) {
                     log::debug!("[CAN_ACTIVATE] condition FAILED for {}: type={:?} location={:?} group={:?} exclude={:?}",
                         effect.action, condition.condition_type, condition.location, condition.group_names, condition.exclude_characters);
@@ -369,10 +382,10 @@ impl AbilityResolver {
     ) -> Result<(), String> {
         let mut dbg = AbDebug::new();
 
-        // Card info for debug
+        // Card info for debug (owned Strings to avoid borrowing gs across mutation)
         let card_data = activating_card.and_then(|id| gs.card_database.get_card(id));
-        let card_name = card_data.map(|c| c.name.as_str()).unwrap_or("unknown");
-        let card_no = card_data.map(|c| c.card_no.as_str()).unwrap_or("");
+        let card_name = card_data.map(|c| c.name.clone()).unwrap_or_default();
+        let card_no = card_data.map(|c| c.card_no.clone()).unwrap_or_default();
         let card_id_str = activating_card.map(|id| id.to_string()).unwrap_or_default();
 
         // Initialize root trace node with ability information
@@ -386,7 +399,7 @@ impl AbilityResolver {
             self.pipeline.trace.before = Some(ZoneSnapshot::from_game_state(gs));
         }
 
-        dbg.ability(card_name, card_no, &card_id_str, ability);
+        dbg.ability(&card_name, &card_no, &card_id_str, ability);
 
         // Check use_limit before cost, but don't insert until after effect runs
         let ability_key = activating_card
@@ -419,6 +432,14 @@ impl AbilityResolver {
             .ability_queue
             .current_entry()
             .is_some_and(|e| e.cost_paid);
+
+        // Log ability activation on first entry (not re-entry from pending choice)
+        if !cost_already_paid {
+            let pp = gs.player_prefix();
+            let trigger = ability.triggers.as_deref().unwrap_or("?");
+            gs.rule_log
+                .push(format!("{pp} {card_name}: 能力起動 [{trigger}]",));
+        }
 
         if !cost_already_paid {
             if let Some(ref cost) = ability.cost {
@@ -488,6 +509,10 @@ impl AbilityResolver {
                         _ => true,
                     };
                     if !pos_ok {
+                        let pp = gs.player_prefix();
+                        gs.rule_log.push(format!(
+                            "{pp} {card_name}: 位置条件不成立 ({kw:?}) - スキップ"
+                        ));
                         dbg.p("RESULT", "position requirement not met — effect skipped");
                         return Ok(());
                     }
@@ -518,6 +543,9 @@ impl AbilityResolver {
             if let Some(entry) = gs.ability_queue.current_entry_mut() {
                 entry.effect_started = true;
             }
+            let pp = gs.player_prefix();
+            gs.rule_log
+                .push(format!("{pp} {card_name}: 任意コスト不成立 - 効果スキップ"));
             dbg.p("RESULT", "optional cost skipped — effect not executed");
             return Ok(());
         }
@@ -526,25 +554,39 @@ impl AbilityResolver {
             // Check the effect's condition BEFORE executing. The condition must
             // be met in the current game state (after cost payment). This prevents
             // effects like "choice" from being shown when the condition fails.
-            if (effect.condition.is_some() || effect.activation_condition_parsed.is_some())
-                && !self.can_activate_effect(gs, effect)
-            {
-                // For 起動 (activation) abilities, the player deliberately paid the
-                // cost, so the attempt counts toward the turn limit even when the
-                // effect's condition isn't met.  AUTO-triggered abilities preserve
-                // their use_limit for when the board state actually satisfies the
-                // condition.
-                if ability.use_limit.is_some()
-                    && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
-                {
-                    if let Some(ref key) = ability_key {
-                        gs.turn_limited_abilities_used.insert(key.clone());
+            let pp = gs.player_prefix();
+            if effect.condition.is_some() || effect.activation_condition_parsed.is_some() {
+                if self.can_activate_effect(gs, effect) {
+                    gs.rule_log.push(format!("{pp} {card_name}: 条件成立 ✓"));
+                } else {
+                    let cond_text = effect
+                        .condition
+                        .as_ref()
+                        .or_else(|| effect.activation_condition_parsed.as_ref())
+                        .map(|c| c.text.as_str())
+                        .unwrap_or("");
+                    gs.rule_log.push(format!(
+                        "{pp} {card_name}: 条件不成立 ✗ ({cond_text}) - スキップ"
+                    ));
+                    // For 起動 (activation) abilities, the player deliberately paid the
+                    // cost, so the attempt counts toward the turn limit even when the
+                    // effect's condition isn't met.  AUTO-triggered abilities preserve
+                    // their use_limit for when the board state actually satisfies the
+                    // condition.
+                    if ability.use_limit.is_some()
+                        && ability.triggers.as_deref() == Some(crate::triggers::ACTIVATION)
+                    {
+                        if let Some(ref key) = ability_key {
+                            gs.turn_limited_abilities_used.insert(key.clone());
+                        }
                     }
+                    dbg.p("RESULT", "effect condition not met — skipped");
+                    return Ok(());
                 }
-                dbg.p("RESULT", "effect condition not met — skipped");
-                return Ok(());
             }
             if let Err(e) = self.execute_effect(gs, effect) {
+                gs.rule_log
+                    .push(format!("{pp} {card_name}: 効果失敗 ✗ ({e})"));
                 dbg.p("RESULT", format_args!("EFFECT FAILED: {}", e));
                 return Err(e);
             }
@@ -588,6 +630,7 @@ impl AbilityResolver {
                 self.store_pending_choice(gs);
                 return Ok(());
             }
+            gs.rule_log.push(format!("{pp} {card_name}: 効果適用 ✓"));
             dbg.p("RESULT", "effect applied ✓");
         }
 

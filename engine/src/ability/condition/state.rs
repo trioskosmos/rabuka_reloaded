@@ -483,18 +483,38 @@ impl<'a> ConditionContext<'a> {
                     return false;
                 }
                 // group_names and cost_limit may describe the arriving member
-                // ("とバトンタッチ" pattern: "baton touch WITH a X member")
-                let check_id = replaced_id;
+                // ("baton touch WITH a X member") or the replaced member
+                // ("baton touch FROM a X member"). The location field determines
+                // which: if self is in discard (location=discard), self is the
+                // replaced member, so group/cost describe the ARRIVING member.
+                // If self is on stage (location=stage), self is the arriving
+                // member, so group/cost describe the REPLACED member.
+                let arriving_id = self.game_state.baton_touch_arriving_card_id;
+                let loc_discard = matches!(
+                    Zone::from_str(condition.location.as_deref().unwrap_or("")),
+                    Some(Zone::Discard | Zone::Waitroom)
+                );
+                let check_id_for_group = if loc_discard {
+                    // Self is replaced: group/cost describe the arriving member
+                    arriving_id
+                } else {
+                    // Self is arriving: group/cost describe the replaced member
+                    Some(replaced_id)
+                };
                 if let Some(ref groups) = condition.group_names {
                     if !groups.is_empty() {
-                        let group_ok = groups.iter().any(|g| {
-                            crate::ability::util::card_matches_group_str(
-                                &self.game_state.card_database,
-                                check_id,
-                                Some(g),
-                            )
-                        });
-                        if !group_ok {
+                        if let Some(check_card) = check_id_for_group {
+                            let group_ok = groups.iter().any(|g| {
+                                crate::ability::util::card_matches_group_str(
+                                    &self.game_state.card_database,
+                                    check_card,
+                                    Some(g),
+                                )
+                            });
+                            if !group_ok {
+                                return false;
+                            }
+                        } else {
                             return false;
                         }
                     }
@@ -509,12 +529,16 @@ impl<'a> ConditionContext<'a> {
                     }
                 }
                 if let Some(cost_limit) = condition.cost_limit {
-                    if let Some(card) = self.game_state.card_database.get_card(check_id) {
-                        let op = condition.cost_limit_operator.as_deref().unwrap_or(">=");
-                        if !card
-                            .cost
-                            .is_some_and(|cost| compare_counts(Some(op), cost, cost_limit))
-                        {
+                    if let Some(check_card) = check_id_for_group {
+                        if let Some(card) = self.game_state.card_database.get_card(check_card) {
+                            let op = condition.cost_limit_operator.as_deref().unwrap_or(">=");
+                            if !card
+                                .cost
+                                .is_some_and(|cost| compare_counts(Some(op), cost, cost_limit))
+                            {
+                                return false;
+                            }
+                        } else {
                             return false;
                         }
                     } else {

@@ -1645,7 +1645,7 @@ impl<'a> ConditionContext<'a> {
                     if let Some(ref groups) = condition.group_names {
                         if !groups.is_empty() {
                             let card_db = &self.game_state.card_database;
-                            let all_match = stage_ids.iter().all(|&cid| {
+                            let any_match = stage_ids.iter().any(|&cid| {
                                 groups.iter().any(|g| {
                                     crate::ability::util::card_matches_group_str(
                                         card_db,
@@ -1654,8 +1654,30 @@ impl<'a> ConditionContext<'a> {
                                     )
                                 })
                             });
-                            if !all_match {
+                            if !any_match {
                                 return false;
+                            }
+                            // Prevent self-trigger on own appearance when NOT
+                            // arriving via baton touch (baton_touch appearances
+                            // legitimately trigger on the activating card itself).
+                            if !baton_touch_trigger {
+                                let has_other_matching = stage_ids.iter().any(|&cid| {
+                                    let matches_group = groups.iter().any(|g| {
+                                        crate::ability::util::card_matches_group_str(
+                                            card_db,
+                                            cid,
+                                            Some(g),
+                                        )
+                                    });
+                                    matches_group
+                                        && self
+                                            .activating_card_id
+                                            .map_or(true, |act_id| cid != act_id)
+                                        && self.game_state.has_card_appeared_this_turn(cid)
+                                });
+                                if !has_other_matching {
+                                    return false;
+                                }
                             }
                         }
                     }

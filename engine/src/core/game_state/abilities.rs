@@ -139,6 +139,7 @@ impl GameState {
     pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
+        let skip_this_card_auto_key = self.just_completed_ability_key.clone();
         {
             let player = if player_id_clone == self.player1.id {
                 &self.player1
@@ -150,9 +151,10 @@ impl GameState {
                 if card_id == -1 {
                     continue;
                 }
-                // Skip the card currently activating to prevent self-re-triggering
-                // (e.g. "自動 このメンバーが登場か、エリアを移動したとき" re-firing
-                // after its own wait-state effect triggers auto-ability re-scan).
+                let skip_this_card_auto_key = self.just_completed_ability_key.clone();
+                // During ability execution, skip the card whose ability is
+                // currently activating (prevents self-re-triggering from
+                // state-change scans or other in-execution scans).
                 if self.activating_card.is_some_and(|act_id| act_id == card_id) {
                     continue;
                 }
@@ -179,7 +181,8 @@ impl GameState {
                                 if let Some(ref condition) = effect.condition {
                                     if Zone::from_str(condition.location.as_deref().unwrap_or(""))
                                         == Some(Zone::Discard)
-                                        && condition.card_type.as_deref() == Some("member_card")
+                                        && (condition.card_type.as_deref() == Some("member_card")
+                                            || condition.target.as_deref() == Some("self"))
                                     {
                                         let in_discard =
                                             self.player1.waitroom.cards.contains(&card_id)
@@ -209,6 +212,11 @@ impl GameState {
                                 }
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            // Re-scan guard: skip re-enqueueing the exact auto
+                            // ability that just completed.
+                            if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
+                                continue;
+                            }
                             abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
                         }
                     }
@@ -240,6 +248,9 @@ impl GameState {
                                 }
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
+                            if skip_this_card_auto_key.as_deref() == Some(&ability_id) {
+                                continue;
+                            }
                             abilities_to_trigger.push((ability_id, card.card_no.clone(), card_id));
                         }
                     }
@@ -689,12 +700,22 @@ impl GameState {
             self.ability_queue.set_resolver(resolver);
             self.ability_queue.pause_for_choice(choice);
         } else {
-            // Capture player_id BEFORE complete_current() resets the queue.
+            // Capture card_no and player_id BEFORE complete_current()
+            // resets the queue.
             let current_pid = self
                 .ability_queue
                 .current_entry()
                 .map(|e| e.player_id.clone())
                 .unwrap_or_default();
+
+            // Build the ability key for the just-completed ability so the
+            // re-scan can skip re-enqueueing this SPECIFIC ability while
+            // still allowing OTHER abilities (e.g. each_time) on the same
+            // card to fire.
+            let just_completed_key: Option<String> = self
+                .ability_queue
+                .current_entry()
+                .map(|e| format!("{}_{}", e.card_no, e.ability.full_text));
 
             self.ability_queue.complete_current();
             self.activating_card = None;
@@ -709,7 +730,9 @@ impl GameState {
                         current_pid, self.recently_moved_cards
                     );
                 }
+                self.just_completed_ability_key = just_completed_key;
                 self.trigger_auto_abilities_for_player(&current_pid);
+                self.just_completed_ability_key = None;
             }
             self.clear_effect_tracking();
             let master_id = self.ability_master_id();

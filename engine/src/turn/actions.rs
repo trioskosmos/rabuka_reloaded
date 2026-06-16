@@ -596,6 +596,11 @@ impl super::TurnEngine {
                 .ability_queue
                 .current_entry()
                 .is_some_and(|e| e.effect_started);
+            // Capture key BEFORE complete_current() removes the entry.
+            let just_completed_key = game_state
+                .ability_queue
+                .current_entry()
+                .map(|e| format!("{}_{}", e.card_no, e.ability.full_text));
             log::debug!(
                 "[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}",
                 cost_was_paid,
@@ -636,7 +641,9 @@ impl super::TurnEngine {
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
                 let player_id = game_state.active_player().id.clone();
+                game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
+                game_state.just_completed_ability_key = None;
             } else if effect_ready {
                 log::debug!("RWC: calling process_current_ability");
                 eprintln!("[RWC_EFFECT_READY] storing resolver and calling PCA");
@@ -650,7 +657,9 @@ impl super::TurnEngine {
                         .current_entry()
                         .map(|e| e.player_id.clone())
                         .unwrap_or_else(|| "p1".to_string());
+                    game_state.just_completed_ability_key = just_completed_key.clone();
                     game_state.process_pending_auto_abilities(&player_id);
+                    game_state.just_completed_ability_key = None;
                 }
             } else if cost_was_paid {
                 // Record use_limit when ability completes (cost+effect both resolved)
@@ -687,7 +696,9 @@ impl super::TurnEngine {
                     game_state.recently_moved_cards = moved_snapshot;
                 }
                 let player_id = game_state.active_player().id.clone();
+                game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
+                game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
             } else {
                 let moved_snapshot = game_state.recently_moved_cards.clone();
@@ -698,7 +709,9 @@ impl super::TurnEngine {
                     game_state.recently_moved_cards = moved_snapshot;
                 }
                 let player_id = game_state.active_player().id.clone();
+                game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
+                game_state.just_completed_ability_key = None;
                 game_state.recently_moved_cards = None;
             }
         }

@@ -213,4 +213,5 @@ pub mod cards_6_thru_13_test;
 // New test files for parser/engine fix coverage
 pub mod nozomi_bp4_aggregate_test;
 pub mod kanon_bp5_constant_test;
+pub mod ability_trigger_fix_test;
 

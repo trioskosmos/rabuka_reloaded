@@ -84,6 +84,10 @@ pub struct GameState {
     pub last_energy_placed_by_effect: bool,
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
+    /// Key of the most recently completed auto ability, used by the re-scan
+    /// to prevent re-enqueueing the exact same ability while still allowing
+    /// other abilities on the same card (e.g. each_time) to fire.
+    pub just_completed_ability_key: Option<String>,
     // --- 1-byte aligned (bool, enum) ---
     pub rps_winner: Option<u8>,
     pub current_turn_phase: TurnPhase,
@@ -215,6 +219,7 @@ impl GameState {
             last_energy_placed_by_effect: false,
             // 2-byte aligned
             activating_card: None,
+            just_completed_ability_key: None,
             // 1-byte aligned
             rps_winner: None,
             current_turn_phase: TurnPhase::FirstAttackerNormal,
@@ -563,7 +568,11 @@ impl GameState {
 
     fn print_trace_node(node: &crate::ability::types::AbilityTraceNode, indent: usize) {
         let pad = "  ".repeat(indent);
-        let card_str = node.card.as_deref().map(|c| format!(" [{}]", c)).unwrap_or_default();
+        let card_str = node
+            .card
+            .as_deref()
+            .map(|c| format!(" [{}]", c))
+            .unwrap_or_default();
         println!("{}- {}{}", pad, node.label, card_str);
         if let (Some(ref b), Some(ref a)) = (&node.before, &node.after) {
             let mut changes = Vec::new();
@@ -574,13 +583,19 @@ impl GameState {
                 changes.push(format!("Stage: {} -> {}", b.stage_count, a.stage_count));
             }
             if b.waitroom_count != a.waitroom_count {
-                changes.push(format!("Discard: {} -> {}", b.waitroom_count, a.waitroom_count));
+                changes.push(format!(
+                    "Discard: {} -> {}",
+                    b.waitroom_count, a.waitroom_count
+                ));
             }
             if b.energy_count != a.energy_count {
                 changes.push(format!("Energy: {} -> {}", b.energy_count, a.energy_count));
             }
             if b.active_energy_count != a.active_energy_count {
-                changes.push(format!("Active Energy: {} -> {}", b.active_energy_count, a.active_energy_count));
+                changes.push(format!(
+                    "Active Energy: {} -> {}",
+                    b.active_energy_count, a.active_energy_count
+                ));
             }
             if b.deck_count != a.deck_count {
                 changes.push(format!("Deck: {} -> {}", b.deck_count, a.deck_count));

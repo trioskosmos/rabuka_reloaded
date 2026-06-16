@@ -184,7 +184,8 @@ impl GameState {
                             Some(crate::ability::enums::ActionType::Restriction) => {
                                 if let Some(ref rt) = effect.restriction_type {
                                     exp_prohibition.push(format!("const_restriction:{}:", rt));
-                                    if rt == "cannot_activate" || rt == "cannot_activate_by_effect" {
+                                    if rt == "cannot_activate" || rt == "cannot_activate_by_effect"
+                                    {
                                         let tgt = effect.target.as_deref().unwrap_or("self");
                                         let resolved = self.resolve_target_player(tgt).id.clone();
                                         if !self.cannot_activate_members.contains(&resolved) {
@@ -689,6 +690,7 @@ impl GameState {
         self.baton_touch_zero_cost = false;
         self.baton_touch_replaced_member_cost = None;
         self.baton_touch_replaced_member_id = None;
+        self.baton_touch_arriving_card_id = None;
     }
 
     pub fn record_card_movement(&mut self, card_id: i16) {

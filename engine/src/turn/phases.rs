@@ -394,6 +394,9 @@ impl super::TurnEngine {
             return Err("Baton touch is prohibited by a restriction effect".to_string());
         }
 
+        // Clear stale baton touch state from any previous action this turn
+        game_state.clear_baton_touch_tracking();
+
         let card_db = game_state.card_database.clone();
 
         // Recalculate constant cost modifiers (hand-based cost reductions, etc.)
