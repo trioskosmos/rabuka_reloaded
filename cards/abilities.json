@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T05:38:18.945706",
+  "generated_at": "2026-06-17T05:45:46.121185",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5561,49 +5561,39 @@
             "duration": "live_end"
           },
           {
-            "text": "その後、自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る",
+            "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る",
+            "condition": {
+              "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合",
+              "target": "both",
+              "location": "stage",
+              "card_type": "member_card",
+              "comparison_target": "opponent",
+              "operator": ">",
+              "comparison_type": "cost",
+              "aggregate": "total",
+              "group_names": [
+                "蓮ノ空"
+              ],
+              "type": "comparison_condition"
+            },
             "action": "sequential",
             "actions": [
               {
-                "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る",
-                "condition": {
-                  "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合",
-                  "target": "both",
-                  "location": "stage",
-                  "card_type": "member_card",
-                  "comparison_target": "opponent",
-                  "operator": ">",
-                  "comparison_type": "cost",
-                  "aggregate": "total",
-                  "group_names": [
-                    "蓮ノ空"
-                  ],
-                  "type": "comparison_condition"
-                },
-                "action": "sequential",
-                "actions": [
-                  {
-                    "action": "gain_resource",
-                    "resource": "blade",
-                    "count": 1,
-                    "duration": "live_end",
-                    "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
-                  },
-                  {
-                    "action": "gain_resource",
-                    "resource": "heart",
-                    "heart_colors": [
-                      "heart05"
-                    ],
-                    "count": 1,
-                    "duration": "live_end",
-                    "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
-                  }
+                "action": "gain_resource",
+                "resource": "blade",
+                "count": 1,
+                "duration": "live_end",
+                "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
+              },
+              {
+                "action": "gain_resource",
+                "resource": "heart",
+                "heart_colors": [
+                  "heart05"
                 ],
-                "group_names": [
-                  "蓮ノ空"
-                ],
-                "duration": "live_end"
+                "count": 1,
+                "duration": "live_end",
+                "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
               }
             ],
             "group_names": [
@@ -7530,18 +7520,11 @@
             "card_type": "card"
           },
           {
-            "text": "そうした場合、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る",
-            "action": "sequential",
-            "actions": [
-              {
-                "text": "{{icon_blade.png|ブレード}}を得る",
-                "duration": "live_end",
-                "action": "gain_resource",
-                "resource": "blade",
-                "count": 1
-              }
-            ],
-            "conditional": true
+            "text": "{{icon_blade.png|ブレード}}を得る",
+            "duration": "live_end",
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1
           },
           {
             "text": "これにより控え室に置いたカードがライブカードの場合、このメンバーをウェイトにする",
@@ -24913,21 +24896,13 @@
             "all": true
           },
           {
-            "text": "自分のステージにいる、このターン中にエリアを移動しているすべてのメンバーは、選んだハートを1つ得る",
-            "action": "sequential",
-            "actions": [
-              {
-                "text": "選んだハートを1つ得る",
-                "count": 1,
-                "action": "gain_resource",
-                "resource": "heart",
-                "duration": "live_end",
-                "all": true,
-                "timing_condition": "moved_this_turn"
-              }
-            ],
+            "text": "選んだハートを1つ得る",
+            "count": 1,
+            "action": "gain_resource",
+            "resource": "heart",
             "duration": "live_end",
-            "all": true
+            "all": true,
+            "timing_condition": "moved_this_turn"
           }
         ],
         "all": true,
@@ -29686,7 +29661,8 @@
             "count": 1,
             "resource": "blade",
             "action": "gain_resource",
-            "text": "自分のエネルギーが7枚以上ある場合、ライブ終了時まで、このメンバーと自分のステージにいるほかの『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る"
+            "text": "自分のエネルギーが7枚以上ある場合、ライブ終了時まで、このメンバーと自分のステージにいるほかの『Liella!』のメンバー1人は、{{icon_blade.png|ブレード}}を得る",
+            "duration": "live_end"
           },
           {
             "text": "{{icon_blade.png|ブレード}}を得る",
@@ -29698,7 +29674,8 @@
             "card_type": "member_card",
             "group_names": [
               "Liella!"
-            ]
+            ],
+            "duration": "live_end"
           }
         ],
         "condition": {

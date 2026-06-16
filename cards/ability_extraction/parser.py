@@ -7177,8 +7177,11 @@ def _normalize_effect_tree(effect, original_text=None):
     effect = _walk(effect, original_text)
 
     # Collapse position_change + gain_resource into gain_resource with timing_condition
-    def _collapse_position_changes(node, parent=None):
+    def _collapse_position_changes(node):
         if isinstance(node, dict):
+            # Recurse into children FIRST so they're collapsed before parent processes them
+            for v in node.values():
+                _collapse_position_changes(v)
             if node.get("action") == "sequential":
                 acts = node.get("actions", [])
                 collapsed = []
@@ -7188,7 +7191,6 @@ def _normalize_effect_tree(effect, original_text=None):
                         skip_next = False
                         continue
                     if isinstance(act, dict) and act.get("action") == "position_change":
-                        # Look ahead for a matching gain_resource
                         if (
                             i + 1 < len(acts)
                             and isinstance(acts[i + 1], dict)
@@ -7199,19 +7201,17 @@ def _normalize_effect_tree(effect, original_text=None):
                             collapsed.append(gr)
                             skip_next = True
                             continue
-                    # After collapsing position_change+gain_resource, if the nested
-                    # sequential has only actions left, flatten into parent
                     if isinstance(act, dict) and act.get("action") == "sequential":
                         sub_acts = act.get("actions", [])
-                        # Check if this sequential was produced by position_change collapse
-                        # by looking for timing_condition on the first sub-action
-                        if len(sub_acts) == 1 and sub_acts[0].get("timing_condition"):
-                            collapsed.append(sub_acts[0])
+                        if len(sub_acts) == 1:
+                            item = dict(sub_acts[0])
+                            for f in ("duration", "all"):
+                                if act.get(f) and not item.get(f):
+                                    item[f] = act[f]
+                            collapsed.append(item)
                             continue
                     collapsed.append(act)
                 node["actions"] = collapsed
-            for v in node.values():
-                _collapse_position_changes(v)
         elif isinstance(node, list):
             for item in node:
                 _collapse_position_changes(item)
@@ -7699,48 +7699,46 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             # ---- A1: Structural transforms (keep) ----
 
             # C: conditional_on_result — N-action sequential with これにより condition
-            # Also handles simple これにより resource conditions (keeps sequential, just attaches condition)
             if eff.get("action") == "sequential" and "これにより" in t:
                 acts = eff.get("actions", [])
-            result_idx = -1
-            for i, act in enumerate(acts):
-                if isinstance(act, dict):
-                    c1 = act.get("condition")
-                    cond_text = c1.get("text", "") if isinstance(c1, dict) else ""
-                    if "これにより" in cond_text:
-                        result_idx = i
-                        break
-                    # Also check the action's own text for これにより+場合 pattern
-                    act_text = act.get("text", "") or ""
-                    m = re.match(r"^(これにより.+?場合)[、，]?\s*", act_text)
-                    if m:
-                        result_idx = i
-                        break
-            # If no action has a parsed これにより condition, extract from action texts
-            if result_idx < 0:
+                result_idx = -1
                 for i, act in enumerate(acts):
-                    if not isinstance(act, dict):
-                        continue
-                    act_text = act.get("text", "") or ""
-                    m = re.match(r"^(これにより.+?場合)[、，]?\s*(.*)$", act_text)
-                    if m:
-                        cond_text = m.group(1)
-                        action_text = m.group(2)
-                        cond_dict = {"text": cond_text, "type": "comparison_condition"}
-                        count_m = re.search(r"(\d+)", cond_text)
-                        if count_m:
-                            cond_dict["count"] = int(count_m.group(1))
-                        cond_dict["operator"] = ">="
-                        if "余剰ハート" in cond_text:
-                            cond_dict["resource_type"] = "surplus_heart"
-                        # For simple resource conditions, keep sequential structure
-                        # and just attach the condition (don't convert to conditional_on_result)
-                        if cond_dict.get("resource_type"):
-                            act["condition"] = cond_dict
-                            act["text"] = action_text
-                        break
-            if 0 < result_idx < len(acts):
-                primary_acts = acts[:result_idx]
+                    if isinstance(act, dict):
+                        c1 = act.get("condition")
+                        cond_text = c1.get("text", "") if isinstance(c1, dict) else ""
+                        if "これにより" in cond_text:
+                            result_idx = i
+                            break
+                        act_text = act.get("text", "") or ""
+                        m = re.match(r"^(これにより.+?場合)[、，]?\s*", act_text)
+                        if m:
+                            result_idx = i
+                            break
+                if result_idx < 0:
+                    for i, act in enumerate(acts):
+                        if not isinstance(act, dict):
+                            continue
+                        act_text = act.get("text", "") or ""
+                        m = re.match(r"^(これにより.+?場合)[、，]?\s*(.*)$", act_text)
+                        if m:
+                            cond_text = m.group(1)
+                            action_text = m.group(2)
+                            cond_dict = {
+                                "text": cond_text,
+                                "type": "comparison_condition",
+                            }
+                            count_m = re.search(r"(\d+)", cond_text)
+                            if count_m:
+                                cond_dict["count"] = int(count_m.group(1))
+                            cond_dict["operator"] = ">="
+                            if "余剰ハート" in cond_text:
+                                cond_dict["resource_type"] = "surplus_heart"
+                            if cond_dict.get("resource_type"):
+                                act["condition"] = cond_dict
+                                act["text"] = action_text
+                            break
+                if 0 < result_idx < len(acts):
+                    primary_acts = acts[:result_idx]
                 if len(primary_acts) == 1:
                     primary = dict(primary_acts[0])
                     if "text" not in primary:
@@ -7995,6 +7993,21 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                             if not sub.get("temporal") and not sub.get("resource_type"):
                                 sub["location"] = new_ctx["location"]
                         _propagate_context(sub, new_ctx)
+
+            # Restore duration for sequential sub-actions when the parser lost it
+            # during sequential creation (e.g., "と" split targets).
+            if action == "sequential" and not new_ctx.get("duration") and t:
+                if "ライブ終了時まで" in t:
+                    for act in node.get("actions", []):
+                        if isinstance(act, dict) and act.get("action") in (
+                            "gain_resource",
+                            "change_state",
+                            "move_cards",
+                        ):
+                            if act.get("duration") is None and "得る" in (
+                                act.get("text", "") or ""
+                            ):
+                                act["duration"] = "live_end"
 
             for ck in (
                 "condition",

@@ -1,0 +1,16 @@
+ 7700: indent= 1 | 
+ 7701: indent=12 |             # C: conditional_on_result — N-action sequential with これにより conditio
+ 7702: indent=12 |             # Also handles simple これにより resource conditions (keeps sequential, j
+ 7703: indent=12 |             if eff.get("action") == "sequential" and "これにより" in t:
+ 7704: indent=16 |                 acts = eff.get("actions", [])
+ 7705: indent=12 |             result_idx = -1
+ 7706: indent=12 |             for i, act in enumerate(acts):
+ 7707: indent=16 |                 if isinstance(act, dict):
+ 7708: indent=20 |                     c1 = act.get("condition")
+ 7709: indent=20 |                     cond_text = c1.get("text", "") if isinstance(c1, dict) else 
+ 7710: indent=20 |                     if "これにより" in cond_text:
+ 7711: indent=24 |                         result_idx = i
+ 7712: indent=24 |                         break
+ 7713: indent=20 |                     # Also check the action's own text for これにより+場合 pattern
+ 7714: indent=20 |                     act_text = act.get("text", "") or ""
+ 7715: indent=20 |                     m = re.match(r"^(これにより.+?場合)[、，]?\s*", act_text)
