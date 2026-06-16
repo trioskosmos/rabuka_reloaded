@@ -1764,6 +1764,8 @@ def parse_condition(text: str) -> Dict[str, Any]:
                 matched.discard(result["position"])
                 if matched:
                     result["position_compare"] = sorted(matched)[0]
+            if "check_self" not in result and "このカード" in text:
+                result["check_self"] = True
             return result
 
     # Fall-through: generic field extraction + type inference
@@ -4817,26 +4819,24 @@ def _try_choice(text):
     if not options:
         return None
 
-    # Conditional alternative in choice modifier: "代わりに" → conditional_alternative
+    # Conditional alternative in choice modifier: "代わりに" → embed in choice result
     if cond_mod and ALTERNATIVE_MARKER in cond_mod:
         alt_parts = cond_mod.split(ALTERNATIVE_MARKER, 1)
         if len(alt_parts) == 2:
             before = alt_parts[0].strip().rstrip("、。")
-            after = alt_parts[1].strip().rstrip("。")
-            alt_effect = {"action": "choice", "options": options}
-            if "以上" in after:
-                alt_effect["any_number"] = True
-            else:
-                ac = extract_count(after)
-                if ac:
-                    alt_effect["count"] = ac
-            return {
-                "text": text,
-                "action": "conditional_alternative",
-                "condition": parse_condition(before),
-                "primary_effect": {"action": "choice", "count": 1, "options": options},
-                "alternative_effect": alt_effect,
-            }
+            after_text = alt_parts[1].strip().rstrip("。")
+            # Override choice_condition with just the "before" part (the primary condition)
+            bc_cond = parse_condition(before)
+            if bc_cond.get("type") != "custom":
+                result["choice_condition"] = bc_cond
+            # Extract and set alternative_condition from the "after" part
+            alt_ct, _ = split_condition_action(after_text)
+            if alt_ct:
+                alt_cond = parse_condition(alt_ct)
+                if alt_cond.get("type") != "custom":
+                    result["alternative_condition"] = alt_cond
+            if "以上" in after_text:
+                result["alternative_count_type"] = "any_number"
 
     result["options"] = options
     return result
@@ -5558,7 +5558,37 @@ def _try_heart_choice(text):
 
 # ============== FALLTHROUGH PATTERN MATCHERS ==============
 
+
+def _try_timing_condition_gain(text):
+    """このターン中にエリアを移動した全てのXのメンバーはYを得る — gain with timing_condition."""
+    m = re.search(
+        r"このターン中にエリアを移動した(?:全て|すべて)の(.+?)のメンバーは、(.+?)を得る",
+        text,
+    )
+    if not m:
+        return None
+    group_name = m.group(1).strip("｢「").rstrip("｣」")
+    resource_text = m.group(2)
+    blade_count = resource_text.count("{{icon_blade.png|ブレード}}")
+    if blade_count == 0:
+        return None
+    result = {
+        "text": text,
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": blade_count,
+        "group_names": [group_name],
+        "all": True,
+        "card_type": "member_card",
+        "timing_condition": "moved_this_turn",
+        "self_target": True,
+        "duration": "live_end",
+    }
+    return result
+
+
 _EFFECT_HANDLERS = [
+    _try_timing_condition_gain,
     _try_per_unit,
     _try_conditional_alternative,
     _try_character_specific,
@@ -5574,8 +5604,8 @@ _EFFECT_HANDLERS = [
     _try_opponent_after_conditional,
     _try_reveal_until_chosen_card,
     _try_reveal_until_live,
-    _try_furthermore,
     _try_kore_niyori_result,
+    _try_furthermore,
     _try_sequential_duration,
     _try_conditional_sequential,
     _try_same_action,
@@ -5694,6 +5724,27 @@ def parse_effect(text: str) -> Dict[str, Any]:
             elif "{{right.png|右サイド}}" in text:
                 extra_activation_pos = "right_side"
 
+    def _add_text_to_sub_actions(node, parent_text):
+        if not isinstance(node, dict):
+            return
+        if "text" not in node:
+            node["text"] = parent_text
+        for key in (
+            "select_action",
+            "optional_action",
+            "conditional_action",
+            "followup_action",
+            "primary_effect",
+            "alternative_effect",
+            "look_action",
+        ):
+            sub = node.get(key)
+            if isinstance(sub, dict):
+                _add_text_to_sub_actions(sub, node.get("text", parent_text))
+        for sub in node.get("actions", []):
+            if isinstance(sub, dict) and "text" not in sub:
+                _add_text_to_sub_actions(sub, parent_text)
+
     # Try all handlers in priority order
     for handler in _EFFECT_HANDLERS:
         hn = handler.__name__ if hasattr(handler, "__name__") else "?"
@@ -5761,6 +5812,33 @@ def parse_effect(text: str) -> Dict[str, Any]:
                 effect["activation_condition_parsed"] = extra_activation_cond
             if extra_activation_pos and "activation_position" not in effect:
                 effect["activation_position"] = extra_activation_pos
+            if (
+                "condition" in effect
+                and isinstance(effect["condition"], dict)
+                and effect["condition"].get("exclude_self")
+            ):
+                effect.pop("exclude_self", None)
+            if effect.get("exclude_self") and "condition" in effect:
+                cond_text = effect["condition"].get("text", "")
+                eff_text = effect.get("text", "")
+                if (
+                    "このメンバー以外" in cond_text
+                    and "このメンバー以外" not in eff_text
+                ):
+                    effect.pop("exclude_self", None)
+            if "source" not in effect and effect.get("action") in (
+                "change_state",
+                "move_cards",
+            ):
+                src = extract_source(text)
+                if src:
+                    effect["source"] = src
+            if "optional" not in effect:
+                if "condition" in effect or "場合" not in text:
+                    opt = extract_optional(text)
+                    if opt:
+                        effect["optional"] = True
+            _add_text_to_sub_actions(effect, text)
             return effect
 
     # No handler matched: fallback to parse_action
@@ -5769,6 +5847,19 @@ def parse_effect(text: str) -> Dict[str, Any]:
 
     action = parse_action(fallback_text)
     effect.update(action)
+
+    if (
+        "condition" in effect
+        and isinstance(effect["condition"], dict)
+        and effect["condition"].get("exclude_self")
+    ):
+        effect.pop("exclude_self", None)
+    if effect.get("exclude_self") and "condition" in effect:
+        cond_text = effect["condition"].get("text", "")
+        eff_text = effect.get("text", "")
+        if "このメンバー以外" in cond_text and "このメンバー以外" not in eff_text:
+            effect.pop("exclude_self", None)
+    _add_text_to_sub_actions(effect, fallback_text)
 
     _merge_parenthetical(effect, parenthetical)
     if extra_activation_cond and "activation_condition_parsed" not in effect:
@@ -6471,7 +6562,70 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
 
 
 def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
-    """Augment temporal_condition effects with heart_colors and count from their text."""
+    """Parse null-effect abilities, then post-process."""
+    # First pass: parse abilities with null cost/effect (from extract_card_abilities.py)
+    for ability in data["unique_abilities"]:
+        eff = ability.get("effect")
+        if isinstance(eff, dict):
+            continue
+        t = ability.get("triggerless_text", "")
+        if not t or ability.get("is_null", False):
+            continue
+
+        # Same parse chain as the old extract_card_abilities.py (no _clean, no parse_ability)
+        cost_text = None
+        effect_text = t
+        if "：" in effect_text:
+            parts = effect_text.split("：", 1)
+            cost_text = parts[0].strip()
+            effect_text = parts[1].strip()
+
+        cost = None
+        if cost_text:
+            try:
+                cost = parse_cost(cost_text)
+            except Exception:
+                cost = None
+
+        effect = {}
+        try:
+            effect = parse_effect(effect_text)
+            effect = _normalize_effect_tree(effect, t)
+            if "actions" in effect and not effect["actions"]:
+                pass
+            # Enrich heart colors (equivalent to old _enrich_effect_type)
+            heart_colors = []
+            seen = set()
+            for m in re.findall(r"{{heart_(\d+)\.png\|heart\d+}}", t):
+                h = f"heart{m.zfill(2)}"
+                if h not in seen:
+                    seen.add(h)
+                    heart_colors.append(h)
+            if heart_colors and "heart_colors" not in effect:
+                effect["heart_colors"] = heart_colors
+            if "heart_colors" in effect and "condition" in effect:
+                cond = effect["condition"]
+                if (
+                    isinstance(cond, dict)
+                    and cond.get("type") == "location_condition"
+                    and "heart_colors" not in cond
+                    and not cond.get("check_self")
+                ):
+                    cond["heart_colors"] = effect["heart_colors"]
+        except Exception:
+            effect = {"text": effect_text, "actions": []}
+
+        if isinstance(effect, dict) and "cost" in effect:
+            cost = effect.pop("cost")
+
+        ability["cost"] = cost
+        ability["effect"] = effect
+        if "Aspire" in str(ability.get("cards", [])):
+            print(
+                f"DEBUG aspire: effect action={effect.get('action')} keys={list(effect.keys())}"
+            )
+
+    # Augment temporal_condition effects with heart_colors and count from their text.
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
         if not isinstance(eff, dict):
@@ -6595,6 +6749,22 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             eff["conditional_action"] = eff.pop("positive_action")
         if "negative_action" in eff:
             eff.pop("negative_action")
+
+    # Flatten opponent_action wrappers to direct actions with target=opponent
+    for ability in data["unique_abilities"]:
+        eff = ability.get("effect")
+        if not isinstance(eff, dict):
+            continue
+        if eff.get("opponent_action") and isinstance(eff["opponent_action"], dict):
+            oa = eff.pop("opponent_action")
+            for k, v in oa.items():
+                if k not in eff:
+                    eff[k] = v
+            inner_action = oa.get("action")
+            if inner_action:
+                eff["action"] = inner_action
+            eff.setdefault("target", "opponent")
+            eff.setdefault("action_by", "opponent")
 
     return data
 
