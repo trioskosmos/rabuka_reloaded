@@ -271,6 +271,23 @@ impl super::TurnEngine {
             &game_state.card_database,
             note_icons,
         );
+        // Add constant score source info into breakdown.scores
+        {
+            let stage_cards: Vec<i16> = if is_first {
+                game_state.player1.stage.stage.to_vec()
+            } else {
+                game_state.player2.stage.stage.to_vec()
+            };
+            for (cid, text, val) in &game_state.mods.constant_score_sources {
+                if stage_cards.contains(cid) {
+                    bd.scores.push(crate::types::ScoreLine {
+                        source: text.clone(),
+                        value: val.unsigned_abs(),
+                    });
+                }
+            }
+        }
+
         // Replace placeholder data with enriched versions from ability_applications
         snap.member_contributions = mc;
         snap.breakdown = bd;

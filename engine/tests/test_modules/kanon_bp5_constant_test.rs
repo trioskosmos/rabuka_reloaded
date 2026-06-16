@@ -19,9 +19,9 @@ fn setup_cards() -> (i16, i16, i16, i16, i16) {
     let db = load_real_database();
     let game = TestGame::new(db);
     let kanon = game.id("PL!SP-bp5-012-N");
-    let tiny_stars = game.id("PL!SP-bp1-024-L");   // Liella!, need_heart total = 8
-    let start_true = game.id("PL!SP-bp1-023-L");   // Liella!, need_heart total = 4
-    let start_dash = game.id("PL!-sd1-019-SD");     // non-Liella, need_heart total = 3
+    let tiny_stars = game.id("PL!SP-bp1-024-L"); // Liella!, need_heart total = 8
+    let start_true = game.id("PL!SP-bp1-023-L"); // Liella!, need_heart total = 4
+    let start_dash = game.id("PL!-sd1-019-SD"); // non-Liella, need_heart total = 3
     let filler = game.id("PL!-sd1-010-SD");
     (kanon, tiny_stars, start_true, start_dash, filler)
 }
@@ -42,9 +42,15 @@ fn kanon_constant_empty_live_card_zone_no_bonus() {
 
     game.state.recalculate_constants();
 
-    let heart = game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03);
-    assert_eq!(heart, 0,
-        "Empty live_card_zone → condition fails, expected heart03=0, got {}", heart);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon, HeartColor::Heart03);
+    assert_eq!(
+        heart, 0,
+        "Empty live_card_zone → condition fails, expected heart03=0, got {}",
+        heart
+    );
 }
 
 /// Liella! live card with total need_heart = 8 → condition met → +1 heart03.
@@ -61,9 +67,15 @@ fn kanon_constant_liella_live_need_heart_8_gains_bonus() {
 
     game.state.recalculate_constants();
 
-    let heart = game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03);
-    assert_eq!(heart, 1,
-        "Liella! live card need_heart=8 → condition met, expected heart03=1, got {}", heart);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon, HeartColor::Heart03);
+    assert_eq!(
+        heart, 1,
+        "Liella! live card need_heart=8 → condition met, expected heart03=1, got {}",
+        heart
+    );
 }
 
 /// Liella! live card with total need_heart = 4 (< 8) → condition not met → no bonus.
@@ -80,9 +92,15 @@ fn kanon_constant_liella_live_need_heart_4_no_bonus() {
 
     game.state.recalculate_constants();
 
-    let heart = game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03);
-    assert_eq!(heart, 0,
-        "Liella! live card need_heart=4 (<8) → condition fails, expected heart03=0, got {}", heart);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon, HeartColor::Heart03);
+    assert_eq!(
+        heart, 0,
+        "Liella! live card need_heart=4 (<8) → condition fails, expected heart03=0, got {}",
+        heart
+    );
 }
 
 /// Non-Liella! live card → group filter rejects it → condition not met → no bonus.
@@ -99,9 +117,15 @@ fn kanon_constant_non_liella_live_no_bonus() {
 
     game.state.recalculate_constants();
 
-    let heart = game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03);
-    assert_eq!(heart, 0,
-        "Non-Liella! live card → group filter fails, expected heart03=0, got {}", heart);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon, HeartColor::Heart03);
+    assert_eq!(
+        heart, 0,
+        "Non-Liella! live card → group filter fails, expected heart03=0, got {}",
+        heart
+    );
 }
 
 /// Two Liella! live cards totalling 4+4=8 → condition met → +1 heart03.
@@ -120,9 +144,15 @@ fn kanon_constant_two_liella_live_cards_sum_to_8() {
 
     game.state.recalculate_constants();
 
-    let heart = game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03);
-    assert_eq!(heart, 1,
-        "Two Liella! live cards (4+4=8) → condition met, expected heart03=1, got {}", heart);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon, HeartColor::Heart03);
+    assert_eq!(
+        heart, 1,
+        "Two Liella! live cards (4+4=8) → condition met, expected heart03=1, got {}",
+        heart
+    );
 }
 
 /// Cards in success_live_card_zone should NOT satisfy the condition (wrong zone).
@@ -134,15 +164,25 @@ fn kanon_constant_success_zone_does_not_count() {
 
     game.state.player1.stage.stage = [filler, kanon, -1];
     // Put qualifying card in the WRONG zone (success, not live_card_zone)
-    game.state.player1.success_live_card_zone.cards.push(tiny_stars);
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(tiny_stars);
     game.state.player1.hand.cards.push(filler);
     game.give_energy(5);
 
     game.state.recalculate_constants();
 
-    let heart = game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03);
-    assert_eq!(heart, 0,
-        "Card in success_live_card_zone → wrong zone, expected heart03=0, got {}", heart);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon, HeartColor::Heart03);
+    assert_eq!(
+        heart, 0,
+        "Card in success_live_card_zone → wrong zone, expected heart03=0, got {}",
+        heart
+    );
 }
 
 /// Condition met → bonus applied; then cards removed → bonus removed.
@@ -159,13 +199,24 @@ fn kanon_constant_bonus_removed_when_cards_leaves_zone() {
 
     // Condition met → bonus active
     game.state.recalculate_constants();
-    assert_eq!(game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03), 1);
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(kanon, HeartColor::Heart03),
+        1
+    );
 
     // Remove the live card → condition fails → bonus removed
     game.state.player1.live_card_zone.cards.clear();
     game.state.recalculate_constants();
 
-    let heart = game.state.mods.get_heart_modifier(kanon, HeartColor::Heart03);
-    assert_eq!(heart, 0,
-        "Cards removed from live_card_zone → bonus should be 0, got {}", heart);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(kanon, HeartColor::Heart03);
+    assert_eq!(
+        heart, 0,
+        "Cards removed from live_card_zone → bonus should be 0, got {}",
+        heart
+    );
 }

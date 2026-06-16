@@ -345,10 +345,7 @@ fn heart00_passes_check_succeeds_when_sufficient() {
         perf.lives.iter().any(|l| l.passed),
         "Live card should PASS with sufficient hearts"
     );
-    assert!(
-        perf.total_score > 0,
-        "Score should be > 0 when live passes"
-    );
+    assert!(perf.total_score > 0, "Score should be > 0 when live passes");
 }
 
 // ── base_score is stored correctly in snapshot ──────────────────
@@ -403,11 +400,15 @@ fn live_card_base_score_stored_correctly() {
     for (i, l) in perf.lives.iter().enumerate() {
         assert_eq!(
             l.base_score, 1,
-            "live[{}] base_score should be 1 (card's raw score)", i
+            "live[{}] base_score should be 1 (card's raw score)",
+            i
         );
         assert!(
             l.score >= l.base_score,
-            "live[{}] score ({}) should be >= base_score ({})", i, l.score, l.base_score
+            "live[{}] score ({}) should be >= base_score ({})",
+            i,
+            l.score,
+            l.base_score
         );
     }
 }

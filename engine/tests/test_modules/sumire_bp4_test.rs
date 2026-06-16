@@ -438,8 +438,7 @@ fn sumire_single_baton_stays_single_no_auto_promote() {
 
     // Left still occupied
     assert_eq!(
-        game.state.player1.stage.stage[0],
-        liella1,
+        game.state.player1.stage.stage[0], liella1,
         "Left still has liella1"
     );
 }
@@ -483,10 +482,7 @@ fn sumire_action_type_string_parsing_play_member_to_stage() {
     );
 
     let parsed: Result<ActionType, String> = "PlayMemberToStage".parse();
-    assert!(
-        parsed.is_err(),
-        "PascalCase should fail to parse"
-    );
+    assert!(parsed.is_err(), "PascalCase should fail to parse");
 
     // This is what the web server does on parse failure — defaults to Pass
     let fallback = "PlayMemberToStage"
@@ -607,16 +603,27 @@ fn sumire_explicit_double_baton_via_card_indices() {
     );
 
     let on_stage = game.state.player1.stage.stage;
-    assert_eq!(on_stage[0], liella2, "Left has deployed liella2 (cost 2 <= 4)");
+    assert_eq!(
+        on_stage[0], liella2,
+        "Left has deployed liella2 (cost 2 <= 4)"
+    );
     assert_eq!(on_stage[1], sumire, "Center has Sumire");
     assert_eq!(on_stage[2], -1, "Right empty");
 
-    assert!(game.state.player1.waitroom.cards.contains(&liella1),
-        "liella1 in waitroom (cost 15 > 4)");
-    assert!(!game.state.player1.waitroom.cards.contains(&liella2),
-        "liella2 deployed back to stage");
+    assert!(
+        game.state.player1.waitroom.cards.contains(&liella1),
+        "liella1 in waitroom (cost 15 > 4)"
+    );
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&liella2),
+        "liella2 deployed back to stage"
+    );
 
-    assert_eq!(game.state.player1.hand.cards.len(), 3, "Hand: filler + 2 draws");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        3,
+        "Hand: filler + 2 draws"
+    );
 
     let expected_cost = 5u32;
     let energy_after = game.state.player1.energy_zone.active_count();
@@ -671,7 +678,11 @@ fn sumire_explicit_double_baton_to_left_no_debut() {
 
     assert_eq!(game.state.baton_touch_count, 2, "2 baton touches");
 
-    assert_eq!(game.state.player1.hand.cards.len(), 1, "No draw: center required");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "No draw: center required"
+    );
 
     let expected_cost = 5u32;
     let energy_after = game.state.player1.energy_zone.active_count();

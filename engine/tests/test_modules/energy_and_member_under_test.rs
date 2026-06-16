@@ -656,7 +656,10 @@ fn sayaka_use_limit_enforced() {
         .stage
         .get_under_cards(MemberArea::Center)
         .len();
-    assert_eq!(under_after_first, 1, "1 card should be under sayaka after first activation");
+    assert_eq!(
+        under_after_first, 1,
+        "1 card should be under sayaka after first activation"
+    );
     // Second activation should fail due to use_limit=1
     let result = game.try_activate_ability(sayaka);
     assert!(

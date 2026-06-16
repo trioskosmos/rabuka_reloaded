@@ -563,6 +563,27 @@ impl<'a> CardFilter<'a> {
         self
     }
 
+    /// Returns true if any filter field is set that could cause cards to be rejected.
+    pub fn has_filter(&self) -> bool {
+        self.card_type.is_some()
+            || self.group.is_some()
+            || self.groups.is_some()
+            || self.cost_limit.is_some()
+            || self.cost_limit_min.is_some()
+            || self.characters.is_some()
+            || self.exclude_characters.is_some()
+            || !self.heart_colors.is_empty()
+            || self.need_heart_total.is_some()
+            || self.need_heart_color.is_some()
+            || self.name_fragments.is_some()
+            || self.original_blade_limit.is_some()
+            || self.ability_filter.is_some()
+            || self.ability_filter_triggers.is_some()
+            || self.or_ability_filters.is_some()
+            || self.card_property.is_some()
+            || self.distinct.is_some()
+    }
+
     /// Check whether a single card matches ALL present filter fields.
     pub fn matches(&self, db: &CardDatabase, id: i16, skip_empty: bool) -> bool {
         if skip_empty && id == -1 {

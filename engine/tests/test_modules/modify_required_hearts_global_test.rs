@@ -113,9 +113,9 @@ fn riko_bp5_condition_met_increases_opponent_hearts() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let chika = game.id("PL!S-sd1-001-SD");   // heart05=2
-    let riko_sd = game.id("PL!S-sd1-011-SD");  // heart05=2
-    let riko_bp5 = game.id("PL!S-bp5-011-N");  // heart05=1, 登場 trigger
+    let chika = game.id("PL!S-sd1-001-SD"); // heart05=2
+    let riko_sd = game.id("PL!S-sd1-011-SD"); // heart05=2
+    let riko_bp5 = game.id("PL!S-bp5-011-N"); // heart05=1, 登場 trigger
     let opp_live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
@@ -150,8 +150,8 @@ fn riko_bp5_condition_not_met_does_nothing() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
-    let riko_sd = game.id("PL!S-sd1-011-SD");  // heart05=2
-    let riko_bp5 = game.id("PL!S-bp5-011-N");  // heart05=1 (only this + riko_sd after play)
+    let riko_sd = game.id("PL!S-sd1-011-SD"); // heart05=2
+    let riko_bp5 = game.id("PL!S-bp5-011-N"); // heart05=1 (only this + riko_sd after play)
     let opp_live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
 

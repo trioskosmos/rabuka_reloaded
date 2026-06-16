@@ -22,7 +22,7 @@ fn maki_q177_debut_triggers_draw_via_ab0() {
     let maki = game.id("PL!-pb1-015-R");
     // Opponent members with cost ≤4 that will be waited by Ab#0
     let cheap_opp = game.id("PL!SP-sd1-019-SD"); // cost 2
-    let cheap_opp2 = game.id("PL!-sd1-011-SD");  // cost 4, BiBi member
+    let cheap_opp2 = game.id("PL!-sd1-011-SD"); // cost 4, BiBi member
     let filler = game.id("PL!-sd1-010-SD");
 
     game.state.player1.hand.cards.push(maki);

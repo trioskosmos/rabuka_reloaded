@@ -4,9 +4,13 @@ use rabuka_engine::zones::MemberArea;
 
 fn fill_decks(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
-    for _ in 0..30 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 }
 
 /// Complete live + victory flow so LiveSuccess triggers fire.
@@ -18,7 +22,9 @@ fn run_live_flow(game: &mut TestGame, p1_live_card: i16) {
 /// Pass -1 for p2_live_card if P2 shouldn't set one.
 /// Both players need score-1 live cards to create a tie (condition not met).
 fn run_live_flow_both(game: &mut TestGame, p1_live_card: i16, p2_live_card: i16) {
-    for _ in 0..5 { game.pass(); }
+    for _ in 0..5 {
+        game.pass();
+    }
     // Phase: LiveCardSetFirstAttacker (P1)
     game.set_live_card(p1_live_card);
     // Pass: → LiveCardSetSecondAttacker (P2)
@@ -31,20 +37,30 @@ fn run_live_flow_both(game: &mut TestGame, p1_live_card: i16, p2_live_card: i16)
     // Drain LiveStart auto-abilities
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {
-            Some("SelectAutoAbility") => { game.select_indices(&[]); }
+            Some("SelectAutoAbility") => {
+                game.select_indices(&[]);
+            }
             _ => break,
         }
     }
     // Pass 1: First performance → SecondAttackerPerformance
     // Pass 2: Second performance → LiveVictoryDetermination
     // Pass 3: LiveVictoryDetermination fires (triggers LiveSuccess)
-    for _ in 0..3 { game.pass(); }
+    for _ in 0..3 {
+        game.pass();
+    }
     // Drain ALL pending choices
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {
-            Some("SelectLiveSuccess") => { game.select_indices(&[0]); }
-            Some("SelectAutoAbility") => { game.select_indices(&[]); }
-            Some("SelectCard") => { game.select_indices(&[0]); }
+            Some("SelectLiveSuccess") => {
+                game.select_indices(&[0]);
+            }
+            Some("SelectAutoAbility") => {
+                game.select_indices(&[]);
+            }
+            Some("SelectCard") => {
+                game.select_indices(&[0]);
+            }
             _ => break,
         }
     }
@@ -75,7 +91,12 @@ fn ranju_activate_places_one_energy_under_draws_one_gains_heart01() {
 
     let energy_before = game.state.player1.energy_zone.cards.len();
     let hand_before = game.state.player1.hand.cards.len();
-    let under_before = game.state.player1.stage.get_under_cards(MemberArea::Center).len();
+    let under_before = game
+        .state
+        .player1
+        .stage
+        .get_under_cards(MemberArea::Center)
+        .len();
 
     game.activate_ability(card);
 
@@ -85,7 +106,11 @@ fn ranju_activate_places_one_energy_under_draws_one_gains_heart01() {
         "cost: 1 active energy removed from zone"
     );
     assert_eq!(
-        game.state.player1.stage.get_under_cards(MemberArea::Center).len(),
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
         under_before + 1,
         "cost: 1 energy placed under this member"
     );
@@ -94,7 +119,10 @@ fn ranju_activate_places_one_energy_under_draws_one_gains_heart01() {
         hand_before + 1,
         "effect: draw 1 card"
     );
-    let heart = game.state.mods.get_heart_modifier(card, HeartColor::Heart01);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(card, HeartColor::Heart01);
     assert_eq!(heart, 1, "effect: heart01 = 1");
 }
 
@@ -114,14 +142,23 @@ fn ranju_activate_no_energy_still_gives_draw_and_heart() {
     game.activate_ability(card);
 
     assert_eq!(
-        game.state.player1.stage.get_under_cards(MemberArea::Center).len(), 0,
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        0,
         "no energy to place under"
     );
     assert_eq!(
-        game.state.player1.hand.cards.len(), hand_before + 1,
+        game.state.player1.hand.cards.len(),
+        hand_before + 1,
         "draw happens even without energy"
     );
-    let heart = game.state.mods.get_heart_modifier(card, HeartColor::Heart01);
+    let heart = game
+        .state
+        .mods
+        .get_heart_modifier(card, HeartColor::Heart01);
     assert_eq!(heart, 1, "heart01 granted even without energy cost");
 }
 
@@ -141,14 +178,16 @@ fn ranju_activate_use_limit_enforces_turn1() {
 
     game.activate_ability(card);
     assert_eq!(
-        game.state.player1.energy_zone.cards.len(), energy_before - 1,
+        game.state.player1.energy_zone.cards.len(),
+        energy_before - 1,
         "first activation cost paid"
     );
 
     let result = game.try_activate_ability(card);
     assert!(result.is_err(), "use_limit=1 blocks second activation");
     assert_eq!(
-        game.state.player1.energy_zone.cards.len(), energy_before - 1,
+        game.state.player1.energy_zone.cards.len(),
+        energy_before - 1,
         "second activation didn't cost"
     );
 }
@@ -166,14 +205,37 @@ fn ranju_activate_under_follows_position_change() {
     fill_decks(&mut game, filler);
 
     game.activate_ability(card);
-    assert_eq!(game.state.player1.stage.get_under_cards(MemberArea::Center).len(), 1);
-
-    game.state.player1.stage.position_change(MemberArea::Center, MemberArea::LeftSide).ok();
     assert_eq!(
-        game.state.player1.stage.get_under_cards(MemberArea::LeftSide).len(), 1,
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        1
+    );
+
+    game.state
+        .player1
+        .stage
+        .position_change(MemberArea::Center, MemberArea::LeftSide)
+        .ok();
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::LeftSide)
+            .len(),
+        1,
         "under cards follow position change"
     );
-    assert_eq!(game.state.player1.stage.get_under_cards(MemberArea::Center).len(), 0);
+    assert_eq!(
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        0
+    );
     assert_eq!(game.state.player1.stage.stage[0], card);
 }
 
@@ -197,7 +259,9 @@ fn ranju_live_success_places_under_plus_one_from_energy_deck() {
 
     // Seed energy deck BEFORE give_energy
     let energy = game.id("LL-E-001-SD");
-    for _ in 0..10 { game.state.player1.energy_deck.cards.push(energy); }
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
     game.state.player1.hand.cards.push(live_card);
 
     // give_energy uses some energy deck cards too
@@ -215,14 +279,18 @@ fn ranju_live_success_places_under_plus_one_from_energy_deck() {
 
     // 3 under + 1 = 4 from deck → zone (wait)
     assert_eq!(
-        energy_deck_after, energy_deck_before - 4,
+        energy_deck_after,
+        energy_deck_before - 4,
         "4 from deck (3 under + 1) — deck went from {} to {}",
-        energy_deck_before, energy_deck_after
+        energy_deck_before,
+        energy_deck_after
     );
     assert_eq!(
-        energy_zone_after, energy_zone_before + 4,
+        energy_zone_after,
+        energy_zone_before + 4,
         "4 added to zone — zone went from {} to {}",
-        energy_zone_before, energy_zone_after
+        energy_zone_before,
+        energy_zone_after
     );
 }
 
@@ -239,7 +307,9 @@ fn ranju_live_success_q239_zero_under_places_one() {
     // 0 energy under (Q239)
 
     let energy = game.id("LL-E-001-SD");
-    for _ in 0..10 { game.state.player1.energy_deck.cards.push(energy); }
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
     game.state.player1.hand.cards.push(live_card);
     fill_decks(&mut game, filler);
     game.give_energy(5);
@@ -253,13 +323,11 @@ fn ranju_live_success_q239_zero_under_places_one() {
     let energy_zone_after = game.state.player1.energy_zone.cards.len();
 
     assert_eq!(
-        energy_deck_after, energy_deck_before - 1,
+        energy_deck_after,
+        energy_deck_before - 1,
         "Q239: 1 from deck when 0 under"
     );
-    assert_eq!(
-        energy_zone_after, energy_zone_before + 1,
-        "Q239: 1 to zone"
-    );
+    assert_eq!(energy_zone_after, energy_zone_before + 1, "Q239: 1 to zone");
 }
 
 #[test]
@@ -280,7 +348,9 @@ fn ranju_live_success_condition_not_met_no_move() {
     game.state.player2.hand.cards.clear();
 
     let energy = game.id("LL-E-001-SD");
-    for _ in 0..10 { game.state.player1.energy_deck.cards.push(energy); }
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
     game.state.player1.hand.cards.push(live_card);
     fill_decks(&mut game, filler);
     game.give_energy(5);
@@ -294,14 +364,12 @@ fn ranju_live_success_condition_not_met_no_move() {
     // Expected: 2 under + 1 = 3 from deck
     let energy_deck_after = game.state.player1.energy_deck.cards.len();
     assert_eq!(
-        energy_deck_after, energy_deck_before - 3,
+        energy_deck_after,
+        energy_deck_before - 3,
         "P1 auto-wins → 3 from deck (2 under + 1)"
     );
     let energy_zone_after = game.state.player1.energy_zone.cards.len();
-    assert_eq!(
-        energy_zone_after, energy_zone_before + 3,
-        "3 added to zone"
-    );
+    assert_eq!(energy_zone_after, energy_zone_before + 3, "3 added to zone");
 }
 
 #[test]
@@ -324,7 +392,9 @@ fn ranju_live_success_condition_not_met_when_scores_tied() {
     place_under_energy(&mut game, MemberArea::Center, 2);
 
     let energy = game.id("LL-E-001-SD");
-    for _ in 0..10 { game.state.player1.energy_deck.cards.push(energy); }
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
     fill_decks(&mut game, filler);
     game.give_energy(5);
 
@@ -334,7 +404,8 @@ fn ranju_live_success_condition_not_met_when_scores_tied() {
     run_live_flow_both(&mut game, live_card, live_card);
 
     assert_eq!(
-        game.state.player1.energy_deck.cards.len(), energy_deck_before,
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before,
         "no energy moved when scores tied (1 vs 1): condition not met"
     );
 }
@@ -352,7 +423,9 @@ fn ranju_live_success_scales_with_more_under() {
     place_under_energy(&mut game, MemberArea::Center, 5);
 
     let energy = game.id("LL-E-001-SD");
-    for _ in 0..20 { game.state.player1.energy_deck.cards.push(energy); }
+    for _ in 0..20 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
     game.state.player1.hand.cards.push(live_card);
     fill_decks(&mut game, filler);
     game.give_energy(5);
@@ -363,7 +436,8 @@ fn ranju_live_success_scales_with_more_under() {
 
     // 5 under + 1 = 6
     assert_eq!(
-        game.state.player1.energy_deck.cards.len(), energy_deck_before - 6,
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before - 6,
         "5 under + 1 = 6 from deck"
     );
 }
@@ -390,7 +464,8 @@ fn ranju_live_success_energy_deck_empty_does_nothing() {
     run_live_flow(&mut game, live_card);
 
     assert_eq!(
-        game.state.player1.energy_zone.cards.len(), energy_zone_before,
+        game.state.player1.energy_zone.cards.len(),
+        energy_zone_before,
         "no energy added when deck empty"
     );
 }
@@ -411,13 +486,20 @@ fn ranju_activate_then_live_success_uses_accumulated_under() {
     // Activate once → 1 energy under
     game.activate_ability(card);
     assert_eq!(
-        game.state.player1.stage.get_under_cards(MemberArea::Center).len(), 1,
+        game.state
+            .player1
+            .stage
+            .get_under_cards(MemberArea::Center)
+            .len(),
+        1,
         "1 under after activation"
     );
 
     // Seed energy deck
     let energy = game.id("LL-E-001-SD");
-    for _ in 0..10 { game.state.player1.energy_deck.cards.push(energy); }
+    for _ in 0..10 {
+        game.state.player1.energy_deck.cards.push(energy);
+    }
     game.state.player1.hand.cards.push(live_card);
 
     let energy_deck_before = game.state.player1.energy_deck.cards.len();
@@ -426,7 +508,8 @@ fn ranju_activate_then_live_success_uses_accumulated_under() {
 
     // 1 under + 1 = 2 from deck
     assert_eq!(
-        game.state.player1.energy_deck.cards.len(), energy_deck_before - 2,
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before - 2,
         "2 from deck (1 under + 1)"
     );
 }

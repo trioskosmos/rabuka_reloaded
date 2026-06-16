@@ -31,8 +31,8 @@ fn test_q246_partial_overlap_dedup() {
     let mut game = TestGame::new(db);
 
     let joint = game.id("LL-bp6-001-R\u{ff0b}");
-    let dia = game.id("PL!S-bp3-004-R");       // H02, H05
-    let kosuzu = game.id("PL!HS-pb1-005-R");   // H04, H05, H06
+    let dia = game.id("PL!S-bp3-004-R"); // H02, H05
+    let kosuzu = game.id("PL!HS-pb1-005-R"); // H04, H05, H06
     let live = game.id("PL!-sd1-010-SD");
     let filler = game.new_id("PL!-sd1-010-SD");
 
@@ -51,23 +51,65 @@ fn test_q246_partial_overlap_dedup() {
     game.set_live_card(live);
     finish_live_setup(&mut game);
 
-    assert!(game.has_pending_choice(), "bp6 should prompt for any-number discard");
+    assert!(
+        game.has_pending_choice(),
+        "bp6 should prompt for any-number discard"
+    );
 
     // Discard both eligible cards (indices 0=kosuzu, 1=dia)
     game.try_select_indices(&[0, 1]).unwrap();
 
-    assert!(!game.has_pending_choice(), "bp6 should resolve after selection");
+    assert!(
+        !game.has_pending_choice(),
+        "bp6 should resolve after selection"
+    );
 
     // kosuzu: H04, H05, H06
     // dia:    H02, H05
     // Shared: H05 → counted once
     // Distinct: H02, H04, H05, H06 = 4
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart02), 1, "H02 from dia");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart04), 1, "H04 from kosuzu");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart05), 1, "H05 shared — counted once");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart06), 1, "H06 from kosuzu");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart01), 0, "H01 not present");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart03), 0, "H03 not present");
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart02),
+        1,
+        "H02 from dia"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart04),
+        1,
+        "H04 from kosuzu"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart05),
+        1,
+        "H05 shared — counted once"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart06),
+        1,
+        "H06 from kosuzu"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart01),
+        0,
+        "H01 not present"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart03),
+        0,
+        "H03 not present"
+    );
 }
 
 /// Subset selection: 3 eligible cards, discard only 2.
@@ -78,9 +120,9 @@ fn test_q246_subset_selection() {
     let mut game = TestGame::new(db);
 
     let joint = game.id("LL-bp6-001-R\u{ff0b}");
-    let kosuzu = game.id("PL!HS-pb1-005-R");   // H04, H05, H06
-    let dia = game.id("PL!S-bp3-004-R");       // H02, H05
-    let kotori = game.id("PL!-bp3-003-R");     // H01, H03, H06
+    let kosuzu = game.id("PL!HS-pb1-005-R"); // H04, H05, H06
+    let dia = game.id("PL!S-bp3-004-R"); // H02, H05
+    let kotori = game.id("PL!-bp3-003-R"); // H01, H03, H06
     let live = game.id("PL!-sd1-010-SD");
     let filler = game.new_id("PL!-sd1-010-SD");
 
@@ -100,13 +142,19 @@ fn test_q246_subset_selection() {
     game.set_live_card(live);
     finish_live_setup(&mut game);
 
-    assert!(game.has_pending_choice(), "bp6 should prompt for any-number discard");
+    assert!(
+        game.has_pending_choice(),
+        "bp6 should prompt for any-number discard"
+    );
 
     // Only select kosuzu (idx 0) and dia (idx 1). Skip kotori (idx 2).
     game.try_select_indices(&[0, 1]).unwrap();
 
     // any_number re-prompts after each non-empty selection; skip to finalize.
-    assert!(game.has_pending_choice(), "any_number re-prompt for more cards");
+    assert!(
+        game.has_pending_choice(),
+        "any_number re-prompt for more cards"
+    );
     game.select_indices(&[]);
 
     assert!(!game.has_pending_choice(), "bp6 should resolve after skip");
@@ -114,12 +162,48 @@ fn test_q246_subset_selection() {
     // kosuzu (selected): H04, H05, H06
     // dia (selected):    H02, H05
     // kotori (NOT selected): should NOT contribute H01 or H03
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart02), 1, "H02 from dia");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart04), 1, "H04 from kosuzu");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart05), 1, "H05 shared");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart06), 1, "H06 from kosuzu");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart01), 0, "H01 NOT from unselected kotori");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart03), 0, "H03 NOT from unselected kotori");
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart02),
+        1,
+        "H02 from dia"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart04),
+        1,
+        "H04 from kosuzu"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart05),
+        1,
+        "H05 shared"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart06),
+        1,
+        "H06 from kosuzu"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart01),
+        0,
+        "H01 NOT from unselected kotori"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart03),
+        0,
+        "H03 NOT from unselected kotori"
+    );
 }
 
 /// Single card discard: only 1 eligible card, discard it.
@@ -129,7 +213,7 @@ fn test_q246_single_card() {
     let mut game = TestGame::new(db);
 
     let joint = game.id("LL-bp6-001-R\u{ff0b}");
-    let kosuzu = game.id("PL!HS-pb1-005-R");   // H04, H05, H06
+    let kosuzu = game.id("PL!HS-pb1-005-R"); // H04, H05, H06
     let live = game.id("PL!-sd1-010-SD");
     let filler = game.new_id("PL!-sd1-010-SD");
 
@@ -147,20 +231,51 @@ fn test_q246_single_card() {
     game.set_live_card(live);
     finish_live_setup(&mut game);
 
-    assert!(game.has_pending_choice(), "bp6 should prompt for any-number discard");
+    assert!(
+        game.has_pending_choice(),
+        "bp6 should prompt for any-number discard"
+    );
 
     // Discard the only eligible card
     game.try_select_indices(&[0]).unwrap();
 
-    assert!(!game.has_pending_choice(), "bp6 should resolve after selection");
+    assert!(
+        !game.has_pending_choice(),
+        "bp6 should resolve after selection"
+    );
 
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart04), 1, "H04 from kosuzu");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart05), 1, "H05 from kosuzu");
-    assert_eq!(game.state.mods.get_heart_modifier(joint, HeartColor::Heart06), 1, "H06 from kosuzu");
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart04),
+        1,
+        "H04 from kosuzu"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart05),
+        1,
+        "H05 from kosuzu"
+    );
+    assert_eq!(
+        game.state
+            .mods
+            .get_heart_modifier(joint, HeartColor::Heart06),
+        1,
+        "H06 from kosuzu"
+    );
 
     let total: i32 = [
-        HeartColor::Heart01, HeartColor::Heart02, HeartColor::Heart03,
-        HeartColor::Heart04, HeartColor::Heart05, HeartColor::Heart06,
-    ].iter().map(|&c| game.state.mods.get_heart_modifier(joint, c)).sum();
+        HeartColor::Heart01,
+        HeartColor::Heart02,
+        HeartColor::Heart03,
+        HeartColor::Heart04,
+        HeartColor::Heart05,
+        HeartColor::Heart06,
+    ]
+    .iter()
+    .map(|&c| game.state.mods.get_heart_modifier(joint, c))
+    .sum();
     assert_eq!(total, 3, "3 distinct hearts from single kosuzu card");
 }

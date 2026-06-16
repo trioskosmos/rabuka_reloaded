@@ -487,7 +487,10 @@ fn test_honoka_change_state_with_valid_targets() {
 
     // Opponent has 2 valid targets (cost ≤ 4)
     g.state.player2.stage.set_area(MemberArea::Center, target1);
-    g.state.player2.stage.set_area(MemberArea::LeftSide, target2);
+    g.state
+        .player2
+        .stage
+        .set_area(MemberArea::LeftSide, target2);
 
     // Player1 has Honoka on stage + enough energy
     g.state.player1.hand.cards.push(honoka);
@@ -548,7 +551,10 @@ fn test_dia_gain_resource_choice() {
 
     // Put 2 Aqours members on player1 stage
     g.state.player1.stage.set_area(MemberArea::Center, aqours1);
-    g.state.player1.stage.set_area(MemberArea::LeftSide, aqours2);
+    g.state
+        .player1
+        .stage
+        .set_area(MemberArea::LeftSide, aqours2);
 
     // Put Dia in hand
     g.state.player1.hand.cards.push(dia);

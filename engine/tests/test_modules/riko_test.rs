@@ -7,7 +7,6 @@
 /// Q130/Q171: Conditional_on_optional — opponent choice + conditional score gain.
 use crate::helpers::*;
 
-
 /// Q130: Opponent skips discarding → conditional fires.
 #[test]
 fn riko_q130_opponent_skips_triggers_conditional() {
@@ -27,7 +26,10 @@ fn riko_q130_opponent_skips_triggers_conditional() {
     game.play_to_stage(riko, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Debut triggers opponent choice — assert exactly one SelectCard for hand
-    assert!(game.has_pending_choice(), "Should have discard choice after debut");
+    assert!(
+        game.has_pending_choice(),
+        "Should have discard choice after debut"
+    );
     game.assert_select_card("hand", 1, true);
     let entry = game.state.ability_queue.current_entry();
     assert_eq!(
@@ -42,7 +44,11 @@ fn riko_q130_opponent_skips_triggers_conditional() {
     // conditional_on_optional auto-resolves with chose_yes=false + negation=true
     let entry = game.state.ability_queue.current_entry();
     if let Some(e) = entry {
-        assert_eq!(e.optional_cost_result, Some(false), "optional_cost_result should be Some(false) for skip");
+        assert_eq!(
+            e.optional_cost_result,
+            Some(false),
+            "optional_cost_result should be Some(false) for skip"
+        );
     }
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
     assert!(game.state.player1.stage.stage.contains(&riko));
@@ -52,11 +58,7 @@ fn riko_q130_opponent_skips_triggers_conditional() {
         "P1 hand: 2 - 1 played = 1"
     );
     // Opponent's hand is untouched
-    assert_eq!(
-        game.state.player2.hand.cards.len(),
-        1,
-        "P2 hand unchanged"
-    );
+    assert_eq!(game.state.player2.hand.cards.len(), 1, "P2 hand unchanged");
     assert!(
         game.state.player2.hand.cards.contains(&live_card),
         "P2 live card still in hand"
@@ -83,7 +85,10 @@ fn riko_q130_opponent_discards_skips_conditional() {
     game.play_to_stage(riko, rabuka_engine::zones::MemberArea::LeftSide);
 
     // Debut triggers opponent choice — opponent has 2 cards, must choose 1
-    assert!(game.has_pending_choice(), "Should have discard choice after debut");
+    assert!(
+        game.has_pending_choice(),
+        "Should have discard choice after debut"
+    );
     game.assert_select_card("hand", 1, true);
     let entry = game.state.ability_queue.current_entry();
     assert_eq!(
@@ -98,7 +103,11 @@ fn riko_q130_opponent_discards_skips_conditional() {
     // conditional_on_optional auto-resolves with chose_yes=true + negation=true → do_nothing
     let entry = game.state.ability_queue.current_entry();
     if let Some(e) = entry {
-        assert_eq!(e.optional_cost_result, Some(true), "optional_cost_result should be Some(true) for paid");
+        assert_eq!(
+            e.optional_cost_result,
+            Some(true),
+            "optional_cost_result should be Some(true) for paid"
+        );
     }
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
     assert_eq!(
@@ -146,11 +155,7 @@ fn riko_q130_opponent_multi_card_skips() {
     }
 
     assert!(!game.has_pending_choice(), "No pending choices");
-    assert_eq!(
-        game.state.player2.hand.cards.len(),
-        3,
-        "P2 hand untouched"
-    );
+    assert_eq!(game.state.player2.hand.cards.len(), 3, "P2 hand untouched");
 }
 
 /// Empty-hand opponent: no cards → conditional_on_optional still presents Skip/Pay.
@@ -177,11 +182,7 @@ fn riko_q130_opponent_empty_hand_auto_skip() {
     }
 
     assert!(!game.has_pending_choice(), "Ability should resolve cleanly");
-    assert_eq!(
-        game.state.player2.hand.cards.len(),
-        0,
-        "P2 empty hand"
-    );
+    assert_eq!(game.state.player2.hand.cards.len(), 0, "P2 empty hand");
     assert_eq!(
         game.state.player2.waitroom.cards.len(),
         0,

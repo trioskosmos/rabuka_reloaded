@@ -461,7 +461,7 @@ fn issue6_natsumi_blade_expires_after_live_victory_determination() {
     // Advance through remaining live phases
     game.pass(); // FirstAttackerPerformance → SecondAttackerPerformance (P1 performs)
     game.pass(); // SecondAttackerPerformance → LiveVictoryDetermination (P2 performs, sets phase to LVD)
-    // Blade should persist through LiveVictoryDetermination
+                 // Blade should persist through LiveVictoryDetermination
     assert_eq!(
         game.state.mods.get_blade_modifier(natsumi),
         1,
@@ -588,7 +588,11 @@ fn issue7_hajimari_set_modifier_replaces_not_adds() {
     let past_live = game.id("PL!-sd1-019-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    game.state.player1.success_live_card_zone.cards.push(past_live);
+    game.state
+        .player1
+        .success_live_card_zone
+        .cards
+        .push(past_live);
     game.state.player1.success_live_card_zone.cards.push(filler);
     game.state.player1.hand.cards.push(live_card);
     fill_decks(&mut game);
@@ -609,7 +613,9 @@ fn issue7_hajimari_set_modifier_replaces_not_adds() {
             (HeartColor::Heart06, 3),
             (HeartColor::Heart00, 3),
         ] {
-            let entry = color_mods.get(&hc).unwrap_or_else(|| panic!("missing {:?}", hc));
+            let entry = color_mods
+                .get(&hc)
+                .unwrap_or_else(|| panic!("missing {:?}", hc));
             assert_eq!(entry.set, expected, "set modifier for {:?}", hc);
             assert_eq!(entry.additive, 0, "additive should be 0 for {:?}", hc);
         }
@@ -642,7 +648,11 @@ fn issue7_hajimari_set_modifier_replaces_not_adds() {
 
     // Effective need with set modifier should replace base entirely:
     // {heart02:3, heart03:3, heart06:3, heart00:3} — base {heart03:1, heart00:2} is dropped
-    let has_set = game.state.mods.need_heart_modifiers.get(&live_card)
+    let has_set = game
+        .state
+        .mods
+        .need_heart_modifiers
+        .get(&live_card)
         .is_some_and(|m| m.values().any(|e| e.set != 0));
     assert!(has_set, "set modifier should exist");
     let effective = {
@@ -656,8 +666,12 @@ fn issue7_hajimari_set_modifier_replaces_not_adds() {
         }
         rabuka_engine::card::BaseHeart { hearts }
     };
-    assert_eq!(effective.hearts.len(), 4,
-        "effective need should have exactly 4 colors, got {:?}", effective.hearts);
+    assert_eq!(
+        effective.hearts.len(),
+        4,
+        "effective need should have exactly 4 colors, got {:?}",
+        effective.hearts
+    );
     assert_eq!(effective.hearts[&HeartColor::Heart02], 3);
     assert_eq!(effective.hearts[&HeartColor::Heart03], 3);
     assert_eq!(effective.hearts[&HeartColor::Heart06], 3);

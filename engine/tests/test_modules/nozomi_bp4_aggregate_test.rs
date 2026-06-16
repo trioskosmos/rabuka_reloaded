@@ -19,8 +19,12 @@ fn nozomi_condition_met_gains_score_boost() {
     let live1 = game.id("PL!-sd1-019-SD"); // score 1
 
     // Fill decks so play_to_stage doesn't fail on deck operations
-    for _ in 0..30 { game.state.player1.main_deck.cards.push(filler); }
-    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     // 1 card in success zone with total score 1 ≤ 1
     game.state.player1.success_live_card_zone.cards.push(live1);
@@ -35,9 +39,12 @@ fn nozomi_condition_met_gains_score_boost() {
     game.play_to_stage(nozomi, MemberArea::LeftSide);
 
     let score_after = game.state.mods.get_score_modifier(nozomi);
-    assert!(score_after > score_before,
+    assert!(
+        score_after > score_before,
         "Condition met: score modifier should increase (before={}, after={})",
-        score_before, score_after);
+        score_before,
+        score_after
+    );
 }
 
 /// Score total > 1: 2 score-1 cards = total 2 > 1 → condition fails → no modifier.
@@ -50,8 +57,12 @@ fn nozomi_score_too_high_condition_fails() {
     let live1 = game.id("PL!-sd1-019-SD"); // score 1
     let live2 = game.new_id("PL!-sd1-019-SD"); // score 1, total = 2
 
-    for _ in 0..30 { game.state.player1.main_deck.cards.push(filler); }
-    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     // 2 cards in success zone, total score = 2 > 1
     game.state.player1.success_live_card_zone.cards.push(live1);
@@ -64,8 +75,10 @@ fn nozomi_score_too_high_condition_fails() {
     game.play_to_stage(nozomi, MemberArea::LeftSide);
     let score_after = game.state.mods.get_score_modifier(nozomi);
 
-    assert_eq!(score_after, score_before,
-        "Total score 2 > 1 → condition fails → no modifier change");
+    assert_eq!(
+        score_after, score_before,
+        "Total score 2 > 1 → condition fails → no modifier change"
+    );
 }
 
 /// Empty success zone → first condition fails (0 ≥ 1 is false) → no modifier.
@@ -76,8 +89,12 @@ fn nozomi_empty_zone_condition_fails() {
     let nozomi = game.id("PL!-bp4-007-R");
     let filler = game.id("PL!-sd1-010-SD");
 
-    for _ in 0..30 { game.state.player1.main_deck.cards.push(filler); }
-    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.stage.stage = [-1, -1, -1];
     game.state.player1.hand.cards.push(nozomi);
@@ -87,8 +104,10 @@ fn nozomi_empty_zone_condition_fails() {
     game.play_to_stage(nozomi, MemberArea::LeftSide);
     let score_after = game.state.mods.get_score_modifier(nozomi);
 
-    assert_eq!(score_after, score_before,
-        "Empty success zone → condition fails → no modifier change");
+    assert_eq!(
+        score_after, score_before,
+        "Empty success zone → condition fails → no modifier change"
+    );
 }
 
 /// Verify P rarity works the same as R.
@@ -100,8 +119,12 @@ fn nozomi_p_rarity_same_behavior() {
     let filler = game.id("PL!-sd1-010-SD");
     let live = game.id("PL!-sd1-019-SD");
 
-    for _ in 0..30 { game.state.player1.main_deck.cards.push(filler); }
-    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
 
     game.state.player1.success_live_card_zone.cards.push(live);
     game.state.player1.stage.stage = [-1, -1, -1];
@@ -112,6 +135,8 @@ fn nozomi_p_rarity_same_behavior() {
     game.play_to_stage(nozomi, MemberArea::LeftSide);
     let score_after = game.state.mods.get_score_modifier(nozomi);
 
-    assert!(score_after > score_before,
-        "P rarity: condition passes, score modifier increases");
+    assert!(
+        score_after > score_before,
+        "P rarity: condition passes, score modifier increases"
+    );
 }

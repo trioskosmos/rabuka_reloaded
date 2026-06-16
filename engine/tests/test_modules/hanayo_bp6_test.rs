@@ -22,7 +22,9 @@ fn q248_hanayo_activate_no_other_members() {
     let hanayo = game.id("PL!-bp6-008-R");
     let filler = game.id("PL!-sd1-010-SD");
 
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     game.add_to_hand(hanayo);
     game.give_energy(8); // cost 7 + 1
@@ -42,7 +44,10 @@ fn q248_hanayo_activate_no_other_members() {
     );
 
     // Effect had no valid targets (no other members) → no pending choice
-    assert!(!game.has_pending_choice(), "No choice needed — no other members to activate");
+    assert!(
+        !game.has_pending_choice(),
+        "No choice needed — no other members to activate"
+    );
 }
 
 /// Other members present but all active → effect still has no wait targets.
@@ -55,7 +60,9 @@ fn q248_hanayo_activate_others_all_active() {
     let friend = game.id("PL!-sd1-010-SD"); // abilityless filler
     let filler = game.id("PL!-sd1-010-SD");
 
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     game.add_to_hand(hanayo);
     game.give_energy(8);
@@ -81,7 +88,10 @@ fn q248_hanayo_activate_others_all_active() {
         "Friend should still be active (no orientation modifier)"
     );
 
-    assert!(!game.has_pending_choice(), "No choice — no wait members to activate");
+    assert!(
+        !game.has_pending_choice(),
+        "No choice — no wait members to activate"
+    );
 }
 
 /// Another member in wait state → normal activation: the wait member becomes active.
@@ -94,7 +104,9 @@ fn q248_hanayo_activate_with_wait_member() {
     let friend = game.id("PL!-sd1-010-SD");
     let filler = game.id("PL!-sd1-010-SD");
 
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     game.add_to_hand(hanayo);
     game.give_energy(8);
@@ -133,7 +145,9 @@ fn q248_hanayo_use_limit_blocks_second_activation() {
     let hanayo = game.id("PL!-bp6-008-R");
     let filler = game.id("PL!-sd1-010-SD");
 
-    for _ in 0..10 { game.state.player1.main_deck.cards.push(filler); }
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
 
     game.add_to_hand(hanayo);
     game.give_energy(8);
@@ -144,7 +158,9 @@ fn q248_hanayo_use_limit_blocks_second_activation() {
     // Second activation should fail (use_limit=1)
     let err = game.try_activate_ability(hanayo).unwrap_err();
     assert!(
-        err.contains("use_limit") || err.contains("already used") || err.contains("限界")
+        err.contains("use_limit")
+            || err.contains("already used")
+            || err.contains("限界")
             || err.contains("No activatable ability"),
         "Second activation should be blocked by use_limit, got: {:?}",
         err

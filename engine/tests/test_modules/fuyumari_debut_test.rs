@@ -49,7 +49,11 @@ fn fuyumari_q118_opponent_picks_first_card() {
         "Should have opponent select choice"
     );
     assert_eq!(
-        game.state.ability_queue.current_entry().as_ref().and_then(|e| e.choice_player_id.as_deref()),
+        game.state
+            .ability_queue
+            .current_entry()
+            .as_ref()
+            .and_then(|e| e.choice_player_id.as_deref()),
         Some("p2"),
         "Opponent-select choice should be routed to opponent"
     );

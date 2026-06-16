@@ -424,6 +424,32 @@ impl super::TurnEngine {
             snap.success = snap.lives.iter().any(|l| l.passed) && snap.total_score > 0;
         }
 
+        // Merge LiveSuccess-triggered ability applications into breakdown.scores.
+        // These were recorded after enrich_from_applications ran (in execute_performance_phase),
+        // so they weren't picked up yet.
+        let late_apps = std::mem::take(&mut game_state.ability_applications);
+        if !late_apps.is_empty() {
+            let p1_cards = game_state.player1.live_card_zone.cards.to_vec();
+            let p2_cards = game_state.player2.live_card_zone.cards.to_vec();
+            for snap in game_state.performance_snapshots.iter_mut() {
+                let player_cards = if snap.player_id == player1_id {
+                    &p1_cards
+                } else {
+                    &p2_cards
+                };
+                for app in &late_apps {
+                    if (app.effect_type == "score_bonus" || app.effect_type == "score_set")
+                        && player_cards.contains(&app.target_card_id)
+                    {
+                        snap.breakdown.scores.push(crate::types::ScoreLine {
+                            source: app.ability_text.clone(),
+                            value: app.amount.unsigned_abs(),
+                        });
+                    }
+                }
+            }
+        }
+
         // Compute surplus from finalized snapshots.
         // Surplus = remaining hearts after filling all live card requirements.
         // Uses actual filled allocations (not just required) to handle cases where

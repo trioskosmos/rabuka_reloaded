@@ -4,6 +4,7 @@ impl GameState {
     /// Clears old constant-derived values and re-applies those whose conditions pass.
     pub fn recalculate_constants(&mut self) {
         let entries = self.collect_constant_stage_effects();
+        self.mods.constant_score_sources.clear();
 
         let mut exp_blade: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
         let mut exp_cost: std::collections::HashMap<i16, i32> = std::collections::HashMap::new();
@@ -174,8 +175,15 @@ impl GameState {
                                 }
                             }
                             Some(crate::ability::enums::ActionType::ModifyScore) => {
-                                *exp_score.entry(*card_id).or_insert(0) +=
-                                    effect.value.unwrap_or(0) as i32;
+                                let sv = effect.value.unwrap_or(0) as i32;
+                                *exp_score.entry(*card_id).or_insert(0) += sv;
+                                if sv != 0 {
+                                    self.mods.constant_score_sources.push((
+                                        *card_id,
+                                        effect.text.clone(),
+                                        sv,
+                                    ));
+                                }
                             }
                             Some(crate::ability::enums::ActionType::ModifyCost) => {
                                 *exp_cost.entry(*card_id).or_insert(0) +=
@@ -216,6 +224,11 @@ impl GameState {
                                             .ok()
                                     }) {
                                         *exp_score.entry(*card_id).or_insert(0) += val;
+                                        self.mods.constant_score_sources.push((
+                                            *card_id,
+                                            gain_text.to_string(),
+                                            val,
+                                        ));
                                     }
                                 }
                             }

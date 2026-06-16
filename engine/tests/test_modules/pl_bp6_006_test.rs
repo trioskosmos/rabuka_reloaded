@@ -47,8 +47,11 @@ fn maki_bp6_activate_cost_discard_works() {
     let ct = game.pending_choice_type().unwrap_or_default();
     eprintln!("choice after cost: {:?}", game.pending_choice_type());
 
-    assert_eq!(game.state.player1.hand.cards.len(), hand_before - 1,
-        "1 card discarded as cost");
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before - 1,
+        "1 card discarded as cost"
+    );
 }
 
 #[test]
@@ -77,7 +80,9 @@ fn maki_bp6_look_and_select_creates_choices() {
         game.state.player1.main_deck.cards.push(filler);
     }
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.give_energy(10);
 
     game.activate_ability(maki);
@@ -88,7 +93,9 @@ fn maki_bp6_look_and_select_creates_choices() {
     }
 
     // Heart color: choose heart01
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectHeartColor") {
+    if game.has_pending_choice()
+        && game.pending_choice_type().as_deref() == Some("SelectHeartColor")
+    {
         game.select_indices(&[0]); // heart01
     }
 
@@ -118,7 +125,9 @@ fn maki_bp6_deck_lt5_handles_gracefully() {
     game.state.player1.main_deck.cards.push(filler);
     game.state.player1.main_deck.cards.push(filler);
     game.state.player2.main_deck.cards.clear();
-    for _ in 0..30 { game.state.player2.main_deck.cards.push(filler); }
+    for _ in 0..30 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
     game.give_energy(10);
 
     game.activate_ability(maki);
@@ -126,7 +135,9 @@ fn maki_bp6_deck_lt5_handles_gracefully() {
     if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
         game.select_indices(&[0]);
     }
-    if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectHeartColor") {
+    if game.has_pending_choice()
+        && game.pending_choice_type().as_deref() == Some("SelectHeartColor")
+    {
         game.select_indices(&[0]);
     }
     if game.has_pending_choice() && game.pending_choice_type().as_deref() == Some("SelectCard") {
@@ -156,13 +167,20 @@ fn maki_bp6_use_limit_turn1_enforces() {
     // Drain color selection too
     while game.has_pending_choice() {
         match game.pending_choice_type().as_deref() {
-            Some("SelectHeartColor") | Some("SelectHeartType") => { game.select_indices(&[0]); }
-            Some("SelectCard") => { game.select_indices(&[0]); }
+            Some("SelectHeartColor") | Some("SelectHeartType") => {
+                game.select_indices(&[0]);
+            }
+            Some("SelectCard") => {
+                game.select_indices(&[0]);
+            }
             _ => break,
         }
     }
 
     // Second activation should be blocked (use_limit=1 + turn1)
     let result = game.try_activate_ability(maki);
-    assert!(result.is_err(), "use_limit=1 + turn1 blocks second activation");
+    assert!(
+        result.is_err(),
+        "use_limit=1 + turn1 blocks second activation"
+    );
 }

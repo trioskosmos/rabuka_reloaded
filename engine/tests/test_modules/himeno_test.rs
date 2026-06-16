@@ -41,7 +41,7 @@ fn himeno_q82_dodo_live_card_selectable() {
         game.has_pending_choice(),
         "Should have look_and_select choice"
     );
-    game.select_indices(&[2]);
+    game.select_indices(&[0]);
 
     // Resolve any remaining sub-choices (reveal, move to hand, discard rest)
     while game.has_pending_choice() {
@@ -88,7 +88,7 @@ fn himeno_q82_identity_live_card_selectable() {
         game.has_pending_choice(),
         "Should have look_and_select choice"
     );
-    game.select_indices(&[2]); // select identity
+    game.select_indices(&[0]); // select identity
     while game.has_pending_choice() {
         game.select_indices(&[]);
     } // resolve remaining

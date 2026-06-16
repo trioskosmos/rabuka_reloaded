@@ -1,8 +1,8 @@
-use rabuka_engine::game_state::GameState;
-use rabuka_engine::types::{Phase, TurnPhase};
-use rabuka_engine::player::Player;
 use rabuka_engine::card::CardDatabase;
 use rabuka_engine::card_loader::CardLoader;
+use rabuka_engine::game_state::GameState;
+use rabuka_engine::player::Player;
+use rabuka_engine::types::{Phase, TurnPhase};
 use rabuka_engine::web_server::pvp_player_can_act;
 use std::sync::Arc;
 
@@ -88,8 +88,14 @@ fn main_phase_second_attacker_only() {
     gs.player1.is_first_attacker = false; // P1 = second attacker
     gs.player2.is_first_attacker = true;
     gs.current_turn_phase = TurnPhase::SecondAttackerNormal;
-    assert!(pvp_player_can_act(&gs, 0), "P1 (second attacker) should act");
-    assert!(!pvp_player_can_act(&gs, 1), "P2 (first attacker) should wait");
+    assert!(
+        pvp_player_can_act(&gs, 0),
+        "P1 (second attacker) should act"
+    );
+    assert!(
+        !pvp_player_can_act(&gs, 1),
+        "P2 (first attacker) should wait"
+    );
 }
 
 #[test]
@@ -105,6 +111,12 @@ fn live_card_set_second_attacker() {
     let mut gs = make_gs(Phase::LiveCardSetSecondAttacker);
     gs.player1.is_first_attacker = false; // P1 = second attacker
     gs.player2.is_first_attacker = true;
-    assert!(pvp_player_can_act(&gs, 0), "P1 (second attacker) should act");
-    assert!(!pvp_player_can_act(&gs, 1), "P2 (first attacker) should wait");
+    assert!(
+        pvp_player_can_act(&gs, 0),
+        "P1 (second attacker) should act"
+    );
+    assert!(
+        !pvp_player_can_act(&gs, 1),
+        "P2 (first attacker) should wait"
+    );
 }

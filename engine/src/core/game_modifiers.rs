@@ -43,6 +43,9 @@ pub struct GameModifiers {
     /// Track need_heart modifiers applied by constant ModifyRequiredHeartsGlobal effects.
     /// Key: (target_card_id, heart_color_str) → total delta applied.
     pub constant_global_need_heart: Vec<(i16, String, i32)>,
+    /// Source info for constant score bonuses: (card_id, ability_text, value)
+    /// Populated by recalculate_constants for display in breakdown.scores.
+    pub constant_score_sources: Vec<(i16, String, i32)>,
     pub heart_color_multiplier: HashMap<i16, HeartColor>,
     /// Number of cards moved from hand to discard by the most recent cost payment.
     pub last_cost_discard_count: u32,
@@ -75,6 +78,7 @@ impl GameModifiers {
             constant_score_bonuses: HashMap::new(),
             constant_heart_bonuses: HashMap::new(),
             constant_global_need_heart: Vec::new(),
+            constant_score_sources: Vec::new(),
             heart_color_multiplier: HashMap::new(),
             last_cost_discard_count: 0,
             last_cost_energy_count: 0,

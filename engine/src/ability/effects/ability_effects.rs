@@ -194,6 +194,14 @@ impl AbilityResolver {
             }) {
                 if let Some(card_id) = gs.activating_card {
                     gs.mods.add_score_modifier(card_id, val);
+                    gs.record_ability_application(
+                        card_id,
+                        ability_text.to_string(),
+                        "score_bonus",
+                        card_id,
+                        None,
+                        val,
+                    );
                     log::debug!(
                         "[GAINED_ABILITY] Applied +{} score modifier to card {}",
                         val,

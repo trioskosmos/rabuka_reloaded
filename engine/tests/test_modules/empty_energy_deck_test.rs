@@ -38,23 +38,35 @@ fn empty_energy_deck_continues_game() {
     // Advance Active → Energy
     TurnEngine::advance_phase(&mut game.state);
     assert_eq!(game.state.current_phase, Phase::Energy);
-    assert!(!game.state.game_ended, "Game should NOT end from empty energy deck");
+    assert!(
+        !game.state.game_ended,
+        "Game should NOT end from empty energy deck"
+    );
     assert_eq!(game.state.game_result, GameResult::Ongoing);
 
     // Advance Energy → Draw (empty energy deck, no state change -> no false loop)
     TurnEngine::advance_phase(&mut game.state);
     assert_eq!(game.state.current_phase, Phase::Draw);
-    assert!(!game.state.game_ended, "Draw phase after empty energy deck should be fine");
+    assert!(
+        !game.state.game_ended,
+        "Draw phase after empty energy deck should be fine"
+    );
 
     // Advance Draw → Main
     TurnEngine::advance_phase(&mut game.state);
     assert_eq!(game.state.current_phase, Phase::Main);
-    assert!(!game.state.game_ended, "Game should reach Main without game_ended");
+    assert!(
+        !game.state.game_ended,
+        "Game should reach Main without game_ended"
+    );
     assert_eq!(game.state.game_result, GameResult::Ongoing);
 
     // The turn should complete normally
     assert_eq!(game.state.turn_number, 3);
-    assert_eq!(game.state.current_turn_phase, TurnPhase::FirstAttackerNormal);
+    assert_eq!(
+        game.state.current_turn_phase,
+        TurnPhase::FirstAttackerNormal
+    );
 }
 
 #[test]
@@ -89,7 +101,10 @@ fn empty_energy_deck_player2_continues_game() {
     // Advance through P2's Active → Energy → Draw → Main
     TurnEngine::advance_phase(&mut game.state);
     assert_eq!(game.state.current_phase, Phase::Energy);
-    assert!(!game.state.game_ended, "P2 empty energy deck should NOT end game");
+    assert!(
+        !game.state.game_ended,
+        "P2 empty energy deck should NOT end game"
+    );
 
     TurnEngine::advance_phase(&mut game.state);
     assert_eq!(game.state.current_phase, Phase::Draw);
@@ -97,7 +112,10 @@ fn empty_energy_deck_player2_continues_game() {
 
     TurnEngine::advance_phase(&mut game.state);
     assert_eq!(game.state.current_phase, Phase::Main);
-    assert!(!game.state.game_ended, "P2 should reach Main without game_ended");
+    assert!(
+        !game.state.game_ended,
+        "P2 should reach Main without game_ended"
+    );
     assert_eq!(game.state.game_result, GameResult::Ongoing);
 
     // P2's turn should complete into Live

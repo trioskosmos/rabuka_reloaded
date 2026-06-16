@@ -153,7 +153,11 @@ fn chisato_bp5_self_cost_not_reduced() {
         Some(rabuka_engine::zones::MemberArea::LeftSide),
         Some(false),
     );
-    assert!(r.is_err(), "16 energy should fail to play 17-cost card: {:?}", r);
+    assert!(
+        r.is_err(),
+        "16 energy should fail to play 17-cost card: {:?}",
+        r
+    );
 
     // 17 energy should work
     game.give_energy(1); // 16 + 1 = 17
@@ -218,10 +222,16 @@ fn chisato_promo_ab1_live_start() {
 
     // Chisato must be in the CENTER area for her Center ability to activate
     game.state.player1.stage.stage = [liella, chisato, filler];
-    
+
     // Set Liella member and Chisato to wait (rested) state
-    game.state.mods.orientation_modifiers.insert(liella, "wait".to_string());
-    game.state.mods.orientation_modifiers.insert(chisato, "wait".to_string());
+    game.state
+        .mods
+        .orientation_modifiers
+        .insert(liella, "wait".to_string());
+    game.state
+        .mods
+        .orientation_modifiers
+        .insert(chisato, "wait".to_string());
 
     // Give 3 energy, but make them all rested
     game.give_energy(3);
@@ -240,7 +250,7 @@ fn chisato_promo_ab1_live_start() {
         game.pass();
     }
     game.set_live_card(live_card);
-    
+
     // Pass to run LiveStart phase and trigger abilities
     game.pass();
     game.pass();
@@ -262,5 +272,3 @@ fn chisato_promo_ab1_live_start() {
         "All 3 energy should be active"
     );
 }
-
-

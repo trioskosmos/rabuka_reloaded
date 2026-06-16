@@ -20,8 +20,14 @@ use rabuka_engine::zones::MemberArea;
 /// After full resolution the entry may be gone; skip the check in that case.
 fn assert_optional_cost_state(game: &TestGame, expected_paid: bool) {
     if let Some(entry) = game.state.ability_queue.current_entry() {
-        if entry.completed { return; }
-        assert_eq!(entry.optional_cost_result, Some(expected_paid), "optional_cost_result mismatch");
+        if entry.completed {
+            return;
+        }
+        assert_eq!(
+            entry.optional_cost_result,
+            Some(expected_paid),
+            "optional_cost_result mismatch"
+        );
     }
 }
 
@@ -144,14 +150,22 @@ fn yoshiko_pb1_opponent_multi_card_skips_gains_blade() {
     game.state.player1.hand.cards.push(live_card);
     // Opponent has 3 cards — classify_selection returns Prompt (len=3 > count=1)
     for _ in 0..3 {
-        game.state.player2.hand.cards.push(game.id("PL!-sd1-010-SD"));
+        game.state
+            .player2
+            .hand
+            .cards
+            .push(game.id("PL!-sd1-010-SD"));
     }
     game.give_energy(1);
 
     setup_yoshiko(&mut game, yoshiko);
 
     // Opponent's discard choice should be routed to opponent
-    let entry = game.state.ability_queue.current_entry().expect("Queue should have entry");
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Queue should have entry");
     assert_eq!(
         entry.choice_player_id.as_deref(),
         Some("p2"),
@@ -200,7 +214,11 @@ fn yoshiko_pb1_opponent_multi_card_discards_skips_blade() {
     setup_yoshiko(&mut game, yoshiko);
 
     // Opponent's discard choice should be routed to opponent
-    let entry = game.state.ability_queue.current_entry().expect("Queue should have entry");
+    let entry = game
+        .state
+        .ability_queue
+        .current_entry()
+        .expect("Queue should have entry");
     assert_eq!(
         entry.choice_player_id.as_deref(),
         Some("p2"),
@@ -262,7 +280,10 @@ fn serasu_edelnote_appear_triggers_opponent_wait() {
     game.play_to_stage(edelnote_member, MemberArea::LeftSide);
 
     // Auto ability fires: opponent chooses which of their members to wait
-    assert!(game.has_pending_choice(), "Opponent should have a choice with 2 active members");
+    assert!(
+        game.has_pending_choice(),
+        "Opponent should have a choice with 2 active members"
+    );
     let entry = game.state.ability_queue.current_entry();
     assert_eq!(
         entry.as_ref().and_then(|e| e.choice_player_id.as_deref()),

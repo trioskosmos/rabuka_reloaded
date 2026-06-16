@@ -47,11 +47,7 @@ impl AbilityResolver {
                 }
             } else {
                 let filter = super::util::CardFilter::from_effect(select_action);
-                let has_filter = filter.card_type.is_some()
-                    || !filter.heart_colors.is_empty()
-                    || filter.cost_limit.is_some()
-                    || filter.ability_filter.is_some();
-                if has_filter {
+                if filter.has_filter() {
                     let (matching, non_matching): (Vec<_>, Vec<_>) = gs
                         .looked_at_cards
                         .iter()
@@ -556,10 +552,7 @@ impl AbilityResolver {
             }
         } else {
             let filter = util::CardFilter::from_effect(effect);
-            let has_filter = filter.card_type.is_some()
-                || !filter.heart_colors.is_empty()
-                || filter.cost_limit.is_some();
-            if has_filter {
+            if filter.has_filter() {
                 let (matching, non_matching): (Vec<_>, Vec<_>) = gs
                     .looked_at_cards
                     .iter()

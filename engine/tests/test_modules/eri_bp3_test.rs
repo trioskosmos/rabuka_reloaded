@@ -35,7 +35,10 @@ fn eri_q144_up_to_semantics_1_eligible_opponent_still_works() {
 
     // Step 1: Optional cost (discard 1 from hand).
     // Hand has [filler] after playing eri. Choice is SelectCard (zone=hand, count=1, optional).
-    assert!(game.has_pending_choice(), "Expected optional discard choice");
+    assert!(
+        game.has_pending_choice(),
+        "Expected optional discard choice"
+    );
     game.assert_select_card("hand", 1, true);
 
     // Pay cost by discarding the filler (index 0)
@@ -44,7 +47,11 @@ fn eri_q144_up_to_semantics_1_eligible_opponent_still_works() {
     // Verify cost was recorded as paid (entry may be gone after resolution)
     if let Some(e) = game.state.ability_queue.current_entry() {
         if !e.completed {
-            assert_eq!(e.optional_cost_result, Some(true), "optional_cost_result should be Some(true)");
+            assert_eq!(
+                e.optional_cost_result,
+                Some(true),
+                "optional_cost_result should be Some(true)"
+            );
         }
     }
 
@@ -60,7 +67,10 @@ fn eri_q144_up_to_semantics_1_eligible_opponent_still_works() {
     );
 
     // Step 2: Select opponent member(s) to put to wait (up to 2).
-    assert!(game.has_pending_choice(), "Expected opponent member selection");
+    assert!(
+        game.has_pending_choice(),
+        "Expected opponent member selection"
+    );
     game.assert_select_card("stage", 2, true);
 
     // Select the only eligible member (index 0)
@@ -99,19 +109,29 @@ fn eri_q144_skip_cost_no_effect() {
     game.play_to_stage(eri, MemberArea::Center);
 
     // Step 1: Optional cost — skip it.
-    assert!(game.has_pending_choice(), "Expected optional discard choice");
+    assert!(
+        game.has_pending_choice(),
+        "Expected optional discard choice"
+    );
     game.assert_select_card("hand", 1, true);
     game.select_indices(&[]);
 
     // Verify cost was skipped (entry may be gone after resolution)
     if let Some(e) = game.state.ability_queue.current_entry() {
         if !e.completed {
-            assert_eq!(e.optional_cost_result, Some(false), "optional_cost_result should be Some(false)");
+            assert_eq!(
+                e.optional_cost_result,
+                Some(false),
+                "optional_cost_result should be Some(false)"
+            );
         }
     }
 
     // No effect — opponent members remain active
-    assert!(!game.has_pending_choice(), "No pending choices (effect canceled)");
+    assert!(
+        !game.has_pending_choice(),
+        "No pending choices (effect canceled)"
+    );
     assert_eq!(
         game.state.mods.get_orientation_modifier(eligible_1),
         None,
@@ -143,13 +163,19 @@ fn eri_q144_no_eligible_opponent_still_pays_cost() {
     game.play_to_stage(eri, MemberArea::Center);
 
     // Step 1: Optional cost — pay it.
-    assert!(game.has_pending_choice(), "Expected optional discard choice");
+    assert!(
+        game.has_pending_choice(),
+        "Expected optional discard choice"
+    );
     game.assert_select_card("hand", 1, true);
     game.select_indices(&[0]); // discard filler
 
     // No selection prompt — opponent has no eligible members.
     // Effect completes without putting anyone to wait.
-    assert!(!game.has_pending_choice(), "No pending choices (no eligible targets)");
+    assert!(
+        !game.has_pending_choice(),
+        "No pending choices (no eligible targets)"
+    );
     assert_eq!(
         game.state.player1.waitroom.cards.len(),
         1,

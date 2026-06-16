@@ -33,15 +33,31 @@ fn target_count_1_gain_resource_chooses_one_of_many() {
     let phoenix = game.id("PL!N-pb1-038-L");
     let stellar = game.id("PL!N-pb1-039-L");
     game.state.player1.stage.stage = [-1, -1, -1];
-    game.state.player1.stage.set_area(MemberArea::Center, member_a);
-    game.state.player1.stage.set_area(MemberArea::LeftSide, member_b);
+    game.state
+        .player1
+        .stage
+        .set_area(MemberArea::Center, member_a);
+    game.state
+        .player1
+        .stage
+        .set_area(MemberArea::LeftSide, member_b);
     game.state.player1.live_card_zone.cards.push(phoenix);
     game.state.player1.live_card_zone.cards.push(stellar);
     setup_live_phase_with_hearts(&mut game);
     process_abilities(&mut game);
-    let a_heart06 = game.state.mods.get_heart_modifier(member_a, HeartColor::Heart06);
-    let b_heart06 = game.state.mods.get_heart_modifier(member_b, HeartColor::Heart06);
-    assert_eq!(a_heart06 + b_heart06, 4, "Total +4 heart06 across both members");
+    let a_heart06 = game
+        .state
+        .mods
+        .get_heart_modifier(member_a, HeartColor::Heart06);
+    let b_heart06 = game
+        .state
+        .mods
+        .get_heart_modifier(member_b, HeartColor::Heart06);
+    assert_eq!(
+        a_heart06 + b_heart06,
+        4,
+        "Total +4 heart06 across both members"
+    );
     assert!(
         a_heart06 == 4 || b_heart06 == 4,
         "Exactly one member got the full +4 heart06 buff"

@@ -124,9 +124,14 @@ fn eternalize_same_name_two_niji_identical() {
     run_live_with_eternalize(&mut game, live);
 
     let mods = game.state.mods.need_heart_modifiers.get(&live);
-    assert!(mods.is_some(), "same-name identical members → should trigger");
+    assert!(
+        mods.is_some(),
+        "same-name identical members → should trigger"
+    );
     if let Some(m) = mods {
-        let h00 = m.get(&HeartColor::Heart00).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+        let h00 = m
+            .get(&HeartColor::Heart00)
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
         assert!(h00 <= -3, "heart00 reduction >= 3 (got {})", h00);
     }
 }
@@ -178,7 +183,9 @@ fn eternalize_two_same_one_different_triggers() {
     let mods = game.state.mods.need_heart_modifiers.get(&live);
     assert!(mods.is_some(), "2/3 share a name → should trigger");
     if let Some(m) = mods {
-        let h00 = m.get(&HeartColor::Heart00).map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+        let h00 = m
+            .get(&HeartColor::Heart00)
+            .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
         assert!(h00 <= -3, "heart00 reduction >= 3 (got {})", h00);
     }
 }
