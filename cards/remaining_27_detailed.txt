@@ -1,0 +1,189 @@
+=== DIFF #1 ===
+ROW: {{jidou.png|自動}}{{turn1.png|ターン1回}}自分がエールしたとき、エールにより公開された自分のカードが持つブレードハートの中に{{he
+
+[actions] DIFFERS
+
+=== DIFF #2 ===
+ROW: {{kidou.png|起動}}{{leftside.png|左サイド}}{{turn1.png|ターン1回}}このメンバーをウェイトにする：カードを3枚引き、
+
+[action] R=conditional_on_result G=sequential
+[primary_effect] DIFFERS
+  action: R='sequential' G=None
+  actions: R=[{'text': 'カードを3枚引き', 'count': 3, 'action': 'draw_card', 'source': 'deck', 'dest G=None
+  activation_position: R='left_side' G=None
+  text: R='カードを3枚引き、手札を2枚控え室に置く' G=None
+[actions] DIFFERS
+[followup_action] DIFFERS
+[result_condition] DIFFERS
+
+=== DIFF #3 ===
+ROW: {{live_start.png|ライブ開始時}}{{heart_01.png|heart01}}か{{heart_02.png|heart02}}か{{hea
+
+[actions] DIFFERS
+
+=== DIFF #4 ===
+ROW: {{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる、このターン中にエリアを移動したすべての『Liella!』のメンバーは、
+
+
+=== DIFF #5 ===
+ROW: {{live_start.png|ライブ開始時}}ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{
+
+[actions] DIFFERS
+
+=== DIFF #6 ===
+ROW: {{live_start.png|ライブ開始時}}手札の『DOLLCHESTRA』のカードを1枚控え室に置いてもよい：自分のステージにいる『DOLLCHESTR
+
+[primary_effect] DIFFERS
+  action: R='sequential' G='select'
+  actions: R=[{'text': '自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ', 'source': 'stage', 'count': 1, 'c G=None
+  card_type: R=None G='member_card'
+  count: R=None G=1
+  duration: R=None G='live_end'
+  source: R=None G='stage'
+  target: R=None G='self'
+
+=== DIFF #7 ===
+ROW: {{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これに
+
+[followup_action] DIFFERS
+[result_condition] DIFFERS
+
+=== DIFF #8 ===
+ROW: {{live_start.png|ライブ開始時}}手札を1枚控え室に置いてもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。これに
+
+[followup_action] DIFFERS
+[result_condition] DIFFERS
+
+=== DIFF #9 ===
+ROW: {{live_start.png|ライブ開始時}}自分のエネルギーが7枚以上ある場合、ライブ終了時まで、このメンバーと自分のステージにいるほかの『Liella!
+
+[actions] DIFFERS
+
+=== DIFF #10 ===
+ROW: {{live_start.png|ライブ開始時}}自分のステージに『Aqours』のメンバーと『SaintSnow』のメンバーがいて、かつそれらのメンバーのコス
+
+[condition] type: R=compound G=compound
+  DIFF conditions: R=[{'text': '自分のステージに『Aqours』のメンバーと『SaintSnow』のメンバーがいて、', 'tar G=[{'text': '自分のステージに『Aqours』のメンバーと『SaintSnow』のメンバーがいて、', 'tar
+
+=== DIFF #11 ===
+ROW: {{live_start.png|ライブ開始時}}自分のステージのエリアすべてに『虹ヶ咲』のメンバーがいて、かつそれらのコストの合計が20以上の場合、カードを3
+
+[condition] type: R=compound G=compound
+  DIFF conditions: R=[{'text': '自分のステージのエリアすべてに『虹ヶ咲』のメンバーがいて、', 'target': 'self', G=[{'text': '自分のステージのエリアすべてに『虹ヶ咲』のメンバーがいて、', 'target': 'self',
+
+=== DIFF #12 ===
+ROW: {{live_start.png|ライブ開始時}}自分のデッキの一番上のカードを控え室に置いてもよい。そうした場合、ライブ終了時まで、{{icon_blade.
+
+[actions] DIFFERS
+
+=== DIFF #13 ===
+ROW: {{live_start.png|ライブ開始時}}自分のライブカード置き場にあるカードが『Aqours』のみで、かつそれらの必要ハートに含まれる{{heart_
+
+[condition] type: R=compound G=compound
+  DIFF conditions: R=[{'text': '自分のライブカード置き場にあるカードが『Aqours』のみで、', 'target': 'self G=[{'text': '自分のライブカード置き場にあるカードが『Aqours』のみで、', 'target': 'self
+
+=== DIFF #14 ===
+ROW: {{live_start.png|ライブ開始時}}自分のライブカード置き場にカードが2枚以上ある場合、その中から{{live_start.png|ライブ開始時}
+
+[select_action] DIFFERS
+  ability_filter: R='no_ability_type' G=None
+  ability_filter_triggers: R=['ライブ開始時'] G=None
+[followup_action] DIFFERS
+
+=== DIFF #15 ===
+ROW: {{live_start.png|ライブ開始時}}自分のライブ中のライブカードの必要ハートに含まれる{{heart_02.png|heart02}}の合計が4以
+
+[condition] type: R=temporal_condition G=temporal_condition
+  G EXTRA location='live_card_zone'
+
+=== DIFF #16 ===
+ROW: {{live_start.png|ライブ開始時}}自分の成功ライブカード置き場かライブ中のライブカードの中に、必要ハートに含まれる{{heart_01.png|
+
+[condition] type: R=temporal_condition G=temporal_condition
+  G EXTRA aggregate='total'
+
+=== DIFF #17 ===
+ROW: {{live_start.png|ライブ開始時}}自分の成功ライブカード置き場かライブ中のライブカードの中に、必要ハートに含まれる{{heart_01.png|
+
+[condition] type: R=temporal_condition G=temporal_condition
+  G EXTRA aggregate='total'
+
+=== DIFF #18 ===
+ROW: {{live_start.png|ライブ開始時}}自分の控え室にカード名の異なる『虹ヶ咲』のライブカードが4枚以上ある場合、このカードのスコアを＋１する。6枚以
+
+[primary_effect] DIFFERS
+  text: R='このカードのスコアを+1する。' G='このカードのスコアを+1する'
+
+=== DIFF #19 ===
+ROW: {{live_success.png|ライブ成功時}}ライブの合計スコアが相手より高く、かつ自分のステージに『蓮ノ空』のメンバーがいる場合、自分のエネルギーデッ
+
+[condition] type: R=compound G=compound
+  DIFF conditions: R=[{'text': 'ライブの合計スコアが相手より高く、', 'comparison_target': 'opponen G=[{'text': 'ライブの合計スコアが相手より高く、', 'comparison_target': 'opponen
+
+=== DIFF #20 ===
+ROW: {{live_success.png|ライブ成功時}}ライブ終了時まで、相手は余剰ハートをすべて失う。これにより相手が余剰ハートを2つ以上失っている場合、このカ
+
+[action] R=sequential G=conditional_on_result
+[primary_effect] DIFFERS
+  action: R=None G='gain_resource'
+  action_by: R=None G='opponent'
+  all: R=None G=True
+  duration: R=None G='live_end'
+  resource: R=None G='surplus_heart'
+  sign: R=None G='negative'
+  target: R=None G='opponent'
+  text: R=None G='相手は余剰ハートをすべて失う。'
+[actions] DIFFERS
+[followup_action] DIFFERS
+[result_condition] DIFFERS
+
+=== DIFF #21 ===
+ROW: {{toujyou.png|登場}}{{center.png|センター}}自分の成功ライブカード置き場に{{icon_score.png|スコア}}を持つ『μ'
+
+[primary_effect] DIFFERS
+  text: R='「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る。' G='「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る'
+
+=== DIFF #22 ===
+ROW: {{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを5枚見る。その中から『SunnyPassion』のメンバーカード
+
+[select_action] DIFFERS
+  options: R=[{'group_names': ['SunnyPassion'], 'card_type': 'member_card'}, {'group_names':  G=None
+  text: R=None G='自分のデッキの上からカードを5枚見る。その中から『SunnyPassion』のメンバーカードかブレードハートを持つ『Liella!』のメンバーカードを1枚公開
+
+=== DIFF #23 ===
+ROW: {{toujyou.png|登場}}能力を持たないメンバーからバトンタッチして登場した場合、カードを1枚引く。
+
+[condition] type: R=movement_condition G=movement_condition
+  G MISSING card_type='member_card'
+
+=== DIFF #24 ===
+ROW: {{toujyou.png|登場}}自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし、自身のデッキの下に置く。これにより自分と相手の
+
+[primary_effect] DIFFERS
+  action: R='sequential' G='move_cards'
+  actions: R=[{'text': '自分と相手はそれぞれ、自身の控え室にあるすべてのメンバーカードをシャッフルし', 'source': 'discard', 'card_t G=None
+  card_type: R=None G='member_card'
+  destination: R=None G='deck_bottom'
+  multiple_targets: R=None G=True
+  source: R=None G='discard'
+  target: R=None G='deck'
+[followup_action] DIFFERS
+
+=== DIFF #25 ===
+ROW: {{toujyou.png|登場}}自分のステージにいる『Liella!』のメンバー1人のすべての{{live_start.png|ライブ開始時}}能力を、ライ
+
+[primary_effect] DIFFERS
+  all: R=False G=True
+
+=== DIFF #26 ===
+ROW: {{toujyou.png|登場}}自分のデッキの上からカードを2枚見る。その中から能力を持たない『μ's』のカードか{{jyouji.png|常時}}能力を持
+
+[select_action] DIFFERS
+  or_ability_filters: R=[{'ability_filter': 'no_ability'}, {'ability_filter': 'has_ability_type', 'abili G=None
+
+=== DIFF #27 ===
+ROW: {{toujyou.png|登場}}自分の成功ライブカード置き場にカードが1枚以上あり、かつスコアの合計が１以下の場合、ライブ終了時まで、「{{jyouji.p
+
+[condition] type: R=compound G=compound
+  DIFF conditions: R=[{'type': 'card_count_condition', 'count': 1, 'operator': '> G=[{'type': 'card_count_condition', 'count': 1, 'operator': '>
+

@@ -7536,23 +7536,13 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if pe_text.endswith("。") and not pe.get("condition"):
                 # Only strip if it's a simple text where reference doesn't have period
                 pe["text"] = pe_text.rstrip("。")
-            # Negation condition from text — extract just the condition part (before first 、after とき)
+            # Negation condition from text
             if (
                 not pe.get("condition")
                 and ("ない" in pet or "いない" in pet)
                 and "とき" in pet
             ):
-                idx = pet.find("とき")
-                if idx > 0:
-                    rest = pet[idx + 2 :]
-                    comma = rest.find("、")
-                    if comma > 0:
-                        neg_text = pet[: idx + 2 + comma]
-                    else:
-                        neg_text = pet[: idx + 2]
-                else:
-                    neg_text = pet
-                neg_text = neg_text.rstrip("。")
+                neg_text = pet.rstrip("。")
                 neg_cond = {
                     "type": "location_condition",
                     "location": "revealed_cards",
@@ -7585,7 +7575,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
         # FIX 12: compound condition → split gain_resource into sequential with two actions
         if isinstance(cond, dict) and cond.get("type") == "compound":
-            if eff.get("action") == "gain_resource":
+            if eff.get("action") == "gain_resource" and eff.get("resource") == "blade":
                 et = eff.get("text", "") or t
                 if (
                     "{{icon_all.png|ハート}}" in et
@@ -7593,6 +7583,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 ):
                     blade_count = et.count("{{icon_blade.png|ブレード}}")
                     heart_count = et.count("{{icon_all.png|ハート}}")
+                    group_names = cond.get("group_names") or eff.get("group_names")
                     actions = [
                         {
                             "action": "gain_resource",
@@ -7610,183 +7601,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     ]
                     eff["action"] = "sequential"
                     eff["actions"] = actions
-                    eff.pop("resource", None)
-                    eff.pop("count", None)
-                    # Propagate group_names from condition or any sub-condition
-                    if isinstance(cond, dict):
-                        gns = cond.get("group_names")
-                        if not gns:
-                            for sc in cond.get("conditions", []):
-                                if isinstance(sc, dict) and sc.get("group_names"):
-                                    gns = sc["group_names"]
-                                    break
-                        if gns:
-                            eff["group_names"] = gns
                     fix_stats["compound_split"] += 1
-
-    # ============== ADDITIONAL REMAINING FIXES ==============
-
-    for ability in data["unique_abilities"]:
-        eff = ability.get("effect")
-        if not isinstance(eff, dict):
-            continue
-        t = ability.get("triggerless_text", "")
-        cond = eff.get("condition", {})
-
-        # A: Strip heart_colors from movement conditions
-        if isinstance(cond, dict) and cond.get("type") == "card_count_condition":
-            if cond.get("source") == "preceding_moved" and cond.get("heart_colors"):
-                cond.pop("heart_colors", None)
-
-        # B: Add location to temporal_conditions with aggregate=total (only for live_card_zone)
-        if isinstance(cond, dict) and cond.get("type") == "temporal_condition":
-            ct = cond.get("text", "") or ""
-            if (
-                cond.get("aggregate") == "total"
-                and "必要ハート" in ct
-                and "含まれ" in ct
-            ):
-                if "成功" not in ct and not cond.get("location"):
-                    cond["location"] = "live_card_zone"
-
-        # C: conditional_on_result — N-action sequential with これにより condition
-        if eff.get("action") == "sequential" and "これにより" in t:
-            acts = eff.get("actions", [])
-            result_idx = -1
-            for i, act in enumerate(acts):
-                if isinstance(act, dict):
-                    c1 = act.get("condition")
-                    if isinstance(c1, dict) and "これにより" in (
-                        c1.get("text", "") or ""
-                    ):
-                        result_idx = i
-                        break
-            if 0 < result_idx < len(acts):
-                primary_acts = acts[:result_idx]
-                if len(primary_acts) == 1:
-                    primary = dict(primary_acts[0])
-                    if "text" not in primary:
-                        primary["text"] = primary_acts[0].get("text", t)
-                else:
-                    primary = {
-                        "text": primary_acts[0].get("text", t),
-                        "action": "sequential",
-                        "actions": [dict(a) for a in primary_acts],
-                    }
-                result_act = acts[result_idx]
-                c1 = result_act.get("condition", {})
-                result_cond = dict(c1)
-                if c1.get("type") == "location_condition":
-                    result_cond["type"] = "card_count_condition"
-                    result_cond.pop("locations", None)
-                    result_cond["source"] = "preceding_moved"
-                result_cond.pop("location", None)
-                rct = result_cond.get("text", "")
-                if "ブレードハートを持たない" in rct or "ブレードハートがない" in rct:
-                    result_cond["card_property"] = "has_blade_heart"
-                if "operator" not in result_cond:
-                    result_cond["operator"] = ">="
-                if "count" not in result_cond:
-                    result_cond["count"] = 1
-                if "source" not in result_cond:
-                    result_cond["source"] = "preceding_moved"
-                followup_acts = []
-                first_fa = dict(result_act)
-                full_text_r = first_fa.get("text", "")
-                rct2 = rct
-                if rct2 and full_text_r.startswith(rct2):
-                    action_text = full_text_r[len(rct2) :].lstrip("、").lstrip("。")
-                    first_fa["text"] = action_text
-                first_fa.pop("condition", None)
-                followup_acts.append(first_fa)
-                remaining = acts[result_idx + 1 :]
-                if remaining:
-                    for rem in remaining:
-                        followup_acts.append(dict(rem))
-                if len(followup_acts) == 1:
-                    followup = followup_acts[0]
-                else:
-                    combined_text = followup_acts[0].get("text", "")
-                    for fa in followup_acts[1:]:
-                        ft = fa.get("text", "")
-                        if ft:
-                            combined_text = (
-                                (combined_text.rstrip("。").rstrip("、")) + "。" + ft
-                            )
-                    followup = {
-                        "text": combined_text,
-                        "action": "sequential",
-                        "actions": followup_acts,
-                    }
-                if eff.get("activation_position") and not followup.get(
-                    "activation_position"
-                ):
-                    followup["activation_position"] = eff["activation_position"]
-                eff["action"] = "conditional_on_result"
-                eff["primary_effect"] = primary
-                eff["result_condition"] = result_cond
-                eff["followup_action"] = followup
-                eff.pop("actions", None)
-
-        # D0: Propagate heart_type:all to sub-actions in actions arrays
-        for act in eff.get("actions", []):
-            if isinstance(act, dict):
-                if (
-                    act.get("action") == "gain_resource"
-                    and act.get("resource") == "heart"
-                ):
-                    if "{{icon_all.png|ハート}}" in (act.get("text", "") or t or ""):
-                        if not act.get("heart_type"):
-                            act["heart_type"] = "all"
-
-        # D1: Remove optional_action from each_time with appearance trigger
-        if (
-            eff.get("action") == "conditional_on_optional"
-            and eff.get("trigger_type") == "each_time"
-        ):
-            tc = eff.get("trigger_condition", {})
-            if isinstance(tc, dict) and tc.get("type") == "appearance_condition":
-                eff.pop("optional_action", None)
-
-        # E0: Add card_property to conditions missing it
-        def _add_card_property(node):
-            if isinstance(node, dict):
-                nc = node.get("condition")
-                if isinstance(nc, dict) and nc.get("type") == "card_count_condition":
-                    nct = nc.get("text", "")
-                    if (
-                        "ブレードハートを持たない" in nct
-                        or "ブレードハートがない" in nct
-                    ):
-                        if not nc.get("card_property"):
-                            nc["card_property"] = "has_blade_heart"
-                for v in node.values():
-                    _add_card_property(v)
-            elif isinstance(node, list):
-                for item in node:
-                    _add_card_property(item)
-
-        _add_card_property(eff)
-
-        # E: Revert over-eager conditional_on_result to sequential (surplus_heart)
-        if eff.get("action") == "conditional_on_result":
-            pe = eff.get("primary_effect", {})
-            if isinstance(pe, dict) and pe.get("resource") == "surplus_heart":
-                actions = [pe]
-                fa = eff.get("followup_action")
-                if isinstance(fa, dict):
-                    actions.append(fa)
-                if actions:
-                    eff["action"] = "sequential"
-                    eff["actions"] = actions
-                    eff.pop("primary_effect", None)
-                    eff.pop("result_condition", None)
-                    eff.pop("followup_action", None)
-
-        # F: Add card_type to movement_condition with ability_filter
-        if isinstance(cond, dict) and cond.get("type") == "movement_condition":
-            if cond.get("ability_filter") and not cond.get("card_type"):
-                cond["card_type"] = "member_card"
 
     if any(fix_stats.values()):
         active = {k: v for k, v in fix_stats.items() if v}
