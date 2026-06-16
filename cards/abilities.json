@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T05:01:34.428622",
+  "generated_at": "2026-06-17T05:20:20.420448",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -3321,8 +3321,7 @@
               "location": "discard",
               "group_names": [
                 "Liella!"
-              ],
-              "card_type": "energy_card"
+              ]
             },
             {
               "type": "card_count_condition",
@@ -3330,8 +3329,7 @@
               "operator": ">=",
               "text": "自分のエネルギーが7枚以上ある場合",
               "target": "self",
-              "location": "energy_zone",
-              "card_type": "energy_card"
+              "location": "energy_zone"
             }
           ],
           "text": "『Liella!』のメンバーからバトンタッチして登場しており、かつ自分のエネルギーが7枚以上ある場合",
@@ -5308,7 +5306,8 @@
               "operator": ">=",
               "aggregate": "total",
               "type": "comparison_condition",
-              "comparison_type": "cost"
+              "comparison_type": "cost",
+              "location": "live_card_zone"
             }
           ],
           "text": "自分のライブカード置き場にあるカードが『Aqours』のみで、かつそれらの必要ハートに含まれる{{heart_02.png|heart02}}と{{heart_04.png|heart04}}と{{heart_05.png|heart05}}の合計が12以上の場合",
@@ -12805,6 +12804,7 @@
               "aggregate": "total",
               "cost_limit": 1,
               "type": "comparison_condition",
+              "location": "success_live_card_zone",
               "count": 1
             }
           ],
@@ -13237,8 +13237,7 @@
               "operator": ">=",
               "text": "自分のエネルギーが7枚以上ある場合",
               "target": "self",
-              "location": "energy_zone",
-              "card_type": "energy_card"
+              "location": "energy_zone"
             }
           ],
           "text": "自分のステージにいるメンバーが『Liella!』のみで、かつ自分のエネルギーが7枚以上ある場合",
@@ -15421,8 +15420,7 @@
                   "text": "コストが選んだ数以上の場合",
                   "operator": ">=",
                   "comparison_type": "cost",
-                  "type": "comparison_condition",
-                  "card_type": "card"
+                  "type": "comparison_condition"
                 }
               ],
               "text": "公開したカードがメンバーカードで、かつコストが選んだ数以上の場合",
@@ -16481,8 +16479,7 @@
               "operator": ">=",
               "text": "相手の成功ライブカード置き場にカードが2枚以上ある場合",
               "location": "success_live_card_zone",
-              "target": "opponent",
-              "card_type": "member_card"
+              "target": "opponent"
             }
           ],
           "text": "自分の成功ライブカード置き場にカードがなく、かつ相手の成功ライブカード置き場にカードが2枚以上ある場合",
@@ -18596,8 +18593,7 @@
               "comparison_type": "score",
               "aggregate": "total",
               "type": "comparison_condition",
-              "target": "self",
-              "card_type": "energy_card"
+              "location": "stage"
             },
             {
               "text": "自分のステージに『蓮ノ空』のメンバーがいる場合",
@@ -20441,7 +20437,8 @@
                 "type": "opponent_live_success",
                 "no_excess_heart": true
               },
-              "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合"
+              "text": "このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
+              "location": "stage"
             }
           ],
           "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_05.png|heart05}}が合計4個以上あり、このターン、相手が余剰のハートを持たずにライブを成功させていた場合",
@@ -21271,8 +21268,7 @@
               "temporal": "this_turn",
               "temporal_scope": "this_turn",
               "type": "comparison_condition",
-              "target": "self",
-              "card_type": "energy_card"
+              "location": "stage"
             },
             {
               "text": "自分のステージに『虹ヶ咲』のメンバーがいる場合",
@@ -22590,7 +22586,8 @@
               "comparison_type": "cost",
               "aggregate": "total",
               "type": "comparison_condition",
-              "cost_total": 20
+              "cost_total": 20,
+              "location": "stage"
             }
           ],
           "text": "自分のステージのエリアすべてに『虹ヶ咲』のメンバーがいて、かつそれらのコストの合計が20以上の場合",
@@ -25726,7 +25723,7 @@
               "aggregate": "total",
               "type": "comparison_condition",
               "cost_total": 20,
-              "target": "self"
+              "location": "stage"
             }
           ],
           "text": "自分のステージに『Aqours』のメンバーと『SaintSnow』のメンバーがいて、かつそれらのメンバーのコストが合計20以上の場合",

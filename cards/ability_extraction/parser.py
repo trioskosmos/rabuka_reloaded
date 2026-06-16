@@ -7845,15 +7845,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     if not nc.get("card_type") and ctx.get("card_type"):
                         nc["card_type"] = ctx["card_type"]
 
-            # Inherit location into compound sub-conditions
-            if node.get("type") == "compound" and "conditions" in node:
-                for sub in node["conditions"]:
-                    if isinstance(sub, dict):
-                        for _f in ("location", "target", "card_type"):
-                            if ctx.get(_f) and not sub.get(_f):
-                                sub[_f] = ctx[_f]
-                        _propagate_context(sub, ctx)
-
             # Inherit duration into action-type dicts
             if action in (
                 "gain_resource",
@@ -7897,6 +7888,30 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             ):
                 if f in node:
                     new_ctx[f] = node[f]
+
+            # Inherit location into compound sub-conditions (from compound's own context)
+            if node.get("type") == "compound" and "conditions" in node:
+                for sub in node["conditions"]:
+                    if isinstance(sub, dict):
+                        if new_ctx.get("location") and not sub.get("location"):
+                            sub["location"] = new_ctx["location"]
+                        _propagate_context(sub, new_ctx)
+
+            # Fallback: infer duration for sequential sub-actions from ability text
+            # when the parser lost duration during sequential creation.
+            if (
+                action == "sequential"
+                and not new_ctx.get("duration")
+                and t
+                and any(
+                    isinstance(act, dict)
+                    and act.get("action")
+                    in ("gain_resource", "move_cards", "change_state", "modify_score")
+                    for act in node.get("actions", [])
+                )
+            ):
+                if "ライブ終了時まで" in t:
+                    new_ctx["duration"] = "live_end"
 
             for ck in (
                 "condition",
