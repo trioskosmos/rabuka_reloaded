@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T03:53:09.489902",
+  "generated_at": "2026-06-17T05:01:34.428622",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1562,7 +1562,7 @@
           ],
           "optional": true,
           "action": "invalidate_ability",
-          "all": true
+          "all": false
         },
         "result_condition": {
           "type": "action_success_condition",
@@ -3321,7 +3321,8 @@
               "location": "discard",
               "group_names": [
                 "Liella!"
-              ]
+              ],
+              "card_type": "energy_card"
             },
             {
               "type": "card_count_condition",
@@ -3329,7 +3330,8 @@
               "operator": ">=",
               "text": "自分のエネルギーが7枚以上ある場合",
               "target": "self",
-              "location": "energy_zone"
+              "location": "energy_zone",
+              "card_type": "energy_card"
             }
           ],
           "text": "『Liella!』のメンバーからバトンタッチして登場しており、かつ自分のエネルギーが7枚以上ある場合",
@@ -3976,8 +3978,7 @@
             "heart_colors": [
               "heart01"
             ],
-            "duration": "live_end",
-            "heart_type": "all"
+            "duration": "live_end"
           },
           {
             "text": "6種類以上ある場合、ライブ終了時まで、「{{jyouji.png|常時}}ライブの合計スコアを+1する。」を得る",
@@ -5304,7 +5305,7 @@
                 "heart05"
               ],
               "count": 12,
-              "operator": "=",
+              "operator": ">=",
               "aggregate": "total",
               "type": "comparison_condition",
               "comparison_type": "cost"
@@ -6125,9 +6126,7 @@
           "text": "これによりライブカードを控え室に置いた場合",
           "card_type": "live_card",
           "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "source": "preceding_moved"
         },
         "followup_action": {
           "text": "カードを1枚引く",
@@ -7557,9 +7556,7 @@
           "text": "これにより控え室に置いたカードがライブカードの場合",
           "card_type": "live_card",
           "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "source": "preceding_moved"
         },
         "followup_action": {
           "text": "このメンバーをウェイトにする。自分はこの手順を4回まで繰り返してもよい",
@@ -7741,16 +7738,34 @@
         "action": "conditional_on_result",
         "primary_effect": {
           "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ。ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
-          "duration": "live_end",
-          "source": "stage",
-          "count": 1,
-          "card_type": "member_card",
-          "target": "self",
           "group_names": [
             "DOLLCHESTRA"
           ],
-          "action": "select",
-          "original_value": true
+          "action": "sequential",
+          "original_value": true,
+          "actions": [
+            {
+              "text": "自分のステージにいる『DOLLCHESTRA』のメンバー1人を選ぶ",
+              "source": "stage",
+              "count": 1,
+              "card_type": "member_card",
+              "target": "self",
+              "group_names": [
+                "DOLLCHESTRA"
+              ],
+              "action": "select"
+            },
+            {
+              "text": "ライブ終了時まで、このメンバーのコストは、選んだメンバーが元々持つコストより1低い値に等しくなる",
+              "duration": "live_end",
+              "card_type": "member_card",
+              "action": "modify_cost",
+              "group_names": [
+                "DOLLCHESTRA"
+              ],
+              "original_value": true
+            }
+          ]
         },
         "result_condition": {
           "text": "これによりこのカードのコストが10以上になった場合",
@@ -12789,7 +12804,8 @@
               "comparison_type": "score",
               "aggregate": "total",
               "cost_limit": 1,
-              "type": "comparison_condition"
+              "type": "comparison_condition",
+              "count": 1
             }
           ],
           "text": "自分の成功ライブカード置き場にカードが1枚以上あり、かつスコアの合計が1以下の場合",
@@ -13221,7 +13237,8 @@
               "operator": ">=",
               "text": "自分のエネルギーが7枚以上ある場合",
               "target": "self",
-              "location": "energy_zone"
+              "location": "energy_zone",
+              "card_type": "energy_card"
             }
           ],
           "text": "自分のステージにいるメンバーが『Liella!』のみで、かつ自分のエネルギーが7枚以上ある場合",
@@ -13857,8 +13874,7 @@
             "heart05",
             "heart06"
           ],
-          "count": 1,
-          "location": "live_card_zone"
+          "count": 1
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -15405,7 +15421,8 @@
                   "text": "コストが選んだ数以上の場合",
                   "operator": ">=",
                   "comparison_type": "cost",
-                  "type": "comparison_condition"
+                  "type": "comparison_condition",
+                  "card_type": "card"
                 }
               ],
               "text": "公開したカードがメンバーカードで、かつコストが選んだ数以上の場合",
@@ -16464,7 +16481,8 @@
               "operator": ">=",
               "text": "相手の成功ライブカード置き場にカードが2枚以上ある場合",
               "location": "success_live_card_zone",
-              "target": "opponent"
+              "target": "opponent",
+              "card_type": "member_card"
             }
           ],
           "text": "自分の成功ライブカード置き場にカードがなく、かつ相手の成功ライブカード置き場にカードが2枚以上ある場合",
@@ -16707,9 +16725,7 @@
           "text": "これにより「百生吟子」のメンバーカードを控え室に置いた場合",
           "card_type": "member_card",
           "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "source": "preceding_moved"
         },
         "followup_action": {
           "text": "{{icon_blade.png|ブレード}}を得る",
@@ -16917,7 +16933,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "{{icon_blade.png|ブレード}}",
+        "text": "{{icon_blade.png|ブレード}}を得る",
         "action": "gain_resource",
         "resource": "blade",
         "count": 1,
@@ -18579,7 +18595,9 @@
               "comparison_target": "opponent",
               "comparison_type": "score",
               "aggregate": "total",
-              "type": "comparison_condition"
+              "type": "comparison_condition",
+              "target": "self",
+              "card_type": "energy_card"
             },
             {
               "text": "自分のステージに『蓮ノ空』のメンバーがいる場合",
@@ -21252,7 +21270,9 @@
               "operator": ">=",
               "temporal": "this_turn",
               "temporal_scope": "this_turn",
-              "type": "comparison_condition"
+              "type": "comparison_condition",
+              "target": "self",
+              "card_type": "energy_card"
             },
             {
               "text": "自分のステージに『虹ヶ咲』のメンバーがいる場合",
@@ -23394,8 +23414,7 @@
           "count": 4,
           "group_names": [
             "虹ヶ咲"
-          ],
-          "aggregate": "total"
+          ]
         },
         "action": "modify_score",
         "value": 1,
@@ -23438,8 +23457,7 @@
           "count": 3,
           "group_names": [
             "虹ヶ咲"
-          ],
-          "aggregate": "total"
+          ]
         },
         "count": 4,
         "card_type": "member_card",
@@ -25707,7 +25725,8 @@
               "comparison_type": "cost",
               "aggregate": "total",
               "type": "comparison_condition",
-              "cost_total": 20
+              "cost_total": 20,
+              "target": "self"
             }
           ],
           "text": "自分のステージに『Aqours』のメンバーと『SaintSnow』のメンバーがいて、かつそれらのメンバーのコストが合計20以上の場合",
@@ -27766,8 +27785,7 @@
           "heart_colors": [
             "heart02"
           ],
-          "count": 4,
-          "location": "live_card_zone"
+          "count": 4
         },
         "action": "gain_resource",
         "resource": "heart",

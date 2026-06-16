@@ -11,7 +11,7 @@ import json, sys, os
 
 GOLDEN = r"C:\Users\trios\Downloads\rabuka_reloaded-master (2)\rabuka_reloaded-master\cards\abilities.json"
 GENERATED = os.path.join(os.path.dirname(__file__), "cards", "abilities.json")
-BASELINE = 28  # current diff count — decrease this as fixes land
+BASELINE = 26  # current diff count — decrease this as fixes land
 
 
 def compare():

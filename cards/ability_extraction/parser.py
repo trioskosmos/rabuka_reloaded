@@ -6183,10 +6183,11 @@ def _try_timing_condition_gain(text):
     group_name = m.group(1).strip("｢「『　 ").rstrip("｣」』　 ")
     resource_text = m.group(2)
     blade_count = resource_text.count("{{icon_blade.png|ブレード}}")
+    full_resource_text = resource_text + "を得る"
     if blade_count == 0:
         return None
     result = {
-        "text": resource_text,
+        "text": full_resource_text,
         "action": "gain_resource",
         "resource": "blade",
         "count": blade_count,
@@ -7043,24 +7044,33 @@ def _normalize_effect_tree(effect, original_text=None):
 
         # Infer operator for comparison conditions when counts are present
         ct = d.get("condition_type") or d.get("type")
+        if ct in ("comparison_condition", "card_count_condition"):
+            # Always override for "以上"/"以下" even if operator was pre-set
+            _text = d.get("text", "")
+            if d.get("count") and not d.get("comparison_target"):
+                if "以上" in _text:
+                    d["operator"] = ">="
+                elif "以下" in _text:
+                    d["operator"] = "<="
+                elif "operator" not in d:
+                    d["operator"] = "="
+            if "operator" not in d:
+                if d.get("values"):
+                    d["operator"] = "in"
+                elif d.get("comparison_target"):
+                    if "高い" in _text or "多い" in _text or "大きい" in _text:
+                        d["operator"] = ">"
+                    elif "低い" in _text or "少ない" in _text or "小さい" in _text:
+                        d["operator"] = "<"
+
+        # Infer count from cost_limit for comparison_conditions (non-cost comparisons)
         if (
-            ct in ("comparison_condition", "card_count_condition")
-            and "operator" not in d
+            ct == "comparison_condition"
+            and "count" not in d
+            and d.get("cost_limit") is not None
+            and d.get("comparison_type") != "cost"
         ):
-            if d.get("values"):
-                d["operator"] = "in"
-            elif d.get("comparison_target") and not d.get("operator"):
-                text = d.get("text", "")
-                if "高い" in text or "多い" in text or "大きい" in text:
-                    d["operator"] = ">"
-                elif "低い" in text or "少ない" in text or "小さい" in text:
-                    d["operator"] = "<"
-            elif (
-                d.get("count")
-                and not d.get("operator")
-                and not d.get("comparison_target")
-            ):
-                d["operator"] = "="
+            d["count"] = d["cost_limit"]
 
         # Default per_unit_count to 1 when missing
         if d.get("per_unit") and "per_unit_count" not in d:
@@ -7114,7 +7124,10 @@ def _normalize_effect_tree(effect, original_text=None):
             if isinstance(cond, dict) and "heart_colors" not in cond:
                 cond_type = cond.get("type", "")
                 loc = cond.get("location", "")
-                if cond_type == "card_count_condition":
+                if (
+                    cond_type == "card_count_condition"
+                    and cond.get("source") != "preceding_moved"
+                ):
                     pass
                 elif cond.get("check_self"):
                     pass
@@ -7134,6 +7147,7 @@ def _normalize_effect_tree(effect, original_text=None):
         for sub_key in (
             "actions",
             "options",
+            "conditions",
             "primary_effect",
             "alternative_effect",
             "select_action",
@@ -7495,7 +7509,11 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             # 8c: Enrich temporal_condition with aggregate
             if cond.get("type") == "temporal_condition":
                 changed = False
-                if "必要ハート" in ct and "含まれ" in ct:
+                hc = len(re.findall(r"\{\{heart_\d+\.png", ct))
+                has_req_heart = "必要ハート" in ct
+                has_aggregate_keyword = "含まれ" in ct or "のうち" in ct
+                has_total_or_each = "合計" in ct or "それぞれ" in ct
+                if has_req_heart and has_aggregate_keyword and has_total_or_each:
                     cond["aggregate"] = "total"
                     changed = True
                 if not cond.get("heart_colors"):
@@ -7527,15 +7545,10 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 rc["negation"] = True
                 fix_stats["result_cond"] += 1
 
-        # FIX 10: Primary effect fixes — trailing period, negation condition, all field
+        # FIX 10: Primary effect fixes — negation condition
         pe = eff.get("primary_effect")
         if isinstance(pe, dict):
             pet = pe.get("text", "") or ""
-            # Strip trailing period from primary_effect text if reference doesn't have it
-            pe_text = pe.get("text", "")
-            if pe_text.endswith("。") and not pe.get("condition"):
-                # Only strip if it's a simple text where reference doesn't have period
-                pe["text"] = pe_text.rstrip("。")
             # Negation condition from text — extract just the condition part (before first 、after とき)
             if (
                 not pe.get("condition")
@@ -7564,9 +7577,9 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 pe["card_type"] = "card"
                 pe.pop("target", None)
                 fix_stats["primary_neg"] += 1
-            # Add all:true to primary_effect if it's missing and parent has it
-            if eff.get("all") and not pe.get("all"):
-                pe["all"] = True
+            # all:false on single-target primary when parent has all:true
+            if eff.get("all") and "all" not in pe and pe.get("count") == 1:
+                pe["all"] = False
 
         # FIX 11: Remove leaking fields from sub-actions in sequential
         if eff.get("action") in ("sequential", "conditional_on_result"):
@@ -7624,7 +7637,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                             eff["group_names"] = gns
                     fix_stats["compound_split"] += 1
 
-    # ============== ADDITIONAL REMAINING FIXES ==============
+    # ============== POST-PROCESSING ==============
 
     for ability in data["unique_abilities"]:
         eff = ability.get("effect")
@@ -7633,21 +7646,13 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         t = ability.get("triggerless_text", "")
         cond = eff.get("condition", {})
 
-        # A: Strip heart_colors from movement conditions
-        if isinstance(cond, dict) and cond.get("type") == "card_count_condition":
-            if cond.get("source") == "preceding_moved" and cond.get("heart_colors"):
-                cond.pop("heart_colors", None)
+        # ---- A: Strip trailing period from primary_effect text ----
+        pe = eff.get("primary_effect")
+        if isinstance(pe, dict) and isinstance(pe.get("text"), str):
+            if pe["text"].endswith("。"):
+                pe["text"] = pe["text"].rstrip("。")
 
-        # B: Add location to temporal_conditions with aggregate=total (only for live_card_zone)
-        if isinstance(cond, dict) and cond.get("type") == "temporal_condition":
-            ct = cond.get("text", "") or ""
-            if (
-                cond.get("aggregate") == "total"
-                and "必要ハート" in ct
-                and "含まれ" in ct
-            ):
-                if "成功" not in ct and not cond.get("location"):
-                    cond["location"] = "live_card_zone"
+        # ---- A1: Structural transforms (keep) ----
 
         # C: conditional_on_result — N-action sequential with これにより condition
         if eff.get("action") == "sequential" and "これにより" in t:
@@ -7684,10 +7689,13 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 rct = result_cond.get("text", "")
                 if "ブレードハートを持たない" in rct or "ブレードハートがない" in rct:
                     result_cond["card_property"] = "has_blade_heart"
-                if "operator" not in result_cond:
-                    result_cond["operator"] = ">="
-                if "count" not in result_cond:
-                    result_cond["count"] = 1
+                # Only add default count/operator when the condition text has an
+                # explicit threshold; action-success patterns should not get defaults.
+                if re.search(r"\d+枚以上", rct) or re.search(r"以上", rct):
+                    if "operator" not in result_cond:
+                        result_cond["operator"] = ">="
+                    if "count" not in result_cond:
+                        result_cond["count"] = 1
                 if "source" not in result_cond:
                     result_cond["source"] = "preceding_moved"
                 followup_acts = []
@@ -7728,17 +7736,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 eff["followup_action"] = followup
                 eff.pop("actions", None)
 
-        # D0: Propagate heart_type:all to sub-actions in actions arrays
-        for act in eff.get("actions", []):
-            if isinstance(act, dict):
-                if (
-                    act.get("action") == "gain_resource"
-                    and act.get("resource") == "heart"
-                ):
-                    if "{{icon_all.png|ハート}}" in (act.get("text", "") or t or ""):
-                        if not act.get("heart_type"):
-                            act["heart_type"] = "all"
-
         # D1: Remove optional_action from each_time with appearance trigger
         if (
             eff.get("action") == "conditional_on_optional"
@@ -7748,25 +7745,41 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
             if isinstance(tc, dict) and tc.get("type") == "appearance_condition":
                 eff.pop("optional_action", None)
 
-        # E0: Add card_property to conditions missing it
-        def _add_card_property(node):
-            if isinstance(node, dict):
-                nc = node.get("condition")
-                if isinstance(nc, dict) and nc.get("type") == "card_count_condition":
-                    nct = nc.get("text", "")
-                    if (
-                        "ブレードハートを持たない" in nct
-                        or "ブレードハートがない" in nct
-                    ):
-                        if not nc.get("card_property"):
-                            nc["card_property"] = "has_blade_heart"
-                for v in node.values():
-                    _add_card_property(v)
-            elif isinstance(node, list):
-                for item in node:
-                    _add_card_property(item)
-
-        _add_card_property(eff)
+        # E0: Fix DOLLCHESTRA-type primary_effect — split select+modify_cost into sequential
+        if eff.get("action") in ("conditional_on_result", "conditional_alternative"):
+            pe = eff.get("primary_effect")
+            if (
+                isinstance(pe, dict)
+                and pe.get("action") == "select"
+                and pe.get("original_value") is True
+            ):
+                pe_text = pe.get("text") or ""
+                parts = pe_text.split("。")
+                if len(parts) >= 2:
+                    text_select = parts[0]
+                    text_cost = "。".join(parts[1:]).lstrip("。")
+                    pe["action"] = "sequential"
+                    pe["actions"] = [
+                        {
+                            "text": text_select,
+                            "source": pe.get("source"),
+                            "count": pe.get("count", 1),
+                            "card_type": pe.get("card_type"),
+                            "target": pe.get("target"),
+                            "group_names": pe.get("group_names"),
+                            "action": "select",
+                        },
+                        {
+                            "text": text_cost,
+                            "duration": "live_end",
+                            "card_type": pe.get("card_type"),
+                            "action": "modify_cost",
+                            "group_names": pe.get("group_names"),
+                            "original_value": True,
+                        },
+                    ]
+                    for k in ("source", "count", "duration", "card_type", "target"):
+                        pe.pop(k, None)
 
         # E: Revert over-eager conditional_on_result to sequential (surplus_heart)
         if eff.get("action") == "conditional_on_result":
@@ -7783,10 +7796,175 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     eff.pop("result_condition", None)
                     eff.pop("followup_action", None)
 
-        # F: Add card_type to movement_condition with ability_filter
-        if isinstance(cond, dict) and cond.get("type") == "movement_condition":
-            if cond.get("ability_filter") and not cond.get("card_type"):
-                cond["card_type"] = "member_card"
+        # ---- B: Scoped context propagation (inherits specific fields) ----
+
+        def _propagate_context(node, ctx=None):
+            if not isinstance(node, dict):
+                return
+            if ctx is None:
+                ctx = {}
+
+            action = node.get("action")
+            ct = node.get("condition_type") or node.get("type")
+
+            # Apply operator inference for condition-type nodes
+            if ct in ("comparison_condition", "card_count_condition"):
+                _text = node.get("text", "")
+                if node.get("count") and not node.get("comparison_target"):
+                    if "以上" in _text:
+                        node["operator"] = ">="
+                    elif "以下" in _text:
+                        node["operator"] = "<="
+                    elif "operator" not in node:
+                        node["operator"] = "="
+                if "operator" not in node:
+                    if node.get("values"):
+                        node["operator"] = "in"
+                    elif node.get("comparison_target"):
+                        if "高い" in _text or "多い" in _text or "大きい" in _text:
+                            node["operator"] = ">"
+                        elif "低い" in _text or "少ない" in _text or "小さい" in _text:
+                            node["operator"] = "<"
+                # Infer count from cost_limit for score-based comparisons
+                if (
+                    ct == "comparison_condition"
+                    and "count" not in node
+                    and node.get("cost_limit") is not None
+                    and node.get("comparison_type") != "cost"
+                ):
+                    node["count"] = node["cost_limit"]
+
+            # Inherit location into conditions
+            if isinstance(node.get("condition"), dict):
+                nc = node["condition"]
+                if nc.get("type") in ("comparison_condition", "card_count_condition"):
+                    if not nc.get("location") and ctx.get("location"):
+                        nc["location"] = ctx["location"]
+                    if not nc.get("target") and ctx.get("target"):
+                        nc["target"] = ctx["target"]
+                    if not nc.get("card_type") and ctx.get("card_type"):
+                        nc["card_type"] = ctx["card_type"]
+
+            # Inherit location into compound sub-conditions
+            if node.get("type") == "compound" and "conditions" in node:
+                for sub in node["conditions"]:
+                    if isinstance(sub, dict):
+                        for _f in ("location", "target", "card_type"):
+                            if ctx.get(_f) and not sub.get(_f):
+                                sub[_f] = ctx[_f]
+                        _propagate_context(sub, ctx)
+
+            # Inherit duration into action-type dicts
+            if action in (
+                "gain_resource",
+                "change_state",
+                "draw_card",
+                "move_cards",
+                "select",
+            ):
+                if not node.get("duration") and ctx.get("duration"):
+                    node["duration"] = ctx["duration"]
+                if not node.get("target") and ctx.get("target"):
+                    node["target"] = ctx["target"]
+                if not node.get("all") and ctx.get("all"):
+                    ap = node.get("activation_position") or ctx.get(
+                        "activation_position"
+                    )
+                    if ap not in ("center", "left_side"):
+                        if action == "move_cards" and ctx.get("source") == node.get(
+                            "source"
+                        ):
+                            pass
+                        elif node.get("count"):
+                            pass
+                        else:
+                            node["all"] = ctx.get("all")
+
+            # Inherit timing_condition into gain_resource actions
+            if action == "gain_resource":
+                if not node.get("timing_condition") and ctx.get("timing_condition"):
+                    node["timing_condition"] = ctx["timing_condition"]
+
+            # Build context for children
+            new_ctx = dict(ctx)
+            for f in (
+                "location",
+                "target",
+                "card_type",
+                "duration",
+                "timing_condition",
+                "all",
+            ):
+                if f in node:
+                    new_ctx[f] = node[f]
+
+            for ck in (
+                "condition",
+                "primary_effect",
+                "followup_action",
+                "optional_action",
+                "conditional_action",
+                "alternative_effect",
+            ):
+                ch = node.get(ck)
+                if isinstance(ch, dict):
+                    _propagate_context(ch, new_ctx)
+
+            for ak in ("actions",):
+                arr = node.get(ak, [])
+                if isinstance(arr, list):
+                    for item in arr:
+                        _propagate_context(item, new_ctx)
+
+            # heart_type:all for gain_resource actions
+            if action == "gain_resource" and node.get("resource") == "heart":
+                if "{{icon_all.png|ハート}}" in (node.get("text", "") or t or ""):
+                    if not node.get("heart_type") and not node.get("heart_colors"):
+                        node["heart_type"] = "all"
+
+            # blade_heart card_property and heart_colors cleanup for card_count_conditions
+            nc = node.get("condition")
+            if isinstance(nc, dict) and nc.get("type") == "card_count_condition":
+                nct = nc.get("text", "")
+                if "ブレードハートを持たない" in nct or "ブレードハートがない" in nct:
+                    if not nc.get("card_property"):
+                        nc["card_property"] = "has_blade_heart"
+                # Strip heart_colors from preceding_moved conditions that have a
+                # specific location — the move already filtered by heart color.
+                if (
+                    nc.get("source") == "preceding_moved"
+                    and nc.get("location")
+                    and nc.get("heart_colors")
+                ):
+                    nc.pop("heart_colors", None)
+
+            # Strip parenthetical from sub-conditions of compound conditions
+            if node.get("type") == "compound" and "conditions" in node:
+                for sub in node["conditions"]:
+                    if isinstance(sub, dict) and isinstance(
+                        sub.get("parenthetical"), list
+                    ):
+                        sub.pop("parenthetical", None)
+
+            # movement_condition card_type
+            nc = node.get("condition")
+            if isinstance(nc, dict) and nc.get("type") == "movement_condition":
+                if nc.get("ability_filter") and not nc.get("card_type"):
+                    nc["card_type"] = "member_card"
+
+            # temporal_condition location — for aggregate conditions
+            nc = node.get("condition")
+            if isinstance(nc, dict) and nc.get("type") == "temporal_condition":
+                ct = nc.get("text", "") or ""
+                if nc.get("aggregate") == "total" and "必要ハート" in ct:
+                    if (
+                        "成功" not in ct
+                        and not nc.get("location")
+                        and not nc.get("temporal")
+                    ):
+                        nc["location"] = "live_card_zone"
+
+        _propagate_context(eff)
 
     if any(fix_stats.values()):
         active = {k: v for k, v in fix_stats.items() if v}

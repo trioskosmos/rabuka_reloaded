@@ -1,0 +1,13 @@
+=== Test Parsing ===
+Original: {{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。
+Triggers: ['起動']
+Use Limit: None
+Effect: このメンバーをステージから控え室に置く：自分の控え室からライブカードを1枚手札に加える。
+
+Extracting abilities from C:\Users\trios\OneDrive\Documents\rabuka_reloaded\cards\cards.json...
+Found 1610 abilities across 1279 cards
+Unique abilities: 750
+  Fixes applied: {'movement': 10, 'heart_type': 5, 'each_time': 2, 'card_property': 1, 'ability_filter': 1, 'temporal': 2, 'local_cond': 2, 'primary_neg': 1, 'compound_split': 1}
+Output written to C:\Users\trios\OneDrive\Documents\rabuka_reloaded\cards\abilities.json
+    No gaps detected -- all known patterns handled.
+Validation complete.
