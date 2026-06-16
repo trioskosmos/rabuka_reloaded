@@ -127,6 +127,16 @@ def extract_dynamic_count(text):
             source = count_match.group(1).strip()
             return {"type": "dynamic_count", "reference": source, "mode": "max"}
 
+    if "と同じ枚数" in text or "と同じ数" in text:
+        # Pattern: "Xと同じ枚数/数" - count equals X
+        # e.g. "これにより控え室に置いたカードと同じ枚数" → count = previously moved cards
+        result = {
+            "type": "dynamic_count",
+            "reference": "previous_moved_cards",
+            "mode": "equals",
+        }
+        return result
+
     if "その枚数に" in text and "を足した枚数" in text:
         # Pattern: "その枚数にNを足した枚数" - count based on the previous moved/discarded cards plus N
         count_match = re.search(r"その枚数に(\d+)を足した(?:枚数|数)", text)
@@ -139,6 +149,18 @@ def extract_dynamic_count(text):
                 "calculation_value": int(count_match.group(1)),
             }
 
+    # Pattern: "エネルギーカードの枚数にNを足した枚数" — under-member energy count + N
+    if "下にあるエネルギーカードの枚数に" in text and "を足した枚数" in text:
+        cm = re.search(r"下にあるエネルギーカードの枚数に(\d+)を足した枚数", text)
+        if cm:
+            return {
+                "type": "dynamic_count",
+                "reference": "energy_cards_under_this_member",
+                "mode": "equals",
+                "calculation": "add",
+                "calculation_value": int(cm.group(1)),
+            }
+
     if "に等しい枚数" in text or "に等しい数" in text:
         # Pattern: "Xに等しい枚数" - count equals X
         count_match = re.search(r"(.+?)に等しい(?:枚数|数)", text)
@@ -148,12 +170,35 @@ def extract_dynamic_count(text):
             # Check for calculation pattern like "スコアに2を足した数"
             calc_match = re.search(r"(.+?)に(\d+)を足した", source)
             if calc_match:
-                result["base_reference"] = calc_match.group(1).strip()
+                calc_base = calc_match.group(1).strip()
+                # Only use total_live_score for "合計スコア" patterns (Issue 8 on 穂乃果)
+                if "合計スコア" in calc_base:
+                    result["reference"] = "total_live_score"
+                else:
+                    result["reference"] = calc_base
                 result["calculation"] = "add"
                 result["calculation_value"] = int(calc_match.group(2))
+                # Trim action description prefixes from reference (e.g.
+                # "自分のデッキの上から、自分のステージにいるメンバーの数" → "自分のステージにいるメンバーの数")
+                result["reference"] = _trim_reference_prefix(result["reference"])
             return result
 
     return None
+
+
+def _trim_reference_prefix(ref):
+    """Remove known action description prefixes from a dynamic count reference string."""
+    prefixes = [
+        "自分のデッキの上から、",
+        "自分のデッキの上から",
+        "デッキの上から、",
+        "デッキの上から",
+    ]
+    for prefix in prefixes:
+        if ref.startswith(prefix):
+            ref = ref[len(prefix):]
+            break
+    return ref.strip()
 
 
 def extract_cost(text):
@@ -358,7 +403,10 @@ SOURCE_PATTERNS: List[Tuple[str, str]] = [
     ("これにより公開したカードを", "revealed_cards"),
     ("公開したカードをすべて", "revealed_cards"),
     ("それらのカードの中から", "those_cards"),
-    ("このカードを手札に加えてもよい", "revealed_card"),
+    ("このカードを手札に加えてもよい", "revealed_cards"),
+    ("手札にある", "hand"),
+    ("ステージにいる", "stage"),
+    ("ステージから", "stage"),
     ("自分の成功ライブカード置き場にある", "success_live_zone"),
     ("エールにより公開された", "revealed_cards"),
     ("メンバーの下にある", "under_member"),

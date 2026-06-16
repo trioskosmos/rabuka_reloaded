@@ -1,145 +1,103 @@
 #!/usr/bin/env python3
-"""Validate generated abilities.json against the working file (from git HEAD)."""
+"""Show entries sorted by fewest diffs (ascending). Fix #1, re-run."""
 
-import json, subprocess, sys
+import json, sys, codecs
 from pathlib import Path
 
+sys.stdout = codecs.getwriter("utf-8")(sys.stdout.buffer)
 sys.path.insert(0, str(Path(__file__).parent.parent / "ability_extraction"))
 
-r = subprocess.run(["git", "show", "HEAD:cards/abilities.json"], capture_output=True)
-working = json.loads(r.stdout)
+working = json.loads(
+    Path(
+        r"C:\Users\trios\Downloads\rabuka_reloaded-master (2)\rabuka_reloaded-master\cards\abilities.json"
+    ).read_text(encoding="utf-8")
+)
 generated = json.loads(Path("cards/abilities.json").read_text(encoding="utf-8"))
 
 wa = {u["full_text"]: u for u in working["unique_abilities"]}
 ga = {u["full_text"]: u for u in generated["unique_abilities"]}
-
-MISSING = "MISSING_FIELD"
-FIELD_ORDER = [
-    "action",
-    "action_by",
-    "text",
-    "triggerless_text",
-    "full_text",
-    "cost",
-    "effect",
-    "condition",
-    "source",
-    "destination",
-    "count",
-    "value",
-    "optional",
-    "duration",
-    "target",
-    "card_type",
-    "timing_condition",
-    "exclude_self",
-    "position",
-    "activation_position",
-    "heart_type",
-    "per_unit",
-    "per_unit_count",
-    "state_change",
-    "actions",
-    "select_action",
-]
+M = "MISSING_FIELD"
+IGNORE_FIELDS = {"text", "full_text", "triggerless_text", "generated_at", "schema"}
 
 
-class b:
-    HDR = "\033[95m"
-    BLUE = "\033[94m"
-    GREEN = "\033[92m"
-    WARN = "\033[93m"
-    FAIL = "\033[91m"
-    END = "\033[0m"
-    BOLD = "\033[1m"
-
-
-def find_diff(w_entry, g_entry, path="", report=None):
+def find_all_diffs(w, g, path="", report=None):
     if report is None:
         report = []
-    if w_entry == g_entry:
+    if w == g:
         return report
-    if type(w_entry) != type(g_entry):
-        report.append((path, str(type(w_entry).__name__), str(type(g_entry).__name__)))
+    if type(w) != type(g):
+        report.append((path, str(type(w).__name__), str(type(g).__name__)))
         return report
-    if isinstance(w_entry, dict):
-        for k in sorted(set(list(w_entry.keys()) + list(g_entry.keys()))):
+    if isinstance(w, dict):
+        for k in sorted(set(list(w.keys()) + list(g.keys()))):
             nk = f"{path}.{k}" if path else k
-            if k not in w_entry:
-                report.append((nk, MISSING, "MISSING"))
-            elif k not in g_entry:
-                report.append((nk, repr(w_entry[k])[:60], MISSING))
-            elif w_entry[k] != g_entry[k]:
-                if isinstance(w_entry[k], (dict, list)):
-                    find_diff(w_entry[k], g_entry[k], nk, report)
+            if k in IGNORE_FIELDS or nk.rstrip("]0123456789").endswith(".text"):
+                continue
+            if k not in w:
+                report.append((nk, M, "MISSING"))
+            elif k not in g:
+                report.append((nk, repr(w[k])[:60], M))
+            elif w[k] != g[k]:
+                if isinstance(w[k], (dict, list)):
+                    find_all_diffs(w[k], g[k], nk, report)
                 else:
-                    report.append((nk, repr(w_entry[k])[:60], repr(g_entry[k])[:60]))
-    elif isinstance(w_entry, list):
-        for i in range(max(len(w_entry), len(g_entry))):
+                    report.append((nk, repr(w[k])[:60], repr(g[k])[:60]))
+    elif isinstance(w, list):
+        for i in range(max(len(w), len(g))):
             nk = f"{path}[{i}]"
-            if i >= len(w_entry):
-                report.append((nk, MISSING, repr(g_entry[i])[:60]))
-            elif i >= len(g_entry):
-                report.append((nk, repr(w_entry[i])[:60], MISSING))
+            if i >= len(w):
+                report.append((nk, M, repr(g[i])[:60]))
+            elif i >= len(g):
+                report.append((nk, repr(w[i])[:60], M))
             else:
-                find_diff(w_entry[i], g_entry[i], nk, report)
+                find_all_diffs(w[i], g[i], nk, report)
     return report
 
 
-total_diff = 0
-cats = {}
+# Collect all entries with diffs, sorted by diff count DESC
+entries = []
 for ft, we in wa.items():
     ge = ga.get(ft)
-    if ge is None:
-        print(f"{b.FAIL}MISSING IN GENERATED: {ft[:50]}{b.END}")
+    if not ge:
         continue
-    we_eff = we.get("effect") or {}
-    ge_eff = ge.get("effect") or {}
-    we_cost = we.get("cost") or {}
-    ge_cost = ge.get("cost") or {}
-
-    diffs = find_diff(we_eff, ge_eff, "effect")
-    diffs += find_diff(we_cost, ge_cost, "cost")
-
+    diffs = find_all_diffs(we.get("effect", {}), ge.get("effect", {}), "effect")
+    diffs += find_all_diffs(we.get("cost", {}), ge.get("cost", {}), "cost")
     if not diffs:
         continue
-    total_diff += 1
+    entries.append((len(diffs), ft, diffs))
 
-    # Categorize
-    for d in diffs:
-        key = d[0]
-        if "cost" in key:
-            cat = "cost"
-        elif "effect.action" in key:
-            cat = "action_diff"
-        elif "effect.source" in key:
-            cat = "missing_source" if "MISSING" in str(d[2]) else "source"
-        elif "effect.optional" in key:
-            cat = "missing_optional" if "MISSING" in str(d[2]) else "extra_optional"
-        elif "effect.condition" in key:
-            cat = "condition_diff"
-        elif "effect.activation_position" in key:
-            cat = "missing_activation_position"
-        elif "effect.position" in key:
-            cat = "position"
-        elif "effect.exclude_self" in key:
-            cat = "exclude_self"
-        elif "effect.count" in key:
-            cat = "count"
-        elif "effect.value" in key:
-            cat = "value"
-        elif "effect.actions" in key:
-            cat = "actions"
-        elif "effect.select_action" in key:
-            cat = "select_action"
-        else:
-            cat = "other"
-        cats[cat] = cats.get(cat, 0) + 1
+entries.sort(key=lambda x: x[0])
 
-print(f"\n{b.BOLD}Entries with differences: {total_diff}{b.END}\n")
-for cat, cnt in sorted(cats.items(), key=lambda x: -x[1]):
-    print(f"  [{cnt:3d}] {cat}")
+total = len(entries)
+print(f"\033[1mEntries with diffs: {total}\033[0m\n")
 
-print(
-    f'\n{b.WARN}To see full diff: python -c "from tools.validate_diff import *"{b.END}'
-)
+# Show bottom 5 (easiest) entries
+for rank in range(min(5, total)):
+    cnt, ft, diffs = entries[rank]
+    print(
+        f"\033[1m#{(rank + 1):2d}: {cnt} diff{'s' if cnt > 1 else ' '}  {ft[:80]}...\033[0m"
+    )
+    for path, t_val, g_val in diffs[:20]:
+        print(f"     {path}")
+        print(f"       T: {t_val[:70]}")
+        print(f"       G: {g_val[:70]}")
+    if len(diffs) > 20:
+        print(f"     ... ({len(diffs) - 20} more diffs)")
+    print()
+
+print(f"\n\033[1mTop entry has {entries[0][0]} diffs\033[0m")
+
+# Show FULL effects for the top entry
+ft0 = entries[0][1]
+we0 = wa[ft0]
+ge0 = ga[ft0]
+print(f"\n\033[1m=== TARGET effect:\033[0m")
+print(json.dumps(we0.get("effect"), indent=2, ensure_ascii=False)[:800])
+print(f"\033[1m=== GENERATED effect:\033[0m")
+print(json.dumps(ge0.get("effect"), indent=2, ensure_ascii=False)[:800])
+print(f"\033[1m=== COST target:\033[0m")
+print(json.dumps(we0.get("cost"), indent=2, ensure_ascii=False)[:400])
+print(f"\033[1m=== COST generated:\033[0m")
+print(json.dumps(ge0.get("cost"), indent=2, ensure_ascii=False)[:400])
+
+print(f"\nFix the #1 entry, re-run, and the next will become #1.")

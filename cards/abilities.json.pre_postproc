@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T03:06:46.156137",
+  "generated_at": "2026-06-17T02:57:33.117397",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -1948,7 +1948,10 @@
         "target_count": 1,
         "action": "gain_resource",
         "resource": "blade",
-        "same_name": true
+        "same_name": true,
+        "heart_colors": [
+          "heart04"
+        ]
       }
     },
     {
@@ -2436,6 +2439,7 @@
               {
                 "text": "自分のステージにいるメンバーは{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
                 "duration": "live_end",
+                "source": "stage",
                 "card_type": "member_card",
                 "target": "self",
                 "action": "gain_resource",
@@ -3735,14 +3739,12 @@
           "location": "revealed_cards",
           "card_type": "member_card",
           "target": "self",
-          "comparison_target": "self",
-          "card_property": "has_blade_heart"
+          "comparison_target": "self"
         },
         "action": "gain_resource",
         "resource": "heart",
         "count": 1,
-        "duration": "live_end",
-        "heart_type": "all"
+        "duration": "live_end"
       }
     },
     {
@@ -3799,8 +3801,7 @@
         "action": "modify_cost",
         "operation": "subtract",
         "location": "hand",
-        "value": 1,
-        "ability_filter": "no_ability"
+        "value": 1
       }
     },
     {
@@ -3886,6 +3887,7 @@
           {
             "text": "自分のステージにいるこのターンに登場したメンバーのうち、『Aqours』以外のすべてのメンバーは選んだハートを1つ得る",
             "duration": "live_end",
+            "source": "stage",
             "card_type": "member_card",
             "target": "self",
             "group_names": [],
@@ -4581,7 +4583,24 @@
       "cost": null,
       "effect": {
         "text": "自分のメインフェイズの間、自分のカードが1枚以上いずれかの領域から控え室に置かれるたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、それらのカードの中から1枚手札に加える",
-        "action": "conditional_on_optional",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{icon_energy.png|E}}支払ってもよい。",
+            "optional": true,
+            "action": "pay_energy",
+            "energy": 1,
+            "count": 1
+          },
+          {
+            "text": "それらのカードの中から1枚手札に加える",
+            "source": "those_cards",
+            "destination": "hand",
+            "count": 1,
+            "action": "move_cards",
+            "card_type": "card"
+          }
+        ],
         "conditional": true,
         "trigger_type": "each_time",
         "trigger_condition": {
@@ -4590,22 +4609,7 @@
           "operator": ">=",
           "text": "自分のメインフェイズの間、自分のカードが1枚以上いずれかの領域から控え室に置かれる",
           "location": "discard",
-          "target": "self",
-          "source": "preceding_moved"
-        },
-        "optional_action": {
-          "text": "{{icon_energy.png|E}}支払ってもよい。",
-          "action": "pay_energy",
-          "energy": 1,
-          "count": 1
-        },
-        "conditional_action": {
-          "text": "それらのカードの中から1枚手札に加える",
-          "source": "those_cards",
-          "destination": "hand",
-          "count": 1,
-          "action": "move_cards",
-          "card_type": "card"
+          "target": "self"
         }
       }
     },
@@ -4736,6 +4740,9 @@
             "resource": "blade",
             "count": 1,
             "duration": "as_long_as",
+            "heart_colors": [
+              "heart05"
+            ],
             "text": "{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
           },
           {
@@ -4806,11 +4813,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         },
         "count": 1,
         "card_type": "member_card",
@@ -4946,6 +4954,7 @@
           "position": "center",
           "type": "group_condition"
         },
+        "source": "stage",
         "card_type": "member_card",
         "target": "self",
         "group_names": [
@@ -5222,14 +5231,15 @@
           "text": "『Aqours』のライブカードが自分のライブカード置き場から控え室に置かれたとき",
           "target": "self",
           "location": "live_card_zone",
+          "locations": [
+            "live_card_zone",
+            "discard"
+          ],
           "card_type": "live_card",
           "group_names": [
             "Aqours"
           ],
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "group_condition"
         },
         "destination": "deck_top_or_bottom",
         "card_type": "live_card",
@@ -5299,8 +5309,7 @@
           "heart02",
           "heart04",
           "heart05"
-        ],
-        "heart_type": "all"
+        ]
       }
     },
     {
@@ -5567,7 +5576,10 @@
                     "resource": "blade",
                     "count": 1,
                     "duration": "live_end",
-                    "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
+                    "text": "自分のステージにいる『蓮ノ空』のメンバーのコストの合計が、相手のステージにいるメンバーのコストの合計より高い場合、ライブ終了時まで、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る",
+                    "heart_colors": [
+                      "heart05"
+                    ]
                   },
                   {
                     "action": "gain_resource",
@@ -6708,6 +6720,7 @@
           {
             "text": "自分のステージにいるこのメンバー以外の『Aqours』のメンバー1人は、ライブ終了時まで、{{icon_blade.png|ブレード}}を得る。",
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -8026,11 +8039,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         },
         "count": 1,
         "card_type": "member_card",
@@ -8172,6 +8186,9 @@
             "resource": "blade",
             "count": 1,
             "duration": "as_long_as",
+            "heart_colors": [
+              "heart05"
+            ],
             "text": "{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る"
           },
           {
@@ -9592,11 +9609,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         },
         "group_names": [
           "Aqours"
@@ -9658,17 +9676,11 @@
             "reference": "previous_reveal"
           },
           "destination": "discard",
-          "card_type": "card",
+          "card_type": "live_card",
+          "target": "self",
           "optional": true,
           "action": "move_cards",
-          "all": true,
-          "condition": {
-            "type": "location_condition",
-            "location": "revealed_cards",
-            "target": "self",
-            "text": "エールにより公開された自分のカードの中にライブカードがないとき、それらのカードをすべて控え室に置いてもよい",
-            "negation": true
-          }
+          "all": true
         },
         "result_condition": {
           "type": "card_count_condition",
@@ -11339,6 +11351,7 @@
           {
             "text": "自分のステージにいるこのメンバー以外の『虹ヶ咲』のメンバー1人は、そのハートを1つ得る",
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -12246,6 +12259,7 @@
       "effect": {
         "text": "自分のステージにいるほかのメンバーは{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "card_type": "member_card",
         "target": "self",
         "exclude_self": true,
@@ -13810,17 +13824,7 @@
           "text": "自分のライブ中のライブカードの必要ハートの中に{{heart_01.png|heart01}}、{{heart_02.png|heart02}}、{{heart_03.png|heart03}}、{{heart_04.png|heart04}}、{{heart_05.png|heart05}}、{{heart_06.png|heart06}}がそれぞれ1以上含まれるかぎり",
           "type": "temporal_condition",
           "temporal": "during_live",
-          "target": "self",
-          "aggregate": "total",
-          "heart_colors": [
-            "heart01",
-            "heart02",
-            "heart03",
-            "heart04",
-            "heart05",
-            "heart06"
-          ],
-          "count": 1
+          "target": "self"
         },
         "duration": "as_long_as",
         "conditional": true,
@@ -13834,8 +13838,7 @@
           "heart04",
           "heart05",
           "heart06"
-        ],
-        "heart_type": "all"
+        ]
       }
     },
     {
@@ -14997,7 +15000,28 @@
       "cost": null,
       "effect": {
         "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場するたび、{{icon_energy.png|E}}支払ってもよい。そうした場合、エネルギーを2枚アクティブにする",
-        "action": "conditional_on_optional",
+        "action": "sequential",
+        "actions": [
+          {
+            "text": "{{icon_energy.png|E}}支払ってもよい。",
+            "optional": true,
+            "action": "pay_energy",
+            "energy": 1,
+            "count": 1,
+            "exclude_self": true,
+            "group_names": [
+              "スリーズブーケ"
+            ]
+          },
+          {
+            "text": "エネルギーを2枚アクティブにする",
+            "state_change": "active",
+            "count": 2,
+            "action": "change_state",
+            "card_type": "energy_card",
+            "exclude_self": true
+          }
+        ],
         "conditional": true,
         "trigger_type": "each_time",
         "trigger_condition": {
@@ -15010,21 +15034,7 @@
         "exclude_self": true,
         "group_names": [
           "スリーズブーケ"
-        ],
-        "optional_action": {
-          "text": "{{icon_energy.png|E}}支払ってもよい。",
-          "action": "pay_energy",
-          "energy": 1,
-          "count": 1
-        },
-        "conditional_action": {
-          "text": "エネルギーを2枚アクティブにする",
-          "state_change": "active",
-          "count": 2,
-          "action": "change_state",
-          "card_type": "energy_card",
-          "exclude_self": true
-        }
+        ]
       }
     },
     {
@@ -15055,6 +15065,9 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 1,
+            "heart_colors": [
+              "heart04"
+            ],
             "duration": "live_end",
             "text": "{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -15234,6 +15247,9 @@
             "resource": "blade",
             "count": 1,
             "duration": "live_end",
+            "heart_colors": [
+              "heart01"
+            ],
             "text": "自分の手札からカードが1枚以上控え室に置かれるたび、ライブ終了時まで、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
           },
           {
@@ -15258,8 +15274,7 @@
           "operator": ">=",
           "text": "自分の手札からカードが1枚以上控え室に置かれる",
           "location": "discard",
-          "target": "self",
-          "source": "preceding_moved"
+          "target": "self"
         }
       }
     },
@@ -15442,6 +15457,9 @@
                 "action": "gain_resource",
                 "resource": "blade",
                 "count": 1,
+                "heart_colors": [
+                  "heart01"
+                ],
                 "duration": "live_end",
                 "text": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
               },
@@ -15965,6 +15983,7 @@
       "effect": {
         "text": "自分のステージにいるこのメンバー以外の{{heart_06.png|heart06}}を持つメンバー1人は、ライブ終了時まで、{{heart_06.png|heart06}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -16602,6 +16621,7 @@
       "effect": {
         "text": "自分のステージにいる『みらくらぱーく！』のメンバー1人は、{{heart_01.png|heart01}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -17561,6 +17581,7 @@
           {
             "text": "自分は相手にエマパンチする。ライブ終了時まで、相手のステージにいるすべてのメンバーは、{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
+            "source": "stage",
             "card_type": "member_card",
             "target": "opponent",
             "action": "gain_resource",
@@ -17841,6 +17862,9 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 2,
+            "heart_colors": [
+              "heart04"
+            ],
             "duration": "live_end",
             "text": "{{heart_04.png|heart04}}{{heart_04.png|heart04}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -17890,6 +17914,9 @@
             "action": "gain_resource",
             "resource": "blade",
             "count": 2,
+            "heart_colors": [
+              "heart05"
+            ],
             "duration": "live_end",
             "text": "{{heart_05.png|heart05}}{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
           },
@@ -18013,6 +18040,7 @@
           {
             "text": "自分と相手のステージにいるメンバーは{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
+            "source": "stage",
             "card_type": "member_card",
             "target": "both",
             "action": "gain_resource",
@@ -18288,7 +18316,11 @@
             "target": "self",
             "card_type": "member_card",
             "duration": "live_end",
-            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
+            "heart_colors": [
+              "heart05",
+              "heart01"
+            ]
           },
           {
             "action": "gain_resource",
@@ -18317,7 +18349,11 @@
             "target": "self",
             "card_type": "member_card",
             "duration": "live_end",
-            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
+            "heart_colors": [
+              "heart05",
+              "heart01"
+            ]
           },
           {
             "action": "gain_resource",
@@ -18658,6 +18694,7 @@
       "effect": {
         "text": "自分のステージにいるほかの『虹ヶ咲』のメンバーは{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "card_type": "member_card",
         "target": "self",
         "group_names": [
@@ -19368,6 +19405,7 @@
           "location": "success_live_card_zone",
           "target": "self"
         },
+        "source": "stage",
         "count": 2,
         "card_type": "member_card",
         "target": "self",
@@ -19560,11 +19598,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -19602,11 +19641,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -19675,11 +19715,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         },
         "action": "sequential",
         "actions": [
@@ -20601,6 +20642,7 @@
           {
             "text": "自分のステージにいる『μ's』のメンバー1人は、選んだハートを1つ得る",
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -20704,6 +20746,7 @@
       "effect": {
         "text": "自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 3,
         "card_type": "member_card",
         "target": "self",
@@ -20880,6 +20923,7 @@
           {
             "text": "自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -20925,6 +20969,7 @@
           {
             "text": "ライブ終了時まで、自分のステージにいるメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
             "duration": "live_end",
+            "source": "stage",
             "count": 2,
             "card_type": "member_card",
             "target": "self",
@@ -21707,6 +21752,7 @@
       "effect": {
         "text": "自分のステージにいるこのメンバー以外のメンバー1人は、{{heart_01.png|heart01}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -21741,6 +21787,7 @@
             "live_success"
           ]
         },
+        "source": "stage",
         "count": 2,
         "card_type": "member_card",
         "target": "self",
@@ -22037,6 +22084,7 @@
       "effect": {
         "text": "自分のステージにいる『μ's』のメンバー1人は、{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -22288,6 +22336,7 @@
           "card_type": "live_card",
           "type": "location_condition"
         },
+        "source": "stage",
         "count": 2,
         "card_type": "member_card",
         "target": "self",
@@ -22437,6 +22486,7 @@
           {
             "text": "自分のステージにいる『虹ヶ咲』のメンバー1人は、{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -22968,6 +23018,9 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
+        "heart_colors": [
+          "heart02"
+        ],
         "position": "left_side"
       }
     },
@@ -23377,8 +23430,7 @@
           "count": 4,
           "group_names": [
             "虹ヶ咲"
-          ],
-          "aggregate": "total"
+          ]
         },
         "action": "modify_score",
         "value": 1,
@@ -23421,9 +23473,9 @@
           "count": 3,
           "group_names": [
             "虹ヶ咲"
-          ],
-          "aggregate": "total"
+          ]
         },
+        "source": "stage",
         "count": 4,
         "card_type": "member_card",
         "target": "self",
@@ -23751,6 +23803,7 @@
               "card_type": "member_card"
             },
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
@@ -24200,7 +24253,15 @@
         "action": "gain_resource",
         "resource": "blade",
         "count": 2,
-        "duration": "live_end"
+        "duration": "live_end",
+        "heart_colors": [
+          "heart01",
+          "heart02",
+          "heart03",
+          "heart04",
+          "heart05",
+          "heart06"
+        ]
       }
     },
     {
@@ -24462,6 +24523,7 @@
           {
             "text": "自分のステージにいる「中須かすみ」1人は、これにより選んだカードが持つ色のハートを1つずつ得る",
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "target": "self",
             "characters": [
@@ -24526,8 +24588,7 @@
           "location": "stage",
           "card_type": "member_card",
           "type": "location_condition"
-        },
-        "heart_type": "all"
+        }
       }
     },
     {
@@ -25528,8 +25589,7 @@
         "resource": "heart",
         "count": 1,
         "duration": "live_end",
-        "group_reference": "different_group_names",
-        "heart_type": "all"
+        "group_reference": "different_group_names"
       }
     },
     {
@@ -25860,6 +25920,7 @@
       "effect": {
         "text": "自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -25869,7 +25930,10 @@
         ],
         "target_count": 1,
         "action": "gain_resource",
-        "resource": "blade"
+        "resource": "blade",
+        "heart_colors": [
+          "heart01"
+        ]
       }
     },
     {
@@ -26086,6 +26150,7 @@
           {
             "text": "自分のステージにいるこのメンバー以外の『蓮ノ空』のメンバー1人は、選んだハートを2つ得る",
             "duration": "live_end",
+            "source": "stage",
             "count": 2,
             "card_type": "member_card",
             "target": "self",
@@ -26670,6 +26735,7 @@
       "effect": {
         "text": "自分のステージにいる『Aqours』のメンバーは{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "card_type": "member_card",
         "target": "self",
         "group_names": [
@@ -26931,6 +26997,7 @@
             "蓮ノ空"
           ]
         },
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -27192,6 +27259,7 @@
         "actions": [
           {
             "text": "自分のステージにいる『EdelNote』のメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+            "source": "stage",
             "count": 2,
             "card_type": "member_card",
             "target": "self",
@@ -27201,7 +27269,10 @@
             "target_count": 1,
             "action": "gain_resource",
             "resource": "blade",
-            "duration": "live_end"
+            "duration": "live_end",
+            "heart_colors": [
+              "heart06"
+            ]
           },
           {
             "text": "そのメンバーとは名前の異なる『EdelNote』のメンバー1人は、{{heart_06.png|heart06}}{{heart_06.png|heart06}}を得る",
@@ -27745,11 +27816,7 @@
           "type": "temporal_condition",
           "temporal": "during_live",
           "target": "self",
-          "aggregate": "total",
-          "heart_colors": [
-            "heart02"
-          ],
-          "count": 4
+          "aggregate": "total"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -28538,11 +28605,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         }
       }
     },
@@ -28576,26 +28644,31 @@
           {
             "text": "自分のステージにいるメンバー1人は、{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を得る",
             "duration": "live_end",
+            "source": "stage",
             "count": 1,
             "card_type": "member_card",
             "target": "self",
             "target_count": 1,
             "action": "gain_resource",
-            "resource": "blade"
+            "resource": "blade",
+            "heart_colors": [
+              "heart05"
+            ]
           }
         ],
         "conditional": true,
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
+          "type": "location_condition",
           "heart_colors": [
             "heart05"
-          ],
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          ]
         },
         "heart_colors": [
           "heart05"
@@ -28618,11 +28691,12 @@
         "condition": {
           "text": "このメンバーがステージから控え室に置かれたとき",
           "location": "discard",
+          "locations": [
+            "discard",
+            "stage"
+          ],
           "card_type": "member_card",
-          "type": "card_count_condition",
-          "source": "preceding_moved",
-          "operator": ">=",
-          "count": 1
+          "type": "location_condition"
         },
         "action": "sequential",
         "actions": [
@@ -28666,6 +28740,7 @@
       "effect": {
         "text": "自分のステージにいる『蓮ノ空』のメンバー1人は、{{heart_05.png|heart05}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -28964,6 +29039,7 @@
         "followup_action": {
           "text": "ライブ終了時まで、自分のステージにいる「安養寺姫芽」1人は{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
           "duration": "live_end",
+          "source": "stage",
           "count": 3,
           "target": "self",
           "characters": [
@@ -29163,6 +29239,7 @@
       "effect": {
         "text": "自分のステージにいる『みらくらぱーく！』のメンバー1人は、{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "count": 1,
         "card_type": "member_card",
         "target": "self",
@@ -29308,6 +29385,7 @@
       "effect": {
         "text": "自分のステージにいるコスト10以上の『蓮ノ空』のメンバー1人は、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
         "duration": "live_end",
+        "source": "stage",
         "cost_limit": 10,
         "cost_limit_operator": ">=",
         "count": 2,
