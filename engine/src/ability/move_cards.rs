@@ -384,25 +384,69 @@ impl AbilityResolver {
                             trigger_cards, count
                         );
                     }
-                    let mut found: Vec<i16> = Vec::new();
+                    let mut all_matching: Vec<i16> = Vec::new();
                     for &cid in &trigger_cards {
-                        if found.len() >= count as usize {
-                            break;
-                        }
                         if card_type_filter
                             .map_or(true, |ct| util::card_matches_type(card_db, cid, Some(ct)))
                             && group_name.map_or(true, |gn| {
                                 util::card_matches_group_str(card_db, cid, Some(gn))
                             })
                         {
-                            found.push(cid);
+                            all_matching.push(cid);
                         }
                     }
-                    if !found.is_empty() {
-                        // When the effect is optional (may place), leave the card
-                        // in waitroom. The caller (handle_position_destination)
-                        // will remove it only if the player picks top or bottom;
-                        // if the player skips, the card stays in waitroom.
+                    if all_matching.is_empty() {
+                        // No matching cards — proceed to default source resolution.
+                    } else if all_matching.len() <= count as usize {
+                        // Exactly `count` or fewer match — take them directly.
+                        let found = all_matching[..count.min(all_matching.len())].to_vec();
+                        if !effect.optional.unwrap_or(false) {
+                            let player = if use_p2 {
+                                &mut gs.player2
+                            } else {
+                                &mut gs.player1
+                            };
+                            for &cid in &found {
+                                if let Some(pos) =
+                                    player.waitroom.cards.iter().position(|&c| c == cid)
+                                {
+                                    player.waitroom.cards.remove(pos);
+                                }
+                            }
+                        }
+                        return Ok(found);
+                    } else if destination == "deck_top_or_bottom" {
+                        // Q252: more matching cards than count, player chooses which one.
+                        // Directly create a SelectCard choice restricted to the
+                        // trigger_moved_cards' positions in the waitroom.
+                        // For all other destinations, take the first `count` directly.
+                        // This keeps Ren (hand destination) working with the old behavior:
+                        let player = if use_p2 {
+                            &mut gs.player2
+                        } else {
+                            &mut gs.player1
+                        };
+                        let filtered_indices: Vec<usize> = all_matching
+                            .iter()
+                            .filter_map(|&cid| player.waitroom.cards.iter().position(|&c| c == cid))
+                            .collect();
+                        let description = card_type_filter
+                            .and_then(|_| group_name)
+                            .map(|g| format!("Select 1 {g} card to place on deck"))
+                            .unwrap_or_else(|| "Select 1 card to place on deck".to_string());
+                        self.pending_choice = Some(
+                            Choice::select_cards(Zone::Discard.to_str(), 1, description, false)
+                                .card_type(card_type_filter.map(|s| s.to_string()))
+                                .group(group_name.map(|s| s.to_string()))
+                                .filtered_indices(Some(filtered_indices))
+                                .target_player_id(Some("self".to_string()))
+                                .build(),
+                        );
+                        return Ok(vec![]);
+                    } else {
+                        // More matching than count for a non-Q252 destination.
+                        // Take the first `count` directly (pre-existing behavior).
+                        let found = all_matching[..count as usize].to_vec();
                         if !effect.optional.unwrap_or(false) {
                             let player = if use_p2 {
                                 &mut gs.player2

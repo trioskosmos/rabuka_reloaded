@@ -484,7 +484,18 @@ impl AbilityResolver {
             .effect
             .as_ref()
             .is_some_and(|e| e.action == "conditional_on_optional");
-        if !cost_already_paid && self.pending_choice.is_none() && !is_conditional_optional {
+        let is_optional_effect = ability
+            .effect
+            .as_ref()
+            .is_some_and(|e| e.optional.unwrap_or(false));
+        // For optional effects (may place / may use), the use_limit is consumed
+        // by the EFFECT execution, not the trigger. If the player skips the
+        // optional effect later, the key is never inserted.
+        if !cost_already_paid
+            && self.pending_choice.is_none()
+            && !is_conditional_optional
+            && !is_optional_effect
+        {
             if let Some(ref key) = ability_key {
                 if ability.use_limit.is_some() {
                     let can_activate = ability
@@ -666,14 +677,23 @@ impl AbilityResolver {
                     if let Some(entry) = gs.ability_queue.current_entry_mut() {
                         entry.cost_paid = true;
                     }
-                    // Don't record use_limit yet when the pending choice is a
-                    // conditional_optional (may pay) — the player hasn't decided
-                    // yet. Record after the choice resolves if they actually paid.
+                    // Don't record use_limit yet when the pending choice is:
+                    // - "conditional_optional" (may pay) — player decides at choice
+                    // - "position|destination" for optional effects (may place)
+                    //   Record after the choice resolves if they actually did it.
+                    let is_optional_pos = matches!(
+                        self.pending_choice,
+                        Some(Choice::SelectTarget { ref target, .. })
+                            if target == "position|destination"
+                    ) && ability
+                        .effect
+                        .as_ref()
+                        .is_some_and(|e| e.optional.unwrap_or(false));
                     let skip_use_limit = matches!(
                         self.pending_choice,
                         Some(Choice::SelectTarget { ref target, .. })
                             if target == "conditional_optional"
-                    );
+                    ) || is_optional_pos;
                     if let Some(ref key) = ability_key {
                         if ability.use_limit.is_some() && !skip_use_limit {
                             gs.turn_limited_abilities_used.insert(key.clone());

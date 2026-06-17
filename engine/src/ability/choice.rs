@@ -2034,6 +2034,26 @@ impl super::resolver::AbilityResolver {
                 source_zone,
                 ..
             } => {
+                // Consume use_limit for optional effects BEFORE the mutable
+                // player borrow, to avoid borrow conflicts with gs.
+                let mut use_limit_key: Option<String> = None;
+                if selected != "skip" {
+                    if let Some(entry) = gs.ability_queue.current_entry() {
+                        let is_optional = entry
+                            .ability
+                            .effect
+                            .as_ref()
+                            .is_some_and(|e| e.optional.unwrap_or(false));
+                        if is_optional && entry.ability.use_limit.is_some() {
+                            if let Some(cid) = entry.card_id.or(gs.activating_card) {
+                                use_limit_key = Some(format!(
+                                    "{}_{}_{}",
+                                    cid, entry.ability_index, gs.turn_number
+                                ));
+                            }
+                        }
+                    }
+                }
                 let player = gs.resolve_target_player_mut(&target);
                 let destination = selected;
                 // Player chose to skip — card stays in waitroom, no-op.
@@ -2085,6 +2105,14 @@ impl super::resolver::AbilityResolver {
                         player.main_deck.cards.first(),
                         player.main_deck.cards.last()
                     );
+                }
+                // The player chose to place the card — insert use_limit key
+                // after the player borrow is done (avoid conflicts with gs).
+                if let Some(key) = use_limit_key {
+                    gs.turn_limited_abilities_used.insert(key);
+                    if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        eprintln!("[DECK_DIAG] recorded use_limit for optional effect");
+                    }
                 }
                 self.clear_choice_state(gs);
                 self.resume_pending_commands(gs)

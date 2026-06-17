@@ -635,9 +635,23 @@ fn riko_bp6_auto_batch_of_3_first_only_taken_others_untouched() {
 
     trigger_riko_auto(&mut game, batch.clone());
 
+    // Q252: first a SelectCard choice appears for the player to pick which card.
     assert!(
         game.has_pending_choice(),
-        "position|destination choice must appear"
+        "SelectCard choice expected (Q252: pick 1 from multiple)"
+    );
+    assert_eq!(
+        game.pending_choice_type().as_deref(),
+        Some("SelectCard"),
+        "first choice should be card selection"
+    );
+    // Pick the second card in the batch (index 1 in the generated list)
+    game.select_indices(&[1]);
+
+    // Then position|destination choice for deck top or bottom
+    assert!(
+        game.has_pending_choice(),
+        "position|destination choice must appear after card selection"
     );
     game.select_generated(0); // deck_top
 
@@ -646,22 +660,26 @@ fn riko_bp6_auto_batch_of_3_first_only_taken_others_untouched() {
         deck_before + 1,
         "exactly 1 card added to deck"
     );
+    // The player picked index 1 (batch[1]), which is the second card
     let on_deck = game.state.player1.main_deck.cards[0];
-    assert_eq!(
-        on_deck, batch[0],
-        "first card in trigger_moved_cards order is taken"
-    );
+    assert_eq!(on_deck, batch[1], "player picked the second card (index 1)");
 
-    // Other 2 remain in waitroom
+    // The other 2 remain in waitroom
     let waitroom = &game.state.player1.waitroom.cards;
     assert_eq!(waitroom.len(), 2, "2 cards remain in waitroom");
-    for &c in &batch[1..] {
-        assert!(
-            waitroom.contains(&c),
-            "batch card {} remains in waitroom",
-            c
-        );
-    }
+    assert!(
+        waitroom.contains(&batch[0]),
+        "batch[0] remains in waitroom (not picked)"
+    );
+    assert!(
+        waitroom.contains(&batch[2]),
+        "batch[2] remains in waitroom (not picked)"
+    );
+    // The picked card batch[1] is NOT in waitroom
+    assert!(
+        !waitroom.contains(&batch[1]),
+        "batch[1] was picked and removed from waitroom"
+    );
 }
 
 /// Mixed batch: 1 Aqours live + 1 non-Aqours live + 1 member card + 1 energy.
@@ -868,41 +886,71 @@ fn riko_bp6_auto_riko_not_on_stage_no_trigger() {
     );
 }
 
-/// Optional skip: the auto ability has 置いてもよい (may place). When triggered,
-/// the position|destination choice should include a skip option. Choosing skip
-/// leaves the card in waitroom and does not place it on deck.
-/// The skip is triggered via select_option(-1) which routes card_id=-1 through
-/// build_choice_result to produce TargetSelected{target:"skip"} →
-/// handle_position_destination(gs, "skip") → no-op, card stays in waitroom.
+/// Optional skip: per QA Q252, the turn limit is consumed by the EFFECT
+/// (placing on deck), not the trigger. Choosing skip leaves the card in
+/// waitroom and DOES NOT consume the turn limit — the ability can fire
+/// again in the same turn when another Aqours live card moves.
 #[test]
-fn riko_bp6_auto_optional_skip_leaves_card_in_waitroom() {
+fn riko_bp6_auto_optional_skip_does_not_consume_turn_limit() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let riko = game.id("PL!S-bp6-002-SEC");
     let filler = game.id("PL!-sd1-010-SD");
-    let live = game.id("PL!S-PR-022-PR");
+    let live_a = game.id("PL!S-PR-022-PR");
+    let live_b = game.id("PL!S-sd1-019-SD");
 
     game.state.player1.stage.stage = [-1, riko, -1];
-    game.state.player1.waitroom.cards.push(live);
     fill_decks(&mut game, filler);
 
-    trigger_riko_auto(&mut game, vec![live]);
-
+    // --- First trigger: skip the optional effect ---
+    game.state.player1.waitroom.cards.push(live_a);
+    trigger_riko_auto(&mut game, vec![live_a]);
     assert!(
         game.has_pending_choice(),
-        "position|destination choice must appear"
+        "first trigger: position|destination choice appears"
     );
-
-    // select_option(-1) routes card_id=-1 → "skip" → handle_position_destination no-op
-    game.select_option(-1);
-
-    // Card stays in waitroom — not placed on deck
+    game.select_option(-1); // skip
     assert!(
-        game.state.player1.waitroom.cards.contains(&live),
-        "optional skip: live card remains in waitroom"
+        game.state.player1.waitroom.cards.contains(&live_a),
+        "skip: live_a stays in waitroom"
     );
     assert!(
-        !game.state.player1.main_deck.cards.contains(&live),
-        "optional skip: live card NOT placed on deck"
+        !game.state.player1.main_deck.cards.contains(&live_a),
+        "skip: live_a not on deck"
+    );
+
+    // --- Second trigger (same turn): skip did NOT consume turn limit ---
+    game.state.player1.waitroom.cards.push(live_b);
+    trigger_riko_auto(&mut game, vec![live_b]);
+    assert!(
+        game.has_pending_choice(),
+        "second trigger: skip didn't consume turn limit — choice appears"
+    );
+    game.select_generated(0); // deck_top
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&live_b),
+        "live_b moved to deck from second trigger"
+    );
+    assert!(
+        game.state.player1.main_deck.cards.contains(&live_b),
+        "live_b on deck"
+    );
+    // live_a still in waitroom (from the skip)
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_a),
+        "live_a still in waitroom (was skipped)"
+    );
+
+    // --- Third trigger: now the turn limit IS consumed (live_b placed on deck) ---
+    let live_c = game.id("PL!S-PR-022-PR");
+    game.state.player1.waitroom.cards.push(live_c);
+    trigger_riko_auto(&mut game, vec![live_c]);
+    assert!(
+        !game.has_pending_choice(),
+        "third trigger: turn limit consumed by live_b placement — no choice"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live_c),
+        "live_c stays in waitroom (turn limit used)"
     );
 }
