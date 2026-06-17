@@ -299,7 +299,30 @@ impl AbilityResolver {
                                 if !cheer.is_empty() {
                                     cheer.to_vec()
                                 } else {
-                                    gs.revealed_cards.to_vec()
+                                    let player = gs.resolve_target_player(target);
+                                    gs.revealed_cards
+                                        .iter()
+                                        .filter(|&&cid| {
+                                            player.hand.cards.contains(&cid)
+                                                || player.waitroom.cards.contains(&cid)
+                                                || player.stage.stage.contains(&cid)
+                                                || player
+                                                    .stage
+                                                    .under_cards
+                                                    .iter()
+                                                    .any(|v| v.contains(&cid))
+                                                || player.energy_zone.cards.contains(&cid)
+                                                || player.main_deck.cards.contains(&cid)
+                                                || player.energy_deck.cards.contains(&cid)
+                                                || player.live_card_zone.cards.contains(&cid)
+                                                || player
+                                                    .success_live_card_zone
+                                                    .cards
+                                                    .contains(&cid)
+                                                || gs.resolution_zone.cards.contains(&cid)
+                                        })
+                                        .copied()
+                                        .collect()
                                 }
                             }
                             _ => Vec::new(),

@@ -120,3 +120,72 @@ fn live_card_set_second_attacker() {
         "P2 (first attacker) should wait"
     );
 }
+
+#[test]
+fn opponent_choice_routed_via_choice_player_id_works_in_pvp() {
+    use rabuka_engine::ability::types::Choice;
+
+    let mut gs = make_gs(Phase::Main);
+    gs.player1.is_first_attacker = true;
+    gs.player2.is_first_attacker = false;
+
+    // Inject a SelectCard choice with choice_player_id set to opponent (P2)
+    let choice = Choice::select_cards("hand", 1, "Select card", false)
+        .target_player_id(Some("opponent".to_string()))
+        .build();
+    gs.ability_queue.pause_for_choice(choice);
+    if let Some(entry) = gs.ability_queue.current_entry_mut() {
+        entry.choice_player_id = Some("p2".to_string());
+    }
+
+    // P2 should be allowed to act (choice is routed to them)
+    assert!(pvp_player_can_act(&gs, 1), "P2 can act on own choice");
+    // P1 should be blocked (not their choice, even though they're active player)
+    assert!(!pvp_player_can_act(&gs, 0), "P1 blocked from P2's choice");
+}
+
+#[test]
+fn opponent_choice_via_select_auto_ability_works_in_pvp() {
+    use rabuka_engine::ability::types::Choice;
+
+    let mut gs = make_gs(Phase::Main);
+    gs.player1.is_first_attacker = true;
+    gs.player2.is_first_attacker = false;
+
+    // Inject a SelectAutoAbility choice routed to P2
+    let choice = Choice::SelectAutoAbility {
+        player_id: "p2".to_string(),
+        options: vec![],
+        description: "Choose auto ability".to_string(),
+    };
+    // Use pause_for_auto_ability_choice (stores in state, no queue entry)
+    gs.ability_queue.pause_for_auto_ability_choice(choice);
+
+    // P2 should be allowed to act (auto-ability choice is for them)
+    assert!(pvp_player_can_act(&gs, 1), "P2 can act on own auto ability");
+    // P1 should be blocked (not their auto ability, even though active player)
+    assert!(
+        !pvp_player_can_act(&gs, 0),
+        "P1 blocked from P2's auto ability"
+    );
+}
+
+#[test]
+fn normal_choice_stays_with_active_player_in_pvp() {
+    use rabuka_engine::ability::types::Choice;
+
+    let mut gs = make_gs(Phase::Main);
+    gs.player1.is_first_attacker = true;
+    gs.player2.is_first_attacker = false;
+
+    // Inject a normal choice (no opponent routing) — should default to P1
+    let choice = Choice::select_cards("hand", 1, "Select card", false)
+        .target_player_id(Some("self".to_string()))
+        .build();
+    gs.ability_queue.pause_for_choice(choice);
+
+    // P1 (active player) should be allowed
+    assert!(pvp_player_can_act(&gs, 0), "P1 can act on own choice");
+    // P2 should be blocked (not active player, choice not routed to them)
+    assert!(!pvp_player_can_act(&gs, 1), "P2 blocked from P1's choice");
+}

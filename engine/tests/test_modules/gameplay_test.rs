@@ -1609,6 +1609,123 @@ fn nico_prompt_path_two_eligible_in_discard() {
     );
 }
 
+// ── Both players have 2+ eligible cards → both get SelectCard prompts ──
+
+#[test]
+fn nico_both_players_two_eligible_cards() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let nico = game.id("PL!-pb1-018-R");
+    let cheap_p1a = game.id("PL!SP-sd1-019-SD");
+    let cheap_p1b = game.id("PL!SP-sd1-020-SD");
+    let cheap_p2a = game.id("PL!-sd1-002-SD");
+    let cheap_p2b = game.id("PL!-sd1-005-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.hand.cards.push(nico);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.waitroom.cards.push(cheap_p1a);
+    game.state.player1.waitroom.cards.push(cheap_p1b);
+    game.state.player2.waitroom.cards.push(cheap_p2a);
+    game.state.player2.waitroom.cards.push(cheap_p2b);
+
+    game.give_energy(7);
+    game.state.player1.stage.stage[0] = -1;
+    game.play_to_stage(nico, rabuka_engine::zones::MemberArea::LeftSide);
+
+    // P1 has 2 eligible cards → SelectCard prompt
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "P1 gets SelectCard prompt"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's SelectCard should have choice_player_id=p1"
+    );
+    game.select_indices(&[0]);
+
+    // P1 position choice
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P1 gets SelectPosition"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p1"),
+        "P1's SelectPosition should have choice_player_id=p1"
+    );
+    game.select_option(1);
+
+    // P2 has 2 eligible cards → SelectCard prompt (must be routed to P2)
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "P2 gets SelectCard prompt"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's SelectCard should have choice_player_id=p2"
+    );
+    game.select_indices(&[0]);
+
+    // P2 position choice
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectPosition".to_string()),
+        "P2 gets SelectPosition"
+    );
+    assert_eq!(
+        game.state
+            .ability_queue
+            .current_entry()
+            .and_then(|e| e.choice_player_id.as_deref()),
+        Some("p2"),
+        "P2's SelectPosition should have choice_player_id=p2"
+    );
+    game.select_option(2);
+
+    assert!(!game.has_pending_choice(), "No more prompts");
+
+    // Verify final board state
+    assert_eq!(game.state.player1.stage.stage[0], nico, "Nico at left");
+    assert_eq!(
+        game.state.player1.stage.stage[1], cheap_p1a,
+        "P1 selected card at center"
+    );
+    assert_eq!(game.state.player1.stage.stage[2], -1, "P1 right empty");
+    assert_eq!(game.state.player2.stage.stage[0], -1, "P2 left empty");
+    assert_eq!(game.state.player2.stage.stage[1], -1, "P2 center empty");
+    assert_eq!(
+        game.state.player2.stage.stage[2], cheap_p2a,
+        "P2 selected card at right"
+    );
+
+    // Both in wait state
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_p1a),
+        Some(&"wait".to_string()),
+        "P1 card wait"
+    );
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(cheap_p2a),
+        Some(&"wait".to_string()),
+        "P2 card wait"
+    );
+}
+
 // ── Prompt path + direct placement: 2+ eligible cards, 1 empty slot ──
 // Ensures wait state is preserved when cards are placed directly
 // (no position-choice to re-apply wait after clear_all_for_card).
@@ -2963,4 +3080,61 @@ fn dia_sd1_optional_draw_pay_then_deck_top() {
     assert_eq!(game.state.player1.main_deck.len(), 10);
     // Hand: 3 + 1 - 1 + 1 - 2 = 2
     assert_eq!(game.state.player1.hand.len(), 2);
+}
+
+// ── Revealed_cards filtered by player ownership when cheer_buf is empty ──
+
+#[test]
+fn revealed_cards_filtered_by_player_ownership() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let p1_card = game.id("PL!SP-sd1-019-SD");
+    let p2_card = game.id("PL!SP-sd1-020-SD");
+
+    // Put both players' cards into their own discard so zone-ownership check passes
+    game.state.player1.waitroom.cards.push(p1_card);
+    game.state.player2.waitroom.cards.push(p2_card);
+
+    // Populate revealed_cards with both players' cards
+    // Leave per-player cheer_bufs empty to force the fallback path
+    game.state.revealed_cards.push(p1_card);
+    game.state.revealed_cards.push(p2_card);
+
+    // Inject a SelectCard choice for the revealed_cards zone targeting self
+    let choice = rabuka_engine::ability::types::Choice::select_cards(
+        "revealed_cards",
+        1,
+        "Select 1 card",
+        false,
+    )
+    .target_player_id(Some("self".to_string()))
+    .build();
+    game.state.ability_queue.pause_for_choice(choice);
+
+    // Set choice_player_id so generate_possible_actions resolves "self" to P1
+    if let Some(entry) = game.state.ability_queue.current_entry_mut() {
+        entry.choice_player_id = Some("p1".to_string());
+    }
+
+    // Generate possible actions and check which cards are selectable
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let select_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == rabuka_engine::game_setup::ActionType::ChoiceSelect)
+        .collect();
+
+    // Only P1's card should be selectable (p2_card is not in P1's zones)
+    assert_eq!(
+        select_actions.len(),
+        1,
+        "Only P1's card should be selectable"
+    );
+    assert_eq!(
+        select_actions[0]
+            .parameters
+            .as_ref()
+            .and_then(|p| p.card_id),
+        Some(p1_card),
+        "P1's card should be selectable"
+    );
 }

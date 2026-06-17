@@ -11,6 +11,7 @@ import { ModalManager } from './utils/ModalManager.js';
 import { DebugModal } from './modals/DebugModal.js';
 import { LogViewerModal } from './modals/LogViewerModal.js';
 import { LogDetailModal } from './modals/LogDetailModal.js';
+import { GameStateModal } from './modals/GameStateModal.js';
 import { DOM_IDS, COLORS, DISPLAY_VALUES } from './constants_dom.js';
 
 const POLL_DELAYS = {
@@ -137,6 +138,9 @@ const actionHandlers = {
     'debug-render-all': DebugModal.renderAll,
     'close-debug-modal': DebugModal.closeDebugModal,
     'show-performance-turn': ({ value }) => Modals.showPerformanceForTurn(Number(value)),
+    'open-game-state-modal': () => GameStateModal.open(),
+    'close-game-state-modal': () => GameStateModal.close(),
+    'switch-game-state-tab': ({ value }) => GameStateModal.showTab(value),
     'close-discard-modal': () => ModalManager.hide(DOM_IDS.MODAL_DISCARD),
     'close-log-detail-modal': LogDetailModal.close,
     'reload-page': () => window.location.reload(),

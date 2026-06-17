@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- CSS Load Order managed by Vite via style.css -->
+    <!-- CSS Load Order managed by base.css imports -->
     <link rel="stylesheet" href="css/style.css">
 </head>
 
@@ -166,7 +166,9 @@
                     <div id="active-abilities-list" class="ability-list"></div>
                 </div>
                 <div class="log-container">
-                    <h3 data-i18n="rule_log">ルールログ</h3>
+                    <h3 data-i18n="rule_log">ルールログ
+                        <button class="btn btn-icon gs-btn" data-action="open-game-state-modal" title="Game State">🔍</button>
+                    </h3>
                     <div class="rule-log-list" id="rule-log"></div>
                 </div>
             </div>
@@ -305,9 +307,14 @@
                     <button class="sidebar-close-btn" data-action="close-sidebar" aria-label="Close action panel">×</button>
                 </div>
                 <div class="performance-check-container">
-                    <button class="btn btn-accent-purple btn-sm" data-action="show-last-performance" data-i18n="check_performance" style="width: 100%;">
-                        パフォーマンス確認
-                    </button>
+                    <div class="perf-gs-btn-row">
+                        <button class="btn btn-accent-purple btn-sm" data-action="show-last-performance" data-i18n="check_performance" style="flex:1;">
+                            パフォーマンス確認
+                        </button>
+                        <button class="btn btn-accent-blue btn-sm gs-btn" data-action="open-game-state-modal" title="Game State" style="flex:0 0 auto; padding:4px 8px;">
+                            🔍
+                        </button>
+                    </div>
                 </div>
                 <div class="action-list" id="actions"></div>
             </div>
@@ -441,6 +448,39 @@
             </div>
             <div class="modal-footer">
                 <button class="btn btn-primary" data-action="close-performance-modal" data-i18n="close">閉じる</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game State Modal -->
+    <div id="game-state-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content game-state-modal-content">
+            <div class="modal-header">
+                <div class="modal-title" data-i18n="game_state_title">ゲーム状態</div>
+                <button class="close-btn" data-action="close-game-state-modal">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="gs-modal-tabs modal-tabs">
+                    <button class="tab-btn active" data-tab="global" data-action="switch-game-state-tab" data-value="global">
+                        <span data-i18n="gs_global">全体</span>
+                    </button>
+                    <button class="tab-btn" data-tab="player" data-action="switch-game-state-tab" data-value="player">
+                        <span data-i18n="gs_player">プレイヤー</span>
+                    </button>
+                    <button class="tab-btn" data-tab="zones" data-action="switch-game-state-tab" data-value="zones">
+                        <span data-i18n="gs_zones">ゾーン</span>
+                    </button>
+                    <button class="tab-btn" data-tab="tracking" data-action="switch-game-state-tab" data-value="tracking">
+                        <span data-i18n="gs_tracking">内部追跡</span>
+                    </button>
+                </div>
+                <div id="gs-tab-global" class="gs-tab-content"></div>
+                <div id="gs-tab-player" class="gs-tab-content" style="display:none;"></div>
+                <div id="gs-tab-zones" class="gs-tab-content" style="display:none;"></div>
+                <div id="gs-tab-tracking" class="gs-tab-content" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-action="close-game-state-modal" data-i18n="close">閉じる</button>
             </div>
         </div>
     </div>

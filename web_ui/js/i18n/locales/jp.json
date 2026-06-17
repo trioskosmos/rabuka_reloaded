@@ -215,7 +215,12 @@
     "area_right": "右",
     "go_first": "先行",
     "go_second": "後攻",
-    "pay_optional_cost": "支払う"
+    "pay_optional_cost": "支払う",
+    "game_state_title": "ゲーム状態",
+    "gs_global": "全体",
+    "gs_player": "プレイヤー",
+    "gs_zones": "ゾーン",
+    "gs_tracking": "内部追跡"
   },
   "heuristics": []
 }

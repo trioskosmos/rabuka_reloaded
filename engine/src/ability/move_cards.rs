@@ -737,7 +737,32 @@ impl AbilityResolver {
                     gs.revealed_cards.retain(|id| !c.contains(id));
                     c
                 } else {
-                    gs.revealed_cards.drain(..).collect()
+                    // Filter to only include cards owned by the target player.
+                    // revealed_cards is a global pool containing cards from both players'
+                    // yells/cheers. When the per-player cheer_buf has been consumed by
+                    // a prior ability, falling back to the entire pool would expose
+                    // the opponent's cards. Check zone ownership to filter correctly.
+                    let owned: Vec<i16> = gs
+                        .revealed_cards
+                        .iter()
+                        .filter(|&&cid| {
+                            player.hand.cards.contains(&cid)
+                                || player.waitroom.cards.contains(&cid)
+                                || player.stage.stage.contains(&cid)
+                                || player.stage.under_cards.iter().any(|v| v.contains(&cid))
+                                || player.energy_zone.cards.contains(&cid)
+                                || player.main_deck.cards.contains(&cid)
+                                || player.energy_deck.cards.contains(&cid)
+                                || player.live_card_zone.cards.contains(&cid)
+                                || player.success_live_card_zone.cards.contains(&cid)
+                                || gs.resolution_zone.cards.contains(&cid)
+                        })
+                        .copied()
+                        .collect();
+                    for &cid in &owned {
+                        gs.revealed_cards.retain(|id| *id != cid);
+                    }
+                    owned
                 };
                 if cards.len() > count {
                     // Put cards back so prompt_card_selection can find them.

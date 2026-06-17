@@ -10,6 +10,7 @@ import { HelpModal } from './modals/HelpModal.js';
 import { LobbyModal } from './modals/LobbyModal.js';
 import { ReportModal } from './modals/ReportModal.js';
 import { DebugModal } from './modals/DebugModal.js';
+import { GameStateModal } from './modals/GameStateModal.js';
 
 export const Modals = {
     deckPresets: [],
@@ -60,6 +61,10 @@ export const Modals = {
     closeReportModal: () => ReportModal.closeReportModal(),
     submitReport: () => ReportModal.submitReport(),
     downloadReport: () => ReportModal.downloadReport(),
+
+    // --- Game State ---
+    openGameStateModal: () => GameStateModal.open(),
+    closeGameStateModal: () => GameStateModal.close(),
 
     // --- Debug ---
     openDebugModal: () => DebugModal.openDebugModal(),

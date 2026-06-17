@@ -56,6 +56,15 @@ function sumPassedBaseScores(lives) {
         .reduce((total, live) => total + (live.base_score || 0), 0);
 }
 
+function findAbilitySource(triggered, sourceText) {
+    if (!triggered || !sourceText) return null;
+    for (const t of triggered) {
+        if (t.effect_text && sourceText.includes(t.effect_text)) return t;
+        if (t.name && sourceText.includes(t.name)) return t;
+    }
+    return null;
+}
+
 function getDisplayResults(results) {
     // If caller passed a structured object (not array), use it directly
     if (results && typeof results === 'object' && !Array.isArray(results)) {
@@ -431,7 +440,7 @@ function renderPerfSteps(result) {
                                 <div class="perf-step-yell-card">
                                     ${imgSrc ? `<img src="${imgSrc}" class="perf-step-card-img-sm">` : ''}
                                     <div>♥ ${fmtHShortSrc(y.blade_hearts)}</div>
-                                    <div>♪${y.note_icons} ⎋${y.draw_icons}</div>
+                                    <div><img src="img/texticon/icon_score.png" class="heart-mini-icon">${y.note_icons} <img src="img/texticon/icon_draw.png" class="heart-mini-icon">${y.draw_icons}</div>
                                 </div>
                             `;
                         }).join('') || '<div class="perf-empty-state small">No yell cards</div>'}
@@ -568,6 +577,7 @@ function renderTotalSection(result) {
 
 function renderLiveCards(result) {
     const lives = Array.isArray(result?.lives) ? result.lives : [];
+    const triggered = result?.triggered_abilities || [];
     if (lives.length === 0) {
         return `
             <section class="perf-section-card">
@@ -595,6 +605,9 @@ function renderLiveCards(result) {
                     const filled = live?.filled || [0,0,0,0,0,0,0,0];
                     const spare = live?.spare || [0,0,0,0,0,0,0,0];
                     const adjustments = live.adjustments;
+                    const baseScore = live?.base_score || 0;
+                    const totalScore = live?.score || 0;
+                    const bonusScore = totalScore > baseScore ? totalScore - baseScore : 0;
                     return `
                         <article class="perf-live-card ${live?.passed ? 'success' : 'failure'}">
                             <div class="perf-live-card-head">
@@ -603,7 +616,7 @@ function renderLiveCards(result) {
                                     ${cd?.img ? `<div class="perf-live-art-wrapper lg"><img src="${fixImg(cd.img)}" alt="${escapeHtml(cd?.name || 'Live')}"></div>` : ''}
                                     <div>
                                         <h4>${escapeHtml(cd?.name || 'Live')}</h4>
-                                        <div class="perf-live-card-meta">Score ${live?.score || 0}</div>
+                                        <div class="perf-live-card-meta">Score ${totalScore}</div>
                                     </div>
                                 </div>
                                 <div class="perf-status-pill ${live?.passed ? 'success' : 'failure'}">${live?.passed ? 'PASS' : 'FAIL'}</div>
@@ -624,14 +637,37 @@ function renderLiveCards(result) {
                                     ${renderHeartsCompact(spare)}
                                     <span class="perf-breakdown-sum">${sumHearts(spare)}</span>
                                 </div>
+                                <div class="perf-breakdown-divider"></div>
+                                <div class="perf-breakdown-row total">
+                                    <span class="perf-mini-heading"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Score</span>
+                                    <span class="perf-breakdown-detail">Base ${baseScore}</span>
+                                    ${bonusScore > 0 ? `<span class="perf-breakdown-detail">+${bonusScore} abilities</span>` : ''}
+                                    <span class="perf-breakdown-sum">${totalScore}</span>
+                                </div>
+                                ${bonusScore > 0 ? `
+                                <div class="perf-breakdown-bonuses">
+                                    ${(result?.breakdown?.scores || []).filter(s => s.value > 0).map((sLine) => {
+                                        const srcAbility = findAbilitySource(triggered, sLine.source);
+                                        const sourceLabel = srcAbility ? `${escapeHtml(srcAbility.card_name || '')}` : escapeHtml(sLine.source);
+                                        return `
+                                            <div class="perf-bonus-item compact">
+                                                <div class="perf-bonus-title"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${sourceLabel} +${sLine.value}</div>
+                                                ${srcAbility?.effect_text ? `<div class="perf-bonus-text">${enrichText(srcAbility.effect_text)}</div>` : ''}
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                                ` : ''}
                             </div>
                             ${required[0] > 0 ? `<div class="perf-heart-legend" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;"><img src="img/texticon/heart_00.png" class="heart-mini-icon" style="width:12px;height:12px;"> Any hearts fill deficits of any color</div>` : ''}
                             ${adjustments && adjustments.length > 0 ? `
                                 <div class="perf-pill-list">
                                     ${adjustments.map((adj) => {
                                         const isTransform = adj?.type === 'transform' || adj?.type === 'override';
-                                        const value = adj?.desc || `${adj?.value > 0 ? '+' : ''}${adj?.value || 0} ${HEART_LABELS[adj?.color ?? 0] || 'heart'}`;
-                                        return `<div class="perf-adjustment-pill ${isTransform ? 'transform' : 'requirement'}">${escapeHtml(adj?.source || 'Effect')}: ${escapeHtml(value)}</div>`;
+                                        const adjText = adj?.desc || `${adj?.value > 0 ? '+' : ''}${adj?.value || 0} ${HEART_LABELS[adj?.color ?? 0] || 'heart'}`;
+                                        const adjAbility = findAbilitySource(triggered, adj?.source || '');
+                                        const sourceLabel = adjAbility ? `${escapeHtml(adjAbility.card_name || adj?.source || 'Effect')}` : escapeHtml(adj?.source || 'Effect');
+                                        return `<div class="perf-adjustment-pill ${isTransform ? 'transform' : 'requirement'}">${sourceLabel}: ${escapeHtml(adjText)}</div>`;
                                     }).join('')}
                                 </div>
                             ` : ''}
@@ -736,9 +772,9 @@ function renderContributionSection(result) {
                                     ` : ''}
                                 </div>
                                 <div class="perf-breakdown-row minor">
-                                    <span class="perf-mini-heading">Notes</span>
+                                    <span class="perf-mini-heading"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Notes</span>
                                     <span class="perf-breakdown-value">${member?.base_notes || 0}${member?.bonus_notes ? ` (+${member.bonus_notes})` : ''}</span>
-                                    <span style="margin-left:12px;" class="perf-mini-heading">Draw</span>
+                                    <span style="margin-left:12px;" class="perf-mini-heading"><img src="img/texticon/icon_draw.png" class="heart-mini-icon"> Draw</span>
                                     <span class="perf-breakdown-value">${member?.draw_icons || 0}</span>
                                 </div>
                             </div>
@@ -755,19 +791,18 @@ function renderContributionSection(result) {
                     </div>
                     <div class="perf-breakdown-bonuses">
                         ${triggered.map((ability) => {
-                            let abilityText = '';
-                            try {
-                                const card = Tooltips.findCardById(ability?.source_card_id);
-                                if (card) {
-                                    const rawText = TextEnricher.getEffectiveRawText(card);
-                                    if (rawText) abilityText = enrichText(rawText);
-                                }
-                            } catch (e) {}
+                            const effectText = ability?.effect_text || '';
+                            const condText = ability?.condition_text || '';
+                            const abilityDisplay = effectText ? enrichText(effectText) : '';
+                            const condDisplay = condText ? enrichText(condText) : '';
+                            const triggeredType = effectText.includes('ライブ開始時') || effectText.includes('live_start') ? 'live_start' :
+                                effectText.includes('ライブ成功時') || effectText.includes('live_success') ? 'live_success' :
+                                effectText.includes('常時') || effectText.includes('jyouji') ? 'jyouji' : '';
                             return `
                                 <div class="perf-bonus-item compact">
-                                    <div class="perf-bonus-title">${escapeHtml(ability?.name || 'Triggered ability')}</div>
-                                    <div class="perf-bonus-meta">${escapeHtml(ability?.card_name || '')}</div>
-                                    ${abilityText ? `<div class="perf-bonus-text">${abilityText}</div>` : ''}
+                                    <div class="perf-bonus-title">${escapeHtml(ability?.card_name || 'Ability')} ${triggeredType ? `<span class="effect-duration">[${escapeHtml(triggeredType)}]</span>` : ''}</div>
+                                    ${abilityDisplay ? `<div class="perf-bonus-text">${abilityDisplay}</div>` : ''}
+                                    ${condDisplay ? `<div class="perf-ability-condition">Condition: ${condDisplay}</div>` : ''}
                                 </div>
                             `;
                         }).join('')}
@@ -836,8 +871,8 @@ function renderYellSection(result) {
                             </div>
                             <div class="perf-yell-icons">
                                 ${renderHeartsCompact(card?.blade_hearts || [])}
-                                ${(card?.note_icons || 0) > 0 ? `<span class="perf-badge note">${card.note_icons}♪</span>` : ''}
-                                ${(card?.draw_icons || 0) > 0 ? `<span class="perf-badge draw">${card.draw_icons}⎋</span>` : ''}
+                                ${(card?.note_icons || 0) > 0 ? `<span class="perf-badge note"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${card.note_icons}</span>` : ''}
+                                ${(card?.draw_icons || 0) > 0 ? `<span class="perf-badge draw"><img src="img/texticon/icon_draw.png" class="heart-mini-icon"> ${card.draw_icons}</span>` : ''}
                             </div>
                         </article>
                     `;
@@ -902,23 +937,21 @@ function renderEffectsSection(result) {
                     <div class="perf-mini-heading">Triggered abilities carried into Live Result</div>
                     <div class="perf-list-block">
                         ${triggered.length > 0 ? triggered.map((ability) => {
-                            let abilityText = '';
-                            try {
-                                const card = Tooltips.findCardById(ability?.source_card_id);
-                                if (card) {
-                                    const rawText = TextEnricher.getEffectiveRawText(card);
-                                    if (rawText) {
-                                        abilityText = enrichText(rawText);
-                                    }
-                                }
-                            } catch (e) {
-                                // Fallback if card lookup fails
-                            }
+                            const effectText = ability?.effect_text || '';
+                            const condText = ability?.condition_text || '';
+                            const abilityDisplay = effectText ? enrichText(effectText) : '';
+                            const condDisplay = condText ? enrichText(condText) : '';
+                            const triggeredType = effectText.includes('ライブ開始時') || effectText.includes('live_start') ? 'live_start' :
+                                effectText.includes('ライブ成功時') || effectText.includes('live_success') ? 'live_success' :
+                                effectText.includes('常時') || effectText.includes('jyouji') ? 'jyouji' : '';
                             return `
                                 <div class="perf-list-row">
-                                    <strong>${escapeHtml(ability?.name || 'Triggered ability')}</strong>
-                                    <span>${escapeHtml(ability?.card_name || 'Unknown card')}</span>
-                                    ${abilityText ? `<div class="perf-bonus-text" style="margin-top: 4px; margin-left: 0;">${abilityText}</div>` : ''}
+                                    <div class="effect-title-row">
+                                        <strong>${escapeHtml(ability?.card_name || 'Unknown card')}</strong>
+                                        ${triggeredType ? `<span class="effect-duration">${escapeHtml(triggeredType)}</span>` : ''}
+                                    </div>
+                                    ${abilityDisplay ? `<div class="perf-bonus-text" style="margin-top: 4px; margin-left: 0;">${abilityDisplay}</div>` : ''}
+                                    ${condDisplay ? `<div class="perf-ability-condition">Condition: ${condDisplay}</div>` : ''}
                                 </div>
                             `;
                         }).join('') : '<div class="perf-empty-state small">No triggered abilities were recorded.</div>'}
@@ -984,7 +1017,7 @@ function renderPlayerPanel(playerId, result) {
                     </div>
                     ${renderTextMetric('Lives Passed', `${passedLives} / ${totalLives}`)}
                     ${renderIconMetric('img/texticon/icon_score.png', 'Live Pts', String(baseLiveScore), 'score')}
-                    ${renderIconMetric('img/texticon/icon_score.png', 'Notes', `${result?.note_icons || 0}♪`, 'notes')}
+                    ${renderIconMetric('img/texticon/icon_score.png', 'Notes', `${result?.note_icons || 0}`, 'notes')}
                     ${renderIconMetric('img/texticon/icon_blade.png', 'Stage Blades', String(totalBlades), 'blades')}
                     ${renderIconMetric('img/texticon/icon_blade.png', 'Yell Count', String(result?.yell_count || 0), 'yells')}
                 </div>

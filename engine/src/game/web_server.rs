@@ -646,8 +646,29 @@ pub fn pvp_player_can_act(game_state: &GameState, player_id: i32) -> bool {
             if game_state.player1.is_first_attacker { player_id == 1 } else { player_id == 0 }
         }
         _ => {
+            let pid = player_id;
+            if game_state.has_pending_choice() {
+                // choice_player_id set on queue entry (G1/G3 routing for both-targets,
+                // choice_maker, opponent_action). When set, only that player can act.
+                if let Some(cpid) = game_state.get_pending_choice_player_id() {
+                    let requester_str = if pid == 0 { "p1" } else { "p2" };
+                    return cpid == requester_str;
+                }
+                // Auto-ability and live-success choices embed player_id in the choice
+                // itself (no queue entry, so choice_player_id is not set).
+                if let Some(choice) = game_state.get_pending_choice() {
+                    match choice {
+                        crate::ability::types::Choice::SelectAutoAbility { player_id: cpid, .. }
+                        | crate::ability::types::Choice::SelectLiveSuccess { player_id: cpid, .. } => {
+                            let requester_str = if pid == 0 { "p1" } else { "p2" };
+                            return *cpid == requester_str;
+                        }
+                        _ => {}
+                    }
+                }
+            }
             let active = game_state.active_player();
-            let is_player1 = player_id == 0;
+            let is_player1 = pid == 0;
             (active.id == game_state.player1.id) == is_player1
         }
     }

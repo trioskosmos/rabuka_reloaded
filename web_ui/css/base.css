@@ -5,6 +5,7 @@
 @import './performance.css';
 @import './log_styles.css';
 @import './deck_validation.css';
+@import './game_state_modal.css';
 
 :root {
     /* --- Brand & Theme Colors --- */

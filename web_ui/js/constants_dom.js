@@ -70,6 +70,9 @@ export const DOM_IDS = {
   MODAL_LOG_DETAIL: 'log-detail-modal',
   LOG_DETAIL_TITLE: 'log-detail-title',
   LOG_DETAIL_CONTENT: 'log-detail-content',
+
+  // Game State Modal
+  MODAL_GAME_STATE: 'game-state-modal',
 };
 
 export const DISPLAY_VALUES = {

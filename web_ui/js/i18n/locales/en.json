@@ -215,7 +215,12 @@
     "area_right": "Right",
     "go_first": "Go First",
     "go_second": "Go Second",
-    "pay_optional_cost": "Pay"
+    "pay_optional_cost": "Pay",
+    "game_state_title": "Game State",
+    "gs_global": "Global",
+    "gs_player": "Player",
+    "gs_zones": "Zones",
+    "gs_tracking": "Tracking"
   },
   "heuristics": []
 }

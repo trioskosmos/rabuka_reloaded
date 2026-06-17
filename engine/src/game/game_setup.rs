@@ -524,11 +524,24 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         if !cheer.is_empty() {
                             cheer.iter().copied().enumerate().collect()
                         } else {
+                            let player = game_state.resolve_target_player(target);
                             game_state
                                 .revealed_cards
                                 .iter()
                                 .copied()
                                 .enumerate()
+                                .filter(|(_, cid)| {
+                                    player.hand.cards.contains(cid)
+                                        || player.waitroom.cards.contains(cid)
+                                        || player.stage.stage.contains(cid)
+                                        || player.stage.under_cards.iter().any(|v| v.contains(cid))
+                                        || player.energy_zone.cards.contains(cid)
+                                        || player.main_deck.cards.contains(cid)
+                                        || player.energy_deck.cards.contains(cid)
+                                        || player.live_card_zone.cards.contains(cid)
+                                        || player.success_live_card_zone.cards.contains(cid)
+                                        || game_state.resolution_zone.cards.contains(cid)
+                                })
                                 .collect()
                         }
                     }

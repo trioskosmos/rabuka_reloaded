@@ -8,6 +8,23 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct TempEffectDisplay {
+    pub effect_type: String,
+    pub duration: String,
+    pub created_turn: u32,
+    pub target_player_id: String,
+    pub description: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ReplacementEffectDisplay {
+    pub card_id: i16,
+    pub player_id: String,
+    pub original_event: String,
+    pub is_choice_based: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct CardDisplay {
     pub card_no: String,
     pub name: String,
@@ -31,6 +48,8 @@ pub struct CardDisplay {
     pub bonus_cost: i32,
     #[serde(default)]
     pub heart_transform: Option<String>,
+    #[serde(default)]
+    pub cost: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
@@ -75,6 +94,10 @@ pub struct PlayerDisplay {
     pub prevent_baton_touch: i32,
     #[serde(default)]
     pub prevent_baton: i32,
+    #[serde(default)]
+    pub areas_locked_this_turn: Vec<String>,
+    #[serde(default)]
+    pub debut_count_this_turn: u32,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -117,6 +140,89 @@ pub struct GameStateDisplay {
     pub waiting_for_opponent: bool,
     #[serde(default)]
     pub mode: String,
+    // --- Internal tracking fields for game state modal ---
+    #[serde(default)]
+    pub current_turn_phase: String,
+    #[serde(default)]
+    pub game_result: String,
+    #[serde(default)]
+    pub is_first_turn: bool,
+    #[serde(default)]
+    pub turn_order_changed: bool,
+    #[serde(default)]
+    pub baton_touch_count: u32,
+    #[serde(default)]
+    pub baton_touch_zero_cost: bool,
+    #[serde(default)]
+    pub baton_touch_replaced_member_cost: Option<u32>,
+    #[serde(default)]
+    pub baton_touch_replaced_member_id: Option<i16>,
+    #[serde(default)]
+    pub baton_touch_arriving_card_id: Option<i16>,
+    #[serde(default)]
+    pub deck_refresh_pending: bool,
+    #[serde(default)]
+    pub loop_detected: bool,
+    #[serde(default)]
+    pub draw_state: bool,
+    #[serde(default)]
+    pub live_being_performed: bool,
+    #[serde(default)]
+    pub cards_moved_this_turn: Vec<i16>,
+    #[serde(default)]
+    pub cards_appeared_this_turn: Vec<i16>,
+    #[serde(default)]
+    pub areas_placed_this_turn: Vec<String>,
+    #[serde(default)]
+    pub last_area_move_card_id: Option<i16>,
+    #[serde(default)]
+    pub last_area_move_by_player: Option<String>,
+    #[serde(default)]
+    pub last_energy_placed_by_effect: bool,
+    #[serde(default)]
+    pub position_change_occurred_this_turn: bool,
+    #[serde(default)]
+    pub formation_change_occurred_this_turn: bool,
+    #[serde(default)]
+    pub opponent_live_success_this_turn: bool,
+    #[serde(default)]
+    pub opponent_live_no_excess_heart_this_turn: bool,
+    #[serde(default)]
+    pub self_no_excess_heart_this_turn: bool,
+    #[serde(default)]
+    pub opponent_live_surplus_count: u32,
+    #[serde(default)]
+    pub self_live_surplus_count: u32,
+    #[serde(default)]
+    pub live_success_triggered_this_turn: bool,
+    #[serde(default)]
+    pub live_surplus_ready_this_turn: bool,
+    #[serde(default)]
+    pub cheer_checks_required: u32,
+    #[serde(default)]
+    pub cheer_checks_done: u32,
+    #[serde(default)]
+    pub turn_limited_abilities_used: Vec<String>,
+    #[serde(default)]
+    pub auto_ability_trigger_counts: std::collections::HashMap<String, u32>,
+    #[serde(default)]
+    pub turn_limit_usage: std::collections::HashMap<String, u32>,
+    #[serde(default)]
+    pub non_stackable_effects: Vec<String>,
+    #[serde(default)]
+    pub prohibition_effects: Vec<String>,
+    #[serde(default)]
+    pub delayed_prohibition_effects: Vec<String>,
+    #[serde(default)]
+    pub cannot_activate_members: Vec<String>,
+    #[serde(default)]
+    pub constant_cannot_activate_members: Vec<String>,
+    #[serde(default)]
+    pub negated_abilities: Vec<i16>,
+    #[serde(default)]
+    pub temporary_effects: Vec<TempEffectDisplay>,
+    #[serde(default)]
+    pub replacement_effects: Vec<ReplacementEffectDisplay>,
 }
 
 pub fn card_to_display(
@@ -167,6 +273,7 @@ pub fn card_to_display(
             bonus_cost: 0,
             heart_transform: None,
             hidden: false,
+            cost: card.cost,
         }
     })
 }
@@ -252,6 +359,7 @@ pub fn card_to_display_full(
             bonus_cost: cost_modifier,
             heart_transform: transform_str,
             hidden: false,
+            cost: card.cost,
         }
     })
 }
@@ -434,7 +542,7 @@ pub fn player_to_display(
                         crate::card::HeartColor::Heart04 => 4,
                         crate::card::HeartColor::Heart05 => 5,
                         crate::card::HeartColor::Heart06 => 6,
-                            crate::card::HeartColor::All => 7,
+                        crate::card::HeartColor::All => 7,
 
                         _ => continue,
                     };
@@ -606,6 +714,12 @@ pub fn player_to_display(
         } else {
             0
         },
+        areas_locked_this_turn: player
+            .areas_locked_this_turn
+            .iter()
+            .map(|a| format!("{:?}", a))
+            .collect(),
+        debut_count_this_turn: player.debut_count_this_turn,
     }
 }
 
@@ -728,6 +842,32 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let heart_flat2 = heart_flat.clone();
     let need_heart_flat2 = need_heart_flat.clone();
 
+    let temp_effects: Vec<TempEffectDisplay> = game_state
+        .temporary_effects
+        .iter()
+        .map(|te| TempEffectDisplay {
+            effect_type: te.effect_type.clone(),
+            duration: format!("{:?}", te.duration),
+            created_turn: te.created_turn,
+            target_player_id: te.target_player_id.clone(),
+            description: te.description.clone(),
+        })
+        .collect();
+
+    let repl_effects: Vec<ReplacementEffectDisplay> = game_state
+        .replacement_effects
+        .iter()
+        .map(|re| ReplacementEffectDisplay {
+            card_id: re.card_id,
+            player_id: re.player_id.clone(),
+            original_event: re.original_event.clone(),
+            is_choice_based: re.is_choice_based,
+        })
+        .collect();
+
+    let turn_phase_str = format!("{:?}", game_state.current_turn_phase);
+    let game_result_str = format!("{:?}", game_state.game_result);
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
@@ -784,5 +924,54 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
             }
             _ => None,
         },
+        current_turn_phase: turn_phase_str,
+        game_result: game_result_str,
+        is_first_turn: game_state.is_first_turn,
+        turn_order_changed: game_state.turn_order_changed,
+        baton_touch_count: game_state.baton_touch_count,
+        baton_touch_zero_cost: game_state.baton_touch_zero_cost,
+        baton_touch_replaced_member_cost: game_state.baton_touch_replaced_member_cost,
+        baton_touch_replaced_member_id: game_state.baton_touch_replaced_member_id,
+        baton_touch_arriving_card_id: game_state.baton_touch_arriving_card_id,
+        deck_refresh_pending: game_state.deck_refresh_pending,
+        loop_detected: game_state.loop_detected,
+        draw_state: game_state.draw_state,
+        live_being_performed: game_state.live_being_performed,
+        cards_moved_this_turn: game_state.cards_moved_this_turn.iter().copied().collect(),
+        cards_appeared_this_turn: game_state
+            .cards_appeared_this_turn
+            .iter()
+            .copied()
+            .collect(),
+        areas_placed_this_turn: game_state.areas_placed_this_turn.iter().cloned().collect(),
+        last_area_move_card_id: game_state.last_area_move_card_id,
+        last_area_move_by_player: game_state.last_area_move_by_player.clone(),
+        last_energy_placed_by_effect: game_state.last_energy_placed_by_effect,
+        position_change_occurred_this_turn: game_state.position_change_occurred_this_turn,
+        formation_change_occurred_this_turn: game_state.formation_change_occurred_this_turn,
+        opponent_live_success_this_turn: game_state.opponent_live_success_this_turn,
+        opponent_live_no_excess_heart_this_turn: game_state.opponent_live_no_excess_heart_this_turn,
+        self_no_excess_heart_this_turn: game_state.self_no_excess_heart_this_turn,
+        opponent_live_surplus_count: game_state.opponent_live_surplus_count,
+        self_live_surplus_count: game_state.self_live_surplus_count,
+        live_success_triggered_this_turn: game_state.live_success_triggered_this_turn,
+        live_surplus_ready_this_turn: game_state.live_surplus_ready_this_turn,
+        cheer_checks_required: game_state.cheer_checks_required,
+        cheer_checks_done: game_state.cheer_checks_done,
+        turn_limited_abilities_used: game_state
+            .turn_limited_abilities_used
+            .iter()
+            .cloned()
+            .collect(),
+        auto_ability_trigger_counts: game_state.auto_ability_trigger_counts.clone(),
+        turn_limit_usage: game_state.turn_limit_usage.clone(),
+        non_stackable_effects: game_state.non_stackable_effects.iter().cloned().collect(),
+        prohibition_effects: game_state.prohibition_effects.clone(),
+        delayed_prohibition_effects: game_state.delayed_prohibition_effects.clone(),
+        cannot_activate_members: game_state.cannot_activate_members.clone(),
+        constant_cannot_activate_members: game_state.constant_cannot_activate_members.clone(),
+        negated_abilities: game_state.negated_abilities.iter().copied().collect(),
+        temporary_effects: temp_effects,
+        replacement_effects: repl_effects,
     }
 }
