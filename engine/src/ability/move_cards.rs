@@ -399,17 +399,22 @@ impl AbilityResolver {
                         }
                     }
                     if !found.is_empty() {
-                        // Remove from source zone (discard) so the caller's
-                        // place_card_in_zone doesn't duplicate it.
-                        let player = if use_p2 {
-                            &mut gs.player2
-                        } else {
-                            &mut gs.player1
-                        };
-                        for &cid in &found {
-                            if let Some(pos) = player.waitroom.cards.iter().position(|&c| c == cid)
-                            {
-                                player.waitroom.cards.remove(pos);
+                        // When the effect is optional (may place), leave the card
+                        // in waitroom. The caller (handle_position_destination)
+                        // will remove it only if the player picks top or bottom;
+                        // if the player skips, the card stays in waitroom.
+                        if !effect.optional.unwrap_or(false) {
+                            let player = if use_p2 {
+                                &mut gs.player2
+                            } else {
+                                &mut gs.player1
+                            };
+                            for &cid in &found {
+                                if let Some(pos) =
+                                    player.waitroom.cards.iter().position(|&c| c == cid)
+                                {
+                                    player.waitroom.cards.remove(pos);
+                                }
                             }
                         }
                         return Ok(found);
@@ -1088,10 +1093,16 @@ impl AbilityResolver {
                     let clamped = pos.min(player.main_deck.cards.len());
                     player.main_deck.cards.insert(clamped, card_id);
                 } else if destination == "deck_top_or_bottom" {
+                    let can_skip = effect.optional.unwrap_or(false);
+                    if can_skip && !taken.is_empty() {
+                        // For optional deck placement, the card was left in
+                        // waitroom by resolve_cards_from_source. If the player
+                        // skips, it stays there.
+                    }
                     self.pending_choice = Some(Choice::SelectTarget {
                         target: "position|destination".to_string(),
                         description: "Choose deck top or bottom".to_string(),
-                        allow_skip: false,
+                        allow_skip: can_skip,
                         options: Some(vec![
                             Zone::DeckTop.to_str().to_string(),
                             Zone::DeckBottom.to_str().to_string(),

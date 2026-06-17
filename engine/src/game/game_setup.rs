@@ -250,13 +250,14 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                 let positions = options.as_deref().unwrap_or(&default_positions);
                 let mut actions: Vec<Action> = positions
                     .iter()
-                    .map(|pos| {
+                    .enumerate()
+                    .map(|(i, pos)| {
                         let idx = crate::ability::util::stage_position_index(pos);
                         let (stage_area, card_id) = match idx {
                             Some(0) => ("left".to_string(), 0),
                             Some(1) => ("center".to_string(), 1),
                             Some(2) => ("right".to_string(), 2),
-                            _ => (pos.clone(), -1),
+                            _ => (pos.clone(), i as i16),
                         };
                         let capitalize = |s: &str| -> String {
                             let mut c = s.chars();

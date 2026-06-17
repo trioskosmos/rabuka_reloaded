@@ -2036,12 +2036,23 @@ impl super::resolver::AbilityResolver {
             } => {
                 let player = gs.resolve_target_player_mut(&target);
                 let destination = selected;
+                // Player chose to skip — card stays in waitroom, no-op.
+                if destination == "skip" {
+                    if ABILITY_DEBUG.load(Ordering::Relaxed) {
+                        eprintln!("[DECK_DIAG] skip — card stays in waitroom");
+                    }
+                    self.clear_choice_state(gs);
+                    return self.resume_pending_commands(gs);
+                }
                 if ABILITY_DEBUG.load(Ordering::Relaxed) {
                     eprintln!("[DECK_DIAG] handle_position_destination ctx=MoveCardsPosition card_id={} dest={} src={}", card_id, destination, source_zone);
                 }
                 // Remove card from source zone first, then place in destination.
                 // The card was left in place when the deck_top_or_bottom choice was created.
-                if source_zone == Zone::Discard.to_str() || source_zone == Zone::Waitroom.to_str() {
+                if source_zone == Zone::Discard.to_str()
+                    || source_zone == Zone::Waitroom.to_str()
+                    || source_zone == "those_cards"
+                {
                     if ABILITY_DEBUG.load(Ordering::Relaxed) {
                         eprintln!(
                             "[DECK_DIAG] waitroom before retain={:?} removing card_id={}",

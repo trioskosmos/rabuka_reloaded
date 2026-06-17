@@ -196,7 +196,7 @@ def _trim_reference_prefix(ref):
     ]
     for prefix in prefixes:
         if ref.startswith(prefix):
-            ref = ref[len(prefix):]
+            ref = ref[len(prefix) :]
             break
     return ref.strip()
 
@@ -403,6 +403,7 @@ SOURCE_PATTERNS: List[Tuple[str, str]] = [
     ("これにより公開したカードを", "revealed_cards"),
     ("公開したカードをすべて", "revealed_cards"),
     ("それらのカードの中から", "those_cards"),
+    ("そのライブカードを", "those_cards"),
     ("このカードを手札に加えてもよい", "revealed_cards"),
     ("手札にある", "hand"),
     ("ステージにいる", "stage"),

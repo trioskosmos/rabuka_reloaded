@@ -1713,7 +1713,8 @@ def _extract_generic_fields(condition, text):
     # Detect "のみ" (only/all members must match the group)
     if gns:
         if "のみの場合" in text or (
-            "のみ" in text and ("ステージ" in text or "メンバー" in text)
+            "のみ" in text
+            and ("ステージ" in text or "メンバー" in text or "カードが" in text)
         ):
             condition["all_members"] = True
 

@@ -1130,11 +1130,7 @@ impl<'a> ConditionContext<'a> {
 
     pub(crate) fn evaluate_group_condition(&self, condition: &Condition) -> bool {
         if condition.all_members.unwrap_or(false) {
-            // all_members is a stage-only concept; skip for other zones
             let location = condition.location.as_deref().unwrap_or("");
-            if Zone::from_str(location) != Some(Zone::Stage) {
-                return false;
-            }
             let target = condition.target.as_deref().unwrap_or("self");
             let player = self.resolve_condition_player(target);
             let group_name = condition
@@ -1142,12 +1138,29 @@ impl<'a> ConditionContext<'a> {
                 .as_ref()
                 .and_then(|gn| gn.first().map(|s| s.as_str()));
             let card_db = &self.game_state.card_database;
-            return player
-                .stage
-                .stage
-                .iter()
-                .filter(|&&id| id != -1)
-                .all(|&id| crate::ability::util::card_matches_group_str(card_db, id, group_name));
+            match Zone::from_str(location) {
+                Some(Zone::Stage) => {
+                    return player
+                        .stage
+                        .stage
+                        .iter()
+                        .filter(|&&id| id != -1)
+                        .all(|&id| {
+                            crate::ability::util::card_matches_group_str(card_db, id, group_name)
+                        });
+                }
+                Some(Zone::LiveCardZone) => {
+                    return player.live_card_zone.cards.iter().all(|&id| {
+                        crate::ability::util::card_matches_group_str(card_db, id, group_name)
+                    });
+                }
+                Some(Zone::SuccessLiveZone) => {
+                    return player.success_live_card_zone.cards.iter().all(|&id| {
+                        crate::ability::util::card_matches_group_str(card_db, id, group_name)
+                    });
+                }
+                _ => return false,
+            }
         }
         // When heart_colors are specified, check that the collective cards in the
         // target zone cover ALL required heart colors (e.g. yell-revealed cards).

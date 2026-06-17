@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T19:39:14.691451",
+  "generated_at": "2026-06-17T20:20:30.687366",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5256,6 +5256,7 @@
           "operator": ">=",
           "count": 1
         },
+        "source": "those_cards",
         "destination": "deck_top_or_bottom",
         "card_type": "live_card",
         "optional": true,
@@ -5294,6 +5295,7 @@
               "group_names": [
                 "Aqours"
               ],
+              "all_members": true,
               "type": "group_condition"
             },
             {
@@ -7074,10 +7076,10 @@
           },
           {
             "text": "そのライブカードを手札に加える",
+            "source": "selected_cards",
             "destination": "hand",
             "card_type": "live_card",
             "action": "move_cards",
-            "source": "selected_cards",
             "count": 1
           }
         ],
