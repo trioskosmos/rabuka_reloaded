@@ -123,11 +123,28 @@ impl super::TurnEngine {
                     if game_state.has_pending_choice() {
                         return;
                     }
+                    // Second attacker's live start (bilateral, same as live_success pattern)
+                    let second_attacker_id = game_state.second_attacker().id.clone();
+                    Self::trigger_live_start_abilities(game_state, &second_attacker_id);
+                    game_state.process_pending_auto_abilities(&second_attacker_id);
+                    if game_state.has_pending_choice() {
+                        return;
+                    }
+                    Self::trigger_each_time_abilities(
+                        game_state,
+                        &second_attacker_id,
+                        crate::triggers::LIVE_START,
+                    );
+                    game_state.process_pending_auto_abilities(&second_attacker_id);
+                    if game_state.has_pending_choice() {
+                        return;
+                    }
                 }
-                Phase::FirstAttackerPerformance | Phase::SecondAttackerPerformance => {
-                    let is_first =
-                        matches!(game_state.current_phase, Phase::FirstAttackerPerformance);
-                    Self::execute_performance_phase(game_state, is_first);
+                Phase::FirstAttackerPerformance => {
+                    Self::execute_performance_phase(game_state, true);
+                }
+                Phase::SecondAttackerPerformance => {
+                    Self::execute_performance_phase(game_state, false);
                 }
                 Phase::LiveVictoryDetermination => {
                     Self::execute_live_victory_determination(game_state);
@@ -296,9 +313,19 @@ impl super::TurnEngine {
         let pid = perf_player_id;
         Self::trigger_auto_abilities_for_player(game_state, &pid);
         game_state.process_pending_auto_abilities(&pid);
+        // Also scan the opponent's auto-abilities (e.g. "when opponent performs a live")
+        let opponent_id = if pid == game_state.player1.id {
+            game_state.player2.id.clone()
+        } else {
+            game_state.player1.id.clone()
+        };
+        Self::trigger_auto_abilities_for_player(game_state, &opponent_id);
+        game_state.process_pending_auto_abilities(&opponent_id);
         if perf_data.draw_effects_occurred {
             Self::trigger_auto_abilities_for_player(game_state, &pid);
             game_state.process_pending_auto_abilities(&pid);
+            Self::trigger_auto_abilities_for_player(game_state, &opponent_id);
+            game_state.process_pending_auto_abilities(&opponent_id);
         }
         game_state.current_phase = if is_first {
             Phase::SecondAttackerPerformance
@@ -564,6 +591,12 @@ impl super::TurnEngine {
 
             Self::trigger_debut_abilities(game_state, &player_id, &card_no, final_cost, true);
             Self::trigger_auto_abilities_for_player(game_state, &player_id);
+            let db_opponent_id = if player_id == game_state.player1.id {
+                game_state.player2.id.clone()
+            } else {
+                game_state.player1.id.clone()
+            };
+            Self::trigger_auto_abilities_for_player(game_state, &db_opponent_id);
             for &replaced_id in &double_replaced_ids {
                 Self::trigger_discard_auto_abilities(game_state, &player_id, replaced_id);
             }
@@ -623,6 +656,12 @@ impl super::TurnEngine {
             baton_touch_used,
         );
         Self::trigger_auto_abilities_for_player(game_state, &player_id);
+        let sb_opponent_id = if player_id == game_state.player1.id {
+            game_state.player2.id.clone()
+        } else {
+            game_state.player1.id.clone()
+        };
+        Self::trigger_auto_abilities_for_player(game_state, &sb_opponent_id);
         game_state.process_pending_auto_abilities(&player_id);
         game_state.recalculate_constants();
 

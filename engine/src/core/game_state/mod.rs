@@ -265,6 +265,10 @@ impl GameState {
             Phase::MulliganSecondAttacker | Phase::LiveCardSetSecondAttacker => {
                 self.second_attacker()
             }
+            Phase::FirstAttackerPerformance | Phase::LiveVictoryDetermination => {
+                self.first_attacker()
+            }
+            Phase::SecondAttackerPerformance => self.second_attacker(),
             _ => match self.current_turn_phase {
                 TurnPhase::FirstAttackerNormal => self.first_attacker(),
                 TurnPhase::SecondAttackerNormal => self.second_attacker(),
@@ -280,6 +284,20 @@ impl GameState {
             }
             Phase::MulliganSecondAttacker | Phase::LiveCardSetSecondAttacker => {
                 self.second_attacker_mut()
+            }
+            Phase::FirstAttackerPerformance | Phase::LiveVictoryDetermination => {
+                if self.player1.is_first_attacker {
+                    &mut self.player1
+                } else {
+                    &mut self.player2
+                }
+            }
+            Phase::SecondAttackerPerformance => {
+                if self.player1.is_first_attacker {
+                    &mut self.player2
+                } else {
+                    &mut self.player1
+                }
             }
             _ => match self.current_turn_phase {
                 TurnPhase::FirstAttackerNormal => {
