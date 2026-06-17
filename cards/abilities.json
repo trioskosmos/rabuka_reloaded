@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T10:44:02.017612",
+  "generated_at": "2026-06-17T11:39:50.311040",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -7019,6 +7019,7 @@
           "card_type": "member_card",
           "location": "stage",
           "text": "自分と相手のステージの中で、このメンバーがほかのすべてのメンバーより多くのハートを持つかぎり",
+          "exclude_self": true,
           "scope": "both"
         },
         "duration": "as_long_as",
@@ -7699,7 +7700,7 @@
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
-        "group_names": [
+        "exclude_group_names": [
           "スリーズブーケ"
         ],
         "location": "stage",
@@ -10235,7 +10236,8 @@
           "みらくらぱーく！"
         ],
         "location": "stage",
-        "target": "self"
+        "target": "self",
+        "exclude_self": true
       }
     },
     {
@@ -14125,6 +14127,7 @@
           "appearance": true,
           "text": "自分のステージにこのメンバー以外のコスト11のメンバーが登場したとき",
           "location": "stage",
+          "exclude_self": true,
           "target": "self"
         },
         "source": "energy_deck",
@@ -14711,7 +14714,8 @@
           "A-RISE"
         ],
         "location": "stage",
-        "target": "self"
+        "target": "self",
+        "exclude_self": true
       }
     },
     {
@@ -15064,6 +15068,7 @@
           "appearance": true,
           "text": "自分のステージにほかの『スリーズブーケ』のメンバーが登場する",
           "location": "stage",
+          "exclude_self": true,
           "target": "self"
         },
         "exclude_self": true,
@@ -21803,6 +21808,7 @@
         "count": 2,
         "card_type": "member_card",
         "target": "self",
+        "exclude_self": true,
         "target_count": 1,
         "action": "gain_resource",
         "resource": "blade",
@@ -25312,6 +25318,7 @@
         ],
         "location": "live_card_zone",
         "target": "self",
+        "exclude_self": true,
         "value": 2
       }
     },

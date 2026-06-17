@@ -1155,6 +1155,13 @@ def _try_appearance(text):
         result["characters"] = [subject]
     if "エリアすべて" in text:
         result["all_areas"] = True
+    # Exclude self for "このメンバー以外" / "このカード以外" patterns
+    if (
+        "このメンバー以外" in text
+        or "このカード以外" in text
+        or re.search(r"ほかの.*?メンバー", text)
+    ):
+        result["exclude_self"] = True
     if "バトンタッチ" in text:
         result["baton_touch_trigger"] = True
         gns = extract_group_names(text)
@@ -1428,6 +1435,13 @@ def _try_heart_possession(text):
         result["original_value"] = True
         result["operator"] = ">"
         result["count"] = 1
+    # Exclude self for "他のメンバー" / "ほかのメンバー" / "このメンバー以外" patterns
+    if (
+        "このメンバー以外" in text
+        or "このカード以外" in text
+        or re.search(r"ほかの.*?メンバー", text)
+    ):
+        result["exclude_self"] = True
     return result
 
 
@@ -4057,11 +4071,28 @@ def _try_per_unit(text):
     if "控え室に置いた" in per_text:
         result["per_unit_type"] = "discard"
 
-    gm = re.search(r"『([^』]+)』", per_text)
+    # Check for excluded groups: 『group』以外
+    exc_gns = re.findall(r"『([^』]+)』以外", per_text)
+    if exc_gns:
+        result["exclude_group_names"] = exc_gns
+    # Extract included groups only (groups NOT followed by 以外)
+    remaining_per_text = re.sub(r"『[^』]+』以外", "", per_text)
+    gm = re.search(r"『([^』]+)』", remaining_per_text)
     if gm:
         result["group_names"] = [gm.group(1)]
     if "名前の異なる" in per_text or "カード名の異なる" in per_text:
         result["distinct"] = "card_name"
+
+    # Extract exclude_self from per_text (self-referential "other" patterns)
+    if (
+        "このメンバー以外" in per_text
+        or "このカード以外" in per_text
+        or "自分以外" in per_text
+        or re.search(r"ほかの.*?(?:メンバー|カード)", per_text)
+        or re.search(r"他の.*?(?:メンバー|カード)", per_text)
+        or "これを除く" in per_text
+    ):
+        result["exclude_self"] = True
 
     # Extract cost_limit from per-text (e.g., "コスト4以上")
     cl = extract_cost_limit(per_text)
@@ -4203,6 +4234,7 @@ def _propagate(src, dst):
         "per_unit_type",
         "card_type",
         "group_names",
+        "exclude_group_names",
         "distinct",
         "timing_condition",
         "state",
@@ -4212,6 +4244,7 @@ def _propagate(src, dst):
         "duration",
         "condition",
         "target",
+        "exclude_self",
     ):
         if k in src:
             dst[k] = src[k]
@@ -4225,6 +4258,7 @@ def _propagate_if_missing(src, dst):
         "per_unit_type",
         "card_type",
         "group_names",
+        "exclude_group_names",
         "distinct",
         "timing_condition",
         "state",
@@ -4234,6 +4268,7 @@ def _propagate_if_missing(src, dst):
         "duration",
         "condition",
         "target",
+        "exclude_self",
     ):
         if k in src and k not in dst:
             dst[k] = src[k]
@@ -5701,11 +5736,13 @@ def _try_conditional(text):
             result["text"] = action["text"]
     else:
         result.update(action)
-    # Issue 4: Strip exclude_self from the action result — it belongs on the
-    # condition only. This prevents the condition's "ほかのメンバー" filter
-    # from leaking into gain_resource/heart actions.
+    # Only strip exclude_self when it duplicates condition-level exclude_self.
+    # Per-unit gain_resource effects need exclude_self on the action for
+    # filter_subset() to correctly exclude self from counting.
     if result.get("action") in ("gain_resource", "heart_selection", "set_heart_type"):
-        result.pop("exclude_self", None)
+        cond = result.get("condition", {})
+        if isinstance(cond, dict) and cond.get("exclude_self"):
+            result.pop("exclude_self", None)
 
     # Restore the outer condition — it must NOT be overwritten by timing phrases
     # or phantom conditions from the recursive parse_effect call.
@@ -6775,6 +6812,7 @@ def _normalize_effect_tree(effect, original_text=None):
                 "source_position",
                 "exclude_position",
                 "group_names",
+                "exclude_group_names",
                 "heart_colors",
                 "shuffle",
                 "optional",
@@ -6893,27 +6931,25 @@ def _normalize_effect_tree(effect, original_text=None):
             elif "{{rightside.png|右サイド}}" in raw:
                 d["activation_position"] = "right_side"
 
-        # Propagate exclude_self from text context to sub-actions
-        # Skip self-targeting gain_resource actions — having target="self" +
-        # exclude_self=true is contradictory (parser would mean "give to
-        # everyone except self" but target="self" means "give to self").
-        # For position_change, target="self" + exclude_self is valid ("change
-        # position on your stage, but not to your own spot").
+        # Propagate exclude_self from text context to sub-actions.
+        # per_unit gain_resource/heart effects should receive exclude_self
+        # (e.g. "ほかのメンバー1人につき" needs self excluded from the count).
+        # Non-per_unit self-buffs (plain "gain_resource" without "per_unit")
+        # are excluded since target="self" + exclude_self is contradictory.
         if (
             "exclude_self" not in d
             and d_ctx
             and ("このメンバー以外" in d_ctx or "ほかの" in d_ctx or "他の" in d_ctx)
         ):
-            is_position_change = d.get("action") == "position_change"
-            # Issue 4: gain_resource/heart actions always target self (the
-            # activating card gains the resource). Don't propagate exclude_self.
+            is_per_unit = d.get("per_unit", False)
             is_self_buff = d.get("action") in (
-                "gain_resource",
                 "set_heart_type",
                 "heart_selection",
                 "modify_score",
-            )
-            if (is_position_change or d.get("target") != "self") and not is_self_buff:
+            ) or (d.get("action") in ("gain_resource",) and not is_per_unit)
+            if (
+                d.get("action") == "position_change" or d.get("target") != "self"
+            ) and not is_self_buff:
                 d["exclude_self"] = True
 
         # Propagate distinct from text context — use string form for serde compat

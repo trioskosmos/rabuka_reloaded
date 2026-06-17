@@ -641,6 +641,7 @@ impl AbilityCost {
             } else {
                 None
             },
+            exclude_group_names: self.exclude_group_names.as_ref(),
             ..Default::default()
         }
     }
@@ -1032,6 +1033,7 @@ impl AbilityEffect {
             } else {
                 None
             },
+            exclude_group_names: self.exclude_group_names.as_ref(),
             ..Default::default()
         }
     }
@@ -1386,6 +1388,7 @@ impl Condition {
             characters: self.characters.as_ref(),
             exclude_characters: self.exclude_characters.as_ref(),
             exclude_self: None,
+            exclude_group_names: self.exclude_group_names.as_ref(),
             ..Default::default()
         }
     }

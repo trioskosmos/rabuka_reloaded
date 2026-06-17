@@ -84,7 +84,10 @@ impl GameState {
                                                 .as_deref()
                                                 .or(effect.per_unit_type.as_deref())
                                                 .unwrap_or(Zone::Hand.to_str());
-                                            let filter = effect.filter_subset();
+                                            let mut filter = effect.filter_subset();
+                                            if filter.exclude_self == Some(-1) {
+                                                filter.exclude_self = Some(*card_id);
+                                            }
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
                                                     true,
@@ -126,7 +129,10 @@ impl GameState {
                                                 .as_deref()
                                                 .or(effect.per_unit_type.as_deref())
                                                 .unwrap_or(Zone::Hand.to_str());
-                                            let filter = effect.filter_subset();
+                                            let mut filter = effect.filter_subset();
+                                            if filter.exclude_self == Some(-1) {
+                                                filter.exclude_self = Some(*card_id);
+                                            }
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
                                                     true,
@@ -405,7 +411,10 @@ impl GameState {
                             .as_deref()
                             .or(effect.per_unit_type.as_deref())
                             .unwrap_or(crate::ability::enums::Zone::Hand.to_str());
-                        let filter = effect.filter_subset();
+                        let mut filter = effect.filter_subset();
+                        if filter.exclude_self == Some(-1) {
+                            filter.exclude_self = Some(cid);
+                        }
                         let per_count = crate::ability::util::resolve_per_unit_count(
                             true,
                             Some(zone),

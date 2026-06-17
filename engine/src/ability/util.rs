@@ -502,6 +502,8 @@ pub struct CardFilter<'a> {
     pub name_fragments: Option<&'a Vec<String>>,
     pub distinct: Option<&'a str>,
     pub exclude_self: Option<i16>,
+    /// Group names to exclude from matching (e.g. 「スリーズブーケ」以外)
+    pub exclude_group_names: Option<&'a Vec<String>>,
     pub original_blade_limit: Option<u32>,
     pub original_blade_operator: Option<&'a str>,
     /// Card IDs to exclude from matching (e.g. previously selected by a prior sequential action)
@@ -618,6 +620,14 @@ impl<'a> CardFilter<'a> {
         } else if let Some(gs) = self.groups {
             if !gs.iter().any(|gn| card_matches_group_str(db, id, Some(gn))) {
                 return false;
+            }
+        }
+        // exclude_group_names: card passes if its group is NOT in the excluded list
+        if let Some(ex_gns) = self.exclude_group_names {
+            for g in ex_gns {
+                if card_matches_group_str(db, id, Some(g.as_str())) {
+                    return false;
+                }
             }
         }
         if let Some(lim) = self.cost_limit {
@@ -844,6 +854,7 @@ impl<'a> CardFilter<'a> {
             cost_total_operator: effect.cost_total_operator.as_deref(),
             characters: effect.characters.as_ref(),
             exclude_characters: effect.exclude_characters.as_ref(),
+            exclude_group_names: effect.exclude_group_names.as_ref(),
             heart_colors: &effect.heart_colors,
             need_heart_total: effect.need_heart_total,
             need_heart_operator: effect.need_heart_operator.as_deref(),
@@ -891,6 +902,7 @@ impl<'a> CardFilter<'a> {
                 need_heart_color: None,
                 characters: characters.as_ref(),
                 exclude_characters: None,
+                exclude_group_names: None,
                 heart_colors: &[],
                 name_fragments: None,
                 distinct: None,

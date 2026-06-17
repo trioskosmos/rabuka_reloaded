@@ -21,9 +21,6 @@ impl GameState {
         self.baton_touch_replaced_member_id = None;
         self.baton_touch_arriving_card_id = None;
         self.clear_area_placement_tracking();
-        // Clear orientation modifiers at turn start so members return to active
-        // unless a persistent effect re-applies them.
-        self.mods.orientation_modifiers.clear();
     }
 
     pub fn perform_cheer_check(&mut self, player_id: &str, blade_count: u32) -> Result<(), String> {
