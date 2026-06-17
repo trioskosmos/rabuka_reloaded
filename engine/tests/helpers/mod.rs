@@ -328,8 +328,72 @@ impl TestGame {
 
     /// Select cards by waitroom/hand indices (for SelectCard choices).
     pub fn select_indices(&mut self, indices: &[usize]) {
-        TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
-            .expect("select_indices failed");
+        if let Err(_) = self.select_via_generated(indices) {
+            TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
+                .expect("select_indices failed");
+        }
+    }
+
+    /// Try to select indices, returning the error instead of panicking.
+    pub fn try_select_indices(&mut self, indices: &[usize]) -> Result<(), String> {
+        if let Err(_) = self.select_via_generated(indices) {
+            TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
+        } else {
+            Ok(())
+        }
+    }
+
+    /// For SelectCard choices, find the generated action matching the given indices
+    /// and resolve through it — matching what the real frontend does.
+    /// Falls back for non-SelectCard choices and multi-index selections.
+    fn select_via_generated(&mut self, indices: &[usize]) -> Result<(), String> {
+        let is_select_card = self
+            .state
+            .get_pending_choice()
+            .is_some_and(|c| matches!(c, rabuka_engine::ability::types::Choice::SelectCard { .. }));
+        if !is_select_card {
+            return Err("Not a SelectCard choice".into());
+        }
+        let actions = rabuka_engine::game_setup::generate_possible_actions(&self.state);
+        if indices.is_empty() {
+            let skip = actions
+                .iter()
+                .find(|a| a.action_type == ActionType::ChoiceSkip)
+                .ok_or("No skip action available")?;
+            let p = skip
+                .parameters
+                .as_ref()
+                .ok_or("Skip action has no params")?;
+            TurnEngine::resume_with_choice(&mut self.state, p.card_id, p.card_indices.clone())
+        } else if indices.len() == 1 {
+            let action = actions
+                .iter()
+                .find(|a| {
+                    a.action_type == ActionType::ChoiceSelect
+                        && a.parameters
+                            .as_ref()
+                            .and_then(|p| p.card_indices.as_deref())
+                            == Some(indices)
+                })
+                .ok_or_else(|| {
+                    format!(
+                        "No ChoiceSelect action with card_indices={:?}. Available: {:?}",
+                        indices,
+                        actions
+                            .iter()
+                            .filter(|a| a.action_type == ActionType::ChoiceSelect)
+                            .map(|a| a
+                                .parameters
+                                .as_ref()
+                                .and_then(|p| p.card_indices.as_deref()))
+                            .collect::<Vec<_>>()
+                    )
+                })?;
+            let p = action.parameters.as_ref().ok_or("Action has no params")?;
+            TurnEngine::resume_with_choice(&mut self.state, p.card_id, p.card_indices.clone())
+        } else {
+            Err("Multi-index not supported via action path".into())
+        }
     }
 
     /// Find a card in the waitroom by ID and select it using the filtered-relative
@@ -366,11 +430,6 @@ impl TestGame {
         self.select_indices(&[filtered_idx]);
     }
 
-    /// Try to select indices, returning the error instead of panicking.
-    pub fn try_select_indices(&mut self, indices: &[usize]) -> Result<(), String> {
-        TurnEngine::resume_with_choice(&mut self.state, None, Some(indices.to_vec()))
-    }
-
     /// Select one index at a time for any-number choices (e.g. reveal any number).
     /// If the pending choice is any-number (count=0, allow_skip=true), feeds each
     /// index individually, waiting for re-prompts between picks, then sends an
@@ -399,9 +458,7 @@ impl TestGame {
         }
         // Any-number: feed one at a time, handling re-prompts
         for (i, &idx) in indices.iter().enumerate() {
-            TurnEngine::resume_with_choice(&mut self.state, None, Some(vec![idx])).unwrap_or_else(
-                |e| panic!("select_indices_sequential failed at index {}: {}", i, e),
-            );
+            self.select_indices(&[idx]);
             // Expect a re-prompt after each selection except the last
             // (when all cards are taken, the engine auto-finalizes).
             if i + 1 < indices.len() {
@@ -427,8 +484,7 @@ impl TestGame {
                 )
             });
             if still_any {
-                TurnEngine::resume_with_choice(&mut self.state, None, Some(vec![]))
-                    .expect("select_indices_sequential skip failed");
+                self.select_indices(&[]);
             }
         }
     }

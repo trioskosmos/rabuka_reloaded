@@ -537,7 +537,14 @@ impl super::resolver::AbilityResolver {
                         let p = gs.resolve_target_player_mut(&target);
                         p.hand.cards.to_vec()
                     };
-                    let new_card_ids: Vec<i16> = indices
+                    // Cost-phase Hand handler: the frontend sends filtered-relative indices
+                    // (positions within filtered_indices). Map to actual hand positions.
+                    let cost_hand_indices: Vec<usize> = if let Some(ref fi) = filtered_indices {
+                        indices.iter().filter_map(|&i| fi.get(i).copied()).collect()
+                    } else {
+                        indices.to_vec()
+                    };
+                    let new_card_ids: Vec<i16> = cost_hand_indices
                         .iter()
                         .filter_map(|&i| {
                             if i < hand_cards.len() {

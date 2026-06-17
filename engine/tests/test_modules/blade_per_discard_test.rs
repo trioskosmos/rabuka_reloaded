@@ -419,3 +419,88 @@ fn any_number_partial_discard_grants_partial_blades() {
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(blade, 1, "1 card discarded → 1 blade, got {}", blade);
 }
+
+/// Edge case: non-contiguous matching cards in hand.
+/// Hand: [hand1(match), live(no-match), hand2(match)]
+/// After discarding hand1 (index 0): hand = [live(0), hand2(1)], fi = [1]
+/// The re-prompt action should have card_indices=[0] (filtered index for hand2),
+/// NOT card_indices=[1] (zone position), because the frontend sends filtered-relative indices.
+/// Before the cost-phase Hand handler fix, this would silently skip hand2
+/// (hand_cards[0] = live, validate_card fails → treated as skip).
+#[test]
+fn non_contiguous_matches_via_action_pipeline() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let stage = game.id("LL-bp2-001-R+");
+    let hand1 = game.new_id("LL-bp2-001-R+");
+    let hand2 = game.new_id("LL-bp2-001-R+");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = stage;
+    game.give_energy(15);
+    // Non-contiguous: matching cards at index 0 and 2, non-matching at 1
+    game.state.player1.hand.cards.push(hand1);
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(hand2);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    // Step 1: Initial cost prompt — 2 matching cards at indices 0 and 2
+    assert!(game.has_pending_choice(), "Optional cost should appear");
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let select_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == ActionType::ChoiceSelect)
+        .collect();
+    assert_eq!(
+        select_actions.len(),
+        2,
+        "2 matching cards should be selectable"
+    );
+
+    // Select hand1 (index 0)
+    game.select_indices(&[0]);
+
+    // Step 2: Re-prompt — hand2 should be at filtered index 0 (zone position 1)
+    assert!(game.has_pending_choice(), "Re-prompt should appear");
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let select_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == ActionType::ChoiceSelect)
+        .collect();
+    assert_eq!(select_actions.len(), 1, "Only 1 matching card remains");
+    // Verify the action's card_indices is the filtered index 0 (frontend standard)
+    assert_eq!(
+        select_actions[0]
+            .parameters
+            .as_ref()
+            .and_then(|p| p.card_indices.as_deref()),
+        Some(&[0usize][..]),
+        "Action should use filtered index 0, not zone position 1"
+    );
+
+    // Select hand2 via filtered index 0
+    game.select_indices(&[0]);
+
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let blade = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage)
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
+}

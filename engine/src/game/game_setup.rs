@@ -645,7 +645,7 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                         .get_card(*card_id)
                         .map(|c| c.card_no.clone())
                         .unwrap_or_default();
-                    // Map stage position to index within filtered_indices
+                    // Map zone position to index within filtered_indices
                     let fi_index = match &fi_for_mapping {
                         Some(fi) if !fi.is_empty() => fi
                             .iter()
