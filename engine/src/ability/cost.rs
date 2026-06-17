@@ -186,12 +186,8 @@ impl AbilityResolver {
                             }
                         })
                         .collect();
-                    // For "any number" costs, the effective max is all matching cards
-                    let effective_count = if is_any_number {
-                        matching_indices.len().max(1)
-                    } else {
-                        count
-                    };
+                    // For "any number" costs, the effective count is 0 (any number)
+                    let effective_count = if is_any_number { 0 } else { count };
                     log::debug!(
                         "▶ cost(move_cards, {}=>discard, effective_count={}, any_number={}, optional={})",
                         source, effective_count, is_any_number, is_optional

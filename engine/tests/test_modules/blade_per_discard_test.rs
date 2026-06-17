@@ -235,7 +235,6 @@ fn triple_discard_re_prompt_shows_correct_actions() {
     game.select_indices(&[0]);
 
     // --- Step 3: All matching cards exhausted — code finalizes directly ---
-    // No re-prompt because count(2) == selected(2). The effect continues.
     if game.has_pending_choice() {
         game.select_indices(&[]);
     }
@@ -247,4 +246,176 @@ fn triple_discard_re_prompt_shows_correct_actions() {
         .get(&stage)
         .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
     assert_eq!(blade, 2, "2 cards discarded → 2 blades, got {}", blade);
+}
+
+/// Two copies of the joint card on stage: both should fire independently.
+#[test]
+fn two_copies_on_stage_both_gain_blades() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let stage1 = game.id("LL-bp2-001-R+");
+    let stage2 = game.new_id("LL-bp2-001-R+");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[0] = stage1;
+    game.state.player1.stage.stage[1] = stage2;
+    game.give_energy(15);
+    // Add 8 matching copies + live + filler = 10 hand cards
+    for _ in 0..8 {
+        game.state
+            .player1
+            .hand
+            .cards
+            .push(game.new_id("LL-bp2-001-R+"));
+    }
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    assert!(game.has_pending_choice(), "SelectAutoAbility should appear");
+    game.select_option(0);
+
+    // First ability: discard 2 cards → 2 blades
+    assert!(game.has_pending_choice(), "First cost should appear");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "Re-prompt after 1st discard");
+    game.select_indices(&[]); // finalize with 1 card
+
+    let p1_id = game.state.player1.id.clone();
+    game.state.process_pending_auto_abilities(&p1_id);
+
+    // Second ability: discard 1 card → 1 blade
+    assert!(game.state.has_pending_choice(), "Second cost should appear");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "Re-prompt after 1st discard");
+    game.select_indices(&[]);
+
+    let blade1 = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage1)
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    let blade2 = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage2)
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert!(
+        blade1 > 0 && blade2 > 0,
+        "Both copies should gain blades: copy1={} copy2={}",
+        blade1,
+        blade2
+    );
+    assert!(
+        blade1 + blade2 >= 2,
+        "Total blades should be at least 2: copy1={} copy2={}",
+        blade1,
+        blade2
+    );
+}
+
+/// Sequential any_number selection: pick one at a time, finalize on done.
+#[test]
+fn any_number_discard_sequential_works() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let stage = game.id("LL-bp2-001-R+");
+    let hand1 = game.new_id("LL-bp2-001-R+");
+    let hand2 = game.new_id("LL-bp2-001-R+");
+    let hand3 = game.new_id("LL-bp2-001-R+");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = stage;
+    game.give_energy(15);
+    game.state.player1.hand.cards.push(hand1);
+    game.state.player1.hand.cards.push(hand2);
+    game.state.player1.hand.cards.push(hand3);
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    assert!(game.has_pending_choice(), "Optional cost should appear");
+    for _ in 0..3 {
+        game.select_indices(&[0]);
+        if game.has_pending_choice() {
+            // re-prompt for next card — continue
+        }
+    }
+    if game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    let blade = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage)
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(blade, 3, "3 cards discarded → 3 blades, got {}", blade);
+}
+
+/// Partial discard: discard 1 of 3 matching, then skip → 1 blade.
+#[test]
+fn any_number_partial_discard_grants_partial_blades() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let stage = game.id("LL-bp2-001-R+");
+    let hand1 = game.new_id("LL-bp2-001-R+");
+    let hand2 = game.new_id("LL-bp2-001-R+");
+    let hand3 = game.new_id("LL-bp2-001-R+");
+    let live = game.id("PL!-sd1-020-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage[1] = stage;
+    game.give_energy(15);
+    game.state.player1.hand.cards.push(hand1);
+    game.state.player1.hand.cards.push(hand2);
+    game.state.player1.hand.cards.push(hand3);
+    game.state.player1.hand.cards.push(live);
+    game.state.player1.hand.cards.push(filler);
+    for _ in 0..10 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..10 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    advance_to_live_start(&mut game);
+
+    assert!(game.has_pending_choice(), "Optional cost should appear");
+    game.select_indices(&[0]);
+    assert!(game.has_pending_choice(), "Re-prompt should appear");
+    game.select_indices(&[]);
+
+    let blade = game
+        .state
+        .mods
+        .blade_modifiers
+        .get(&stage)
+        .map_or(0, rabuka_engine::core::game_modifiers::ModifierEntry::total);
+    assert_eq!(blade, 1, "1 card discarded → 1 blade, got {}", blade);
 }

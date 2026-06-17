@@ -1443,6 +1443,12 @@ impl Card {
         self.blade_heart.is_some()
     }
 
+    pub fn has_score_icon(&self) -> bool {
+        self.special_heart
+            .as_ref()
+            .is_some_and(|sh| sh.hearts.contains_key(&HeartColor::Score))
+    }
+
     /// Check if a given need_heart is satisfied by provided hearts.
     /// This is identical to satisfies_heart_requirement but allows an
     /// externally-adjusted need_heart (e.g. with modifiers applied).

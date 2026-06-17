@@ -624,8 +624,6 @@ impl super::resolver::AbilityResolver {
                                 Some(available_idxs)
                             })
                             .target_player_id(Some(target.clone()))
-                            .blind(blind)
-                            .is_reveal(is_reveal)
                             .build(),
                         );
                         self.store_pending_choice(gs);
@@ -640,6 +638,17 @@ impl super::resolver::AbilityResolver {
                         let available_idxs: Vec<usize> = (0..hand_now.len())
                             .filter(|i| validate_card(hand_now[*i]))
                             .collect();
+                        if available_idxs.is_empty() && !self.moved_cards.is_empty() {
+                            let final_count = self.moved_cards.len() as u32;
+                            gs.mods.last_cost_discard_count = final_count;
+                            gs.recently_moved_cards = Some(self.moved_cards.clone());
+                            if let Some(entry) = gs.ability_queue.current_entry_mut() {
+                                entry.cost_paid = true;
+                                entry.optional_cost_result = Some(true);
+                            }
+                            self.pending_choice = None;
+                            return Ok(());
+                        }
                         self.pending_choice = Some(
                             Choice::select_cards(
                                 Zone::Hand.to_str(),

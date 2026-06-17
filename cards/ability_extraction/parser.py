@@ -7712,7 +7712,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     cond["negation"] = True
                     fix_stats["card_property"] += 1
 
-            # 8c: Enrich temporal_condition with aggregate
+            # 8d: Enrich temporal_condition with aggregate
             if cond.get("type") == "temporal_condition":
                 changed = False
                 hc = len(re.findall(r"\{\{heart_\d+\.png", ct))
@@ -7741,6 +7741,15 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                     fix_stats["temporal"] += 1
 
             # Remove check_self (reference doesn't have it)
+
+        # FIX 8e: card_property: has_score_icon for effects selecting cards with score icon
+        if "{{icon_score.png|スコア}}を持つ" in t and eff.get("action") in (
+            "move_cards",
+            "select",
+        ):
+            if not eff.get("card_property"):
+                eff["card_property"] = "has_score_icon"
+                fix_stats["card_property"] += 1
 
         # FIX 9: Result condition enrichment in conditional_on_result
         rc = eff.get("result_condition")

@@ -809,6 +809,11 @@ impl<'a> CardFilter<'a> {
                         return false;
                     }
                 }
+                "has_score_icon" => {
+                    if !db.get_card(id).is_some_and(|c| c.has_score_icon()) {
+                        return false;
+                    }
+                }
                 _ => {
                     // Unknown property — reject since we can't verify it
                     return false;

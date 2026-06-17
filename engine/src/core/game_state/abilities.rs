@@ -66,7 +66,11 @@ impl GameState {
         AbilityQueueEntry {
             id: AbilityId::new(&card_no, ability_index, &format!("{:?}", trigger_type)),
             card_no,
-            player_id,
+            player_id: match player_id.as_str() {
+                "player1" => "p1".to_string(),
+                "player2" => "p2".to_string(),
+                other => other.to_string(),
+            },
             ability,
             ability_index,
             card_id,
@@ -387,7 +391,12 @@ impl GameState {
 
     /// Internal: Process all standby abilities for a single player.
     /// Stops early if an ability creates a pending choice.
-    fn process_player_abilities(&mut self, player_id: &str) {
+    fn process_player_abilities(&mut self, raw_player_id: &str) {
+        let player_id = match raw_player_id {
+            "player1" => "p1",
+            "player2" => "p2",
+            other => other,
+        };
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
             eprintln!(
                 "[QUEUE_DIAG] process_player_abilities player={} queue_len={}",
@@ -502,7 +511,12 @@ impl GameState {
         }
     }
 
-    pub fn process_pending_auto_abilities(&mut self, active_player_id: &str) {
+    pub fn process_pending_auto_abilities(&mut self, raw_player_id: &str) {
+        let active_player_id = match raw_player_id {
+            "player1" => "p1",
+            "player2" => "p2",
+            other => other,
+        };
         // Rule 9.5.3.2: Active player resolves ALL their standby abilities first
         // (one at a time, back to rule processing between each)
         self.process_player_abilities(active_player_id);

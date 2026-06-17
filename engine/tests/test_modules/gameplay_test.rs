@@ -3299,3 +3299,90 @@ fn kanon_activation_choice_condition_wait_option() {
         "Kanon should be in wait state"
     );
 }
+
+// ── Hanamaru: activation ability filters by score icon in discard ──
+
+#[test]
+fn hanamaru_score_icon_filter() {
+    use rabuka_engine::ability::types::Choice;
+    use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let hanamaru = game.id("PL!S-sd1-007-SD");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Aqours live card WITH score icon → should be selectable
+    let score_live = game.id("PL!S-bp2-024-L");
+    // Aqours live card WITHOUT score icon → should NOT be selectable
+    let no_score_live = game.id("PL!S-bp2-026-L");
+    // Member card from same series → should NOT be selectable
+    let member = game.id("PL!S-bp2-015-PR");
+
+    // Hand: hanamaru + 2 cards to discard for cost
+    game.state.player1.hand.cards.push(hanamaru);
+    game.state.player1.hand.cards.push(filler);
+    game.state.player1.hand.cards.push(filler);
+
+    // Discard: one score live, one non-score live, one member
+    game.state.player1.waitroom.cards.push(score_live);
+    game.state.player1.waitroom.cards.push(no_score_live);
+    game.state.player1.waitroom.cards.push(member);
+
+    game.give_energy(15);
+
+    // Manually place hanamaru on stage
+    game.state.player1.stage.stage[0] = hanamaru;
+    game.state.player1.hand.cards.retain(|id| *id != hanamaru);
+
+    // Verify the card has the ability with card_property: has_score_icon
+    {
+        let card_data = game.state.card_database.get_card(hanamaru).unwrap();
+        let has_ability = card_data.abilities.iter().any(|a| {
+            a.effect
+                .as_ref()
+                .is_some_and(|e| e.card_property.as_deref() == Some("has_score_icon"))
+        });
+        assert!(
+            has_ability,
+            "hanamaru must have ability with card_property=has_score_icon"
+        );
+    }
+
+    // Activate 起動 ability
+    game.activate_ability(hanamaru);
+
+    // Cost: Select 2 cards from hand to discard
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "Cost: select 2 cards from hand"
+    );
+    game.select_indices(&[0, 1]);
+
+    // No pending choice — exactly 1 candidate matched (score_live), so auto-selected.
+    assert!(
+        !game.has_pending_choice(),
+        "Effect should auto-select when exactly 1 card matches filter"
+    );
+
+    // Verify: score_live moved from waitroom to hand
+    assert!(
+        !game.state.player1.waitroom.cards.contains(&score_live),
+        "score icon live card should have been moved out of discard"
+    );
+    assert!(
+        game.state.player1.hand.cards.contains(&score_live),
+        "score icon live card should be in hand"
+    );
+
+    // Verify: non-score live and member remain in discard
+    assert!(
+        game.state.player1.waitroom.cards.contains(&no_score_live),
+        "non-score live card should remain in discard"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&member),
+        "member card should remain in discard"
+    );
+}

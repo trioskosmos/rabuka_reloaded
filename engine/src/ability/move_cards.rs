@@ -686,6 +686,7 @@ impl AbilityResolver {
                 filter.need_heart_total = effect.need_heart_total;
                 filter.need_heart_operator = effect.need_heart_operator.as_deref();
                 filter.need_heart_color = effect.need_heart_color.as_deref();
+                filter.card_property = effect.card_property.as_deref();
                 log::debug!(
                     "[NEED_HEART] filter: color={:?} total={:?} op={:?} src={:?} card_type={:?}",
                     filter.need_heart_color,
