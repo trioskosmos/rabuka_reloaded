@@ -3138,3 +3138,164 @@ fn revealed_cards_filtered_by_player_ownership() {
         "P1's card should be selectable"
     );
 }
+
+// ── choice_condition cost shows proper option labels ──
+
+#[test]
+fn choice_condition_shows_proper_labels_in_actions() {
+    use rabuka_engine::ability::types::Choice;
+    use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    // Inject a choice_condition SelectTarget with option labels
+    let choice = Choice::SelectTarget {
+        target: "choice_condition".to_string(),
+        description: "Choose cost option: このメンバーをウェイトにする OR 手札を1枚控え室に置く"
+            .to_string(),
+        allow_skip: false,
+        options: Some(vec![
+            "このメンバーをウェイトにする".to_string(),
+            "手札を1枚控え室に置く".to_string(),
+        ]),
+    };
+    game.state.ability_queue.pause_for_choice(choice);
+
+    // Generate actions and verify they show the actual option labels
+    let actions = generate_possible_actions(&game.state);
+    let option_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == ActionType::ChoiceOption)
+        .collect();
+
+    assert_eq!(option_actions.len(), 2, "Two option buttons");
+    assert!(
+        option_actions[0].description.contains("ウェイトにする"),
+        "First option should be 'wait this member'"
+    );
+    assert!(
+        option_actions[1].description.contains("控え室に置く"),
+        "Second option should be 'discard from hand'"
+    );
+}
+
+// ── Kanon activation: choice_condition cost — discard option creates card selection ──
+
+#[test]
+fn kanon_activation_choice_condition_discard_flow() {
+    use rabuka_engine::game_setup::ActionType;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let kanon = game.id("PL!SP-bp5-001-R+");
+    let filler = game.id("PL!-sd1-010-SD");
+    let cheap = game.id("PL!SP-sd1-019-SD");
+
+    // Put kanon in hand and play to stage
+    game.state.player1.hand.cards.push(kanon);
+    // Add some cards to hand (one for the discard cost option)
+    game.state.player1.hand.cards.push(cheap);
+    game.state.player1.hand.cards.push(filler);
+
+    // Put wait energy — make 5 of 15 wait
+    game.give_energy(15);
+    game.state.player1.energy_zone.active_energy_count = 10;
+
+    // Manually place kanon on stage to avoid triggering debut ability
+    game.state.player1.stage.stage[0] = kanon;
+    game.state.player1.hand.cards.retain(|id| *id != kanon);
+
+    // Activate kanon's 起動 ability
+    game.activate_ability(kanon);
+
+    // Should be a choice_condition with proper labels (not Yes/No)
+    let actions = rabuka_engine::game_setup::generate_possible_actions(&game.state);
+    let option_actions: Vec<_> = actions
+        .iter()
+        .filter(|a| a.action_type == ActionType::ChoiceOption)
+        .collect();
+
+    assert_eq!(
+        option_actions.len(),
+        2,
+        "Two cost options should be shown with their labels"
+    );
+    // Verify we see one of the actual cost option texts
+    let all_descriptions: String = option_actions
+        .iter()
+        .map(|a| a.description.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        all_descriptions.contains("ウェイト") || all_descriptions.contains("wait"),
+        "Option labels should contain the actual cost text"
+    );
+
+    // Select the discard option (index 1 = 手札を1枚控え室に置く)
+    game.select_option(1);
+
+    // Should now show a SelectCard choice to pick which card to discard
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectCard".to_string()),
+        "Discard option should create a card selection prompt"
+    );
+
+    // Select the cheap card to discard
+    game.select_indices(&[0]);
+
+    // Effect should resolve: activate 1 energy
+    assert!(
+        !game.has_pending_choice(),
+        "Effect should resolve after discard"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_energy_count, 11,
+        "One wait energy should be activated"
+    );
+    // The selected card should be in discard (waitroom)
+    assert!(
+        game.state.player1.waitroom.cards.contains(&cheap),
+        "Discarded card should be in waitroom"
+    );
+}
+
+#[test]
+fn kanon_activation_choice_condition_wait_option() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let kanon = game.id("PL!SP-bp5-001-R+");
+
+    game.state.player1.hand.cards.push(kanon);
+    game.give_energy(15);
+    game.state.player1.energy_zone.active_energy_count = 10;
+
+    // Manually place kanon on stage without triggering debut ability
+    game.state.player1.stage.stage[0] = kanon;
+    game.state.player1.hand.cards.retain(|id| *id != kanon);
+
+    // Activate kanon's 起動 ability
+    game.activate_ability(kanon);
+
+    // Select the wait option (index 0 = このメンバーをウェイトにする)
+    game.select_option(0);
+
+    // Effect should resolve: activate 1 energy
+    assert!(
+        !game.has_pending_choice(),
+        "Effect should resolve after paying wait cost"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.active_energy_count, 11,
+        "One wait energy should be activated"
+    );
+    // Kanon should be in wait state
+    assert_eq!(
+        game.state.mods.get_orientation_modifier(kanon),
+        Some(&"wait".to_string()),
+        "Kanon should be in wait state"
+    );
+}

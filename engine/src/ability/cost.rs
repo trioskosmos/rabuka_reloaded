@@ -135,7 +135,7 @@ impl AbilityResolver {
                     target: "choice_condition".to_string(),
                     description: format!("Choose cost option: {}", texts.join(" OR ")),
                     allow_skip: false,
-                    options: None,
+                    options: Some(texts),
                 });
                 if let Some(entry) = gs.ability_queue.current_entry_mut() {
                     entry.choice_card_no = Some(ChoiceRoute::ChoiceCost);

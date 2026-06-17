@@ -447,6 +447,26 @@ fn generate_pending_choice_actions(game_state: &GameState, choice: &Choice) -> V
                     ),
                 ];
             }
+            if target == "choice_condition" {
+                let opts = options.as_ref().map(|v| v.as_slice()).unwrap_or(&[]);
+                if !opts.is_empty() {
+                    return opts
+                        .iter()
+                        .enumerate()
+                        .map(|(i, opt)| {
+                            make_action_params(
+                                ActionType::ChoiceOption,
+                                opt,
+                                ActionParameters {
+                                    card_id: Some(i as i16),
+                                    card_no: Some(i.to_string()),
+                                    ..make_params()
+                                },
+                            )
+                        })
+                        .collect();
+                }
+            }
             vec![
                 make_action_params(
                     ActionType::ChoiceDecision,

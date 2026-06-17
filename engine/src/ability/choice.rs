@@ -2248,8 +2248,17 @@ impl super::resolver::AbilityResolver {
         let idx: usize = selected.parse().unwrap_or(0);
         if let Some(options) = gs.entry_cost().and_then(|c| c.compound.actions.clone()) {
             if idx < options.len() {
-                if let Err(e) = self.pay_cost(gs, &options[idx]) {
-                    log::debug!("Failed to pay cost option: {}", e);
+                // Take the pending SelectTarget so we can detect if pay_cost
+                // creates a new sub-choice (e.g., SelectCard for discard from hand).
+                let old_choice = self.pending_choice.take();
+                self.pay_cost(gs, &options[idx])?;
+                if self.pending_choice.is_some() {
+                    // pay_cost created a sub-choice — signal to preserve it
+                    self.sub_choice_created = true;
+                } else {
+                    // pay_cost resolved immediately — restore original choice
+                    // so clear_choice_state can clean it up properly.
+                    self.pending_choice = old_choice;
                 }
             }
         }

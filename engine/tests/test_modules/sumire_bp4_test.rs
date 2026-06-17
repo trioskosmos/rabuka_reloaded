@@ -107,6 +107,22 @@ fn sumire_q193_q194_baton_touch_draw_and_deploy() {
         3,
         "Q193: Drew 2 cards = hand len 3"
     );
+
+    // Both vacated areas (Left & Center) should be locked after double baton
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::LeftSide),
+        "LeftSide should be locked after double baton"
+    );
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::Center),
+        "Center should be locked after double baton"
+    );
 }
 
 /// Playing WITHOUT baton touch to an EMPTY area — ab#1 should NOT trigger (no draw).
@@ -331,6 +347,22 @@ fn sumire_double_baton_to_left_does_not_activate_debut() {
         hand_len, 1,
         "No draw: ab#1 requires Center position, Sumire is at Left"
     );
+
+    // Both vacated areas (Left & Center) should be locked
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::LeftSide),
+        "LeftSide should be locked after double baton"
+    );
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::Center),
+        "Center should be locked after double baton"
+    );
 }
 
 /// Play without Liella! on stage — no baton touch available, just play normally.
@@ -553,6 +585,22 @@ fn sumire_double_baton_integration_via_string_path() {
         3,
         "Hand: filler + 2 draws from ab#1"
     );
+
+    // Both vacated areas should be locked
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::LeftSide),
+        "LeftSide should be locked after double baton"
+    );
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::Center),
+        "Center should be locked after double baton"
+    );
 }
 
 /// Explicit double baton via card_indices parameter (UI double-baton button path).
@@ -634,6 +682,22 @@ fn sumire_explicit_double_baton_via_card_indices() {
         expected_cost,
         energy_after
     );
+
+    // Both vacated areas (Left & Center) should be locked
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::LeftSide),
+        "LeftSide should be locked after double baton"
+    );
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::Center),
+        "Center should be locked after double baton"
+    );
 }
 
 /// Explicit double baton to non-Center position should NOT trigger ab#1.
@@ -697,4 +761,20 @@ fn sumire_explicit_double_baton_to_left_no_debut() {
     assert_eq!(game.state.player1.stage.stage[0], sumire, "Sumire at Left");
     assert_eq!(game.state.player1.stage.stage[1], -1, "Center empty");
     assert_eq!(game.state.player1.stage.stage[2], -1, "Right empty");
+
+    // Both vacated areas should be locked
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::LeftSide),
+        "LeftSide should be locked after double baton"
+    );
+    assert!(
+        game.state
+            .player1
+            .areas_locked_this_turn
+            .contains(&MemberArea::Center),
+        "Center should be locked after double baton"
+    );
 }

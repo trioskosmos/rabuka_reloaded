@@ -544,6 +544,10 @@ impl super::TurnEngine {
             player.hand.cards.remove(idx);
             // Place card in chosen placement area
             player.stage.stage[area as usize] = card_id;
+            // Re-lock both vacated areas (remove_member_from_stage_with_recycling removed them)
+            for &a in &db_areas {
+                player.areas_locked_this_turn.insert(a);
+            }
             game_state.record_card_movement(card_id);
             // Record 2 baton touches
             for _ in 0..2 {
