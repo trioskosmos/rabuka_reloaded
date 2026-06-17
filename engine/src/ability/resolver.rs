@@ -579,18 +579,34 @@ impl AbilityResolver {
             // effects like "choice" from being shown when the condition fails.
             let pp = gs.player_prefix();
             if effect.condition.is_some() || effect.activation_condition_parsed.is_some() {
-                if self.can_activate_effect(gs, effect) {
-                    gs.rule_log.push(format!("{pp} {card_name}: 条件成立 ✓"));
-                } else {
-                    let cond_text = effect
-                        .condition
+                let passed = self.can_activate_effect(gs, effect);
+                let cond = effect
+                    .condition
+                    .as_ref()
+                    .or_else(|| effect.activation_condition_parsed.as_ref());
+                if let Some(c) = cond {
+                    let cond_type = c
+                        .condition_type
                         .as_ref()
-                        .or_else(|| effect.activation_condition_parsed.as_ref())
-                        .map(|c| c.text.as_str())
-                        .unwrap_or("");
+                        .map(|t| format!("{:?}", t))
+                        .unwrap_or_default();
+                    let detail = match (c.operator.as_deref(), c.count) {
+                        (Some(op), Some(th)) => format!(" {}{} {}", c.text, op, th),
+                        _ => format!(" {}", c.text),
+                    };
+                    let icon = if passed { "✓" } else { "✗" };
                     gs.rule_log.push(format!(
-                        "{pp} {card_name}: 条件不成立 ✗ ({cond_text}) - スキップ"
+                        "{pp} {card_name}: [条件]{}{} {}",
+                        detail,
+                        if !cond_type.is_empty() && cond_type != "OtherwiseCondition" {
+                            format!(" ({})", cond_type)
+                        } else {
+                            String::new()
+                        },
+                        icon,
                     ));
+                }
+                if !passed {
                     // For 起動 (activation) abilities, the player deliberately paid the
                     // cost, so the attempt counts toward the turn limit even when the
                     // effect's condition isn't met.  AUTO-triggered abilities preserve

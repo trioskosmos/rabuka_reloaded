@@ -1,4 +1,5 @@
 use crate::ability::debug::AbDebug;
+use crate::ability_queue::QueueState;
 use crate::card::CardDatabase;
 use crate::game_state::GameState;
 use crate::player::Player;
@@ -22,6 +23,34 @@ pub struct ReplacementEffectDisplay {
     pub player_id: String,
     pub original_event: String,
     pub is_choice_based: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AbilityQueueEntryDisplay {
+    pub card_no: String,
+    pub player_id: String,
+    pub trigger_type: String,
+    pub completed: bool,
+    pub cost_paid: bool,
+    pub effect_started: bool,
+    pub choice_player_id: Option<String>,
+    pub ability_text: String,
+    pub card_id: Option<i16>,
+    pub ability_index: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct DebutTriggerDisplay {
+    pub ability_key: String,
+    pub card_id: i16,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct AbilityApplicationDisplay {
+    pub source_card_id: i16,
+    pub effect_type: String,
+    pub target_card_id: i16,
+    pub amount: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -98,6 +127,18 @@ pub struct PlayerDisplay {
     pub areas_locked_this_turn: Vec<String>,
     #[serde(default)]
     pub debut_count_this_turn: u32,
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub is_first_attacker: bool,
+    #[serde(default)]
+    pub exclusion_zone: ZoneDisplay,
+    #[serde(default)]
+    pub energy_active_count: usize,
+    #[serde(default)]
+    pub stage_hearts: Option<HashMap<String, u32>>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -223,6 +264,118 @@ pub struct GameStateDisplay {
     pub temporary_effects: Vec<TempEffectDisplay>,
     #[serde(default)]
     pub replacement_effects: Vec<ReplacementEffectDisplay>,
+
+    // === New comprehensive fields ===
+    // Ability Queue
+    #[serde(default)]
+    pub ability_queue_state: String,
+    #[serde(default)]
+    pub ability_queue_current_index: usize,
+    #[serde(default)]
+    pub ability_queue_entries: Vec<AbilityQueueEntryDisplay>,
+
+    // RPS
+    #[serde(default)]
+    pub rps_winner: Option<u8>,
+    #[serde(default)]
+    pub player1_rps_choice: Option<i32>,
+    #[serde(default)]
+    pub player2_rps_choice: Option<i32>,
+    #[serde(default)]
+    pub pending_rps_player_id: Option<i32>,
+
+    // Card/Ability Runtime
+    #[serde(default)]
+    pub activating_card: Option<i16>,
+    #[serde(default)]
+    pub activating_ability_index: Option<usize>,
+    #[serde(default)]
+    pub just_completed_ability_key: Option<String>,
+    #[serde(default)]
+    pub turn1_abilities_played: Vec<String>,
+    #[serde(default)]
+    pub turn2_abilities_played: std::collections::HashMap<String, u32>,
+    #[serde(default)]
+    pub card_instance_mapping: std::collections::HashMap<String, u32>,
+    #[serde(default)]
+    pub card_instance_counter: u32,
+
+    // Move Tracking
+    #[serde(default)]
+    pub recently_moved_cards: Vec<i16>,
+    #[serde(default)]
+    pub recently_moved_from_zone: Option<String>,
+    #[serde(default)]
+    pub last_vacated_stage_area: Option<String>,
+    #[serde(default)]
+    pub debut_ability_triggers: Vec<DebutTriggerDisplay>,
+
+    // Live/Cheer
+    #[serde(default)]
+    pub live_cheer_count: u32,
+    #[serde(default)]
+    pub cheer_check_completed: bool,
+    #[serde(default)]
+    pub player1_cheer_blade_heart_count: u32,
+    #[serde(default)]
+    pub player2_cheer_blade_heart_count: u32,
+    #[serde(default)]
+    pub player1_cheer_revealed_cards: Vec<i16>,
+    #[serde(default)]
+    pub player2_cheer_revealed_cards: Vec<i16>,
+    #[serde(default)]
+    pub heart_color_decision_phase: String,
+    #[serde(default)]
+    pub live_owned_hearts: std::collections::HashMap<String, Vec<[String; 2]>>,
+    #[serde(default)]
+    pub opponent_choice_declined: bool,
+    #[serde(default)]
+    pub pending_success_replacement_card_id: Option<i16>,
+    #[serde(default)]
+    pub pending_success_replacement_player_id: Option<String>,
+
+    // Resolution/Misc
+    #[serde(default)]
+    pub resolution_zone_cards: Vec<i16>,
+    #[serde(default)]
+    pub revealed_cost_cards: Vec<i16>,
+    #[serde(default)]
+    pub ability_applications: Vec<AbilityApplicationDisplay>,
+    #[serde(default)]
+    pub effect_creation_counter: u32,
+    #[serde(default)]
+    pub last_state_change_wait_to_active_count: u32,
+
+    // GameModifiers constant* breakdown
+    #[serde(default)]
+    pub constant_blade_bonuses: std::collections::HashMap<i16, i32>,
+    #[serde(default)]
+    pub constant_cost_bonuses: std::collections::HashMap<i16, i32>,
+    #[serde(default)]
+    pub constant_score_bonuses: std::collections::HashMap<i16, i32>,
+    #[serde(default)]
+    pub constant_heart_bonuses:
+        std::collections::HashMap<i16, std::collections::HashMap<String, i32>>,
+    #[serde(default)]
+    pub constant_global_need_heart: Vec<[String; 3]>,
+    #[serde(default)]
+    pub constant_score_sources: Vec<[String; 3]>,
+    #[serde(default)]
+    pub blade_type_modifiers: std::collections::HashMap<i16, String>,
+    #[serde(default)]
+    pub heart_override: std::collections::HashMap<i16, [String; 2]>,
+    #[serde(default)]
+    pub delayed_cannot_active: std::collections::HashMap<i16, u32>,
+    #[serde(default)]
+    pub last_cost_discard_count: u32,
+    #[serde(default)]
+    pub last_cost_energy_count: u32,
+
+    // Cheer/Blade heart tracking
+    #[serde(default)]
+    pub mulligan_selected_indices: Vec<usize>,
+    #[serde(default)]
+    pub live_success_total_score: Option<u32>,
 }
 
 pub fn card_to_display(
@@ -627,6 +780,28 @@ pub fn player_to_display(
         restrictions.push("cannot_activate_members".to_string());
     }
 
+    let stage_hearts_display = player.stage_hearts.as_ref().map(|sh| {
+        sh.hearts
+            .iter()
+            .map(|(color, count)| {
+                let color_str = match color {
+                    crate::card::HeartColor::Heart00 => "heart00",
+                    crate::card::HeartColor::Heart01 => "heart01",
+                    crate::card::HeartColor::Heart02 => "heart02",
+                    crate::card::HeartColor::Heart03 => "heart03",
+                    crate::card::HeartColor::Heart04 => "heart04",
+                    crate::card::HeartColor::Heart05 => "heart05",
+                    crate::card::HeartColor::Heart06 => "heart06",
+                    crate::card::HeartColor::BAll => "b_all",
+                    crate::card::HeartColor::Draw => "draw",
+                    crate::card::HeartColor::Score => "score",
+                    crate::card::HeartColor::All => "all",
+                };
+                (color_str.to_string(), *count)
+            })
+            .collect()
+    });
+
     PlayerDisplay {
         energy: energy_display,
         hand: zone_to_display(&player.hand.cards, card_db),
@@ -720,6 +895,12 @@ pub fn player_to_display(
             .map(|a| format!("{:?}", a))
             .collect(),
         debut_count_this_turn: player.debut_count_this_turn,
+        id: player.id.clone(),
+        name: player.name.clone(),
+        is_first_attacker: player.is_first_attacker,
+        exclusion_zone: zone_to_display(&player.exclusion_zone.cards, card_db),
+        energy_active_count: player.energy_zone.active_energy_count,
+        stage_hearts: stage_hearts_display,
     }
 }
 
@@ -868,6 +1049,93 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
     let turn_phase_str = format!("{:?}", game_state.current_turn_phase);
     let game_result_str = format!("{:?}", game_state.game_result);
 
+    // Ability queue
+    let queue_entries: Vec<AbilityQueueEntryDisplay> = game_state
+        .ability_queue
+        .iter()
+        .map(|entry| {
+            let trigger_str = format!("{:?}", entry.trigger_type);
+            AbilityQueueEntryDisplay {
+                card_no: entry.card_no.clone(),
+                player_id: entry.player_id.clone(),
+                trigger_type: trigger_str,
+                completed: entry.completed,
+                cost_paid: entry.cost_paid,
+                effect_started: entry.effect_started,
+                choice_player_id: entry.choice_player_id.clone(),
+                ability_text: entry.ability.full_text.clone(),
+                card_id: entry.card_id,
+                ability_index: entry.ability_index,
+            }
+        })
+        .collect();
+    let queue_state_str = format!("{:?}", game_state.ability_queue.get_state());
+    let queue_current_idx = match game_state.ability_queue.get_state() {
+        QueueState::Idle => 0,
+        QueueState::WaitingForAutoAbilityChoice { .. } => 0,
+        QueueState::PayingCost { entry_index } => *entry_index,
+        QueueState::WaitingForChoice { entry_index, .. } => *entry_index,
+        QueueState::ExecutingEffect { entry_index } => *entry_index,
+        QueueState::Completed { entry_index } => *entry_index,
+    };
+
+    // Debut triggers
+    let debut_triggers: Vec<DebutTriggerDisplay> = game_state
+        .debut_ability_triggers
+        .iter()
+        .map(|(key, cid)| DebutTriggerDisplay {
+            ability_key: key.clone(),
+            card_id: *cid,
+        })
+        .collect();
+
+    // Ability applications
+    let ability_apps: Vec<AbilityApplicationDisplay> = game_state
+        .ability_applications
+        .iter()
+        .map(|app| AbilityApplicationDisplay {
+            source_card_id: app.source_card_id,
+            effect_type: app.effect_type.clone(),
+            target_card_id: app.target_card_id,
+            amount: app.amount,
+        })
+        .collect();
+
+    // Live owned hearts: HashMap<String, Vec<(String, u32)>> -> HashMap<String, Vec<[String; 2]>>
+    let live_owned: HashMap<String, Vec<[String; 2]>> = game_state
+        .live_owned_hearts
+        .iter()
+        .map(|(pid, pairs)| {
+            let converted: Vec<[String; 2]> = pairs
+                .iter()
+                .map(|(color, count)| [color.clone(), count.to_string()])
+                .collect();
+            (pid.clone(), converted)
+        })
+        .collect();
+
+    // Constant heart bonuses: HashMap<i16, HashMap<String, i32>>
+    let const_heart: HashMap<i16, HashMap<String, i32>> = game_state
+        .mods
+        .constant_heart_bonuses
+        .iter()
+        .map(|(cid, map)| (*cid, map.clone()))
+        .collect();
+
+    // Delayed cannot active: HashMap<i16, u32>
+    let delayed_cannot: HashMap<i16, u32> = game_state.mods.delayed_cannot_active.clone();
+
+    // Last vacated stage area
+    let last_vacated = game_state.last_vacated_stage_area.map(|idx| match idx {
+        0 => "LeftSide".to_string(),
+        1 => "Center".to_string(),
+        2 => "RightSide".to_string(),
+        _ => format!("Slot{}", idx),
+    });
+
+    // Mulligan indices
+    let mulligan_indices: Vec<usize> = game_state.mulligan_selected_indices.clone();
+
     GameStateDisplay {
         turn: game_state.turn_number,
         phase: format!("{:?}", game_state.current_phase),
@@ -973,5 +1241,78 @@ pub fn game_state_to_display(game_state: &GameState) -> GameStateDisplay {
         negated_abilities: game_state.negated_abilities.iter().copied().collect(),
         temporary_effects: temp_effects,
         replacement_effects: repl_effects,
+        ability_queue_state: queue_state_str,
+        ability_queue_current_index: queue_current_idx,
+        ability_queue_entries: queue_entries,
+        rps_winner: game_state.rps_winner,
+        player1_rps_choice: game_state.player1_rps_choice,
+        player2_rps_choice: game_state.player2_rps_choice,
+        pending_rps_player_id: game_state.pending_rps_player_id,
+        activating_card: game_state.activating_card,
+        activating_ability_index: game_state.activating_ability_index,
+        just_completed_ability_key: game_state.just_completed_ability_key.clone(),
+        turn1_abilities_played: game_state.turn1_abilities_played.iter().cloned().collect(),
+        turn2_abilities_played: game_state.turn2_abilities_played.clone(),
+        card_instance_mapping: game_state
+            .card_instance_mapping
+            .iter()
+            .map(|(k, v)| (k.to_string(), *v))
+            .collect(),
+        card_instance_counter: game_state.card_instance_counter,
+        recently_moved_cards: game_state.recently_moved_cards.clone().unwrap_or_default(),
+        recently_moved_from_zone: game_state.recently_moved_from_zone.clone(),
+        last_vacated_stage_area: last_vacated,
+        debut_ability_triggers: debut_triggers,
+        live_cheer_count: game_state.live_cheer_count,
+        cheer_check_completed: game_state.cheer_check_completed,
+        player1_cheer_blade_heart_count: game_state.player1_cheer_blade_heart_count,
+        player2_cheer_blade_heart_count: game_state.player2_cheer_blade_heart_count,
+        player1_cheer_revealed_cards: game_state.player1_cheer_revealed_cards.clone(),
+        player2_cheer_revealed_cards: game_state.player2_cheer_revealed_cards.clone(),
+        heart_color_decision_phase: game_state.heart_color_decision_phase.clone(),
+        live_owned_hearts: live_owned,
+        opponent_choice_declined: game_state.opponent_choice_declined,
+        pending_success_replacement_card_id: game_state.pending_success_replacement_card_id,
+        pending_success_replacement_player_id: game_state
+            .pending_success_replacement_player_id
+            .clone(),
+        resolution_zone_cards: game_state.resolution_zone.cards.iter().copied().collect(),
+        revealed_cost_cards: game_state.revealed_cost_cards.clone(),
+        ability_applications: ability_apps,
+        effect_creation_counter: game_state.effect_creation_counter,
+        last_state_change_wait_to_active_count: game_state.last_state_change_wait_to_active_count,
+        constant_blade_bonuses: game_state.mods.constant_blade_bonuses.clone(),
+        constant_cost_bonuses: game_state.mods.constant_cost_bonuses.clone(),
+        constant_score_bonuses: game_state.mods.constant_score_bonuses.clone(),
+        constant_heart_bonuses: const_heart,
+        constant_global_need_heart: game_state
+            .mods
+            .constant_global_need_heart
+            .iter()
+            .map(|(cid, s, v)| [cid.to_string(), s.clone(), v.to_string()])
+            .collect(),
+        constant_score_sources: game_state
+            .mods
+            .constant_score_sources
+            .iter()
+            .map(|(cid, s, v)| [cid.to_string(), s.clone(), v.to_string()])
+            .collect(),
+        blade_type_modifiers: game_state
+            .mods
+            .blade_type_modifiers
+            .iter()
+            .map(|(k, v)| (*k, format!("{:?}", v)))
+            .collect(),
+        heart_override: game_state
+            .mods
+            .heart_override
+            .iter()
+            .map(|(k, (hc, v))| (*k, [format!("{:?}", hc), v.to_string()]))
+            .collect(),
+        delayed_cannot_active: delayed_cannot,
+        last_cost_discard_count: game_state.mods.last_cost_discard_count,
+        last_cost_energy_count: game_state.mods.last_cost_energy_count,
+        mulligan_selected_indices: mulligan_indices,
+        live_success_total_score: None,
     }
 }

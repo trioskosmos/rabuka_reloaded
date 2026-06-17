@@ -23,8 +23,13 @@ impl AbilityResolver {
         heart_colors: &[String],
     ) -> Result<(), String> {
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}", 
-                value, target, operation, effect.condition.is_some());
+            eprintln!(
+                "[SCORE_DIAG] execute_modify_score called: value={} target={} op={} condition={:?}",
+                value,
+                target,
+                operation,
+                effect.condition.is_some()
+            );
         }
         let operation = operation.to_string();
         let target = target.to_string();

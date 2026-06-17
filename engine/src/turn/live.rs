@@ -503,12 +503,26 @@ impl super::TurnEngine {
             game_state.self_no_excess_heart_this_turn = p1_surplus == 0;
         }
 
-        // Push snapshots to rule log
+        // Push performance summary to rule log
         let card_db = game_state.card_database.clone();
         for snap in &game_state.performance_snapshots {
-            for line in snapshot_to_rule_log(snap, &card_db) {
-                game_state.rule_log.push(line);
+            let player = fmt_player_id(&snap.player_id);
+            let mut live_details = String::new();
+            for (i, live) in snap.lives.iter().enumerate() {
+                let live_result = if live.passed { "PASS" } else { "FAIL" };
+                if i > 0 {
+                    live_details.push_str(", ");
+                }
+                let _ = std::fmt::Write::write_fmt(
+                    &mut live_details,
+                    format_args!("live score+{} → {}", live.score, live_result),
+                );
             }
+            let perf_result = if snap.success { "PASS" } else { "FAIL" };
+            game_state.rule_log.push(format!(
+                "[Turn {}] {} Performance: total_score={} {} [{}]",
+                snap.turn, player, snap.total_score, perf_result, live_details,
+            ));
         }
 
         Self::move_restricted_cards_to_discard(&mut game_state.player1, &card_db);

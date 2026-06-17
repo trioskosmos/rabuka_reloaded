@@ -290,6 +290,35 @@
     background: rgba(245, 158, 11, 0.1);
 }
 
+/* Zone card chip type colors */
+.zone-card-chip.member { background: rgba(74, 158, 255, 0.15); color: #7dd3fc; }
+.zone-card-chip.live { background: rgba(255, 85, 170, 0.15); color: #f9a8d4; }
+.zone-card-chip.energy { background: rgba(46, 204, 113, 0.15); color: #6ee7b7; }
+
+/* Generic badge style (for orientations, states) */
+.gs-card-slot .badge, .badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    padding: 0 4px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-dim);
+}
+.gs-card-slot .badge.active-state, .badge.active-state { background: rgba(74, 222, 128, 0.2); color: #4ade80; }
+.gs-card-slot .badge.wait-state, .badge.wait-state { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+.gs-card-slot .badge.moved, .badge.moved { background: rgba(250, 204, 21, 0.2); color: #facc15; }
+.gs-card-slot .badge.negated, .badge.negated { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.gs-card-slot .badge.member, .badge.member { background: rgba(74, 158, 255, 0.2); color: #7dd3fc; }
+.gs-card-slot .badge.live, .badge.live { background: rgba(255, 85, 170, 0.2); color: #f9a8d4; }
+.gs-card-slot .badge.energy, .badge.energy { background: rgba(46, 204, 113, 0.2); color: #6ee7b7; }
+
+/* Ability queue entry highlight */
+.gs-track-item.highlight-queue {
+    background: rgba(245, 158, 11, 0.08);
+    border-left: 2px solid var(--accent-gold);
+    padding: 2px 6px;
+}
+
 /* Section header button style */
 .log-container h3 .gs-btn {
     float: right;

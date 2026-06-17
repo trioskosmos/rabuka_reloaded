@@ -46,6 +46,30 @@ impl AbilityResolver {
             gs.non_stackable_effects.insert(effect_key);
         }
 
+        // Log effect execution to rule_log
+        // Log effect execution to rule_log (skip compound/dispatch-only types
+        // whose sub-actions log individually, to avoid duplicates).
+        if !effect.text.is_empty()
+            && !matches!(
+                effect.action.as_str(),
+                "compound_action"
+                    | "sequential"
+                    | "choice"
+                    | "conditional_alternative"
+                    | "conditional_on_result"
+                    | "conditional_on_optional"
+            )
+        {
+            let pp = gs.player_prefix();
+            let card_name = gs
+                .activating_card
+                .and_then(|id| gs.card_database.get_card(id))
+                .map(|c| c.name.clone())
+                .unwrap_or_default();
+            gs.rule_log
+                .push(format!("{pp} {card_name}: [effect] {}", effect.text));
+        }
+
         // Legacy opponent_action wrapper (pre-parser-flatten). Flat effects
         // carry target="opponent" directly and dispatch via ActionType.
         if effect.action == "opponent_action" {
@@ -142,8 +166,12 @@ impl AbilityResolver {
         // Convert string action to typed enum for stronger dispatch
         let action_type = ActionType::from_str(&action_str).unwrap_or(ActionType::Custom);
         if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
-            eprintln!("[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}", 
-                action_type, effect.effect_steps.is_some(), effect.compound.actions.is_some());
+            eprintln!(
+                "[EXEC_ACTION] action_type={:?} has_steps={} has_actions={}",
+                action_type,
+                effect.effect_steps.is_some(),
+                effect.compound.actions.is_some()
+            );
         }
 
         // Sequential and LookAndSelect both route through the generic
@@ -297,11 +325,10 @@ impl AbilityResolver {
             }
             ActionType::SetHeartType => {
                 let is_self_target = effect.self_target.unwrap_or(false);
-                let needs_target = !is_self_target && (
-                    effect.heart_selection.unwrap_or(false) ||
-                    effect.group_names.is_some() ||
-                    effect.card_type.as_deref() == Some("member_card")
-                );
+                let needs_target = !is_self_target
+                    && (effect.heart_selection.unwrap_or(false)
+                        || effect.group_names.is_some()
+                        || effect.card_type.as_deref() == Some("member_card"));
                 let heart_type = effect
                     .heart_type
                     .as_deref()
@@ -321,18 +348,17 @@ impl AbilityResolver {
                     let target = effect.target_name();
                     let stage_ids: Vec<i16> = {
                         let p = gs.resolve_target_player(target);
-                        p.stage.stage.iter().copied().filter(|&id| id != -1).collect()
+                        p.stage
+                            .stage
+                            .iter()
+                            .copied()
+                            .filter(|&id| id != -1)
+                            .collect()
                     };
                     let card_db = self.card_db();
                     let filter = effect.filter_subset();
                     let candidates = util::matching_ids_filtered(
-                        &stage_ids,
-                        &card_db,
-                        &filter,
-                        true,
-                        None,
-                        None,
-                        None,
+                        &stage_ids, &card_db, &filter, true, None, None, None,
                     );
                     if candidates.is_empty() {
                         // No eligible targets — no-op
@@ -475,9 +501,10 @@ impl AbilityResolver {
                     if !has_empty_slot {
                         return Ok(());
                     }
-                    let pos = gs.activating_card.and_then(|c| {
-                        player.stage.stage.iter().position(|&id| id == c)
-                    }).unwrap_or(1);
+                    let pos = gs
+                        .activating_card
+                        .and_then(|c| player.stage.stage.iter().position(|&id| id == c))
+                        .unwrap_or(1);
                     let area = match pos {
                         0 => crate::zones::MemberArea::LeftSide,
                         1 => crate::zones::MemberArea::Center,
@@ -503,7 +530,8 @@ impl AbilityResolver {
                     }
                     b = b.cost_limit(effect.cost_limit, effect.cost_limit_operator.clone());
                     self.pending_choice = Some(b.build());
-                    self.execution_context = super::types::ExecutionContext::SingleEffect { effect_index: 0 };
+                    self.execution_context =
+                        super::types::ExecutionContext::SingleEffect { effect_index: 0 };
                 } else if effect.source.as_deref() == Some("under_member")
                     && effect.destination.as_deref() == Some("energy_deck")
                 {

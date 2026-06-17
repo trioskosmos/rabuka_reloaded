@@ -3,53 +3,79 @@ import { ModalManager } from '../utils/ModalManager.js';
 import { Tooltips } from '../ui_tooltips.js';
 import * as i18n from '../i18n/index.js';
 
-const HEART_COLORS = ['Smile', 'Pure', 'Cool', 'Green', 'Blue', 'Purple', 'Wildcard'];
+const HEART_NAMES = ['Smile', 'Pure', 'Cool', 'Green', 'Blue', 'Purple', 'Wildcard', 'All'];
 
-function escapeHtml(v) {
+function esc(v) {
     return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function cardName(id) {
-    const card = State.resolveCardData(id);
-    return card ? card.name || card.card_no || `#${id}` : `#${id}`;
+    const c = State.resolveCardData(id);
+    return c ? c.name || c.card_no || `#${id}` : `#${id}`;
 }
 
-function cardNo(id) {
-    const card = State.resolveCardData(id);
-    return card ? card.card_no || '' : '';
+function cardTypeClass(t) {
+    const m = { Member: 'member', Live: 'live', Energy: 'energy' };
+    return m[t] || 'member';
 }
 
-function boolYes(v) { return v ? 'Yes' : 'No'; }
-function boolVal(v) { return v ? 'true' : 'false'; }
+function bool(v) { return v ? 'Yes' : 'No'; }
 
-function section(title, content, badge) {
-    const sec = document.createElement('div');
-    sec.className = 'gs-section';
-    const hdr = document.createElement('div');
-    hdr.className = 'gs-section-header';
-    hdr.textContent = title;
-    if (badge !== undefined) {
-        const b = document.createElement('span');
-        b.className = 'gs-badge';
-        b.textContent = badge;
-        hdr.appendChild(b);
-    }
-    sec.appendChild(hdr);
-    if (typeof content === 'string') {
-        sec.insertAdjacentHTML('beforeend', content);
-    } else {
-        sec.appendChild(content);
-    }
-    return sec;
+function section(title, content) {
+    const s = document.createElement('div'); s.className = 'gs-section';
+    const h = document.createElement('div'); h.className = 'gs-section-header'; h.textContent = title;
+    s.appendChild(h);
+    if (typeof content === 'string') s.insertAdjacentHTML('beforeend', content);
+    else s.appendChild(content);
+    return s;
 }
 
-function gridItem(label, value, valueClass) {
-    const cls = valueClass ? `gs-value ${valueClass}` : 'gs-value';
-    return `<div class="gs-grid-item"><span class="gs-label">${escapeHtml(label)}</span><span class="${cls}">${escapeHtml(String(value))}</span></div>`;
+function grid(items) {
+    return `<div class="gs-grid">${items.map(([l, v, c]) => {
+        const cls = c ? `gs-value ${c}` : 'gs-value';
+        return `<div class="gs-grid-item"><span class="gs-label">${esc(l)}</span><span class="${cls}">${esc(String(v ?? ''))}</span></div>`;
+    }).join('')}</div>`;
 }
 
-function kvRows(map) {
-    return map.map(([k, v]) => `<div class="gs-track-item"><div class="track-kv"><span>${escapeHtml(k)}</span><span class="tv">${escapeHtml(String(v ?? ''))}</span></div></div>`).join('');
+function trackKV(items) {
+    return items.map(([k, v]) =>
+        `<div class="gs-track-item"><div class="track-kv"><span>${esc(k)}</span><span class="tv">${esc(String(v ?? ''))}</span></div></div>`
+    ).join('');
+}
+
+function mkBox(title, html) {
+    return `<div class="gs-tracking-box"><h4>${esc(title)}</h4>${html}</div>`;
+}
+
+function chip(name, cls) {
+    return `<span class="zone-card-chip ${cls || ''}">${esc(name)}</span>`;
+}
+
+function renderCardSlot(slot, prefix, state) {
+    if (!slot) return `<div class="gs-card-slot"><span class="card-sub">${prefix}: empty</span></div>`;
+    const orient = slot.orientation || 'Active';
+    const orientCls = orient === 'Wait' ? 'badge wait-state' : 'badge active-state';
+    const baseCost = slot.cost ?? '?';
+    const bonusCost = slot.bonus_cost ?? 0;
+    const effCost = baseCost !== '?' ? Math.max(0, (baseCost + bonusCost)) : '?';
+    const moved = (state.cards_moved_this_turn || []).includes(slot.id);
+    const negated = (state.negated_abilities || []).includes(slot.id);
+    const typeCls = cardTypeClass(slot.type);
+    let badges = `<span class="${orientCls}">${orient}</span>`;
+    if (moved) badges += ` <span class="badge moved">moved</span>`;
+    if (negated) badges += ` <span class="badge negated">negated</span>`;
+    const heartStr = slot.base_heart && typeof slot.base_heart === 'object'
+        ? Object.entries(slot.base_heart).filter(([_, c]) => c > 0).map(([col, c]) => `${col}:${c}`).join(' ')
+        : '';
+    return `<div class="gs-card-slot">
+        <div><span class="card-name">${esc(slot.name || `#${slot.id}`)}</span> ${badges} <span class="badge ${typeCls}">${esc(slot.type)}</span></div>
+        <div class="card-sub">${prefix} · Cost: ${baseCost}${bonusCost !== 0 ? ` (${bonusCost > 0 ? '+' : ''}${bonusCost})` : ''} → ${effCost}</div>
+        <div class="card-sub">Blade: ${slot.total_blade ?? slot.blade ?? 0}${(slot.bonus_blade ?? 0) !== 0 ? ` (${(slot.bonus_blade ?? 0) > 0 ? '+' : ''}${slot.bonus_blade ?? 0})` : ''}</div>
+        ${heartStr ? `<div class="card-hearts">${esc(heartStr)}</div>` : ''}
+        ${(slot.bonus_score ?? 0) !== 0 ? `<div class="card-sub">Score: +${slot.bonus_score}</div>` : ''}
+        ${(slot.bonus_hearts || []).some(h => h !== 0) ? `<div class="card-sub">Heart bonus: [${(slot.bonus_hearts || []).join(', ')}]</div>` : ''}
+        ${slot.heart_transform ? `<div class="card-sub">Heart → ${slot.heart_transform}</div>` : ''}
+    </div>`;
 }
 
 export const GameStateModal = {
@@ -59,145 +85,177 @@ export const GameStateModal = {
         ModalManager.show('game-state-modal');
         GameStateModal.renderAll();
     },
-
-    close: () => {
-        ModalManager.hide('game-state-modal');
-    },
+    close: () => { ModalManager.hide('game-state-modal'); },
 
     showTab: (tab) => {
-        const tabs = ['global', 'player', 'zones', 'tracking'];
-        tabs.forEach(t => {
-            const panel = document.getElementById(`gs-tab-${t}`);
-            const btn = document.querySelector(`.gs-modal-tabs [data-tab="${t}"]`);
-            if (panel) panel.style.display = t === tab ? 'block' : 'none';
-            if (btn) btn.classList.toggle('active', t === tab);
+        ['global', 'player', 'zones', 'tracking'].forEach(t => {
+            const p = document.getElementById(`gs-tab-${t}`);
+            const b = document.querySelector(`.gs-modal-tabs [data-tab="${t}"]`);
+            if (p) p.style.display = t === tab ? 'block' : 'none';
+            if (b) b.classList.toggle('active', t === tab);
         });
         GameStateModal._currentTab = tab;
         GameStateModal.renderAll();
     },
 
     renderAll: () => {
-        const state = State.data;
-        if (!state) return;
-        GameStateModal.renderGlobalTab(state);
-        GameStateModal.renderPlayerTab(state);
-        GameStateModal.renderZonesTab(state);
-        GameStateModal.renderTrackingTab(state);
+        const s = State.data;
+        if (!s) return;
+        GameStateModal.renderGlobalTab(s);
+        GameStateModal.renderPlayerTab(s);
+        GameStateModal.renderZonesTab(s);
+        GameStateModal.renderTrackingTab(s);
     },
 
-    renderGlobalTab: (state) => {
-        const container = document.getElementById('gs-tab-global');
-        if (!container) return;
-        container.innerHTML = '';
+    // ─── Global Tab ──────────────────────────────────────────
+    renderGlobalTab: (s) => {
+        const c = document.getElementById('gs-tab-global');
+        if (!c) return;
+        c.innerHTML = '';
 
-        const items = [];
-
-        // Turn info
         const turnLines = [
-            ['Turn', state.turn ?? '?'],
-            ['Phase', state.phase ?? '?'],
-            ['Turn Phase', state.current_turn_phase ?? '?'],
-            ['Active Player', state.active_player ?? '?'],
-            ['Game Result', state.game_result ?? 'Ongoing'],
-            ['Is First Turn', boolYes(state.is_first_turn)],
-            ['Turn Order Changed', boolYes(state.turn_order_changed)],
+            ['Turn', s.turn], ['Phase', s.phase], ['Turn Phase', s.current_turn_phase],
+            ['Active Player', s.active_player], ['Game Result', s.game_result],
+            ['Is First Turn', bool(s.is_first_turn)], ['Turn Order Changed', bool(s.turn_order_changed)],
+            ['Heart Color Decision', s.heart_color_decision_phase || 'none'],
         ];
-        const turnGrid = turnLines.map(([k, v]) => gridItem(k, v)).join('');
-        items.push(section('Turn', `<div class="gs-grid">${turnGrid}</div>`));
+        c.appendChild(section('Turn', grid(turnLines)));
+
+        // RPS
+        const rpsLines = [
+            ['RPS Winner', s.rps_winner != null ? `P${s.rps_winner}` : 'none'],
+            ['P1 RPS Choice', s.player1_rps_choice != null ? s.player1_rps_choice : 'none'],
+            ['P2 RPS Choice', s.player2_rps_choice != null ? s.player2_rps_choice : 'none'],
+            ['Pending RPS Player', s.pending_rps_player_id != null ? `P${s.pending_rps_player_id}` : 'none'],
+        ];
+        if (s.rps_winner != null || s.player1_rps_choice != null) {
+            c.appendChild(section('RPS', grid(rpsLines)));
+        }
+
+        // Ability Queue state summary
+        const hasQueue = s.ability_queue_entries && s.ability_queue_entries.length > 0;
+        const qLines = [
+            ['Queue State', s.ability_queue_state || 'Idle'],
+            ['Current Index', s.ability_queue_current_index ?? 0],
+            ['Pending Entries', hasQueue ? s.ability_queue_entries.length : 0],
+        ];
+        c.appendChild(section('Ability Queue', grid(qLines)));
+
+        // Activating card
+        const actLines = [
+            ['Activating Card', s.activating_card != null ? cardName(s.activating_card) : 'none'],
+            ['Activating Ability Index', s.activating_ability_index != null ? s.activating_ability_index : 'none'],
+            ['Just Completed Key', s.just_completed_ability_key || 'none'],
+        ];
+        c.appendChild(section('Active Ability', grid(actLines)));
 
         // Baton touch
-        const bt = state;
         const btLines = [
-            ['Baton Touch Count', bt.baton_touch_count ?? 0],
-            ['Zero Cost', boolYes(bt.baton_touch_zero_cost)],
-            ['Replaced Card', bt.baton_touch_replaced_member_id != null ? cardName(bt.baton_touch_replaced_member_id) : 'none'],
-            ['Replaced Cost', bt.baton_touch_replaced_member_cost != null ? bt.baton_touch_replaced_member_cost : 'none'],
-            ['Arriving Card', bt.baton_touch_arriving_card_id != null ? cardName(bt.baton_touch_arriving_card_id) : 'none'],
+            ['Baton Touch Count', s.baton_touch_count ?? 0],
+            ['Zero Cost', bool(s.baton_touch_zero_cost)],
+            ['Replaced', s.baton_touch_replaced_member_id != null ? cardName(s.baton_touch_replaced_member_id) : 'none'],
+            ['Replaced Cost', s.baton_touch_replaced_member_cost != null ? s.baton_touch_replaced_member_cost : 'none'],
+            ['Arriving', s.baton_touch_arriving_card_id != null ? cardName(s.baton_touch_arriving_card_id) : 'none'],
+            ['Last Vacated', s.last_vacated_stage_area || 'none'],
         ];
-        const btGrid = btLines.map(([k, v]) => gridItem(k, v)).join('');
-        items.push(section('Baton Touch', `<div class="gs-grid">${btGrid}</div>`));
+        c.appendChild(section('Baton Touch', grid(btLines)));
 
         // Card tracking
-        const movedNames = (state.cards_moved_this_turn || []).map(id => cardName(id)).join(', ') || 'none';
-        const appearedNames = (state.cards_appeared_this_turn || []).map(id => cardName(id)).join(', ') || 'none';
-        const areasStr = (state.areas_placed_this_turn || []).join(', ') || 'none';
-        const lastMove = state.last_area_move_card_id != null ? `${cardName(state.last_area_move_card_id)} (by ${state.last_area_move_by_player || '?'})` : 'none';
-
         const ctLines = [
-            ['Cards Moved', movedNames],
-            ['Cards Appeared', appearedNames],
-            ['Areas Placed', areasStr],
-            ['Last Area Move', lastMove],
-            ['Last Energy By Effect', boolYes(state.last_energy_placed_by_effect)],
+            ['Cards Moved', (s.cards_moved_this_turn || []).map(id => cardName(id)).join(', ') || 'none'],
+            ['Cards Appeared', (s.cards_appeared_this_turn || []).map(id => cardName(id)).join(', ') || 'none'],
+            ['Areas Placed', (s.areas_placed_this_turn || []).join(', ') || 'none'],
+            ['Recently Moved', (s.recently_moved_cards || []).map(id => cardName(id)).join(', ') || 'none'],
+            ['Recently From', s.recently_moved_from_zone || 'none'],
+            ['Last Move', s.last_area_move_card_id != null ? `${cardName(s.last_area_move_card_id)} (by ${s.last_area_move_by_player || '?'})` : 'none'],
+            ['Energy By Effect', bool(s.last_energy_placed_by_effect)],
         ];
-        const ctGrid = ctLines.map(([k, v]) => gridItem(k, v)).join('');
-        items.push(section('Card Movement', `<div class="gs-grid">${ctGrid}</div>`));
+        c.appendChild(section('Card Movement', grid(ctLines)));
 
         // Flags
-        const flags = [
-            ['Position Changed', boolYes(state.position_change_occurred_this_turn)],
-            ['Formation Changed', boolYes(state.formation_change_occurred_this_turn)],
-            ['Opponent Live Success', boolYes(state.opponent_live_success_this_turn)],
-            ['Opponent No Excess Heart', boolYes(state.opponent_live_no_excess_heart_this_turn)],
-            ['Self No Excess Heart', boolYes(state.self_no_excess_heart_this_turn)],
-            ['Opponent Surplus', state.opponent_live_surplus_count ?? 0],
-            ['Self Surplus', state.self_live_surplus_count ?? 0],
-            ['Live Success Triggered', boolYes(state.live_success_triggered_this_turn)],
-            ['Live Surplus Ready', boolYes(state.live_surplus_ready_this_turn)],
-            ['Live Being Performed', boolYes(state.live_being_performed)],
-            ['Deck Refresh Pending', boolYes(state.deck_refresh_pending)],
-            ['Loop Detected', boolYes(state.loop_detected)],
-            ['Draw State', boolYes(state.draw_state)],
-            ['Cheer Checks', `${state.cheer_checks_done ?? 0}/${state.cheer_checks_required ?? 0}`],
+        const flagLines = [
+            ['Position Changed', bool(s.position_change_occurred_this_turn)],
+            ['Formation Changed', bool(s.formation_change_occurred_this_turn)],
+            ['Opponent Live Success', bool(s.opponent_live_success_this_turn)],
+            ['Opponent No Excess', bool(s.opponent_live_no_excess_heart_this_turn)],
+            ['Self No Excess', bool(s.self_no_excess_heart_this_turn)],
+            ['Opponent Surplus', s.opponent_live_surplus_count ?? 0],
+            ['Self Surplus', s.self_live_surplus_count ?? 0],
+            ['Live Success Triggered', bool(s.live_success_triggered_this_turn)],
+            ['Live Surplus Ready', bool(s.live_surplus_ready_this_turn)],
+            ['Live Being Performed', bool(s.live_being_performed)],
+            ['Deck Refresh', bool(s.deck_refresh_pending)],
+            ['Loop Detected', bool(s.loop_detected)],
+            ['Draw State', bool(s.draw_state)],
+            ['Opponent Choice Declined', bool(s.opponent_choice_declined)],
+            ['Cheer Checks', `${s.cheer_checks_done ?? 0}/${s.cheer_checks_required ?? 0}`],
+            ['Cheer Completed', bool(s.cheer_check_completed)],
+            ['Live Cheer Count', s.live_cheer_count ?? 0],
         ];
-        const flagGrid = flags.map(([k, v]) => gridItem(k, v)).join('');
-        items.push(section('Flags & Live', `<div class="gs-grid">${flagGrid}</div>`));
+        c.appendChild(section('Flags & Live', grid(flagLines)));
 
-        items.forEach(el => container.appendChild(el));
+        // Cheer blade hearts
+        const cheerLines = [
+            ['P1 Cheer Blade Hearts', s.player1_cheer_blade_heart_count ?? 0],
+            ['P2 Cheer Blade Hearts', s.player2_cheer_blade_heart_count ?? 0],
+        ];
+        c.appendChild(section('Cheer Stats', grid(cheerLines)));
+
+        // Resolution zone
+        const resCards = s.resolution_zone_cards || [];
+        if (resCards.length > 0) {
+            c.appendChild(section('Resolution Zone',
+                `<div style="display:flex;flex-wrap:wrap;gap:4px;">${resCards.map(id => chip(cardName(id))).join('')}</div>`));
+        }
+
+        // Mulligan
+        if (s.mulligan_selected_indices && s.mulligan_selected_indices.length > 0) {
+            c.appendChild(section('Mulligan Selected', `<div class="gs-track-item">${s.mulligan_selected_indices.join(', ')}</div>`));
+        }
     },
 
-    renderPlayerTab: (state) => {
-        const container = document.getElementById('gs-tab-player');
-        if (!container) return;
-        container.innerHTML = '';
-
-        if (!state.player1 && !state.player2) {
-            container.textContent = 'No player data';
-            return;
-        }
+    // ─── Player Tab ──────────────────────────────────────────
+    renderPlayerTab: (s) => {
+        const c = document.getElementById('gs-tab-player');
+        if (!c) return;
+        c.innerHTML = '';
+        if (!s.player1 && !s.player2) { c.textContent = 'No player data'; return; }
 
         const cols = document.createElement('div');
         cols.className = 'gs-player-columns';
 
-        [state.player1, state.player2].forEach((p, idx) => {
+        [s.player1, s.player2].forEach((p, idx) => {
             if (!p) return;
             const panel = document.createElement('div');
             panel.className = `gs-player-panel p${idx}`;
-
+            const isMe = idx === State.perspectivePlayer;
             const title = document.createElement('div');
             title.className = 'gs-player-title';
-            const isMe = idx === State.perspectivePlayer;
-            title.innerHTML = `<span>${isMe ? 'You' : 'Opponent'} (P${idx + 1})</span> <span class="gs-badge">${escapeHtml(p.main_deck_count ?? '?')} deck</span>`;
+            title.innerHTML = `<span>${isMe ? 'You' : 'Opponent'} ${esc(p.id || `P${idx + 1}`)}${p.is_first_attacker ? ' ★' : ''}</span> <span class="gs-badge">${p.main_deck_count ?? '?'} deck</span>`;
             panel.appendChild(title);
 
-            // Totals grid
+            // Stats grid
             const tLines = [
                 ['Cost Reduction', p.cost_reduction ?? 0],
-                ['Prevent Baton', boolYes(!!(p.prevent_baton_touch || p.prevent_baton))],
-                ['Debut Count This Turn', p.debut_count_this_turn ?? 0],
+                ['Prevent Baton', bool(!!(p.prevent_baton_touch || p.prevent_baton))],
+                ['Debut Count', p.debut_count_this_turn ?? 0],
                 ['Areas Locked', (p.areas_locked_this_turn || []).join(', ') || 'none'],
+                ['Energy Active', `${p.energy_active_count ?? 0}/${(p.energy?.cards || []).length}`],
             ];
             if (p.total_hearts) {
-                p.total_hearts.forEach((h, ci) => { if (h > 0) tLines.push([`Hearts ${HEART_COLORS[ci] || ci}`, h]); });
+                p.total_hearts.forEach((h, ci) => { if (h > 0) tLines.push([`Hearts ${HEART_NAMES[ci] || ci}`, h]); });
             }
             if (p.live_card_scores) {
                 Object.entries(p.live_card_scores).forEach(([no, sc]) => tLines.push([`Score ${no}`, sc]));
             }
-            const tGrid = tLines.map(([k, v]) => gridItem(k, v)).join('');
-            panel.insertAdjacentHTML('beforeend', `<div class="gs-grid" style="margin-bottom:6px;">${tGrid}</div>`);
+            // Stage hearts
+            if (p.stage_hearts) {
+                Object.entries(p.stage_hearts).forEach(([col, h]) => { if (h > 0) tLines.push([`Stage ${col}`, h]); });
+            }
+            panel.insertAdjacentHTML('beforeend', grid(tLines));
             panel.appendChild(document.createElement('hr'));
 
-            // Stage cards — like board card spacing
+            // Stage cards with per-card gained abilities
             const stage = p.stage;
             if (stage) {
                 const slots = [
@@ -205,72 +263,43 @@ export const GameStateModal = {
                     { label: 'Center', card: stage.center, under: stage.center_under || [] },
                     { label: 'Right', card: stage.right_side, under: stage.right_under || [] },
                 ];
-
                 const cardRow = document.createElement('div');
                 cardRow.className = 'gs-card-row';
-
                 slots.forEach(({ label, card, under }) => {
-                    const slot = document.createElement('div');
-                    slot.className = 'gs-card-slot';
+                    const slotDiv = document.createElement('div');
                     if (!card) {
-                        slot.innerHTML = `<span class="card-sub">${label}: empty</span>`;
+                        slotDiv.innerHTML = `<div class="gs-card-slot"><span class="card-sub">${label}: empty</span></div>`;
                     } else {
-                        const orient = card.orientation || 'Active';
-                        const orientBadge = orient === 'Wait' ? 'wait-state' : 'active-state';
-                        const baseCost = card.cost ?? '?';
-                        const bonusCost = card.bonus_cost ?? 0;
-                        const effectiveCost = baseCost !== '?' ? Math.max(0, (baseCost + bonusCost)) : '?';
-                        const moved = (state.cards_moved_this_turn || []).includes(card.id);
-                        const negated = (state.negated_abilities || []).includes(card.id);
-
-                        let badges = `<span class="card-badge ${orientBadge}">${orient}</span>`;
-                        if (moved) badges += ` <span class="card-badge moved">moved</span>`;
-                        if (negated) badges += ` <span class="card-badge negated">negated</span>`;
-
-                        const heartStr = card.base_heart && typeof card.base_heart === 'object'
-                            ? Object.entries(card.base_heart).filter(([_, c]) => c > 0).map(([col, c]) => `${col}:${c}`).join(' ')
-                            : '';
-
-                        slot.innerHTML = `
-                            <div><span class="card-name">${escapeHtml(card.name || `#${card.id}`)}</span> ${badges}</div>
-                            <div class="card-sub">${label} · Cost: ${baseCost}${bonusCost !== 0 ? ` (${bonusCost > 0 ? '+' : ''}${bonusCost})` : ''} → ${effectiveCost}</div>
-                            <div class="card-sub">Blade: ${card.total_blade ?? card.blade ?? 0}${(card.bonus_blade ?? 0) !== 0 ? ` (${(card.bonus_blade ?? 0) > 0 ? '+' : ''}${card.bonus_blade ?? 0})` : ''}</div>
-                            ${heartStr ? `<div class="card-hearts">${escapeHtml(heartStr)}</div>` : ''}
-                            ${(card.bonus_score ?? 0) !== 0 ? `<div class="card-sub">Score bonus: ${card.bonus_score > 0 ? '+' : ''}${card.bonus_score}</div>` : ''}
-                            ${(card.bonus_hearts || []).some(h => h !== 0) ? `<div class="card-sub">Heart bonus: [${(card.bonus_hearts || []).join(', ')}]</div>` : ''}
-                            ${card.heart_transform ? `<div class="card-sub">Heart → ${card.heart_transform}</div>` : ''}
-                            ${under.length > 0 ? `<div class="card-sub">Under: ${under.map(u => escapeHtml(u.name || `#${u.id}`)).join(', ')}</div>` : ''}
-                        `;
+                        slotDiv.innerHTML = renderCardSlot(card, label, s);
+                        // Append undercards
+                        if (under.length > 0) {
+                            const underDiv = document.createElement('div');
+                            underDiv.style.cssText = 'margin-top:2px;font-size:0.6rem;color:var(--text-muted);';
+                            underDiv.textContent = `Under: ${under.map(u => u.name || `#${u.id}`).join(', ')}`;
+                            slotDiv.appendChild(underDiv);
+                        }
+                        // Per-card gained abilities
+                        const gainedOnThis = (p.gained_abilities || []).filter(a => a.startsWith(`Card#${card.id}:`));
+                        if (gainedOnThis.length > 0) {
+                            const gDiv = document.createElement('div');
+                            gDiv.style.cssText = 'margin-top:2px;font-size:0.6rem;';
+                            gDiv.innerHTML = `<span style="color:var(--accent-gold);">Abilities gained:</span> ${gainedOnThis.map(a => a.replace(/^Card#\d+:\s*/, '')).join(', ')}`;
+                            slotDiv.appendChild(gDiv);
+                        }
+                        // Ability text
+                        if (card.ability_text) {
+                            const aDiv = document.createElement('div');
+                            aDiv.style.cssText = 'margin-top:2px;font-size:0.6rem;color:var(--text-muted);font-style:italic;overflow:hidden;text-overflow:ellipsis;max-height:2.4em;';
+                            aDiv.textContent = card.ability_text;
+                            slotDiv.appendChild(aDiv);
+                        }
                     }
-                    cardRow.appendChild(slot);
+                    cardRow.appendChild(slotDiv);
                 });
                 panel.appendChild(cardRow);
-            } else {
-                panel.insertAdjacentHTML('beforeend', '<div class="card-sub">No stage data</div>');
             }
 
-            // Gained abilities on this player
-            if (p.gained_abilities && p.gained_abilities.length > 0) {
-                const abDiv = document.createElement('div');
-                abDiv.className = 'gs-section';
-                abDiv.style.marginTop = '8px';
-                abDiv.style.padding = '6px 8px';
-                abDiv.style.background = 'rgba(255,255,255,0.03)';
-                abDiv.style.borderRadius = '6px';
-                const abTitle = document.createElement('div');
-                abTitle.style.cssText = 'font-size:0.75rem;font-weight:600;color:var(--accent-gold);margin-bottom:2px;';
-                abTitle.textContent = 'Gained Abilities';
-                abDiv.appendChild(abTitle);
-                p.gained_abilities.forEach(a => {
-                    const el = document.createElement('div');
-                    el.style.cssText = 'font-size:0.65rem;color:var(--text-dim);padding:1px 0;font-family:monospace;';
-                    el.textContent = a;
-                    abDiv.appendChild(el);
-                });
-                panel.appendChild(abDiv);
-            }
-
-            // Active restrictions
+            // Restrictions
             if (p.active_restrictions && p.active_restrictions.length > 0) {
                 const rDiv = document.createElement('div');
                 rDiv.style.cssText = 'margin-top:6px;font-size:0.7rem;';
@@ -278,26 +307,31 @@ export const GameStateModal = {
                 panel.appendChild(rDiv);
             }
 
+            // Exclusion zone count
+            const excCount = p.exclusion_zone?.cards?.length || 0;
+            if (excCount > 0) {
+                const eDiv = document.createElement('div');
+                eDiv.style.cssText = 'margin-top:4px;font-size:0.7rem;color:var(--text-muted);';
+                eDiv.textContent = `Exclusion zone: ${excCount} cards`;
+                panel.appendChild(eDiv);
+            }
+
             cols.appendChild(panel);
         });
-
-        container.appendChild(cols);
+        c.appendChild(cols);
     },
 
-    renderZonesTab: (state) => {
-        const container = document.getElementById('gs-tab-zones');
-        if (!container) return;
-        container.innerHTML = '';
+    // ─── Zones Tab ───────────────────────────────────────────
+    renderZonesTab: (s) => {
+        const c = document.getElementById('gs-tab-zones');
+        if (!c) return;
+        c.innerHTML = '';
+        if (!s.player1 && !s.player2) { c.textContent = 'No zone data'; return; }
 
-        if (!state.player1 && !state.player2) {
-            container.textContent = 'No zone data';
-            return;
-        }
-
-        [state.player1, state.player2].forEach((p, idx) => {
+        [s.player1, s.player2].forEach((p, idx) => {
             if (!p) return;
             const isMe = idx === State.perspectivePlayer;
-            const label = `${isMe ? 'You' : 'Opponent'} (P${idx + 1})`;
+            const label = `${isMe ? 'You' : 'Opponent'} (${p.id || `P${idx + 1}`})`;
 
             const zoneRow = document.createElement('div');
             zoneRow.className = 'gs-zone-row';
@@ -305,147 +339,262 @@ export const GameStateModal = {
             const mkZone = (name, cards, extra) => {
                 const box = document.createElement('div');
                 box.className = 'gs-zone-box';
-                box.innerHTML = `<div class="zone-name"><span>${escapeHtml(name)}</span><span>${extra ?? (cards ? cards.length : 0)}</span></div>`;
+                box.innerHTML = `<div class="zone-name"><span>${esc(name)}</span><span>${extra ?? (cards ? cards.length : 0)}</span></div>`;
                 if (cards && cards.length > 0) {
-                    const chips = document.createElement('div');
-                    chips.className = 'zone-cards';
+                    const chipsDiv = document.createElement('div');
+                    chipsDiv.className = 'zone-cards';
                     cards.forEach(c => {
-                        const chip = document.createElement('span');
-                        chip.className = 'zone-card-chip';
-                        chip.textContent = c.name || `#${c.id}`;
-                        chips.appendChild(chip);
+                        const t = c.type || 'Member';
+                        const chipType = cardTypeClass(t);
+                        const cost = c.cost != null ? ` (cost ${c.cost})` : '';
+                        const orient = c.orientation === 'Wait' ? ' ⏸' : c.orientation === 'Active' ? ' ▶' : '';
+                        chip(c.name || `#${c.id}`, chipType);
+                        const sp = document.createElement('span');
+                        sp.className = `zone-card-chip ${chipType}`;
+                        sp.textContent = `${c.name || `#${c.id}`}${orient}${cost}`;
+                        sp.title = `${t} · ID: ${c.id}`;
+                        chipsDiv.appendChild(sp);
                     });
-                    box.appendChild(chips);
+                    box.appendChild(chipsDiv);
                 }
                 zoneRow.appendChild(box);
             };
 
             mkZone('Main Deck', [], `${p.main_deck_count ?? 0} cards`);
             mkZone('Energy Deck', [], `${p.energy_deck_count ?? 0} cards`);
-            mkZone('Energy', p.energy?.cards || []);
+            // Energy with active/wait split
+            const activeE = (p.energy?.cards || []).filter(c => c.orientation === 'Active');
+            const waitE = (p.energy?.cards || []).filter(c => c.orientation !== 'Active');
+            mkZone('Energy (Active)', activeE, `${activeE.length} active`);
+            mkZone('Energy (Wait)', waitE, `${waitE.length} wait`);
             mkZone('Hand', p.hand?.cards || []);
             mkZone('Waitroom', p.waitroom?.cards || []);
             mkZone('Live Zone', p.live_zone?.cards || []);
             mkZone('Success Zone', p.success_live_card_zone?.cards || []);
+            mkZone('Exclusion', p.exclusion_zone?.cards || []);
 
-            container.appendChild(section(label, zoneRow));
+            c.appendChild(section(label, zoneRow));
         });
 
-        // Resolution zone and looked cards
-        if (state.looked_cards && state.looked_cards.cards && state.looked_cards.cards.length > 0) {
-            const rzRow = document.createElement('div');
-            rzRow.className = 'gs-zone-row';
-            const box = document.createElement('div');
-            box.className = 'gs-zone-box';
-            box.innerHTML = `<div class="zone-name"><span>Looked / Revealed</span><span>${state.looked_cards.cards.length}</span></div>`;
-            const chips = document.createElement('div');
-            chips.className = 'zone-cards';
-            state.looked_cards.cards.forEach(c => {
-                const chip = document.createElement('span');
-                chip.className = 'zone-card-chip';
-                chip.textContent = c.name || `#${c.id}`;
-                chips.appendChild(chip);
+        // Global zones
+        const globalSections = [];
+        if (s.looked_cards && s.looked_cards.cards && s.looked_cards.cards.length > 0) {
+            const row = document.createElement('div'); row.className = 'gs-zone-row';
+            const box = document.createElement('div'); box.className = 'gs-zone-box';
+            box.innerHTML = `<div class="zone-name"><span>Looked / Revealed</span><span>${s.looked_cards.cards.length}</span></div>`;
+            const chips = document.createElement('div'); chips.className = 'zone-cards';
+            s.looked_cards.cards.forEach(c => {
+                const sp = document.createElement('span'); sp.className = 'zone-card-chip';
+                sp.textContent = c.name || `#${c.id}`; chips.appendChild(sp);
             });
-            box.appendChild(chips);
-            rzRow.appendChild(box);
-            container.appendChild(section('Global Zones', rzRow));
+            box.appendChild(chips); row.appendChild(box);
+            globalSections.push(section('Global Zones', row));
         }
+        // Revealed cost cards
+        if (s.revealed_cost_cards && s.revealed_cost_cards.length > 0) {
+            globalSections.push(section('Revealed Cost Cards',
+                `<div style="display:flex;flex-wrap:wrap;gap:4px;">${s.revealed_cost_cards.map(id => chip(cardName(id))).join('')}</div>`));
+        }
+        // Cheer revealed cards
+        if (s.player1_cheer_revealed_cards && s.player1_cheer_revealed_cards.length > 0) {
+            globalSections.push(section('P1 Cheer Revealed',
+                `<div style="display:flex;flex-wrap:wrap;gap:4px;">${s.player1_cheer_revealed_cards.map(id => chip(cardName(id))).join('')}</div>`));
+        }
+        if (s.player2_cheer_revealed_cards && s.player2_cheer_revealed_cards.length > 0) {
+            globalSections.push(section('P2 Cheer Revealed',
+                `<div style="display:flex;flex-wrap:wrap;gap:4px;">${s.player2_cheer_revealed_cards.map(id => chip(cardName(id))).join('')}</div>`));
+        }
+        globalSections.forEach(el => c.appendChild(el));
     },
 
-    renderTrackingTab: (state) => {
-        const container = document.getElementById('gs-tab-tracking');
-        if (!container) return;
-        container.innerHTML = '';
+    // ─── Tracking Tab ────────────────────────────────────────
+    renderTrackingTab: (s) => {
+        const c = document.getElementById('gs-tab-tracking');
+        if (!c) return;
+        c.innerHTML = '';
 
-        const grid = document.createElement('div');
-        grid.className = 'gs-tracking-grid';
+        const gridDiv = document.createElement('div');
+        gridDiv.className = 'gs-tracking-grid';
 
-        const mkBox = (title, rows) => {
-            const box = document.createElement('div');
-            box.className = 'gs-tracking-box';
-            box.insertAdjacentHTML('beforeend', `<h4>${escapeHtml(title)}</h4>`);
-            box.insertAdjacentHTML('beforeend', rows);
-            return box;
-        };
+        // Ability Queue
+        const entries = s.ability_queue_entries || [];
+        let qHtml = `<div class="gs-track-item"><b>State:</b> ${esc(s.ability_queue_state || 'Idle')}, idx=${s.ability_queue_current_index ?? 0}</div>`;
+        if (entries.length > 0) {
+            entries.forEach((e, i) => {
+                const active = i === (s.ability_queue_current_index ?? -1);
+                qHtml += `<div class="gs-track-item" style="${active ? 'background:rgba(245,158,11,0.1);border-left:2px solid var(--accent-gold);' : ''}padding:2px 4px;margin:2px 0;">
+                    <div class="track-kv"><span>#${i} ${esc(e.card_no)}</span><span class="tv">${esc(e.player_id)} · ${esc(e.trigger_type)}</span></div>
+                    <div style="font-size:0.65rem;color:var(--text-dim);">${esc(e.ability_text || '(no text)')}</div>
+                    <div style="font-size:0.6rem;">${['completed','cost_paid','effect_started'].map(f => `${f}:${e[f] ? '✓' : '✗'}`).join(' · ')}${e.choice_player_id ? ` · choice: ${e.choice_player_id}` : ''}</div>
+                </div>`;
+            });
+        } else {
+            qHtml += '<div class="gs-track-item">(empty)</div>';
+        }
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Ability Queue', qHtml));
+
+        // Debut triggers
+        const debuts = s.debut_ability_triggers || [];
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Debut Triggers',
+            debuts.length > 0 ? debuts.map(d => `<div class="gs-track-item">${esc(d.ability_key)} → ${esc(cardName(d.card_id))}</div>`).join('') : '<div class="gs-track-item">none</div>'));
 
         // Turn-limited abilities
-        const turn1 = (state.turn_limited_abilities_used || []);
-        const turn2 = state.turn2_abilities_played || {};
+        const tla = s.turn_limited_abilities_used || [];
+        const tla2 = s.turn2_abilities_played || {};
         let tlaHtml = '';
-        if (turn1.length > 0) tlaHtml += `<div class="gs-track-item">Turn1: ${turn1.join(', ')}</div>`;
-        if (Object.keys(turn2).length > 0) tlaHtml += kvRows(Object.entries(turn2));
+        if (tla.length > 0) tlaHtml += `<div class="gs-track-item">Turn-limited: ${tla.join(', ')}</div>`;
+        if (Object.keys(tla2).length > 0) tlaHtml += trackKV(Object.entries(tla2).map(([k, v]) => [`Turn2: ${k}`, v]));
         if (!tlaHtml) tlaHtml = '<div class="gs-track-item">none</div>';
-        grid.appendChild(mkBox('Turn-Limited Abilities Used', tlaHtml));
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Turn-Limited Abilities', tlaHtml));
+
+        // Turn1 abilities played
+        const t1ap = s.turn1_abilities_played || [];
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Turn1 Abilities',
+            t1ap.length > 0 ? t1ap.map(a => `<div class="gs-track-item">${esc(a)}</div>`).join('') : '<div class="gs-track-item">none</div>'));
 
         // Turn limit usage
-        const tlu = state.turn_limit_usage || {};
-        grid.appendChild(mkBox('Turn Limit Usage', Object.keys(tlu).length > 0 ? kvRows(Object.entries(tlu)) : '<div class="gs-track-item">none</div>'));
+        const tlu = s.turn_limit_usage || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Turn Limit Usage',
+            Object.keys(tlu).length > 0 ? trackKV(Object.entries(tlu)) : '<div class="gs-track-item">none</div>'));
 
-        // Auto ability trigger counts
-        const aatc = state.auto_ability_trigger_counts || {};
-        grid.appendChild(mkBox('Auto Ability Trigger Counts', Object.keys(aatc).length > 0 ? kvRows(Object.entries(aatc)) : '<div class="gs-track-item">none</div>'));
+        // Auto ability triggers
+        const aatc = s.auto_ability_trigger_counts || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Auto Ability Triggers',
+            Object.keys(aatc).length > 0 ? trackKV(Object.entries(aatc)) : '<div class="gs-track-item">none</div>'));
 
-        // Prohibition effects
-        const proh = state.prohibition_effects || [];
-        const dproh = state.delayed_prohibition_effects || [];
-        let prohHtml = '';
-        if (proh.length > 0) prohHtml += proh.map(p => `<div class="gs-track-item">${escapeHtml(p)}</div>`).join('');
-        if (dproh.length > 0) prohHtml += dproh.map(p => `<div class="gs-track-item">[delayed] ${escapeHtml(p)}</div>`).join('');
+        // Prohibitions
+        const proh = s.prohibition_effects || [];
+        const dproh = s.delayed_prohibition_effects || [];
+        let prohHtml = proh.map(p => `<div class="gs-track-item">${esc(p)}</div>`).join('');
+        if (dproh.length > 0) prohHtml += dproh.map(p => `<div class="gs-track-item">[delayed] ${esc(p)}</div>`).join('');
         if (!prohHtml) prohHtml = '<div class="gs-track-item">none</div>';
-        grid.appendChild(mkBox('Prohibition Effects', prohHtml));
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Prohibition Effects', prohHtml));
 
-        // Cannot activate members
-        const ca = state.cannot_activate_members || [];
-        const cca = state.constant_cannot_activate_members || [];
-        let caHtml = '';
-        if (ca.length > 0) caHtml += ca.map(p => `<div class="gs-track-item">${escapeHtml(p)}</div>`).join('');
-        if (cca.length > 0) caHtml += cca.map(p => `<div class="gs-track-item">[constant] ${escapeHtml(p)}</div>`).join('');
+        // Cannot activate
+        const ca = s.cannot_activate_members || [];
+        const cca = s.constant_cannot_activate_members || [];
+        let caHtml = ca.map(p => `<div class="gs-track-item">${esc(p)}</div>`).join('');
+        if (cca.length > 0) caHtml += cca.map(p => `<div class="gs-track-item">[constant] ${esc(p)}</div>`).join('');
         if (!caHtml) caHtml = '<div class="gs-track-item">none</div>';
-        grid.appendChild(mkBox('Cannot Activate Members', caHtml));
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Cannot Activate Members', caHtml));
 
-        // Negated abilities
-        const neg = state.negated_abilities || [];
-        grid.appendChild(mkBox('Negated Card IDs', neg.length > 0 ? neg.map(id => `<div class="gs-track-item">#${id} (${escapeHtml(cardName(id))})</div>`).join('') : '<div class="gs-track-item">none</div>'));
+        // Negated
+        const neg = s.negated_abilities || [];
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Negated Abilities',
+            neg.length > 0 ? neg.map(id => `<div class="gs-track-item">#${id} (${esc(cardName(id))})</div>`).join('') : '<div class="gs-track-item">none</div>'));
 
-        // Non-stackable effects
-        const ns = state.non_stackable_effects || [];
-        grid.appendChild(mkBox('Non-Stackable Effects', ns.length > 0 ? ns.map(e => `<div class="gs-track-item">${escapeHtml(e)}</div>`).join('') : '<div class="gs-track-item">none</div>'));
+        // Non-stackable
+        const ns = s.non_stackable_effects || [];
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Non-Stackable Effects',
+            ns.length > 0 ? ns.map(e => `<div class="gs-track-item">${esc(e)}</div>`).join('') : '<div class="gs-track-item">none</div>'));
 
         // Temporary effects
-        const te = state.temporary_effects || [];
-        let teHtml = '';
-        if (te.length > 0) {
-            te.forEach(e => {
-                teHtml += `<div class="gs-track-item" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:2px 0;">
-                    <div class="track-kv"><span>Type</span><span class="tv">${escapeHtml(e.effect_type)}</span></div>
-                    <div class="track-kv"><span>Duration</span><span class="tv">${escapeHtml(e.duration)}</span></div>
-                    <div class="track-kv"><span>Turn</span><span class="tv">${e.created_turn ?? '?'}</span></div>
-                    <div class="track-kv"><span>Target</span><span class="tv">${escapeHtml(e.target_player_id || '?')}</span></div>
-                    <div class="track-kv" style="color:var(--text-dim);font-size:0.65rem;white-space:normal;word-break:break-all;"><span>${escapeHtml(e.description || '')}</span></div>
-                </div>`;
-            });
-        } else {
-            teHtml = '<div class="gs-track-item">none</div>';
-        }
-        grid.appendChild(mkBox('Temporary Effects', teHtml));
+        const te = s.temporary_effects || [];
+        let teHtml = te.length > 0 ? te.map(e => `
+            <div class="gs-track-item" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:2px 0;">
+                <div class="track-kv"><span>Type</span><span class="tv">${esc(e.effect_type)}</span></div>
+                <div class="track-kv"><span>Duration</span><span class="tv">${esc(e.duration)}</span></div>
+                <div class="track-kv"><span>Turn</span><span class="tv">${e.created_turn ?? '?'}</span></div>
+                <div class="track-kv"><span>Target</span><span class="tv">${esc(e.target_player_id || '?')}</span></div>
+                <div style="color:var(--text-dim);font-size:0.65rem;white-space:normal;word-break:break-all;">${esc(e.description || '')}</div>
+            </div>`).join('') : '<div class="gs-track-item">none</div>';
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Temporary Effects', teHtml));
 
         // Replacement effects
-        const re = state.replacement_effects || [];
-        let reHtml = '';
-        if (re.length > 0) {
-            re.forEach(e => {
-                reHtml += `<div class="gs-track-item" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:2px 0;">
-                    <div class="track-kv"><span>Card</span><span class="tv">${e.card_id != null ? escapeHtml(cardName(e.card_id)) : '?'}</span></div>
-                    <div class="track-kv"><span>Player</span><span class="tv">${escapeHtml(e.player_id || '?')}</span></div>
-                    <div class="track-kv"><span>Event</span><span class="tv">${escapeHtml(e.original_event || '?')}</span></div>
-                    <div class="track-kv"><span>Choice</span><span class="tv">${e.is_choice_based ? 'Yes' : 'No'}</span></div>
-                </div>`;
-            });
-        } else {
-            reHtml = '<div class="gs-track-item">none</div>';
-        }
-        grid.appendChild(mkBox('Replacement Effects', reHtml));
+        const re = s.replacement_effects || [];
+        let reHtml = re.length > 0 ? re.map(e => `
+            <div class="gs-track-item" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:2px 0;">
+                <div class="track-kv"><span>Card</span><span class="tv">${e.card_id != null ? esc(cardName(e.card_id)) : '?'}</span></div>
+                <div class="track-kv"><span>Player</span><span class="tv">${esc(e.player_id || '?')}</span></div>
+                <div class="track-kv"><span>Event</span><span class="tv">${esc(e.original_event || '?')}</span></div>
+                <div class="track-kv"><span>Choice</span><span class="tv">${e.is_choice_based ? 'Yes' : 'No'}</span></div>
+            </div>`).join('') : '<div class="gs-track-item">none</div>';
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Replacement Effects', reHtml));
 
-        container.appendChild(grid);
+        // Ability applications
+        const apps = s.ability_applications || [];
+        let appHtml = apps.length > 0 ? apps.map(a => `
+            <div class="gs-track-item" style="border-bottom:1px solid rgba(255,255,255,0.05);padding:1px 0;">
+                <div class="track-kv"><span>Source</span><span class="tv">${esc(cardName(a.source_card_id))}</span></div>
+                <div class="track-kv"><span>Effect</span><span class="tv">${esc(a.effect_type)}</span></div>
+                <div class="track-kv"><span>Target</span><span class="tv">${esc(cardName(a.target_card_id))}</span></div>
+                <div class="track-kv"><span>Amount</span><span class="tv">${a.amount ?? 0}</span></div>
+            </div>`).join('') : '<div class="gs-track-item">none</div>';
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Ability Applications', appHtml));
+
+        // Card instance mapping
+        const cim = s.card_instance_mapping || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Card Instance Mapping',
+            Object.keys(cim).length > 0 ? trackKV(Object.entries(cim).map(([id, inst]) => [`#${id} (${cardName(parseInt(id))})`, inst])) : '<div class="gs-track-item">none</div>'));
+
+        // Live owned hearts
+        const loh = s.live_owned_hearts || {};
+        let lohHtml = Object.keys(loh).length > 0
+            ? Object.entries(loh).map(([pid, pairs]) =>
+                `<div class="gs-track-item"><b>${esc(pid)}</b>: ${pairs.map(([c, v]) => `${c}:${v}`).join(', ')}</div>`).join('')
+            : '<div class="gs-track-item">none</div>';
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Live Owned Hearts', lohHtml));
+
+        // Pending success replacement
+        const psr = [];
+        if (s.pending_success_replacement_card_id != null) psr.push(['Card', cardName(s.pending_success_replacement_card_id)]);
+        if (s.pending_success_replacement_player_id) psr.push(['Player', s.pending_success_replacement_player_id]);
+        if (psr.length > 0) gridDiv.insertAdjacentHTML('beforeend', mkBox('Pending Success Replacement', trackKV(psr)));
+
+        // Card instance counter + effect creation counter
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Counters', trackKV([
+            ['Card Instance Counter', s.card_instance_counter ?? 0],
+            ['Effect Creation Counter', s.effect_creation_counter ?? 0],
+            ['Last State Change Wait→Active', s.last_state_change_wait_to_active_count ?? 0],
+        ])));
+
+        // --- Modifier Constants ---
+        const constBlade = s.constant_blade_bonuses || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Blade Bonuses',
+            Object.keys(constBlade).length > 0 ? trackKV(Object.entries(constBlade).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '<div class="gs-track-item">none</div>'));
+
+        const constCost = s.constant_cost_bonuses || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Cost Bonuses',
+            Object.keys(constCost).length > 0 ? trackKV(Object.entries(constCost).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '<div class="gs-track-item">none</div>'));
+
+        const constScore = s.constant_score_bonuses || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Score Bonuses',
+            Object.keys(constScore).length > 0 ? trackKV(Object.entries(constScore).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '<div class="gs-track-item">none</div>'));
+
+        const constHeart = s.constant_heart_bonuses || {};
+        let chHtml = Object.keys(constHeart).length > 0
+            ? Object.entries(constHeart).map(([id, cols]) =>
+                `<div class="gs-track-item">#${id} (${cardName(parseInt(id))}): ${Object.entries(cols).map(([c, v]) => `${c}:${v}`).join(', ')}</div>`).join('')
+            : '<div class="gs-track-item">none</div>';
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Heart Bonuses', chHtml));
+
+        const cgnh = s.constant_global_need_heart || [];
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Global Need Heart',
+            cgnh.length > 0 ? cgnh.map(([cid, sname, v]) => `<div class="gs-track-item">#${cid} (${cardName(parseInt(cid))}) · ${esc(sname)}: ${v}</div>`).join('') : '<div class="gs-track-item">none</div>'));
+
+        const css = s.constant_score_sources || [];
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Constant Score Sources',
+            css.length > 0 ? css.map(([cid, sname, v]) => `<div class="gs-track-item">#${cid} (${cardName(parseInt(cid))}) · ${esc(sname)}: ${v}</div>`).join('') : '<div class="gs-track-item">none</div>'));
+
+        const btMod = s.blade_type_modifiers || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Blade Type Modifiers',
+            Object.keys(btMod).length > 0 ? trackKV(Object.entries(btMod).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '<div class="gs-track-item">none</div>'));
+
+        const ho = s.heart_override || {};
+        let hoHtml = Object.keys(ho).length > 0
+            ? Object.entries(ho).map(([id, arr]) => `<div class="gs-track-item">#${id} (${cardName(parseInt(id))}): ${arr[0]} × ${arr[1]}</div>`).join('')
+            : '<div class="gs-track-item">none</div>';
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Heart Override', hoHtml));
+
+        const dca = s.delayed_cannot_active || {};
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Delayed Cannot Activate',
+            Object.keys(dca).length > 0 ? trackKV(Object.entries(dca).map(([id, v]) => [`#${id} (${cardName(parseInt(id))})`, v])) : '<div class="gs-track-item">none</div>'));
+
+        gridDiv.insertAdjacentHTML('beforeend', mkBox('Cost Payment', trackKV([
+            ['Last Cost Discard Count', s.last_cost_discard_count ?? 0],
+            ['Last Cost Energy Count', s.last_cost_energy_count ?? 0],
+        ])));
+
+        c.appendChild(gridDiv);
     },
 };

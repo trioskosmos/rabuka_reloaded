@@ -105,47 +105,57 @@ export const ImageLoader = {
 };
 
 // Consistent image path resolution across all card displays
+/**
+ * Resolve card image path(s). Returns an array of candidate paths to try
+ * in order. The first element is the primary candidate; subsequent ones
+ * are fallbacks the image loader can try if the primary fails.
+ */
 export function resolveCardImagePath(cardNo) {
-    if (!cardNo) return '';
-    // Bail early for placeholder/invalid card numbers
-    if (cardNo === '-1' || cardNo === -1 || cardNo === '-2' || cardNo === -2) return '';
+    if (!cardNo) return [];
+    if (cardNo === '-1' || cardNo === -1 || cardNo === '-2' || cardNo === -2) return [];
+
+    const candidates = [];
 
     // 1. Direct mapping lookup
     const mapped = State.cardImageMapping?.[cardNo];
-    if (mapped) return fixImgPath(mapped);
+    if (mapped) return [fixImgPath(mapped)];
     
-    // 2. Try ＋/+, → 2 variant in mapping (webp uses PR2 not PR＋)
+    // 2. Try ＋ → 2, + → 2 variant in mapping (webp uses PR2 not PR＋)
     if (cardNo.includes('＋') || cardNo.endsWith('+')) {
         const with2 = cardNo.replace(/＋/g, '2').replace(/\+$/, '2');
         const mapped2 = State.cardImageMapping?.[with2];
-        if (mapped2) return fixImgPath(mapped2);
+        if (mapped2) return [fixImgPath(mapped2)];
     }
     
     // 3. Try compressed name in mapping (PL!HS-PR-017-PR → PL!HS-017-PR)
     const stripped = cardNo.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
     if (stripped !== cardNo) {
         const compressedMapped = State.cardImageMapping?.[stripped];
-        if (compressedMapped) return fixImgPath(compressedMapped);
+        if (compressedMapped) return [fixImgPath(compressedMapped)];
     }
     
-    // 4. Compressed ＋/+, → 2
+    // 4. Compressed ＋ → 2
     if (cardNo.includes('＋')) {
         const normalized = cardNo.replace(/＋/g, '2');
         const stripped2 = normalized.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
         if (stripped2 !== normalized) {
             const mapped2 = State.cardImageMapping?.[stripped2];
-            if (mapped2) return fixImgPath(mapped2);
+            if (mapped2) return [fixImgPath(mapped2)];
         }
     }
-    
-    // 5. Fallback: try direct webp path (also try ＋→2 variant)
+
+    // Build fallback paths. Cards with ＋/+/2 rarity markers need multiple
+    // candidates because the file on disk may use any convention.
+    const addWebp = (n) => candidates.push(fixImgPath(`img/cards_webp/${n}.webp`));
+    addWebp(cardNo);
     if (cardNo.includes('＋')) {
-        const with2 = cardNo.replace(/＋/g, '2');
-        return fixImgPath(`img/cards_webp/${with2}.webp`);
+        addWebp(cardNo.replace(/＋/g, '2'));
+        addWebp(cardNo.replace(/＋/g, '+'));
+    } else if (cardNo.includes('+')) {
+        addWebp(cardNo.replace(/\+/g, '2'));
     }
-    
-    // 6. Rarity fallback: use rare_list from card database to find alternative rarities
-    //    e.g. PL!SP-bp2-024-SECL → PL!SP-bp2-024-L (same card, different rarity)
+
+    // 5. Rarity fallback: use rare_list from card database to find alternative rarities
     if (State.staticCardDatabase && State.cardImageMapping) {
         const cardEntry = State.staticCardDatabase[cardNo];
         const rareList = cardEntry?.rare_list;
@@ -154,13 +164,13 @@ export function resolveCardImagePath(cardNo) {
                 const altCardNo = entry.card_no;
                 if (altCardNo !== cardNo) {
                     const altMapped = State.cardImageMapping[altCardNo];
-                    if (altMapped) return fixImgPath(altMapped);
+                    if (altMapped) candidates.push(fixImgPath(altMapped));
                 }
             }
         }
     }
 
-    // 7. Desperate fallback: strip the last rarity segment and try base-key match
+    // 6. Desperate fallback: strip the last rarity segment and try base-key match
     const rarityFallback = resolveCardImagePath._rarityCache || (() => {
         const cache = {};
         if (State.cardImageMapping) {
@@ -178,12 +188,12 @@ export function resolveCardImagePath(cardNo) {
         for (const alt of rarityFallback[baseKey]) {
             if (alt !== cardNo) {
                 const mappedAlt = State.cardImageMapping?.[alt];
-                if (mappedAlt) return fixImgPath(mappedAlt);
+                if (mappedAlt) candidates.push(fixImgPath(mappedAlt));
             }
         }
     }
 
-    return fixImgPath(`img/cards_webp/${cardNo}.webp`);
+    return candidates;
 }
 
 export const CardRenderer = {

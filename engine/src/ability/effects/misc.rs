@@ -1130,12 +1130,12 @@ impl AbilityResolver {
         };
         if resource == "heart" || resource == "ハート" {
             gs.rule_log.push(format!(
-                "{} {}: {} {}獲得 ({}){}",
+                "{} {}: [effect] {} {}獲得 ({}){}",
                 pp, act_name, final_count, resource_jp, color_tag, target_suffix
             ));
         } else {
             gs.rule_log.push(format!(
-                "{} {}: {} {}獲得{}",
+                "{} {}: [effect] {} {}獲得{}",
                 pp, act_name, final_count, resource_jp, target_suffix
             ));
         }

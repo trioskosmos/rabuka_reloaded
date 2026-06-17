@@ -637,7 +637,21 @@ impl AbilityResolver {
     }
 
     pub fn pay_cost(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
-        self.pay_cost_inner(gs, cost)
+        let result = self.pay_cost_inner(gs, cost);
+        if result.is_ok() && self.pending_choice.is_none() {
+            if let Some(entry) = gs.ability_queue.current_entry() {
+                let pp = gs.player_prefix();
+                let card_name = entry
+                    .card_id
+                    .and_then(|cid| gs.card_database.get_card(cid))
+                    .map(|c| c.name.clone())
+                    .unwrap_or_default();
+                let cost_desc = cost.text.split("}}").last().unwrap_or(&cost.text).trim();
+                gs.rule_log
+                    .push(format!("{pp} {card_name}: [cost] {} ✓", cost_desc));
+            }
+        }
+        result
     }
 
     pub fn handle_optional_cost_payment(

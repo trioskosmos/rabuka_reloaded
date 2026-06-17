@@ -2248,6 +2248,23 @@ impl super::resolver::AbilityResolver {
         let idx: usize = selected.parse().unwrap_or(0);
         if let Some(options) = gs.entry_cost().and_then(|c| c.compound.actions.clone()) {
             if idx < options.len() {
+                let label = options[idx]
+                    .text
+                    .split("}}")
+                    .last()
+                    .unwrap_or(&options[idx].text)
+                    .trim()
+                    .to_string();
+                if let Some(entry) = gs.ability_queue.current_entry() {
+                    let pp = gs.player_prefix();
+                    let card_name = entry
+                        .card_id
+                        .and_then(|cid| gs.card_database.get_card(cid))
+                        .map(|c| c.name.clone())
+                        .unwrap_or_default();
+                    gs.rule_log
+                        .push(format!("{pp} {card_name}: [choice] {} ✓", label));
+                }
                 // Take the pending SelectTarget so we can detect if pay_cost
                 // creates a new sub-choice (e.g., SelectCard for discard from hand).
                 let old_choice = self.pending_choice.take();
