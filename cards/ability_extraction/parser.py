@@ -1757,9 +1757,10 @@ def _infer_condition_type(condition, text):
         and condition.get("comparison_type") != "equality"
     ):
         condition["type"] = "comparison_condition"
-        # Add cost_total whenever comparison_type is cost
+        # Only set cost_total for sum-total cost comparisons (合計), not per-card checks
         if condition.get("comparison_type") == "cost" and condition.get("count"):
-            condition["cost_total"] = condition["count"]
+            if "合計" in text:
+                condition["cost_total"] = condition["count"]
         # Issue 2: Extract count and operator from "合計が、N" patterns when
         # comparison_type is "cost" and aggregate is "total". This branch fires
         # BEFORE the aggregate-only branch below, so we must extract here too.

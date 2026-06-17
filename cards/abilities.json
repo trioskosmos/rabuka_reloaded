@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T23:53:25.157599",
+  "generated_at": "2026-06-18T00:12:18.599108",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -2154,8 +2154,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 13,
-          "type": "comparison_condition",
-          "cost_total": 13
+          "type": "comparison_condition"
         },
         "count": 1,
         "action": "draw_card",
@@ -7775,8 +7774,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 10,
-          "type": "comparison_condition",
-          "cost_total": 10
+          "type": "comparison_condition"
         },
         "followup_action": {
           "text": "ライブ終了時まで、{{heart_05.png|heart05}}を得る",
@@ -15781,8 +15779,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 10,
-          "type": "comparison_condition",
-          "cost_total": 10
+          "type": "comparison_condition"
         },
         "source": "stage",
         "cost_limit": 4,
@@ -20982,8 +20979,7 @@
           ],
           "cost_limit": 9,
           "position": "center",
-          "type": "comparison_condition",
-          "cost_total": 9
+          "type": "comparison_condition"
         },
         "action": "choice",
         "options": [
@@ -25456,8 +25452,7 @@
             "EdelNote"
           ],
           "cost_limit": 9,
-          "type": "comparison_condition",
-          "cost_total": 9
+          "type": "comparison_condition"
         },
         "action": "choice",
         "options": [
@@ -29646,8 +29641,7 @@
           "operator": ">=",
           "comparison_type": "cost",
           "cost_limit": 13,
-          "type": "comparison_condition",
-          "cost_total": 13
+          "type": "comparison_condition"
         },
         "duration": "as_long_as",
         "conditional": true,

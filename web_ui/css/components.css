@@ -595,6 +595,10 @@
     margin-bottom: 0px;
 }
 
+.action-btn .action-title .icon-wrapper {
+    display: inline;
+}
+
 .action-btn .action-card-thumb {
     height: 32px;
     width: auto;

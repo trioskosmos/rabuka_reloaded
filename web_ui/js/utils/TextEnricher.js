@@ -120,6 +120,11 @@ export const TextEnricher = {
     enrichAbilityText: (text) => {
         if (!text) return "";
 
+        // Already enriched — contains rendered <img> tags from a previous pass.
+        // The tooltip flow sometimes double-enriches (getEffectiveActionText
+        // already calls enrichAbilityText, then the caller enriches again).
+        if (text.includes('<img')) return text;
+
         const placeholders = [];
 
         text = text.replace(REGEX_HTML_TAG, (match) => {

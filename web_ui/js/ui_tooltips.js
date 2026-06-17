@@ -51,7 +51,21 @@ export const Tooltips = {
         if (cid !== undefined && cid !== -1) el.setAttribute('data-card-id', cid);
         if (card.name) el.setAttribute('data-card-name', card.name);
 
-        const rawText = (State.cardSet === 'vanilla') ? "" : TextEnricher.getEffectiveRawText(card);
+        let rawText = (State.cardSet === 'vanilla') ? "" : TextEnricher.getEffectiveRawText(card);
+
+        // If we have an action context with a specific ability index, filter
+        // data-text to show only the relevant ability block (not all abilities).
+        if (rawText && actionId !== undefined && State.data?.legal_actions) {
+            const actionObj = State.data.legal_actions.find(a => a.index === actionId);
+            if (actionObj) {
+                const abilityIdx = actionObj.parameters?.ability_index ?? actionObj.params?.ability_index;
+                if (abilityIdx !== undefined) {
+                    const block = TextEnricher.extractRelevantAbility(card, null, abilityIdx);
+                    if (block) rawText = block;
+                }
+            }
+        }
+
         if (rawText) el.setAttribute('data-text', rawText);
 
         if (actionId !== undefined && actionId !== 0) el.setAttribute('data-action-id', actionId);

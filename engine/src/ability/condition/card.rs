@@ -55,6 +55,43 @@ impl<'a> ConditionContext<'a> {
             if pos.get_position() == Some("front") {
                 return self.evaluate_front_comparison(condition);
             }
+            // Position-based cost check: "センターエリアにコスト9以上のメンバー"
+            if condition.comparison_type.as_deref() == Some("cost") {
+                if let Some(position) = pos.get_position() {
+                    let target = condition.target.as_deref().unwrap_or("self");
+                    let player = self.resolve_condition_player(target);
+                    let card_db = &self.game_state.card_database;
+                    if let Some(card_id) = util::card_at_position(player, position) {
+                        // Apply group filter if specified (e.g. Aqours)
+                        if let Some(ref groups) = condition.group_names {
+                            if !groups.is_empty()
+                                && !groups.iter().any(|g| {
+                                    util::card_matches_group_str(card_db, card_id, Some(g))
+                                })
+                            {
+                                return false;
+                            }
+                        }
+                        // Apply card type filter if specified (e.g. member_card)
+                        if let Some(ref ct) = condition.card_type {
+                            if !util::card_matches_type(card_db, card_id, Some(ct)) {
+                                return false;
+                            }
+                        }
+                        let card_cost = self
+                            .game_state
+                            .card_database
+                            .get_card(card_id)
+                            .and_then(|c| c.cost)
+                            .unwrap_or(0);
+                        let threshold = condition.count.unwrap_or(0);
+                        let operator = condition.operator.as_deref().unwrap_or(">=");
+                        return util::compare_counts(Some(operator), card_cost, threshold);
+                    }
+                    // No card at the specified position → condition fails
+                    return false;
+                }
+            }
         }
 
         let count = self.get_count_for_condition(condition);
