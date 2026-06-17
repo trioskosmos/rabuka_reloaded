@@ -205,8 +205,11 @@ def extract_target(text: str) -> Optional[str]:
     """Extract target (self/opponent/both/either).
     'both' means the action applies to or involves both players.
     Used for both action target and condition scope."""
+    # "自分のカードの効果" (my card's effect) refers to the effect source,
+    # not the target location — exclude this pattern from "both" detection.
+    text_for_target = text.replace("自分のカードの効果", "")
     if (
-        ("自分の" in text and "相手の" in text)
+        ("自分の" in text_for_target and "相手の" in text_for_target)
         or "自分と相手の" in text
         or "自分と相手は" in text
         or "自分と対戦相手は" in text
@@ -1384,6 +1387,9 @@ def _try_state_change(text):
             if unit:
                 result["unit"] = unit
             break
+
+    # Extract generic fields (cost_limit, position, card_type, blade_limit, etc.)
+    _extract_generic_fields(result, text)
 
     return result
 

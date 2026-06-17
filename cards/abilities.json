@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T09:43:22.005812",
+  "generated_at": "2026-06-17T10:25:18.906233",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -12515,7 +12515,12 @@
           "text": "自分のカードの効果によって、相手のステージにいるアクティブ状態のコスト4以下のメンバーがウェイト状態になったとき",
           "from_state": "active",
           "to_state": "wait",
-          "target": "both"
+          "target": "opponent",
+          "location": "stage",
+          "card_type": "member_card",
+          "operator": "<=",
+          "comparison_type": "cost",
+          "cost_limit": 4
         },
         "count": 1,
         "action": "draw_card",
@@ -21466,7 +21471,8 @@
           "to_state": "active",
           "count": 3,
           "operator": ">=",
-          "unit": "人"
+          "unit": "人",
+          "card_type": "member_card"
         },
         "followup_action": {
           "text": "このカードのスコアを+1する",
@@ -22120,7 +22126,8 @@
           "from_state": "active",
           "to_state": "wait",
           "phase": "main",
-          "target": "self"
+          "target": "self",
+          "card_type": "member_card"
         },
         "action": "sequential",
         "actions": [

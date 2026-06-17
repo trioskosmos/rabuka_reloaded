@@ -84,6 +84,7 @@ pub struct GameState {
     pub last_energy_placed_by_effect: bool,
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
+    pub activating_ability_index: Option<usize>,
     /// Key of the most recently completed auto ability, used by the re-scan
     /// to prevent re-enqueueing the exact same ability while still allowing
     /// other abilities on the same card (e.g. each_time) to fire.
@@ -219,6 +220,7 @@ impl GameState {
             last_energy_placed_by_effect: false,
             // 2-byte aligned
             activating_card: None,
+            activating_ability_index: None,
             just_completed_ability_key: None,
             // 1-byte aligned
             rps_winner: None,

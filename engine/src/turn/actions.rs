@@ -608,6 +608,7 @@ impl super::TurnEngine {
                 had_pending_sequential
             );
             game_state.activating_card = None;
+            game_state.activating_ability_index = None;
 
             let optional_skipped = game_state.ability_queue.current_entry().is_some_and(|e| {
                 e.cost_paid

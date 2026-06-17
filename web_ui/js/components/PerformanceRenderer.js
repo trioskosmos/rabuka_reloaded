@@ -242,7 +242,7 @@ function renderAggregateHeartSummary(result) {
     const wildRemaining = wildAvail - wildForDeficit;
 
     // Step 3: remaining colored + wild fill wild requirement (required[0])
-    const coloredRemaining = coloredAvail - coloredFilled;
+    const coloredRemaining = Math.max(0, coloredAvail - coloredFilled);
     const wildReq = totalRequired[0] || 0;
     const availableForWildReq = coloredRemaining + wildRemaining;
 
@@ -300,6 +300,7 @@ function renderAggregateHeartSummary(result) {
                 <div class="perf-agg-divider"></div>
                 <div class="perf-agg-row surplus ${surplus > 0 ? 'positive' : 'zero'}">
                     <span class="perf-agg-label">Surplus</span>
+                    ${renderHeartsCompact(totalHearts.map((v, i) => Math.max(0, (v || 0) - (totalFilled[i] || 0))))}
                     <span class="perf-agg-surplus-value">${surplus > 0 ? '+' : ''}${surplus}</span>
                 </div>
             </div>
@@ -642,69 +643,6 @@ function renderLiveCards(result) {
     `;
 }
 
-function renderAllocationSection(result) {
-    if (!result?.breakdown?.allocations) return '';
-    const allocations = result.breakdown.allocations;
-    if (allocations.length === 0) {
-        return `
-            <section class="perf-section-card">
-                <div class="perf-section-heading-row compact">
-                    <div>
-                        <div class="perf-eyebrow">Heart Routing</div>
-                        <h3>Which sources paid which live</h3>
-                    </div>
-                </div>
-                <div class="perf-empty-state">No source-to-live allocation map was stored for this result.</div>
-            </section>
-        `;
-    }
-
-    const groups = new Map();
-    allocations.forEach((allocation) => {
-        const key = `${allocation?.target_idx ?? -1}`;
-        if (!groups.has(key)) {
-            groups.set(key, []);
-        }
-        groups.get(key).push(allocation);
-    });
-
-    return `
-        <section class="perf-section-card">
-            <div class="perf-section-heading-row compact">
-                <div>
-                    <div class="perf-eyebrow">Heart Routing</div>
-                </div>
-            </div>
-            <div class="perf-route-grid">
-                ${[...groups.entries()].map((entry) => {
-                    const [targetIndex, rows] = entry;
-                    const title = rows[0]?.target_name || `Live ${Number(targetIndex) + 1}`;
-                    return `
-                        <article class="perf-route-card">
-                            <h4>${escapeHtml(title)}</h4>
-                            <div class="perf-route-list">
-                                ${rows.map((row) => `
-                                    <div class="perf-route-row">
-                                        <div class="perf-route-source ${row?.source_type === 'yell' ? 'yell' : ''}">
-                                            <span class="perf-route-source-name">${escapeHtml(row?.source_name || 'Source')}</span>
-                                            <span class="perf-route-source-meta">${row?.source_type === 'yell' ? 'Yell card' : `Stage slot ${Number(row?.source_slot ?? -1) + 1}`}</span>
-                                        </div>
-                                        <div class="perf-route-payment">
-                                            <img src="${row?.color === 7 ? 'img/texticon/icon_all.png' : (row?.wildcard ? 'img/texticon/heart_00.png' : HEART_ICONS[row?.color ?? 0])}" class="heart-mini-icon" alt="">
-                                            <strong>${row?.amount || 0}</strong>
-                                            ${row?.is_bonus ? '<span class="perf-badge bonus">bonus</span>' : '<span class="perf-badge base">printed</span>'}
-                                            ${row?.wildcard ? '<span class="perf-badge wildcard">wildcard</span>' : ''}
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </article>
-                    `;
-                }).join('')}
-            </div>
-        </section>
-    `;
-}
 
 function renderContributionSection(result) {
     if (!result?.member_contributions) return '';
@@ -1057,7 +995,6 @@ function renderPlayerPanel(playerId, result) {
                     ${renderAggregateHeartSummary(result)}
                     ${renderTotalSection(result)}
                     ${renderYellSection(result)}
-                    ${renderAllocationSection(result)}
                     ${renderEffectsSection(result)}
                 </div>
                 <div class="perf-column right">

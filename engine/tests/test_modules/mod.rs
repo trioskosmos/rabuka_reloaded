@@ -214,4 +214,5 @@ pub mod target_selection_test;
 pub mod ability_trigger_fix_test;
 pub mod card_filter_test;
 pub mod kanon_bp5_constant_test;
+pub mod maki_pb1_test;
 pub mod nozomi_bp4_aggregate_test;

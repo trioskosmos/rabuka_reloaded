@@ -151,15 +151,8 @@ impl GameState {
                 if card_id == -1 {
                     continue;
                 }
-                let skip_this_card_auto_key = self.just_completed_ability_key.clone();
-                // During ability execution, skip the card whose ability is
-                // currently activating (prevents self-re-triggering from
-                // state-change scans or other in-execution scans).
-                if self.activating_card.is_some_and(|act_id| act_id == card_id) {
-                    continue;
-                }
                 if let Some(card) = self.card_database.get_card(card_id) {
-                    for ability in &card.abilities {
+                    for (ability_idx, ability) in card.abilities.iter().enumerate() {
                         if ability
                             .triggers
                             .as_ref()
@@ -210,6 +203,15 @@ impl GameState {
                                         continue;
                                     }
                                 }
+                            }
+                            // During in-execution scans (e.g. state.rs state-change),
+                            // skip the exact same ability on the same card to prevent
+                            // self-re-triggering. Different abilities on the same card
+                            // (e.g. Maki debut ab#0 vs auto ab#1) can fire normally.
+                            if self.activating_card == Some(card_id)
+                                && self.activating_ability_index == Some(ability_idx)
+                            {
+                                continue;
                             }
                             let ability_id = format!("{}_{}", card.card_no, ability.full_text);
                             // Re-scan guard: skip re-enqueueing the exact auto
@@ -590,6 +592,7 @@ impl GameState {
         };
 
         self.activating_card = card_id;
+        self.activating_ability_index = Some(ability_index);
 
         // Check if a resolver already exists (e.g., cost phase completed, effect needs to run).
         // If so, reuse it — it carries state (revealed_cost_cards, etc.) needed by the effect.
@@ -719,6 +722,7 @@ impl GameState {
 
             self.ability_queue.complete_current();
             self.activating_card = None;
+            self.activating_ability_index = None;
             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
             // recently_moved_cards so their preceding_moved conditions pass.
             if self.recently_moved_cards.is_some()
