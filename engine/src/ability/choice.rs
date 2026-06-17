@@ -2255,16 +2255,22 @@ impl super::resolver::AbilityResolver {
                     .unwrap_or(&options[idx].text)
                     .trim()
                     .to_string();
-                if let Some(entry) = gs.ability_queue.current_entry() {
-                    let pp = gs.player_prefix();
-                    let card_name = entry
-                        .card_id
-                        .and_then(|cid| gs.card_database.get_card(cid))
-                        .map(|c| c.name.clone())
-                        .unwrap_or_default();
-                    gs.rule_log
-                        .push(format!("{pp} {card_name}: [choice] {} ✓", label));
-                }
+                let pp = gs.player_prefix();
+                let act_name = gs
+                    .activating_card
+                    .and_then(|id| gs.card_database.get_card(id))
+                    .map(|c| c.name.clone());
+                gs.log_entry(
+                    format!(
+                        "{pp} {}: [choice] {} ✓",
+                        act_name.as_deref().unwrap_or(""),
+                        label
+                    ),
+                    &pp,
+                    gs.activating_card,
+                    act_name,
+                    "choice",
+                );
                 // Take the pending SelectTarget so we can detect if pay_cost
                 // creates a new sub-choice (e.g., SelectCard for discard from hand).
                 let old_choice = self.pending_choice.take();

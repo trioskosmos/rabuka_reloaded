@@ -61,13 +61,21 @@ impl AbilityResolver {
             )
         {
             let pp = gs.player_prefix();
-            let card_name = gs
+            let act_name = gs
                 .activating_card
                 .and_then(|id| gs.card_database.get_card(id))
-                .map(|c| c.name.clone())
-                .unwrap_or_default();
-            gs.rule_log
-                .push(format!("{pp} {card_name}: [effect] {}", effect.text));
+                .map(|c| c.name.clone());
+            gs.log_entry(
+                format!(
+                    "{pp} {}: [effect] {}",
+                    act_name.as_deref().unwrap_or(""),
+                    effect.text
+                ),
+                &pp,
+                gs.activating_card,
+                act_name,
+                "effect",
+            );
         }
 
         // Legacy opponent_action wrapper (pre-parser-flatten). Flat effects

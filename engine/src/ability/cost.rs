@@ -639,17 +639,23 @@ impl AbilityResolver {
     pub fn pay_cost(&mut self, gs: &mut GameState, cost: &AbilityEffect) -> Result<(), String> {
         let result = self.pay_cost_inner(gs, cost);
         if result.is_ok() && self.pending_choice.is_none() {
-            if let Some(entry) = gs.ability_queue.current_entry() {
-                let pp = gs.player_prefix();
-                let card_name = entry
-                    .card_id
-                    .and_then(|cid| gs.card_database.get_card(cid))
-                    .map(|c| c.name.clone())
-                    .unwrap_or_default();
-                let cost_desc = cost.text.split("}}").last().unwrap_or(&cost.text).trim();
-                gs.rule_log
-                    .push(format!("{pp} {card_name}: [cost] {} ✓", cost_desc));
-            }
+            let pp = gs.player_prefix();
+            let act_name = gs
+                .activating_card
+                .and_then(|id| gs.card_database.get_card(id))
+                .map(|c| c.name.clone());
+            let cost_desc = cost.text.split("}}").last().unwrap_or(&cost.text).trim();
+            gs.log_entry(
+                format!(
+                    "{pp} {}: [cost] {} ✓",
+                    act_name.as_deref().unwrap_or(""),
+                    cost_desc
+                ),
+                &pp,
+                gs.activating_card,
+                act_name,
+                "cost",
+            );
         }
         result
     }

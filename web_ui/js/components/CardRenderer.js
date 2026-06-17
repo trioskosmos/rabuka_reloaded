@@ -50,7 +50,21 @@ export const ImageLoader = {
                     this._doLoad(img, src, true);
                 }, delays[retries]);
             } else {
-                console.warn('[ImageLoader] Failed to load image after retries:', src);
+                // Try fallback paths (＋→2, ＋→+, etc.) when all retries exhausted
+                const fbRaw = img.dataset.fallbackPaths;
+                if (fbRaw) {
+                    let fallbacks;
+                    try { fallbacks = JSON.parse(fbRaw); } catch (_) { fallbacks = null; }
+                    if (fallbacks && fallbacks.length > 0) {
+                        const next = fallbacks.shift();
+                        img.dataset.fallbackPaths = JSON.stringify(fallbacks);
+                        this.failedImages.delete(src);
+                        console.log('[ImageLoader] Trying fallback path:', next);
+                        this._doLoad(img, next, true);
+                        return;
+                    }
+                }
+                console.warn('[ImageLoader] Failed to load image after retries + fallbacks:', src);
                 img.style.opacity = '0.3';
                 img.dispatchEvent(new CustomEvent('imagePermanentFailure'));
             }
@@ -76,6 +90,11 @@ export const ImageLoader = {
     },
 
     loadImage(img, src) {
+        // src may have _fallbacks attached by resolveCardImagePath
+        const fallbacks = src?._fallbacks;
+        if (fallbacks && fallbacks.length > 0) {
+            img.dataset.fallbackPaths = JSON.stringify(fallbacks);
+        }
         if (!src) return;
         this.init();
 
@@ -106,32 +125,33 @@ export const ImageLoader = {
 
 // Consistent image path resolution across all card displays
 /**
- * Resolve card image path(s). Returns an array of candidate paths to try
- * in order. The first element is the primary candidate; subsequent ones
- * are fallbacks the image loader can try if the primary fails.
+ * Resolve card image path. Returns the primary candidate path as a string.
+ * If there are fallback alternatives (e.g. ＋ → 2, ＋ → +), they are stored
+ * as a non-enumerable _fallbacks array on the returned string so the image
+ * loader can try them when the primary path fails.
  */
 export function resolveCardImagePath(cardNo) {
-    if (!cardNo) return [];
-    if (cardNo === '-1' || cardNo === -1 || cardNo === '-2' || cardNo === -2) return [];
+    if (!cardNo) return '';
+    if (cardNo === '-1' || cardNo === -1 || cardNo === '-2' || cardNo === -2) return '';
 
     const candidates = [];
 
     // 1. Direct mapping lookup
     const mapped = State.cardImageMapping?.[cardNo];
-    if (mapped) return [fixImgPath(mapped)];
+    if (mapped) return fixImgPath(mapped);
     
     // 2. Try ＋ → 2, + → 2 variant in mapping (webp uses PR2 not PR＋)
     if (cardNo.includes('＋') || cardNo.endsWith('+')) {
         const with2 = cardNo.replace(/＋/g, '2').replace(/\+$/, '2');
         const mapped2 = State.cardImageMapping?.[with2];
-        if (mapped2) return [fixImgPath(mapped2)];
+        if (mapped2) return fixImgPath(mapped2);
     }
     
     // 3. Try compressed name in mapping (PL!HS-PR-017-PR → PL!HS-017-PR)
     const stripped = cardNo.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
     if (stripped !== cardNo) {
         const compressedMapped = State.cardImageMapping?.[stripped];
-        if (compressedMapped) return [fixImgPath(compressedMapped)];
+        if (compressedMapped) return fixImgPath(compressedMapped);
     }
     
     // 4. Compressed ＋ → 2
@@ -140,19 +160,22 @@ export function resolveCardImagePath(cardNo) {
         const stripped2 = normalized.replace(/^(PL![\w]*)-[A-Z]+-(\d*)-/, '$1-$2-');
         if (stripped2 !== normalized) {
             const mapped2 = State.cardImageMapping?.[stripped2];
-            if (mapped2) return [fixImgPath(mapped2)];
+            if (mapped2) return fixImgPath(mapped2);
         }
     }
 
-    // Build fallback paths. Cards with ＋/+/2 rarity markers need multiple
-    // candidates because the file on disk may use any convention.
+    // Build candidate paths. Try the numeric variant first (R2 is the most
+    // common filesystem convention), then full-width plus (R＋), then + (R+).
     const addWebp = (n) => candidates.push(fixImgPath(`img/cards_webp/${n}.webp`));
-    addWebp(cardNo);
     if (cardNo.includes('＋')) {
         addWebp(cardNo.replace(/＋/g, '2'));
+        addWebp(cardNo);
         addWebp(cardNo.replace(/＋/g, '+'));
     } else if (cardNo.includes('+')) {
         addWebp(cardNo.replace(/\+/g, '2'));
+        addWebp(cardNo);
+    } else {
+        addWebp(cardNo);
     }
 
     // 5. Rarity fallback: use rare_list from card database to find alternative rarities
@@ -193,7 +216,17 @@ export function resolveCardImagePath(cardNo) {
         }
     }
 
-    return candidates;
+    // Return primary path with fallbacks attached as a non-enumerable property.
+    // Must use new String() so Object.defineProperty has an object target.
+    const result = new String(candidates[0] || '');
+    if (candidates.length > 1) {
+        Object.defineProperty(result, '_fallbacks', {
+            value: candidates.slice(1),
+            enumerable: false,
+            configurable: true,
+        });
+    }
+    return result;
 }
 
 export const CardRenderer = {
@@ -741,9 +774,9 @@ export const CardRenderer = {
             if (card && card.card_no) {
                 const isCardHidden = viewModel?.isHidden;
                 if (!isCardHidden) {
-                    const fixedPath = viewModel?.imgPath || resolveCardImagePath(card.card_no);
                     const existingImg = slot.querySelector('img');
                     const existingInner = slot.querySelector('.live-card-inner');
+                    const fixedPath = viewModel?.imgPath || resolveCardImagePath(card.card_no);
 
                     if (existingInner && existingImg) {
                         if (existingImg.src !== fixedPath) {

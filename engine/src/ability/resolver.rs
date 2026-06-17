@@ -532,10 +532,16 @@ impl AbilityResolver {
                         _ => true,
                     };
                     if !pos_ok {
-                        let pp = gs.player_prefix();
-                        gs.rule_log.push(format!(
-                            "{pp} {card_name}: 位置条件不成立 ({kw:?}) - スキップ"
-                        ));
+                        // Suppress position condition failures for auto abilities
+                        // to avoid noise (they fire on every phase transition).
+                        if ability.triggers.as_deref() != Some(crate::triggers::ACTIVATION)
+                            && ability.triggers.as_deref() != Some(crate::triggers::DEBUT)
+                        {
+                            let pp = gs.player_prefix();
+                            gs.rule_log.push(format!(
+                                "{pp} {card_name}: 位置条件不成立 ({kw:?}) - スキップ"
+                            ));
+                        }
                         dbg.p("RESULT", "position requirement not met — effect skipped");
                         return Ok(());
                     }
@@ -594,17 +600,38 @@ impl AbilityResolver {
                         (Some(op), Some(th)) => format!(" {}{} {}", c.text, op, th),
                         _ => format!(" {}", c.text),
                     };
+                    // Suppress condition failures for auto abilities to
+                    // avoid log noise (they fire on every phase transition).
+                    let is_auto = ability.triggers.as_deref() != Some(crate::triggers::ACTIVATION)
+                        && ability.triggers.as_deref() != Some(crate::triggers::DEBUT);
                     let icon = if passed { "✓" } else { "✗" };
-                    gs.rule_log.push(format!(
-                        "{pp} {card_name}: [条件]{}{} {}",
-                        detail,
-                        if !cond_type.is_empty() && cond_type != "OtherwiseCondition" {
-                            format!(" ({})", cond_type)
-                        } else {
-                            String::new()
-                        },
-                        icon,
-                    ));
+                    if passed || !is_auto {
+                        let detail_text = format!(
+                            "[条件]{}{} {}",
+                            detail,
+                            if !cond_type.is_empty() && cond_type != "OtherwiseCondition" {
+                                format!(" ({})", cond_type)
+                            } else {
+                                String::new()
+                            },
+                            icon,
+                        );
+                        let act_name = gs
+                            .activating_card
+                            .and_then(|id| gs.card_database.get_card(id))
+                            .map(|c| c.name.clone());
+                        gs.log_entry(
+                            format!(
+                                "{pp} {}: {}",
+                                act_name.as_deref().unwrap_or(""),
+                                detail_text
+                            ),
+                            &pp,
+                            gs.activating_card,
+                            act_name,
+                            "condition",
+                        );
+                    }
                 }
                 if !passed {
                     // For 起動 (activation) abilities, the player deliberately paid the
