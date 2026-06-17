@@ -84,10 +84,7 @@ impl GameState {
                                                 .as_deref()
                                                 .or(effect.per_unit_type.as_deref())
                                                 .unwrap_or(Zone::Hand.to_str());
-                                            let filter = crate::ability::util::CardFilter {
-                                                card_type: effect.card_type.as_deref(),
-                                                ..Default::default()
-                                            };
+                                            let filter = effect.filter_subset();
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
                                                     true,
@@ -129,10 +126,7 @@ impl GameState {
                                                 .as_deref()
                                                 .or(effect.per_unit_type.as_deref())
                                                 .unwrap_or(Zone::Hand.to_str());
-                                            let filter = crate::ability::util::CardFilter {
-                                                card_type: effect.card_type.as_deref(),
-                                                ..Default::default()
-                                            };
+                                            let filter = effect.filter_subset();
                                             let per_count =
                                                 crate::ability::util::resolve_per_unit_count(
                                                     true,
@@ -411,10 +405,7 @@ impl GameState {
                             .as_deref()
                             .or(effect.per_unit_type.as_deref())
                             .unwrap_or(crate::ability::enums::Zone::Hand.to_str());
-                        let filter = crate::ability::util::CardFilter {
-                            card_type: effect.card_type.as_deref(),
-                            ..Default::default()
-                        };
+                        let filter = effect.filter_subset();
                         let per_count = crate::ability::util::resolve_per_unit_count(
                             true,
                             Some(zone),

@@ -853,6 +853,11 @@ def _try_card_count(text):
                     "conditions": [result, hand_cond],
                     "text": full_text,
                 }
+            # State (wait/active) — member state filter for card count conditions
+            if "ウェイト状態" in text:
+                result["state"] = "wait"
+            elif "アクティブ状態" in text:
+                result["state"] = "active"
             return result
     return None
 

@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-17T10:25:18.906233",
+  "generated_at": "2026-06-17T10:44:02.017612",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -25185,7 +25185,8 @@
           "unit": "人",
           "card_type": "member_card",
           "location": "stage",
-          "target": "opponent"
+          "target": "opponent",
+          "state": "wait"
         },
         "duration": "as_long_as",
         "conditional": true,

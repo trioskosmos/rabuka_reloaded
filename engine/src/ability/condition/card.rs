@@ -1356,6 +1356,23 @@ impl<'a> ConditionContext<'a> {
                 } else {
                     player.stage.stage.to_vec()
                 };
+                // Filter by state (wait/active) if specified
+                let stage_cards: Vec<i16> = if let Some(ref state) = condition.state {
+                    stage_cards
+                        .into_iter()
+                        .filter(|&cid| {
+                            if cid == -1 {
+                                return false;
+                            }
+                            self.game_state
+                                .mods
+                                .get_orientation_modifier(cid)
+                                .map_or(state == "active", |o| o.as_str() == state)
+                        })
+                        .collect()
+                } else {
+                    stage_cards
+                };
                 let is_distinct_cost = condition.distinct.as_ref().is_some_and(
                     |d| matches!(d, crate::core::card::DistinctInfo::String(s) if s == "cost"),
                 );
@@ -1490,15 +1507,27 @@ impl<'a> ConditionContext<'a> {
                         let mut stage_count = stage_slots
                             .iter()
                             .filter(|&&id| {
-                                id != -1 && {
-                                    if hc.is_empty() {
-                                        true
-                                    } else {
-                                        crate::ability::util::card_matches_heart_colors(
-                                            card_db, id, hc,
-                                        )
+                                if id == -1 {
+                                    return false;
+                                }
+                                if !hc.is_empty()
+                                    && !crate::ability::util::card_matches_heart_colors(
+                                        card_db, id, hc,
+                                    )
+                                {
+                                    return false;
+                                }
+                                if let Some(ref state) = condition.state {
+                                    let state_ok = self
+                                        .game_state
+                                        .mods
+                                        .get_orientation_modifier(id)
+                                        .map_or(state == "active", |o| o.as_str() == state);
+                                    if !state_ok {
+                                        return false;
                                     }
                                 }
+                                true
                             })
                             .count();
                         if exclude_self {
@@ -1532,6 +1561,23 @@ impl<'a> ConditionContext<'a> {
                 combined
             } else {
                 player.stage.stage.to_vec()
+            };
+            // Apply state filter for same-name check if specified
+            let stage_cards: Vec<i16> = if let Some(ref state) = condition.state {
+                stage_cards
+                    .into_iter()
+                    .filter(|&cid| {
+                        if cid == -1 {
+                            return false;
+                        }
+                        self.game_state
+                            .mods
+                            .get_orientation_modifier(cid)
+                            .map_or(state == "active", |o| o.as_str() == state)
+                    })
+                    .collect()
+            } else {
+                stage_cards
             };
             let mut name_counts: std::collections::HashMap<String, u32> =
                 std::collections::HashMap::new();

@@ -268,3 +268,31 @@ fn music_start_removed_from_success_zone_stops_reduction() {
         "No Music S.T.A.R.T!! in success zone → paid full cost 17"
     );
 }
+
+// PL!HS-bp2-006-R 藤島 慈 ab#1:
+// 常時: 自分のステージにいるほかの『みらくらぱーく！』のメンバー1人につき、ブレードを得る。
+//
+// Test that constant per_unit correctly filters by group_names.
+// Stage: self (center) + 1 matching member (left) + 1 unrelated (right).
+// Before fix: ALL 3 stage cards counted → 3 blade (BUG: ignores group filter)
+// After fix: Only みらくらぱーく！ members counted → 2 blade (self + other)
+#[test]
+fn constant_blade_per_unit_with_group_names() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+
+    let megumi = game.id("PL!HS-bp2-006-R");
+    let hime = game.id("PL!HS-bp1-005-R");
+    let unrelated = game.id("PL!-sd1-010-SD");
+
+    game.state.player1.stage.stage = [hime, megumi, unrelated];
+
+    game.state.recalculate_constant_blade_modifiers();
+
+    let blade_mod = game.state.mods.get_blade_modifier(megumi);
+    assert_eq!(
+        blade_mod, 2,
+        "2 みらくらぱーく！ members on stage → exactly 2 blade (group_names filtered), got {}",
+        blade_mod
+    );
+}

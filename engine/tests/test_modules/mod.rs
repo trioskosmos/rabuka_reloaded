@@ -17,6 +17,7 @@ pub mod bloom_hs_test;
 pub mod bring_love_test;
 pub mod cannot_baton_touch_test;
 pub mod card_ability_tests;
+pub mod card_count_state_test;
 pub mod cheer_pipeline_test;
 pub mod chika_test;
 pub mod chisato_bp5_test;
