@@ -909,6 +909,10 @@ pub struct AbilityEffect {
     pub timing_condition: Option<String>,
     #[serde(default)]
     pub self_target: Option<bool>,
+    /// When true, this effect can place cards on occupied stage slots
+    /// (replacing existing cards). Used for Q76-style rulings.
+    #[serde(default)]
+    pub allow_occupied_stage: Option<bool>,
     #[serde(default)]
     pub trigger_type: Option<String>,
     /// "+" or "-" sign for resource operations (gain_resource with sign: "negative" = lose)

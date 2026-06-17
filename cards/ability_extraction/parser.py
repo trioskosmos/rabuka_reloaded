@@ -8273,6 +8273,19 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
 
         _propagate_context(eff)
 
+    # ============== Q76: allow_occupied_stage for self-targeting discard-to-stage ==============
+    for ability in data["unique_abilities"]:
+        eff = ability.get("effect")
+        if not isinstance(eff, dict):
+            continue
+        if (
+            eff.get("action") == "move_cards"
+            and eff.get("source") == "discard"
+            and eff.get("destination") == "stage"
+            and eff.get("self_target") is True
+        ):
+            eff["allow_occupied_stage"] = True
+
     if any(fix_stats.values()):
         active = {k: v for k, v in fix_stats.items() if v}
         print(f"  Fixes applied: {active}")

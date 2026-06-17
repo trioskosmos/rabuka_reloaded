@@ -143,6 +143,7 @@ impl AbilityResolver {
         state_change: Option<String>,
         deck_position: Option<usize>,
         source_zone: &str,
+        allow_occupied_stage: bool,
     ) -> Result<bool, String> {
         let activating_card = gs.activating_card;
         let player = gs.resolve_target_player_mut(player_target);
@@ -150,7 +151,28 @@ impl AbilityResolver {
             || Zone::from_str(destination) == Some(Zone::Stage)
         {
             let empty_slots: Vec<usize> = (0..3).filter(|&i| player.stage.stage[i] == -1).collect();
-            if empty_slots.len() > 1 {
+
+            // Determine which slots are available for placement
+            let available_slots: Vec<usize> = if allow_occupied_stage {
+                // Q76: Include ALL positions (including occupied), excluding locked areas
+                (0..3)
+                    .filter(|&i| {
+                        let area = match i {
+                            0 => zones::MemberArea::LeftSide,
+                            1 => zones::MemberArea::Center,
+                            _ => zones::MemberArea::RightSide,
+                        };
+                        !player.areas_locked_this_turn.contains(&area)
+                    })
+                    .collect()
+            } else {
+                empty_slots.clone()
+            };
+
+            if available_slots.is_empty() {
+                return Err("Stage is full".to_string());
+            }
+            if available_slots.len() > 1 {
                 // Prefer the vacated area (other baton-passed position) if still empty
                 if let Some(va) = vacated_area {
                     if va < 3 && player.stage.stage[va] == -1 {
@@ -162,7 +184,7 @@ impl AbilityResolver {
                     }
                 }
                 let pos_target = player_target.to_string();
-                let pos_str = empty_slots
+                let pos_str = available_slots
                     .iter()
                     .map(|&i| match i {
                         0 => "left_side",
@@ -188,8 +210,13 @@ impl AbilityResolver {
                     source_zone: source_zone.to_string(),
                 };
                 return Ok(true);
-            } else if empty_slots.len() == 1 {
-                let slot = empty_slots[0];
+            } else {
+                // Exactly 1 available slot (either empty or, with allow_occupied_stage, occupied)
+                let slot = available_slots[0];
+                if player.stage.stage[slot] != -1 {
+                    // Replace existing card
+                    player.waitroom.add_card(player.stage.stage[slot]);
+                }
                 player.stage.stage[slot] = card_id;
                 if source_zone != Zone::Stage.to_str() {
                     player
@@ -197,8 +224,6 @@ impl AbilityResolver {
                         .insert(util::pos_to_area(slot));
                 }
                 return Ok(false);
-            } else {
-                return Err("Stage is full".to_string());
             }
         }
         let pos_to_use = if Zone::from_str(destination) == Some(Zone::UnderMember) {
@@ -1172,6 +1197,7 @@ impl AbilityResolver {
                         effect.state_change.clone(),
                         deck_pos,
                         &source,
+                        effect.allow_occupied_stage.unwrap_or(false),
                     ) {
                         Ok(true) => {
                             return Ok(());
@@ -1226,31 +1252,29 @@ impl AbilityResolver {
                             let player = &mut gs.player1;
                             let pos_idx = super::util::stage_position_index(position);
                             let should_lock = source_zone != Zone::Stage.to_str();
+                            fn do_place(
+                                player: &mut crate::player::Player,
+                                idx: usize,
+                                card_id: i16,
+                                should_lock: bool,
+                            ) {
+                                if player.stage.stage[idx] != -1 {
+                                    player.waitroom.add_card(player.stage.stage[idx]);
+                                }
+                                player.stage.stage[idx] = card_id;
+                                if should_lock {
+                                    let area = match idx {
+                                        0 => zones::MemberArea::LeftSide,
+                                        1 => zones::MemberArea::Center,
+                                        _ => zones::MemberArea::RightSide,
+                                    };
+                                    player.areas_locked_this_turn.insert(area);
+                                }
+                            }
                             match pos_idx {
-                                Some(0) => {
-                                    player.stage.stage[0] = card_id;
-                                    if should_lock {
-                                        player
-                                            .areas_locked_this_turn
-                                            .insert(zones::MemberArea::LeftSide);
-                                    }
-                                }
-                                Some(1) => {
-                                    player.stage.stage[1] = card_id;
-                                    if should_lock {
-                                        player
-                                            .areas_locked_this_turn
-                                            .insert(zones::MemberArea::Center);
-                                    }
-                                }
-                                Some(2) => {
-                                    player.stage.stage[2] = card_id;
-                                    if should_lock {
-                                        player
-                                            .areas_locked_this_turn
-                                            .insert(zones::MemberArea::RightSide);
-                                    }
-                                }
+                                Some(0) => do_place(player, 0, card_id, should_lock),
+                                Some(1) => do_place(player, 1, card_id, should_lock),
+                                Some(2) => do_place(player, 2, card_id, should_lock),
                                 _ => {
                                     player.hand.add_card(card_id);
                                 }
@@ -1289,12 +1313,13 @@ impl AbilityResolver {
                     }
                     _ => false,
                 };
-                // Fall back to first empty slot if the chosen one was occupied
+                // If chosen position is occupied, replace (move existing to waitroom)
                 if !placed {
-                    for slot in [1usize, 0, 2] {
-                        if player.stage.stage[slot] == -1 {
-                            player.stage.stage[slot] = card_id;
-                            let area = match slot {
+                    if let Some(idx) = pos_idx {
+                        if idx < 3 && player.stage.stage[idx] != -1 {
+                            player.waitroom.add_card(player.stage.stage[idx]);
+                            player.stage.stage[idx] = card_id;
+                            let area = match idx {
                                 0 => zones::MemberArea::LeftSide,
                                 1 => zones::MemberArea::Center,
                                 _ => zones::MemberArea::RightSide,
@@ -1303,7 +1328,6 @@ impl AbilityResolver {
                                 player.areas_locked_this_turn.insert(area);
                             }
                             placed = true;
-                            break;
                         }
                     }
                 }
@@ -1641,11 +1665,15 @@ impl AbilityResolver {
                 let player = gs.resolve_target_player_mut(target);
                 util::remove_card_from_zone(player, card_id, src_zone, &card_db);
             }
-            let state_change = gs
+            let entry_effect = gs
                 .ability_queue
                 .current_entry()
-                .and_then(|e| e.ability.effect.as_ref())
-                .and_then(|ef| ef.state_change.clone());
+                .and_then(|e| e.ability.effect.clone());
+            let state_change = entry_effect.as_ref().and_then(|ef| ef.state_change.clone());
+            let allow_occupied = entry_effect
+                .as_ref()
+                .and_then(|ef| ef.allow_occupied_stage)
+                .unwrap_or(false);
             match self.place_card_with_stage_choice(
                 gs,
                 target,
@@ -1657,6 +1685,7 @@ impl AbilityResolver {
                 state_change,
                 None,
                 src_zone,
+                allow_occupied,
             ) {
                 Ok(true) => {
                     moved.push(card_id);

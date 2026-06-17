@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-18T00:12:18.599108",
+  "generated_at": "2026-06-18T00:38:06.869231",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -790,7 +790,8 @@
           "operator": ">=",
           "target": "self",
           "type": "comparison_condition"
-        }
+        },
+        "allow_occupied_stage": true
       }
     },
     {
