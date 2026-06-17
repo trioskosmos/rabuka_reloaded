@@ -107,34 +107,28 @@ impl super::TurnEngine {
                     Self::check_timing(game_state);
                     game_state.current_phase = Phase::FirstAttackerPerformance;
                     let first_attacker_id = game_state.first_attacker().id.clone();
+                    let second_attacker_id = game_state.second_attacker().id.clone();
+                    // Trigger ALL LiveStart abilities for BOTH players before processing,
+                    // so that if one player's processing creates a choice (e.g. SelectAutoAbility
+                    // from multiple abilities), the other player's abilities are already queued
+                    // and will be processed when the choice resolves.
                     Self::trigger_live_start_abilities(game_state, &first_attacker_id);
-                    game_state.process_pending_auto_abilities(&first_attacker_id);
-                    if game_state.has_pending_choice() {
-                        return;
-                    }
-                    // After all LiveStart abilities resolve, trigger each_time abilities
-                    // on live cards (e.g. 繚乱！ビクトリーロード ab#0)
+                    Self::trigger_live_start_abilities(game_state, &second_attacker_id);
                     Self::trigger_each_time_abilities(
                         game_state,
                         &first_attacker_id,
                         crate::triggers::LIVE_START,
                     );
-                    game_state.process_pending_auto_abilities(&first_attacker_id);
-                    if game_state.has_pending_choice() {
-                        return;
-                    }
-                    // Second attacker's live start (bilateral, same as live_success pattern)
-                    let second_attacker_id = game_state.second_attacker().id.clone();
-                    Self::trigger_live_start_abilities(game_state, &second_attacker_id);
-                    game_state.process_pending_auto_abilities(&second_attacker_id);
-                    if game_state.has_pending_choice() {
-                        return;
-                    }
                     Self::trigger_each_time_abilities(
                         game_state,
                         &second_attacker_id,
                         crate::triggers::LIVE_START,
                     );
+                    // Now process both players' abilities
+                    game_state.process_pending_auto_abilities(&first_attacker_id);
+                    if game_state.has_pending_choice() {
+                        return;
+                    }
                     game_state.process_pending_auto_abilities(&second_attacker_id);
                     if game_state.has_pending_choice() {
                         return;
@@ -260,7 +254,48 @@ impl super::TurnEngine {
             scores: Vec::new(),
         };
         let mut tas = Vec::new();
-        let apps = std::mem::take(&mut game_state.ability_applications);
+        // Rule: split ability_applications by performer. LiveStart abilities fire for
+        // BOTH players before the first performance phase; consuming all at once would
+        // leave the second player's snapshot empty. Only enrich apps whose source or
+        // target card belongs to the current performer.
+        let performer_owned_ids: Vec<i16> = {
+            let p = if perf_player_id == game_state.player1.id {
+                &game_state.player1
+            } else {
+                &game_state.player2
+            };
+            let mut ids = Vec::new();
+            for &cid in p.stage.stage.iter() {
+                if cid != -1 {
+                    ids.push(cid);
+                }
+            }
+            for &cid in p.live_card_zone.cards.iter() {
+                if cid != -1 {
+                    ids.push(cid);
+                }
+            }
+            for &cid in p.success_live_card_zone.cards.iter() {
+                if cid != -1 {
+                    ids.push(cid);
+                }
+            }
+            ids
+        };
+        let all_apps = std::mem::take(&mut game_state.ability_applications);
+        let mut apps = Vec::new();
+        let mut other_apps = Vec::new();
+        for app in all_apps {
+            let belongs = (app.target_card_id != -1
+                && performer_owned_ids.contains(&app.target_card_id))
+                || (app.source_card_id != -1 && performer_owned_ids.contains(&app.source_card_id));
+            if belongs {
+                apps.push(app);
+            } else {
+                other_apps.push(app);
+            }
+        }
+        game_state.ability_applications = other_apps;
         crate::turn::live::enrich_from_applications(
             &mut mc,
             &mut bd,

@@ -420,8 +420,9 @@ impl super::TurnEngine {
             } else {
                 player2_score
             };
-            // Success: at least one live card passed + total_score > 0
-            snap.success = snap.lives.iter().any(|l| l.passed) && snap.total_score > 0;
+            // Rule 8.3.16: If ANY live card's need_heart could not be satisfied,
+            // ALL live cards fail. Success requires ALL cards to pass.
+            snap.success = snap.lives.iter().all(|l| l.passed) && snap.total_score > 0;
         }
 
         // Merge LiveSuccess-triggered ability applications into breakdown.scores.
@@ -1332,8 +1333,19 @@ impl super::TurnEngine {
             }
         }
 
-        // Check each live card's requirement (with modifiers applied)
-        let any_requirement_failed = live_card_ids.iter().any(|&lc_id| {
+        // Check each live card's requirement using actual allocation results.
+        // This correctly reflects Rule 8.3.15-8.3.16: hearts are checked and deducted
+        // from a shared pool sequentially per card. Using the actual allocations
+        // catches the case where the total pool can satisfy each card individually
+        // but the shared pool runs out before all cards are served.
+        let mut per_card_filled: Vec<[u32; 8]> = vec![EMPTY_H8; live_card_ids.len()];
+        for alloc in &allocations {
+            if alloc.target_idx < per_card_filled.len() {
+                per_card_filled[alloc.target_idx][alloc.color] += alloc.amount;
+            }
+        }
+
+        let any_requirement_failed = live_card_ids.iter().enumerate().any(|(live_idx, &lc_id)| {
             card_db.get_card(lc_id).is_some_and(|card| {
                 let nh = match card.need_heart.as_ref() {
                     Some(nh) => {
@@ -1362,8 +1374,39 @@ impl super::TurnEngine {
                     }
                     None => return false,
                 };
-                !nh.hearts.is_empty()
-                    && !crate::card::Card::need_heart_satisfied(&nh, &owned_hearts)
+                if nh.hearts.is_empty() {
+                    return false;
+                }
+                // Build required array from the adjusted need
+                let mut required_arr = EMPTY_H8;
+                for (color, needed) in &nh.hearts {
+                    required_arr[color.index()] = *needed;
+                }
+                let filled = per_card_filled[live_idx];
+                // Check if filled meets required using wildcard logic
+                // (same as execute_live_victory_determination lines 298-325)
+                let mut wildcard = filled[0];
+                let mut ok = true;
+                if required_arr[0] > 0 {
+                    let h00_satisfied: u32 = filled[1..7].iter().sum();
+                    if h00_satisfied + wildcard < required_arr[0] {
+                        ok = false;
+                    }
+                }
+                if ok {
+                    for idx in 1..7 {
+                        if filled[idx] < required_arr[idx] {
+                            let deficit = required_arr[idx] - filled[idx];
+                            if wildcard >= deficit {
+                                wildcard -= deficit;
+                            } else {
+                                ok = false;
+                                break;
+                            }
+                        }
+                    }
+                }
+                !ok
             })
         });
         if any_requirement_failed {

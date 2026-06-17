@@ -84,6 +84,17 @@ impl<'a> ConditionContext<'a> {
                             .get_card(card_id)
                             .and_then(|c| c.cost)
                             .unwrap_or(0);
+                        // Handle comparison_target: compare self vs opponent at same position
+                        if condition.comparison_target.as_deref() == Some("opponent") {
+                            let opponent = self.game_state.resolve_target_player("opponent");
+                            let opp_card_id = util::card_at_position(opponent, position);
+                            let opp_cost = opp_card_id
+                                .and_then(|id| self.game_state.card_database.get_card(id))
+                                .and_then(|c| c.cost)
+                                .unwrap_or(0);
+                            let operator = condition.operator.as_deref().unwrap_or(">=");
+                            return util::compare_counts(Some(operator), card_cost, opp_cost);
+                        }
                         let threshold = condition.count.unwrap_or(0);
                         let operator = condition.operator.as_deref().unwrap_or(">=");
                         return util::compare_counts(Some(operator), card_cost, threshold);
@@ -2459,23 +2470,73 @@ impl<'a> ConditionContext<'a> {
             return player.hand.len() as u32;
         }
         if let Some(rt) = resource_type {
-            if rt.starts_with("heart") && rt.len() == 7 {
-                let color = crate::zones::parse_heart_color(rt);
+            if rt.starts_with("heart") {
+                let clean: String = rt.chars().filter(|&c| c != '_').collect();
+                let color = crate::zones::parse_heart_color(&clean);
                 let player = self.resolve_condition_player(target);
                 let card_db = &self.game_state.card_database;
-                let count: u32 = player
-                    .stage
-                    .stage
-                    .iter()
-                    .filter(|&&id| id != -1)
-                    .map(|&id| {
-                        card_db
-                            .get_card(id)
-                            .and_then(|c| c.base_heart.as_ref())
-                            .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
-                            .unwrap_or(0)
-                    })
-                    .sum();
+                // If position is specified, only count hearts for the card at that position
+                let count = if let Some(ref pos) = condition.position {
+                    if let Some(p) = pos.get_position() {
+                        if let Some(idx) = util::stage_position_index(p) {
+                            let cid = player.stage.stage[idx];
+                            if cid != -1 {
+                                card_db
+                                    .get_card(cid)
+                                    .and_then(|c| c.base_heart.as_ref())
+                                    .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
+                                    .unwrap_or(0)
+                            } else {
+                                0
+                            }
+                        } else {
+                            // No valid position index → sum all
+                            player
+                                .stage
+                                .stage
+                                .iter()
+                                .filter(|&&id| id != -1)
+                                .map(|&id| {
+                                    card_db
+                                        .get_card(id)
+                                        .and_then(|c| c.base_heart.as_ref())
+                                        .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
+                                        .unwrap_or(0)
+                                })
+                                .sum()
+                        }
+                    } else {
+                        // No position found → sum all
+                        player
+                            .stage
+                            .stage
+                            .iter()
+                            .filter(|&&id| id != -1)
+                            .map(|&id| {
+                                card_db
+                                    .get_card(id)
+                                    .and_then(|c| c.base_heart.as_ref())
+                                    .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
+                                    .unwrap_or(0)
+                            })
+                            .sum()
+                    }
+                } else {
+                    // No position filter → sum all
+                    player
+                        .stage
+                        .stage
+                        .iter()
+                        .filter(|&&id| id != -1)
+                        .map(|&id| {
+                            card_db
+                                .get_card(id)
+                                .and_then(|c| c.base_heart.as_ref())
+                                .map(|bh| bh.hearts.get(&color).copied().unwrap_or(0))
+                                .unwrap_or(0)
+                        })
+                        .sum()
+                };
                 return count;
             }
         }

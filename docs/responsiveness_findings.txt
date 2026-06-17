@@ -1,0 +1,199 @@
+====================================================================
+ PvP ACTION RESPONSIVENESS — FINDINGS & SUGGESTIONS
+====================================================================
+
+## TL;DR
+There is NO client-side Rust/WASM engine. "The fast rust client side" is
+actually the localhost actix server — sandbox feels instant because the
+round-trip is to 127.0.0.1 (sub-millisecond), and PvP feels slow because
+the same HTTP request has to cross the cloudflared tunnel to the
+opponent's machine. Every visible change is gated on that full network
+round-trip returning. The JS UI does zero prediction and zero local
+simulation.
+
+So "rely more on the client-side speed" can't mean "use the rust engine
+in the browser" (it's not there). It has to mean one of:
+  (a) predict locally so the UI doesn't wait for the tunnel, OR
+  (b) make each tunnel round-trip much cheaper / stop repeating it.
+
+====================================================================
+ PART 1 — WHAT'S ACTUALLY HAPPENING
+====================================================================
+
+### A. Architecture (corrected)
+- engine/ compiles to a single actix-web SERVER binary (rabuka_engine),
+  served on 0.0.0.0:8080. Cargo.toml has NO cdylib, no wasm-bindgen, no
+  wasm32 target. Repo has NO .wasm files, no client engine.
+- web_ui/ is PURE JS. index.html loads only js/main.js. Every game
+  operation is an HTTP fetch to api/*. GameService.sendAction ->
+  POST api/execute-action; state reads -> GET api/game-state.
+- Both sandbox and PvP are hosted in ROOMS on that one server. Sandbox
+  inits its room immediately; PvP waits for both decks. There is NO
+  local-only code path for either.
+- Internet play = one cloudflared quick-tunnel (start.bat,
+  run_web_server_with_ngrok). SSE, action POST, and state GETs all
+  traverse that single tunnel.
+
+### B. The click -> visible-change path (where latency lives)
+1. Click -> GameService.sendAction (web_ui/js/services/GameService.js:126).
+2. `await fetch('api/execute-action', ...)` — THIS IS THE WHOLE WAIT.
+   Nothing renders until it resolves.
+3. Server execute_action (web_server.rs:757):
+   - Clones the entire GameState for undo history (web_server.rs:785,
+     `lock_state!(...).clone()`). Cheap on localhost, irrelevant next
+     to the tunnel.
+   - Runs the engine (instant).
+   - Builds the FULL GameStateDisplay for both players (display.rs:907
+     `game_state_to_display`) and returns it as GameStateResponse
+     (web_server.rs:870).
+4. Response arrives -> updateStateData(data) -> State.update
+   wholesale-replaces state -> render.
+
+So the ENTIRE perceived latency = tunnel RTT + time to transfer a LARGE
+JSON blob, and the UI shows nothing until that's done.
+
+### C. Why each round-trip is heavy
+- The action response flattens a full GameStateDisplay
+  (web_server.rs:91-99, #[serde(flatten)]). It re-sends EVERY card on
+  the board as a full CardDisplay — name, ability_text, base_heart,
+  blade/bonus arrays, image fields (display.rs:56-82) — for both
+  players, every action (display.rs:907-1318). The client already has
+  the card registry (loaded once via get_card_registry), so all that
+  per-card text is redundant over the wire.
+- No delta/ID-only mode exists. Identity is already id: i16; the client
+  could resolve everything else locally.
+
+### D. The update fan-out races itself (PvP-only jank)
+After player A acts, player B (and A's own confirm) can be updated by
+THREE independent paths, each downloading the full payload:
+1. SSE — but the server only sends a 1-byte ping `data: update\n\n`
+   (web_server.rs:1601), NOT the state. So each ping forces a full
+   fetchState() (SSEClient.js:8-12).
+2. 500 ms version poll (GameService.js:43-64) — startGameplayPolling,
+   explicitly a "fallback for unreliable SSE (Cloudflared, proxies)"
+   (GameService.js:116).
+3. 3000 ms blind poll (app_controller.js:309-316) — _pvpPollInterval
+   fetches full state with no version check.
+
+SSE over a cloudflared quick-tunnel is buffered/laggy, which is exactly
+why the polling fallbacks exist — but having all three means repeated
+full-state downloads and re-renders that interleave with the action
+response, causing flicker and "it already changed" confusion.
+State.update is authoritative and all-or-nothing (state.js:118-131), so
+there's no prediction and no smooth reconcile.
+
+### E. Why sandbox "just works"
+Same code, same POST api/execute-action — but the fetch resolves
+against 127.0.0.1 in well under a frame, so steps B2-B4 are effectively
+instant. The defensive measures (SSE/poll fallbacks) still run but the
+round-trip cost is negligible. This is the strongest evidence that the
+latency is purely the tunnel + payload, not the JS or the engine.
+
+====================================================================
+ PART 2 — SUGGESTIONS (ranked by impact-to-effort)
+====================================================================
+
+### Suggestion 1 — Optimistic local prediction (biggest perceived win) [5/5]
+Make the click update the board IMMEDIATELY, before the await. On click,
+apply the action's local effect (move card hand->stage, decrement
+deck/hand counts, flip waiting_for_opponent, advance phase for
+deterministic phases), render at once, then POST in the background and
+reconcile with the authoritative reply.
+- Pro: PvP "feels like sandbox" — the card snaps to place instantly.
+- Con: requires a small per-action-type local applier, and a reconcile
+  that can correct a wrong guess. For most actions the guess is exact;
+  for random/side-effect-heavy ones (draw, shuffle, ability triggers)
+  you either skip prediction (show a quick spinner) or predict and fix
+  on reply.
+- Touches: GameService.sendAction (add prediction before await),
+  state.js (a reconcile-on-update that merges rather than hard-replaces
+  when a prediction is pending).
+
+### Suggestion 2 — Collapse the update fan-out into one version-gated poll [4/5]
+SSE only pings, so it forces a full fetch anyway. Replace the three
+paths with ONE cheap path:
+- Keep the lightweight version endpoint (get_game_state_version,
+  web_server.rs:435 — returns just frame_counter) as the single source
+  of truth.
+- One poll loop (e.g. 500-750 ms) that fetches full state ONLY when the
+  version changes.
+- Either make SSE actually carry the new frame_counter (and have the
+  client fetch state once on change), or drop SSE entirely in favor of
+  the version poll (simpler, and avoids cloudflared SSE buffering
+  entirely).
+- Removes the redundant 3000 ms blind poll (app_controller.js:309) and
+  the always-on 500 ms poll started inside fetchState.
+- Touches: GameService.js, SSEClient.js, app_controller.js, optionally
+  web_server.rs SSE payload.
+
+### Suggestion 3 — Shrink the per-action payload (real bytes-over-tunnel win) [3/5]
+Send card IDs + deltas instead of full CardDisplay objects. The client
+already holds the registry; it can resolve name/ability_text/base_heart/
+images locally from an id: i16.
+- Add a "lean" serialization mode to GameStateDisplay/
+  game_state_to_display (display.rs): zones as Vec<i16> (card IDs) +
+  only the fields that change (modifiers, position, face-up/down,
+  counts). Keep the full mode for the initial get_game_state.
+- Pro: dramatically smaller JSON over the tunnel -> faster per action.
+- Con: more work; client resolveCardData (state.js:401) already
+  supports ID lookup, so the consumer side is mostly ready. Need to
+  handle hidden-opponent cards carefully (don't leak).
+
+### Suggestion 4 — Drop the expensive per-action debug logging [2/5]
+GameService.sendAction currently does
+  console.log('DEBUG: Full response data:', JSON.stringify(data, null, 2))
+on every action (GameService.js:163) — pretty-printing the entire state
+tree on the main thread, right when we want to paint. Remove/feature-flag
+it. Trivial, removes main-thread jank per action.
+
+### Suggestion 5 — Drop the unconditional full-state clone for undo [1/5]
+web_server.rs:785 clones the whole GameState every action purely for
+undo history. On localhost it's microseconds; over the tunnel it's not
+the bottleneck. Worth doing only if profiling after S1-S3 still shows
+server-side cost — e.g. snapshot only the lightweight FrameSnapshot for
+undo, or cap history length. Low priority.
+
+====================================================================
+ PART 3 — RECOMMENDED PATH
+====================================================================
+1. First, do Suggestion 1 + Suggestion 2 together for the PvP "feels
+   instant" goal: optimistic prediction makes each click snap, and the
+   single version-gated poll removes the racing full-state fetches that
+   cause the "already pressed / state changed" errors.
+2. Then Suggestion 3 if the tunnel bandwidth is still a limit after
+   that — it's the deeper fix but only worth the complexity once the UX
+   layer is solid.
+3. Suggestion 4 can go in immediately regardless.
+
+====================================================================
+ OPEN QUESTIONS
+====================================================================
+- Are you OK with optimistic prediction occasionally self-correcting
+  (e.g. an ability trigger changes what you predicted)? Most actions
+  are deterministic; the few that aren't can just show a brief
+  "resolving..." state instead of predicting.
+- Do you want to keep SSE at all, or is a single version-gated poll
+  acceptable? (SSE over cloudflared is the flaky part.)
+- Scope: PvP-only (sandbox already feels instant, leave it) or both
+  modes (uniform code path)?
+
+====================================================================
+ KEY FILE:LINE REFERENCES
+====================================================================
+- engine/Cargo.toml                      — server-only, no wasm target
+- engine/src/game/web_server.rs:757      — execute_action handler
+- engine/src/game/web_server.rs:785      — full GameState clone for undo
+- engine/src/game/web_server.rs:870      — full GameStateResponse return
+- engine/src/game/web_server.rs:91-99    — GameStateResponse (flatten)
+- engine/src/game/web_server.rs:435      — get_game_state_version (cheap)
+- engine/src/game/web_server.rs:1560/1601— SSE endpoint (ping only)
+- engine/src/game/display.rs:56-82       — CardDisplay (full card text)
+- engine/src/game/display.rs:907-1318    — game_state_to_display (full)
+- web_ui/js/services/GameService.js:126  — sendAction (awaits full RTT)
+- web_ui/js/services/GameService.js:43   — 500ms version poll
+- web_ui/js/services/GameService.js:163  — expensive debug log
+- web_ui/js/services/SSEClient.js:8      — SSE ping -> full fetchState
+- web_ui/js/app_controller.js:309        — 3000ms blind poll
+- web_ui/js/state.js:118-131             — State.update (wholesale replace)
+- web_ui/js/state.js:401                 — resolveCardData (ID lookup ready)
+- start.bat                              — single cloudflared tunnel

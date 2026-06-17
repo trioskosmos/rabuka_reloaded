@@ -572,3 +572,110 @@ fn daydream_mermaid_niji_in_success_pick_both() {
         "Energy card was placed"
     );
 }
+
+/// Shared pool depletion: total hearts satisfy each individual card but not both
+/// simultaneously. Rule 8.3.16: if ANY card fails, ALL must fail (zone cleared).
+/// Uses PL!-sd1-001-SD (heart01=1, heart03=2, heart06=1, blade=3) with filler
+/// that has no blade_heart, so yell contributes 0 hearts.
+/// Two PL!-sd1-019-SD need {heart01:1, heart03:1, heart06:1} each → need 6 total,
+/// only have 4 → second card gets only heart03=1 → should fail.
+#[test]
+fn shared_pool_depletion_all_fail() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-014-SD"); // no blade_heart → yell contributes 0
+    let member = game.id("PL!-sd1-001-SD"); // heart01=1, heart03=2, heart06=1, blade=3
+
+    game.state.player1.stage.stage = [member, -1, -1];
+    game.state.player1.hand.cards.push(live);
+    // Add a second live card
+    let live2 = game.id("PL!-sd1-019-SD");
+    game.state.player1.hand.cards.push(live2);
+    for _ in 0..50 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    // Set the first live card during LiveCardSet phase
+    game.set_live_card(live);
+    // Add second live card directly (simulating having set 2 cards)
+    game.state.player1.live_card_zone.cards.push(live2);
+    assert_eq!(
+        game.state.player1.live_card_zone.cards.len(),
+        2,
+        "2 live cards in zone"
+    );
+
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    advance_to_live_victory(&mut game);
+
+    // Rule 8.3.16: all live cards should have been cleared (zone empty).
+    assert!(
+        game.state.player1.live_card_zone.cards.is_empty(),
+        "8.3.16: Live card zone cleared when shared pool insufficient"
+    );
+    // No victory choices because the zone was cleared.
+    assert!(
+        !game.has_pending_choice(),
+        "No SelectLiveSuccess choice when performance fails"
+    );
+}
+
+/// Three live cards where pool is insufficient for all three.
+/// Verifies that snap.success = all(l.passed) correctly enforces Rule 8.3.16.
+/// Same card setup as shared_pool_depletion_all_fail but with 3 live cards.
+#[test]
+fn three_live_cards_any_fails_all_fail() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let live = game.id("PL!-sd1-019-SD");
+    let filler = game.id("PL!-sd1-014-SD");
+    let member = game.id("PL!-sd1-001-SD");
+
+    game.state.player1.stage.stage = [member, -1, -1];
+    game.state.player1.hand.cards.push(live);
+    let live2 = game.id("PL!-sd1-019-SD");
+    game.state.player1.hand.cards.push(live2);
+    let live3 = game.id("PL!-sd1-019-SD");
+    game.state.player1.hand.cards.push(live3);
+    for _ in 0..50 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    for _ in 0..20 {
+        game.state.player2.main_deck.cards.push(filler);
+    }
+
+    advance_to_live_card_set_p1(&mut game);
+    game.set_live_card(live);
+    game.state.player1.live_card_zone.cards.push(live2);
+    game.state.player1.live_card_zone.cards.push(live3);
+    assert_eq!(
+        game.state.player1.live_card_zone.cards.len(),
+        3,
+        "3 live cards in zone"
+    );
+
+    advance_to_live_start(&mut game);
+    while game.has_pending_choice() {
+        game.select_indices(&[]);
+    }
+
+    advance_to_live_victory(&mut game);
+
+    assert!(
+        game.state.player1.live_card_zone.cards.is_empty(),
+        "8.3.16: All 3 live cards cleared when hearts insufficient"
+    );
+    assert!(
+        !game.has_pending_choice(),
+        "No victory choices when all 3 live cards fail"
+    );
+}

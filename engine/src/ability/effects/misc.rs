@@ -949,6 +949,34 @@ impl AbilityResolver {
                         );
                         effect_data = Some(serde_json::Value::Object(data));
                     }
+                } else if effect.position.is_some() {
+                    // Position-based target: apply to the stage member at that position
+                    if resource == "blade" || resource == "ブレード" {
+                        if let Some(pos_info) = effect.position.as_ref() {
+                            if let Some(p) = pos_info.get_position() {
+                                if let Some(stage_idx) = util::stage_position_index(p) {
+                                    let player = gs.resolve_target_player_mut(&target);
+                                    let card_id = player.stage.stage[stage_idx];
+                                    if card_id != -1 {
+                                        gs.mods.add_blade_modifier_with_trace(
+                                            card_id,
+                                            blades_to_add,
+                                            &mut gs.ability_applications,
+                                            gs.activating_card.unwrap_or(-1),
+                                            &effect.text,
+                                        );
+                                        if is_temporary {
+                                            effect_data = Some(Self::make_card_effect_data(
+                                                card_id,
+                                                blades_to_add,
+                                                None,
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else if effect.target_count.is_none()
                     && (effect.exclude_self.is_none() || effect.target.as_deref() == Some("self"))
                 {
@@ -1006,7 +1034,35 @@ impl AbilityResolver {
 
         if resource == "heart" || resource == "ハート" {
             if heart_targets.is_empty() {
-                if effect.target_count.is_none()
+                if effect.position.is_some() {
+                    if let Some(pos_info) = effect.position.as_ref() {
+                        if let Some(p) = pos_info.get_position() {
+                            if let Some(stage_idx) = util::stage_position_index(p) {
+                                let player = gs.resolve_target_player_mut(&target);
+                                let card_id = player.stage.stage[stage_idx];
+                                if card_id != -1 {
+                                    gs.mods.add_heart_modifier_with_trace(
+                                        card_id,
+                                        heart_color_val,
+                                        heart_to_add,
+                                        &mut gs.ability_applications,
+                                        gs.activating_card.unwrap_or(-1),
+                                        &effect.text,
+                                    );
+                                    if is_temporary && effect_data.is_none() {
+                                        let color_name =
+                                            heart_color_str.as_deref().unwrap_or("heart01");
+                                        effect_data = Some(Self::make_card_effect_data(
+                                            card_id,
+                                            heart_to_add,
+                                            Some(color_name),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else if effect.target_count.is_none()
                     && (effect.exclude_self.is_none() || effect.target.as_deref() == Some("self"))
                 {
                     if let Some(card_id) = activating_card_id {
