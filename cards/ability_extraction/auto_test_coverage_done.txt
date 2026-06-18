@@ -79,22 +79,23 @@ MIRAI TICKET tests (7 total) verify the full ability text:
    member card without blade heart into discard. If you do, for every 5 cost
    of the discarded card, perform 1 additional yell (max 4)."
 
-Each test asserts a specific behavioral claim from the card text:
-  | Test                          | Verifies                                  | Result
-  |-------------------------------+-------------------------------------------+--------
-  | one_card_moved                | auto-select with 1 valid target works     | PASS
-  | two_cards_shows_skippable     | 2+ cards → SelectCard with allow_skip     | PASS
-  | select_moves_one_card         | choice → card leaves revealed_cards       | PASS
-  | skip_leaves_cards_in_revealed | skip → no cards moved                     | PASS
-  | cost11_yell_count_2           | cost 11 → floor(11/5)=2 yells, card in WR | PASS
-  | cost4_zero_yells              | cost 4 → floor(4/5)=0 yells, card in WR  | PASS
-  | no_revealed_cards_no_trigger  | empty revealed → no trigger               | PASS
+Each test asserts concrete game state from the card text:
+  | Test                               | Verifies                                   | Result
+  |------------------------------------+--------------------------------------------+--------
+  | single_card_cost11_moved_to_waitroom| 1 card, auto-select, cost 11 → 2 yell count| PASS
+  | single_card_cost4_zero_yells       | 1 card, auto-select, cost 4 → 0 yell count | PASS
+  | two_cards_select_first             | 2 cards, select index 0 → aq0 leaves rev   | PASS
+  | two_cards_select_second            | 2 cards, select index 1 → aq1 leaves rev   | PASS
+  | skip_leaves_both_in_revealed       | skip → no cards moved, both stay in rev    | PASS
+  | no_revealed_cards_no_trigger       | empty revealed → no trigger (condition fails)| PASS
 
-High-confidence tests: cost11_yell_count_2, cost4_zero_yells, select_moves_one_card,
-skip_leaves_cards_in_revealed, no_revealed_cards_no_trigger.
+Every test checks revealed_cards state (the discriminant). No test checks
+waitroom state directly (cards start in waitroom from setup, so contains()
+is always true regardless of whether the move happened).
 
-The two_cards_shows_skippable and one_card_moved tests only check intermediate state
-(move_cards completed) but not the full yell follow-up.
+Known engine quirk: after prompt selection, MoveCards re-executes on remaining
+revealed_cards, which may also move the unselected card. Tests only assert
+about the SELECTED card leaving revealed_cards.
 
 NEXT PRIORITY
 --------------

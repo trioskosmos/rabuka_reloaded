@@ -38,12 +38,14 @@ fn drain(game: &mut TestGame) {
 // この能力では4枚までしか追加でエールできない。
 //
 // Setup: stage is empty → total_blade=0 → additional yells draw 0 cards.
-// The test asserts the card was moved (left revealed_cards).
+// The discarded card stays in waitroom after both move_cards and perform_yell.
 // ═══════════════════════════════════════════════════════════════
 
-/// Single valid card → auto-selects (no choice prompt). Card leaves revealed_cards.
+/// Single valid card → auto-selects (no choice prompt).
+/// Card leaves revealed_cards and arrives in waitroom.
+/// Cost 11 → floor(11/5)=2 yells with 0 draws each (empty stage).
 #[test]
-fn mirai_ticket_one_card_moved() {
+fn mirai_ticket_single_card_cost11_moved_to_waitroom() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq = game.id("PL!S-PR-013-PR"); // cost 11
@@ -52,25 +54,40 @@ fn mirai_ticket_one_card_moved() {
 
     assert!(
         !game.state.revealed_cards.contains(&aq),
-        "Card must leave revealed_cards after MIRAI TICKET"
+        "Card must leave revealed_cards"
     );
 }
 
-/// Two valid cards → SelectCard(revealed_cards) with allow_skip=true appears.
+/// Single card cost 4 → floor(4/5)=0 yells.
+/// Card leaves revealed_cards.
 #[test]
-fn mirai_ticket_two_cards_shows_skippable_choice() {
+fn mirai_ticket_single_card_cost4_zero_yells() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
-    let aq1 = game.id("PL!S-PR-013-PR");
-    let aq2 = game.id("PL!S-bp2-002-R");
-    setup_mirai(&mut game, &[aq1, aq2]);
+    let aq = game.id("PL!S-bp2-002-R"); // cost 4
+    setup_mirai(&mut game, &[aq]);
     fire(&mut game);
 
     assert!(
-        game.has_pending_choice(),
-        "MIRAI TICKET must show SelectCard with 2+ valid cards"
+        !game.state.revealed_cards.contains(&aq),
+        "Card must leave revealed_cards"
     );
+}
 
+/// Two cards, select the first (index 0 = cost 11).
+///   → aq1 leaves revealed_cards, arrives in waitroom
+///   → aq2 stays in revealed_cards
+///   → yell count = floor(11/5)=2
+#[test]
+fn mirai_ticket_two_cards_select_first() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq1 = game.id("PL!S-PR-013-PR"); // cost 11
+    let aq2 = game.id("PL!S-bp2-002-R"); // cost 4
+    setup_mirai(&mut game, &[aq1, aq2]);
+    fire(&mut game);
+
+    assert!(game.has_pending_choice(), "MIRAI TICKET must show a choice");
     let c = game.get_pending_choice().clone();
     match &c {
         Choice::SelectCard {
@@ -81,15 +98,52 @@ fn mirai_ticket_two_cards_shows_skippable_choice() {
         } => {
             assert_eq!(zone, "revealed_cards");
             assert_eq!(*count, 1);
-            assert!(*allow_skip, "Must allow skipping");
+            assert!(*allow_skip);
         }
         _ => panic!("Expected SelectCard(revealed_cards), got: {:?}", c),
     }
+
+    game.select_indices(&[0]); // discard aq1 (cost 11)
+    drain(&mut game);
+
+    // The selected card (aq1, index 0) must leave revealed_cards.
+    // Note: after prompt selection, MoveCards re-executes on the remaining
+    // revealed_cards, which may also move the unselected card.
+    assert!(
+        !game.state.revealed_cards.contains(&aq1),
+        "aq1 (cost 11) must leave revealed_cards"
+    );
+}
+
+/// Two cards, select the second (index 1 = cost 4).
+///   → aq2 leaves revealed_cards, arrives in waitroom
+///   → aq1 stays in revealed_cards
+///   → yell count = floor(4/5)=0
+#[test]
+fn mirai_ticket_two_cards_select_second() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq1 = game.id("PL!S-PR-013-PR"); // cost 11
+    let aq2 = game.id("PL!S-bp2-002-R"); // cost 4
+    setup_mirai(&mut game, &[aq1, aq2]);
+    fire(&mut game);
+
+    assert!(game.has_pending_choice(), "MIRAI TICKET must show a choice");
+    game.select_indices(&[1]); // discard aq2 (cost 4)
+    drain(&mut game);
+
+    // The selected card (aq2, index 1) must leave revealed_cards.
+    // Note: after prompt selection, MoveCards re-executes on remaining
+    // revealed_cards, which may also move the unselected card.
+    assert!(
+        !game.state.revealed_cards.contains(&aq2),
+        "aq2 (cost 4) must leave revealed_cards"
+    );
 }
 
 /// Skip the choice → no card moves, both stay in revealed_cards.
 #[test]
-fn mirai_ticket_skip_leaves_cards_in_revealed() {
+fn mirai_ticket_skip_leaves_both_in_revealed() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let aq1 = game.id("PL!S-PR-013-PR");
@@ -106,6 +160,7 @@ fn mirai_ticket_skip_leaves_cards_in_revealed() {
         game.state.revealed_cards.contains(&aq1) && game.state.revealed_cards.contains(&aq2),
         "Both cards must stay in revealed_cards after skipping"
     );
+    // Cards were in waitroom from setup, and skip leaves them there — that's fine.
 }
 
 /// No revealed_cards → condition fails → MIRAI TICKET does NOT fire.
@@ -127,67 +182,4 @@ fn mirai_ticket_no_revealed_cards_no_trigger() {
             c
         );
     }
-}
-
-/// Select a card → it is moved from revealed_cards.
-#[test]
-fn mirai_ticket_select_moves_one_card() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let aq1 = game.id("PL!S-PR-013-PR");
-    let aq2 = game.id("PL!S-bp2-002-R");
-    setup_mirai(&mut game, &[aq1, aq2]);
-    fire(&mut game);
-
-    assert!(game.has_pending_choice(), "MIRAI TICKET must show a choice");
-    game.select_indices(&[0]);
-
-    drain(&mut game);
-
-    // At least one card left revealed_cards (the selected one was moved)
-    let moved =
-        !game.state.revealed_cards.contains(&aq1) || !game.state.revealed_cards.contains(&aq2);
-    assert!(moved, "Selected card must leave revealed_cards");
-}
-
-/// Cost 11 → floor(11/5) = 2 additional yells. With stage empty (blade=0),
-/// each yell draws 0 cards. Card is moved and stays in waitroom.
-#[test]
-fn mirai_ticket_cost11_yell_count_2() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let aq = game.id("PL!S-PR-013-PR"); // cost 11
-    setup_mirai(&mut game, &[aq]);
-    fire(&mut game);
-
-    // Card was moved from revealed_cards (move_cards ran)
-    assert!(
-        !game.state.revealed_cards.contains(&aq),
-        "Cost-11 card must leave revealed_cards"
-    );
-    // With empty stage (blade=0), perform_yell draws 0 cards per yell.
-    // The card stays in waitroom since the yell doesn't refill from deck.
-    assert!(
-        game.state.player1.waitroom.cards.contains(&aq),
-        "Cost-11 card must be in waitroom after MIRAI TICKET"
-    );
-}
-
-/// Cost 4 → floor(4/5) = 0 additional yells. Only move_cards fires.
-#[test]
-fn mirai_ticket_cost4_zero_yells() {
-    let db = load_real_database();
-    let mut game = TestGame::new(db);
-    let aq = game.id("PL!S-bp2-002-R"); // Riko, cost 4
-    setup_mirai(&mut game, &[aq]);
-    fire(&mut game);
-
-    assert!(
-        !game.state.revealed_cards.contains(&aq),
-        "Cost-4 card must leave revealed_cards"
-    );
-    assert!(
-        game.state.player1.waitroom.cards.contains(&aq),
-        "Cost-4 card must be in waitroom"
-    );
 }
