@@ -665,6 +665,13 @@ impl super::TurnEngine {
                     game_state.just_completed_ability_key = just_completed_key.clone();
                     game_state.process_pending_auto_abilities(&player_id);
                     game_state.just_completed_ability_key = None;
+                } else {
+                    // Effect completed without sub-choice — process any newly
+                    // enqueued watcher abilities (e.g. each_time triggers).
+                    let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+                    game_state.just_completed_ability_key = just_completed_key.clone();
+                    game_state.process_pending_auto_abilities(&player_id);
+                    game_state.just_completed_ability_key = None;
                 }
             } else if cost_was_paid {
                 // Record use_limit when ability completes (cost+effect both resolved)

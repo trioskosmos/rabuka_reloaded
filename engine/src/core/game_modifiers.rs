@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 /// Stores both the additive delta and absolute set value for a modifier.
 /// Replaces the old dual-map pattern (`blade_modifiers` + `set_blade_modifiers`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ModifierEntry {
     /// Accumulated via repeated `add_*` / `+=` calls.
     pub additive: i32,

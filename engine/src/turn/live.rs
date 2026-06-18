@@ -30,6 +30,29 @@ impl super::TurnEngine {
         // heart requirement checks.
         game_state.evaluate_success_zone_heart_reductions();
 
+        // Restore performance-time need_heart_modifiers that were cleared by
+        // evaluate_success_zone_heart_reductions. This preserves modifications
+        // from live_start triggers and other non-constant sources. The merge is
+        // safe to call on re-entry because evaluate_success_zone_heart_reductions
+        // is deterministic given the same success zone state.
+        for snap in &game_state.performance_snapshots {
+            for (cid, colors) in &snap.performance_need_heart_modifiers {
+                for (color, entry) in colors {
+                    let target = game_state
+                        .mods
+                        .need_heart_modifiers
+                        .entry(*cid)
+                        .or_default()
+                        .entry(*color)
+                        .or_insert(ModifierEntry::default());
+                    if entry.set != 0 && target.set == 0 {
+                        target.set = entry.set;
+                    }
+                    target.additive += entry.additive;
+                }
+            }
+        }
+
         let p1_mult = &game_state.mods.heart_color_multiplier.clone();
         let p2_mult = &game_state.mods.heart_color_multiplier.clone();
         // Include yell blade hearts in stage_hearts so should_trigger_live_success
@@ -1553,6 +1576,7 @@ pub fn build_snapshot(
     perf: &LivePerformanceData,
     card_db: &CardDatabase,
     note_icons: u32,
+    performance_need_heart_modifiers: &HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
 ) -> crate::types::PerformanceSnapshot {
     let mut lives = Vec::new();
     // Use perf.live_card_ids (captured before heart check cleared the zone)
@@ -1631,6 +1655,7 @@ pub fn build_snapshot(
         },
         p0_wins: false,
         p1_wins: false,
+        performance_need_heart_modifiers: performance_need_heart_modifiers.clone(),
     }
 }
 

@@ -322,6 +322,7 @@ impl super::TurnEngine {
             &perf_data,
             &game_state.card_database,
             note_icons,
+            &nhm,
         );
         // Add constant score source info into breakdown.scores
         {

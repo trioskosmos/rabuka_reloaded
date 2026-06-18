@@ -1,4 +1,6 @@
-use crate::card::AbilityEffect;
+use crate::card::{AbilityEffect, HeartColor};
+use crate::core::game_modifiers::ModifierEntry;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AbilityTrigger {
@@ -139,6 +141,11 @@ pub struct PerformanceSnapshot {
     pub triggered_abilities: Vec<TriggeredAbility>,
     pub p0_wins: bool,
     pub p1_wins: bool,
+    /// Snapshot of need_heart_modifiers at performance time (includes live_start
+    /// and other non-constant changes that get cleared by
+    /// evaluate_success_zone_heart_reductions during victory determination).
+    /// Merged back during snapshot finalization for correct required/adjustments/passed.
+    pub performance_need_heart_modifiers: HashMap<i16, HashMap<HeartColor, ModifierEntry>>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

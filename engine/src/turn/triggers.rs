@@ -308,6 +308,27 @@ impl super::TurnEngine {
         // success_live_card_zone before checking live success conditions.
         game_state.evaluate_success_zone_heart_reductions();
 
+        // Restore performance-time need_heart_modifiers that were cleared above.
+        // This preserves modifications from live_start triggers and other non-constant
+        // sources, ensuring should_trigger_live_success uses the correct requirements.
+        for snap in &game_state.performance_snapshots {
+            for (cid, colors) in &snap.performance_need_heart_modifiers {
+                for (color, entry) in colors {
+                    let target = game_state
+                        .mods
+                        .need_heart_modifiers
+                        .entry(*cid)
+                        .or_default()
+                        .entry(*color)
+                        .or_insert(crate::core::game_modifiers::ModifierEntry::default());
+                    if entry.set != 0 && target.set == 0 {
+                        target.set = entry.set;
+                    }
+                    target.additive += entry.additive;
+                }
+            }
+        }
+
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
 
