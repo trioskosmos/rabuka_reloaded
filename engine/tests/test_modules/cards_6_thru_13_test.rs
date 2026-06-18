@@ -1,6 +1,4 @@
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
-use rabuka_engine::zones::MemberArea;
 
 fn deck(game: &mut TestGame, filler: i16) {
     game.state.player1.main_deck.cards.clear();
@@ -156,9 +154,8 @@ fn c9_arise_constant_heart_with_other_arise() {
     deck(&mut g, f);
     g.give_energy(5);
     g.state.recalculate_constants();
-    let h = g.state.mods.get_heart_modifier(c, HeartColor::Heart05);
-    // 0 other A-RISE → heart05 = 0
 }
+
 #[test]
 fn c9_arise_activate_and_recover() {
     let db = load_real_database();

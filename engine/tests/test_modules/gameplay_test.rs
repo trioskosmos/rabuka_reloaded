@@ -3304,9 +3304,6 @@ fn kanon_activation_choice_condition_wait_option() {
 
 #[test]
 fn hanamaru_score_icon_filter() {
-    use rabuka_engine::ability::types::Choice;
-    use rabuka_engine::game_setup::{generate_possible_actions, ActionType};
-
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let hanamaru = game.id("PL!S-sd1-007-SD");

@@ -1,12 +1,27 @@
 use crate::ability::debug::AbDebug;
 use crate::ability_queue::QueueState;
 use crate::card::CardDatabase;
+use crate::card::HeartColor;
 use crate::game_state::GameState;
 use crate::player::Player;
 use crate::types::PerformanceSnapshot;
 use crate::zones::Orientation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+fn heart_color_index(color: &HeartColor) -> Option<usize> {
+    Some(match color {
+        HeartColor::Heart00 => 0,
+        HeartColor::Heart01 => 1,
+        HeartColor::Heart02 => 2,
+        HeartColor::Heart03 => 3,
+        HeartColor::Heart04 => 4,
+        HeartColor::Heart05 => 5,
+        HeartColor::Heart06 => 6,
+        HeartColor::All => 7,
+        _ => return None,
+    })
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct TempEffectDisplay {
@@ -658,24 +673,24 @@ pub fn player_to_display(
     // Calculate total hearts including modifiers (7 elements: heart00-heart06)
     let mut total_hearts = vec![0u32; 8];
 
-    // Add base hearts from stage cards
+    // Add base hearts from stage cards (accounting for heart_color_multiplier transforms)
     for &card_id in &player.stage.stage {
-        if card_id != -1 {
-            if let Some(card) = card_db.get_card(card_id) {
-                if let Some(ref base_heart) = card.base_heart {
+        if card_id == -1 {
+            continue;
+        }
+        if let Some(card) = card_db.get_card(card_id) {
+            if let Some(ref base_heart) = card.base_heart {
+                if let Some(&override_color) = heart_color_multiplier.get(&card_id) {
+                    // Heart transform: sum all base hearts into the override color
+                    if let Some(idx) = heart_color_index(&override_color) {
+                        let total: u32 = base_heart.hearts.values().sum();
+                        total_hearts[idx] += total;
+                    }
+                } else {
                     for (color, count) in &base_heart.hearts {
-                        let index = match color {
-                            crate::card::HeartColor::Heart00 => 0,
-                            crate::card::HeartColor::Heart01 => 1,
-                            crate::card::HeartColor::Heart02 => 2,
-                            crate::card::HeartColor::Heart03 => 3,
-                            crate::card::HeartColor::Heart04 => 4,
-                            crate::card::HeartColor::Heart05 => 5,
-                            crate::card::HeartColor::Heart06 => 6,
-                            crate::card::HeartColor::All => 7,
-                            _ => continue,
-                        };
-                        total_hearts[index] += count;
+                        if let Some(idx) = heart_color_index(color) {
+                            total_hearts[idx] += count;
+                        }
                     }
                 }
             }
@@ -687,19 +702,9 @@ pub fn player_to_display(
         if card_id != -1 {
             if let Some(card_heart_modifiers) = heart_modifiers.get(&card_id) {
                 for (color, modifier) in card_heart_modifiers {
-                    let index = match color {
-                        crate::card::HeartColor::Heart00 => 0,
-                        crate::card::HeartColor::Heart01 => 1,
-                        crate::card::HeartColor::Heart02 => 2,
-                        crate::card::HeartColor::Heart03 => 3,
-                        crate::card::HeartColor::Heart04 => 4,
-                        crate::card::HeartColor::Heart05 => 5,
-                        crate::card::HeartColor::Heart06 => 6,
-                        crate::card::HeartColor::All => 7,
-
-                        _ => continue,
-                    };
-                    total_hearts[index] = (total_hearts[index] as i32 + modifier).max(0) as u32;
+                    if let Some(index) = heart_color_index(color) {
+                        total_hearts[index] = (total_hearts[index] as i32 + modifier).max(0) as u32;
+                    }
                 }
             }
         }

@@ -3352,6 +3352,8 @@ def parse_action(text: str) -> Dict[str, Any]:
                 "heart_type": (
                     f"heart{m.group(1)}"
                     if (m := re.search(r"{{heart_(\d+)\.png\|heart\d+}}", t))
+                    else "selected"
+                    if "選んだハート" in t
                     else None
                 ),
                 "original_value": "元々" in t,

@@ -1,5 +1,4 @@
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 /// PL!-bp6-006-R+ 西木野真姫 (Nishikino Maki, μ's)
 /// 起動 turn1: discard 1 → reveal 5 from deck.
@@ -44,7 +43,6 @@ fn maki_bp6_activate_cost_discard_works() {
     }
 
     // After cost, engine goes to look_and_select → SelectCard
-    let ct = game.pending_choice_type().unwrap_or_default();
     eprintln!("choice after cost: {:?}", game.pending_choice_type());
 
     assert_eq!(

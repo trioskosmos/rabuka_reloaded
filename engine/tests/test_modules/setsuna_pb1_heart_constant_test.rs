@@ -87,7 +87,7 @@ fn get_setsuna_heart_contribution(
 #[test]
 fn setsuna_pb1_verify_card_metadata() {
     let db = load_real_database();
-    let mut game = TestGame::new(db.clone());
+    let game = TestGame::new(db.clone());
     let setsuna: i16 = game.id("PL!N-pb1-007-R");
 
     let card = db

@@ -1,17 +1,6 @@
 use crate::helpers::*;
 use rabuka_engine::zones::MemberArea;
 
-fn fill_decks(game: &mut TestGame, filler: i16) {
-    game.state.player1.main_deck.cards.clear();
-    for _ in 0..30 {
-        game.state.player1.main_deck.cards.push(filler);
-    }
-    game.state.player2.main_deck.cards.clear();
-    for _ in 0..30 {
-        game.state.player2.main_deck.cards.push(filler);
-    }
-}
-
 fn place_under(game: &mut TestGame, area: MemberArea, card_id: i16) {
     game.state.player1.stage.place_under_card(area, card_id);
 }

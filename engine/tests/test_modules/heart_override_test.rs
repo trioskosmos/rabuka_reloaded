@@ -7,6 +7,92 @@ fn advance_to_live(game: &mut TestGame) {
     }
 }
 
+fn advance_to_performance(game: &mut TestGame) {
+    for _ in 0..7 {
+        game.pass();
+    }
+}
+
+/// Kasumi (PL!N-bp3-014-N) has base hearts: heart03:1.
+/// Her LiveStart ability (ab#0): select heart01/heart03/heart04 → until live end,
+/// this member's original heart becomes the selected heart.
+/// Verifies total_hearts in the display reflects each of the 3 possible choices.
+#[test]
+fn kasumi_heart_transform_reflected_in_header_stats() {
+    use rabuka_engine::display::game_state_to_display;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db.clone());
+    let kasumi = game.id("PL!N-bp3-014-N");
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Kasumi on stage center.
+    game.state.player1.stage.stage = [-1, kasumi, -1];
+    fill_both_decks(&mut game, filler);
+
+    advance_to_performance(&mut game);
+
+    // Kasumi's LiveStart fires, SelectHeartColor choice should be pending.
+    assert!(
+        game.has_pending_choice(),
+        "SelectHeartColor should be pending"
+    );
+
+    // Test each of the 3 choices (heart01, heart03, heart04)
+    for (option, expected_color, expected_index) in [
+        (0, HeartColor::Heart01, 1),
+        (1, HeartColor::Heart03, 3),
+        (2, HeartColor::Heart04, 4),
+    ] {
+        let mut game = TestGame::new(db.clone());
+        let kasumi = game.id("PL!N-bp3-014-N");
+        let filler = game.id("PL!-sd1-010-SD");
+        game.state.player1.stage.stage = [-1, kasumi, -1];
+        fill_both_decks(&mut game, filler);
+        advance_to_performance(&mut game);
+
+        // Select the heart color option
+        game.select_option(option);
+
+        // Verify the transform was applied
+        assert_eq!(
+            game.state.mods.heart_color_multiplier.get(&kasumi),
+            Some(&expected_color),
+            "Kasumi's heart transform should be {:?}",
+            expected_color
+        );
+
+        // Verify total_hearts in display reflects the transform
+        let display = game_state_to_display(&game.state);
+        let total = &display.player1.total_hearts;
+        let expected_idx = expected_index as usize;
+        assert_eq!(
+            total[expected_idx], 1,
+            "total_hearts[{}] should be 1 after transform to {:?}",
+            expected_idx, expected_color
+        );
+        // All other heart slots should be 0 (only card on stage has 1 heart, transformed)
+        for (i, &val) in total.iter().enumerate() {
+            if i != expected_idx && i < 7 {
+                assert_eq!(
+                    val, 0,
+                    "total_hearts[{}] should be 0 after transform to {:?}, got {}",
+                    i, expected_color, val
+                );
+            }
+        }
+    }
+}
+
+fn fill_both_decks(game: &mut TestGame, filler: i16) {
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+}
+
 /// Kanan (PL!S-pb1-003-R) has base hearts: heart02:1, heart04:4, heart05:1 = 6 total.
 /// Her LiveStart ability (ab#0): pay 2E → until live end, all her hearts become heart04.
 /// Verifies the heart_color_multiplier mechanism through the actual card ability.

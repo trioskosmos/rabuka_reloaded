@@ -12,7 +12,6 @@
 /// Q221: 「それらのカードの中」refers to the cards placed by the trigger, not all discard.
 /// Q233: Skipping the optional E cost allows re-triggering later in the same turn.
 use crate::helpers::*;
-use rabuka_engine::card::HeartColor;
 use rabuka_engine::game_setup::ActionType;
 use rabuka_engine::turn::TurnEngine;
 

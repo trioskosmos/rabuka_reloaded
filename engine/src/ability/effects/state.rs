@@ -690,10 +690,18 @@ impl AbilityResolver {
             .activating_card
             .map(|c| self.card_name(c))
             .unwrap_or_default();
-        let ht = heart_type.unwrap_or("heart00");
+        // "selected" means the heart type was chosen by a preceding select action
+        // in a Sequential effect; look up the choice from the queue entry.
+        let resolved_heart_type = match heart_type {
+            Some("selected") => gs
+                .ability_queue
+                .current_entry()
+                .and_then(|e| e.conditional_choice.as_deref()),
+            other => other,
+        };
+        let ht = resolved_heart_type.unwrap_or("heart00");
         gs.rule_log
             .push(format!("{} {}: ハート種類を{}に設定", pp, act_name, ht));
-        let heart_type = heart_type.unwrap_or("heart00");
         // Use selected_target from self.selected_cards if available (member-targeting
         // abilities like PL!HS-bp5-021-L), otherwise fall back to activating_card
         // (self-targeting abilities like Kanan PL!S-pb1-003-R).
@@ -706,11 +714,11 @@ impl AbilityResolver {
         if card_id == -1 {
             return;
         }
-        let color = crate::zones::parse_heart_color(heart_type);
+        let color = crate::zones::parse_heart_color(ht);
         gs.mods.heart_color_multiplier.insert(card_id, color);
         gs.record_ability_application(
             card_id,
-            format!("Transform hearts to {}", heart_type),
+            format!("Transform hearts to {}", ht),
             "transform",
             card_id,
             Some(color.index()),

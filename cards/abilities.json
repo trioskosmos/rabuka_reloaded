@@ -1,13 +1,13 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-18T11:22:08.902360",
+  "generated_at": "2026-06-18T11:52:51.861048",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
     "total_cards": 2130,
     "cards_with_abilities": 1279,
-    "total_abilities": 1610,
-    "unique_abilities": 750
+    "total_abilities": 1615,
+    "unique_abilities": 752
   },
   "unique_abilities": [
     {
@@ -67,6 +67,65 @@
       }
     },
     {
+      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
+      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
+      "card_count": 22,
+      "cards": [
+        "PL!-sd1-011-SD | 絢瀬 絵里 (ab#0)",
+        "PL!-sd1-012-SD | 南 ことり (ab#0)",
+        "PL!-sd1-016-SD | 東條 希 (ab#0)",
+        "PL!-sd1-011-PR | 絢瀬絵里 (ab#0)",
+        "PL!-sd1-016-PR | 東條 希 (ab#0)",
+        "PL!S-PR-013-PR | 高海千歌 (ab#0)",
+        "PL!S-PR-019-PR | 国木田花丸 (ab#0)",
+        "PL!N-PR-004-PR | 中須かすみ (ab#0)",
+        "PL!N-PR-006-PR | 朝香果林 (ab#0)",
+        "PL!N-PR-013-PR | ミア・テイラー (ab#0)",
+        "PL!HS-PR-001-PR | 日野下花帆 (ab#0)",
+        "PL!HS-PR-002-PR | 村野さやか (ab#0)",
+        "PL!HS-PR-005-PR | 大沢瑠璃乃 (ab#0)",
+        "PL!N-bp1-007-R | 優木せつ菜 (ab#0)",
+        "PL!N-bp1-007-P | 優木せつ菜 (ab#0)",
+        "PL!N-bp1-010-R | 三船栞子 (ab#0)",
+        "PL!N-bp1-010-P | 三船栞子 (ab#0)",
+        "PL!N-sd1-002-SD | 中須かすみ (ab#0)",
+        "PL!N-sd1-003-SD | 桜坂しずく (ab#0)",
+        "PL!HS-pb1-011-R | 大沢瑠璃乃 (ab#0)",
+        "PL!HS-pb1-011-P＋ | 大沢瑠璃乃 (ab#0)",
+        "PL!HS-cl1-007-CL | セラス 柳田 リリエンフェルト (ab#0)"
+      ],
+      "triggers": "登場",
+      "use_limit": null,
+      "is_null": false,
+      "cost": {
+        "text": "手札を1枚控え室に置いてもよい",
+        "source": "hand",
+        "zone": "hand",
+        "destination": "discard",
+        "count": 1,
+        "optional": true,
+        "type": "move_cards"
+      },
+      "effect": {
+        "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く",
+        "action": "look_and_select",
+        "look_action": {
+          "text": "自分のデッキの上からカードを3枚見る。",
+          "source": "deck_top",
+          "count": 3,
+          "target": "self",
+          "action": "look_at"
+        },
+        "select_action": {
+          "action": "select_cards",
+          "discard_remaining": true,
+          "destination": "hand",
+          "count": 1,
+          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く"
+        }
+      }
+    },
+    {
       "full_text": "{{kidou.png|起動}}このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。",
       "triggerless_text": "このメンバーをステージから控え室に置く：自分の控え室からメンバーカードを1枚手札に加える。",
       "card_count": 21,
@@ -113,63 +172,6 @@
         "card_type": "member_card",
         "target": "self",
         "action": "move_cards"
-      }
-    },
-    {
-      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
-      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。",
-      "card_count": 20,
-      "cards": [
-        "PL!-sd1-011-SD | 絢瀬 絵里 (ab#0)",
-        "PL!-sd1-012-SD | 南 ことり (ab#0)",
-        "PL!-sd1-016-SD | 東條 希 (ab#0)",
-        "PL!-sd1-011-PR | 絢瀬絵里 (ab#0)",
-        "PL!-sd1-016-PR | 東條 希 (ab#0)",
-        "PL!N-PR-004-PR | 中須かすみ (ab#0)",
-        "PL!N-PR-006-PR | 朝香果林 (ab#0)",
-        "PL!N-PR-013-PR | ミア・テイラー (ab#0)",
-        "PL!HS-PR-001-PR | 日野下花帆 (ab#0)",
-        "PL!HS-PR-002-PR | 村野さやか (ab#0)",
-        "PL!HS-PR-005-PR | 大沢瑠璃乃 (ab#0)",
-        "PL!N-bp1-007-R | 優木せつ菜 (ab#0)",
-        "PL!N-bp1-007-P | 優木せつ菜 (ab#0)",
-        "PL!N-bp1-010-R | 三船栞子 (ab#0)",
-        "PL!N-bp1-010-P | 三船栞子 (ab#0)",
-        "PL!N-sd1-002-SD | 中須かすみ (ab#0)",
-        "PL!N-sd1-003-SD | 桜坂しずく (ab#0)",
-        "PL!HS-pb1-011-R | 大沢瑠璃乃 (ab#0)",
-        "PL!HS-pb1-011-P＋ | 大沢瑠璃乃 (ab#0)",
-        "PL!HS-cl1-007-CL | セラス 柳田 リリエンフェルト (ab#0)"
-      ],
-      "triggers": "登場",
-      "use_limit": null,
-      "is_null": false,
-      "cost": {
-        "text": "手札を1枚控え室に置いてもよい",
-        "source": "hand",
-        "zone": "hand",
-        "destination": "discard",
-        "count": 1,
-        "optional": true,
-        "type": "move_cards"
-      },
-      "effect": {
-        "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分のデッキの上からカードを3枚見る。",
-          "source": "deck_top",
-          "count": 3,
-          "target": "self",
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "discard_remaining": true,
-          "destination": "hand",
-          "count": 1,
-          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く"
-        }
       }
     },
     {
@@ -8157,44 +8159,30 @@
       }
     },
     {
-      "full_text": "{{toujyou.png|登場}}手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
-      "triggerless_text": "手札を1枚控え室に置いてもよい：自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
+      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る。",
       "card_count": 2,
       "cards": [
-        "PL!S-PR-013-PR | 高海千歌 (ab#0)",
-        "PL!S-PR-019-PR | 国木田花丸 (ab#0)"
+        "PL!S-PR-013-PR | 高海千歌 (ab#1)",
+        "PL!S-PR-019-PR | 国木田花丸 (ab#1)"
       ],
-      "triggers": "登場",
+      "triggers": "ライブ開始時",
       "use_limit": null,
       "is_null": false,
       "cost": {
-        "text": "手札を1枚控え室に置いてもよい",
-        "source": "hand",
-        "zone": "hand",
-        "destination": "discard",
-        "count": 1,
+        "text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい",
         "optional": true,
-        "type": "move_cards"
+        "type": "pay_energy",
+        "energy": 2,
+        "zone": "energy_zone",
+        "count": 2
       },
       "effect": {
-        "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
-        "action": "look_and_select",
-        "look_action": {
-          "text": "自分のデッキの上からカードを3枚見る。",
-          "source": "deck_top",
-          "count": 3,
-          "target": "self",
-          "action": "look_at"
-        },
-        "select_action": {
-          "action": "select_cards",
-          "discard_remaining": true,
-          "destination": "hand",
-          "count": 1,
-          "optional": true,
-          "text": "自分のデッキの上からカードを3枚見る。その中から1枚を手札に加え、残りを控え室に置く。{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る"
-        },
-        "optional": true
+        "text": "{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
+        "duration": "live_end",
+        "action": "gain_resource",
+        "resource": "blade",
+        "count": 2
       }
     },
     {
@@ -10556,8 +10544,8 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える。",
-      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える。",
+      "full_text": "{{live_start.png|ライブ開始時}}{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。",
+      "triggerless_text": "{{icon_energy.png|E}}{{icon_energy.png|E}}支払ってもよい：ライブ終了時まで、このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。",
       "card_count": 2,
       "cards": [
         "PL!S-pb1-003-R | 松浦果南 (ab#0)",
@@ -10575,45 +10563,43 @@
         "count": 2
       },
       "effect": {
-        "text": "このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる。{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える",
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる",
-            "card_type": "member_card",
-            "action": "set_heart_type",
-            "heart_type": "heart04",
-            "original_value": true,
-            "self_target": true,
-            "heart_colors": [
-              "heart04"
-            ],
-            "count": 1,
-            "duration": "live_end"
-          },
-          {
-            "text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える",
-            "source": "revealed_cards",
-            "dynamic_count": {
-              "type": "revealed_cards",
-              "reference": "previous_reveal"
-            },
-            "destination": "hand",
-            "count": 1,
-            "card_type": "live_card",
-            "target": "self",
-            "action": "move_cards",
-            "duration": "live_end",
-            "heart_colors": [
-              "heart04"
-            ]
-          }
-        ],
+        "text": "このメンバーが元々持つハートはすべて{{heart_04.png|heart04}}になる",
         "duration": "live_end",
+        "card_type": "member_card",
+        "action": "set_heart_type",
+        "heart_type": "heart04",
         "original_value": true,
+        "self_target": true,
         "heart_colors": [
           "heart04"
-        ]
+        ],
+        "count": 1
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える。",
+      "triggerless_text": "エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える。",
+      "card_count": 2,
+      "cards": [
+        "PL!S-pb1-003-R | 松浦果南 (ab#1)",
+        "PL!S-pb1-003-P＋ | 松浦果南 (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "エールにより公開された自分のカードの中から、ライブカードを1枚手札に加える",
+        "source": "revealed_cards",
+        "dynamic_count": {
+          "type": "revealed_cards",
+          "reference": "previous_reveal"
+        },
+        "destination": "hand",
+        "count": 1,
+        "card_type": "live_card",
+        "target": "self",
+        "action": "move_cards"
       }
     },
     {
@@ -20317,8 +20303,8 @@
       }
     },
     {
-      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合、このカードの{{live_success.png|ライブ成功時}}能力を無効にする。{{live_success.png|ライブ成功時}}相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く。",
-      "triggerless_text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合、このカードの{{live_success.png|ライブ成功時}}能力を無効にする。{{live_success.png|ライブ成功時}}相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く。",
+      "full_text": "{{live_start.png|ライブ開始時}}自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合、このカードの{{live_success.png|ライブ成功時}}能力を無効にする。",
+      "triggerless_text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合、このカードの{{live_success.png|ライブ成功時}}能力を無効にする。",
       "card_count": 1,
       "cards": [
         "PL!S-pb1-019-L | 元気全開DAY！DAY！DAY！ (ab#0)"
@@ -20328,7 +20314,7 @@
       "is_null": false,
       "cost": null,
       "effect": {
-        "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合、このカードの{{live_success.png|ライブ成功時}}能力を無効にする。{{live_success.png|ライブ成功時}}相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く",
+        "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合、このカードの{{live_success.png|ライブ成功時}}能力を無効にする",
         "condition": {
           "text": "自分のステージにいる『Aqours』のメンバーが持つハートに、{{heart_02.png|heart02}}が合計6個以上ある場合",
           "target": "self",
@@ -20345,35 +20331,37 @@
           ],
           "type": "group_condition"
         },
-        "action": "sequential",
-        "actions": [
-          {
-            "text": "このカードの{{live_success.png|ライブ成功時}}能力を無効にする",
-            "action": "invalidate_ability",
-            "self_target": true,
-            "group_names": [
-              "Aqours"
-            ]
-          },
-          {
-            "text": "{{live_success.png|ライブ成功時}}相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く",
-            "source": "energy_deck",
-            "destination": "energy_zone",
-            "state_change": "wait",
-            "count": 1,
-            "card_type": "energy_card",
-            "action": "move_cards",
-            "heart_colors": [
-              "heart02"
-            ]
-          }
-        ],
+        "action": "invalidate_ability",
+        "self_target": true,
         "group_names": [
           "Aqours"
         ],
         "heart_colors": [
           "heart02"
         ]
+      }
+    },
+    {
+      "full_text": "{{live_success.png|ライブ成功時}}相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く。",
+      "triggerless_text": "相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く。",
+      "card_count": 1,
+      "cards": [
+        "PL!S-pb1-019-L | 元気全開DAY！DAY！DAY！ (ab#1)"
+      ],
+      "triggers": "ライブ成功時",
+      "use_limit": null,
+      "is_null": false,
+      "cost": null,
+      "effect": {
+        "text": "相手は、エネルギーデッキからエネルギーカードを1枚ウェイト状態で置く",
+        "source": "energy_deck",
+        "destination": "energy_zone",
+        "state_change": "wait",
+        "count": 1,
+        "card_type": "energy_card",
+        "action": "move_cards",
+        "target": "opponent",
+        "action_by": "opponent"
       }
     },
     {
@@ -21119,7 +21107,7 @@
             "duration": "live_end",
             "card_type": "member_card",
             "action": "set_heart_type",
-            "heart_type": null,
+            "heart_type": "selected",
             "original_value": true,
             "self_target": true
           }
@@ -21162,7 +21150,7 @@
             "duration": "live_end",
             "card_type": "member_card",
             "action": "set_heart_type",
-            "heart_type": null,
+            "heart_type": "selected",
             "original_value": true,
             "self_target": true
           }
@@ -23303,7 +23291,7 @@
             "duration": "live_end",
             "card_type": "member_card",
             "action": "set_heart_type",
-            "heart_type": null,
+            "heart_type": "selected",
             "original_value": true,
             "self_target": true
           }
@@ -23346,7 +23334,7 @@
             "duration": "live_end",
             "card_type": "member_card",
             "action": "set_heart_type",
-            "heart_type": null,
+            "heart_type": "selected",
             "original_value": true,
             "self_target": true
           }

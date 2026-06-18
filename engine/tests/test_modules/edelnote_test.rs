@@ -215,11 +215,6 @@ fn edelnote_three_members_two_same_name() {
 
     let blade_count = got_blade.iter().filter(|&&b| b > 0).count();
     let heart_count = got_heart.iter().filter(|&&h| h > 0).count();
-    let both_count = got_blade
-        .iter()
-        .zip(got_heart.iter())
-        .filter(|(&b, &h)| b > 0 && h > 0)
-        .count();
 
     assert_eq!(
         blade_count, 1,
