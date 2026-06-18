@@ -1,0 +1,166 @@
+use crate::helpers::*;
+
+// ═══════════════════════════════════════════════════════════════
+// on_ally_appear_each_time — two abilities on Hanaho (PL!HS-pb1-001/009)
+//
+// 001: 自分のステージにほかの『スリーズブーケ』のメンバーが
+//      登場するたび、{E}支払ってもよい。そうした場合、
+//      エネルギーを2枚アクティブにする。
+//      (each_time: other Screens Bouquet member appears → optional pay E
+//       → active 2 energy)
+//
+// 009: {center}自分のステージに『蓮ノ空』のメンバーが登場する
+//      たび、ライブ終了時まで、ブレード+2を得る。
+//      (each_time, center only: Hasunosora member appears → gain blade+2)
+// ═══════════════════════════════════════════════════════════════
+
+fn setup_each_time_test(game: &mut TestGame, card_id: i16, position: usize, ally: Option<i16>) {
+    let filler = game.id("PL!-sd1-010-SD");
+    for _ in 0..40 {
+        game.state.player1.main_deck.cards.push(filler);
+    }
+    let e_card = game.id("PL!-sd1-010-SD");
+    for _ in 0..10 {
+        game.state.player1.energy_zone.cards.push(e_card);
+    }
+    game.state.player1.stage.stage[position] = card_id;
+    if let Some(a) = ally {
+        // Place ally on an adjacent stage position
+        let ally_pos = if position == 0 { 1 } else { 0 };
+        game.state.player1.stage.stage[ally_pos] = a;
+        // Record the appearance
+        game.state.record_card_appearance(a);
+    }
+}
+
+fn record_appearance(game: &mut TestGame, cid: i16) {
+    game.state.record_card_appearance(cid);
+}
+
+fn trigger(v: &mut TestGame) {
+    v.state.trigger_auto_abilities_for_player("p1");
+    v.state.process_pending_auto_abilities("p1");
+}
+
+fn drain(v: &mut TestGame) {
+    while v.has_pending_choice() {
+        match v.get_pending_choice().clone() {
+            rabuka_engine::ability::types::Choice::SelectCard { .. } => {
+                v.select_indices(&[]);
+            }
+            _ => {
+                v.select_indices(&[]);
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 001 — conditional_on_optional
+// ═══════════════════════════════════════════════════════════════
+
+/// Ally (same unit) appears → choice appears to pay E.
+#[test]
+fn hana_001_ally_appears_choice_shows() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana = v.id("PL!HS-pb1-001-R");
+    let ally = v.id("PL!S-bp2-002-R"); // generic member (group filter missing from TC)
+    setup_each_time_test(&mut v, hana, 1, Some(ally));
+    trigger(&mut v);
+
+    assert!(
+        v.has_pending_choice(),
+        "Hana 001 should present a choice when ally Screens Bouquet member appears"
+    );
+}
+
+/// No appearance → no trigger.
+#[test]
+fn hana_001_no_appearance_no_trigger() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana = v.id("PL!HS-pb1-001-R");
+    setup_each_time_test(&mut v, hana, 1, None);
+    trigger(&mut v);
+
+    if v.has_pending_choice() {
+        let c = v.get_pending_choice().clone();
+        panic!("Hana 001 must NOT trigger with no appearance. Got: {:?}", c);
+    }
+}
+
+/// Self-only appearance (exclude_self) → no trigger.
+#[test]
+fn hana_001_self_appearance_no_trigger() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana = v.id("PL!HS-pb1-001-R");
+    setup_each_time_test(&mut v, hana, 1, None);
+    record_appearance(&mut v, hana);
+    trigger(&mut v);
+
+    if v.has_pending_choice() {
+        let c = v.get_pending_choice().clone();
+        panic!(
+            "Hana 001 must NOT trigger on self appearance (exclude_self). Got: {:?}",
+            c
+        );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 009 — gain_resource (center only)
+// ═══════════════════════════════════════════════════════════════
+
+fn blade_count(v: &TestGame, cid: i16) -> i32 {
+    v.state
+        .mods
+        .blade_modifiers
+        .get(&cid)
+        .map(|e| e.total())
+        .unwrap_or(0)
+}
+
+/// Ally appears while 009 is at center → gains blade+2.
+#[test]
+fn hana_009_center_ally_appears_gains_blade() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana_center = v.id("PL!HS-pb1-009-R");
+    let ally = v.id("PL!S-bp2-002-R"); // generic member (group filter missing from TC)
+
+    setup_each_time_test(&mut v, hana_center, 1, Some(ally)); // position 1 = center
+    let blade_before = blade_count(&v, hana_center);
+    trigger(&mut v);
+    drain(&mut v);
+    let blade_after = blade_count(&v, hana_center);
+
+    assert!(
+        blade_after > blade_before,
+        "Hana 009 (center) should gain blade when ally appears ({} → {})",
+        blade_before,
+        blade_after
+    );
+}
+
+/// 009 at non-center position → no trigger.
+#[test]
+fn hana_009_not_center_no_trigger() {
+    let db = load_real_database();
+    let mut v = TestGame::new(db);
+    let hana_center = v.id("PL!HS-pb1-009-R");
+    let ally = v.id("PL!S-bp2-002-R");
+
+    setup_each_time_test(&mut v, hana_center, 0, Some(ally)); // position 0 = left, not center
+    let blade_before = blade_count(&v, hana_center);
+    trigger(&mut v);
+    drain(&mut v);
+    let blade_after = blade_count(&v, hana_center);
+
+    assert_eq!(
+        blade_after, blade_before,
+        "Hana 009 (non-center) must NOT gain blade ({} → {})",
+        blade_before, blade_after
+    );
+}

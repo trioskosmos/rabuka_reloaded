@@ -1,4 +1,18 @@
 use crate::helpers::*;
+use rabuka_engine::card::HeartColor;
+
+// ═══════════════════════════════════════════════════════════════
+// Group E: PL!-bp5-004-R+ (Sonoda Umi) — gain all hearts
+//
+// 自分がエールしたとき、エールにより公開された自分のカードの中に
+// ブレードハートを持たないメンバーカードが3枚以上ある場合、
+// ライブ終了時まで、全ハートを得る。
+//
+// The engine adds HeartColor::All to heart_modifiers on the
+// activating card (misc.rs:246). The condition checks
+// card_count_condition ≥3 member cards without blade heart
+// in revealed_cards.
+// ═══════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
 // Group D: PL!S-bp2-007-R+ (Kurosawa Dia) — conditional draw
@@ -100,13 +114,14 @@ fn setup_umi_test(game: &mut TestGame, member_ids: &[i16]) {
     }
 }
 
-fn has_any_heart_modifiers(game: &TestGame) -> bool {
+fn has_all_heart_modifier(game: &TestGame) -> bool {
+    // HeartColor::All is added to the activating card's heart_modifiers
+    // by execute_gain_resource (misc.rs:244-253) when heart_type="all".
     game.state
         .mods
         .heart_modifiers
         .iter()
-        .flat_map(|(_, hm)| hm.values())
-        .any(|e| e.total() > 0)
+        .any(|(_, hm)| hm.get(&HeartColor::All).map_or(false, |e| e.total() > 0))
 }
 
 /// 3 qualifying members → gains hearts.
@@ -119,13 +134,16 @@ fn umi_bp5_three_members_without_blade_heart_gains_all_hearts() {
     let m3 = game.id("PL!S-sd1-006-SD"); // Yoshiko, no blade_heart
     setup_umi_test(&mut game, &[m1, m2, m3]);
 
-    assert!(!has_any_heart_modifiers(&game), "No hearts before");
+    assert!(
+        !has_all_heart_modifier(&game),
+        "HeartColor::All must not be present before"
+    );
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
 
     assert!(
-        has_any_heart_modifiers(&game),
-        "Umi must give hearts with 3+ qualifying members in yell"
+        has_all_heart_modifier(&game),
+        "Umi must set HeartColor::All with 3+ qualifying members in yell"
     );
 }
 
@@ -140,14 +158,14 @@ fn umi_bp5_three_members_with_blade_heart_no_gain() {
     let m3 = game.id("PL!-pb1-014-R");
     setup_umi_test(&mut game, &[m1, m2, m3]);
 
-    let before = has_any_heart_modifiers(&game);
+    let before = has_all_heart_modifier(&game);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
-    let after = has_any_heart_modifiers(&game);
+    let after = has_all_heart_modifier(&game);
 
     assert_eq!(
         before, after,
-        "Umi must NOT give hearts with 3 members that HAVE blade heart"
+        "Umi must NOT set HeartColor::All with 3 members that HAVE blade heart"
     );
 }
 
@@ -160,13 +178,13 @@ fn umi_bp5_two_members_no_heart_gain() {
     let m2 = game.id("PL!S-PR-013-PR");
     setup_umi_test(&mut game, &[m1, m2]);
 
-    let before = has_any_heart_modifiers(&game);
+    let before = has_all_heart_modifier(&game);
     game.state.trigger_auto_abilities_for_player("p1");
     game.state.process_pending_auto_abilities("p1");
-    let after = has_any_heart_modifiers(&game);
+    let after = has_all_heart_modifier(&game);
 
     assert_eq!(
         before, after,
-        "Umi must NOT give hearts with only 2 qualifying members"
+        "Umi must NOT set HeartColor::All with only 2 qualifying members"
     );
 }

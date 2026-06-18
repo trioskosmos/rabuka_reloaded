@@ -208,6 +208,11 @@ impl GameState {
                                 if let Some(ref trigger_cond) = effect.trigger_condition {
                                     let moved: &[i16] =
                                         self.recently_moved_cards.as_deref().unwrap_or(&[]);
+                                    // Temporarily set activating_card so position-based
+                                    // checks (center, left, right) in appearance_condition
+                                    // can match the current card during scanning.
+                                    let saved_activating = self.activating_card;
+                                    self.activating_card = Some(card_id);
                                     let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
                                     let passes = ctx.evaluate_condition(trigger_cond);
                                     if crate::ability::debug::ABILITY_DEBUG
@@ -218,6 +223,7 @@ impl GameState {
                                             card.name, trigger_cond.condition_type, trigger_cond.source, passes
                                         );
                                     }
+                                    self.activating_card = saved_activating;
                                     if !passes {
                                         continue;
                                     }
