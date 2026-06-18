@@ -82,6 +82,8 @@ pub struct GameState {
     pub last_area_move_by_player: Option<String>,
     /// Whether energy was placed by a card effect (vs energy phase draw).
     pub last_energy_placed_by_effect: bool,
+    /// Which player's effect caused the last energy placement.
+    pub last_energy_placed_by_player: Option<String>,
     // --- 2-byte aligned (i16, Option<i16>) ---
     pub activating_card: Option<i16>,
     pub activating_ability_index: Option<usize>,
@@ -221,6 +223,7 @@ impl GameState {
             last_area_move_card_id: None,
             last_area_move_by_player: None,
             last_energy_placed_by_effect: false,
+            last_energy_placed_by_player: None,
             // 2-byte aligned
             activating_card: None,
             activating_ability_index: None,
@@ -410,6 +413,7 @@ impl GameState {
         self.last_area_move_card_id = None;
         self.last_area_move_by_player = None;
         self.last_energy_placed_by_effect = false;
+        self.last_energy_placed_by_player = None;
         self.recently_moved_cards = None;
         self.recently_moved_from_zone = None;
         self.mods.last_cost_discard_count = 0;

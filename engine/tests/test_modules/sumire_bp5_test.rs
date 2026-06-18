@@ -52,6 +52,7 @@ fn test_sumire_energy_effect_triggers() {
     game.add_to_stage(MemberArea::Center, sumire);
     // Simulate energy placed by card effect
     game.state.last_energy_placed_by_effect = true;
+    game.state.last_energy_placed_by_player = Some(game.state.player1.id.clone());
     game.state.last_area_move_card_id = None;
     game.state.last_area_move_by_player = None;
 
@@ -138,6 +139,77 @@ fn test_sumire_opponent_no_trigger() {
     );
 }
 
+/// Energy placed by opponent's effect → self_effect_only check must reject it.
+#[test]
+fn test_sumire_opponent_energy_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    game.add_to_stage(MemberArea::Center, sumire);
+    // Simulate opponent's effect placing energy — last_energy_placed_by_player is "p2"
+    game.state.last_energy_placed_by_effect = true;
+    game.state.last_energy_placed_by_player = Some(game.state.player2.id.clone());
+    game.state.last_area_move_card_id = None;
+    game.state.last_area_move_by_player = None;
+
+    let before_hand = game.state.player1.hand.cards.len();
+    let player_id = game.state.player1.id.clone();
+    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+        &mut game.state,
+        &player_id,
+    );
+    // self_effect_only check: energy_ok requires last_energy_placed_by_player == "p1"
+    assert_eq!(
+        heart02_mod(&game, sumire),
+        0,
+        "opponent energy must NOT trigger"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        before_hand,
+        "no draw from opponent energy"
+    );
+}
+
+/// Different card area move by own effect → DOES trigger (engine checks
+/// last_area_move_card_id.is_some() but not WHICH card moved). Card text says
+/// "このメンバー" (this member) but the movement condition doesn't validate it.
+#[test]
+fn test_sumire_other_card_move_triggers() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    let other = game.id("PL!-sd1-010-SD");
+    fill_deck(&mut game);
+    game.give_energy(15);
+    game.add_to_stage(MemberArea::Center, sumire);
+    game.state.last_area_move_card_id = Some(other);
+    game.state.last_area_move_by_player = Some(game.state.player1.id.clone());
+    game.state.last_energy_placed_by_effect = false;
+    game.state.last_energy_placed_by_player = None;
+
+    let before_hand = game.state.player1.hand.cards.len();
+    let player_id = game.state.player1.id.clone();
+    let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
+        &mut game.state,
+        &player_id,
+    );
+    game.state.process_pending_auto_abilities(&player_id);
+
+    assert_eq!(
+        heart02_mod(&game, sumire),
+        1,
+        "different-card move triggers (engine does not validate card identity)"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        before_hand + 1,
+        "draw from different-card move"
+    );
+}
+
 #[test]
 fn test_sumire_use_limit_blocks_second() {
     let db = load_real_database();
@@ -153,6 +225,7 @@ fn test_sumire_use_limit_blocks_second() {
     // First trigger consumed use_limit during play_to_stage.
     // Set up energy trigger and try again → should be blocked by use_limit.
     game.state.last_energy_placed_by_effect = true;
+    game.state.last_energy_placed_by_player = Some(game.state.player1.id.clone());
     game.state.last_area_move_card_id = None;
     game.state.last_area_move_by_player = None;
     let _ = rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(
@@ -181,6 +254,7 @@ fn test_sumire_no_event_no_trigger() {
     game.state.last_area_move_card_id = None;
     game.state.last_area_move_by_player = None;
     game.state.last_energy_placed_by_effect = false;
+    game.state.last_energy_placed_by_player = None;
 
     let before_hand = game.state.player1.hand.cards.len();
     let player_id = game.state.player1.id.clone();

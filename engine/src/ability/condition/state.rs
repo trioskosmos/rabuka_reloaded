@@ -577,9 +577,12 @@ impl<'a> ConditionContext<'a> {
                     self.game_state.last_area_move_card_id.is_some()
                         && (self.game_state.last_area_move_by_player.as_ref() == Some(&player.id))
                 });
-                let energy_ok = condition
-                    .energy_placed
-                    .is_none_or(|_| self.game_state.last_energy_placed_by_effect);
+                let energy_ok = condition.energy_placed.is_none_or(|_| {
+                    self.game_state.last_energy_placed_by_effect
+                        && (!condition.self_effect_only.unwrap_or(false)
+                            || self.game_state.last_energy_placed_by_player.as_ref()
+                                == Some(&player.id))
+                });
                 let has_area_check = condition.self_effect_only.is_some();
                 let has_energy_check = condition.energy_placed.is_some();
                 if !has_area_check && !has_energy_check {

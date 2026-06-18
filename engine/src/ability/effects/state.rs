@@ -416,7 +416,9 @@ impl AbilityResolver {
         }
         // Track that energy was placed by a card effect (not energy phase draw)
         if count > 0 {
+            let player_id = player.id.clone();
             gs.last_energy_placed_by_effect = true;
+            gs.last_energy_placed_by_player = Some(player_id);
         }
     }
 
