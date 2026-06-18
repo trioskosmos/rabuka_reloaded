@@ -1,0 +1,65 @@
+AUTO TRIGGER PARSER FIXES — COMPLETED
+======================================
+Date: 2026-06-19
+File: cards/ability_extraction/parser.py
+Tests: 968/968 pass
+
+PROBLEM
+-------
+56 jidou (自動) abilities in abilities.json. 12 had issues:
+  - 5 had NEITHER condition NOR trigger_condition  → engine false positives
+  - 7 had trigger_condition but NO condition        → theoretically risky
+  - 38 had both (working correctly)
+
+Additionally, 1 had `condition.type: "custom"` (parser gave up), and several
+had wrong location or missing source fields for zone-placement triggers.
+
+CHANGES MADE
+------------
+
+1. NEW HANDLER: _try_zone_placement() in parse_condition cascade
+   Added at position #14 (after _try_movement, _try_appearance)
+   Handles "から...に置かれ" (zone-to-zone placement) patterns.
+   Extracts SOURCE zone (before "から") not destination.
+   Calls _extract_generic_fields() for card_type, target, group_names.
+   Produces: card_count_condition with source: "preceding_moved"
+   Fixes: Riko's "live_card_zone→discard" (preserves Aqours group + source zone)
+
+2. NEW HANDLER: _try_appear_or_move() in parse_condition cascade  
+   Handles "登場か、エリアを移動" (appear OR area move) pattern.
+   Produces: or_condition with [appearance, movement]
+   Fixes: Kinako's "登場か、エリアを移動するたび"
+
+3. _try_revealed() — relaxed entrance check
+   Changed from specific "エールにより公開された自分のカードの中に" only
+   to also accept any text with "エールにより公開された" or "エールした".
+   Fixes: Chika, Ayumu, Dia — yell triggers now produce proper conditions
+
+4. _try_each_time() — trigger_condition enhancement
+   Falls through to parse_condition() even when "か、" is present
+   (previously only tried _try_or which required "あるか、")
+   Adds source: "preceding_moved" to card_count_conditions with location:discard
+   Does NOT copy to condition (avoids resolution-time stale state)
+
+5. parse_ability() — auto trigger extraction in main loop
+   Only fires when BOTH condition AND trigger_condition are absent
+   Extracts first "とき、/場合、/たび、/なら、" segment as trigger
+   Produces both condition + trigger_condition from parse_condition result
+   Fixes: Ayumu, Miyashita Ai, Dia, Chika, Mirai Ticket (custom→proper)
+
+6. REMOVED: Post-processing FIX 5 (each_time preceding_moved injection)
+   Moved inline into _try_each_time() instead.
+
+7. REMOVED: Post-processing FIX 8a (location_condition→movement conversion)
+   Replaced by _try_zone_placement() which produces correct type directly.
+
+8. UPDATED: mirai_ticket_test.rs
+   Changed test assertion from expecting ConditionType::Custom to expecting
+   any properly-parsed condition type (not Custom).
+
+RESULT SUMMARY
+--------------
+12/12 broken jidou abilities now produce proper condition/trigger_condition.
+0 new regressions (968 existing tests all pass).
+0 abilities remain with `condition.type: "custom"`.
+Parser changes are in main handler loops, not post-processing.

@@ -1,0 +1,90 @@
+=== PARSER INCONSISTENCIES WITHIN SAME TRIGGER TYPE ===
+
+### OTHER (14 abilities) - INCONSISTENT PARSING
+  PL!N-bp5-005-R＋ | 宮下 愛: action=sequential cond_type=None has_cond=False
+  PL!SP-bp5-005-R＋ | 葉月 恋: action=conditional_on_optional cond_type=None has_cond=False
+  PL!HS-bp5-003-R＋ | 大沢瑠璃乃: action=position_change cond_type=card_count_condition has_cond=True
+  PL!S-bp6-002-R＋ | 桜内梨子: action=move_cards cond_type=card_count_condition has_cond=True
+  PL!-PR-001-PR | 高坂穂乃果: action=change_state cond_type=card_count_condition has_cond=True
+  PL!S-bp2-002-R | 桜内梨子: action=sequential cond_type=card_count_condition has_cond=True
+  PL!HS-pb1-003-R | 大沢瑠璃乃: action=sequential cond_type=None has_cond=False
+  PL!HS-bp2-012-N | 乙宗 梢: action=look_and_select cond_type=card_count_condition has_cond=True
+  PL!HS-bp2-013-N | 夕霧綴理: action=look_and_select cond_type=card_count_condition has_cond=True
+  PL!HS-bp2-015-N | 藤島 慈: action=sequential cond_type=card_count_condition has_cond=True
+  PL!HS-sd1-001-SD | 日野下花帆: action=change_state cond_type=movement_condition has_cond=True
+  PL!HS-bp6-017-N | 日野下花帆: action=sequential cond_type=card_count_condition has_cond=True
+  PL!HS-bp6-018-N | 村野さやか: action=sequential cond_type=card_count_condition has_cond=True
+  PL!HS-bp6-019-N | 大沢瑠璃乃: action=sequential cond_type=card_count_condition has_cond=True
+
+### on_ally_appear (4 abilities) - INCONSISTENT PARSING
+  PL!N-bp3-005-R＋ | 宮下 愛: action=draw_until_count cond_type=temporal_condition has_cond=True
+  PL!N-pb1-005-R | 宮下 愛: action=draw_card cond_type=appearance_condition has_cond=True
+  PL!N-pb1-012-R | 鐘 嵐珠: action=move_cards cond_type=appearance_condition has_cond=True
+  PL!HS-bp6-007-R | セラス 柳田 リリエンフェルト: action=change_state cond_type=appearance_condition has_cond=True
+
+### on_appear_each (2 abilities) - INCONSISTENT PARSING
+  PL!HS-pb1-001-R | 日野下花帆: action=conditional_on_optional cond_type=None has_cond=False
+  PL!HS-pb1-009-R | 日野下花帆: action=gain_resource cond_type=None has_cond=False
+
+### on_appear_or_move (2 abilities) - INCONSISTENT PARSING
+  PL!SP-bp4-011-R＋ | 鬼塚冬毬: action=change_state cond_type=movement_condition has_cond=True
+  PL!SP-pb1-006-R | 桜小路きな子: action=gain_resource cond_type=None has_cond=False
+
+### on_area_move (10 abilities) - INCONSISTENT PARSING
+  PL!SP-sd2-002-P | 唐 可可: action=gain_resource cond_type=movement_condition has_cond=True
+  PL!SP-bp2-003-R | 嵐 千砂都: action=move_cards cond_type=movement_condition has_cond=True
+  PL!SP-bp4-007-R | 米女メイ: action=move_cards cond_type=movement_condition has_cond=True
+  PL!S-bp5-111-R | 鹿角聖良: action=change_state cond_type=movement_condition has_cond=True
+  PL!S-bp5-222-R | 鹿角理亞: action=change_state cond_type=movement_condition has_cond=True
+  PL!SP-pb1-020-N | 鬼塚夏美: action=draw_card cond_type=None has_cond=False
+  PL!HS-bp5-014-N | 安養寺 姫芽: action=gain_resource cond_type=movement_condition has_cond=True
+  PL!SP-sd2-011-SD2 | 鬼塚冬毬: action=gain_resource cond_type=movement_condition has_cond=True
+  PL!SP-sd2-012-SD2 | 澁谷かのん: action=gain_resource cond_type=movement_condition has_cond=True
+  PL!SP-sd2-022-SD2 | 鬼塚冬毬: action=gain_resource cond_type=movement_condition has_cond=True
+
+### on_live_start_resolved (2 abilities) - INCONSISTENT PARSING
+  PL!N-bp5-030-L | 繚乱！ビクトリーロード: action=gain_resource cond_type=location_condition has_cond=True
+  PL!-bp6-020-L | Dancing stars on me!: action=position_change cond_type=group_condition has_cond=True
+
+### on_live_success_resolved (2 abilities) - INCONSISTENT PARSING
+  PL!N-bp5-030-L | 繚乱！ビクトリーロード: action=draw_card cond_type=None has_cond=False
+  PL!-bp6-020-L | Dancing stars on me!: action=modify_score cond_type=temporal_condition has_cond=True
+
+### on_placed_live_zone (2 abilities) - INCONSISTENT PARSING
+  PL!N-bp4-026-L | DIVE!: action=sequential cond_type=location_condition has_cond=True
+  PL!N-bp4-026-L | DIVE!: action=gain_resource cond_type=location_condition has_cond=True
+
+### on_self_active_to_wait (2 abilities) - INCONSISTENT PARSING
+  PL!-pb1-015-R | 西木野真姫: action=draw_card cond_type=state_change_condition has_cond=True
+  PL!N-bp4-018-N | 近江彼方: action=sequential cond_type=state_change_condition has_cond=True
+
+### on_yell (13 abilities) - INCONSISTENT PARSING
+  PL!S-bp2-007-R＋ | 国木田花丸: action=draw_card cond_type=compound has_cond=True
+  PL!-bp5-004-R＋ | 園田海未: action=gain_resource cond_type=card_count_condition has_cond=True
+  PL!N-bp5-001-R＋ | 上原歩夢: action=sequential cond_type=None has_cond=False
+  PL!S-PR-040-PR | 国木田花丸: action=gain_resource cond_type=card_count_condition has_cond=True
+  PL!S-bp2-003-R | 松浦果南: action=gain_resource cond_type=card_count_condition has_cond=True
+  PL!S-bp2-004-R | 黒澤ダイヤ: action=conditional_on_result cond_type=None has_cond=False
+  PL!SP-bp2-015-N | 平安名すみれ: action=gain_resource cond_type=location_condition has_cond=True
+  PL!SP-bp2-020-N | 鬼塚夏美: action=gain_resource cond_type=location_condition has_cond=True
+  PL!SP-bp2-021-N | ウィーン・マルガレーテ: action=gain_resource cond_type=location_condition has_cond=True
+  PL!S-bp3-020-L | ダイスキだったらダイジョウブ！: action=sequential cond_type=card_count_condition has_cond=True
+  PL!S-sd1-001-SD | 高海千歌: action=gain_resource cond_type=None has_cond=False
+  PL!S-bp6-021-L | MIRAI TICKET: action=sequential cond_type=custom has_cond=True
+  PL!HS-bp6-027-L | 月夜見海月: action=sequential cond_type=custom has_cond=True
+
+=== WRONG/MISSING cond_type ASSIGNMENTS ===
+
+MISSING: PL!N-bp5-001-R＋ | 上原歩夢 - yell trigger has NO condition parsed
+MISSING: PL!SP-pb1-006-R | 桜小路きな子 - area_move trigger has NO condition parsed
+MISSING: PL!S-bp2-004-R | 黒澤ダイヤ - yell trigger has NO condition parsed
+MISSING: PL!HS-pb1-001-R | 日野下花帆 - appear_each trigger has NO condition parsed
+MISSING: PL!HS-pb1-009-R | 日野下花帆 - appear_each trigger has NO condition parsed
+MISSING: PL!SP-pb1-020-N | 鬼塚夏美 - area_move trigger has NO condition parsed
+WRONG TYPE: PL!SP-bp2-015-N | 平安名すみれ - yell trigger got cond_type=location_condition (should be card_count_condition)
+WRONG TYPE: PL!SP-bp2-020-N | 鬼塚夏美 - yell trigger got cond_type=location_condition (should be card_count_condition)
+WRONG TYPE: PL!SP-bp2-021-N | ウィーン・マルガレーテ - yell trigger got cond_type=location_condition (should be card_count_condition)
+MISSING: PL!SP-bp4-016-N | 葉月 恋 - energy_placed trigger has NO condition parsed
+MISSING: PL!S-sd1-001-SD | 高海千歌 - yell trigger has NO condition parsed
+
+Total abilities with wrong/missing cond_type: 11/56

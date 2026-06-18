@@ -8,9 +8,7 @@ use crate::helpers::*;
 /// カードのコスト5につき、追加で1枚エールを行う。
 /// この能力では4枚までしか追加でエールできない。
 ///
-/// The condition text "自分がエールしたとき" is a "custom" condition type.
-/// The trigger system already filters for yell timing, so the custom
-/// condition should always evaluate to true at that point.
+/// Verify the ability is loaded with proper condition from parser.
 #[test]
 fn mirai_ticket_custom_condition_loads_and_fires() {
     let db = load_real_database();
@@ -30,7 +28,7 @@ fn mirai_ticket_custom_condition_loads_and_fires() {
     // Stage MIRAI TICKET
     game.state.player1.stage.stage = [-1, mirai, -1];
 
-    // Verify the ability is loaded with custom condition
+    // Verify the ability is loaded
     let card = game
         .state
         .card_database
@@ -44,13 +42,12 @@ fn mirai_ticket_custom_condition_loads_and_fires() {
     let cond = ab.effect.as_ref().and_then(|e| e.condition.as_ref());
     assert!(cond.is_some(), "Ability should have a condition");
     if let Some(c) = cond {
-        // The condition type should be "custom" (parser couldn't fully parse)
-        assert_eq!(
-            c.condition_type,
-            Some(rabuka_engine::ability::enums::ConditionType::Custom),
-            "Condition type should be Custom"
+        assert!(
+            c.condition_type.is_some()
+                && c.condition_type != Some(rabuka_engine::ability::enums::ConditionType::Custom),
+            "Condition type should be a proper parsed type, not Custom"
         );
-        assert!(!c.text.is_empty(), "Custom condition should have text");
+        assert!(!c.text.is_empty(), "Condition should have text");
         assert!(
             c.text.contains("エール"),
             "Condition text should mention エール (yell): {}",

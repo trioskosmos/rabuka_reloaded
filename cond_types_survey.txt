@@ -1,0 +1,182 @@
+=== CONDITION TYPES USED IN ABILITIES.JSON ===
+
+NONE (1 structural variants)
+  keys: 
+
+ability_filter_condition (1 structural variants)
+  keys: ability_filter|ability_filter_triggers|type
+
+all_cost_comparison_condition (1 structural variants)
+  keys: card_type|comparison_source|comparison_target|comparison_type|location|operator|type
+
+appearance_condition (7 structural variants)
+  keys: all_areas|appearance|location|target|type
+  keys: appearance|baton_touch_trigger|group_names|location|min_baton_touch_count|position|type
+  keys: appearance|characters|location|position|position_compare|target|type
+  keys: appearance|exclude_self|location|target|type
+  keys: appearance|location|position|type
+  keys: appearance|location|target|type
+  keys: appearance|location|type
+
+card_blade_condition (1 structural variants)
+  keys: count|operator|source|type
+
+card_count_condition (25 structural variants)
+  keys: aggregate|card_type|count|heart_colors|location|operator|target|type
+  keys: aggregate|card_type|count|location|operator|target|type
+  keys: aggregate|count|location|operator|scope|target|type
+  keys: card_property|card_type|comparison_target|count|location|negation|operator|target|type
+  keys: card_property|count|location|operator|target|type
+  keys: card_type|comparison_target|count|location|operator|target|type
+  keys: card_type|count|distinct|group_names|location|operator|target|type
+  keys: card_type|count|distinct|location|operator|target|type|unit
+  keys: card_type|count|exclude_self|location|operator|target|type|unit
+  keys: card_type|count|group_names|location|operator|same_name|target|type|unit
+  keys: card_type|count|group_names|location|operator|source|target|type
+  keys: card_type|count|group_names|location|operator|target|type
+  keys: card_type|count|group_names|location|operator|target|type|unit
+  keys: card_type|count|location|operator|source|type
+  keys: card_type|count|location|operator|state|target|type|unit
+  keys: card_type|count|location|operator|target|type
+  keys: card_type|count|location|operator|target|type|unit
+  keys: card_type|count|location|operator|type
+  keys: card_type|count|operator|target|type
+  keys: comparison_target|count|location|operator|target|type
+  keys: count|group_names|location|operator|position|target|type
+  keys: count|group_names|location|operator|target|type
+  keys: count|group_names|operator|target|type
+  keys: count|location|operator|target|type
+  keys: count|operator|target|type
+
+comparison_condition (29 structural variants)
+  keys: aggregate|card_type|comparison_target|comparison_type|location|operator|target|type
+  keys: aggregate|card_type|comparison_type|cost_total|count|group_names|location|operator|target|type
+  keys: aggregate|card_type|comparison_type|count|location|operator|target|type
+  keys: aggregate|comparison_target|comparison_type|location|operator|resource_type|scope|target|temporal|temporal_scope|type
+  keys: aggregate|comparison_target|comparison_type|location|operator|resource_type|scope|target|type
+  keys: aggregate|comparison_target|comparison_type|operator|type
+  keys: aggregate|comparison_type|cost_total|count|location|operator|type|values
+  keys: card_type|comparison_target|comparison_type|group_names|operator|position|target|type
+  keys: card_type|comparison_target|comparison_type|location|operator|target|type
+  keys: card_type|comparison_target|comparison_type|operator|position|target|type
+  keys: card_type|comparison_target|location|operator|target|type
+  keys: card_type|comparison_target|operator|target|type
+  keys: card_type|comparison_type|cost_limit|count|group_names|location|operator|position|target|type
+  keys: card_type|comparison_type|cost_limit|count|group_names|location|operator|target|type
+  keys: card_type|comparison_type|cost_limit|count|location|operator|target|type
+  keys: card_type|comparison_type|cost_limit|exclude_self|location|target|type
+  keys: card_type|comparison_type|location|operator|position|target|type
+  keys: card_type|comparison_type|location|target|type
+  keys: card_type|count|group_names|heart_colors|location|operator|position|resource_type|target|type
+  keys: card_type|count|heart_colors|location|operator|resource_type|target|type
+  keys: card_type|location|resource_type|target|type
+  keys: comparison_target|location|operator|target|type
+  keys: comparison_target|operator|resource_type|target|type
+  keys: comparison_type|type
+  keys: count|heart_colors|operator|resource_type|type
+  keys: count|location|operator|target|type
+  keys: count|operator|resource_type|target|type
+  keys: count|operator|resource_type|temporal|temporal_scope|type
+  keys: count|operator|resource_type|type
+
+compound (6 structural variants)
+  keys: aggregate|card_type|conditions|location|operator|target|type
+  keys: card_type|conditions|distinct|location|operator|target|type
+  keys: card_type|conditions|location|operator|target|type
+  keys: card_type|conditions|operator|target|type
+  keys: conditions|location|operator|target|type
+  keys: conditions|operator|type
+
+custom (1 structural variants)
+  keys: type
+
+energy_state_condition (1 structural variants)
+  keys: state|type
+
+group_condition (13 structural variants)
+  keys: aggregate|card_type|count|group_names|heart_colors|location|operator|target|type
+  keys: aggregate|card_type|count|group_names|location|operator|target|type
+  keys: all_members|card_type|group_names|location|target|type
+  keys: card_type|count|group_names|location|negation|operator|target|type
+  keys: card_type|count|group_names|location|operator|target|type
+  keys: card_type|count|group_names|operator|position|target|type
+  keys: card_type|exclude_characters|group_names|location|target|type
+  keys: card_type|exclude_self|group_names|location|target|type
+  keys: card_type|group_names|heart_colors|location|target|type
+  keys: card_type|group_names|location|position|target|type
+  keys: card_type|group_names|location|target|type
+  keys: card_type|group_names|position|target|type
+  keys: group_names|location|type
+
+location_condition (33 structural variants)
+  keys: aggregate|card_type|count|heart_colors|location|operator|target|type
+  keys: aggregate|card_type|count|heart_colors|location|scope|target|type
+  keys: aggregate|card_type|count|location|operator|target|type
+  keys: aggregate|card_type|location|type
+  keys: blade_limit|blade_limit_operator|card_type|count|location|position|position_compare|target|type
+  keys: card_property|heart_colors|location|negation|target|type
+  keys: card_property|location|negation|target|type
+  keys: card_type|check_self|location|target|type
+  keys: card_type|comparison_type|heart_colors|location|operator|scope|target|type
+  keys: card_type|comparison_type|location|operator|position|position_compare|target|type
+  keys: card_type|count|heart_colors|location|operator|target|type
+  keys: card_type|count|location|operator|original_value|type
+  keys: card_type|exclude_self|location|negation|target|type
+  keys: card_type|exclude_self|location|scope|type
+  keys: card_type|exclude_self|location|target|type
+  keys: card_type|heart_colors|location|negation|type
+  keys: card_type|heart_colors|location|target|type
+  keys: card_type|heart_colors|location|type
+  keys: card_type|heart_type|location|negation|type
+  keys: card_type|location|target_event|type
+  keys: card_type|location|target|type
+  keys: card_type|location|type
+  keys: characters|heart_colors|location|target|type
+  keys: characters|location|target|type
+  keys: cost_limit|location|operator|target|type
+  keys: count|distinct|group_names|heart_colors|locations|operator|target|type|unit
+  keys: count|distinct|group_names|location|operator|target|type|unit
+  keys: count|distinct|heart_colors|location|operator|target|type|unit
+  keys: count|distinct|location|operator|target|type|unit
+  keys: location|locations|target|type
+  keys: location|position|target|type
+  keys: location|target|temporal|temporal_scope|type
+  keys: location|target|type
+
+movement_condition (10 structural variants)
+  keys: ability_filter|baton_touch_trigger|card_type|location|movement|target|type
+  keys: baton_touch_source|baton_touch_trigger|location|movement|target|type
+  keys: baton_touch_trigger|comparison_type|group_names|location|movement|operator|target|type
+  keys: baton_touch_trigger|comparison_type|location|movement|operator|target|type
+  keys: baton_touch_trigger|cost_limit|cost_limit_operator|group_names|location|movement|target|type
+  keys: baton_touch_trigger|exclude_self|location|movement|target|type
+  keys: baton_touch_trigger|group_names|location|movement|target|type
+  keys: baton_touch_trigger|location|movement|target|type
+  keys: energy_placed|movement|self_effect_only|type
+  keys: movement|movement_state|type
+
+or_condition (2 structural variants)
+  keys: aggregate|conditions|type
+  keys: conditions|type
+
+position_condition (1 structural variants)
+  keys: location|position|type
+
+state_change_condition (2 structural variants)
+  keys: card_type|comparison_type|cost_limit|from_state|location|operator|target|to_state|type
+  keys: card_type|from_state|phase|target|to_state|type
+
+state_condition (1 structural variants)
+  keys: state|type
+
+temporal_condition (9 structural variants)
+  keys: aggregate|count|heart_colors|location|target|temporal|type
+  keys: aggregate|count|heart_colors|target|temporal|type
+  keys: card_type|condition|position|temporal|type
+  keys: card_type|condition|temporal|type
+  keys: card_type|count|location|target|temporal|type
+  keys: condition|temporal|type
+  keys: count|group_names|heart_colors|location|locations|target|temporal|type
+  keys: phase|turn_number|type
+  keys: target|temporal|type
+

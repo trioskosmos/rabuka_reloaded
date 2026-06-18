@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-19T03:14:58.418804",
+  "generated_at": "2026-06-19T03:04:58.736592",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4002,17 +4002,27 @@
             },
             "action": "gain_ability",
             "ability_gain": "ライブの合計スコアを+1する。",
-            "duration": "live_end"
+            "duration": "live_end",
+            "gained_effect": {
+              "text": "ライブの合計スコアを+1する",
+              "action": "modify_score",
+              "value": 1,
+              "operation": "add"
+            }
           }
         ],
-        "heart_colors": [
-          "heart01",
-          "heart02",
-          "heart03",
-          "heart04",
-          "heart05",
-          "heart06"
-        ]
+        "trigger_condition": {
+          "type": "location_condition",
+          "location": "revealed_cards",
+          "target": "self",
+          "text": "自分がエールしたとき"
+        },
+        "condition": {
+          "type": "location_condition",
+          "location": "revealed_cards",
+          "target": "self",
+          "text": "自分がエールしたとき"
+        }
       }
     },
     {
@@ -4067,7 +4077,33 @@
         ],
         "group_names": [
           "虹ヶ咲"
-        ]
+        ],
+        "trigger_condition": {
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
+          "source": "preceding_moved",
+          "text": "このメンバーがステージから控え室に置かれたとき",
+          "location": "stage",
+          "locations": [
+            "discard",
+            "stage"
+          ],
+          "card_type": "member_card"
+        },
+        "condition": {
+          "type": "card_count_condition",
+          "count": 1,
+          "operator": ">=",
+          "source": "preceding_moved",
+          "text": "このメンバーがステージから控え室に置かれたとき",
+          "location": "stage",
+          "locations": [
+            "discard",
+            "stage"
+          ],
+          "card_type": "member_card"
+        }
       }
     },
     {
@@ -4432,8 +4468,7 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1,
-              "activation_position": "left_side"
+              "count": 1
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4450,8 +4485,7 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end",
-              "activation_position": "left_side"
+              "duration": "live_end"
             }
           ],
           "activation_position": "left_side"
@@ -4560,9 +4594,6 @@
               "heart02"
             ]
           }
-        ],
-        "heart_colors": [
-          "heart02"
         ]
       }
     },
@@ -4858,7 +4889,6 @@
         "card_type": "member_card",
         "optional": true,
         "action": "position_change",
-        "target": null,
         "target_member": "select"
       }
     },
@@ -9774,7 +9804,21 @@
           "action": "re_yell",
           "lose_blade_hearts": true
         },
-        "all": true
+        "all": true,
+        "trigger_condition": {
+          "type": "location_condition",
+          "location": "revealed_cards",
+          "target": "self",
+          "text": "エールにより公開された自分のカードの中にライブカードがないとき",
+          "negation": true
+        },
+        "condition": {
+          "type": "location_condition",
+          "location": "revealed_cards",
+          "target": "self",
+          "text": "エールにより公開された自分のカードの中にライブカードがないとき",
+          "negation": true
+        }
       }
     },
     {
@@ -19475,10 +19519,7 @@
           "target": "self",
           "text": "エールにより公開された自分のカードの中にブレードハートを持つカードがないとき",
           "negation": true,
-          "card_property": "has_blade_heart",
-          "heart_colors": [
-            "heart06"
-          ]
+          "card_property": "has_blade_heart"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -19509,10 +19550,7 @@
           "target": "self",
           "text": "エールにより公開された自分のカードの中にブレードハートを持つカードがないとき",
           "negation": true,
-          "card_property": "has_blade_heart",
-          "heart_colors": [
-            "heart02"
-          ]
+          "card_property": "has_blade_heart"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -19543,10 +19581,7 @@
           "target": "self",
           "text": "エールにより公開された自分のカードの中にブレードハートを持つカードがないとき",
           "negation": true,
-          "card_property": "has_blade_heart",
-          "heart_colors": [
-            "heart03"
-          ]
+          "card_property": "has_blade_heart"
         },
         "action": "gain_resource",
         "resource": "heart",
@@ -26417,10 +26452,7 @@
           "type": "location_condition",
           "location": "revealed_cards",
           "target": "self",
-          "text": "自分がエールしたとき",
-          "heart_colors": [
-            "heart02"
-          ]
+          "text": "自分がエールしたとき"
         },
         "target": "self"
       }
@@ -27613,7 +27645,6 @@
         },
         "card_type": "member_card",
         "action": "position_change",
-        "target": null,
         "group_names": [
           "μ's"
         ],
@@ -28708,10 +28739,7 @@
             "stage"
           ],
           "card_type": "member_card"
-        },
-        "heart_colors": [
-          "heart05"
-        ]
+        }
       }
     },
     {

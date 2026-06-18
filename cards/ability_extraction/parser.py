@@ -1124,6 +1124,49 @@ def _try_movement(text):
     return result
 
 
+def _try_zone_placement(text):
+    if not re.search(r"から.*?に置かれ", text) or "バトンタッチ" in text:
+        return None
+    result = {
+        "type": "card_count_condition",
+        "count": 1,
+        "operator": ">=",
+        "source": "preceding_moved",
+        "text": text,
+    }
+    _extract_generic_fields(result, text)
+    m_from = re.search(r"から", text)
+    if m_from:
+        source_text = text[: m_from.start()]
+        if "ライブカード置き場" in source_text:
+            result["location"] = "live_card_zone"
+        elif "エネルギー置き場" in source_text:
+            result["location"] = "energy_zone"
+        elif "手札" in source_text or "手元" in source_text:
+            result["location"] = "hand"
+        elif "ステージ" in source_text:
+            result["location"] = "stage"
+    return result
+
+
+def _try_appear_or_move(text):
+    if "登場か、エリアを移動" not in text:
+        return None
+    return {
+        "type": "or_condition",
+        "conditions": [
+            {
+                "type": "appearance_condition",
+                "appearance": True,
+                "location": "stage",
+                "text": text,
+            },
+            {"type": "movement_condition", "movement": "moves", "text": text},
+        ],
+        "text": text,
+    }
+
+
 def _try_appearance(text):
     if "登場" not in text:
         return None
@@ -1224,7 +1267,7 @@ def _try_state(text):
 
 
 def _try_revealed(text):
-    if "エールにより公開された自分のカードの中に" not in text:
+    if "エールにより公開された" not in text and "エールした" not in text:
         return None
     has_negation = "ない" in text
     result = {
@@ -1862,8 +1905,10 @@ def parse_condition(text: str) -> Dict[str, Any]:
         _try_baton_touch,
         _try_temporal_count,
         _try_either_target,
+        _try_appear_or_move,
         _try_movement,
         _try_appearance,
+        _try_zone_placement,
         _try_energy_state,
         _try_state,
         _try_revealed,
@@ -4557,14 +4602,21 @@ def _try_each_time(text):
     sub["trigger_type"] = "each_time"
     sub["text"] = text
     # Parse the trigger condition text
+    trigger_cond = None
     if "か、" in trigger_text:
         or_cond = _try_or(trigger_text)
         if or_cond:
-            sub["trigger_condition"] = or_cond
-    else:
+            trigger_cond = or_cond
+    if trigger_cond is None:
         trigger_cond = parse_condition(trigger_text)
-        if trigger_cond and trigger_cond.get("type") != "custom":
-            sub["trigger_condition"] = trigger_cond
+    if trigger_cond and trigger_cond.get("type") != "custom":
+        if (
+            trigger_cond.get("type") == "card_count_condition"
+            and trigger_cond.get("location") in ("discard",)
+            and "source" not in trigger_cond
+        ):
+            trigger_cond["source"] = "preceding_moved"
+        sub["trigger_condition"] = trigger_cond
     return sub
 
 
@@ -7494,6 +7546,80 @@ def parse_ability(triggerless_text: str) -> Dict[str, Any]:
         # per-shape code paths in the engine.
         effect = _collapse_to_effect_steps(effect)
 
+        # Fill missing trigger_condition from text when neither condition nor trigger_condition exists
+        if not effect.get("condition") and not effect.get("trigger_condition"):
+            txt = effect.get("text", "") or triggerless_text
+            for sep in ["とき、", "場合、", "たび、", "なら、"]:
+                idx = txt.find(sep)
+                if idx >= 0:
+                    cond_text = txt[
+                        : idx
+                        + len(
+                            "とき"
+                            if sep == "とき、"
+                            else "場合"
+                            if sep == "場合、"
+                            else "たび"
+                            if sep == "たび、"
+                            else "なら"
+                        )
+                    ]
+                    if ")" in cond_text or "）" in cond_text:
+                        continue
+                    tc = parse_condition(cond_text)
+                    if tc and tc.get("type") not in (None, "custom"):
+                        effect["trigger_condition"] = tc
+                        effect["condition"] = copy.deepcopy(tc)
+                        break
+            if not effect.get("trigger_condition"):
+                for key in ("actions", "primary_effect", "conditional_action"):
+                    sub = effect.get(key)
+                    if isinstance(sub, dict):
+                        for ck in ("condition", "trigger_condition"):
+                            sv = sub.get(ck)
+                            if sv and isinstance(sv, dict):
+                                effect[ck] = copy.deepcopy(sv)
+                                break
+                        if effect.get("trigger_condition"):
+                            break
+                    elif isinstance(sub, list):
+                        for item in sub:
+                            if isinstance(item, dict):
+                                for ck in ("condition", "trigger_condition"):
+                                    sv = item.get(ck)
+                                    if sv and isinstance(sv, dict):
+                                        effect[ck] = copy.deepcopy(sv)
+                                        break
+                                if effect.get("trigger_condition"):
+                                    break
+                        if effect.get("trigger_condition"):
+                            break
+            if not effect.get("condition"):
+                for key in ("actions", "primary_effect", "conditional_action"):
+                    sub = effect.get(key)
+                    if isinstance(sub, dict):
+                        for ck in ("condition", "trigger_condition"):
+                            sv = sub.get(ck)
+                            if sv and isinstance(sv, dict):
+                                effect[ck] = copy.deepcopy(sv)
+                                break
+                        if effect.get("condition") or effect.get("trigger_condition"):
+                            break
+                    elif isinstance(sub, list):
+                        for item in sub:
+                            if isinstance(item, dict):
+                                for ck in ("condition", "trigger_condition"):
+                                    sv = item.get(ck)
+                                    if sv and isinstance(sv, dict):
+                                        effect[ck] = copy.deepcopy(sv)
+                                        break
+                                if effect.get("condition") or effect.get(
+                                    "trigger_condition"
+                                ):
+                                    break
+                        if effect.get("condition") or effect.get("trigger_condition"):
+                            break
+
         # Apply activation_position from cost text to the effect
         if extra_pos_from_cost and "activation_position" not in effect:
             effect["activation_position"] = extra_pos_from_cost
@@ -7670,14 +7796,6 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(cost, dict):
             _clean_gain_resource(cost)
 
-        # FIX 5: each_time trigger_condition — add source:preceding_moved when location:discard
-        if eff.get("trigger_type") == "each_time":
-            tc = eff.get("trigger_condition")
-            if isinstance(tc, dict):
-                if tc.get("location") == "discard" and "source" not in tc:
-                    tc["source"] = "preceding_moved"
-                    fix_stats["local_cond"] += 1
-
         # FIX 6: Flatten opponent_action wrappers
         if eff.get("opponent_action") and isinstance(eff["opponent_action"], dict):
             oa = eff.pop("opponent_action")
@@ -7696,24 +7814,10 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                 eff["ability_filter"] = "no_ability"
                 fix_stats["ability_filter"] += 1
 
-        # FIX 8: Condition fixes — movement pattern + card_property + enrichment
+        # FIX 8: Condition fixes — card_property + enrichment
         cond = eff.get("condition")
         if isinstance(cond, dict):
             ct = cond.get("text", "") or t
-
-            # 8a: Movement condition for location_condition or group_condition
-            if cond.get("type") in (
-                "location_condition",
-                "group_condition",
-            ) and re.search(r"から.*?に置かれた", ct):
-                cond["type"] = "card_count_condition"
-                cond["source"] = "preceding_moved"
-                cond["operator"] = ">="
-                cond["count"] = 1
-                cond.pop("locations", None)
-                if cond.get("group_names"):
-                    cond.pop("locations", None)
-                fix_stats["movement"] += 1
 
             # 8b: card_property: has_blade_heart
             if cond.get("type") == "card_count_condition":
@@ -7861,6 +7965,38 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
                         if gns:
                             eff["group_names"] = gns
                     fix_stats["compound_split"] += 1
+
+        # FIX 13: Auto abilities with no condition/trigger_condition — extract from text
+        if (
+            ability.get("triggers") == "自動"
+            and eff.get("action")
+            and not eff.get("condition")
+            and not eff.get("trigger_condition")
+        ):
+            for sep in ["とき、", "場合、", "たび、", "なら、"]:
+                idx = t.find(sep)
+                if idx >= 0:
+                    ct = t[
+                        : idx
+                        + (
+                            2
+                            if sep == "とき、"
+                            else 2
+                            if sep == "場合、"
+                            else 2
+                            if sep == "たび、"
+                            else 2
+                        )
+                    ]
+                    if ")" in ct or "）" in ct:
+                        continue
+                    tc = parse_condition(ct)
+                    if tc and tc.get("type") not in (None, "custom"):
+                        eff["trigger_condition"] = tc
+                        eff["condition"] = copy.deepcopy(tc)
+                        fix_stats.setdefault("auto_trigger", 0)
+                        fix_stats["auto_trigger"] += 1
+                        break
 
     # ============== POST-PROCESSING ==============
 
