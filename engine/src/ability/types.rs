@@ -360,6 +360,7 @@ impl Choice {
                 ability_filter_triggers: None,
                 or_ability_filters: None,
                 card_property: None,
+                negation: false,
                 exclude_group_names: None,
             },
             _ => crate::ability::util::CardFilter::default(),

@@ -543,6 +543,8 @@ pub struct CardFilter<'a> {
     pub or_ability_filters: Option<&'a [crate::card::AbilityFilterBranch]>,
     /// Card property filter (e.g. "has_blade_heart")
     pub card_property: Option<&'a str>,
+    /// Negate the card_property check (e.g. "does NOT have blade heart")
+    pub negation: bool,
 }
 
 impl<'a> CardFilter<'a> {
@@ -830,21 +832,18 @@ impl<'a> CardFilter<'a> {
         }
         // card_property filter (e.g. "has_blade_heart")
         if let Some(prop) = self.card_property {
-            match prop {
-                "has_blade_heart" => {
-                    if !db.get_card(id).is_some_and(|c| c.has_blade_heart()) {
-                        return false;
-                    }
-                }
-                "has_score_icon" => {
-                    if !db.get_card(id).is_some_and(|c| c.has_score_icon()) {
-                        return false;
-                    }
-                }
-                _ => {
-                    // Unknown property — reject since we can't verify it
-                    return false;
-                }
+            let has_property = match prop {
+                "has_blade_heart" => db.get_card(id).is_some_and(|c| c.has_blade_heart()),
+                "has_score_icon" => db.get_card(id).is_some_and(|c| c.has_score_icon()),
+                _ => false,
+            };
+            let passes = if self.negation {
+                !has_property
+            } else {
+                has_property
+            };
+            if !passes {
+                return false;
             }
         }
         true
@@ -905,6 +904,7 @@ impl<'a> CardFilter<'a> {
             ability_filter_triggers: effect.ability_filter_triggers.as_ref().map(|v| &**v),
             or_ability_filters: effect.or_ability_filters.as_ref().map(|v| &**v),
             card_property: effect.card_property.as_deref(),
+            negation: false,
         }
     }
 
@@ -946,6 +946,7 @@ impl<'a> CardFilter<'a> {
                 ability_filter_triggers: None,
                 or_ability_filters: None,
                 card_property: None,
+                negation: false,
             },
             _ => CardFilter::default(),
         }

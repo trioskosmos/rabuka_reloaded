@@ -2177,6 +2177,10 @@ impl<'a> ConditionContext<'a> {
         if let Some(ex) = exclude_self {
             filter.exclude_self = Some(ex);
         }
+        if let Some(cp) = &condition.card_property {
+            filter.card_property = Some(cp.as_str());
+            filter.negation = condition.negation.unwrap_or(false);
+        }
         let card_db = &self.game_state.card_database;
         let mut count = 0u32;
         for &card_id in cards {
