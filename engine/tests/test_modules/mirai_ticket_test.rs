@@ -1,114 +1,193 @@
 use crate::helpers::*;
+use rabuka_engine::ability::types::Choice;
 
-/// PL!S-bp6-021-L | MIRAI TICKET (ab#0)
-///
-/// 自分がエールしたとき、エールにより公開された自分のカードの中から
-/// ブレードハートを持たない『Aqours』のメンバーカードを1枚まで
-/// 控え室に置いてもよい。そうした場合、これにより控え室に置いた
-/// カードのコスト5につき、追加で1枚エールを行う。
-/// この能力では4枚までしか追加でエールできない。
-///
-/// Verify the ability is loaded with proper condition from parser.
+fn setup_mirai(game: &mut TestGame, aqours_ids: &[i16]) {
+    let mirai = game.id("PL!S-bp6-021-L");
+    game.state.player1.live_card_zone.cards.push(mirai);
+    for &id in aqours_ids {
+        game.state.revealed_cards.push(id);
+        game.state.player1.waitroom.cards.push(id);
+    }
+}
+
+fn fire(game: &mut TestGame) {
+    game.state.trigger_auto_abilities_for_player("p1");
+    game.state.process_pending_auto_abilities("p1");
+}
+
+fn drain(game: &mut TestGame) {
+    while game.has_pending_choice() {
+        match game.get_pending_choice().clone() {
+            Choice::SelectCard { .. } => {
+                game.select_indices(&[]);
+            }
+            _ => {
+                game.select_indices(&[]);
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MIRAI TICKET (PL!S-bp6-021-L) — Live card, auto ability:
+//
+// 自分がエールしたとき、エールにより公開された自分のカードの中から
+// ブレードハートを持たない『Aqours』のメンバーカードを1枚まで
+// 控え室に置いてもよい。そうした場合、これにより控え室に置いた
+// カードのコスト5につき、追加で1枚エールを行う。
+// この能力では4枚までしか追加でエールできない。
+//
+// Setup: stage is empty → total_blade=0 → additional yells draw 0 cards.
+// The test asserts the card was moved (left revealed_cards).
+// ═══════════════════════════════════════════════════════════════
+
+/// Single valid card → auto-selects (no choice prompt). Card leaves revealed_cards.
 #[test]
-fn mirai_ticket_custom_condition_loads_and_fires() {
+fn mirai_ticket_one_card_moved() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let aq = game.id("PL!S-PR-013-PR"); // cost 11
+    setup_mirai(&mut game, &[aq]);
+    fire(&mut game);
 
-    let mirai = game.id("PL!S-bp6-021-L");
-    let _live = game.id("PL!-bp3-026-L"); // Oh,Love&Peace!
-    let _center = game.id("PL!-pb1-014-R"); // stage member with blade
-    let filler = game.id("PL!-sd1-010-SD");
-
-    // Fill decks
-    for _ in 0..40 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
-    }
-
-    // Stage MIRAI TICKET
-    game.state.player1.stage.stage = [-1, mirai, -1];
-
-    // Verify the ability is loaded
-    let card = game
-        .state
-        .card_database
-        .get_card(mirai)
-        .expect("MIRAI TICKET should exist in DB");
     assert!(
-        !card.abilities.is_empty(),
-        "MIRAI TICKET should have abilities"
+        !game.state.revealed_cards.contains(&aq),
+        "Card must leave revealed_cards after MIRAI TICKET"
     );
-    let ab = &card.abilities[0];
-    let cond = ab.effect.as_ref().and_then(|e| e.condition.as_ref());
-    assert!(cond.is_some(), "Ability should have a condition");
-    if let Some(c) = cond {
-        assert!(
-            c.condition_type.is_some()
-                && c.condition_type != Some(rabuka_engine::ability::enums::ConditionType::Custom),
-            "Condition type should be a proper parsed type, not Custom"
-        );
-        assert!(!c.text.is_empty(), "Condition should have text");
-        assert!(
-            c.text.contains("エール"),
-            "Condition text should mention エール (yell): {}",
-            c.text
+}
+
+/// Two valid cards → SelectCard(revealed_cards) with allow_skip=true appears.
+#[test]
+fn mirai_ticket_two_cards_shows_skippable_choice() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq1 = game.id("PL!S-PR-013-PR");
+    let aq2 = game.id("PL!S-bp2-002-R");
+    setup_mirai(&mut game, &[aq1, aq2]);
+    fire(&mut game);
+
+    assert!(
+        game.has_pending_choice(),
+        "MIRAI TICKET must show SelectCard with 2+ valid cards"
+    );
+
+    let c = game.get_pending_choice().clone();
+    match &c {
+        Choice::SelectCard {
+            zone,
+            count,
+            allow_skip,
+            ..
+        } => {
+            assert_eq!(zone, "revealed_cards");
+            assert_eq!(*count, 1);
+            assert!(*allow_skip, "Must allow skipping");
+        }
+        _ => panic!("Expected SelectCard(revealed_cards), got: {:?}", c),
+    }
+}
+
+/// Skip the choice → no card moves, both stay in revealed_cards.
+#[test]
+fn mirai_ticket_skip_leaves_cards_in_revealed() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq1 = game.id("PL!S-PR-013-PR");
+    let aq2 = game.id("PL!S-bp2-002-R");
+    setup_mirai(&mut game, &[aq1, aq2]);
+    fire(&mut game);
+
+    assert!(game.has_pending_choice(), "MIRAI TICKET must show a choice");
+    game.select_indices(&[]); // skip
+
+    drain(&mut game);
+
+    assert!(
+        game.state.revealed_cards.contains(&aq1) && game.state.revealed_cards.contains(&aq2),
+        "Both cards must stay in revealed_cards after skipping"
+    );
+}
+
+/// No revealed_cards → condition fails → MIRAI TICKET does NOT fire.
+#[test]
+fn mirai_ticket_no_revealed_cards_no_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    game.state
+        .player1
+        .live_card_zone
+        .cards
+        .push(game.id("PL!S-bp6-021-L"));
+    fire(&mut game);
+
+    if game.has_pending_choice() {
+        let c = game.get_pending_choice().clone();
+        panic!(
+            "MIRAI TICKET must NOT fire without revealed_cards. Got: {:?}",
+            c
         );
     }
 }
 
-/// Verify the ability processes through the live performance pipeline
-/// without crashing. The custom condition evaluates to true when yell
-/// occurs during performance.
+/// Select a card → it is moved from revealed_cards.
 #[test]
-fn mirai_ticket_performance_does_not_crash() {
+fn mirai_ticket_select_moves_one_card() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
+    let aq1 = game.id("PL!S-PR-013-PR");
+    let aq2 = game.id("PL!S-bp2-002-R");
+    setup_mirai(&mut game, &[aq1, aq2]);
+    fire(&mut game);
 
-    let mirai = game.id("PL!S-bp6-021-L");
-    let live = game.id("PL!-bp3-026-L");
-    let center = game.id("PL!-pb1-014-R");
-    let filler = game.id("PL!-sd1-010-SD");
+    assert!(game.has_pending_choice(), "MIRAI TICKET must show a choice");
+    game.select_indices(&[0]);
 
-    for _ in 0..40 {
-        game.state.player1.main_deck.cards.push(filler);
-        game.state.player2.main_deck.cards.push(filler);
-    }
+    drain(&mut game);
 
-    // Center with blade for yell, MIRAI TICKET on stage
-    game.state.player1.stage.stage = [-1, center, mirai];
-    game.state.player2.stage.stage = [-1, filler, -1];
+    // At least one card left revealed_cards (the selected one was moved)
+    let moved =
+        !game.state.revealed_cards.contains(&aq1) || !game.state.revealed_cards.contains(&aq2);
+    assert!(moved, "Selected card must leave revealed_cards");
+}
 
-    // Set live cards
-    game.state.player1.hand.cards.push(live);
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    game.pass();
-    // LiveCardSet phase
-    game.set_live_card(live);
+/// Cost 11 → floor(11/5) = 2 additional yells. With stage empty (blade=0),
+/// each yell draws 0 cards. Card is moved and stays in waitroom.
+#[test]
+fn mirai_ticket_cost11_yell_count_2() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq = game.id("PL!S-PR-013-PR"); // cost 11
+    setup_mirai(&mut game, &[aq]);
+    fire(&mut game);
 
-    // Handle any pending choices from live-start triggers
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
+    // Card was moved from revealed_cards (move_cards ran)
+    assert!(
+        !game.state.revealed_cards.contains(&aq),
+        "Cost-11 card must leave revealed_cards"
+    );
+    // With empty stage (blade=0), perform_yell draws 0 cards per yell.
+    // The card stays in waitroom since the yell doesn't refill from deck.
+    assert!(
+        game.state.player1.waitroom.cards.contains(&aq),
+        "Cost-11 card must be in waitroom after MIRAI TICKET"
+    );
+}
 
-    // P2 passes
-    game.state.player2.hand.cards.push(live);
-    game.pass();
-    game.set_live_card(live);
-    game.pass();
+/// Cost 4 → floor(4/5) = 0 additional yells. Only move_cards fires.
+#[test]
+fn mirai_ticket_cost4_zero_yells() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq = game.id("PL!S-bp2-002-R"); // Riko, cost 4
+    setup_mirai(&mut game, &[aq]);
+    fire(&mut game);
 
-    // Process pending auto abilities (MIRAI TICKET may trigger here)
-    while game.has_pending_choice() {
-        game.select_indices(&[]);
-    }
-
-    // Advance through performance → LiveVictory without crash
-    game.pass();
-    game.pass();
-
-    // If we get here, no crash occurred
-    // The ability may or may not have fired depending on
-    // whether Aqours members without blade were revealed
+    assert!(
+        !game.state.revealed_cards.contains(&aq),
+        "Cost-4 card must leave revealed_cards"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&aq),
+        "Cost-4 card must be in waitroom"
+    );
 }

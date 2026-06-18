@@ -860,7 +860,7 @@ impl AbilityResolver {
                     self.prompt_card_selection(
                         Zone::RevealedCards.to_str(),
                         count,
-                        false,
+                        effect.optional.unwrap_or(false),
                         effect,
                         &filter,
                         Some(matching),

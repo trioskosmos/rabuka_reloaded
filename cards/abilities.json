@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-19T03:36:06.660680",
+  "generated_at": "2026-06-19T05:04:28.753067",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -4470,8 +4470,7 @@
               "state_change": "active",
               "card_type": "member_card",
               "action": "change_state",
-              "count": 1,
-              "activation_position": "left_side"
+              "count": 1
             },
             {
               "text": "2枚ある場合、ライブ終了時まで、{{icon_blade.png|ブレード}}{{icon_blade.png|ブレード}}を得る",
@@ -4488,8 +4487,7 @@
               "action": "gain_resource",
               "resource": "blade",
               "count": 2,
-              "duration": "live_end",
-              "activation_position": "left_side"
+              "duration": "live_end"
             }
           ],
           "activation_position": "left_side"
@@ -28202,14 +28200,15 @@
             ],
             "optional": true,
             "max": true,
-            "action": "move_cards"
+            "action": "move_cards",
+            "card_property": "has_blade_heart",
+            "negation": true
           },
           {
             "text": "これにより控え室に置いたカードのコスト5につき、追加で1枚エールを行う。この能力では4枚までしか追加でエールできない",
             "count": 4,
             "max": true,
-            "action": "modify_score",
-            "operation": "add",
+            "action": "perform_yell",
             "max_repeats": 4,
             "per_unit": true,
             "per_unit_count": 5,
@@ -28912,7 +28911,9 @@
             "optional": true,
             "max": true,
             "action": "move_cards",
-            "card_type": "card"
+            "card_type": "card",
+            "card_property": "has_blade_heart",
+            "negation": true
           },
           {
             "text": "これにより控え室に置いた数に等しい枚数のエールを追加で行う",
@@ -28921,8 +28922,7 @@
               "reference": "これにより控え室に置いた数",
               "mode": "equals"
             },
-            "action": "modify_score",
-            "operation": "add",
+            "action": "modify_yell_count",
             "group_names": [
               "蓮ノ空"
             ]

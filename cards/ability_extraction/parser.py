@@ -2315,6 +2315,12 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             ct = _infer_card_type(text, action)
             if ct:
                 action["card_type"] = ct
+        if "card_property" not in action:
+            if "ブレードハートを持たない" in text:
+                action["card_property"] = "has_blade_heart"
+                action["negation"] = True
+            elif "ブレードハートを持つ" in text:
+                action["card_property"] = "has_blade_heart"
         if "state_change" not in action and "ウェイト状態" in text:
             action["state_change"] = "wait"
         # If after inference source and destination are both missing/None,
@@ -3337,7 +3343,7 @@ def parse_action(text: str) -> Dict[str, Any]:
         None,
     )
     R(
-        lambda t: "追加" in t,
+        lambda t: "追加" in t and "エール" not in t,
         "modify_score",
         lambda t, a: a.update({"operation": "add"}),
     )

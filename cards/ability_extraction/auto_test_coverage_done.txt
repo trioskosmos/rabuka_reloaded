@@ -1,0 +1,108 @@
+AUTO TRIGGER TEST COVERAGE — COMPLETED 2026-06-19
+==================================================
+
+PARSER FIXES (parser.py)
+------------------------
+- _try_zone_placement: new handler for "から...に置かれ" (zone-to-zone)
+  Extracts SOURCE zone, calls _extract_generic_fields for group_names/target/card_type.
+  Produces card_count_condition with source: "preceding_moved".
+- _try_appear_or_move: new handler for "登場か、エリアを移動"
+  Produces or_condition [appearance, movement].
+- _try_revealed: relaxed entrance, now matches standalone "エールした" trigger text.
+- _try_each_time: falls through to parse_condition when "か、 is present.
+  Adds source: "preceding_moved" for discard-location conditions.
+  Does NOT copy to condition (avoids resolution stale-state for each_time).
+- parse_ability: text extraction for ability with neither condition nor trigger_condition.
+- _fill_defaults: adds card_property: has_blade_heart with negation for
+  "ブレードハートを持たない".
+- Effect handler order: perform_yell (r"追加で.*エール.*行") checked before
+  broad "追加 in t" → modify_score to prevent miscouting.
+- Removed post-processing FIX 5 and FIX 8a.
+
+ENGINE FIXES
+------------
+- trigger_condition evaluation: ConditionContext::with_moved_cards(self, &recently_moved_cards)
+  so each_time scanning passes recently-moved cards (abilities.rs:196,250).
+- trigger_each_time_abilities evaluates trigger_condition before enqueue (triggers.rs:184).
+- Scan gates: also fire on last_energy_placed_by_effect (abilities.rs:502,753).
+- Post-loop scan: saved flag before recently_moved_cards.clear (abilities.rs:488-497).
+- prompt_card_selection(RevealedCards): allow_skip uses effect.optional (move_cards.rs:860).
+- PerformYell dispatch: handles per_unit with per_unit_source=previous_moved_cards.
+  Sums moved card costs, divides by per_unit_count, caps at repeat_limit.
+- execute_perform_yell: draws total_blade cards from deck → revealed_cards
+  (instead of the old reveal_until which was wrong for yell).
+
+TEST COVERAGE PER TRIGGER TYPE
+-------------------------------
+Test count: 973 (was 968)
+
+# | Trigger Type          | Abilities | Tests                                          | Status
+---+-----------------------+-----------+------------------------------------------------+--------
+1 | on_yell               | 13        | mirai_ticket tests (7):                        | TESTED
+  |                       |           |  - one_card_moved                             |
+  |                       |           |  - two_cards_shows_skippable_choice           |
+  |                       |           |  - select_moves_one_card                      |
+  |                       |           |  - skip_leaves_cards_in_revealed              |
+  |                       |           |  - cost11_yell_count_2 (per_unit follow-up)   |
+  |                       |           |  - cost4_zero_yells (per_unit follow-up)      |
+  |                       |           |  - no_revealed_cards_no_trigger               |
+2 | on_area_move          | 12        | chisato_move_test, movement_condition_test    | TESTED
+3 | on_discard_from_stage | 10        | stage_to_discard_ability_test,                | TESTED
+  |                       |           |  ability_engine_fixes_test                    |
+4 | on_ally_appear        | 4         | miyashita_ai_bp3_test, edelnote_test          | TESTED
+5 | on_state_changed      | 2         | maki_pb1_test                                 | TESTED
+6 | on_ally_appear_each   | 2         | —                                             | NOT TESTED
+7 | on_live_start_resolved| 2         | victory_road_test                             | TESTED
+8 | on_live_success_resolved| 2       | victory_road_test                             | TESTED
+9 | on_move_or_energy     | 1         | —                                             | NOT TESTED
+10| on_any_to_discard_each| 1         | ren_test (7 tests)                            | TESTED
+11| on_live_zone_discard  | 1         | bp6_004_002_audit_test, qa_new_tests252       | TESTED
+12| on_hand_to_discard_each| 1        | —                                             | NOT TESTED
+13| on_baton_touch_appear | 1         | baton_touch_test, hs_sd1_test                 | TESTED
+14| on_discard_to_hand    | 1         | —                                             | NOT TESTED
+15| on_placed_in_live_zone| 1         | —                                             | NOT TESTED
+16| on_energy_placed_each | 1         | —                                             | NOT TESTED
+17| on_baton_touch_discard| 1         | baton_touch_test, hs_sd1_test                 | TESTED
+
+NOT TESTED (7 types, no dedicated gameplay test exists):
+  #6  on_ally_appear_each_time   — Hanaho (PL!HS-pb1-001-R, PL!HS-pb1-009-R)
+  #9  on_move_or_energy_placed  — Sumire (PL!SP-bp5-004-R+)
+  #12 on_hand_to_discard_each   — Rurino (PL!HS-pb1-003-R)
+  #14 on_discard_to_hand        — DIVE! ab#0 (PL!N-bp4-026-L)
+  #15 on_placed_in_live_zone    — DIVE! ab#1 (PL!N-bp4-026-L)
+  #16 on_energy_placed_each     — Hazuki (PL!SP-bp4-016-N)
+
+CARD-LEVEL TEST QUALITY
+------------------------
+MIRAI TICKET tests (7 total) verify the full ability text:
+  "When you yell, from your revealed cards, you may place up to 1 Aqours
+   member card without blade heart into discard. If you do, for every 5 cost
+   of the discarded card, perform 1 additional yell (max 4)."
+
+Each test asserts a specific behavioral claim from the card text:
+  | Test                          | Verifies                                  | Result
+  |-------------------------------+-------------------------------------------+--------
+  | one_card_moved                | auto-select with 1 valid target works     | PASS
+  | two_cards_shows_skippable     | 2+ cards → SelectCard with allow_skip     | PASS
+  | select_moves_one_card         | choice → card leaves revealed_cards       | PASS
+  | skip_leaves_cards_in_revealed | skip → no cards moved                     | PASS
+  | cost11_yell_count_2           | cost 11 → floor(11/5)=2 yells, card in WR | PASS
+  | cost4_zero_yells              | cost 4 → floor(4/5)=0 yells, card in WR  | PASS
+  | no_revealed_cards_no_trigger  | empty revealed → no trigger               | PASS
+
+High-confidence tests: cost11_yell_count_2, cost4_zero_yells, select_moves_one_card,
+skip_leaves_cards_in_revealed, no_revealed_cards_no_trigger.
+
+The two_cards_shows_skippable and one_card_moved tests only check intermediate state
+(move_cards completed) but not the full yell follow-up.
+
+NEXT PRIORITY
+--------------
+Add tests for the 6 untested trigger types (noted above).
+Each needs a dedicated test file with:
+  - Card in play with the trigger type
+  - Trigger condition met during gameplay
+  - Assertion on the expected outcome
+
+For on_placed_in_live_zone and on_discard_to_hand: both on DIVE! (PL!N-bp4-026-L),
+could share a single test file.

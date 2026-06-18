@@ -1,0 +1,101 @@
+Found 100:
+PL!S-PR-013-PR | 高海千歌 | cost=11 | blade=3
+PL!S-PR-016-PR | 黒澤ダイヤ | cost=9 | blade=3
+PL!S-PR-019-PR | 国木田花丸 | cost=11 | blade=3
+PL!S-PR-020-PR | 小原鞠莉 | cost=9 | blade=3
+PL!S-PR-021-PR | 黒澤ルビィ | cost=9 | blade=3
+PL!S-PR-028-PR | 黒澤ダイヤ | cost=4 | blade=1
+PL!S-PR-029-PR | 渡辺 曜 | cost=9 | blade=3
+PL!S-PR-030-PR | 津島善子 | cost=9 | blade=3
+PL!S-PR-031-PR | 国木田花丸 | cost=9 | blade=3
+PL!S-PR-032-PR | 小原鞠莉 | cost=4 | blade=1
+PL!S-PR-033-PR | 黒澤ルビィ | cost=4 | blade=1
+PL!S-PR-040-PR | 国木田花丸 | cost=9 | blade=4
+PL!S-bp2-001-R | 高海千歌 | cost=9 | blade=4
+PL!S-bp2-001-P | 高海千歌 | cost=9 | blade=4
+PL!S-bp2-002-R | 桜内梨子 | cost=4 | blade=None
+PL!S-bp2-002-P | 桜内梨子 | cost=4 | blade=None
+PL!S-bp2-003-R | 松浦果南 | cost=9 | blade=4
+PL!S-bp2-003-P | 松浦果南 | cost=9 | blade=4
+PL!S-bp2-004-R | 黒澤ダイヤ | cost=11 | blade=3
+PL!S-bp2-004-P | 黒澤ダイヤ | cost=11 | blade=3
+PL!S-bp2-007-R＋ | 国木田花丸 | cost=4 | blade=3
+PL!S-bp2-007-P | 国木田花丸 | cost=4 | blade=3
+PL!S-bp2-007-P＋ | 国木田花丸 | cost=4 | blade=3
+PL!S-bp2-007-SEC | 国木田花丸 | cost=4 | blade=3
+PL!S-bp2-008-R＋ | 小原鞠莉 | cost=17 | blade=4
+PL!S-bp2-008-P | 小原鞠莉 | cost=17 | blade=4
+PL!S-bp2-008-P＋ | 小原鞠莉 | cost=17 | blade=4
+PL!S-bp2-008-SEC | 小原鞠莉 | cost=17 | blade=4
+PL!S-bp2-013-N | 黒澤ダイヤ | cost=9 | blade=3
+PL!S-bp2-018-N | 黒澤ルビィ | cost=9 | blade=3
+LL-bp2-001-R＋ | 渡辺 曜&鬼塚夏美&大沢瑠璃乃 | cost=20 | blade=6
+PL!S-pb1-002-R | 桜内梨子 | cost=13 | blade=5
+PL!S-pb1-002-P＋ | 桜内梨子 | cost=13 | blade=5
+PL!S-pb1-006-R | 津島善子 | cost=9 | blade=1
+PL!S-pb1-006-P＋ | 津島善子 | cost=9 | blade=1
+PL!S-pb1-007-R | 国木田花丸 | cost=9 | blade=2
+PL!S-pb1-007-P＋ | 国木田花丸 | cost=9 | blade=2
+PL!S-pb1-010-N | 高海千歌 | cost=5 | blade=1
+PL!S-pb1-011-N | 桜内梨子 | cost=5 | blade=1
+PL!S-pb1-012-N | 松浦果南 | cost=5 | blade=1
+PL!S-pb1-013-N | 黒澤ダイヤ | cost=4 | blade=2
+PL!S-pb1-014-N | 渡辺 曜 | cost=4 | blade=2
+PL!S-pb1-015-N | 津島善子 | cost=4 | blade=2
+PL!S-bp3-002-R | 桜内梨子 | cost=11 | blade=3
+PL!S-bp3-002-P | 桜内梨子 | cost=11 | blade=3
+PL!S-bp3-003-R＋ | 松浦果南 | cost=11 | blade=1
+PL!S-bp3-003-P | 松浦果南 | cost=11 | blade=1
+PL!S-bp3-003-P＋ | 松浦果南 | cost=11 | blade=1
+PL!S-bp3-003-SEC | 松浦果南 | cost=11 | blade=1
+PL!S-bp3-004-R | 黒澤ダイヤ | cost=5 | blade=2
+PL!S-bp3-004-P | 黒澤ダイヤ | cost=5 | blade=2
+PL!S-bp3-005-R | 渡辺 曜 | cost=7 | blade=1
+PL!S-bp3-005-P | 渡辺 曜 | cost=7 | blade=1
+PL!S-bp3-007-R | 国木田花丸 | cost=9 | blade=2
+PL!S-bp3-007-P | 国木田花丸 | cost=9 | blade=2
+PL!S-bp3-008-R | 小原鞠莉 | cost=4 | blade=1
+PL!S-bp3-008-P | 小原鞠莉 | cost=4 | blade=1
+PL!S-bp3-009-R | 黒澤ルビィ | cost=9 | blade=2
+PL!S-bp3-009-P | 黒澤ルビィ | cost=9 | blade=2
+PL!S-bp3-012-N | 松浦果南 | cost=4 | blade=2
+PL!S-bp3-013-N | 黒澤ダイヤ | cost=7 | blade=2
+PL!S-bp3-014-N | 渡辺 曜 | cost=5 | blade=1
+PL!S-bp3-015-N | 津島善子 | cost=9 | blade=3
+PL!S-bp3-016-N | 国木田花丸 | cost=4 | blade=1
+PL!S-bp3-017-N | 小原鞠莉 | cost=4 | blade=2
+LL-bp3-001-R＋ | 園田海未&津島善子&天王寺璃奈 | cost=20 | blade=5
+PL!S-bp5-001-R＋ | 高海千歌 | cost=10 | blade=3
+PL!S-bp5-001-P | 高海千歌 | cost=10 | blade=3
+PL!S-bp5-001-AR | 高海千歌 | cost=10 | blade=3
+PL!S-bp5-001-SEC | 高海千歌 | cost=10 | blade=3
+PL!S-bp5-002-R＋ | 桜内梨子 | cost=11 | blade=2
+PL!S-bp5-002-P | 桜内梨子 | cost=11 | blade=2
+PL!S-bp5-002-AR | 桜内梨子 | cost=11 | blade=2
+PL!S-bp5-002-SEC | 桜内梨子 | cost=11 | blade=2
+PL!S-bp5-005-R＋ | 渡辺 曜 | cost=4 | blade=None
+PL!S-bp5-005-P | 渡辺 曜 | cost=4 | blade=None
+PL!S-bp5-005-AR | 渡辺 曜 | cost=4 | blade=None
+PL!S-bp5-005-SEC | 渡辺 曜 | cost=4 | blade=None
+PL!S-bp5-008-R | 小原鞠莉 | cost=9 | blade=2
+PL!S-bp5-008-P | 小原鞠莉 | cost=9 | blade=2
+PL!S-bp5-008-AR | 小原鞠莉 | cost=9 | blade=2
+PL!S-bp5-015-N | 津島善子 | cost=9 | blade=4
+PL!S-bp5-016-N | 国木田花丸 | cost=9 | blade=4
+PL!S-sd1-001-SD | 高海千歌 | cost=17 | blade=6
+PL!S-sd1-005-SD | 渡辺 曜 | cost=5 | blade=2
+PL!S-sd1-006-SD | 津島善子 | cost=5 | blade=None
+PL!S-sd1-009-SD | 黒澤ルビィ | cost=9 | blade=3
+PL!S-sd1-012-SD | 松浦果南 | cost=9 | blade=3
+PL!S-bp6-001-R | 高海千歌 | cost=4 | blade=2
+PL!S-bp6-001-P | 高海千歌 | cost=4 | blade=2
+PL!S-bp6-003-R | 松浦果南 | cost=9 | blade=3
+PL!S-bp6-003-P | 松浦果南 | cost=9 | blade=3
+PL!S-bp6-006-R | 津島善子 | cost=17 | blade=5
+PL!S-bp6-006-P | 津島善子 | cost=17 | blade=5
+PL!S-bp6-009-R＋ | 黒澤ルビィ | cost=9 | blade=2
+PL!S-bp6-009-P | 黒澤ルビィ | cost=9 | blade=2
+PL!S-bp6-009-P＋ | 黒澤ルビィ | cost=9 | blade=2
+PL!S-bp6-009-SEC | 黒澤ルビィ | cost=9 | blade=2
+PL!S-bp6-013-N | 黒澤ダイヤ | cost=5 | blade=None
+LL-bp6-001-R＋ | 南 ことり&黒澤ダイヤ&徒町小鈴 | cost=20 | blade=7

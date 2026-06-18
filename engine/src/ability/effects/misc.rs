@@ -2421,11 +2421,39 @@ impl AbilityResolver {
 
     /// Perform N additional yells.
     /// A yell reveals cards from deck top until a live card is found.
+    /// Perform an actual yell: draw total_blade cards from the player's deck
+    /// and add them to revealed_cards. The yell count is the number of times
+    /// to repeat this draw-and-reveal process (calculated from per_unit for
+    /// MIRAI TICKET's "for every 5 cost, perform 1 additional yell").
     pub(crate) fn execute_perform_yell(&mut self, gs: &mut GameState, count: u32, target: &str) {
+        let card_db = gs.card_database.clone();
+        let bm: std::collections::HashMap<i16, i32> = gs
+            .mods
+            .blade_modifiers
+            .iter()
+            .map(|(&k, e)| (k, e.total()))
+            .collect();
+        let om: std::collections::HashMap<i16, String> = gs
+            .mods
+            .orientation_modifiers
+            .iter()
+            .map(|(k, v)| (*k, v.clone()))
+            .collect();
         for _ in 0..count {
-            // Reuse existing reveal-until-live-card logic
-            self.execute_reveal_until_live_card(gs, target)
-                .unwrap_or_else(|e| log::debug!("[YELL] Error during yell: {}", e));
+            let total_blade = {
+                let player = gs.resolve_target_player_mut(target);
+                let tb = player.stage.total_blades(&card_db, &bm, &om);
+                let mut drawn: Vec<i16> = Vec::new();
+                for _ in 0..tb {
+                    if let Some(cid) = player.main_deck.draw() {
+                        drawn.push(cid);
+                    }
+                }
+                drawn
+            };
+            for cid in total_blade {
+                gs.revealed_cards.push(cid);
+            }
         }
     }
 }

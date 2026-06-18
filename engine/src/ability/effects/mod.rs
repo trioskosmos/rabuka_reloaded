@@ -742,7 +742,22 @@ impl AbilityResolver {
             }
             ActionType::RevealUntilChosenCard => self.execute_reveal_until_chosen_card(gs, effect),
             ActionType::PerformYell => {
-                let count = if let Some(ref dc) = effect.dynamic_count {
+                let count = if effect.per_unit.unwrap_or(false) {
+                    // per_unit with per_unit_source = "previous_moved_cards":
+                    // sum costs of cards moved by the preceding action,
+                    // divide by per_unit_count, cap at repeat_limit.
+                    let total_cost: u32 = self
+                        .moved_cards
+                        .iter()
+                        .filter_map(|&cid| gs.card_database.get_card(cid).and_then(|c| c.cost))
+                        .sum();
+                    let divisor = effect.per_unit_count.unwrap_or(1) as u32;
+                    let mut c = total_cost / divisor;
+                    if let Some(cap) = effect.repeat_limit {
+                        c = c.min(cap);
+                    }
+                    c
+                } else if let Some(ref dc) = effect.dynamic_count {
                     self.resolve_dynamic_count(gs, dc)
                 } else {
                     effect.count_or(1)
