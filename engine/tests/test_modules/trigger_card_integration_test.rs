@@ -3,185 +3,292 @@ use rabuka_engine::ability::types::Choice;
 use rabuka_engine::card::HeartColor;
 use rabuka_engine::zones::MemberArea;
 
-fn heart_mod(v: &TestGame, cid: i16, hc: HeartColor) -> i32 {
-    v.state.mods.get_heart_modifier(cid, hc)
+fn heart_mod(game: &TestGame, card_id: i16, heart: HeartColor) -> i32 {
+    game.state.mods.get_heart_modifier(card_id, heart)
 }
 
-fn filler_id(v: &mut TestGame) -> i16 {
-    v.id("PL!-sd1-010-SD")
-}
-
-fn setup(v: &mut TestGame, stage: [i16; 3]) {
-    let f = filler_id(v);
+fn fill_deck_and_energy(game: &mut TestGame) {
+    let filler = game.id("PL!-sd1-010-SD");
     for _ in 0..40 {
-        v.state.player1.main_deck.cards.push(f);
+        game.state.player1.main_deck.cards.push(filler);
     }
     for _ in 0..15 {
-        v.state.player1.energy_zone.cards.push(f);
+        game.state.player1.energy_zone.cards.push(filler);
     }
-    v.state.player1.energy_zone.active_energy_count = 15;
-    v.state.player1.stage.stage = stage;
+    game.state.player1.energy_zone.active_energy_count = 15;
 }
 
-// Drain any pending choices (position_change prompt, auto-ability order, etc.)
-fn drain_choices(v: &mut TestGame) {
-    while v.has_pending_choice() {
-        match v.get_pending_choice().clone() {
-            Choice::SelectTarget { .. } => v.select_option(0),
-            Choice::SelectCard { .. } => v.select_indices(&[0]),
-            _ => v.select_indices(&[]),
+fn drain_auto_choices(game: &mut TestGame) {
+    while game.has_pending_choice() {
+        match game.get_pending_choice().clone() {
+            Choice::SelectAutoAbility { .. } => game.select_indices(&[]),
+            other => panic!(
+                "expected only auto-ability ordering choices, got {:?}",
+                other
+            ),
         }
     }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// A. Energy placement via PL!SP-pb1-005-R (Hazuki Kano)
-//
-// Expected: Sumire [1], Hazuki [1], Rurino [0]
-//
-// Trigger at RightSide so Sumire (pos 0) and Hazuki (pos 1) stay.
-// ═══════════════════════════════════════════════════════════════
-
-#[test]
-fn energy_placement_triggers_sumire_and_hazuki() {
-    let mut v = TestGame::new(load_real_database());
-
-    let sumire = v.id("PL!SP-bp5-004-R\u{ff0b}");
-    let hazuki = v.id("PL!SP-bp4-016-N");
-    let rurino = v.id("PL!HS-pb1-003-R");
-    setup(&mut v, [sumire, hazuki, rurino]);
-
-    let e_f = filler_id(&mut v);
-    v.state.player1.energy_deck.cards.push(e_f);
-    let trigger = v.id("PL!SP-pb1-005-R");
-    v.state.player1.hand.cards.push(trigger);
-    v.play_to_stage(trigger, MemberArea::RightSide);
-    drain_choices(&mut v);
-
-    assert_eq!(
-        heart_mod(&v, sumire, HeartColor::Heart02),
-        1,
-        "[1] Sumire: energy → on_move_or_energy"
-    );
-    assert_eq!(
-        heart_mod(&v, hazuki, HeartColor::Heart06),
-        1,
-        "[1] Hazuki: energy → on_energy_placed_each_time"
-    );
-    assert_eq!(
-        v.state
-            .mods
-            .blade_modifiers
-            .get(&rurino)
-            .map_or(0, |e| e.total()),
-        0,
-        "[0] Rurino: no hand discard → not triggered"
-    );
+fn trigger_p1_auto_abilities(game: &mut TestGame) {
+    let player_id = game.state.player1.id.clone();
+    rabuka_engine::turn::TurnEngine::trigger_auto_abilities_for_player(&mut game.state, &player_id);
+    game.state.process_pending_auto_abilities(&player_id);
+    drain_auto_choices(game);
 }
 
-// ═══════════════════════════════════════════════════════════════
-// B. Position change via PL!SP-bp4-013-N (Tang Keke)
-//
-// Expected: Sumire [1], Natsumi [1], filler [0]
-//
-// Stage has [sumire, natsumi, filler]. Trigger at position 2 replaces
-// filler (sacrificed). Debut fires optional position change → accept.
-// Position change sets last_area_move_card_id. Auto scan picks up
-// Sumire and Natsumi.
-// ═══════════════════════════════════════════════════════════════
+fn accept_optional_position_change(game: &mut TestGame, destination: &str) {
+    if matches!(
+        game.get_pending_choice().clone(),
+        Choice::SelectAutoAbility { .. }
+    ) {
+        game.select_option(0);
+    }
 
-#[test]
-fn position_change_triggers_sumire_and_natsumi() {
-    let mut v = TestGame::new(load_real_database());
+    match game.get_pending_choice().clone() {
+        Choice::SelectTarget { target, .. } => {
+            assert_eq!(
+                target, "conditional_optional",
+                "Keke debut should first ask whether to use the optional position-change effect"
+            );
+            game.select_option(0);
+        }
+        other => panic!(
+            "Keke debut should pause at optional position-change choice, got {:?}",
+            other
+        ),
+    }
 
-    let sumire = v.id("PL!SP-bp5-004-R\u{ff0b}");
-    let natsumi = v.id("PL!SP-pb1-020-N");
-    let scapegoat = filler_id(&mut v);
-    setup(&mut v, [sumire, natsumi, scapegoat]);
-
-    let trigger = v.id("PL!SP-bp4-013-N");
-    v.state.player1.hand.cards.push(trigger);
-    v.play_to_stage(trigger, MemberArea::RightSide);
-    drain_choices(&mut v);
-
-    assert_eq!(
-        heart_mod(&v, sumire, HeartColor::Heart02),
-        1,
-        "[1] Sumire: area move → on_move_or_energy"
-    );
-    // Natsumi each_time: moved card triggers → draw 1 (deck was 40, stays 40 if
-    // draw happens and is discarded? Or decreases by 1? Just check no crash.)
-    assert_eq!(
-        v.state.player1.main_deck.cards.len(),
-        40,
-        "[1] Natsumi: each_time area move fires"
-    );
-    assert_eq!(
-        heart_mod(&v, scapegoat, HeartColor::Heart06),
-        0,
-        "[0] scapegoat: no energy → not triggered"
-    );
+    match game.get_pending_choice().clone() {
+        Choice::SelectTarget { target, .. } => {
+            assert_eq!(
+                target, "position|destination",
+                "accepted position-change effect should ask for a destination"
+            );
+            let action_index = game
+                .generated_actions()
+                .iter()
+                .position(|action| {
+                    action
+                        .parameters
+                        .as_ref()
+                        .and_then(|params| params.stage_area.as_deref())
+                        == Some(destination)
+                })
+                .unwrap_or_else(|| {
+                    panic!(
+                        "position-change destination '{}' should be a legal generated action",
+                        destination
+                    )
+                });
+            assert!(
+                !game.generated_actions().is_empty(),
+                "position-change destination choice should expose legal generated actions"
+            );
+            game.select_generated(action_index);
+        }
+        other => panic!(
+            "accepted position-change effect should ask for a destination, got {:?}",
+            other
+        ),
+    }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// C. Opponent energy → self_effect_only check
-//
-// Expected: Sumire [0], Hazuki [1]
-//
-// P2 places the trigger. P1's Sumire must NOT fire (self_effect_only).
-// P1's Hazuki card text says opponent also triggers → SHOULD fire.
-// ═══════════════════════════════════════════════════════════════
-
 #[test]
-fn opponent_energy_triggers_hazuki_not_sumire() {
-    let mut v = TestGame::new(load_real_database());
-    let f = filler_id(&mut v);
+fn hazuki_debut_energy_placement_triggers_energy_watchers() {
+    let mut game = TestGame::new(load_real_database());
 
-    let sumire = v.id("PL!SP-bp5-004-R\u{ff0b}");
-    let hazuki = v.id("PL!SP-bp4-016-N");
-    v.state.player1.stage.stage = [sumire, hazuki, -1];
-    for _ in 0..40 {
-        v.state.player1.main_deck.cards.push(f);
-    }
-    for _ in 0..40 {
-        v.state.player2.main_deck.cards.push(f);
-    }
-    for _ in 0..15 {
-        v.state.player2.energy_zone.cards.push(f);
-    }
-    v.state.player2.energy_zone.active_energy_count = 15;
-    v.state.player2.energy_deck.cards.push(f);
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    let hazuki_watcher = game.id("PL!SP-bp4-016-N");
+    fill_deck_and_energy(&mut game);
+    game.state.player1.stage.stage = [sumire, hazuki_watcher, -1];
 
-    // Place trigger on P2's stage. Use PlayMemberToStage which handles
-    // energy cost, debut triggering, auto scanning, and processing.
-    let trigger = v.id("PL!SP-pb1-005-R");
-    v.state.player2.hand.cards.push(trigger);
-    // First, give P2 energy to pay the play cost
-    v.state.player2.hand.cards.push(trigger);
-    v.state.player2.energy_zone.active_energy_count = 15;
-    let f2 = filler_id(&mut v);
-    v.state.player2.energy_deck.cards.push(f2);
-    // PlayMemberToStage processes P2's debut, which places energy
-    // from energy_deck → energy_zone. The post-resolution scan in
-    // process_current_ability picks up auto abilities on P1's stage.
-    let _ = rabuka_engine::turn::TurnEngine::execute_main_phase_action(
-        &mut v.state,
-        &rabuka_engine::game_setup::ActionType::PlayMemberToStage,
+    let energy_from_deck = game.id("PL!-sd1-010-SD");
+    game.state.player1.energy_deck.cards.push(energy_from_deck);
+    let trigger = game.id("PL!SP-pb1-005-R");
+    game.state.player1.hand.cards.push(trigger);
+
+    let hand_before = game.state.player1.hand.cards.len();
+    let main_deck_before = game.state.player1.main_deck.cards.len();
+    let energy_deck_before = game.state.player1.energy_deck.cards.len();
+    let energy_zone_before = game.state.player1.energy_zone.cards.len();
+
+    game.play_to_stage(trigger, MemberArea::RightSide);
+    drain_auto_choices(&mut game);
+
+    assert_eq!(
+        game.state.player1.stage.get_area(MemberArea::RightSide),
         Some(trigger),
-        None,
-        Some(MemberArea::Center),
-        Some(false),
+        "Hazuki Kano should remain in the played right-side slot"
     );
-    drain_choices(&mut v);
+    assert_eq!(
+        game.state.player1.energy_deck.cards.len(),
+        energy_deck_before - 1,
+        "Hazuki Kano debut should move exactly one card out of the energy deck"
+    );
+    assert_eq!(
+        game.state.player1.energy_zone.cards.len(),
+        energy_zone_before + 1,
+        "Hazuki Kano debut should place exactly one card into the energy zone"
+    );
+    assert!(
+        game.state
+            .player1
+            .energy_zone
+            .cards
+            .contains(&energy_from_deck),
+        "the card moved from energy deck should be present in the energy zone"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        main_deck_before - 1,
+        "Sumire should draw exactly one card from the main deck"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "playing Hazuki spends one hand card and Sumire draws one replacement"
+    );
+    assert_eq!(
+        heart_mod(&game, sumire, HeartColor::Heart02),
+        1,
+        "Sumire should gain heart02 when own effect puts energy into the energy zone"
+    );
+    assert_eq!(
+        heart_mod(&game, hazuki_watcher, HeartColor::Heart06),
+        1,
+        "Hazuki watcher should gain heart06 when an effect puts energy into the energy zone"
+    );
+}
+
+#[test]
+fn opponent_energy_effect_triggers_hazuki_but_not_sumire() {
+    let mut game = TestGame::new(load_real_database());
+
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    let hazuki_watcher = game.id("PL!SP-bp4-016-N");
+    fill_deck_and_energy(&mut game);
+    game.state.player1.stage.stage = [sumire, hazuki_watcher, -1];
+
+    let hand_before = game.state.player1.hand.cards.len();
+    game.state.last_energy_placed_by_effect = true;
+    game.state.last_energy_placed_by_player = Some(game.state.player2.id.clone());
+
+    trigger_p1_auto_abilities(&mut game);
 
     assert_eq!(
-        heart_mod(&v, sumire, HeartColor::Heart02),
+        heart_mod(&game, sumire, HeartColor::Heart02),
         0,
-        "[0] Sumire: opponent energy → self_effect_only blocks"
+        "Sumire says 'by your own card effect', so opponent energy placement should not trigger her"
     );
     assert_eq!(
-        heart_mod(&v, hazuki, HeartColor::Heart06),
+        game.state.player1.hand.cards.len(),
+        hand_before,
+        "Sumire should not draw from opponent energy placement"
+    );
+    assert_eq!(
+        heart_mod(&game, hazuki_watcher, HeartColor::Heart06),
         1,
-        "[1] Hazuki: opponent energy allowed per card text"
+        "Hazuki watcher explicitly says opponent card effects also trigger it"
+    );
+}
+
+#[test]
+fn keke_position_change_swapping_with_sumire_triggers_sumire() {
+    let mut game = TestGame::new(load_real_database());
+
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    let natsumi = game.id("PL!SP-pb1-020-N");
+    fill_deck_and_energy(&mut game);
+    game.state.player1.stage.stage = [sumire, natsumi, -1];
+
+    let trigger = game.id("PL!SP-bp4-013-N");
+    game.state.player1.hand.cards.push(trigger);
+
+    let main_deck_before = game.state.player1.main_deck.cards.len();
+
+    game.play_to_stage(trigger, MemberArea::RightSide);
+    accept_optional_position_change(&mut game, "left");
+    drain_auto_choices(&mut game);
+
+    assert_eq!(
+        game.state.player1.stage.get_area(MemberArea::LeftSide),
+        Some(trigger),
+        "Keke should move from right to left"
+    );
+    assert_eq!(
+        game.state.player1.stage.get_area(MemberArea::RightSide),
+        Some(sumire),
+        "Sumire should be swapped from left to right by Keke's position change"
+    );
+    assert_eq!(
+        game.state.player1.stage.get_area(MemberArea::Center),
+        Some(natsumi),
+        "Natsumi should stay center and should not satisfy 'this member moved'"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        main_deck_before - 1,
+        "only Sumire should draw because only Sumire moved"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "playing Keke spends one hand card, then Sumire draws one"
+    );
+    assert_eq!(
+        heart_mod(&game, sumire, HeartColor::Heart02),
+        1,
+        "Sumire should gain heart02 when Keke swaps into her area; Q220 says this movement triggers"
+    );
+}
+
+#[test]
+fn keke_position_change_swapping_with_natsumi_triggers_natsumi() {
+    let mut game = TestGame::new(load_real_database());
+
+    let sumire = game.id("PL!SP-bp5-004-R+");
+    let natsumi = game.id("PL!SP-pb1-020-N");
+    fill_deck_and_energy(&mut game);
+    game.state.player1.stage.stage = [sumire, natsumi, -1];
+
+    let trigger = game.id("PL!SP-bp4-013-N");
+    game.state.player1.hand.cards.push(trigger);
+
+    let main_deck_before = game.state.player1.main_deck.cards.len();
+
+    game.play_to_stage(trigger, MemberArea::RightSide);
+    accept_optional_position_change(&mut game, "center");
+    drain_auto_choices(&mut game);
+
+    assert_eq!(
+        game.state.player1.stage.get_area(MemberArea::Center),
+        Some(trigger),
+        "Keke should move from right to center"
+    );
+    assert_eq!(
+        game.state.player1.stage.get_area(MemberArea::RightSide),
+        Some(natsumi),
+        "Natsumi should be swapped from center to right by Keke's position change"
+    );
+    assert_eq!(
+        game.state.player1.stage.get_area(MemberArea::LeftSide),
+        Some(sumire),
+        "Sumire should stay left and should not satisfy 'this member moved'"
+    );
+    assert_eq!(
+        game.state.player1.main_deck.cards.len(),
+        main_deck_before - 1,
+        "only Natsumi should draw because only Natsumi moved"
+    );
+    assert_eq!(
+        game.state.player1.hand.cards.len(),
+        1,
+        "playing Keke spends one hand card, then Natsumi draws one"
+    );
+    assert_eq!(
+        heart_mod(&game, sumire, HeartColor::Heart02),
+        0,
+        "Sumire should not gain heart02 when she did not move and no energy was placed"
     );
 }

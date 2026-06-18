@@ -22,9 +22,13 @@ fn test_parse_heart_color() {
 /// exist but require engine-level changes. All other patterns are clean.
 #[test]
 fn test_parser_validation() {
-    let extract_script = std::path::Path::new("../cards/ability_extraction/extract_card_abilities.py");
+    let extract_script =
+        std::path::Path::new("../cards/ability_extraction/extract_card_abilities.py");
     if !extract_script.exists() {
-        eprintln!("Parser validation: extract_card_abilities.py not found at {:?}, skipping", extract_script);
+        eprintln!(
+            "Parser validation: extract_card_abilities.py not found at {:?}, skipping",
+            extract_script
+        );
         return;
     }
     let output = std::process::Command::new("python")
@@ -37,11 +41,21 @@ fn test_parser_validation() {
     if stderr.contains("GAPS DETECTED") || stdout.contains("GAPS DETECTED") {
         eprintln!("PARSER VALIDATION FAILED:");
         for line in stdout.lines().chain(stderr.lines()) {
-            if line.contains("GAPS") || line.contains("ability_") || line.contains("exclusivity") || line.contains("heart_type") || line.contains("conditional") || line.contains("movement") || line.contains("aggregate") || line.contains("static") {
+            if line.contains("GAPS")
+                || line.contains("ability_")
+                || line.contains("exclusivity")
+                || line.contains("heart_type")
+                || line.contains("conditional")
+                || line.contains("movement")
+                || line.contains("aggregate")
+                || line.contains("static")
+            {
                 eprintln!("  {}", line);
             }
         }
-        eprintln!("Run `python ../cards/ability_extraction/extract_card_abilities.py` for full report.");
+        eprintln!(
+            "Run `python ../cards/ability_extraction/extract_card_abilities.py` for full report."
+        );
         eprintln!("KNOWN ISSUES: 3 gaps (exclusivity, ability_filter OR-case) require engine-level changes.");
     }
 }
@@ -83,10 +97,9 @@ fn test_no_custom_actions() {
         eprintln!("abilities.json not found at {:?}, skipping", abilities_path);
         return;
     }
-    let contents = std::fs::read_to_string(abilities_path)
-        .expect("Failed to read abilities.json");
-    let data: serde_json::Value = serde_json::from_str(&contents)
-        .expect("Failed to parse abilities.json");
+    let contents = std::fs::read_to_string(abilities_path).expect("Failed to read abilities.json");
+    let data: serde_json::Value =
+        serde_json::from_str(&contents).expect("Failed to parse abilities.json");
 
     let mut custom_actions = Vec::new();
     if let Some(unique_abilities) = data.get("unique_abilities").and_then(|v| v.as_array()) {
@@ -101,7 +114,10 @@ fn test_no_custom_actions() {
         for ca in &custom_actions {
             eprintln!("  {}", ca);
         }
-        eprintln!("\n{} custom action(s) found. These need parser updates.", custom_actions.len());
+        eprintln!(
+            "\n{} custom action(s) found. These need parser updates.",
+            custom_actions.len()
+        );
         panic!("Custom actions detected in abilities.json");
     }
 }

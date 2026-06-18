@@ -96,7 +96,10 @@ impl<'a> ConditionContext<'a> {
     pub fn evaluate_condition(&self, condition: &Condition) -> bool {
         // Handle aggregate total with heart_colors — runs before type dispatch
         if condition.aggregate.as_deref() == Some("total")
-            && condition.heart_colors.as_ref().is_some_and(|c| !c.is_empty())
+            && condition
+                .heart_colors
+                .as_ref()
+                .is_some_and(|c| !c.is_empty())
             && Zone::from_str(condition.location.as_deref().unwrap_or("")) != Some(Zone::Stage)
         {
             let location = condition.location.as_deref().unwrap_or("");

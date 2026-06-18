@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
-use std::vec::Vec;
 use std::string::String;
+use std::vec::Vec;
 
 #[derive(Debug, Clone)]
 pub struct DeckEntry {
@@ -19,78 +19,86 @@ pub struct DeckParser;
 
 impl DeckParser {
     pub fn parse_deck_file(path: &Path) -> Result<DeckList, String> {
-        let content = fs::read_to_string(path)
-            .map_err(|e| format!("Failed to read deck file: {}", e))?;
-        
-        let name = path.file_stem()
+        let content =
+            fs::read_to_string(path).map_err(|e| format!("Failed to read deck file: {}", e))?;
+
+        let name = path
+            .file_stem()
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
-        
+
         let mut entries = Vec::new();
-        
+
         for line in content.lines() {
             let line = line.trim();
             if line.is_empty() {
                 continue;
             }
-            
+
             // Parse format: "card_no x quantity" or "quantity x card_no"
             let parts: Vec<&str> = line.split(" x ").collect();
             if parts.len() != 2 {
                 return Err(format!("Invalid line format: {}", line));
             }
-            
+
             // Try to parse first part as quantity (for "quantity x card_no" format)
             let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
                 // Format: "quantity x card_no"
                 (parts[1].trim().to_string(), q)
             } else {
                 // Format: "card_no x quantity"
-                let q = parts[1].trim().parse::<u32>()
+                let q = parts[1]
+                    .trim()
+                    .parse::<u32>()
                     .map_err(|e| format!("Invalid quantity: {}", e))?;
                 (parts[0].trim().to_string(), q)
             };
-            
+
             entries.push(DeckEntry { card_no, quantity });
         }
-        
+
         Ok(DeckList { name, entries })
     }
-    
+
     pub fn parse_all_decks_from_directory(dir_path: &Path) -> Result<Vec<DeckList>, String> {
         let mut decks = Vec::new();
-        
-        let dir_entries = fs::read_dir(dir_path)
-            .map_err(|e| format!("Failed to read directory: {}", e))?;
-        
+
+        let dir_entries =
+            fs::read_dir(dir_path).map_err(|e| format!("Failed to read directory: {}", e))?;
+
         for entry in dir_entries {
             let entry = entry.map_err(|e| format!("Failed to read entry: {}", e))?;
             let path = entry.path();
-            
+
             if path.is_file() && path.extension().map(|e| e == "txt").unwrap_or(false) {
                 let deck = Self::parse_deck_file(&path)?;
                 decks.push(deck);
             }
         }
-        
+
         Ok(decks)
     }
-    
+
     pub fn parse_all_decks() -> Result<Vec<DeckList>, String> {
         let decks_path = Path::new("../game/decks");
         Self::parse_all_decks_from_directory(decks_path)
     }
-    
+
     /// Parse deck content from HTML or plain text input.
     /// Strips HTML tags, then extracts card identifiers from each line.
     pub fn parse_deck_content(content: &str) -> Vec<String> {
         // Strip HTML tags (rough but effective for deck table rows)
         let cleaned = content
-            .replace("<br>", "\n").replace("<br/>", "\n").replace("<br />", "\n")
-            .replace("</tr>", "\n").replace("</div>", "\n")
-            .replace("<td>", " ").replace("</td>", " ")
-            .replace("<th>", " ").replace("</th>", " ");
+            .replace("<br>", "\n")
+            .replace("<br/>", "\n")
+            .replace("<br />", "\n")
+            .replace("</tr>", "\n")
+            .replace("</div>", "\n")
+            .replace("<td>", " ")
+            .replace("</td>", " ")
+            .replace("<th>", " ")
+            .replace("</th>", " ");
         let stripped = cleaned.chars().fold(String::new(), |mut acc, c| {
             if c == '<' {
                 acc.push('\n');
@@ -108,7 +116,9 @@ impl DeckParser {
         let mut card_numbers = Vec::new();
         for line in stripped.lines() {
             let line = line.trim();
-            if line.is_empty() || line.starts_with("//") { continue; }
+            if line.is_empty() || line.starts_with("//") {
+                continue;
+            }
             // Try "card_no x quantity" format
             if let Some(card_no) = Self::parse_line(line) {
                 card_numbers.push(card_no);
@@ -142,13 +152,13 @@ impl DeckParser {
 
     pub fn deck_list_to_card_numbers(deck: &DeckList) -> Vec<String> {
         let mut card_numbers = Vec::new();
-        
+
         for entry in &deck.entries {
             for _ in 0..entry.quantity {
                 card_numbers.push(entry.card_no.clone());
             }
         }
-        
+
         card_numbers
     }
 }

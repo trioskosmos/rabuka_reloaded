@@ -1,24 +1,24 @@
-use actix_web::{web, App, HttpResponse, HttpServer, Responder};
-use actix_files as fs;
 use actix_cors::Cors;
-use std::sync::{Arc, Mutex, RwLock};
-use serde::{Serialize, Deserialize};
-use std::path::PathBuf;
+use actix_files as fs;
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use rand::Rng;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
-use rand::Rng;
 
+use crate::card::CardDatabase;
+use crate::card_loader;
+use crate::deck_builder;
+use crate::deck_parser;
+use crate::display;
+use crate::game_setup::{ActionParameters, ActionType};
 use crate::game_state::GameState;
 use crate::player::Player;
-use crate::card_loader;
-use crate::card::CardDatabase;
-use crate::deck_parser;
-use crate::deck_builder;
-use crate::game_setup::{ActionParameters, ActionType};
-use crate::display;
 
-pub use crate::display::{CardDisplay, ZoneDisplay, PlayerDisplay, StageDisplay, GameStateDisplay};
+pub use crate::display::{CardDisplay, GameStateDisplay, PlayerDisplay, StageDisplay, ZoneDisplay};
 
 // ====================================================================
 // Frame snapshot — lightweight board state using card IDs only
@@ -64,7 +64,12 @@ impl FrameSnapshot {
                 player.stage.under_cards[2].iter().copied().collect(),
             ],
             live_zone: player.live_card_zone.cards.iter().copied().collect(),
-            success_live_zone: player.success_live_card_zone.cards.iter().copied().collect(),
+            success_live_zone: player
+                .success_live_card_zone
+                .cards
+                .iter()
+                .copied()
+                .collect(),
         };
         FrameSnapshot {
             frame,
@@ -77,8 +82,6 @@ impl FrameSnapshot {
         }
     }
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ActionIndex {
@@ -98,12 +101,9 @@ struct GameStateResponse {
     ui_config: Option<UiConfig>,
 }
 
-
-
 #[derive(Deserialize)]
 
 pub struct ExecuteActionRequest {
-
     pub action_index: usize,
 
     pub stage_area: Option<String>, // Accept string from webapp, will parse to MemberArea
@@ -119,29 +119,21 @@ pub struct ExecuteActionRequest {
     pub card_no: Option<String>,
 
     pub use_baton_touch: Option<bool>,
-
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone)]
 
 pub struct RoomSession {
-
     pub session_id: String,
 
     pub player_id: i32,
 
     pub username: Option<String>,
-
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone)]
 
 pub struct Room {
-
     pub room_id: String,
 
     pub mode: String, // "sandbox" or "pvp"
@@ -159,9 +151,7 @@ pub struct Room {
     pub custom_decks: Option<HashMap<i32, CustomDeck>>,
 
     #[serde(skip)]
-
     #[allow(dead_code)]
-
     pub game_state: Option<Arc<RwLock<GameState>>>, // Per-room game state
 
     // Per-room state (completely isolated from other rooms)
@@ -179,24 +169,17 @@ pub struct Room {
     pub actions_dirty: bool,
 }
 
-
-
 #[derive(Serialize, Deserialize, Clone)]
 
 pub struct CustomDeck {
-
     pub main: Vec<String>,
 
     pub energy: Vec<String>,
-
 }
-
-
 
 #[derive(Deserialize)]
 
 pub struct CreateRoomRequest {
-
     pub mode: Option<String>,
 
     pub public: Option<bool>,
@@ -210,22 +193,15 @@ pub struct CreateRoomRequest {
     pub p1_deck: Option<Vec<String>>,
 
     pub p1_energy: Option<Vec<String>>,
-
 }
-
-
 
 #[derive(Deserialize)]
 
 pub struct JoinRoomRequest {
-
     pub room_id: String,
 
     pub username: Option<String>,
-
 }
-
-
 
 #[derive(Deserialize)]
 pub struct SetUiConfigRequest {
@@ -241,22 +217,14 @@ pub struct SetUiConfigRequest {
 #[derive(Deserialize)]
 
 pub struct InitGameRequest {
-
     pub deck: Option<String>,
-
 }
-
-
 
 #[derive(Deserialize)]
 
 pub struct ExecCodeRequest {
-
     pub code: String,
-
 }
-
-
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct UiConfig {
@@ -284,7 +252,6 @@ impl Default for UiConfig {
 }
 
 pub struct AppState {
-
     pub game_state: Arc<RwLock<GameState>>,
 
     pub rooms: Arc<Mutex<HashMap<String, Room>>>,
@@ -314,13 +281,11 @@ pub struct AppState {
     pub actions_dirty: Arc<Mutex<bool>>,
 
     pub room_broadcasts: Arc<Mutex<HashMap<String, tokio::sync::broadcast::Sender<()>>>>,
-
 }
 
-
-
 fn get_room_id_from_req(req: &actix_web::HttpRequest) -> Option<String> {
-    req.headers().get("X-Room-Id")
+    req.headers()
+        .get("X-Room-Id")
         .or_else(|| req.headers().get("x-room-id"))
         .and_then(|v| v.to_str().ok())
         .filter(|s| !s.is_empty())
@@ -328,7 +293,8 @@ fn get_room_id_from_req(req: &actix_web::HttpRequest) -> Option<String> {
 }
 
 fn get_session_token_from_req(req: &actix_web::HttpRequest) -> Option<String> {
-    req.headers().get("X-Session-Token")
+    req.headers()
+        .get("X-Session-Token")
         .or_else(|| req.headers().get("x-session-token"))
         .and_then(|v| v.to_str().ok())
         .filter(|s| !s.is_empty())
@@ -432,7 +398,10 @@ fn ensure_actions(data: &AppState, game_state: &GameState, room_id: Option<&str>
 /// Lightweight version endpoint for polling — returns a sequence number
 /// that increments on each state change. Clients should only fetch the full
 /// /api/game-state when this version differs from their last known value.
-async fn get_game_state_version(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
+async fn get_game_state_version(
+    data: web::Data<AppState>,
+    req: actix_web::HttpRequest,
+) -> impl Responder {
     let room_id = get_room_id_from_req(&req);
     let version = if let Some(ref rid) = room_id {
         let rooms = data.rooms.lock().unwrap();
@@ -443,7 +412,10 @@ async fn get_game_state_version(data: web::Data<AppState>, req: actix_web::HttpR
     HttpResponse::Ok().json(serde_json::json!({ "version": version }))
 }
 
-pub async fn get_game_state(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
+pub async fn get_game_state(
+    data: web::Data<AppState>,
+    req: actix_web::HttpRequest,
+) -> impl Responder {
     let room_id_str = get_room_id_from_req(&req);
     let session_token = get_session_token_from_req(&req);
 
@@ -482,10 +454,11 @@ pub async fn get_game_state(data: web::Data<AppState>, req: actix_web::HttpReque
         if let Some(room) = rooms.get(rid) {
             display.mode = room.mode.clone();
             if room.mode == "pvp" {
-                requester_player_id = session_token.as_ref()
+                requester_player_id = session_token
+                    .as_ref()
                     .and_then(|token| room.sessions.get(token))
                     .map(|sess| sess.player_id);
-                
+
                 if let Some(pid) = requester_player_id {
                     let gs = lock_state!(gs_arc, read);
                     filter_display_for_player(&mut display, &gs, pid);
@@ -506,8 +479,16 @@ pub async fn get_game_state(data: web::Data<AppState>, req: actix_web::HttpReque
     }
 
     let ui_config = data.ui_config.lock().unwrap().clone();
-    let final_actions = if display.waiting_for_opponent { None } else { Some(actions) };
-    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: final_actions, ui_config: Some(ui_config) })
+    let final_actions = if display.waiting_for_opponent {
+        None
+    } else {
+        Some(actions)
+    };
+    HttpResponse::Ok().json(GameStateResponse {
+        game_state: display,
+        legal_actions: final_actions,
+        ui_config: Some(ui_config),
+    })
 }
 
 async fn get_actions(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
@@ -520,94 +501,69 @@ async fn get_actions(data: web::Data<AppState>, req: actix_web::HttpRequest) -> 
     HttpResponse::Ok().json(serde_json::json!({ "actions": actions }))
 }
 
-
-
-
 fn actions_with_index(game_state: &GameState) -> Vec<ActionIndex> {
-    crate::game_setup::generate_possible_actions(game_state).into_iter().enumerate().map(|(i, a)| ActionIndex {
-        description: a.description,
-        action_type: a.action_type.to_string(),
-        parameters: a.parameters,
-        index: i,
-    }).collect()
+    crate::game_setup::generate_possible_actions(game_state)
+        .into_iter()
+        .enumerate()
+        .map(|(i, a)| ActionIndex {
+            description: a.description,
+            action_type: a.action_type.to_string(),
+            parameters: a.parameters,
+            index: i,
+        })
+        .collect()
 }
-
-
 
 fn is_automatic_phase(game_state: &GameState) -> bool {
-
     matches!(
-
         game_state.current_phase,
-
         crate::game_state::Phase::Active
-
             | crate::game_state::Phase::Energy
-
             | crate::game_state::Phase::Draw
-
             | crate::game_state::Phase::FirstAttackerPerformance
-
             | crate::game_state::Phase::SecondAttackerPerformance
-
             | crate::game_state::Phase::LiveVictoryDetermination
-
     )
-
 }
-
-
 
 fn is_live_card_set_phase(game_state: &GameState) -> bool {
-
     matches!(
-
         game_state.current_phase,
-
         crate::game_state::Phase::LiveCardSetFirstAttacker
-
             | crate::game_state::Phase::LiveCardSetSecondAttacker
-
     )
 }
 
-
-
 fn settle_single_player_state(game_state: &mut GameState) -> Result<(), String> {
-
     loop {
-
         // If the player needs to make a choice, stop and wait for their input
-        if game_state.has_pending_choice() { break; }
+        if game_state.has_pending_choice() {
+            break;
+        }
 
         if is_automatic_phase(game_state) {
-
             let old_phase = game_state.current_phase.clone();
 
             crate::turn::TurnEngine::advance_phase(game_state);
 
-            println!("DEBUG: Auto-advanced from {:?} to {:?}", old_phase, game_state.current_phase);
-
+            println!(
+                "DEBUG: Auto-advanced from {:?} to {:?}",
+                old_phase, game_state.current_phase
+            );
         } else if is_live_card_set_phase(game_state) {
-
             // Live card set phases are manual - don't auto-advance
 
             println!("DEBUG: Live card set phase reached, stopping auto-advance");
 
             break;
-
         } else {
-
             // Reached a human decision phase, stop auto-advancing
 
             break;
-
         }
-
     }
 
     Ok(())
-
 }
 
 /// For PVP: determine if `player_id` (0 or 1) is allowed to act in the current game state.
@@ -616,15 +572,25 @@ pub fn pvp_player_can_act(game_state: &GameState, player_id: i32) -> bool {
     use crate::game_state::Phase;
 
     // Pending choices with routing info override phase-based defaults.
-    let pid_str = || -> &'static str { if player_id == 0 { "p1" } else { "p2" } };
+    let pid_str = || -> &'static str {
+        if player_id == 0 {
+            "p1"
+        } else {
+            "p2"
+        }
+    };
     if game_state.has_pending_choice() {
         if let Some(cpid) = game_state.get_pending_choice_player_id() {
             return cpid == pid_str();
         }
         if let Some(choice) = game_state.get_pending_choice() {
             match choice {
-                crate::ability::types::Choice::SelectAutoAbility { player_id: cpid, .. }
-                | crate::ability::types::Choice::SelectLiveSuccess { player_id: cpid, .. } => {
+                crate::ability::types::Choice::SelectAutoAbility {
+                    player_id: cpid, ..
+                }
+                | crate::ability::types::Choice::SelectLiveSuccess {
+                    player_id: cpid, ..
+                } => {
                     return *cpid == pid_str();
                 }
                 _ => {}
@@ -646,22 +612,46 @@ pub fn pvp_player_can_act(game_state: &GameState, player_id: i32) -> bool {
             winner_idx == Some(if player_id == 0 { 1 } else { 2 })
         }
         Phase::MulliganFirstAttacker => {
-            if game_state.player1.is_first_attacker { player_id == 0 } else { player_id == 1 }
+            if game_state.player1.is_first_attacker {
+                player_id == 0
+            } else {
+                player_id == 1
+            }
         }
         Phase::MulliganSecondAttacker => {
-            if game_state.player1.is_first_attacker { player_id == 1 } else { player_id == 0 }
+            if game_state.player1.is_first_attacker {
+                player_id == 1
+            } else {
+                player_id == 0
+            }
         }
         Phase::LiveCardSetFirstAttacker => {
-            if game_state.player1.is_first_attacker { player_id == 0 } else { player_id == 1 }
+            if game_state.player1.is_first_attacker {
+                player_id == 0
+            } else {
+                player_id == 1
+            }
         }
         Phase::LiveCardSetSecondAttacker => {
-            if game_state.player1.is_first_attacker { player_id == 1 } else { player_id == 0 }
+            if game_state.player1.is_first_attacker {
+                player_id == 1
+            } else {
+                player_id == 0
+            }
         }
         Phase::FirstAttackerPerformance => {
-            if game_state.player1.is_first_attacker { player_id == 0 } else { player_id == 1 }
+            if game_state.player1.is_first_attacker {
+                player_id == 0
+            } else {
+                player_id == 1
+            }
         }
         Phase::SecondAttackerPerformance => {
-            if game_state.player1.is_first_attacker { player_id == 1 } else { player_id == 0 }
+            if game_state.player1.is_first_attacker {
+                player_id == 1
+            } else {
+                player_id == 0
+            }
         }
         _ => {
             let active = game_state.active_player();
@@ -670,7 +660,6 @@ pub fn pvp_player_can_act(game_state: &GameState, player_id: i32) -> bool {
         }
     }
 }
-
 
 /// Filter the game state display to hide information from the opponent
 /// based on the requesting player's perspective. Only applied in PVP mode.
@@ -750,7 +739,6 @@ fn filter_display_for_player(
     }
 }
 
-
 pub async fn execute_action(
     data: web::Data<AppState>,
     req: web::Json<ExecuteActionRequest>,
@@ -763,7 +751,9 @@ pub async fn execute_action(
     let pvp_player_pid = exec_room_id_str.as_deref().and_then(|rid| {
         let rooms = data.rooms.lock().unwrap();
         rooms.get(rid).and_then(|room| {
-            if room.mode != "pvp" { return None; }
+            if room.mode != "pvp" {
+                return None;
+            }
             let token = get_session_token_from_req(&http_req)?;
             room.sessions.get(&token).map(|s| s.player_id)
         })
@@ -782,12 +772,17 @@ pub async fn execute_action(
     let snapshot = lock_state!(gs_arc, read).clone();
     let mut game_state = lock_state!(gs_arc, write);
 
-    let action_type = req.action_type.as_ref()
+    let action_type = req
+        .action_type
+        .as_ref()
         .and_then(|t| t.parse::<ActionType>().ok())
         .unwrap_or(ActionType::Pass);
 
     // PVP RPS: set transient player_id so the handler routes to the correct player
-    if matches!(action_type, ActionType::RockChoice | ActionType::PaperChoice | ActionType::ScissorsChoice) {
+    if matches!(
+        action_type,
+        ActionType::RockChoice | ActionType::PaperChoice | ActionType::ScissorsChoice
+    ) {
         game_state.pending_rps_player_id = pvp_player_pid;
     }
 
@@ -796,7 +791,8 @@ pub async fn execute_action(
         &action_type,
         req.card_id,
         req.card_indices.as_ref().cloned(),
-        req.stage_area.as_ref()
+        req.stage_area
+            .as_ref()
             .and_then(|s| s.parse::<crate::zones::MemberArea>().ok()),
         req.use_baton_touch,
     );
@@ -819,11 +815,13 @@ pub async fn execute_action(
                         let label = format!(
                             "{}{}",
                             req.action_type.as_deref().unwrap_or("?"),
-                            req.card_no.as_deref().map(|n| format!(": {}", n)).unwrap_or_default(),
+                            req.card_no
+                                .as_deref()
+                                .map(|n| format!(": {}", n))
+                                .unwrap_or_default(),
                         );
-                        room.frame_history.push(
-                            FrameSnapshot::capture(&game_state, frame, label)
-                        );
+                        room.frame_history
+                            .push(FrameSnapshot::capture(&game_state, frame, label));
                     }
                 }
             } else {
@@ -836,11 +834,15 @@ pub async fn execute_action(
                 let label = format!(
                     "{}{}",
                     req.action_type.as_deref().unwrap_or("?"),
-                    req.card_no.as_deref().map(|n| format!(": {}", n)).unwrap_or_default(),
+                    req.card_no
+                        .as_deref()
+                        .map(|n| format!(": {}", n))
+                        .unwrap_or_default(),
                 );
-                data.frame_history.lock().unwrap().push(
-                    FrameSnapshot::capture(&game_state, frame, label)
-                );
+                data.frame_history
+                    .lock()
+                    .unwrap()
+                    .push(FrameSnapshot::capture(&game_state, frame, label));
             }
 
             // Notify other SSE clients that state changed
@@ -863,16 +865,20 @@ pub async fn execute_action(
                 }
             }
             let actions = actions_with_index(&game_state);
-            let final_actions = if display.waiting_for_opponent { None } else { Some(actions) };
-            HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: final_actions, ui_config: None })
+            let final_actions = if display.waiting_for_opponent {
+                None
+            } else {
+                Some(actions)
+            };
+            HttpResponse::Ok().json(GameStateResponse {
+                game_state: display,
+                legal_actions: final_actions,
+                ui_config: None,
+            })
         }
-        Err(e) => {
-            HttpResponse::BadRequest().json(serde_json::json!({ "error": e }))
-        }
+        Err(e) => HttpResponse::BadRequest().json(serde_json::json!({ "error": e })),
     }
 }
-
-
 
 async fn get_status(data: web::Data<AppState>) -> impl Responder {
     let members = data.card_database.cards.len();
@@ -884,9 +890,10 @@ async fn get_status(data: web::Data<AppState>) -> impl Responder {
     }))
 }
 
-
-
-async fn set_ui_config(data: web::Data<AppState>, req: web::Json<SetUiConfigRequest>) -> impl Responder {
+async fn set_ui_config(
+    data: web::Data<AppState>,
+    req: web::Json<SetUiConfigRequest>,
+) -> impl Responder {
     let mut ui_config = data.ui_config.lock().unwrap();
 
     if let Some(lang) = &req.current_lang {
@@ -915,7 +922,6 @@ async fn set_ui_config(data: web::Data<AppState>, req: web::Json<SetUiConfigRequ
 }
 
 async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) -> impl Responder {
-
     // Placeholder for AI mode setting
 
     HttpResponse::Ok().json(serde_json::json!({
@@ -923,22 +929,25 @@ async fn set_ai(_data: web::Data<AppState>, _req: web::Json<serde_json::Value>) 
         "success": true
 
     }))
-
 }
-
-
 
 async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
     let undo_room_id = get_room_id_from_req(&req);
     let snapshot = if let Some(ref rid) = undo_room_id {
         let mut rooms = data.rooms.lock().unwrap();
         if let Some(room) = rooms.get_mut(rid) {
-            room.history.pop().ok_or_else(|| HttpResponse::BadRequest().json("No history to undo"))
+            room.history
+                .pop()
+                .ok_or_else(|| HttpResponse::BadRequest().json("No history to undo"))
         } else {
             return HttpResponse::BadRequest().json("Room not found");
         }
     } else {
-        data.history.lock().unwrap().pop().ok_or_else(|| HttpResponse::BadRequest().json("No history to undo"))
+        data.history
+            .lock()
+            .unwrap()
+            .pop()
+            .ok_or_else(|| HttpResponse::BadRequest().json("No history to undo"))
     };
     let snapshot = match snapshot {
         Ok(s) => s,
@@ -964,7 +973,11 @@ async fn undo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     let display = crate::display::game_state_to_display(&game_state);
     drop(game_state);
     let ui_config = data.ui_config.lock().unwrap().clone();
-    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: None, ui_config: Some(ui_config) })
+    HttpResponse::Ok().json(GameStateResponse {
+        game_state: display,
+        legal_actions: None,
+        ui_config: Some(ui_config),
+    })
 }
 
 async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
@@ -972,12 +985,18 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     let snapshot = if let Some(ref rid) = redo_room_id {
         let mut rooms = data.rooms.lock().unwrap();
         if let Some(room) = rooms.get_mut(rid) {
-            room.future.pop().ok_or_else(|| HttpResponse::BadRequest().json("No future to redo"))
+            room.future
+                .pop()
+                .ok_or_else(|| HttpResponse::BadRequest().json("No future to redo"))
         } else {
             return HttpResponse::BadRequest().json("Room not found");
         }
     } else {
-        data.future.lock().unwrap().pop().ok_or_else(|| HttpResponse::BadRequest().json("No future to redo"))
+        data.future
+            .lock()
+            .unwrap()
+            .pop()
+            .ok_or_else(|| HttpResponse::BadRequest().json("No future to redo"))
     };
     let snapshot = match snapshot {
         Ok(s) => s,
@@ -1003,11 +1022,12 @@ async fn redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Re
     let display = crate::display::game_state_to_display(&game_state);
     drop(game_state);
     let ui_config = data.ui_config.lock().unwrap().clone();
-    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: None, ui_config: Some(ui_config) })
+    HttpResponse::Ok().json(GameStateResponse {
+        game_state: display,
+        legal_actions: None,
+        ui_config: Some(ui_config),
+    })
 }
-
-
-
 
 async fn exec_code(
     data: web::Data<AppState>,
@@ -1023,11 +1043,18 @@ async fn exec_code(
         for segment in code.split(';') {
             let seg = segment.trim();
             // handle "let key = value" and "key=value" formats
-            let without_let = if let Some(rest) = seg.strip_prefix("let ") { rest } else { seg };
+            let without_let = if let Some(rest) = seg.strip_prefix("let ") {
+                rest
+            } else {
+                seg
+            };
             if let Some(eq_pos) = without_let.find('=') {
                 let k = without_let[..eq_pos].trim().to_lowercase();
                 if k == key {
-                    let v = without_let[eq_pos + 1..].trim().trim_matches('"').to_string();
+                    let v = without_let[eq_pos + 1..]
+                        .trim()
+                        .trim_matches('"')
+                        .to_string();
                     return Some(v);
                 }
             }
@@ -1041,7 +1068,11 @@ async fn exec_code(
 
     macro_rules! with_player {
         ($p:ident, $body:block) => {
-            let $p = if player_idx == 0 { &mut game_state.player1 } else { &mut game_state.player2 };
+            let $p = if player_idx == 0 {
+                &mut game_state.player1
+            } else {
+                &mut game_state.player2
+            };
             $body
         };
     }
@@ -1061,7 +1092,9 @@ async fn exec_code(
     if code.contains("add_card") && code.contains("card_no") {
         let card_no = parse_param(code, "card_no").unwrap_or_default();
         if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
-            with_player!(p, { p.hand.add_card(card_id); });
+            with_player!(p, {
+                p.hand.add_card(card_id);
+            });
         }
     }
 
@@ -1096,13 +1129,17 @@ async fn exec_code(
     }
 
     if code.contains("reshuffle_deck") {
-        with_player!(p, { p.main_deck.shuffle(); });
+        with_player!(p, {
+            p.main_deck.shuffle();
+        });
     }
 
     if code.contains("add_live_to_zone") {
         let card_no = parse_param(code, "card_no").unwrap_or_default();
         if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
-            with_player!(p, { p.live_card_zone.cards.push(card_id); });
+            with_player!(p, {
+                p.live_card_zone.cards.push(card_id);
+            });
         }
     }
 
@@ -1124,8 +1161,10 @@ async fn exec_code(
         with_player!(p, {
             if let Some(cid) = p.energy_zone.cards.pop() {
                 p.energy_deck.cards.push(cid);
-                p.energy_zone.active_energy_count =
-                    p.energy_zone.active_energy_count.min(p.energy_zone.cards.len());
+                p.energy_zone.active_energy_count = p
+                    .energy_zone
+                    .active_energy_count
+                    .min(p.energy_zone.cards.len());
             }
         });
     }
@@ -1133,14 +1172,18 @@ async fn exec_code(
     if code.contains("to_success") {
         let card_no = parse_param(code, "card_no").unwrap_or_default();
         if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
-            with_player!(p, { p.success_live_card_zone.cards.push(card_id); });
+            with_player!(p, {
+                p.success_live_card_zone.cards.push(card_id);
+            });
         }
     }
 
     if code.contains("to_discard") {
         let card_no = parse_param(code, "card_no").unwrap_or_default();
         if let Some(card_id) = game_state.card_database.get_card_id(&card_no) {
-            with_player!(p, { p.waitroom.add_card(card_id); });
+            with_player!(p, {
+                p.waitroom.add_card(card_id);
+            });
         }
     }
 
@@ -1149,15 +1192,14 @@ async fn exec_code(
     let display = crate::display::game_state_to_display(&game_state);
     let actions = read_actions(&data, exec_room_id.as_deref());
     let mut response = serde_json::to_value(display).unwrap_or_default();
-    response["legal_actions"] = serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
+    response["legal_actions"] =
+        serde_json::to_value(&actions).unwrap_or(serde_json::Value::Array(vec![]));
 
     HttpResponse::Ok().json(serde_json::json!({
         "success": true,
         "state": response
     }))
 }
-
-
 
 async fn debug_rewind(data: web::Data<AppState>, req: actix_web::HttpRequest) -> impl Responder {
     let rewind_room_id = get_room_id_from_req(&req);
@@ -1169,7 +1211,10 @@ async fn debug_rewind(data: web::Data<AppState>, req: actix_web::HttpRequest) ->
     };
     let snapshot = match snapshot {
         Some(s) => s,
-        None => return HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": "No history"})),
+        None => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"success": false, "error": "No history"}))
+        }
     };
     let gs_arc = resolve_game_state_arc(&data, &req);
     let mut game_state = lock_state!(gs_arc, write);
@@ -1188,7 +1233,10 @@ async fn debug_redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     };
     let snapshot = match snapshot {
         Some(s) => s,
-        None => return HttpResponse::BadRequest().json(serde_json::json!({"success": false, "error": "No future"})),
+        None => {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"success": false, "error": "No future"}))
+        }
     };
     let gs_arc = resolve_game_state_arc(&data, &req);
     let mut game_state = lock_state!(gs_arc, write);
@@ -1196,16 +1244,20 @@ async fn debug_redo(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     HttpResponse::Ok().json(serde_json::json!({"success": true}))
 }
 
-async fn debug_snapshot(data: web::Data<AppState>, http_req: actix_web::HttpRequest) -> impl Responder {
+async fn debug_snapshot(
+    data: web::Data<AppState>,
+    http_req: actix_web::HttpRequest,
+) -> impl Responder {
     let gs_arc = resolve_game_state_arc(&data, &http_req);
     let game_state = lock_state!(gs_arc, read);
     let display = crate::display::game_state_to_display(&game_state);
     HttpResponse::Ok().json(serde_json::json!({"success": true, "state": display}))
 }
 
-
-
-async fn debug_dump_state(data: web::Data<AppState>, http_req: actix_web::HttpRequest) -> impl Responder {
+async fn debug_dump_state(
+    data: web::Data<AppState>,
+    http_req: actix_web::HttpRequest,
+) -> impl Responder {
     let gs_arc = resolve_game_state_arc(&data, &http_req);
     let game_state = lock_state!(gs_arc, read);
     let display = crate::display::game_state_to_display(&game_state);
@@ -1248,76 +1300,65 @@ async fn debug_dump_frames(data: web::Data<AppState>) -> impl Responder {
     }))
 }
 
-
-
 async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
     let game_state = lock_state!(data.game_state, read);
     let mut results = Vec::new();
 
     let card_db = &game_state.card_database;
 
-    for (player_idx, player) in [&game_state.player1, &game_state.player2].iter().enumerate() {
-
+    for (player_idx, player) in [&game_state.player1, &game_state.player2]
+        .iter()
+        .enumerate()
+    {
         let zone_defs: [(&str, &[i16]); 6] = [
-
             ("stage", &player.stage.stage),
-
             ("hand", &player.hand.cards),
-
             ("energy", &player.energy_zone.cards),
-
             ("waitroom", &player.waitroom.cards),
-
             ("live_zone", &player.live_card_zone.cards),
-
             ("success_live_zone", &player.success_live_card_zone.cards),
-
         ];
 
         for &(zone_name, cards) in &zone_defs {
-
             for &card_id in cards {
-
-                if card_id < 0 { continue; }
+                if card_id < 0 {
+                    continue;
+                }
 
                 if let Some(card) = card_db.get_card(card_id) {
-
                     for (ability_idx, ability) in card.abilities.iter().enumerate() {
-
                         if let Some(ref effect) = ability.effect {
-
                             let condition_fields: [(&str, &Option<crate::card::Condition>); 4] = [
-
-                                ("activation_condition_parsed", &effect.activation_condition_parsed),
-
+                                (
+                                    "activation_condition_parsed",
+                                    &effect.activation_condition_parsed,
+                                ),
                                 ("condition", &effect.condition),
-
-                                ("alternative_condition", &effect.compound.alternative_condition),
-
+                                (
+                                    "alternative_condition",
+                                    &effect.compound.alternative_condition,
+                                ),
                                 ("result_condition", &effect.compound.result_condition),
-
                             ];
 
                             for &(field_name, condition_opt) in &condition_fields {
-
                                 if let Some(ref condition) = condition_opt {
-
-                                    results.push((player_idx, zone_name, card_id, card.name.clone(), ability_idx, field_name, condition.clone()));
-
+                                    results.push((
+                                        player_idx,
+                                        zone_name,
+                                        card_id,
+                                        card.name.clone(),
+                                        ability_idx,
+                                        field_name,
+                                        condition.clone(),
+                                    ));
                                 }
-
                             }
-
                         }
-
                     }
-
                 }
-
             }
-
         }
-
     }
 
     let state_clone = game_state.clone();
@@ -1326,49 +1367,47 @@ async fn debug_conditions(data: web::Data<AppState>) -> impl Responder {
 
     let ctx = crate::ability::condition::ConditionContext::new(&state_clone);
 
-    let evaluated: Vec<serde_json::Value> = results.into_iter().map(|(player_idx, zone_name, card_id, card_name, ability_idx, field_name, condition)| {
+    let evaluated: Vec<serde_json::Value> = results
+        .into_iter()
+        .map(
+            |(player_idx, zone_name, card_id, card_name, ability_idx, field_name, condition)| {
+                let result = ctx.evaluate_condition(&condition);
 
-        let result = ctx.evaluate_condition(&condition);
+                serde_json::json!({
 
-        serde_json::json!({
+                    "player": player_idx,
 
-            "player": player_idx,
+                    "zone": zone_name,
 
-            "zone": zone_name,
+                    "card_id": card_id,
 
-            "card_id": card_id,
+                    "card_name": card_name,
 
-            "card_name": card_name,
+                    "ability_index": ability_idx,
 
-            "ability_index": ability_idx,
+                    "field": field_name,
 
-            "field": field_name,
+                    "condition_type": condition.condition_type,
 
-            "condition_type": condition.condition_type,
+                    "condition_text": condition.text,
 
-            "condition_text": condition.text,
+                    "condition_data": serde_json::to_value(&condition).unwrap_or_default(),
 
-            "condition_data": serde_json::to_value(&condition).unwrap_or_default(),
+                    "result": result,
 
-            "result": result,
-
-        })
-
-    }).collect();
+                })
+            },
+        )
+        .collect();
 
     HttpResponse::Ok().json(serde_json::json!({"success": true, "conditions": evaluated}))
-
 }
-
-
 
 async fn export_game(data: web::Data<AppState>) -> impl Responder {
     let game_state = lock_state!(data.game_state, read);
     let display = crate::display::game_state_to_display(&game_state);
     HttpResponse::Ok().json(serde_json::json!({"success": true, "game_state": display}))
 }
-
-
 
 fn deck_files() -> Vec<PathBuf> {
     let decks_dir = PathBuf::from("../web_ui/decks");
@@ -1392,7 +1431,9 @@ fn deck_name_from_path(path: &PathBuf) -> String {
             s.split('_')
                 .map(|w| {
                     let mut c = w.chars();
-                    c.next().map(|f| f.to_uppercase().to_string() + c.as_str()).unwrap_or_default()
+                    c.next()
+                        .map(|f| f.to_uppercase().to_string() + c.as_str())
+                        .unwrap_or_default()
                 })
                 .collect::<Vec<_>>()
                 .join(" ")
@@ -1401,55 +1442,72 @@ fn deck_name_from_path(path: &PathBuf) -> String {
 }
 
 fn parse_deck_text(content: &str) -> Vec<String> {
-    content.lines()
+    content
+        .lines()
         .filter(|l| !l.trim().is_empty())
         .flat_map(|l| {
             let parts: Vec<&str> = l.split(" x ").collect();
-            if parts.len() != 2 { return Vec::new(); }
+            if parts.len() != 2 {
+                return Vec::new();
+            }
             let (card_no, quantity) = if let Ok(q) = parts[0].trim().parse::<u32>() {
                 (parts[1].trim().to_string(), q)
             } else if let Ok(q) = parts[1].trim().parse::<u32>() {
                 (parts[0].trim().to_string(), q)
-            } else { return Vec::new(); };
+            } else {
+                return Vec::new();
+            };
             if card_no.contains('-') {
                 std::iter::repeat_n(card_no, quantity as usize).collect()
-            } else { Vec::new() }
+            } else {
+                Vec::new()
+            }
         })
         .collect()
 }
 
 async fn get_decks(_data: web::Data<AppState>) -> impl Responder {
-    let decks: Vec<serde_json::Value> = deck_files().into_iter().map(|path| {
-        let id = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_string();
-        let name = deck_name_from_path(&path);
-        let content = std::fs::read_to_string(&path).unwrap_or_default();
-        let card_count = content.lines()
-            .filter(|l| !l.trim().is_empty())
-            .filter_map(|l| l.split(" x ").nth(1))
-            .filter_map(|q| q.trim().parse::<u32>().ok())
-            .sum::<u32>();
-        let main = parse_deck_text(&content);
-        serde_json::json!({
-            "id": id,
-            "name": name,
-            "card_count": card_count,
-            "content": content,
-            "main": main,
-            "energy": [],
+    let decks: Vec<serde_json::Value> = deck_files()
+        .into_iter()
+        .map(|path| {
+            let id = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_string();
+            let name = deck_name_from_path(&path);
+            let content = std::fs::read_to_string(&path).unwrap_or_default();
+            let card_count = content
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .filter_map(|l| l.split(" x ").nth(1))
+                .filter_map(|q| q.trim().parse::<u32>().ok())
+                .sum::<u32>();
+            let main = parse_deck_text(&content);
+            serde_json::json!({
+                "id": id,
+                "name": name,
+                "card_count": card_count,
+                "content": content,
+                "main": main,
+                "energy": [],
+            })
         })
-    }).collect();
+        .collect();
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "decks": decks }))
 }
 
 async fn get_random_deck(_data: web::Data<AppState>) -> impl Responder {
     let files = deck_files();
     if files.is_empty() {
-        return HttpResponse::NotFound().json(serde_json::json!({ "success": false, "error": "No decks found" }));
+        return HttpResponse::NotFound()
+            .json(serde_json::json!({ "success": false, "error": "No decks found" }));
     }
     use rand::seq::SliceRandom;
     let chosen = files.choose(&mut rand::thread_rng()).unwrap();
     let content = std::fs::read_to_string(chosen).unwrap_or_default();
-    HttpResponse::Ok().json(serde_json::json!({ "success": true, "content": content, "energy": [] }))
+    HttpResponse::Ok()
+        .json(serde_json::json!({ "success": true, "content": content, "energy": [] }))
 }
 
 async fn get_test_deck(_data: web::Data<AppState>) -> impl Responder {
@@ -1458,12 +1516,20 @@ async fn get_test_deck(_data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "content": content }))
 }
 
-pub async fn set_deck(data: web::Data<AppState>, req: web::Json<serde_json::Value>) -> impl Responder {
+pub async fn set_deck(
+    data: web::Data<AppState>,
+    req: web::Json<serde_json::Value>,
+) -> impl Responder {
     let player = req.get("player").and_then(|v| v.as_i64()).unwrap_or(0) as i32;
-    let room_id = req.get("room_id").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let room_id = req
+        .get("room_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
 
     let card_numbers: Vec<String> = if let Some(arr) = req.get("deck").and_then(|v| v.as_array()) {
-        arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+        arr.iter()
+            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+            .collect()
     } else {
         let deck_content = req.get("deck").and_then(|v| v.as_str()).unwrap_or("");
         if deck_content.is_empty() {
@@ -1473,7 +1539,8 @@ pub async fn set_deck(data: web::Data<AppState>, req: web::Json<serde_json::Valu
         }
     };
     if card_numbers.is_empty() {
-        return HttpResponse::Ok().json(serde_json::json!({ "success": false, "status": "empty_deck" }));
+        return HttpResponse::Ok()
+            .json(serde_json::json!({ "success": false, "status": "empty_deck" }));
     }
 
     // If room_id is present, store deck in the room's custom_decks
@@ -1488,7 +1555,8 @@ pub async fn set_deck(data: web::Data<AppState>, req: web::Json<serde_json::Valu
             });
             deck_entry.main = card_numbers.clone();
             if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
-                deck_entry.energy = energy_arr.iter()
+                deck_entry.energy = energy_arr
+                    .iter()
                     .filter_map(|v| v.as_str().map(|s| s.to_string()))
                     .collect();
             }
@@ -1504,14 +1572,21 @@ pub async fn set_deck(data: web::Data<AppState>, req: web::Json<serde_json::Valu
     } else {
         // Legacy sandbox mode: store in global custom_decks
         if !card_numbers.is_empty() {
-            data.custom_decks.lock().unwrap().insert(player, card_numbers);
+            data.custom_decks
+                .lock()
+                .unwrap()
+                .insert(player, card_numbers);
         }
         if let Some(energy_arr) = req.get("energy_deck").and_then(|v| v.as_array()) {
-            let energy_cards: Vec<String> = energy_arr.iter()
+            let energy_cards: Vec<String> = energy_arr
+                .iter()
                 .filter_map(|v| v.as_str().map(|s| s.to_string()))
                 .collect();
             if !energy_cards.is_empty() {
-                data.custom_energy_decks.lock().unwrap().insert(player, energy_cards);
+                data.custom_energy_decks
+                    .lock()
+                    .unwrap()
+                    .insert(player, energy_cards);
             }
         }
     }
@@ -1526,19 +1601,20 @@ pub async fn set_deck(data: web::Data<AppState>, req: web::Json<serde_json::Valu
 
 async fn rooms_list(data: web::Data<AppState>) -> impl Responder {
     let rooms = data.rooms.lock().unwrap();
-    let public_rooms: Vec<serde_json::Value> = rooms.values()
+    let public_rooms: Vec<serde_json::Value> = rooms
+        .values()
         .filter(|r| r.public)
-        .map(|r| serde_json::json!({
-            "room_id": r.room_id,
-            "mode": r.mode,
-            "player_count": r.sessions.len(),
-            "created_at": r.created_at,
-        }))
+        .map(|r| {
+            serde_json::json!({
+                "room_id": r.room_id,
+                "mode": r.mode,
+                "player_count": r.sessions.len(),
+                "created_at": r.created_at,
+            })
+        })
         .collect();
     HttpResponse::Ok().json(serde_json::json!({ "success": true, "rooms": public_rooms }))
 }
-
-
 
 /// Notify all SSE clients in a room that state has changed.
 fn notify_room_clients(data: &AppState, room_id: &str) {
@@ -1561,10 +1637,12 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::UnboundedReceiverStream;
 
-    let room_id = actix_web::web::Query::<std::collections::HashMap<String, String>>::from_query(req.query_string())
-        .ok()
-        .and_then(|params| params.get("room_id").cloned())
-        .unwrap_or_default();
+    let room_id = actix_web::web::Query::<std::collections::HashMap<String, String>>::from_query(
+        req.query_string(),
+    )
+    .ok()
+    .and_then(|params| params.get("room_id").cloned())
+    .unwrap_or_default();
 
     if room_id.is_empty() {
         return HttpResponse::BadRequest().body("Missing room_id");
@@ -1573,10 +1651,13 @@ async fn sse_events(data: web::Data<AppState>, req: actix_web::HttpRequest) -> i
     // Get or create broadcast sender for this room
     let sender = {
         let mut broadcasts = data.room_broadcasts.lock().unwrap();
-        broadcasts.entry(room_id.clone()).or_insert_with(|| {
-            let (tx, _) = tokio::sync::broadcast::channel::<()>(32);
-            tx
-        }).clone()
+        broadcasts
+            .entry(room_id.clone())
+            .or_insert_with(|| {
+                let (tx, _) = tokio::sync::broadcast::channel::<()>(32);
+                tx
+            })
+            .clone()
     };
 
     println!("[SSE] Client connected to room {}", room_id);
@@ -1632,8 +1713,6 @@ async fn get_card_registry(data: web::Data<AppState>) -> impl Responder {
     HttpResponse::Ok().json(&*data.card_registry)
 }
 
-
-
 /// Initialize a room's game state once both PVP players have submitted decks.
 fn try_init_room_game_state(room: &mut Room, data: &AppState) -> bool {
     let decks = match room.custom_decks.as_ref() {
@@ -1653,13 +1732,33 @@ fn try_init_room_game_state(room: &mut Room, data: &AppState) -> bool {
 
     let mut card_database = data.card_database.clone();
 
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers1) {
-        Ok(mut deck) => { deck.shuffle_main_deck(); deck.shuffle_energy_deck(); deck }
-        Err(e) => { log::debug!("Room init: failed to build deck for p1: {}", e); return false; }
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(
+        &mut card_database,
+        card_numbers1,
+    ) {
+        Ok(mut deck) => {
+            deck.shuffle_main_deck();
+            deck.shuffle_energy_deck();
+            deck
+        }
+        Err(e) => {
+            log::debug!("Room init: failed to build deck for p1: {}", e);
+            return false;
+        }
     };
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers2) {
-        Ok(mut deck) => { deck.shuffle_main_deck(); deck.shuffle_energy_deck(); deck }
-        Err(e) => { log::debug!("Room init: failed to build deck for p2: {}", e); return false; }
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(
+        &mut card_database,
+        card_numbers2,
+    ) {
+        Ok(mut deck) => {
+            deck.shuffle_main_deck();
+            deck.shuffle_energy_deck();
+            deck
+        }
+        Err(e) => {
+            log::debug!("Room init: failed to build deck for p2: {}", e);
+            return false;
+        }
     };
     for eid in &energy_nos1 {
         if let Some(tid) = card_database.get_card_id(eid) {
@@ -1673,8 +1772,14 @@ fn try_init_room_game_state(room: &mut Room, data: &AppState) -> bool {
             player2_deck.energy_deck.push_back(cid);
         }
     }
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &mut card_database);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &mut card_database);
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+        &mut player1_deck,
+        &mut card_database,
+    );
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+        &mut player2_deck,
+        &mut card_database,
+    );
 
     let mut p1 = Player::new("player1".to_string(), "Player 1".to_string(), true);
     let mut p2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
@@ -1690,17 +1795,20 @@ fn try_init_room_game_state(room: &mut Room, data: &AppState) -> bool {
     true
 }
 
-
-pub async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRequest>) -> impl Responder {
-
+pub async fn rooms_create(
+    data: web::Data<AppState>,
+    req: web::Json<CreateRoomRequest>,
+) -> impl Responder {
     // Skip card database loading for now to avoid deserialization errors
 
     println!("DEBUG: rooms_create called");
 
-    let room_id: String = (0..4).map(|_| {
-        let idx = rand::thread_rng().gen_range(0..26);
-        (b'A' + idx) as char
-    }).collect();
+    let room_id: String = (0..4)
+        .map(|_| {
+            let idx = rand::thread_rng().gen_range(0..26);
+            (b'A' + idx) as char
+        })
+        .collect();
 
     let mut mode = req.mode.clone().unwrap_or_else(|| "sandbox".to_string());
     if mode == "pve" {
@@ -1711,55 +1819,42 @@ pub async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRe
 
     let username = req.username.clone();
 
-    
-
     let now = SystemTime::now()
-
         .duration_since(UNIX_EPOCH)
-
         .unwrap()
-
         .as_secs();
-
-    
 
     // Build custom decks if provided
 
     let mut custom_decks: Option<HashMap<i32, CustomDeck>> = None;
 
     if req.p0_deck.is_some() || req.p1_deck.is_some() {
-
         let mut decks = HashMap::new();
 
         if let Some(p0_deck) = req.p0_deck.clone() {
+            decks.insert(
+                0,
+                CustomDeck {
+                    main: p0_deck,
 
-            decks.insert(0, CustomDeck {
-
-                main: p0_deck,
-
-                energy: req.p0_energy.clone().unwrap_or_default(),
-
-            });
-
+                    energy: req.p0_energy.clone().unwrap_or_default(),
+                },
+            );
         }
 
         if let Some(p1_deck) = req.p1_deck.clone() {
+            decks.insert(
+                1,
+                CustomDeck {
+                    main: p1_deck,
 
-            decks.insert(1, CustomDeck {
-
-                main: p1_deck,
-
-                energy: req.p1_energy.clone().unwrap_or_default(),
-
-            });
-
+                    energy: req.p1_energy.clone().unwrap_or_default(),
+                },
+            );
         }
 
         custom_decks = Some(decks);
-
     }
-
-    
 
     // For PVP rooms, delay game init until both decks are submitted.
     // For sandbox mode, init game state immediately.
@@ -1771,12 +1866,14 @@ pub async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRe
         let player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
         let mut fresh_game_state = GameState::new(player1, player2, card_database);
         crate::game_setup::setup_game(&mut fresh_game_state);
-        println!("DEBUG: Fresh room game state initialized with phase: {:?}", fresh_game_state.current_phase);
+        println!(
+            "DEBUG: Fresh room game state initialized with phase: {:?}",
+            fresh_game_state.current_phase
+        );
         Some(Arc::new(RwLock::new(fresh_game_state)))
     };
 
     let room = Room {
-
         room_id: room_id.clone(),
 
         mode: mode.clone(),
@@ -1800,15 +1897,11 @@ pub async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRe
         frame_history: Vec::new(),
         cached_actions: Vec::new(),
         actions_dirty: true,
-
     };
-
-    
 
     println!("DEBUG: Inserting room with ID: {}", room_id);
 
     {
-
         let mut rooms = data.rooms.lock().unwrap();
 
         rooms.insert(room_id.clone(), room);
@@ -1820,10 +1913,7 @@ pub async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRe
         drop(rooms);
 
         println!("DEBUG: Room lock dropped, room should be stored");
-
     }
-
-    
 
     // Auto-join creator
 
@@ -1831,37 +1921,28 @@ pub async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRe
 
     let player_id = 0; // Creator always gets player 0
 
-    
-
     {
-
         let mut rooms = data.rooms.lock().unwrap();
 
         if let Some(room) = rooms.get_mut(&room_id) {
+            room.sessions.insert(
+                session_id.clone(),
+                RoomSession {
+                    session_id: session_id.clone(),
 
-            room.sessions.insert(session_id.clone(), RoomSession {
+                    player_id,
 
-                session_id: session_id.clone(),
-
-                player_id,
-
-                username: username.clone(),
-
-            });
+                    username: username.clone(),
+                },
+            );
 
             if let Some(name) = username {
-
                 room.usernames.insert(player_id, name);
-
             }
 
             room.last_active = now;
-
         }
-
     }
-
-    
 
     HttpResponse::Ok().json(serde_json::json!({
 
@@ -1880,57 +1961,45 @@ pub async fn rooms_create(data: web::Data<AppState>, req: web::Json<CreateRoomRe
         }
 
     }))
-
 }
 
-
-
-pub async fn rooms_join(data: web::Data<AppState>, req: web::Json<JoinRoomRequest>) -> impl Responder {
-
+pub async fn rooms_join(
+    data: web::Data<AppState>,
+    req: web::Json<JoinRoomRequest>,
+) -> impl Responder {
     let room_id = req.room_id.to_uppercase();
 
     let username = req.username.clone();
-
-    
 
     let session_id = Uuid::new_v4().to_string();
 
     let mut player_id = -1;
 
-    
-
     {
-
         let mut rooms = data.rooms.lock().unwrap();
 
         if let Some(room) = rooms.get_mut(&room_id) {
-
             // Check for recovery by username
 
             if let Some(name) = &username {
-
                 for (pid, existing_name) in &room.usernames {
-
                     if existing_name == name {
-
                         player_id = *pid;
 
-                        room.sessions.insert(session_id.clone(), RoomSession {
+                        room.sessions.insert(
+                            session_id.clone(),
+                            RoomSession {
+                                session_id: session_id.clone(),
 
-                            session_id: session_id.clone(),
+                                player_id,
 
-                            player_id,
-
-                            username: Some(name.clone()),
-
-                        });
+                                username: Some(name.clone()),
+                            },
+                        );
 
                         room.last_active = SystemTime::now()
-
                             .duration_since(UNIX_EPOCH)
-
                             .unwrap()
-
                             .as_secs();
 
                         return HttpResponse::Ok().json(serde_json::json!({
@@ -1952,67 +2021,43 @@ pub async fn rooms_join(data: web::Data<AppState>, req: web::Json<JoinRoomReques
                             "recovered": true
 
                         }));
-
                     }
-
                 }
-
             }
-
-            
 
             // Assign new player
 
-            let taken_pids: std::collections::HashSet<i32> = room.sessions.values()
-
-                .map(|s| s.player_id)
-
-                .collect();
-
-            
+            let taken_pids: std::collections::HashSet<i32> =
+                room.sessions.values().map(|s| s.player_id).collect();
 
             if !taken_pids.contains(&0) {
-
                 player_id = 0;
-
             } else if !taken_pids.contains(&1) {
-
                 player_id = 1;
-
             }
 
-            
-
             if player_id >= 0 {
+                room.sessions.insert(
+                    session_id.clone(),
+                    RoomSession {
+                        session_id: session_id.clone(),
 
-                room.sessions.insert(session_id.clone(), RoomSession {
+                        player_id,
 
-                    session_id: session_id.clone(),
-
-                    player_id,
-
-                    username: username.clone(),
-
-                });
+                        username: username.clone(),
+                    },
+                );
 
                 if let Some(name) = username {
-
                     room.usernames.insert(player_id, name);
-
                 }
 
                 room.last_active = SystemTime::now()
-
                     .duration_since(UNIX_EPOCH)
-
                     .unwrap()
-
                     .as_secs();
-
             }
-
         } else {
-
             return HttpResponse::NotFound().json(serde_json::json!({
 
                 "success": false,
@@ -2020,15 +2065,10 @@ pub async fn rooms_join(data: web::Data<AppState>, req: web::Json<JoinRoomReques
                 "error": "Room not found"
 
             }));
-
         }
-
     }
 
-    
-
     if player_id < 0 {
-
         return HttpResponse::BadRequest().json(serde_json::json!({
 
             "success": false,
@@ -2036,23 +2076,23 @@ pub async fn rooms_join(data: web::Data<AppState>, req: web::Json<JoinRoomReques
             "error": "Room is full"
 
         }));
-
     }
 
-    
-
     let mode = {
-
         let rooms = data.rooms.lock().unwrap();
 
-        rooms.get(&room_id).map(|r| {
-            let m = r.mode.clone();
-            if m == "pve" { "sandbox".to_string() } else { m }
-        }).unwrap_or_else(|| "sandbox".to_string())
-
+        rooms
+            .get(&room_id)
+            .map(|r| {
+                let m = r.mode.clone();
+                if m == "pve" {
+                    "sandbox".to_string()
+                } else {
+                    m
+                }
+            })
+            .unwrap_or_else(|| "sandbox".to_string())
     };
-
-    
 
     HttpResponse::Ok().json(serde_json::json!({
 
@@ -2071,10 +2111,7 @@ pub async fn rooms_join(data: web::Data<AppState>, req: web::Json<JoinRoomReques
         }
 
     }))
-
 }
-
-
 
 pub async fn rooms_leave(
     data: web::Data<AppState>,
@@ -2082,12 +2119,14 @@ pub async fn rooms_leave(
     http_req: actix_web::HttpRequest,
 ) -> impl Responder {
     // Try body first, fallback to headers
-    let room_id = req.get("room_id")
+    let room_id = req
+        .get("room_id")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_uppercase())
         .or_else(|| get_room_id_from_req(&http_req));
-    let _session_token: Option<String> = req.get("session_id")
+    let _session_token: Option<String> = req
+        .get("session_id")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
@@ -2095,10 +2134,12 @@ pub async fn rooms_leave(
 
     let room_id = match room_id {
         Some(id) if !id.is_empty() => id,
-        _ => return HttpResponse::BadRequest().json(serde_json::json!({
-            "success": false,
-            "error": "Room ID required"
-        })),
+        _ => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "success": false,
+                "error": "Room ID required"
+            }))
+        }
     };
 
     // Notify other SSE clients that the room is closing, then destroy it
@@ -2125,62 +2166,38 @@ pub async fn rooms_leave(
     HttpResponse::Ok().json(serde_json::json!({"success": true}))
 }
 
-
-
-
-
 async fn init_game(
     data: web::Data<AppState>,
     req: Option<web::Json<InitGameRequest>>,
     http_req: actix_web::HttpRequest,
 ) -> impl Responder {
-
     let mut card_database = data.card_database.clone();
     let deck_lists = data.deck_lists.clone();
 
     // Map frontend deck names to deck file names
 
     let deck_name_mapping = std::collections::HashMap::from([
-
         ("Aqours Cup", "aqours_cup"),
-
         ("Muse Cup", "muse_cup"),
-
         ("Nijigaku Cup", "nijigaku_cup"),
-
         ("Liella Cup", "liella_cup"),
-
         ("Hasunosora Cup", "hasunosora_cup"),
-
         ("Fade Deck", "fade deck"),
-
     ]);
-
-
 
     // Select deck based on request, default to first deck if not specified or not found
 
     let selected_deck_name = req.as_ref().and_then(|r| r.deck.as_deref());
 
     let deck_index = if let Some(name) = selected_deck_name {
-
         if let Some(file_name) = deck_name_mapping.get(name) {
-
             deck_lists.iter().position(|d| d.name == *file_name)
-
         } else {
-
             None
-
         }
-
     } else {
-
         None
-
     };
-
-
 
     // Check for custom decks: first try room's custom_decks, then global fallback
     let init_room_id_custom = get_room_id_from_req(&http_req);
@@ -2197,71 +2214,70 @@ async fn init_game(
             let e1 = decks.get(&1).map(|d| d.energy.clone()).unwrap_or_default();
             (p0, p1, e0, e1)
         } else {
-        let mut custom = data.custom_decks.lock().unwrap();
-        let mut custom_energy = data.custom_energy_decks.lock().unwrap();
-        if custom.contains_key(&0) || custom.contains_key(&1) {
-            let p0 = custom.remove(&0).unwrap_or_default();
-            let p1 = custom.remove(&1).unwrap_or_else(|| p0.clone());
-            let e0 = custom_energy.remove(&0).unwrap_or_default();
-            let e1 = custom_energy.remove(&1).unwrap_or_else(|| e0.clone());
-            (p0, p1, e0, e1)
-        } else {
-            let deck = if let Some(idx) = deck_index { &deck_lists[idx] } else { &deck_lists[0] };
-            let nos = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
-            (nos.clone(), nos, Vec::new(), Vec::new())
-        }
+            let mut custom = data.custom_decks.lock().unwrap();
+            let mut custom_energy = data.custom_energy_decks.lock().unwrap();
+            if custom.contains_key(&0) || custom.contains_key(&1) {
+                let p0 = custom.remove(&0).unwrap_or_default();
+                let p1 = custom.remove(&1).unwrap_or_else(|| p0.clone());
+                let e0 = custom_energy.remove(&0).unwrap_or_default();
+                let e1 = custom_energy.remove(&1).unwrap_or_else(|| e0.clone());
+                (p0, p1, e0, e1)
+            } else {
+                let deck = if let Some(idx) = deck_index {
+                    &deck_lists[idx]
+                } else {
+                    &deck_lists[0]
+                };
+                let nos = deck_parser::DeckParser::deck_list_to_card_numbers(deck);
+                (nos.clone(), nos, Vec::new(), Vec::new())
+            }
         }
     };
 
-    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers1) {
-
+    let mut player1_deck = match deck_builder::DeckBuilder::build_deck_from_database(
+        &mut card_database,
+        card_numbers1,
+    ) {
         Ok(mut deck) => {
-
             deck.shuffle_main_deck();
 
             deck.shuffle_energy_deck();
 
             deck
-
         }
 
         Err(e) => {
-
             log::debug!("Failed to build deck for Player 1: {}", e);
 
             return HttpResponse::InternalServerError().json("Failed to build deck for Player 1");
-
         }
-
     };
 
-
-
-    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(&mut card_database, card_numbers2) {
-
+    let mut player2_deck = match deck_builder::DeckBuilder::build_deck_from_database(
+        &mut card_database,
+        card_numbers2,
+    ) {
         Ok(mut deck) => {
-
             deck.shuffle_main_deck();
 
             deck.shuffle_energy_deck();
 
             deck
-
         }
 
         Err(e) => {
-
             log::debug!("Failed to build deck for Player 2: {}", e);
 
             return HttpResponse::InternalServerError().json("Failed to build deck for Player 2");
-
         }
-
     };
 
     // Merge separately-provided energy cards into decks
     {
-        let deck_refs = [(&mut player1_deck, &energy_nos1), (&mut player2_deck, &energy_nos2)];
+        let deck_refs = [
+            (&mut player1_deck, &energy_nos1),
+            (&mut player2_deck, &energy_nos2),
+        ];
         for (deck, energy_ids) in deck_refs {
             for eid in energy_ids {
                 if let Some(template_id) = card_database.get_card_id(eid) {
@@ -2272,10 +2288,14 @@ async fn init_game(
         }
     }
 
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player1_deck, &mut card_database);
-    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(&mut player2_deck, &mut card_database);
-
-
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+        &mut player1_deck,
+        &mut card_database,
+    );
+    let _ = deck_builder::DeckBuilder::add_default_energy_cards_from_database(
+        &mut player2_deck,
+        &mut card_database,
+    );
 
     // Create fresh players
 
@@ -2283,25 +2303,17 @@ async fn init_game(
 
     let mut player2 = Player::new("player2".to_string(), "Player 2".to_string(), false);
 
-
-
     player1.set_main_deck(player1_deck.main_deck);
 
     player1.set_energy_deck(player1_deck.energy_deck);
-
-
 
     player2.set_main_deck(player2_deck.main_deck);
 
     player2.set_energy_deck(player2_deck.energy_deck);
 
-
-
     // Create fresh game state with CardDatabase
 
     let mut game_state = GameState::new(player1, player2, card_database);
-
-    
 
     // Setup game (Rule 6.2)
 
@@ -2309,7 +2321,10 @@ async fn init_game(
 
     // Don't call settle_single_player_state here - game should start in RockPaperScissors phase
 
-    println!("DEBUG: init_game complete, phase: {:?}", game_state.current_phase);
+    println!(
+        "DEBUG: init_game complete, phase: {:?}",
+        game_state.current_phase
+    );
 
     let init_room_id = get_room_id_from_req(&http_req);
     if let Some(ref rid) = init_room_id {
@@ -2322,14 +2337,22 @@ async fn init_game(
             room.frame_counter = 0;
             room.frame_history.clear();
             let gs = Arc::new(RwLock::new(game_state));
-            room.frame_history.push(FrameSnapshot::capture(&gs.read().unwrap(), 0, "Game start".into()));
+            room.frame_history.push(FrameSnapshot::capture(
+                &gs.read().unwrap(),
+                0,
+                "Game start".into(),
+            ));
             let display = crate::display::game_state_to_display(&gs.read().unwrap());
             let actions = actions_with_index(&gs.read().unwrap());
             room.game_state = Some(gs);
             drop(rooms);
             notify_room_clients(&data, rid);
             let ui_config = data.ui_config.lock().unwrap().clone();
-            return HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: Some(actions), ui_config: Some(ui_config) });
+            return HttpResponse::Ok().json(GameStateResponse {
+                game_state: display,
+                legal_actions: Some(actions),
+                ui_config: Some(ui_config),
+            });
         }
     }
 
@@ -2349,8 +2372,11 @@ async fn init_game(
     drop(state_guard);
 
     let ui_config = data.ui_config.lock().unwrap().clone();
-    HttpResponse::Ok().json(GameStateResponse { game_state: display, legal_actions: Some(actions), ui_config: Some(ui_config) })
-
+    HttpResponse::Ok().json(GameStateResponse {
+        game_state: display,
+        legal_actions: Some(actions),
+        ui_config: Some(ui_config),
+    })
 }
 
 fn build_cached_card_registry(card_database: &CardDatabase) -> serde_json::Value {
@@ -2418,18 +2444,22 @@ fn launch_cloudflared_sync(port: u16) {
         std::fs::canonicalize(&cwd_bin).unwrap_or(cwd_bin)
     } else if let Ok(path) = std::env::var("PATH") {
         let paths: Vec<std::path::PathBuf> = std::env::split_paths(&path).collect();
-        paths.iter()
+        paths
+            .iter()
             .map(|p| p.join("cloudflared.exe"))
             .find(|p| p.exists())
             .or_else(|| {
-                paths.iter()
+                paths
+                    .iter()
                     .map(|p| p.join("cloudflared"))
                     .find(|p| p.exists())
             })
             .map(|p| std::fs::canonicalize(&p).unwrap_or(p))
             .unwrap_or_else(|| {
                 println!("cloudflared not found in PATH or engine/ directory.");
-                println!("Install from: https://developers.cloudflare.com/cloudflared/quick-start/");
+                println!(
+                    "Install from: https://developers.cloudflare.com/cloudflared/quick-start/"
+                );
                 std::path::PathBuf::from("cloudflared_NOT_FOUND")
             })
     } else {
@@ -2462,7 +2492,10 @@ fn launch_cloudflared_sync(port: u16) {
         if let Ok(l) = line {
             if l.contains("trycloudflare.com") {
                 if let Some(start) = l.find("https://") {
-                    let tunnel_url: String = l[start..].chars().take_while(|c| !c.is_whitespace() && *c != '|').collect();
+                    let tunnel_url: String = l[start..]
+                        .chars()
+                        .take_while(|c| !c.is_whitespace() && *c != '|')
+                        .collect();
                     println!("========================================");
                     println!("  Internet access: {}", tunnel_url);
                     println!("  Share this URL with your opponent!");
@@ -2500,7 +2533,10 @@ async fn launch_ngrok(port: u16, auth_token: Option<String>) {
             let _ = child;
         }
         Err(e) => {
-            println!("Failed to launch ngrok: {}. Install from https://ngrok.com/download", e);
+            println!(
+                "Failed to launch ngrok: {}. Install from https://ngrok.com/download",
+                e
+            );
         }
     }
 }
@@ -2510,7 +2546,6 @@ pub async fn run_web_server() -> std::io::Result<()> {
 }
 
 pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::io::Result<()> {
-
     let rooms = Arc::new(Mutex::new(HashMap::new()));
 
     // Initialize card database (only loaded once at startup)
@@ -2524,9 +2559,7 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     };
 
     // Load deck lists once at startup and cache them
-    let deck_lists = Arc::new(
-        deck_parser::DeckParser::parse_all_decks().unwrap_or_default()
-    );
+    let deck_lists = Arc::new(deck_parser::DeckParser::parse_all_decks().unwrap_or_default());
 
     // Build card registry JSON once at startup
     let card_registry = Arc::new(build_cached_card_registry(&card_database));
@@ -2535,7 +2568,11 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     let player1 = Player::new("0".to_string(), "Player 1".to_string(), true);
     let player2 = Player::new("1".to_string(), "Player 2".to_string(), false);
 
-    let game_state = Arc::new(RwLock::new(GameState::new(player1.clone(), player2.clone(), card_database.clone())));
+    let game_state = Arc::new(RwLock::new(GameState::new(
+        player1.clone(),
+        player2.clone(),
+        card_database.clone(),
+    )));
 
     let app_state = web::Data::new(AppState {
         game_state: game_state.clone(),
@@ -2564,8 +2601,6 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     println!("Game UI: http://127.0.0.1:{}", port);
     println!("LAN access: http://{}:{}", local_ip, port);
 
-
-
     if let Some(token) = ngrok_authtoken {
         let ngrok_future = launch_ngrok(port, Some(token));
         tokio::spawn(ngrok_future);
@@ -2584,27 +2619,36 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
                 rooms_lock.retain(|id, room| {
                     let keep = !room.sessions.is_empty();
                     if !keep {
-                        println!("[CLEANUP] Removing stale room {} (no sessions, {}s idle)", id, 0);
+                        println!(
+                            "[CLEANUP] Removing stale room {} (no sessions, {}s idle)",
+                            id, 0
+                        );
                     }
                     keep
                 });
                 let removed = before - rooms_lock.len();
                 if removed > 0 {
-                    println!("[CLEANUP] Removed {} stale room(s), {} remaining", removed, rooms_lock.len());
+                    println!(
+                        "[CLEANUP] Removed {} stale room(s), {} remaining",
+                        removed,
+                        rooms_lock.len()
+                    );
                 }
             }
         });
     }
 
     HttpServer::new(move || {
-
         let cors = Cors::permissive();
 
         App::new()
             .wrap(cors)
             .app_data(app_state.clone())
             .route("/api/game-state", web::get().to(get_game_state))
-            .route("/api/game-state/version", web::get().to(get_game_state_version))
+            .route(
+                "/api/game-state/version",
+                web::get().to(get_game_state_version),
+            )
             .route("/api/events", web::get().to(sse_events))
             .route("/api/actions", web::get().to(get_actions))
             .route("/api/execute-action", web::post().to(execute_action))
@@ -2632,14 +2676,11 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
             .route("/api/rooms/create", web::post().to(rooms_create))
             .route("/api/rooms/join", web::post().to(rooms_join))
             .route("/api/rooms/leave", web::post().to(rooms_leave))
-            .service(
-                fs::Files::new("/engine", "../engine")
-                    .prefer_utf8(true)
-            )
+            .service(fs::Files::new("/engine", "../engine").prefer_utf8(true))
             .service(
                 fs::Files::new("/", "../web_ui")
                     .index_file("index.html")
-                    .prefer_utf8(true)
+                    .prefer_utf8(true),
             )
     })
     .bind(&bind_addr)
@@ -2650,4 +2691,3 @@ pub async fn run_web_server_with_ngrok(ngrok_authtoken: Option<String>) -> std::
     .run()
     .await
 }
-

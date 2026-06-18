@@ -789,7 +789,6 @@ impl GameState {
                 self.trigger_auto_abilities_for_player(&current_pid);
                 self.just_completed_ability_key = None;
             }
-            self.clear_effect_tracking();
             if let Some(pid) = self.ability_master_id() {
                 // Process abilities enqueued by the scan above BEFORE returning
                 // to the main loop, so that their condition evaluation sees the
@@ -797,6 +796,7 @@ impl GameState {
                 // that were set by the just-completed ability.
                 self.process_pending_auto_abilities(&pid);
             }
+            self.clear_effect_tracking();
             let master_id = self.ability_master_id();
             if let Some(pid) = master_id {
                 self.trigger_auto_for_discarded_cards(&pid);

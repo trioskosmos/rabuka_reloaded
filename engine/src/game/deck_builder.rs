@@ -83,7 +83,9 @@ impl DeckBuilder {
         if total_main < 60 {
             log::debug!(
                 "Warning: Main deck has {} cards (expected 60): {} member + {} live",
-                total_main, member_count, live_count
+                total_main,
+                member_count,
+                live_count
             );
         }
 
@@ -123,7 +125,9 @@ impl DeckBuilder {
 
         if needed > 0 {
             // Find a template energy card
-            let template_energy_id = card_db.cards.iter()
+            let template_energy_id = card_db
+                .cards
+                .iter()
                 .find(|(_, card)| card.is_energy())
                 .map(|(id, _)| *id);
 

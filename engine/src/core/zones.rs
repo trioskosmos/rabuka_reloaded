@@ -551,9 +551,8 @@ impl LiveCardZone {
                             None
                         };
                         let ref_need = effective_need.as_ref().unwrap_or(need_heart);
-                        stage_hearts.is_some_and(|sh| {
-                            crate::card::Card::need_heart_satisfied(ref_need, sh)
-                        })
+                        stage_hearts
+                            .is_some_and(|sh| crate::card::Card::need_heart_satisfied(ref_need, sh))
                     } else {
                         true
                     }

@@ -1,0 +1,264 @@
+diff --git a/engine/src/ability/condition/state.rs b/engine/src/ability/condition/state.rs
+index bc523e0..62a780c 100644
+--- a/engine/src/ability/condition/state.rs
++++ b/engine/src/ability/condition/state.rs
+@@ -573,6 +573,14 @@ impl<'a> ConditionContext<'a> {
+                 true
+             }
+             "moves" => {
++                eprintln!(
++                    "[MOVES] area_id={:?} area_by={:?} energy={} energy_by={:?} pid={}",
++                    self.game_state.last_area_move_card_id,
++                    self.game_state.last_area_move_by_player,
++                    self.game_state.last_energy_placed_by_effect,
++                    self.game_state.last_energy_placed_by_player,
++                    player.id
++                );
+                 let area_ok = condition.self_effect_only.is_none_or(|_| {
+                     self.game_state.last_area_move_card_id.is_some()
+                         && (self.game_state.last_area_move_by_player.as_ref() == Some(&player.id))
+@@ -583,9 +591,16 @@ impl<'a> ConditionContext<'a> {
+                             || self.game_state.last_energy_placed_by_player.as_ref()
+                                 == Some(&player.id))
+                 });
++                eprintln!(
++                    "[MOVES] area_ok={} energy_ok={} has_a={} has_e={}",
++                    area_ok,
++                    energy_ok,
++                    condition.self_effect_only.is_some(),
++                    condition.energy_placed.is_some()
++                );
+                 let has_area_check = condition.self_effect_only.is_some();
+                 let has_energy_check = condition.energy_placed.is_some();
+-                if !has_area_check && !has_energy_check {
++                let r = if !has_area_check && !has_energy_check {
+                     true
+                 } else if has_area_check && has_energy_check {
+                     area_ok || energy_ok
+@@ -593,7 +608,15 @@ impl<'a> ConditionContext<'a> {
+                     area_ok
+                 } else {
+                     energy_ok
+-                }
++                };
++                eprintln!(
++                    "[MOVES] result={} (area_ok={} || energy_ok={}? = {})",
++                    r,
++                    area_ok,
++                    energy_ok,
++                    area_ok || energy_ok
++                );
++                r
+             }
+             _ => match Zone::from_str(location) {
+                 Some(Zone::Stage) => {
+diff --git a/engine/src/core/game_state/abilities.rs b/engine/src/core/game_state/abilities.rs
+index 2ecd756..6123475 100644
+--- a/engine/src/core/game_state/abilities.rs
++++ b/engine/src/core/game_state/abilities.rs
+@@ -773,12 +773,27 @@ impl GameState {
+             self.ability_queue.complete_current();
+             self.activating_card = None;
+             self.activating_ability_index = None;
++            // Snapshot move/energy flags so watcher abilities (Sumire's
++            // "moves", each_time:energy_placed, etc.) can still evaluate
++            // during the post-completion scan. Clear them first to prevent
++            // re-fire loops, then restore for one scan pass.
++            let mtf = self.snapshot_move_trigger_flags();
++            eprintln!(
++                "[PCA_DONE] snapshot: area_card={:?} area_by={:?} energy={} energy_by={:?}",
++                mtf.last_area_move_card_id,
++                mtf.last_area_move_by_player,
++                mtf.last_energy_placed_by_effect,
++                mtf.last_energy_placed_by_player
++            );
++            self.clear_move_trigger_flags();
+             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
+             // recently_moved_cards so their preceding_moved conditions pass.
+             // Trigger types: each_time:discard, each_time:area_move, each_time:energy_placed
+-            if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect)
++            if (self.recently_moved_cards.is_some() || mtf.last_energy_placed_by_effect)
+                 && self.current_phase == crate::types::Phase::Main
+             {
++                eprintln!("[PCA_DONE] restoring flags, scanning watchers");
++                self.restore_move_trigger_flags(mtf);
+                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {
+                     eprintln!(
+                         "[PCA_TRIGGER] scanning stage watchers pid={} moved={:?}",
+@@ -788,15 +803,18 @@ impl GameState {
+                 self.just_completed_ability_key = just_completed_key;
+                 self.trigger_auto_abilities_for_player(&current_pid);
+                 self.just_completed_ability_key = None;
++                // Process watcher abilities now, while the flags are still
++                // available for condition evaluation. If the processing pauses
++                // for a SelectAutoAbility choice, the flags must survive so
++                // the abilities can use them when the choice resolves.
++                if let Some(pid) = self.ability_master_id() {
++                    self.process_pending_auto_abilities(&pid);
++                }
++                if !self.has_pending_choice() {
++                    self.clear_move_trigger_flags();
++                }
+             }
+             self.clear_effect_tracking();
+-            if let Some(pid) = self.ability_master_id() {
+-                // Process abilities enqueued by the scan above BEFORE returning
+-                // to the main loop, so that their condition evaluation sees the
+-                // tracking fields (last_energy_placed_by_effect, last_area_move_card_id)
+-                // that were set by the just-completed ability.
+-                self.process_pending_auto_abilities(&pid);
+-            }
+             let master_id = self.ability_master_id();
+             if let Some(pid) = master_id {
+                 self.trigger_auto_for_discarded_cards(&pid);
+diff --git a/engine/src/core/game_state/mod.rs b/engine/src/core/game_state/mod.rs
+index b842587..0267a5d 100644
+--- a/engine/src/core/game_state/mod.rs
++++ b/engine/src/core/game_state/mod.rs
+@@ -14,6 +14,18 @@ pub use crate::types::{
+     TemporaryEffect, TriggeredAbility, TurnPhase, YellCardResult,
+ };
+ 
++/// One-shot flags set by `finalize_card_movement` / `execute_energy_placement`
++/// that watcher auto-abilities (e.g. Sumire's "moves" condition) read during
++/// the post-completion scan.  The caller snapshots these before `clear_effect_tracking`,
++/// restores them for the scan, then clears them to prevent re-fire loops.
++#[derive(Debug, Clone)]
++pub struct MoveTriggerFlags {
++    pub last_area_move_card_id: Option<i16>,
++    pub last_area_move_by_player: Option<String>,
++    pub last_energy_placed_by_effect: bool,
++    pub last_energy_placed_by_player: Option<String>,
++}
++
+ #[derive(Debug, Clone)]
+ pub struct GameState {
+     // --- 8-byte aligned (Player, HashMap, HashSet, String, Vec, Arc, usize, Value) ---
+@@ -410,16 +422,42 @@ impl GameState {
+     }
+ 
+     pub fn clear_effect_tracking(&mut self) {
+-        self.last_area_move_card_id = None;
+-        self.last_area_move_by_player = None;
+-        self.last_energy_placed_by_effect = false;
+-        self.last_energy_placed_by_player = None;
+         self.recently_moved_cards = None;
+         self.recently_moved_from_zone = None;
+         self.mods.last_cost_discard_count = 0;
+         self.mods.last_cost_energy_count = 0;
+     }
+ 
++    /// Snapshot the one-shot move/energy trigger flags. These must survive
++    /// `clear_effect_tracking()` so watcher abilities (e.g. Sumire's
++    /// "moves (area_move/energy_placed)") can still evaluate their conditions
++    /// during the post-completion `process_pending_auto_abilities` scan. The
++    /// caller must pass the snapshot to [`restore_move_trigger_flags`] before
++    /// the scan and call [`clear_move_trigger_flags`] afterwards — otherwise
++    /// the same ability re-fires every loop iteration and overflows the stack.
++    pub fn snapshot_move_trigger_flags(&self) -> MoveTriggerFlags {
++        MoveTriggerFlags {
++            last_area_move_card_id: self.last_area_move_card_id,
++            last_area_move_by_player: self.last_area_move_by_player.clone(),
++            last_energy_placed_by_effect: self.last_energy_placed_by_effect,
++            last_energy_placed_by_player: self.last_energy_placed_by_player.clone(),
++        }
++    }
++
++    pub fn restore_move_trigger_flags(&mut self, flags: MoveTriggerFlags) {
++        self.last_area_move_card_id = flags.last_area_move_card_id;
++        self.last_area_move_by_player = flags.last_area_move_by_player;
++        self.last_energy_placed_by_effect = flags.last_energy_placed_by_effect;
++        self.last_energy_placed_by_player = flags.last_energy_placed_by_player;
++    }
++
++    pub fn clear_move_trigger_flags(&mut self) {
++        self.last_area_move_card_id = None;
++        self.last_area_move_by_player = None;
++        self.last_energy_placed_by_effect = false;
++        self.last_energy_placed_by_player = None;
++    }
++
+     /// Resolve which player's cheer_revealed_cards to use based on ability master.
+     pub fn cheer_revealed_cards_mut(&mut self) -> &mut Vec<i16> {
+         match self.ability_master_id().as_deref() {
+diff --git a/engine/src/turn/actions.rs b/engine/src/turn/actions.rs
+index 58a7095..f73bf7c 100644
+--- a/engine/src/turn/actions.rs
++++ b/engine/src/turn/actions.rs
+@@ -696,35 +696,60 @@ impl super::TurnEngine {
+                         }
+                     }
+                 }
+-                // Save recently_moved_cards before clear_effect_tracking
+-                // erases them (they were set by look_and_select discard_remaining
+-                // or similar batch discards during this ability's resolution).
++                // Save recently_moved_cards and move/energy trigger flags before
++                // clear_effect_tracking erases them (they were set by
++                // look_and_select, position change, energy placement, etc.).
+                 let moved_snapshot = game_state.recently_moved_cards.clone();
++                let mtf = game_state.snapshot_move_trigger_flags();
+                 game_state.ability_queue.complete_current();
+                 game_state.clear_effect_tracking();
+-                if moved_snapshot.is_some() && game_state.current_phase == crate::types::Phase::Main
++                game_state.clear_move_trigger_flags();
++                if (moved_snapshot.is_some()
++                    || mtf.last_energy_placed_by_effect
++                    || mtf.last_area_move_card_id.is_some())
++                    && game_state.current_phase == crate::types::Phase::Main
+                 {
+-                    // Temporarily restore so the trigger scan can see them
++                    game_state.restore_move_trigger_flags(mtf);
+                     game_state.recently_moved_cards = moved_snapshot;
++                    let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
++                    game_state.just_completed_ability_key = just_completed_key.clone();
++                    game_state.process_pending_auto_abilities(&player_id);
++                    eprintln!(
++                        "[ACT_RESUME] after process: pending={}",
++                        game_state.has_pending_choice()
++                    );
++                    game_state.just_completed_ability_key = None;
++                    game_state.recently_moved_cards = None;
++                    if !game_state.has_pending_choice() {
++                        game_state.clear_move_trigger_flags();
++                    }
+                 }
+-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+-                game_state.just_completed_ability_key = just_completed_key.clone();
+-                game_state.process_pending_auto_abilities(&player_id);
+-                game_state.just_completed_ability_key = None;
+-                game_state.recently_moved_cards = None;
+             } else {
+                 let moved_snapshot = game_state.recently_moved_cards.clone();
++                let mtf = game_state.snapshot_move_trigger_flags();
+                 game_state.ability_queue.complete_current();
+                 game_state.clear_effect_tracking();
+-                if moved_snapshot.is_some() && game_state.current_phase == crate::types::Phase::Main
++                game_state.clear_move_trigger_flags();
++                if (moved_snapshot.is_some()
++                    || mtf.last_energy_placed_by_effect
++                    || mtf.last_area_move_card_id.is_some())
++                    && game_state.current_phase == crate::types::Phase::Main
+                 {
++                    game_state.restore_move_trigger_flags(mtf);
+                     game_state.recently_moved_cards = moved_snapshot;
++                    let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
++                    game_state.just_completed_ability_key = just_completed_key.clone();
++                    game_state.process_pending_auto_abilities(&player_id);
++                    eprintln!(
++                        "[ACT_RESUME2] after process: pending={}",
++                        game_state.has_pending_choice()
++                    );
++                    game_state.just_completed_ability_key = None;
++                    game_state.recently_moved_cards = None;
++                    if !game_state.has_pending_choice() {
++                        game_state.clear_move_trigger_flags();
++                    }
+                 }
+-                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
+-                game_state.just_completed_ability_key = just_completed_key.clone();
+-                game_state.process_pending_auto_abilities(&player_id);
+-                game_state.just_completed_ability_key = None;
+-                game_state.recently_moved_cards = None;
+             }
+         }
+         Ok(())
