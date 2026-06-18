@@ -1454,13 +1454,22 @@ impl AbilityResolver {
             gs.record_card_movement(*card_id);
         }
 
+        let is_energy = Zone::from_str(destination) == Some(Zone::Energy);
         if Zone::from_str(destination) == Some(Zone::Discard)
             || Zone::from_str(destination) == Some(Zone::Waitroom)
             || Zone::from_str(destination) == Some(Zone::DeckBottom)
+            || is_energy
         {
             self.moved_cards.extend(moved_cards);
             gs.recently_moved_cards = Some(moved_cards.to_vec());
             gs.recently_moved_from_zone = Some(source.to_string());
+            if is_energy && !moved_cards.is_empty() {
+                gs.last_energy_placed_by_effect = true;
+                gs.last_energy_placed_by_player = gs
+                    .ability_queue
+                    .current_entry()
+                    .map(|e| e.player_id.clone());
+            }
         }
         log::debug!(
             "[FINALIZE_MOVE] dest={} cards={:?} -> self.moved_cards={:?}",

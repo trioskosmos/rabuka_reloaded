@@ -163,6 +163,35 @@ fn mirai_ticket_skip_leaves_both_in_revealed() {
     // Cards were in waitroom from setup, and skip leaves them there — that's fine.
 }
 
+/// Use-limit (turn1): after firing once, scanning again within the same
+/// turn must NOT re-enqueue MIRAI TICKET.
+#[test]
+fn mirai_ticket_use_limit_blocks_second_trigger() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let aq = game.id("PL!S-PR-013-PR");
+
+    setup_mirai(&mut game, &[aq]);
+    fire(&mut game); // first trigger — consumes the 1/turn use limit
+
+    assert!(
+        !game.state.revealed_cards.contains(&aq),
+        "Card removed from revealed_cards by first trigger"
+    );
+
+    // Push a DIFFERENT Aqours member to trigger again
+    let aq2 = game.id("PL!S-bp2-002-R");
+    game.state.revealed_cards.push(aq2);
+    game.state.player1.waitroom.cards.push(aq2);
+    fire(&mut game); // second trigger attempt — blocked by use_limit
+
+    // The second card should NOT have been moved (use_limit blocked)
+    assert!(
+        game.state.revealed_cards.contains(&aq2),
+        "Second Aqours member must stay in revealed_cards (use_limit 1/turn)"
+    );
+}
+
 /// No revealed_cards → condition fails → MIRAI TICKET does NOT fire.
 #[test]
 fn mirai_ticket_no_revealed_cards_no_trigger() {

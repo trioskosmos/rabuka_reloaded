@@ -1994,9 +1994,14 @@ impl AbilityResolver {
                 gs.record_card_movement(source_id2);
             }
             gs.position_change_occurred_this_turn = true;
+            let mover_pid = gs
+                .ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone());
+            gs.last_area_move_card_id = Some(source_id2);
+            gs.last_area_move_by_player = mover_pid;
             return Ok(());
         }
-
         // Handle specific card_no (for "multiple_targets" each-member pattern)
         if let Some(ref card_no) = effect.target_member {
             if card_no != "this_member" {
@@ -2036,9 +2041,15 @@ impl AbilityResolver {
                     if source_id != -1 {
                         gs.record_card_movement(source_id);
                     }
+                    gs.position_change_occurred_this_turn = true;
+                    let mover_pid = gs
+                        .ability_queue
+                        .current_entry()
+                        .map(|e| e.player_id.clone());
+                    gs.last_area_move_card_id = Some(source_id);
+                    gs.last_area_move_by_player = mover_pid;
+                    return Ok(());
                 }
-                gs.position_change_occurred_this_turn = true;
-                return Ok(());
             }
         }
 
@@ -2076,6 +2087,13 @@ impl AbilityResolver {
                     if source_id3 != -1 {
                         gs.record_card_movement(source_id3);
                     }
+                    gs.position_change_occurred_this_turn = true;
+                    let mover_pid = gs
+                        .ability_queue
+                        .current_entry()
+                        .map(|e| e.player_id.clone());
+                    gs.last_area_move_card_id = Some(activating_card_id);
+                    gs.last_area_move_by_player = mover_pid;
                 } else {
                     return Err(format!(
                         "Activating card {} not found on stage",

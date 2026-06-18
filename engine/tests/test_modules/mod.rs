@@ -224,4 +224,5 @@ pub mod maki_pb1_test;
 pub mod nozomi_bp4_aggregate_test;
 pub mod on_energy_placed_test;
 pub mod on_hand_to_discard_test;
+pub mod trigger_card_integration_test;
 pub mod upper_batch_on_yell_test;

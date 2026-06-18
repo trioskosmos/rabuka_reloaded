@@ -96,6 +96,33 @@ fn dive_only_live_zone_only_ab1_triggers() {
     assert_eq!(blade_mod(&v, niji), 2, "ab#1 fires: blade+2 from live zone");
 }
 
+/// DIVE! ab#0: no DIVE! card in hand → move_cards finds no target → ability
+/// fires but the optional placement can't execute. No crash.
+#[test]
+fn dive_no_dive_card_in_hand_ab0_no_target() {
+    let mut v = TestGame::new(load_real_database());
+    let niji = v.id("PL!N-PR-003-PR");
+
+    v.state
+        .player1
+        .live_card_zone
+        .cards
+        .push(v.id("PL!N-bp4-026-L"));
+    v.state.player1.waitroom.cards.push(v.id("PL!N-bp4-026-L"));
+    // NO DIVE! in hand
+    v.state.player1.stage.stage = [-1, niji, -1];
+
+    trigger_process_drain(&mut v);
+
+    // ab#1 should still fire (blade+2) even though ab#0 had no target
+    assert_eq!(
+        blade_mod(&v, niji),
+        2,
+        "ab#1 fires regardless of ab#0 target availability"
+    );
+    // ab#0 tried to move but no matching card in hand → no-op
+}
+
 /// DIVE! live + discard but no Nijigasaki on stage → ab#0 places card, ab#1 no target.
 #[test]
 fn dive_no_niji_on_stage_ab1_no_target() {
