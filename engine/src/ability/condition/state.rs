@@ -573,15 +573,50 @@ impl<'a> ConditionContext<'a> {
                 true
             }
             "moves" => {
+                // Use the snapshot captured at enqueue time in preference to
+                // the global flags (which clear_effect_tracking() may have
+                // already wiped before the ability executes).  Fall back to
+                // the global state for abilities enqueued without a snapshot.
+                let snapshot_energy = self
+                    .game_state
+                    .entry_snapshot_last_energy_placed_by_effect();
+                let snapshot_energy_player = self
+                    .game_state
+                    .entry_snapshot_last_energy_placed_by_player();
+                let snapshot_area = self.game_state.entry_snapshot_last_area_move_card_id();
+                let snapshot_area_player =
+                    self.game_state.entry_snapshot_last_area_move_by_player();
+
                 let area_ok = condition.self_effect_only.is_none_or(|_| {
-                    self.game_state.last_area_move_card_id.is_some()
-                        && (self.game_state.last_area_move_by_player.as_ref() == Some(&player.id))
+                    let area_id = snapshot_area.or(self.game_state.last_area_move_card_id);
+                    let area_by = snapshot_area_player
+                        .as_ref()
+                        .or_else(|| self.game_state.last_area_move_by_player.as_ref());
+                    // Card identity check — "このメンバーがエリアを移動する" means THIS card
+                    // must have moved, not just any card.  cards_moved_this_turn persists
+                    // for the whole turn (never cleared mid-turn), so it's reliable even
+                    // after clear_effect_tracking() wipes last_area_move_card_id.
+                    let this_card_moved =
+                        self.game_state.activating_card.map_or(false, |activating| {
+                            self.game_state.cards_moved_this_turn.contains(&activating)
+                        });
+                    this_card_moved && area_id.is_some() && area_by == Some(&player.id)
                 });
                 let energy_ok = condition.energy_placed.is_none_or(|_| {
-                    self.game_state.last_energy_placed_by_effect
+                    let energy_val = if snapshot_energy {
+                        true
+                    } else if !self.game_state.last_energy_placed_by_effect {
+                        false
+                    } else {
+                        // snapshot is false but global is true — use global
+                        true
+                    };
+                    let energy_player = snapshot_energy_player
+                        .as_ref()
+                        .or_else(|| self.game_state.last_energy_placed_by_player.as_ref());
+                    energy_val
                         && (!condition.self_effect_only.unwrap_or(false)
-                            || self.game_state.last_energy_placed_by_player.as_ref()
-                                == Some(&player.id))
+                            || energy_player == Some(&player.id))
                 });
                 let has_area_check = condition.self_effect_only.is_some();
                 let has_energy_check = condition.energy_placed.is_some();

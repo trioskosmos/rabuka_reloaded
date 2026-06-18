@@ -45,25 +45,13 @@ fn accept_optional_position_change(game: &mut TestGame, destination: &str) {
         game.select_option(0);
     }
 
-    match game.get_pending_choice().clone() {
-        Choice::SelectTarget { target, .. } => {
-            assert_eq!(
-                target, "conditional_optional",
-                "Keke debut should first ask whether to use the optional position-change effect"
-            );
-            game.select_option(0);
-        }
-        other => panic!(
-            "Keke debut should pause at optional position-change choice, got {:?}",
-            other
-        ),
-    }
-
+    // Keke's optional position change creates a single position|destination
+    // choice with allow_skip: true — no separate conditional_optional step.
     match game.get_pending_choice().clone() {
         Choice::SelectTarget { target, .. } => {
             assert_eq!(
                 target, "position|destination",
-                "accepted position-change effect should ask for a destination"
+                "Keke debut should ask for a position-change destination"
             );
             let action_index = game
                 .generated_actions()
@@ -88,7 +76,7 @@ fn accept_optional_position_change(game: &mut TestGame, destination: &str) {
             game.select_generated(action_index);
         }
         other => panic!(
-            "accepted position-change effect should ask for a destination, got {:?}",
+            "Keke debut should ask for a position-change destination, got {:?}",
             other
         ),
     }

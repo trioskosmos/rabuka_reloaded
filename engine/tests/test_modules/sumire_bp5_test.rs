@@ -185,6 +185,8 @@ fn test_sumire_other_card_move_triggers() {
     fill_deck(&mut game);
     game.give_energy(15);
     game.add_to_stage(MemberArea::Center, sumire);
+    // Sumire's ability says "このメンバーがエリアを移動する" = THIS MEMBER must
+    // move.  When a different card moves, Sumire should NOT trigger.
     game.state.last_area_move_card_id = Some(other);
     game.state.last_area_move_by_player = Some(game.state.player1.id.clone());
     game.state.last_energy_placed_by_effect = false;
@@ -198,15 +200,16 @@ fn test_sumire_other_card_move_triggers() {
     );
     game.state.process_pending_auto_abilities(&player_id);
 
+    // Since a different card moved, Sumire's "this member" check should NOT trigger.
     assert_eq!(
         heart02_mod(&game, sumire),
-        1,
-        "different-card move triggers (engine does not validate card identity)"
+        0,
+        "different-card move should NOT trigger Sumire (card identity check)"
     );
     assert_eq!(
         game.state.player1.hand.cards.len(),
-        before_hand + 1,
-        "draw from different-card move"
+        before_hand,
+        "no draw from different-card move"
     );
 }
 

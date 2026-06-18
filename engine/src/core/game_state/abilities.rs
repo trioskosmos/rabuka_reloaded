@@ -87,6 +87,10 @@ impl GameState {
             pending_commands: Vec::new(),
             resolver: None,
             trigger_moved_cards,
+            snapshot_last_energy_placed_by_effect: false,
+            snapshot_last_energy_placed_by_player: None,
+            snapshot_last_area_move_card_id: None,
+            snapshot_last_area_move_by_player: None,
         }
     }
 
@@ -227,6 +231,21 @@ impl GameState {
                                     if !passes {
                                         continue;
                                     }
+                                    // Heuristic guard: each_time abilities whose
+                                    // trigger_condition is a comparison on energy_zone
+                                    // should also require that energy was actually
+                                    // placed by an effect (the flag is consumed after
+                                    // every TAS scan to prevent re-triggering on stale
+                                    // comparisons like "energy_zone >= 0").
+                                    if effect.trigger_type.as_deref() == Some("each_time") {
+                                        if trigger_cond.condition_type
+                                            == Some(crate::ability::enums::ConditionType::ComparisonCondition)
+                                            && trigger_cond.location.as_deref() == Some("energy_zone")
+                                            && !self.last_energy_placed_by_effect
+                                        {
+                                            continue;
+                                        }
+                                    }
                                 }
                             }
                             // During in-execution scans (e.g. state.rs state-change),
@@ -296,6 +315,12 @@ impl GameState {
                 moved.clone(),
             );
         }
+        // Consume the energy flag after every TAS scan — each event should
+        // trigger at most one batch of each_time abilities.  The snapshot
+        // captured in trigger_auto_ability (above) preserves the flag value
+        // for abilities that need it during execution (e.g. Sumire's "moves").
+        self.last_energy_placed_by_effect = false;
+        self.last_energy_placed_by_player = None;
     }
 
     pub fn trigger_auto_ability(
@@ -327,6 +352,17 @@ impl GameState {
                             trigger_type,
                             trigger_moved_cards.clone(),
                         );
+                        // Snapshot tracking flags at enqueue time so the
+                        // "moves" condition can check what triggered it even
+                        // after clear_effect_tracking() clears the globals.
+                        let mut entry = entry;
+                        entry.snapshot_last_energy_placed_by_effect =
+                            self.last_energy_placed_by_effect;
+                        entry.snapshot_last_energy_placed_by_player =
+                            self.last_energy_placed_by_player.clone();
+                        entry.snapshot_last_area_move_card_id = self.last_area_move_card_id;
+                        entry.snapshot_last_area_move_by_player =
+                            self.last_area_move_by_player.clone();
                         if crate::ability::debug::ABILITY_DEBUG
                             .load(std::sync::atomic::Ordering::Relaxed)
                         {
@@ -847,6 +883,35 @@ impl GameState {
         self.ability_queue
             .current_entry()
             .and_then(|e| e.conditional_choice.clone())
+    }
+
+    /// Tracking flag snapshots captured at enqueue time. Used by condition
+    /// evaluation so that each_time / auto abilities see the trigger event
+    /// that caused their enqueue, even after clear_effect_tracking() clears
+    /// the global copies (e.g. last_energy_placed_by_effect).
+    pub fn entry_snapshot_last_energy_placed_by_effect(&self) -> bool {
+        self.ability_queue
+            .current_entry()
+            .map(|e| e.snapshot_last_energy_placed_by_effect)
+            .unwrap_or(false)
+    }
+
+    pub fn entry_snapshot_last_energy_placed_by_player(&self) -> Option<String> {
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.snapshot_last_energy_placed_by_player.clone())
+    }
+
+    pub fn entry_snapshot_last_area_move_card_id(&self) -> Option<i16> {
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.snapshot_last_area_move_card_id)
+    }
+
+    pub fn entry_snapshot_last_area_move_by_player(&self) -> Option<String> {
+        self.ability_queue
+            .current_entry()
+            .and_then(|e| e.snapshot_last_area_move_by_player.clone())
     }
 
     /// If the pending choice is routed to a specific player (PVP), return their player_id.
