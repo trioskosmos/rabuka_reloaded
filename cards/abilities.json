@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-18T10:57:42.383435",
+  "generated_at": "2026-06-18T11:22:08.902360",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -18338,88 +18338,62 @@
         "action": "sequential",
         "actions": [
           {
-            "action": "sequential",
-            "actions": [
-              {
-                "action": "gain_resource",
-                "resource": "blade",
-                "count": 1,
-                "characters": [
-                  "澁谷かのん"
-                ],
-                "target": "self",
-                "card_type": "member_card",
-                "target_count": 1,
-                "duration": "live_end",
-                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
-              },
-              {
-                "action": "gain_resource",
-                "resource": "heart",
-                "heart_color": "heart05",
-                "count": 1,
-                "characters": [
-                  "澁谷かのん"
-                ],
-                "target": "self",
-                "card_type": "member_card",
-                "target_count": 1,
-                "duration": "live_end",
-                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
-              }
+            "action": "gain_resource",
+            "resource": "blade",
+            "count": 1,
+            "characters": [
+              "澁谷かのん"
             ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
             "duration": "live_end",
-            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
           },
           {
-            "action": "sequential",
-            "actions": [
-              {
-                "action": "gain_resource",
-                "resource": "blade",
-                "count": 1,
-                "characters": [
-                  "唐可可"
-                ],
-                "target": "self",
-                "card_type": "member_card",
-                "target_count": 1,
-                "duration": "live_end",
-                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
-              },
-              {
-                "action": "gain_resource",
-                "resource": "heart",
-                "heart_color": "heart01",
-                "count": 1,
-                "characters": [
-                  "唐可可"
-                ],
-                "target": "self",
-                "card_type": "member_card",
-                "target_count": 1,
-                "duration": "live_end",
-                "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
-              }
-            ],
-            "duration": "live_end",
-            "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る"
-          }
-        ],
-        "text": "自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る",
-        "character_effects": [
-          {
-            "character": "澁谷かのん",
+            "action": "gain_resource",
+            "resource": "heart",
+            "heart_color": "heart05",
             "count": 1,
-            "resources": "{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}"
+            "characters": [
+              "澁谷かのん"
+            ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
+            "duration": "live_end",
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
           },
           {
-            "character": "唐可可",
+            "action": "gain_resource",
+            "resource": "blade",
             "count": 1,
-            "resources": "{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}"
+            "characters": [
+              "唐可可"
+            ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
+            "duration": "live_end",
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
+          },
+          {
+            "action": "gain_resource",
+            "resource": "heart",
+            "heart_color": "heart01",
+            "count": 1,
+            "characters": [
+              "唐可可"
+            ],
+            "card_type": "member_card",
+            "target": "self",
+            "target_count": 1,
+            "duration": "live_end",
+            "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。"
           }
         ],
         "duration": "live_end",
+        "text": "ライブ終了時まで、自分のステージにいる「澁谷かのん」1人は{{heart_05.png|heart05}}{{icon_blade.png|ブレード}}を、「唐可可」1人は{{heart_01.png|heart01}}{{icon_blade.png|ブレード}}を得る。",
         "heart_colors": [
           "heart05",
           "heart01"

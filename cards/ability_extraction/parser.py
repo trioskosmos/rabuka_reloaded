@@ -4371,8 +4371,8 @@ def _try_character_specific(text):
                         "resource": "blade",
                         "count": blade_count,
                         "characters": [eff["character"]],
-                        "target": "self",
                         "card_type": "member_card",
+                        "target": "self",
                         "target_count": eff["count"],
                     }
                 )
@@ -4384,15 +4384,15 @@ def _try_character_specific(text):
                         "heart_color": heart_color,
                         "count": 1,
                         "characters": [eff["character"]],
-                        "target": "self",
                         "card_type": "member_card",
+                        "target": "self",
                         "target_count": eff["count"],
                     }
                 )
             if len(char_acts) == 1:
                 per_char_actions.append(char_acts[0])
             else:
-                per_char_actions.append({"action": "sequential", "actions": char_acts})
+                per_char_actions.extend(char_acts)
         if len(per_char_actions) == 1:
             result = per_char_actions[0]
         else:
@@ -4400,8 +4400,6 @@ def _try_character_specific(text):
                 "action": "sequential",
                 "actions": per_char_actions,
             }
-        result["text"] = text
-        result["character_effects"] = effects
         return result
     return None
 
