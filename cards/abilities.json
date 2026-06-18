@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-18T07:40:28.679611",
+  "generated_at": "2026-06-18T10:48:18.368416",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -5686,6 +5686,13 @@
         "text": "手札にあるこのメンバーカードのコストは、自分のステージにいる『みらくらぱーく！』のメンバー1人につき、2少なくなる",
         "value": 2,
         "location": "hand",
+        "condition": {
+          "type": "location_condition",
+          "location": "hand",
+          "card_type": "member_card",
+          "target": "self",
+          "text": "手札にある"
+        },
         "per_unit": true,
         "per_unit_count": 1,
         "per_unit_type": "人",
@@ -20115,6 +20122,13 @@
         "text": "手札にあるこのメンバーカードのコストは、このカード以外の自分の手札1枚につき、1少なくなる",
         "value": 1,
         "location": "hand",
+        "condition": {
+          "type": "location_condition",
+          "location": "hand",
+          "card_type": "member_card",
+          "target": "self",
+          "text": "手札にある"
+        },
         "exclude_self": true,
         "per_unit": true,
         "per_unit_count": 1,

@@ -1460,6 +1460,12 @@ impl Card {
         if need.hearts.is_empty() {
             return true;
         }
+        // Rule 2.11.3 bullet 2: total provided must be >= total required.
+        let total_provided: u32 = provided_hearts.hearts.values().sum();
+        let total_required: u32 = need.hearts.values().sum();
+        if total_provided < total_required {
+            return false;
+        }
         // Both Heart00 (wildcard) and HeartColor::All (all-heart) act as
         // flexible supply that can fill any specific-color deficit.
         let mut wildcard_remaining = *provided_hearts
@@ -1471,29 +1477,32 @@ impl Card {
         // the used hearts are deducted from this map so that the heart0 check
         // sees only hearts that have NOT already been allocated.
         let mut remaining = provided_hearts.hearts.clone();
+        // Process specific colors first (Heart01-Heart06) before Heart00 (Fix B).
+        // This avoids non-deterministic double-counting from HashMap iteration order.
         for (color, &needed_amount) in &need.hearts {
             if *color == HeartColor::Heart00 {
-                // heart0: sum of specific-color hearts that are still available
-                // (not yet consumed by heart01–heart06 requirements)
-                let leftover_sum: i32 = remaining
-                    .iter()
-                    .filter(|(c, _)| **c != HeartColor::Heart00 && **c != HeartColor::All)
-                    .map(|(_, v)| *v as i32)
-                    .sum();
-                if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
-                    return false;
-                }
-            } else {
-                let provided = *remaining.get(color).unwrap_or(&0) as i32;
-                if provided + wildcard_remaining < needed_amount as i32 {
-                    return false;
-                }
-                let shortfall = (needed_amount as i32 - provided).max(0);
-                wildcard_remaining -= shortfall;
-                let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
-                if let Some(rem) = remaining.get_mut(color) {
-                    *rem -= consumed;
-                }
+                continue;
+            }
+            let provided = *remaining.get(color).unwrap_or(&0) as i32;
+            if provided + wildcard_remaining < needed_amount as i32 {
+                return false;
+            }
+            let shortfall = (needed_amount as i32 - provided).max(0);
+            wildcard_remaining -= shortfall;
+            let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
+            if let Some(rem) = remaining.get_mut(color) {
+                *rem -= consumed;
+            }
+        }
+        // Then process Heart00 (wildcard requirement) using remaining hearts.
+        if let Some(&heart00_needed) = need.hearts.get(&HeartColor::Heart00) {
+            let leftover_sum: i32 = remaining
+                .iter()
+                .filter(|(c, _)| **c != HeartColor::Heart00 && **c != HeartColor::All)
+                .map(|(_, v)| *v as i32)
+                .sum();
+            if leftover_sum + wildcard_remaining.max(0) < heart00_needed as i32 {
+                return false;
             }
         }
         true
@@ -1509,30 +1518,43 @@ impl Card {
 }
 
 pub fn check_heart_requirement(need: &BaseHeart, provided: &BaseHeart) -> bool {
+    if need.hearts.is_empty() {
+        return true;
+    }
+    // Rule 2.11.3 bullet 2: total provided must be >= total required.
+    let total_provided: u32 = provided.hearts.values().sum();
+    let total_required: u32 = need.hearts.values().sum();
+    if total_provided < total_required {
+        return false;
+    }
     let mut wildcard_remaining = *provided.hearts.get(&HeartColor::Heart00).unwrap_or(&0) as i32
         + *provided.hearts.get(&HeartColor::All).unwrap_or(&0) as i32;
     let mut remaining = provided.hearts.clone();
+    // Process specific colors first (Heart01-Heart06) before Heart00 (Fix B).
     for (color, &needed_amount) in &need.hearts {
         if *color == HeartColor::Heart00 {
-            let leftover_sum: i32 = remaining
-                .iter()
-                .filter(|(c, _)| **c != HeartColor::Heart00 && **c != HeartColor::All)
-                .map(|(_, v)| *v as i32)
-                .sum();
-            if leftover_sum + wildcard_remaining.max(0) < needed_amount as i32 {
-                return false;
-            }
-        } else {
-            let provided_val = *remaining.get(color).unwrap_or(&0) as i32;
-            if provided_val + wildcard_remaining < needed_amount as i32 {
-                return false;
-            }
-            let shortfall = (needed_amount as i32 - provided_val).max(0);
-            wildcard_remaining -= shortfall;
-            let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
-            if let Some(rem) = remaining.get_mut(color) {
-                *rem -= consumed;
-            }
+            continue;
+        }
+        let provided_val = *remaining.get(color).unwrap_or(&0) as i32;
+        if provided_val + wildcard_remaining < needed_amount as i32 {
+            return false;
+        }
+        let shortfall = (needed_amount as i32 - provided_val).max(0);
+        wildcard_remaining -= shortfall;
+        let consumed = needed_amount.min(*remaining.get(color).unwrap_or(&0));
+        if let Some(rem) = remaining.get_mut(color) {
+            *rem -= consumed;
+        }
+    }
+    // Then process Heart00 (wildcard requirement) using remaining hearts.
+    if let Some(&heart00_needed) = need.hearts.get(&HeartColor::Heart00) {
+        let leftover_sum: i32 = remaining
+            .iter()
+            .filter(|(c, _)| **c != HeartColor::Heart00 && **c != HeartColor::All)
+            .map(|(_, v)| *v as i32)
+            .sum();
+        if leftover_sum + wildcard_remaining.max(0) < heart00_needed as i32 {
+            return false;
         }
     }
     true

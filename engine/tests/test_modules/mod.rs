@@ -217,5 +217,6 @@ pub mod card_filter_test;
 pub mod condition_evaluation_test;
 pub mod deep_resonance_bp3_test;
 pub mod kanon_bp5_constant_test;
+pub mod ll_bp2_001_cost_reduction_test;
 pub mod maki_pb1_test;
 pub mod nozomi_bp4_aggregate_test;

@@ -105,6 +105,14 @@ pub fn calculate_play_cost_reduction(
                             && effect.location.as_deref().and_then(Zone::from_str)
                                 == Some(Zone::Hand)
                         {
+                            // Skip effects with a location condition requiring hand
+                            // (e.g. "手札にあるこのカード") — the card is on stage, so
+                            // the condition is not met.
+                            if let Some(ref cond) = effect.condition {
+                                if cond.location.as_deref() == Some("hand") {
+                                    continue;
+                                }
+                            }
                             let group_matches = effect
                                 .group_names
                                 .as_ref()
@@ -129,7 +137,16 @@ pub fn calculate_play_cost_reduction(
                                     continue;
                                 }
                             }
-                            let reduction = effect.value.unwrap_or(1);
+                            // Handle per_unit scaling for stage card effects
+                            // (self-cost-reduction abilities when the card itself
+                            // is being played from hand — handled in the card's own
+                            // ability path above).
+                            let reduction = if effect.per_unit.unwrap_or(false) {
+                                let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
+                                (hand_count.saturating_sub(1) * per_unit) as u32
+                            } else {
+                                effect.value.unwrap_or(1)
+                            };
                             cost_reduction = cost_reduction.max(reduction);
                             break;
                         }
@@ -152,6 +169,11 @@ pub fn calculate_play_cost_reduction(
                             && effect.location.as_deref().and_then(Zone::from_str)
                                 == Some(Zone::Hand)
                         {
+                            if let Some(ref cond) = effect.condition {
+                                if cond.location.as_deref() == Some("hand") {
+                                    continue;
+                                }
+                            }
                             let group_matches = effect
                                 .group_names
                                 .as_ref()
@@ -171,7 +193,12 @@ pub fn calculate_play_cost_reduction(
                                     continue;
                                 }
                             }
-                            let reduction = effect.value.unwrap_or(1);
+                            let reduction = if effect.per_unit.unwrap_or(false) {
+                                let per_unit = effect.per_unit_count.unwrap_or(1) as usize;
+                                (hand_count.saturating_sub(1) * per_unit) as u32
+                            } else {
+                                effect.value.unwrap_or(1)
+                            };
                             cost_reduction = cost_reduction.max(reduction);
                             break;
                         }

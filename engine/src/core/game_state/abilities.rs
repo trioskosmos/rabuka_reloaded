@@ -952,6 +952,22 @@ impl GameState {
                         obj.insert("selection_cards".into(), serde_json::Value::Array(sel));
                     }
                 }
+            } else if let Some(choice) = self.ability_queue.is_waiting_for_choice() {
+                match choice {
+                    crate::ability::types::Choice::SelectAutoAbility { player_id, .. }
+                    | crate::ability::types::Choice::SelectLiveSuccess { player_id, .. } => {
+                        let normalized = match player_id.as_str() {
+                            "player1" => "p1",
+                            "player2" => "p2",
+                            _ => player_id.as_str(),
+                        };
+                        obj.insert(
+                            "choice_player_id".into(),
+                            serde_json::Value::String(normalized.to_string()),
+                        );
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -1587,6 +1603,9 @@ impl GameState {
         self.opponent_live_success_this_turn = false;
         self.opponent_live_no_excess_heart_this_turn = false;
         self.live_success_triggered_this_turn = false;
+        self.live_success_p2_fired = false;
+        self.live_success_p1_extra = 0;
+        self.live_success_p2_extra = 0;
         self.last_state_change_wait_to_active_count = 0;
         self.self_no_excess_heart_this_turn = false;
     }

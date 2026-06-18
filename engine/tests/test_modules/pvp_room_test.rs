@@ -6,6 +6,8 @@ use rabuka_engine::types::{Phase, TurnPhase};
 use rabuka_engine::web_server::pvp_player_can_act;
 use std::sync::Arc;
 
+use crate::helpers::*;
+
 fn make_db() -> Arc<CardDatabase> {
     let cards_path = std::path::Path::new("../cards/cards.json");
     match CardLoader::load_cards_from_file(cards_path) {
@@ -188,4 +190,155 @@ fn normal_choice_stays_with_active_player_in_pvp() {
     assert!(pvp_player_can_act(&gs, 0), "P1 can act on own choice");
     // P2 should be blocked (not active player, choice not routed to them)
     assert!(!pvp_player_can_act(&gs, 1), "P2 blocked from P1's choice");
+}
+
+fn fill_both_decks(game: &mut TestGame, filler: i16) {
+    game.state.player1.main_deck.cards.clear();
+    game.state.player2.main_deck.cards.clear();
+    for _ in 0..30 {
+        game.state.player1.main_deck.cards.push(filler);
+        game.state.player2.main_deck.cards.push(filler);
+    }
+}
+
+#[test]
+fn both_players_multiple_live_start_abilities_get_correct_choice_routing() {
+    use rabuka_engine::ability::types::Choice;
+
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+
+    let filler = game.id("PL!-sd1-010-SD");
+
+    // Get 3 copies of Shizuku for each player
+    let p1_a = game.id("PL!N-bp3-015-N");
+    let p1_b = game.id("PL!N-bp3-015-N");
+    let p1_c = game.id("PL!N-bp3-015-N");
+    let p2_a = game.id("PL!N-bp3-015-N");
+    let p2_b = game.id("PL!N-bp3-015-N");
+    let p2_c = game.id("PL!N-bp3-015-N");
+
+    // Set up both players' stages with 3x Shizuku
+    game.state.player1.stage.stage = [p1_a, p1_b, p1_c];
+    game.state.player2.stage.stage = [p2_a, p2_b, p2_c];
+
+    fill_both_decks(&mut game, filler);
+
+    // Advance through turns to reach FirstAttackerPerformance (triggers LiveStart)
+    // 7 passes: Main → Active → Energy → Draw → Main → LiveCardSetFirst → LiveCardSetSecond → FirstAttackerPerformance
+    for _ in 0..7 {
+        game.pass();
+    }
+
+    // After LiveCardSetSecondAttacker → FirstAttackerPerformance transition,
+    // LiveStart abilities for both players are triggered and processed.
+    // P1 (first attacker) should have SelectAutoAbility for their 3 Shizuku.
+    assert!(
+        game.state.has_pending_choice(),
+        "Should have pending choice after LiveStart triggers"
+    );
+
+    // Verify P1's SelectAutoAbility routing
+    {
+        let choice = game.state.get_pending_choice().unwrap();
+        match choice {
+            Choice::SelectAutoAbility {
+                player_id, options, ..
+            } => {
+                assert_eq!(player_id, "p1", "First SelectAutoAbility must be for P1");
+                assert_eq!(options.len(), 3, "P1 should have 3 ability options");
+                assert!(
+                    pvp_player_can_act(&game.state, 0),
+                    "P1 must be able to act on their own SelectAutoAbility"
+                );
+                assert!(
+                    !pvp_player_can_act(&game.state, 1),
+                    "P2 must NOT be able to act on P1's SelectAutoAbility"
+                );
+            }
+            _ => panic!("Expected SelectAutoAbility for P1, got {:?}", choice),
+        }
+    }
+
+    // Verify choice_player_id is in the JSON for P1
+    {
+        let json = game.state.get_pending_choice_json().unwrap();
+        let cpid = json.get("choice_player_id").and_then(|v| v.as_str());
+        assert_eq!(
+            cpid,
+            Some("p1"),
+            "choice_player_id must be 'p1' in JSON for P1's choice"
+        );
+    }
+
+    // Drain P1's 3 abilities:
+    //   - When >1 options: SelectAutoAbility → pick 0 → ability runs → SelectHeartColor → pick 0
+    //   - When only 1 option remains, engine auto-starts it (no SelectAutoAbility), goes directly to SelectHeartColor
+    for i in 0..2 {
+        // First two: 3 options then 2 options → engine shows SelectAutoAbility
+        assert_eq!(
+            game.pending_choice_type(),
+            Some("SelectAutoAbility".to_string()),
+            "Iteration {} of P1: expected SelectAutoAbility",
+            i
+        );
+        let choice = game.state.get_pending_choice().unwrap();
+        match choice {
+            Choice::SelectAutoAbility { player_id, .. } => {
+                assert_eq!(player_id, "p1", "Iteration {}: still P1's choice", i);
+            }
+            _ => {}
+        }
+        game.select_option(0);
+
+        assert_eq!(
+            game.pending_choice_type(),
+            Some("SelectHeartColor".to_string()),
+            "Iteration {} of P1: expected SelectHeartColor after picking ability",
+            i
+        );
+        game.select_option(0);
+    }
+
+    // Third ability: only 1 option left → engine auto-starts, goes directly to SelectHeartColor
+    assert_eq!(
+        game.pending_choice_type(),
+        Some("SelectHeartColor".to_string()),
+        "Third P1 ability: expected SelectHeartColor (last option auto-started)"
+    );
+    game.select_option(0);
+
+    // Now P2 should have their SelectAutoAbility
+    assert!(
+        game.state.has_pending_choice(),
+        "P2 should have pending choice after P1's abilities are done"
+    );
+
+    let choice = game.state.get_pending_choice().unwrap();
+    match choice {
+        Choice::SelectAutoAbility {
+            player_id, options, ..
+        } => {
+            assert_eq!(player_id, "p2", "Second SelectAutoAbility must be for P2");
+            assert_eq!(options.len(), 3, "P2 should have 3 ability options");
+            assert!(
+                !pvp_player_can_act(&game.state, 0),
+                "P1 must NOT be able to act on P2's SelectAutoAbility"
+            );
+            assert!(
+                pvp_player_can_act(&game.state, 1),
+                "P2 must be able to act on their own SelectAutoAbility"
+            );
+        }
+        _ => panic!("Expected SelectAutoAbility for P2, got {:?}", choice),
+    }
+
+    // Verify choice_player_id is in the JSON for P2
+    let json = game.state.get_pending_choice_json().unwrap();
+    let cpid = json.get("choice_player_id").and_then(|v| v.as_str());
+    assert_eq!(
+        cpid,
+        Some("p2"),
+        "choice_player_id must be 'p2' in JSON for P2's choice"
+    );
 }

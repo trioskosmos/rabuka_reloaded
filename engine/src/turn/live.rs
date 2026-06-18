@@ -87,72 +87,80 @@ impl super::TurnEngine {
             .collect();
         let p1_extra: u32;
         let p2_extra: u32;
-        if game_state.live_success_triggered_this_turn {
-            p1_extra = 0u32;
-            p2_extra = 0u32;
+        if game_state.live_success_triggered_this_turn && game_state.live_success_p2_fired {
+            // Re-entry after BOTH players' triggers already resolved.
+            // Restore saved extras (e.g. if a later auto-ability creates a choice).
+            p1_extra = game_state.live_success_p1_extra;
+            p2_extra = game_state.live_success_p2_extra;
         } else {
-            game_state.live_success_triggered_this_turn = true;
+            if !game_state.live_success_triggered_this_turn {
+                // First entry: init state, process surplus, fire P1 triggers.
+                game_state.live_success_triggered_this_turn = true;
+                game_state.live_success_p2_fired = false;
 
-            // Compute initial surplus from stage hearts + yell before triggers fire,
-            // so the condition evaluator can read stored values during LiveSuccess.
-            for snap in &game_state.performance_snapshots {
-                let total_hearts: u32 = snap.total_hearts.iter().sum();
-                let player = if snap.player_id == player1_id {
-                    &game_state.player1
-                } else {
-                    &game_state.player2
-                };
-                let required: u32 = player
-                    .live_card_zone
-                    .cards
-                    .iter()
-                    .filter_map(|&id| game_state.card_database.get_card(id))
-                    .filter_map(|c| c.need_heart.as_ref())
-                    .flat_map(|nh| nh.hearts.values())
-                    .sum();
-                let surplus = total_hearts.saturating_sub(required);
-                if snap.player_id == player2_id {
-                    game_state.opponent_live_surplus_count = surplus;
-                } else {
-                    game_state.self_live_surplus_count = surplus;
+                for snap in &game_state.performance_snapshots {
+                    let total_hearts: u32 = snap.total_hearts.iter().sum();
+                    let player = if snap.player_id == player1_id {
+                        &game_state.player1
+                    } else {
+                        &game_state.player2
+                    };
+                    let required: u32 = player
+                        .live_card_zone
+                        .cards
+                        .iter()
+                        .filter_map(|&id| game_state.card_database.get_card(id))
+                        .filter_map(|c| c.need_heart.as_ref())
+                        .flat_map(|nh| nh.hearts.values())
+                        .sum();
+                    let surplus = total_hearts.saturating_sub(required);
+                    if snap.player_id == player2_id {
+                        game_state.opponent_live_surplus_count = surplus;
+                    } else {
+                        game_state.self_live_surplus_count = surplus;
+                    }
                 }
-            }
-            game_state.live_surplus_ready_this_turn = true;
+                game_state.live_surplus_ready_this_turn = true;
 
-            Self::trigger_live_success_abilities(game_state, &player1_id);
-            game_state.process_pending_auto_abilities(&player1_id);
-            if game_state.has_pending_choice() {
-                return;
+                Self::trigger_live_success_abilities(game_state, &player1_id);
+                game_state.process_pending_auto_abilities(&player1_id);
+                if game_state.has_pending_choice() {
+                    return;
+                }
+                Self::trigger_each_time_abilities(
+                    game_state,
+                    &player1_id,
+                    crate::triggers::LIVE_SUCCESS,
+                );
+                game_state.process_pending_auto_abilities(&player1_id);
+                if game_state.has_pending_choice() {
+                    return;
+                }
+                let score_cur: HashMap<i16, i32> = game_state
+                    .mods
+                    .score_modifiers
+                    .iter()
+                    .map(|(&k, e)| (k, e.total()))
+                    .collect();
+                p1_extra = Self::score_delta_since(
+                    &score_cur,
+                    &pre_score_flat,
+                    &game_state.player1.live_card_zone.cards,
+                )
+                .max(0) as u32;
+                game_state.live_success_p1_extra = p1_extra;
+                game_state.live_success_p2_fired = true;
+            } else {
+                // Re-entry after P1 triggers resolved but P2 still pending.
+                p1_extra = game_state.live_success_p1_extra;
             }
-            // After all LiveSuccess abilities resolve, trigger each_time abilities
-            Self::trigger_each_time_abilities(
-                game_state,
-                &player1_id,
-                crate::triggers::LIVE_SUCCESS,
-            );
-            game_state.process_pending_auto_abilities(&player1_id);
-            if game_state.has_pending_choice() {
-                return;
-            }
-            let score_cur: HashMap<i16, i32> = game_state
-                .mods
-                .score_modifiers
-                .iter()
-                .map(|(&k, e)| (k, e.total()))
-                .collect();
-            p1_extra = Self::score_delta_since(
-                &score_cur,
-                &pre_score_flat,
-                &game_state.player1.live_card_zone.cards,
-            )
-            .max(0) as u32;
 
+            // P2 trigger block (shared between first entry and re-entry paths)
             Self::trigger_live_success_abilities(game_state, &player2_id);
             game_state.process_pending_auto_abilities(&player2_id);
             if game_state.has_pending_choice() {
                 return;
             }
-            // After all LiveSuccess abilities resolve, trigger each_time abilities
             Self::trigger_each_time_abilities(
                 game_state,
                 &player2_id,
@@ -174,6 +182,7 @@ impl super::TurnEngine {
                 &game_state.player2.live_card_zone.cards,
             )
             .max(0) as u32;
+            game_state.live_success_p2_extra = p2_extra;
         }
 
         // Process any remaining auto-abilities that were queued but not yet resolved
@@ -298,13 +307,20 @@ impl super::TurnEngine {
                         let passed = {
                             let mut wildcard = filled[0];
                             let mut ok = true;
-                            // Check if the Heart00 requirement itself is satisfied.
-                            // Any filled colored hearts (1-6) that were allocated by Phase 3
-                            // count toward the Heart00 requirement, so we subtract them.
-                            if required_arr[0] > 0 {
+                            // Rule 2.11.3 bullet 2: total provided >= total required
+                            let total_filled: u32 = filled.iter().sum();
+                            let total_required: u32 = required_arr.iter().sum();
+                            if total_filled < total_required {
+                                ok = false;
+                            }
+                            if ok && required_arr[0] > 0 {
                                 let h00_satisfied: u32 = filled[1..7].iter().sum();
                                 if h00_satisfied + wildcard < required_arr[0] {
                                     ok = false;
+                                } else {
+                                    // Fix C: decrement wildcard by amount consumed for Heart00
+                                    let used = required_arr[0].saturating_sub(h00_satisfied);
+                                    wildcard = wildcard.saturating_sub(used);
                                 }
                             }
                             // Use remaining wildcard to cover deficits in specific colors
@@ -1085,6 +1101,10 @@ impl super::TurnEngine {
             value: total_blade,
         });
 
+        // Q42: Defer draw effects until after all yell cards have been revealed.
+        // Count draw icons during the loop, then process all draws at once after.
+        let mut total_draw_icons = 0u32;
+
         for card_id in &resolution_zone.cards {
             if let Some(card) = card_db.get_card(*card_id) {
                 let mut bh_arr = EMPTY_H8;
@@ -1100,11 +1120,6 @@ impl super::TurnEngine {
                             total_hearts_arr[0] += count;
                         } else if effective_color == HeartColor::Draw {
                             draw_icons += count;
-                            for _ in 0..*count {
-                                if let Some(new_card) = player.main_deck.draw() {
-                                    player.hand.add_card(new_card);
-                                }
-                            }
                         } else if effective_color == HeartColor::Score {
                             note_icons += count;
                             cheer_icon_count += count;
@@ -1124,17 +1139,14 @@ impl super::TurnEngine {
                     for (color, count) in &sh.hearts {
                         if *color == HeartColor::Draw {
                             draw_icons += count;
-                            for _ in 0..*count {
-                                if let Some(new_card) = player.main_deck.draw() {
-                                    player.hand.add_card(new_card);
-                                }
-                            }
                         } else if *color == HeartColor::Score {
                             note_icons += count;
                             cheer_icon_count += count;
                         }
                     }
                 }
+
+                total_draw_icons += draw_icons;
 
                 yell_cards.push(YellCardResult {
                     card_id: *card_id,
@@ -1146,6 +1158,13 @@ impl super::TurnEngine {
                         .map(|c| c.card_no.clone())
                         .unwrap_or_default(),
                 });
+            }
+        }
+
+        // Process all deferred draw effects after all yell cards are revealed (Q42).
+        for _ in 0..total_draw_icons {
+            if let Some(new_card) = player.main_deck.draw() {
+                player.hand.add_card(new_card);
             }
         }
 
@@ -1387,10 +1406,20 @@ impl super::TurnEngine {
                 // (same as execute_live_victory_determination lines 298-325)
                 let mut wildcard = filled[0];
                 let mut ok = true;
-                if required_arr[0] > 0 {
+                // Rule 2.11.3 bullet 2: total provided >= total required
+                let total_filled: u32 = filled.iter().sum();
+                let total_required: u32 = required_arr.iter().sum();
+                if total_filled < total_required {
+                    ok = false;
+                }
+                if ok && required_arr[0] > 0 {
                     let h00_satisfied: u32 = filled[1..7].iter().sum();
                     if h00_satisfied + wildcard < required_arr[0] {
                         ok = false;
+                    } else {
+                        // Fix C: decrement wildcard by amount consumed for Heart00
+                        let used = required_arr[0].saturating_sub(h00_satisfied);
+                        wildcard = wildcard.saturating_sub(used);
                     }
                 }
                 if ok {

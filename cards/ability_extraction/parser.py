@@ -4468,9 +4468,18 @@ def _try_cost_modification(text):
         "text": text,
         "value": value,
     }
-    # Location: "手札にある" → hand
+    # Location: "手札にある" → hand, and emit a condition so the engine
+    # only activates this effect when the card is actually in hand.
     if "手札" in text:
         result["location"] = "hand"
+        if "手札にある" in text or "手札にいる" in text:
+            result["condition"] = {
+                "type": "location_condition",
+                "location": "hand",
+                "card_type": "member_card",
+                "target": "self",
+                "text": "手札にある",
+            }
     # Exclude self: "このカード以外" or "ほかの"
     if "以外" in text or "ほかの" in text or "他の" in text:
         result["exclude_self"] = True

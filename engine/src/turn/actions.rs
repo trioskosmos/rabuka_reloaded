@@ -596,11 +596,15 @@ impl super::TurnEngine {
                 .ability_queue
                 .current_entry()
                 .is_some_and(|e| e.effect_started);
-            // Capture key BEFORE complete_current() removes the entry.
+            // Capture key and player_id BEFORE complete_current() removes the entry.
             let just_completed_key = game_state
                 .ability_queue
                 .current_entry()
                 .map(|e| format!("{}_{}", e.card_no, e.ability.full_text));
+            let entry_player_id = game_state
+                .ability_queue
+                .current_entry()
+                .map(|e| e.player_id.clone());
             log::debug!(
                 "[RWC] cost_was_paid={}, effect_started={}, had_pending_sequential={}",
                 cost_was_paid,
@@ -641,7 +645,7 @@ impl super::TurnEngine {
                 );
                 game_state.ability_queue.complete_current();
                 game_state.clear_effect_tracking();
-                let player_id = game_state.active_player().id.clone();
+                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
@@ -696,7 +700,7 @@ impl super::TurnEngine {
                     // Temporarily restore so the trigger scan can see them
                     game_state.recently_moved_cards = moved_snapshot;
                 }
-                let player_id = game_state.active_player().id.clone();
+                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
@@ -709,7 +713,7 @@ impl super::TurnEngine {
                 {
                     game_state.recently_moved_cards = moved_snapshot;
                 }
-                let player_id = game_state.active_player().id.clone();
+                let player_id = entry_player_id.clone().unwrap_or_else(|| "p1".to_string());
                 game_state.just_completed_ability_key = just_completed_key.clone();
                 game_state.process_pending_auto_abilities(&player_id);
                 game_state.just_completed_ability_key = None;
