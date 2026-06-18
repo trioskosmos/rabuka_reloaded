@@ -143,6 +143,13 @@ impl super::TurnEngine {
     /// Trigger "each_time" abilities on live cards that watch for the given trigger keyword.
     /// For each matching each_time ability, enqueue it once per stage member that has
     /// an ability with the matching trigger type.
+    ///
+    /// Trigger types handled (matched by trigger_substring):
+    ///   LIVE_START  — "ライブ開始時" (each_time: live start ability resolves)
+    ///   LIVE_SUCCESS — "ライブ成功時" (each_time: live success ability resolves)
+    ///   Future: DEBUT, AREA_MOVE, STATE_CHANGE, DISCARD, ENERGY, YELL
+    ///
+    /// Called from phase and performance transitions in phases.rs and live.rs.
     pub fn trigger_each_time_abilities(
         game_state: &mut GameState,
         player_id: &str,
@@ -180,6 +187,17 @@ impl super::TurnEngine {
                         };
                         if !watch_text.contains(trigger_substring) {
                             continue;
+                        }
+                        // Evaluate trigger_condition before enqueuing.
+                        // For example, an each_time:discard ability with
+                        // "このメンバーがステージから控え室に置かれたとき" must
+                        // verify via recently_moved_cards that a card actually
+                        // moved to discard before this each_time fires.
+                        if let Some(ref trigger_cond) = effect.trigger_condition {
+                            let ctx = crate::ability::condition::ConditionContext::new(game_state);
+                            if !ctx.evaluate_condition(trigger_cond) {
+                                continue;
+                            }
                         }
                         for _ in 0..member_count {
                             let aid = format!("{}_{}", card.card_no, ability.full_text);

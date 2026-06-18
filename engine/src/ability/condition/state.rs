@@ -362,6 +362,12 @@ impl<'a> ConditionContext<'a> {
         }
     }
 
+    /// Evaluate movement condition — matches jidou auto trigger types:
+    ///   on_area_move     ("エリアを移動したとき/するたび")  → movement: "moved"/"moves"
+    ///   on_discard_from_stage ("ステージから控え室に置かれたとき") → preceding_moved path
+    ///   on_baton_touch    ("バトンタッチして控え室に置かれた") → movement: "baton_touch"
+    ///   on_move_or_energy ("エリアを移動するかエネルギーが置かれた") → movement: "moves" + energy check
+    ///   on_appear_or_move ("登場か、エリアを移動するたび") → movement: "moves" + appearance check
     pub(crate) fn evaluate_movement_condition(&self, condition: &Condition) -> bool {
         let movement = condition.movement.as_deref().unwrap_or("");
         let movement_state = condition.movement_state.as_deref();

@@ -140,6 +140,20 @@ impl GameState {
 
     /// Scan a player's stage and enqueue auto abilities for that player.
     /// Guards against triggering discard-location abilities when the card isn't in discard.
+    ///
+    /// Trigger types scanned:
+    ///   Stage cards: all 17 jidou sub-types that have trigger_condition set.
+    ///     Includes each_time triggers on stage cards (e.g. Ren:discard, Natsumi:area_move).
+    ///     trigger_condition evaluated with recently_moved_cards context (P1 fix).
+    ///   Live cards: non-each_time auto abilities only.
+    ///     each_time live card abilities handled by trigger_each_time_abilities().
+    ///
+    /// Called from:
+    ///   - process_current_ability() post-resolve scan (line ~753)
+    ///   - process_player_abilities() post-loop batch scan (line ~503)
+    ///   - execute_performance_phase() for yell/performance triggers (line ~350)
+    ///   - debut placement in phases.rs
+    ///   - state change effects in effects/state.rs
     pub fn trigger_auto_abilities_for_player(&mut self, player_id: &str) {
         let player_id_clone = player_id.to_string();
         let mut abilities_to_trigger: Vec<(String, String, i16)> = Vec::new();
@@ -192,8 +206,9 @@ impl GameState {
                                 // Evaluate trigger_condition (e.g. "このメンバーがエリアを移動する"
                                 // for each-time triggers). If not met, skip.
                                 if let Some(ref trigger_cond) = effect.trigger_condition {
-                                    let ctx =
-                                        crate::ability::condition::ConditionContext::new(self);
+                                    let moved: &[i16] =
+                                        self.recently_moved_cards.as_deref().unwrap_or(&[]);
+                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
                                     let passes = ctx.evaluate_condition(trigger_cond);
                                     if crate::ability::debug::ABILITY_DEBUG
                                         .load(std::sync::atomic::Ordering::Relaxed)
@@ -246,8 +261,9 @@ impl GameState {
                                     continue;
                                 }
                                 if let Some(ref trigger_cond) = effect.trigger_condition {
-                                    let ctx =
-                                        crate::ability::condition::ConditionContext::new(self);
+                                    let moved: &[i16] =
+                                        self.recently_moved_cards.as_deref().unwrap_or(&[]);
+                                    let ctx = crate::ability::condition::ConditionContext::with_moved_cards(self, moved);
                                     if !ctx.evaluate_condition(trigger_cond) {
                                         continue;
                                     }
@@ -490,8 +506,18 @@ impl GameState {
             }
 
             self.process_current_ability();
+            let had_recent_moves = self.recently_moved_cards.is_some();
             self.recently_moved_cards = None;
             self.recently_moved_from_zone = None;
+            // Save flag for the post-loop batch scan below;
+            // process_current_ability's internal scan (line 742) already ran
+            // before the clear above, so each_time watchers from the
+            // just-resolved effect were caught. This post-loop scan catches
+            // batch movements (look_and_select, etc.) that finalize card
+            // movement outside individual ability resolution.
+            if had_recent_moves {
+                self.recently_moved_cards = Some(Vec::new()); // non-None marker for scan below
+            }
             if self.has_pending_choice() {
                 break;
             }
@@ -499,7 +525,11 @@ impl GameState {
         // After loop, scan for watchers triggered by batch discards from
         // look_and_select or similar (callers that finalize_card_movement
         // after the loop already exited, via moved_snapshot in actions.rs).
-        if self.recently_moved_cards.is_some() && self.current_phase == crate::types::Phase::Main {
+        // Trigger types: each_time:discard, each_time:hand_to_discard, each_time:any_to_discard,
+        // each_time:energy_placed
+        if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect)
+            && self.current_phase == crate::types::Phase::Main
+        {
             self.trigger_auto_abilities_for_player(player_id);
             self.recently_moved_cards = None;
             self.recently_moved_from_zone = None;
@@ -739,7 +769,8 @@ impl GameState {
             self.activating_ability_index = None;
             // Scan stage watchers (e.g. each_time triggers) BEFORE clearing
             // recently_moved_cards so their preceding_moved conditions pass.
-            if self.recently_moved_cards.is_some()
+            // Trigger types: each_time:discard, each_time:area_move, each_time:energy_placed
+            if (self.recently_moved_cards.is_some() || self.last_energy_placed_by_effect)
                 && self.current_phase == crate::types::Phase::Main
             {
                 if crate::ability::debug::ABILITY_DEBUG.load(std::sync::atomic::Ordering::Relaxed) {

@@ -7734,6 +7734,7 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         "primary_neg": 0,
         "leak": 0,
         "compound_split": 0,
+        "auto_trigger": 0,
     }
 
     for ability in data["unique_abilities"]:
@@ -7969,32 +7970,18 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         # FIX 13: Auto abilities with no condition/trigger_condition — extract from text
         if (
             ability.get("triggers") == "自動"
-            and eff.get("action")
+            and isinstance(eff, dict)
             and not eff.get("condition")
             and not eff.get("trigger_condition")
         ):
             for sep in ["とき、", "場合、", "たび、", "なら、"]:
                 idx = t.find(sep)
                 if idx >= 0:
-                    ct = t[
-                        : idx
-                        + (
-                            2
-                            if sep == "とき、"
-                            else 2
-                            if sep == "場合、"
-                            else 2
-                            if sep == "たび、"
-                            else 2
-                        )
-                    ]
-                    if ")" in ct or "）" in ct:
-                        continue
+                    ct = t[: idx + 2]
                     tc = parse_condition(ct)
                     if tc and tc.get("type") not in (None, "custom"):
                         eff["trigger_condition"] = tc
                         eff["condition"] = copy.deepcopy(tc)
-                        fix_stats.setdefault("auto_trigger", 0)
                         fix_stats["auto_trigger"] += 1
                         break
 
