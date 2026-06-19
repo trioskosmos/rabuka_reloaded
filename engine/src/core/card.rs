@@ -1371,6 +1371,9 @@ pub struct Condition {
     /// (same card name) conditions.
     #[serde(default)]
     pub reference_card: Option<String>,
+    /// self_target: condition refers to this specific card ("このメンバーが" / "このカードが").
+    #[serde(default)]
+    pub self_target: Option<bool>,
 }
 
 impl Condition {

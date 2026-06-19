@@ -1696,6 +1696,13 @@ def _extract_generic_fields(condition, text):
     if condition.get("check_self") and "heart_colors" in condition:
         del condition["heart_colors"]
 
+    # Self-target: "このメンバーが" / "このメンバーは" / "このカードが" / "このカードは"
+    # (without "以外") means the condition refers to this specific card.
+    # Uses self_target (distinct from target="self" which can come from
+    # extract_target's "自分の" zone-reference match).
+    if re.search(r"この(メンバー|カード)[がは]", text) and "以外" not in text:
+        condition["self_target"] = True
+
     # Includes
     if "含む" in text and "その中に" in text:
         condition["includes"] = True
@@ -1730,7 +1737,13 @@ def _extract_generic_fields(condition, text):
 
     # Exclude self
     has_exclude_self_kw = any(
-        kw in text for kw in ["このメンバー以外", "このメンバー以外の"]
+        kw in text
+        for kw in [
+            "このメンバー以外",
+            "このメンバー以外の",
+            "このカード以外",
+            "このカード以外の",
+        ]
     )
     if not has_exclude_self_kw:
         has_exclude_self_kw = bool(re.search(r"ほかの.*?メンバー", text))
@@ -4725,10 +4738,20 @@ def _try_kore_niyori_case(text):
     action_text = re.sub(r"『.+』のカード$", "", ap.strip()).strip()
     fe = parse_effect(action_text)
     se = parse_effect(second.lstrip("、。").strip())
+    condition = parse_condition(cond_text)
+    # The "これにより" refers to the card just moved by the preceding cost
+    # (discard from hand). Check it via preceding_moved, not the discard pile.
+    if condition and condition.get("location") == "discard":
+        condition["source"] = "preceding_moved"
+        condition.pop("location", None)
+        # Branch logic: TRUE → alternative_effect, FALSE → primary_effect.
+        # The primary_effect is the named/gated case (μ's), so negate so
+        # that μ's → FALSE → primary, non-μ's → TRUE → alternative.
+        condition["negation"] = True
     return {
         "text": text,
         "action": "conditional_alternative",
-        "condition": parse_condition(cond_text),
+        "condition": condition,
         "primary_effect": fe,
         "alternative_effect": se,
     }

@@ -1353,6 +1353,17 @@ impl<'a> ConditionContext<'a> {
             } else {
                 self.moved_cards.to_vec()
             };
+            // When self_target and source=preceding_moved, restrict to the
+            // activating card only — don't check ALL moved cards.
+            let moved_source = if condition.self_target.unwrap_or(false)
+                && condition.source.as_deref() == Some("preceding_moved")
+            {
+                self.activating_card_id
+                    .filter(|id| moved_source.contains(id))
+                    .map_or(vec![], |id| vec![id])
+            } else {
+                moved_source
+            };
             // Determine destination zone for zone-transition filtering.
             // When condition.location (source) and condition.locations are both set,
             // find the destination zone (a zone in locations that is NOT the source).
@@ -1362,11 +1373,20 @@ impl<'a> ConditionContext<'a> {
                     .as_ref()
                     .and_then(|locs| locs.iter().find(|l| l.as_str() != src.as_str()).cloned())
             });
+            let moved_group_name = condition
+                .group_names
+                .as_ref()
+                .and_then(|g| g.first().map(|s| s.as_str()));
             let actual = moved_source
                 .iter()
                 .filter(|&&cid| {
                     if cid == -1 {
                         return false;
+                    }
+                    if let Some(gn) = moved_group_name {
+                        if !util::card_matches_group_str(card_db, cid, Some(gn)) {
+                            return false;
+                        }
                     }
                     let type_ok = card_type.is_empty()
                         || util::card_matches_type(card_db, cid, Some(card_type));
@@ -2768,6 +2788,28 @@ impl<'a> ConditionContext<'a> {
 
         let ct = condition.card_type.as_deref();
         let exc = condition.exclude_characters.as_deref();
+
+        // Preceding-moved path: check recently moved cards instead of a zone.
+        if condition.source.as_deref() == Some("preceding_moved")
+            || condition.source.as_deref() == Some("previous_moved_cards")
+        {
+            let moved_source: Vec<i16> = if self.moved_cards.is_empty() {
+                let enqueued = self.game_state.entry_trigger_moved_cards();
+                let global = self.game_state.recently_moved_cards.clone();
+                match (&enqueued, &global) {
+                    (Some(ev), None) if !ev.is_empty() => ev.clone(),
+                    _ => global.unwrap_or_default(),
+                }
+            } else {
+                self.moved_cards.to_vec()
+            };
+            return self.count_group_cards_in_cards(
+                &moved_source,
+                group_filter.map(|v| &**v),
+                ct,
+                exc,
+            );
+        }
 
         // When `locations` has multiple entries, count across all listed zones.
         // This handles zone-transition conditions (e.g. "card in live_card_zone OR discard").

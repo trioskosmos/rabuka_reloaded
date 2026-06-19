@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-19T20:17:19.270017",
+  "generated_at": "2026-06-19T21:18:36.520248",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -788,6 +788,7 @@
           "text": "このカードが控え室にある場合",
           "location": "discard",
           "check_self": true,
+          "self_target": true,
           "count": 1,
           "operator": ">=",
           "target": "self",
@@ -3667,11 +3668,12 @@
         "action": "conditional_alternative",
         "condition": {
           "text": "これにより控え室に置いたカードが『μ's』のカードの場合",
-          "location": "discard",
           "group_names": [
             "μ's"
           ],
-          "type": "group_condition"
+          "type": "group_condition",
+          "source": "preceding_moved",
+          "negation": true
         },
         "primary_effect": {
           "text": "自分のデッキの上からカードを4枚見る。その中からカードを2枚手札に加える。残りを控え室に置く",
@@ -4085,7 +4087,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "trigger_condition": {
           "type": "card_count_condition",
@@ -4098,7 +4101,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -4884,7 +4888,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "count": 1,
         "card_type": "member_card",
@@ -4903,7 +4908,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -8177,7 +8183,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "count": 1,
         "card_type": "member_card",
@@ -8195,7 +8202,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -9763,7 +9771,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "group_names": [
           "Aqours"
@@ -9779,7 +9788,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -11234,6 +11244,7 @@
         "activation_condition_parsed": {
           "text": "このカードが自分のエールによって公開されている場合",
           "target": "self",
+          "self_target": true,
           "count": 1,
           "operator": ">=",
           "type": "comparison_condition"
@@ -11793,6 +11804,7 @@
               "operator": "=",
               "comparison_type": "equality",
               "type": "card_count_condition",
+              "self_target": true,
               "count": 1
             },
             "action": "gain_resource",
@@ -13841,6 +13853,7 @@
           "text": "このカードが手札にある場合",
           "location": "hand",
           "check_self": true,
+          "self_target": true,
           "count": 1,
           "operator": ">=",
           "target": "self",
@@ -19748,7 +19761,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -19778,7 +19792,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -19807,7 +19822,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "look_action": {
           "text": "自分のデッキの上からカードを5枚見る。",
@@ -19837,7 +19853,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -19897,7 +19914,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "sequential",
         "actions": [
@@ -19928,7 +19946,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -22076,6 +22095,7 @@
               "target": "self",
               "location": "success_live_card_zone",
               "card_type": "live_card",
+              "self_target": true,
               "type": "location_condition"
             },
             {
@@ -22160,6 +22180,7 @@
           "location": "success_live_card_zone",
           "card_type": "live_card",
           "check_self": true,
+          "self_target": true,
           "type": "location_condition"
         },
         "duration": "as_long_as",
@@ -22309,7 +22330,8 @@
           "to_state": "wait",
           "phase": "main",
           "target": "self",
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "sequential",
         "actions": [
@@ -22503,6 +22525,7 @@
             "discard",
             "hand"
           ],
+          "self_target": true,
           "type": "location_condition"
         }
       }
@@ -22524,6 +22547,7 @@
           "text": "このカードが表向きでライブカード置き場に置かれたとき",
           "location": "live_card_zone",
           "card_type": "live_card",
+          "self_target": true,
           "type": "location_condition"
         },
         "count": 2,
@@ -27703,6 +27727,7 @@
           "location": "success_live_card_zone",
           "card_type": "live_card",
           "check_self": true,
+          "self_target": true,
           "type": "location_condition"
         },
         "duration": "as_long_as",
@@ -27867,6 +27892,7 @@
           "location": "success_live_card_zone",
           "card_type": "live_card",
           "check_self": true,
+          "self_target": true,
           "type": "location_condition"
         },
         "duration": "as_long_as",
@@ -28645,6 +28671,7 @@
           "text": "このカードが手札にある場合",
           "location": "hand",
           "check_self": true,
+          "self_target": true,
           "count": 1,
           "operator": ">=",
           "target": "self",
@@ -28794,7 +28821,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "trigger_condition": {
           "type": "card_count_condition",
@@ -28807,7 +28835,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -28861,7 +28890,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "heart_colors": [
           "heart05"
@@ -28877,7 +28907,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },
@@ -28905,7 +28936,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         },
         "action": "sequential",
         "actions": [
@@ -28936,7 +28968,8 @@
             "discard",
             "stage"
           ],
-          "card_type": "member_card"
+          "card_type": "member_card",
+          "self_target": true
         }
       }
     },

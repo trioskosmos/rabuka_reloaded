@@ -302,7 +302,9 @@ impl AbilityResolver {
                 return Ok(());
             }
 
-            // Legacy: single condition decides between alternative (true) and primary (false).
+            // Legacy: single condition selects alternative (true) or primary (false).
+            // The alternative_effect is the "special case" when the condition is met;
+            // primary_effect is the normal/default case when condition is not met.
             let single_cond = effect
                 .compound
                 .alternative_condition

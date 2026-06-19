@@ -80,16 +80,14 @@ fn bouken_three_options() {
 }
 
 /// Kotori (PL!-bp5-003-R+): 起動 — conditional_alternative
-/// Discard non-μ's → retrieve 1 live card from discard.
-/// Tests: conditional_alternative reads effect.condition fallback,
-///        auto-evaluates without prompting, executes alt effect.
+/// Discard μ's → look at top 4, add 2 to hand, discard rest.
 #[test]
-fn kotori_discard_non_muse_retrieve_live() {
+fn kotori_discard_muse_look_and_select() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
     let filler = game.id("PL!-sd1-010-SD");
     let kotori = game.id("PL!-bp5-003-R\u{ff0b}");
-    let nm = game.id("PL!-sd1-003-SD");
+    let muse_card = game.id("PL!-sd1-010-SD");
     let live = game.id("PL!-sd1-019-SD");
 
     for p in [&mut game.state.player1, &mut game.state.player2] {
@@ -99,18 +97,81 @@ fn kotori_discard_non_muse_retrieve_live() {
         }
     }
     game.state.player1.stage.stage = [kotori, filler, -1];
-    game.state.player1.hand.cards.push(nm);
+    game.state.player1.hand.cards.push(muse_card);
     game.state.player1.waitroom.cards.push(live);
     game.give_energy(10);
     game.state.turn_number = 1;
 
     game.activate_ability(kotori);
-    while game.state.has_pending_choice() {
-        game.select_indices(&[0]);
+
+    // Cost: discard 1 from hand
+    assert!(game.has_pending_choice(), "Discard prompt expected");
+    game.select_indices(&[0]);
+
+    // Primary effect: look at top 4, select 2 to hand
+    assert!(
+        game.has_pending_choice(),
+        "Look-and-select prompt expected for primary effect"
+    );
+
+    let choice = game.get_pending_choice();
+    match choice {
+        rabuka_engine::ability::types::Choice::SelectCard { zone, count, .. } => {
+            assert_eq!(zone, "looked_at", "Should select from looked_at cards");
+            assert_eq!(*count, 2, "Should select 2 cards");
+        }
+        _ => panic!("Expected SelectCard for look-and-select, got {:?}", choice),
     }
-    while game.state.has_pending_choice() {
-        game.select_option(1);
+
+    game.select_indices(&[0, 1]);
+    assert!(!game.has_pending_choice(), "No remaining prompts");
+
+    // 2 looked-at cards moved to hand, 2 discarded
+    assert_eq!(game.state.player1.hand.cards.len(), 2, "2 selected to hand");
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live),
+        "Live card stays in discard (primary effect ran, not alternative)"
+    );
+    assert!(
+        game.state.player1.waitroom.cards.contains(&live),
+        "Live card stays in discard (primary effect ran, not alternative)"
+    );
+}
+
+/// Kotori (PL!-bp5-003-R+): 起動 — conditional_alternative
+/// Discard non-μ's → retrieve 1 live card from discard.
+#[test]
+fn kotori_discard_non_muse_retrieve_live() {
+    let db = load_real_database();
+    let mut game = TestGame::new(db);
+    let filler = game.id("PL!-sd1-010-SD");
+    let kotori = game.id("PL!-bp5-003-R\u{ff0b}");
+    let non_muse = game.id("PL!S-bp2-009-R");
+    let live = game.id("PL!-sd1-019-SD");
+
+    for p in [&mut game.state.player1, &mut game.state.player2] {
+        p.main_deck.cards.clear();
+        for _ in 0..40 {
+            p.main_deck.cards.push(filler);
+        }
     }
+    game.state.player1.stage.stage = [kotori, filler, -1];
+    game.state.player1.hand.cards.push(non_muse);
+    game.state.player1.waitroom.cards.push(live);
+    game.give_energy(10);
+    game.state.turn_number = 1;
+
+    game.activate_ability(kotori);
+
+    // Cost: discard 1 from hand
+    assert!(game.has_pending_choice(), "Discard prompt expected");
+    game.select_indices(&[0]);
+
+    // Alternative effect: retrieve live from discard (no further prompts)
+    assert!(
+        !game.has_pending_choice(),
+        "No prompts after discard — alternative effect auto-retrieves"
+    );
 
     assert!(
         game.state.player1.hand.cards.contains(&live),
