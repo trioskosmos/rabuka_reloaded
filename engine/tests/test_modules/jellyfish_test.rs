@@ -57,8 +57,8 @@ fn jellyfish_q99_two_qualifying_members_reduce_by_2() {
     advance_to_live_card_set_p1(&mut game);
 
     // Record appearances AFTER phase advancement (Active phase resets tracking)
-    game.state.record_card_appearance(member_a);
-    game.state.record_card_appearance(member_b);
+    game.state.record_card_appearance(member_a, "");
+    game.state.record_card_appearance(member_b, "");
 
     game.set_live_card(jellyfish);
     advance_to_live_start(&mut game);
@@ -89,7 +89,7 @@ fn jellyfish_q98_same_card_appeared_and_moved_counts_once() {
     game.state.player1.stage.stage = [member, -1, -1];
 
     // Record as BOTH appeared AND moved (OR logic should still count 1)
-    game.state.record_card_appearance(member);
+    game.state.record_card_appearance(member, "");
     game.state.record_card_movement(member);
 
     game.state.player1.hand.cards.push(jellyfish);

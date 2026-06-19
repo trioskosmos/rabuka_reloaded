@@ -1666,7 +1666,8 @@ impl AbilityResolver {
             }
         };
 
-        gs.record_card_appearance(card_id);
+        let source = self.spawn_context.source.as_deref().unwrap_or("");
+        gs.record_card_appearance(card_id, source);
 
         let card = gs.card_database.get_card(card_id).cloned();
         if let Some(card) = card {

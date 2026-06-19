@@ -622,7 +622,7 @@ impl super::TurnEngine {
                     player.waitroom.cards.last().copied()
                 });
             game_state.active_player_mut().debut_count_this_turn += 1;
-            game_state.record_card_appearance(card_id);
+            game_state.record_card_appearance(card_id, "hand");
             game_state.baton_touch_arriving_card_id = Some(card_id);
 
             Self::trigger_debut_abilities(game_state, &player_id, &card_no, final_cost, true);
@@ -666,7 +666,7 @@ impl super::TurnEngine {
         game_state.baton_touch_replaced_member_id = replaced_member_id;
 
         game_state.active_player_mut().debut_count_this_turn += 1;
-        game_state.record_card_appearance(card_id);
+        game_state.record_card_appearance(card_id, "hand");
 
         if baton_touch_used {
             game_state.record_baton_touch();

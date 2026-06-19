@@ -1181,6 +1181,9 @@ def _try_appearance(text):
     result = {"type": "appearance_condition", "appearance": True, "text": text}
     # Default to stage since abilities almost always check member appearance
     result["location"] = "stage"
+    # Detect "appeared from waiting room" (控え室から登場)
+    if "控え室から" in text:
+        result["appearance_source"] = "discard"
     # Extract subject character (the one before が/を登場)
     # Pattern: 「X」が登場 → X is the subject
     # Pattern: 「A」よりコストの(大きい|高い)「B」が登場 → B is the subject
@@ -1913,7 +1916,6 @@ def _infer_condition_type(condition, text):
 def parse_condition(text: str) -> Dict[str, Any]:
     """Parse a condition text using priority-ordered handler cascade."""
     text = strip_parenthetical(text)
-
     # Try early-return handlers (most specific first)
     for handler in [
         _try_complex,
@@ -8153,6 +8155,25 @@ def process_abilities(data: Dict[str, Any]) -> Dict[str, Any]:
         ):
             eff["trigger_condition"] = copy.deepcopy(eff["condition"])
             fix_stats["auto_trigger"] += 1
+
+    # FIX 14: appearance_source — add "discard" for 控え室から登場 conditions
+    def _add_appearance_source(d):
+        if isinstance(d, dict):
+            if d.get("type") == "appearance_condition" and "控え室から" in d.get(
+                "text", ""
+            ):
+                if "appearance_source" not in d:
+                    d["appearance_source"] = "discard"
+                    fix_stats["appearance_source"] = (
+                        fix_stats.get("appearance_source", 0) + 1
+                    )
+            for v in d.values():
+                _add_appearance_source(v)
+        elif isinstance(d, list):
+            for item in d:
+                _add_appearance_source(item)
+
+    _add_appearance_source(data["unique_abilities"])
 
     # ============== POST-PROCESSING ==============
 

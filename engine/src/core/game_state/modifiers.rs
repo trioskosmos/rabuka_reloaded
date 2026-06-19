@@ -621,16 +621,27 @@ impl GameState {
         self.areas_placed_this_turn.clear();
     }
 
-    pub fn record_card_appearance(&mut self, card_id: i16) {
+    pub fn record_card_appearance(&mut self, card_id: i16, source: &str) {
         self.cards_appeared_this_turn.insert(card_id);
+        if !source.is_empty() {
+            self.card_appearance_source
+                .insert(card_id, source.to_string());
+        }
     }
 
     pub fn has_card_appeared_this_turn(&self, card_id: i16) -> bool {
         self.cards_appeared_this_turn.contains(&card_id)
     }
 
+    pub fn get_card_appearance_source(&self, card_id: i16) -> Option<&str> {
+        self.card_appearance_source
+            .get(&card_id)
+            .map(|s| s.as_str())
+    }
+
     pub fn clear_card_appearance_tracking(&mut self) {
         self.cards_appeared_this_turn.clear();
+        self.card_appearance_source.clear();
     }
 
     pub fn set_turn_order_changed(&mut self, changed: bool) {

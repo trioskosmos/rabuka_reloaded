@@ -1,6 +1,6 @@
 {
   "schema": "extracted_abilities.v1",
-  "generated_at": "2026-06-20T00:39:37.080175",
+  "generated_at": "2026-06-20T01:07:39.919919",
   "generated_by": "tools/ability_extraction/extract_card_abilities.py",
   "source_file": "C:\\Users\\trios\\OneDrive\\Documents\\rabuka_reloaded\\cards\\cards.json",
   "statistics": {
@@ -16463,7 +16463,8 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "控え室から登場している場合",
-          "location": "stage"
+          "location": "stage",
+          "appearance_source": "discard"
         },
         "cost_limit": 13,
         "cost_limit_operator": ">=",
@@ -16622,7 +16623,8 @@
               "type": "appearance_condition",
               "appearance": true,
               "text": "控え室から登場している場合",
-              "location": "stage"
+              "location": "stage",
+              "appearance_source": "discard"
             },
             "action": "gain_resource",
             "resource": "blade",
@@ -28084,7 +28086,8 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "控え室から登場している場合",
-          "location": "stage"
+          "location": "stage",
+          "appearance_source": "discard"
         },
         "action": "sequential",
         "actions": [
@@ -28166,7 +28169,8 @@
           "type": "appearance_condition",
           "appearance": true,
           "text": "控え室から登場している場合",
-          "location": "stage"
+          "location": "stage",
+          "appearance_source": "discard"
         },
         "look_action": {
           "text": "自分のデッキの上からカードを3枚見る。",

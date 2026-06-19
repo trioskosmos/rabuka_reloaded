@@ -1986,6 +1986,17 @@ impl<'a> ConditionContext<'a> {
                             true
                         }
                     } else {
+                        // Check appearance_source if specified
+                        if let Some(ref expected_source) = condition.appearance_source {
+                            let card_to_check = self.activating_card_id;
+                            let ok = card_to_check.map_or(false, |cid| {
+                                self.game_state.get_card_appearance_source(cid)
+                                    == Some(expected_source.as_str())
+                            });
+                            if !ok {
+                                return false;
+                            }
+                        }
                         log::debug!(
                             "[APPEARANCE] no characters filter, stage_ids={:?}",
                             stage_ids

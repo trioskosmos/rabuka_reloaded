@@ -1293,6 +1293,8 @@ pub struct Condition {
     pub phase: Option<String>,
     pub comparison_type: Option<String>,
     pub appearance: Option<bool>,
+    #[serde(default)]
+    pub appearance_source: Option<String>,
     pub conditions: Option<Vec<Condition>>,
     pub options: Option<Vec<AbilityEffect>>,
     #[serde(default)]

@@ -308,7 +308,7 @@ fn fuyumari_appear_triggers_opponent_wait() {
     game.state.player2.stage.stage[0] = target;
 
     // Simulate 登場: card appeared and moved this turn
-    game.state.record_card_appearance(fuyumari);
+    game.state.record_card_appearance(fuyumari, "");
     game.state.record_card_movement(fuyumari);
 
     let pid = game.state.player1.id.clone();
@@ -379,7 +379,7 @@ fn fuyumari_blade_limit_excludes_high_blade() {
     game.state.player1.stage.stage[0] = fuyumari;
     game.state.player2.stage.stage[0] = high_blade;
 
-    game.state.record_card_appearance(fuyumari);
+    game.state.record_card_appearance(fuyumari, "");
     game.state.record_card_movement(fuyumari);
 
     let pid = game.state.player1.id.clone();
@@ -417,7 +417,7 @@ fn fuyumari_already_wait_excluded_from_candidates() {
     // Mark target as already in wait state
     game.state.mods.add_orientation_modifier(target, "wait");
 
-    game.state.record_card_appearance(fuyumari);
+    game.state.record_card_appearance(fuyumari, "");
     game.state.record_card_movement(fuyumari);
 
     let pid = game.state.player1.id.clone();
@@ -456,7 +456,7 @@ fn fuyumari_waits_only_one_member() {
     game.state.player2.stage.stage[0] = target_a;
     game.state.player2.stage.stage[1] = target_b;
 
-    game.state.record_card_appearance(fuyumari);
+    game.state.record_card_appearance(fuyumari, "");
     game.state.record_card_movement(fuyumari);
 
     let pid = game.state.player1.id.clone();

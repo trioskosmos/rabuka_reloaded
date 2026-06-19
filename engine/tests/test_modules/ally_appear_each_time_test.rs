@@ -30,12 +30,12 @@ fn setup_each_time_test(game: &mut TestGame, card_id: i16, position: usize, ally
         let ally_pos = if position == 0 { 1 } else { 0 };
         game.state.player1.stage.stage[ally_pos] = a;
         // Record the appearance
-        game.state.record_card_appearance(a);
+        game.state.record_card_appearance(a, "");
     }
 }
 
 fn record_appearance(game: &mut TestGame, cid: i16) {
-    game.state.record_card_appearance(cid);
+    game.state.record_card_appearance(cid, "");
 }
 
 fn trigger(v: &mut TestGame) {
