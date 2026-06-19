@@ -2096,14 +2096,6 @@ impl AbilityResolver {
                     .and_then(|ef| ef.compound.select_action.clone())
             });
         let current = self.current_effect.as_ref();
-        eprintln!("[HSC_LA] target={} cur_eff={:?} cur_dest={:?} cur_discard={:?} cur_place={:?} sel_act_dest={:?}",
-            target,
-            current.map(|c| &c.action),
-            current.and_then(|c| c.destination.as_deref()),
-            current.and_then(|c| c.discard_remaining),
-            current.and_then(|c| c.placement_order.as_deref()),
-            select_action.as_ref().and_then(|sa| sa.destination.as_deref()),
-        );
         let (destination, discard_remaining, placement_order) = (
             select_action
                 .as_ref()
@@ -2223,7 +2215,6 @@ impl AbilityResolver {
         }
 
         let player = gs.resolve_target_player_mut(&target);
-        log::debug!("[PLACE] dest={} cards={:?}", destination, selected_cards);
         for card_id in selected_cards {
             util::place_card_in_zone(player, card_id, &destination, None, false, 1);
         }

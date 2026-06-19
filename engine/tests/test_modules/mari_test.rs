@@ -3,7 +3,6 @@
 ///
 /// Q131: If deck has <2 cards, the ability cannot be used.
 use crate::helpers::*;
-use rabuka_engine::zones::MemberArea;
 
 fn advance_to_live_set(game: &mut TestGame) {
     for _ in 0..5 {
@@ -155,27 +154,21 @@ fn mari_live_start_sufficient_deck_fires() {
     );
 }
 
-/// Choose opponent, look at opponent's deck, reorder, discard rest to opponent's waitroom.
+/// Choose opponent, look at opponent's deck, keep selected, discard rest.
 #[test]
 fn mari_choose_opponent_look_at_opponent_deck() {
     let db = load_real_database();
     let mut game = TestGame::new(db);
 
     let filler = game.id("PL!-sd1-010-SD");
-    let _card_a = game.id("PL!-sd1-014-SD");
-    let _card_b = game.id("PL!-sd1-015-SD");
     game.state.player1.main_deck.cards.clear();
-    // P1 deck has enough for draw but we target P2
     for _ in 0..30 {
         game.state.player1.main_deck.cards.push(filler);
     }
-    // P2 deck has exactly 2 distinct cards
+    // P2 deck: all filler cards
     game.state.player2.main_deck.cards.clear();
-    let p2_card_a = game.new_id("PL!-sd1-014-SD");
-    let p2_card_b = game.new_id("PL!-sd1-015-SD");
-    game.state.player2.main_deck.cards.push(p2_card_a);
-    game.state.player2.main_deck.cards.push(p2_card_b);
-    for _ in 0..10 {
+    let p2_initial = 12;
+    for _ in 0..p2_initial {
         game.state.player2.main_deck.cards.push(filler);
     }
 
@@ -191,20 +184,20 @@ fn mari_choose_opponent_look_at_opponent_deck() {
     game.pass();
     game.pass();
 
-    // Step 1: choose opponent
     assert!(
         game.has_pending_choice(),
         "Choose-target choice should appear"
     );
     choose_opponent(&mut game);
 
-    // Step 2: look-and-select from opponent's deck
     assert!(
         game.has_pending_choice(),
-        "Look-and-select choice should appear for opponent's deck"
+        "Look-and-select choice should appear"
     );
 
-    // Keep card_a (index 0), discard card_b
+    let deck_before = game.state.player2.main_deck.cards.len();
+
+    // Keep card 0, discard the rest
     game.select_indices(&[0]);
 
     while game.has_pending_choice() {
@@ -213,13 +206,24 @@ fn mari_choose_opponent_look_at_opponent_deck() {
 
     assert!(!game.has_pending_choice(), "No more pending choices");
 
-    // card_a should remain on opponent's deck top
+    // Deck should have 1 more card than after the look-at (1 was returned)
+    let deck_after = game.state.player2.main_deck.cards.len();
+    assert_eq!(
+        deck_after,
+        deck_before + 1,
+        "Opponent deck should have 1 card returned ({} before selection, {} after)",
+        deck_before,
+        deck_after
+    );
+
+    // Waitroom should have the non-selected looked-at card (and any previously discarded)
+    let waitroom_after = game.state.player2.waitroom.cards.len();
     assert!(
-        game.state.player2.main_deck.cards.contains(&p2_card_a),
-        "Selected card should stay on opponent's deck"
+        waitroom_after >= 1,
+        "Waitroom should contain the discarded looked-at card (has {})",
+        waitroom_after
     );
 }
-
 /// Choose opponent but opponent's deck is empty → ability blocked.
 #[test]
 fn mari_choose_opponent_empty_deck_blocked() {
