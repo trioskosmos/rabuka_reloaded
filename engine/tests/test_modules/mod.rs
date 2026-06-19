@@ -127,6 +127,7 @@ pub mod remaining_quick_test;
 pub mod ren_bp4_test;
 pub mod ren_test;
 pub mod riko_test;
+pub mod rin_bp6_test;
 pub mod rin_test;
 pub mod rina_bp3_debut_test;
 pub mod rina_bp3_test;

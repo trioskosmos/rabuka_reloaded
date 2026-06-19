@@ -616,7 +616,26 @@ function renderLiveCards(result) {
                                     ${cd?.img ? `<div class="perf-live-art-wrapper lg"><img src="${fixImg(cd.img)}" alt="${escapeHtml(cd?.name || 'Live')}"></div>` : ''}
                                     <div>
                                         <h4>${escapeHtml(cd?.name || 'Live')}</h4>
-                                        <div class="perf-live-card-meta">Score ${totalScore}</div>
+                                        <div class="perf-breakdown-row total">
+                                            <span class="perf-mini-heading"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Score</span>
+                                            <span class="perf-breakdown-detail">Base ${baseScore}</span>
+                                            ${bonusScore > 0 ? `<span class="perf-breakdown-detail">+${bonusScore} abilities</span>` : ''}
+                                            <span class="perf-breakdown-sum">${totalScore}</span>
+                                        </div>
+                                        ${bonusScore > 0 ? `
+                                        <div class="perf-breakdown-bonuses">
+                                            ${(result?.breakdown?.scores || []).filter(s => s.value > 0).map((sLine) => {
+                                                const srcAbility = findAbilitySource(triggered, sLine.source);
+                                                const sourceLabel = srcAbility ? `${escapeHtml(srcAbility.card_name || '')}` : escapeHtml(sLine.source);
+                                                return `
+                                                    <div class="perf-bonus-item compact">
+                                                        <div class="perf-bonus-title"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${sourceLabel} +${sLine.value}</div>
+                                                        ${srcAbility?.effect_text ? `<div class="perf-bonus-text">${enrichText(srcAbility.effect_text)}</div>` : ''}
+                                                    </div>
+                                                `;
+                                            }).join('')}
+                                        </div>
+                                        ` : ''}
                                     </div>
                                 </div>
                                 <div class="perf-status-pill ${live?.passed ? 'success' : 'failure'}">${live?.passed ? 'PASS' : 'FAIL'}</div>
@@ -637,27 +656,6 @@ function renderLiveCards(result) {
                                     ${renderHeartsCompact(spare)}
                                     <span class="perf-breakdown-sum">${sumHearts(spare)}</span>
                                 </div>
-                                <div class="perf-breakdown-divider"></div>
-                                <div class="perf-breakdown-row total">
-                                    <span class="perf-mini-heading"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> Score</span>
-                                    <span class="perf-breakdown-detail">Base ${baseScore}</span>
-                                    ${bonusScore > 0 ? `<span class="perf-breakdown-detail">+${bonusScore} abilities</span>` : ''}
-                                    <span class="perf-breakdown-sum">${totalScore}</span>
-                                </div>
-                                ${bonusScore > 0 ? `
-                                <div class="perf-breakdown-bonuses">
-                                    ${(result?.breakdown?.scores || []).filter(s => s.value > 0).map((sLine) => {
-                                        const srcAbility = findAbilitySource(triggered, sLine.source);
-                                        const sourceLabel = srcAbility ? `${escapeHtml(srcAbility.card_name || '')}` : escapeHtml(sLine.source);
-                                        return `
-                                            <div class="perf-bonus-item compact">
-                                                <div class="perf-bonus-title"><img src="img/texticon/icon_score.png" class="heart-mini-icon"> ${sourceLabel} +${sLine.value}</div>
-                                                ${srcAbility?.effect_text ? `<div class="perf-bonus-text">${enrichText(srcAbility.effect_text)}</div>` : ''}
-                                            </div>
-                                        `;
-                                    }).join('')}
-                                </div>
-                                ` : ''}
                             </div>
                             ${required[0] > 0 ? `<div class="perf-heart-legend" style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;"><img src="img/texticon/heart_00.png" class="heart-mini-icon" style="width:12px;height:12px;"> Any hearts fill deficits of any color</div>` : ''}
                             ${adjustments && adjustments.length > 0 ? `
@@ -725,15 +723,24 @@ function renderContributionSection(result) {
                                 ${memberImg ? `<img src="${memberImg}" class="perf-contrib-art" alt="${escapeHtml(memberName)}">` : ''}
                                 <div>
                                     <h4>${escapeHtml(memberName)}</h4>
-                                    <div class="perf-live-card-meta">${slot}</div>
+                                    <div class="perf-breakdown-row total">
+                                        <span class="perf-mini-heading">Total hearts</span>
+                                        ${renderHeartsCompact(total)}
+                                        <span class="perf-breakdown-sum">${sumHearts(total)}</span>
+                                    </div>
+                                    ${heartBonuses.length > 0 ? `
+                                    <div class="perf-breakdown-bonuses">
+                                        ${heartBonuses.map((bonus) => `
+                                            <div class="perf-bonus-item compact">
+                                                <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 0] || 'heart')}</div>
+                                                ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                    ` : ''}
                                 </div>
                             </div>
                             <div class="perf-stage-breakdown">
-                                <div class="perf-breakdown-row total">
-                                    <span class="perf-mini-heading">Total hearts</span>
-                                    ${renderHeartsCompact(total)}
-                                    <span class="perf-breakdown-sum">${sumHearts(total)}</span>
-                                </div>
                                 <div class="perf-breakdown-subrows">
                                     <div class="perf-breakdown-row sub">
                                         <span class="perf-mini-heading">Base hearts</span>
@@ -746,16 +753,6 @@ function renderContributionSection(result) {
                                     </div>
                                     ` : ''}
                                 </div>
-                                ${heartBonuses.length > 0 ? `
-                                <div class="perf-breakdown-bonuses">
-                                    ${heartBonuses.map((bonus) => `
-                                        <div class="perf-bonus-item compact">
-                                            <div class="perf-bonus-title">${escapeHtml(bonus?.source || 'Effect')} +${bonus?.amount || 0} ${escapeHtml(HEART_LABELS[bonus?.color ?? 0] || 'heart')}</div>
-                                            ${bonus?.ability_text ? `<div class="perf-bonus-text">${enrichText(bonus.ability_text)}</div>` : ''}
-                                        </div>
-                                    `).join('')}
-                                </div>
-                                ` : ''}
                                 <div class="perf-breakdown-row">
                                     <span class="perf-mini-heading">Blades</span>
                                     ${renderBladesCompact(totalBlade)}
@@ -786,26 +783,25 @@ function renderContributionSection(result) {
                     <div class="perf-contrib-header">
                         <div>
                             <h4>Global Bonuses</h4>
-                            <div class="perf-live-card-meta">Effects not tied to a single member</div>
+                            <div class="perf-breakdown-bonuses">
+                                ${triggered.map((ability) => {
+                                    const effectText = ability?.effect_text || '';
+                                    const condText = ability?.condition_text || '';
+                                    const abilityDisplay = effectText ? enrichText(effectText) : '';
+                                    const condDisplay = condText ? enrichText(condText) : '';
+                                    const triggeredType = effectText.includes('ライブ開始時') || effectText.includes('live_start') ? 'live_start' :
+                                        effectText.includes('ライブ成功時') || effectText.includes('live_success') ? 'live_success' :
+                                        effectText.includes('常時') || effectText.includes('jyouji') ? 'jyouji' : '';
+                                    return `
+                                        <div class="perf-bonus-item compact">
+                                            <div class="perf-bonus-title">${escapeHtml(ability?.card_name || 'Ability')} ${triggeredType ? `<span class="effect-duration">[${escapeHtml(triggeredType)}]</span>` : ''}</div>
+                                            ${abilityDisplay ? `<div class="perf-bonus-text">${abilityDisplay}</div>` : ''}
+                                            ${condDisplay ? `<div class="perf-ability-condition">Condition: ${condDisplay}</div>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
                         </div>
-                    </div>
-                    <div class="perf-breakdown-bonuses">
-                        ${triggered.map((ability) => {
-                            const effectText = ability?.effect_text || '';
-                            const condText = ability?.condition_text || '';
-                            const abilityDisplay = effectText ? enrichText(effectText) : '';
-                            const condDisplay = condText ? enrichText(condText) : '';
-                            const triggeredType = effectText.includes('ライブ開始時') || effectText.includes('live_start') ? 'live_start' :
-                                effectText.includes('ライブ成功時') || effectText.includes('live_success') ? 'live_success' :
-                                effectText.includes('常時') || effectText.includes('jyouji') ? 'jyouji' : '';
-                            return `
-                                <div class="perf-bonus-item compact">
-                                    <div class="perf-bonus-title">${escapeHtml(ability?.card_name || 'Ability')} ${triggeredType ? `<span class="effect-duration">[${escapeHtml(triggeredType)}]</span>` : ''}</div>
-                                    ${abilityDisplay ? `<div class="perf-bonus-text">${abilityDisplay}</div>` : ''}
-                                    ${condDisplay ? `<div class="perf-ability-condition">Condition: ${condDisplay}</div>` : ''}
-                                </div>
-                            `;
-                        }).join('')}
                     </div>
                 </article>
                 ` : ''}

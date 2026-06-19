@@ -186,7 +186,7 @@ export const ChoiceView = {
                     if (a.action_type === 'Pass') return;
                     const cardNo = a.parameters?.card_no;
                     const resolved = cardNo ? State.resolveCardData(cardNo) : null;
-                    const cardData = cardNo ? (resolved || { card_no: cardNo }) : null;
+                    const cardData = cardNo ? resolved : null;
                     // Text-only action (yes/no/skip/digit) → render as text button, not empty card
                      const isTextAction = cardNo === '-1' || (cardNo && !cardData);
                     let name = cardData?.name || a.parameters?.card_name || a.description || '';

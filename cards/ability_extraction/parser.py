@@ -2375,7 +2375,13 @@ def _fill_defaults(action, text, _cached_source=None, _cached_dest=None):
             r"(ライブカード|メンバーカード|エネルギーカード).*と.*(ライブカード|メンバーカード|エネルギーカード)",
             text,
         ):
-            and_types = [t for t, kw in card_type_kws if kw in text]
+            and_types = [
+                t
+                for kw, t in sorted(
+                    [(kw, t) for t, kw in card_type_kws if kw in text],
+                    key=lambda x: text.index(x[0]),
+                )
+            ]
             if (
                 len(and_types) >= 2
                 and action.get("source")
